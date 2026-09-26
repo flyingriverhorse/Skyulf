@@ -227,13 +227,20 @@ def _warn_large_output(output_cols: int, threshold: int = 10_000) -> str | None:
     return None
 
 
+def _vectorizer_dense(text: Any, vectorizer: Any, output_width: int) -> np.ndarray:
+    """Preserve the fitted feature schema for empty evaluation partitions."""
+    if len(text) == 0:
+        return np.empty((0, output_width), dtype=vectorizer.dtype)
+    encoded = vectorizer.transform(text)
+    return np.asarray(encoded.toarray() if hasattr(encoded, "toarray") else encoded)
+
+
 def _vectorizer_transform_to_frame(
     X: pd.DataFrame, vectorizer: Any, valid_cols: list[str], output_columns: list[str]
 ) -> pd.DataFrame:
     """Transform text columns with a fitted vectorizer into a dense output frame."""
     text = _join_text_columns(X, valid_cols)
-    encoded = vectorizer.transform(text)
-    dense = encoded.toarray() if hasattr(encoded, "toarray") else encoded
+    dense = _vectorizer_dense(text, vectorizer, len(output_columns))
     return pd.DataFrame(
         dense,
         columns=output_columns,  # ty: ignore[invalid-argument-type]
@@ -321,7 +328,6 @@ def _sklearn_vectorizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     if text is None:
         return None
 
-    encoded = vectorizer.transform(text.to_list())
-    dense = encoded.toarray() if hasattr(encoded, "toarray") else encoded
+    dense = _vectorizer_dense(text.to_list(), vectorizer, len(output_columns))
     encoded_frame = pl.from_numpy(np.asarray(dense), schema=output_columns)
     return _drop_and_concat_polars(X, encoded_frame, valid_cols, drop_original)

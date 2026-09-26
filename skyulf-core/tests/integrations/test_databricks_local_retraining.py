@@ -1,7 +1,11 @@
 """Label-aware local candidate training from pinned Databricks snapshots."""
 
+import subprocess
+import sys
 from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -171,7 +175,9 @@ def test_failed_candidate_never_mutates_champion(monkeypatch, tmp_path):
     monkeypatch.setattr(
         retraining,
         "fit_local_workflow",
-        lambda *args, **kwargs: SimpleNamespace(manifest=SimpleNamespace(pipeline_sha256="a" * 64)),
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest=SimpleNamespace(pipeline_sha256="a" * 64, project_source_sha256=None)
+        ),
     )
     monkeypatch.setattr(
         retraining, "evaluate_local_holdout", lambda *args, **kwargs: {"heldout_rmse": 0.1}
@@ -223,7 +229,9 @@ def test_invalid_comparison_request_fails_before_mlflow_publication(monkeypatch,
     monkeypatch.setattr(
         retraining,
         "fit_local_workflow",
-        lambda *args, **kwargs: SimpleNamespace(manifest=SimpleNamespace(pipeline_sha256="a" * 64)),
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest=SimpleNamespace(pipeline_sha256="a" * 64, project_source_sha256=None)
+        ),
     )
     monkeypatch.setattr(
         retraining, "evaluate_local_holdout", lambda *args, **kwargs: {"heldout_rmse": 0.1}
@@ -331,3 +339,138 @@ def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_pa
     assert next_result.comparison.eligible is False
     with pytest.raises(Exception, match="alias|Alias"):
         client.get_model_version_by_alias(result.model_name, "champion")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_saved_filter_evidence_replays_after_project_file_changes(monkeypatch, tmp_path, engine):
+    """Approval must recover the original filtered cohort from saved artifacts."""
+    import hashlib
+    import json
+
+    import mlflow
+
+    from skyulf.integrations.databricks import local_approval
+    from skyulf.integrations.databricks.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.project import load_project_workflow
+
+    source = tmp_path / "preprocessing.py"
+    source.write_text(
+        "def build_preprocessing():\n"
+        "    return [{'name': 'scale', 'transformer': 'StandardScaler', "
+        "'params': {'columns': ['x']}}]\n"
+        "def build_pre_split_steps():\n"
+        "    return [{'name': 'eligible', 'transformer': 'ManualBounds', "
+        "'params': {'bounds': {'x': {'lower': 1}}}}]\n",
+        encoding="utf-8",
+    )
+    project = load_project_workflow(
+        {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
+        source,
+    )
+    frame = pd.DataFrame(
+        {
+            "id": range(20),
+            "event_time": pd.to_datetime(["2026-01-10"] * 15 + ["2026-02-10"] * 5, utc=True),
+            "label_at": pd.to_datetime(["2026-01-11"] * 15 + ["2026-02-11"] * 5, utc=True),
+            "x": pd.Series(range(20), dtype="float64"),
+            "target": pd.Series([2 * value for value in range(20)], dtype="float64"),
+        }
+    )
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda spark, request: frame)
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
+    client.create_experiment("filter_evidence", artifact_location=(tmp_path / "mlruns").as_uri())
+    result = retraining.train_local_candidate(
+        None,
+        _spec(max_rows=20, max_bytes=30000, pre_split_steps=tuple(project["pre_split_steps"])),
+        project["pipeline"],
+        model_name=f"filter_evidence_{engine}",
+        tracking_uri=store,
+        registry_uri=store,
+        experiment_name="filter_evidence",
+        run_name=engine,
+        artifact_path=tmp_path / "artifact",
+        metric="heldout_rmse",
+        min_improvement=0,
+        engine=engine,
+        cv=LocalCVSpec(enabled=True, folds=2),
+    )
+    source.write_text("def build_preprocessing():\n    return []\n", encoding="utf-8")
+    digest = hashlib.sha256(
+        json.dumps(asdict(result.comparison), sort_keys=True, allow_nan=False).encode()
+    ).hexdigest()
+    report, saved, saved_engine, evidence = local_approval._load_evidence(
+        client, result.model_name, result.model_version, digest
+    )
+    _, holdout, _ = retraining.split_labeled_snapshot(frame, saved, engine=saved_engine)
+    assert evidence is not None
+    local_approval.validate_training_evidence(
+        evidence, saved, project_source_sha256=evidence["project_source_sha256"], heldout=holdout
+    )
+    artifacts = {item.path for item in client.list_artifacts(result.run_id)}
+    assert report.dataset_id == saved.dataset_id
+    assert "training_filter_evidence.json" in artifacts
+    assert "cross_validation.json" in artifacts
+    assert "cv_rmse_mean" in client.get_run(result.run_id).data.metrics
+    assert holdout["x"].tolist() == [15.0, 16.0, 17.0, 18.0, 19.0]
+    assert saved.pre_split_steps == tuple(project["pre_split_steps"])
+
+    downloaded = mlflow.artifacts.download_artifacts(
+        artifact_uri=f"runs:/{result.run_id}/model", tracking_uri=store
+    )
+    code = (
+        "import json, sys, mlflow, pandas as pd\n"
+        "model = mlflow.pyfunc.load_model(sys.argv[1])\n"
+        "print(json.dumps(model.predict(pd.DataFrame({'x': [0., 20.]}))"
+        "['prediction'].tolist()))\n"
+    )
+    fresh = subprocess.run(
+        [sys.executable, "-c", code, downloaded],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert fresh.returncode == 0, fresh.stderr
+    assert json.loads(fresh.stdout) == pytest.approx([0.0, 40.0], abs=1e-8)
+
+    original_download = client.download_artifacts
+
+    def changed_engine(run_id, path, directory):
+        """Model an altered spec artifact while leaving the real model intact."""
+        downloaded = original_download(run_id, path, directory)
+        if path != "candidate_training_spec.json":
+            return downloaded
+        changed = json.loads(Path(downloaded).read_text(encoding="utf-8"))
+        changed["engine"] = "polars" if engine == "pandas" else "pandas"
+        Path(downloaded).write_text(json.dumps(changed), encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", changed_engine)
+    with pytest.raises(ValueError, match="engine"):
+        local_approval._load_evidence(client, result.model_name, result.model_version, digest)
+
+    def changed_counts(run_id, path, directory):
+        """Model an altered filter receipt without changing the pinned comparison."""
+        downloaded = original_download(run_id, path, directory)
+        if path != "training_filter_evidence.json":
+            return downloaded
+        changed = json.loads(Path(downloaded).read_text(encoding="utf-8"))
+        changed["filter_counts"][0]["excluded_rows"] += 1
+        Path(downloaded).write_text(json.dumps(changed), encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", changed_counts)
+    with pytest.raises(ValueError, match="evidence digest"):
+        local_approval._load_evidence(client, result.model_name, result.model_version, digest)
+
+    def null_receipt(run_id, path, directory):
+        """A declared receipt decoded as JSON null must stop approval replay."""
+        downloaded = original_download(run_id, path, directory)
+        if path == "training_filter_evidence.json":
+            Path(downloaded).write_text("null", encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", null_receipt)
+    with pytest.raises(ValueError, match="training filter evidence.*object"):
+        local_approval._load_evidence(client, result.model_name, result.model_version, digest)

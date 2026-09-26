@@ -294,13 +294,13 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         f"Local input limits: {checked['max_rows']} rows, {checked['max_input_mb']} MiB "
         "(not total training memory)",
         "Phase order: source window -> optional seeded sample -> bounded read -> "
-        "availability -> training filters -> final split -> fold-local preprocessing/model.",
+        "availability -> fixed cleanup and training filters -> final split -> fold-local preprocessing/model.",
         "With sampling, availability is selected before the seeded sample; without "
         "sampling, it is selected after the bounded read.",
         f"Final holdout: {checked.get('split_strategy', 'random')} | "
         f"fraction={checked.get('test_size', 0.2)} | start={holdout_start}",
         f"Manual training: {manual_status}",
-        "Training filters (after bounded source read, before final split; edit build_pre_split_steps()):",
+        "Pre-split cleanup (fixed normalization and training eligibility; edit build_pre_split_steps()):",
     ]
     for index, step in enumerate(checked.get("pre_split_steps", []), 1):
         lines.append(
@@ -308,7 +308,11 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
             f"{json.dumps(step.get('params', {}), sort_keys=True)}"
         )
     if not checked.get("pre_split_steps"):
-        lines.append("  No training filters.")
+        lines.append("  No pre-split cleanup steps.")
+    lines.append(
+        "Fixed feature cleanup is saved as a pipeline prefix and applied once to raw model inputs; "
+        "training row exclusions are not repeated during scoring."
+    )
     lines.append("Fold-local preprocessing (after final split; edit build_preprocessing()):")
     for index, step in enumerate(checked["pipeline"].get("preprocessing", []), 1):
         lines.append(

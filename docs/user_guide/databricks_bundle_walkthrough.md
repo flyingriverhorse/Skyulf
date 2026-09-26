@@ -20,9 +20,12 @@ when reviewing another target. Edit preprocessing and custom fit/apply code in
 `src/preprocessing.py`; keep model hyperparameters in `config/workflow.json`.
 Preview executes the trusted recipe without itself fitting or reading data.
 The same file can define `build_pre_split_steps()` for explicit training
-eligibility. It accepts `DropMissingRows` with named columns and optional Core
+eligibility and fixed normalization. It accepts `DropMissingRows` with named columns and optional Core
 `how`, `threshold`, or `missing_threshold` rules; `ManualBounds` requires numeric,
-non-Boolean columns and explicit finite bounds. Learned steps remain in
+non-Boolean columns and explicit finite bounds. Fixed explicit-column
+`ValueReplacement`, `TextCleaning`, `AliasReplacement`,
+`InvalidValueReplacement` and noncategorical `Casting` can precede those filters.
+Learned steps remain in
 `build_preprocessing()`. The order
 is snapshot/window selection, optional seeded source sample, bounded transfer,
 label-availability selection, training filters, final split, then fold-local
@@ -30,11 +33,106 @@ preprocessing and model fit. Sampling selects available labels before its
 seeded key choice; without sampling, availability is selected after the bounded
 transfer. Filtering can shrink the selected sample without refilling it.
 Holdout metrics cover the remaining eligible rows; `pre_split_filters.json`
-records the requested steps and exclusions per step. Preview shows the phase
-order without reading source data or predicting exclusion counts.
+records the requested steps and exclusions per step. The versioned
+`training_filter_evidence.json` also records the Python source and recipe
+digests, ordered sampled, filtered, training and holdout key digests, and row
+counts. Its digest is part of the candidate's comparison identity. Approval
+replays the saved source version and recipe, then checks those populations;
+editing today's Python file does not change an earlier candidate. Preview shows
+the phase order without reading source data or predicting exclusion counts.
 Training saves the Python source with the model, so later file edits do not
-change existing-model inference. Model/node listings come from the Core registry.
+change existing-model inference. These filters select training and evaluation
+rows only. Scoring does not require a target column and can predict rows that
+training excluded. Shared prediction eligibility needs a separate opt-in rule.
+Model/node listings come from the Core registry.
 See [guided setup](databricks_bundle.md#guided-setup-and-offline-preview).
+
+## Choose the preprocessing phase
+
+Both hooks live in `src/preprocessing.py`; leave either list empty when unneeded.
+The hook determines when the existing Core node runs, not which implementation
+of the algorithm is used.
+
+| Operation | Where to put it | Prediction behavior |
+| --- | --- | --- |
+| Fixed replacement, text/alias cleanup, numeric invalid-value rules, noncategorical casts | `build_pre_split_steps()` when eligibility depends on cleaned values; otherwise `build_preprocessing()` | Feature normalization is saved and applied once to raw input |
+| Missing-target or fixed-bounds training eligibility | `build_pre_split_steps()` | Training exclusions are not reapplied to prediction requests |
+| Deduplicate with an explicit subset and keep policy | `build_pre_split_steps()` for the eligible population, or ordinary training-only cleanup | Never remove requested prediction rows |
+| Learned imputation, scaling, encoding, binning, selection | `build_preprocessing()` | Reuse fitted state; CV fits fresh state inside each training fold |
+| Oversampling / undersampling | `build_preprocessing()` | Training/fold rows only; never resample holdout or prediction |
+| Winsorize | `build_preprocessing()` | Clip using fitted limits and retain all prediction rows |
+| Filtering outliers such as IQR or ZScore | `build_preprocessing()` | Prediction fails if the configured transform removes requested rows |
+| Lag / rolling | `build_preprocessing()` with ordered supplied history | No automatic history lookup; sorting must not reorder prediction rows |
+| Text vectorization / geo features | `build_preprocessing()` | Retain fitted vocabulary or fixed feature rules; install optional dependencies where required |
+| DataSnapshot / DatasetProfile | `build_preprocessing()` for training diagnostics | Pass features through unchanged |
+| Train/test split | Workflow split settings | Do not put another splitter inside the recipe |
+
+For example, interpret `-999` as a missing income before deciding which training
+rows to retain:
+
+```python
+def build_pre_split_steps():
+    """Normalize the source sentinel before checking training eligibility."""
+    return [
+        {"name": "income_sentinel", "transformer": "ValueReplacement",
+         "params": {"columns": ["income"], "to_replace": -999, "value": None}},
+        {"name": "known_income", "transformer": "DropMissingRows",
+         "params": {"subset": ["income"]}},
+    ]
+```
+
+Do not repeat `income_sentinel` in `build_preprocessing()`: the training adapter
+saves its feature transformation as a prefix of the model pipeline. Eligibility
+uses a working copy; selected model inputs stay raw so fitting, CV, holdout
+evaluation and prediction each apply the prefix once. A score row with `-999`
+becomes missing but is not dropped. Add an ordinary fitted imputer if the model
+should accept such prediction inputs.
+
+Use explicit column lists. Pre-split normalization cannot edit record keys or
+event/result timestamps. Categorical casts and automatic column selection stay
+after the split. For numeric replacement keys, use `to_replace`/`value` or
+`replacements=[{"old": -999, "new": None}]`; numeric dictionary keys are rejected
+because JSON would turn them into strings. Use `None`, not NaN, in the recipe.
+
+Target-only fixed normalization affects labels used for splitting and metrics;
+it is omitted from the feature pipeline and never requires a target at scoring.
+Models with different saved target-normalization contracts cannot be compared
+or promoted against each other as though their metrics had the same meaning.
+Changing target units or label meanings requires a deliberate new comparison
+baseline, even if the resulting class names happen to match.
+
+### Deduplication and your own training filter
+
+`Deduplicate` requires a named `subset` and supports `keep="first"`, `"last"`,
+or `"none"` (`False` also means none). The source is ordered by active event
+time and then record keys before cleanup. Duplicate groups with different
+target values are rejected instead of silently choosing a label. Source record
+keys must still be unique. This does not create customer-disjoint train/test
+sets; do not deduplicate on customer alone to simulate a group split.
+
+The generated Python file also contains a disabled `example_custom_pre_split`.
+Enable it in `build_pre_split_steps()` after changing the column name:
+
+```python
+def build_pre_split_steps():
+    """Retain known non-test accounts for training and final evaluation."""
+    return [example_custom_pre_split("is_test")]
+```
+
+The example keeps rows whose Boolean flag is `False`; `True` and null rows are
+excluded from training. The flag is read from the source but is not required
+at scoring unless you also choose it as a model input. Edit the supplied
+`EligibilityCalculator` / `EligibilityApplier` for your fixed rule. Its
+`custom_step(..., pre_split={"effect": "filter", "required_columns": ["is_test"],
+"learns_from_data": False})` declaration explicitly opts in to training eligibility.
+
+Runtime guards reject added/reordered rows, missing required inputs, column
+changes, target changes and invalid return types. The declaration is your
+assertion that the code does not learn statistics; it is not automatic proof
+against leakage. Arbitrary custom value normalization is not admitted before
+the split in this release; place it in ordinary preprocessing. Keep the custom
+classes in this same file so saved-source approval can restore their registration
+in a fresh process. Current file edits do not change existing candidates.
 
 Before training, review three separate data settings in `config/workflow.json`:
 `training_window_mode` selects full/fixed/rolling source data, optional
@@ -159,11 +257,13 @@ flowchart TD
     R --> A{Filter unavailable results?}
     T --> A
     A -->|Yes| F[Keep known result dates at or before result cutoff]
-    A -->|No| L[Require all targets to be known]
-    F --> K[Validate labels and stable record keys]
+    A -->|No| L[Use provided result values]
+    F --> K[Validate stable record keys]
     L --> K
-    K --> H[Create disjoint training and final holdout sets]
-    H --> M[Fit preprocessing and model on training rows only]
+    K --> C[Apply fixed cleanup and training eligibility on a working copy]
+    C --> H[Require known targets and create disjoint train and holdout sets]
+    H --> R0[Recover selected raw features and cleaned target]
+    R0 --> M[Apply saved fixed prefix and fit learned preprocessing on training rows]
     M --> E[Evaluate candidate and champion on the same holdout]
     E --> V[Save snapshot, split settings and holdout membership digest]
     V --> O[Approval replays saved evidence before alias change]

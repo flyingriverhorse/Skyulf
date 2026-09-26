@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -52,6 +53,32 @@ def _config():
         "quality_threshold": None,
         "pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}},
     }
+
+
+def _saved_candidate(workflow, monkeypatch, config, report: Any):
+    """Represent a registered candidate with a pinned saved comparison receipt."""
+    candidate = workflow.LocalCandidateResult(
+        run_id="run",
+        model_name=config["model_name"],
+        model_version=report.candidate_version,
+        model_digest="a" * 64,
+        dataset_id="dataset",
+        training_rows=10,
+        holdout_rows=3,
+        unavailable_labels=0,
+        engine=config["engine"],
+        comparison=report,
+        comparison_sha256="b" * 64,
+        holdout_key_sha256="c" * 64,
+    )
+    monkeypatch.setattr(workflow, "_require_mlflow", lambda: object())
+    monkeypatch.setattr(workflow, "_make_client", lambda *args: object())
+    monkeypatch.setattr(
+        workflow,
+        "_load_evidence",
+        lambda *args, **kwargs: (report, workflow._training_spec(config), config["engine"], None),
+    )
+    return candidate
 
 
 def _one_column_schema(kind):
@@ -331,7 +358,7 @@ def test_auto_champion_train_promotes_only_an_eligible_candidate(monkeypatch, tm
     config = _config()
     config.update(model_selection_mode="auto_champion", quality_threshold=1.0, engine="pandas")
     report = SimpleNamespace(champion_version="1", candidate_version="2", eligible=True)
-    candidate = SimpleNamespace(comparison=report, holdout_key_sha256="a" * 64)
+    candidate = _saved_candidate(workflow, monkeypatch, config, report)
     frame = object()
     heldout = object()
     monkeypatch.setattr(workflow, "train_local_candidate", Mock(return_value=candidate))
@@ -364,17 +391,11 @@ def test_auto_champion_train_retains_challenger_when_candidate_fails_gate(monkey
     workflow = _workflow()
     config = _config()
     config.update(model_selection_mode="auto_champion", quality_threshold=1.0, engine="pandas")
+    report = SimpleNamespace(champion_version="1", candidate_version="2", eligible=False)
     monkeypatch.setattr(
         workflow,
         "train_local_candidate",
-        Mock(
-            return_value=SimpleNamespace(
-                holdout_key_sha256="a" * 64,
-                comparison=SimpleNamespace(
-                    champion_version="1", candidate_version="2", eligible=False
-                ),
-            )
-        ),
+        Mock(return_value=_saved_candidate(workflow, monkeypatch, config, report)),
     )
     monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="1"))
     stage = Mock()
@@ -401,19 +422,15 @@ def test_auto_champion_bootstraps_first_model_or_rejects_missing_threshold(monke
     workflow = _workflow()
     config = _config()
     config.update(model_selection_mode="auto_champion", quality_threshold=None, engine="pandas")
-    train = Mock(
-        return_value=SimpleNamespace(
-            holdout_key_sha256="a" * 64,
-            comparison=SimpleNamespace(
-                champion_version=None,
-                candidate_version="1",
-                candidate_metrics={"heldout_rmse": 0.1},
-                metric="heldout_rmse",
-                metric_direction="minimize",
-                quality_threshold=1.0,
-            ),
-        )
+    report = SimpleNamespace(
+        champion_version=None,
+        candidate_version="1",
+        candidate_metrics={"heldout_rmse": 0.1},
+        metric="heldout_rmse",
+        metric_direction="minimize",
+        quality_threshold=1.0,
     )
+    train = Mock(return_value=_saved_candidate(workflow, monkeypatch, config, report))
     monkeypatch.setattr(workflow, "train_local_candidate", train)
     with pytest.raises(ValueError, match="quality_threshold"):
         workflow.run_action(

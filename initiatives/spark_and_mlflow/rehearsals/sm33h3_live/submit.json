@@ -1,0 +1,70 @@
+{
+  "run_name": "skyulf_sm33h3_20260926_r1",
+  "timeout_seconds": 900,
+  "tasks": [
+    {
+      "task_key": "pandas_train",
+      "timeout_seconds": 900,
+      "max_retries": 0,
+      "disable_auto_optimization": true,
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/edwardwolfe99@gmail.com/skyulf_lifecycle_test/sm33h3/r1/rehearsal",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "phase": "pandas_train"
+        }
+      },
+      "environment_key": "skyulf"
+    },
+    {
+      "task_key": "polars_train",
+      "timeout_seconds": 900,
+      "max_retries": 0,
+      "disable_auto_optimization": true,
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/edwardwolfe99@gmail.com/skyulf_lifecycle_test/sm33h3/r1/rehearsal",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "phase": "polars_train"
+        }
+      },
+      "environment_key": "skyulf",
+      "depends_on": [
+        {
+          "task_key": "pandas_train"
+        }
+      ]
+    },
+    {
+      "task_key": "score",
+      "timeout_seconds": 900,
+      "max_retries": 0,
+      "disable_auto_optimization": true,
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/edwardwolfe99@gmail.com/skyulf_lifecycle_test/sm33h3/r1/rehearsal",
+        "source": "WORKSPACE",
+        "base_parameters": {
+          "phase": "score"
+        }
+      },
+      "environment_key": "skyulf",
+      "depends_on": [
+        {
+          "task_key": "polars_train"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "environment_key": "skyulf",
+      "spec": {
+        "client": "4",
+        "dependencies": [
+          "/Workspace/Users/edwardwolfe99@gmail.com/skyulf_lifecycle_test/sm33h3/r1/skyulf_core-0.9.0-py3-none-any.whl",
+          "mlflow==3.16.1"
+        ]
+      }
+    }
+  ]
+}

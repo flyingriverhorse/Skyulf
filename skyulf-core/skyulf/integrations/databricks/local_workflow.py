@@ -23,13 +23,19 @@ from ..mlflow.promotion import (
     rollback_promotion,
     stage_challenger,
 )
-from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
+from ..mlflow.registry import (
+    RegistryModelNotFoundError,
+    _make_client,
+    _require_mlflow,
+    resolve_model,
+)
 from ._contracts import input_budget_bytes
 from .admission import SingleWriterAdmission
-from .local_approval import approve_local_candidate, reject_local_candidate
+from .local_approval import _load_evidence, approve_local_candidate, reject_local_candidate
 from .local_cv import LocalCVSpec
 from .local_incremental import run_incremental_local_batch
 from .local_retraining import (
+    LocalCandidateResult,
     LocalTrainingSpec,
     read_training_snapshot,
     split_labeled_snapshot,
@@ -42,6 +48,7 @@ from .local_sdk import (
     OutputSink,
     prepare_local_workflow,
 )
+from .local_training_evidence import validate_training_evidence
 from .prediction_output import (
     _IDENTIFIER,
     _TABLE_NAME,
@@ -323,10 +330,30 @@ def _automatic_promotion(
     promote: bool = True,
 ) -> AliasChangeReceipt | None:
     """Record contender evidence separately from any optional champion transition."""
+    if not isinstance(candidate, LocalCandidateResult):
+        raise ValueError("Automatic replay requires a saved candidate result.")
     report = candidate.comparison
-    spec = replace(spec, holdout_key_sha256=candidate.holdout_key_sha256)
+    tracking_uri = config.get("tracking_uri", "databricks")
+    registry_uri = config.get("registry_uri", "databricks-uc")
+    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    saved_report, spec, saved_engine, filter_evidence = _load_evidence(
+        client,
+        candidate.model_name,
+        candidate.model_version,
+        candidate.comparison_sha256,
+        registry_uri=registry_uri,
+    )
+    if saved_report != report or saved_engine != config["engine"]:
+        raise ValueError("Saved candidate evidence differs from automatic comparison.")
     frame = read_training_snapshot(spark, spec)
     _, heldout, _ = split_labeled_snapshot(frame, spec, engine=config["engine"])
+    if filter_evidence is not None:
+        validate_training_evidence(
+            filter_evidence,
+            spec,
+            project_source_sha256=filter_evidence["project_source_sha256"],
+            heldout=heldout,
+        )
     native = pl.from_pandas(heldout) if config["engine"] == "polars" else heldout
     options = {
         "target_column": spec.target_column,

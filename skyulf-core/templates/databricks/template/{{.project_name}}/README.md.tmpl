@@ -49,14 +49,19 @@ from the installed Core registry via the list commands above; a registry listing
 does not guarantee every option/dependency is usable in your target environment.
 
 For training eligibility, edit `build_pre_split_steps()` in the same Python
-file. It starts empty and accepts only Core `DropMissingRows` with an explicit
+file. It starts empty and accepts Core `DropMissingRows` with an explicit
 `subset` (and optional `how`, `threshold`, or `missing_threshold`), or
-`ManualBounds` with explicit finite numeric bounds. For example:
+`ManualBounds` with explicit finite numeric bounds. Fixed explicit-column
+`ValueReplacement`, `TextCleaning`, `AliasReplacement`,
+`InvalidValueReplacement` and noncategorical `Casting` can run before the filters.
+They reuse existing Core implementations. For example:
 
 ```python
 def build_pre_split_steps():
     """Keep known targets and plausible ages for training and evaluation."""
     return [
+        {"name": "missing_income", "transformer": "ValueReplacement",
+         "params": {"columns": ["income"], "to_replace": -999, "value": None}},
         {"name": "known_target", "transformer": "DropMissingRows",
          "params": {"subset": ["target"], "how": "any"}},
         {"name": "valid_age", "transformer": "ManualBounds",
@@ -75,7 +80,39 @@ The sample is never refilled: filtering can leave fewer rows than requested.
 Both fit and held-out metrics use the remaining eligible population, with
 requested steps and per-step exclusions in `pre_split_filters.json`. Missing
 training targets require an explicit target filter; otherwise training fails.
-Keep learned imputation, scaling and custom code in `build_preprocessing()`.
+The versioned `training_filter_evidence.json` records the saved recipe and
+Python source identities, ordered row-key membership digests, and counts.
+Approval replays and checks this evidence against the original source version;
+later edits to this file do not change an existing candidate. These are
+training-only filters. Scoring does not require a target and may predict rows
+excluded from training. Shared prediction eligibility is a separate opt-in rule.
+Fixed feature cleanup is saved as a prefix of the model pipeline. The adapter
+selects rows on a working copy and keeps raw model inputs, so fit, CV, holdout
+and prediction each apply that prefix once. Do not repeat the same step in
+`build_preprocessing()`. A scoring sentinel becomes missing but is not dropped;
+use ordinary fitted imputation if the model must accept those inputs.
+Target-only cleanup is excluded from scoring and its semantic contract must
+match champion before comparing metrics. Record keys and source timestamps
+cannot be modified. Numeric replacement dictionary keys are not JSON-safe;
+use `to_replace`/`value` or `replacements=[{"old": -999, "new": None}]` instead.
+Keep learned imputation, scaling and ordinary custom transformations in
+`build_preprocessing()`.
+
+Existing `Deduplicate` can also run before splitting with an explicit nonempty
+`subset` and `keep="first"`, `"last"`, or `"none"`. Source rows are ordered by
+event time (when active) and record keys first. Conflicting target values in a
+duplicate group are rejected; unique source record keys remain mandatory.
+Deduplicating on customer alone does not implement a customer-group split.
+
+For a project-specific fixed training filter, enable
+`example_custom_pre_split("is_test")` in the same hook. The supplied example
+keeps known `False` flags and excludes true/null flags. Edit the supplied
+Eligibility Calculator/Applier classes and keep their `pre_split` declaration
+explicit: `effect="filter"`, named `required_columns`, `learns_from_data=False`.
+The source snapshot saves this code. Scoring never runs this training filter
+or requires its extra flag column. Runtime guards preserve existing row order,
+identities, columns and target values; they do not prove arbitrary Python code
+is leakage-free. Custom value changes belong in ordinary preprocessing.
 
 For example, replace the empty Python recipe with the following steps
 after changing `income` and `age` to your actual numeric feature names:

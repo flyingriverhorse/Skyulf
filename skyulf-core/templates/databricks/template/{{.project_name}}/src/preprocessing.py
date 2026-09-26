@@ -12,16 +12,22 @@ from skyulf.preprocessing.base import BaseApplier, BaseCalculator, apply_method,
 
 
 def build_pre_split_steps():
-    """Declare optional Core row filters before the final train/holdout split.
+    """Declare fixed cleanup and training eligibility before the final split.
 
-    Use explicit source columns. These are training eligibility rules, so keep
+    Use explicit source columns. Fixed feature edits are saved and replayed once
+    on raw model inputs; row filters only select training/evaluation rows. Keep
     learned preprocessing in build_preprocessing() below.
     """
     return [
+        # {"name": "missing_sentinel", "transformer": "ValueReplacement",
+        #  "params": {"columns": ["feature_value"], "to_replace": -999, "value": None}},
         # {"name": "known_target", "transformer": "DropMissingRows",
         #  "params": {"subset": ["target"], "how": "any"}},
         # {"name": "valid_age", "transformer": "ManualBounds",
         #  "params": {"bounds": {"age": {"lower": 0, "upper": 120}}}},
+        # {"name": "unique_observations", "transformer": "Deduplicate",
+        #  "params": {"subset": ["feature_value"], "keep": "first"}},
+        # example_custom_pre_split("is_test"),
     ]
 
 
@@ -64,3 +70,45 @@ class CenterApplier(BaseApplier):
 def example_custom_step(column):
     """Build the example without enabling it in the default preprocessing chain."""
     return custom_step("center", CenterCalculator, CenterApplier, params={"column": column})
+
+
+class EligibilityCalculator(BaseCalculator):
+    """Example fixed rule: retain the declared value without learning statistics."""
+
+    @fit_method
+    def fit(self, X, y, config):
+        """Return only the developer's fixed rule, never a statistic from the data."""
+        return dict(config)
+
+
+class EligibilityApplier(BaseApplier):
+    """Example training filter: keep rows whose flag equals the declared value."""
+
+    @apply_method
+    def apply(self, X, y, params):
+        """Keep existing rows in order without editing any column or target value."""
+        frame = X.to_native() if hasattr(X, "to_native") else X
+        column, value = params["column"], params["keep_value"]
+        if isinstance(frame, pl.DataFrame):
+            return frame.filter(pl.col(column) == value)
+        return frame.loc[frame[column] == value]
+
+
+def example_custom_pre_split(column):
+    """Opt in to retaining known non-test rows; null or true flags are excluded.
+
+    This declaration is the developer's assertion that no statistics are learned.
+    Runtime guards check row/value preservation; they do not audit arbitrary code.
+    Custom value transformations belong in build_preprocessing().
+    """
+    return custom_step(
+        "non_test_rows",
+        EligibilityCalculator,
+        EligibilityApplier,
+        params={"column": column, "keep_value": False},
+        pre_split={
+            "effect": "filter",
+            "required_columns": [column],
+            "learns_from_data": False,
+        },
+    )

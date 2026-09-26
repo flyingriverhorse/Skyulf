@@ -210,6 +210,10 @@ def compare_registered_local_models(
         )
     ):
         raise ValueError("Candidate and champion task or class contracts differ.")
+    if champion_artifact is not None and (
+        candidate_artifact.pipeline.config.get("pre_split_target_contract", [])
+    ) != champion_artifact.pipeline.config.get("pre_split_target_contract", []):
+        raise ValueError("Candidate and champion target normalization contracts differ.")
     candidate_metrics = evaluate_local_holdout(
         candidate_artifact, heldout, target_column=target_column
     )

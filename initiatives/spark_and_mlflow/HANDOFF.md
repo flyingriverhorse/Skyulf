@@ -1,8 +1,96 @@
-# Current handoff: SM-33H1 verified; SM-33H2 READY
+# Current handoff: SM-33H3 DONE; SM-34 READY
+
+Post-acceptance refactor: `local_pre_split.fixed_columns` delegates to per-node
+validators; `FIXED_TYPES` derives from the same admission rule table. This is
+a behavior-preserving source refactor after the live run recorded below. The
+live wheel digest identifies the pre-refactor implementation, not this newer
+source. No additional Databricks run or deployment was made for the refactor.
+Verification: 145 affected tests passed; 7,510 deterministic valid/invalid
+configurations matched the previous return values/order and exact exceptions.
+Full ty, scoped Ruff/format and diff checks passed. Ruff McCabe complexity for
+`fixed_columns` fell from 49 to 4; its length fell from 214 to 18 lines.
+
+Updated 2026-09-26. Requested prior work was committed as `55b31ca9` with DCO,
+227 passing tests and applicable hooks; no push. New H2 changes are uncommitted.
+
+H2 saves versioned `training_filter_evidence.json`, bound to the saved comparison:
+recipe/source identity, ordered pre-filter/survivor/train/holdout membership and
+counts. Automatic staging and manual lifecycle actions verify the registered
+artifact's engine/source and saved recipe. Approval replays the pinned snapshot;
+current editable Python cannot change it. Legacy evidence retains its old IDs.
+No new Delta control table; training eligibility remains separate from scoring.
+
+Final changed-path suite: 144 passed (five existing policy deprecation warnings).
+The review found and fixed a JSON-null receipt bypass: two real MLflow tests
+failed before the fix and passed after; 102 related lifecycle tests then passed.
+Broader earlier suite: 248 passed, overlapping and before final automatic-path
+tightening. Fresh-process MLflow tests cover both engines, CV, targetless
+prediction and evidence/engine tampering. Parent local SQLite harness exercised
+three versions per engine, bootstrap/promotion/rejection/rollback; it did not
+exercise Delta prediction writes. All 15 real WSL Spark/Delta training-date tests,
+56 CLI generation tests, full ty, scoped Ruff/format, strict docs and strict dev
+Bundle validation with the current wheel passed.
+
+Scoped round-two review approved the null-receipt fix and exact output checks.
+The explicitly authorized [live run 926706369150614](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/886322042039901/run/926706369150614)
+succeeded in 701.797 seconds; all three tasks passed. Both engines trained
+three versions with CV/MLflow, approved v1/v2, rejected v3 and rolled back to v1.
+The separate score task wrote 240 then 3 predictions per output; exact key and
+prior-prediction identity stayed intact. A further run was a no-op at Delta
+version 2. Local artifact and MLflow predictions matched without target/age.
+
+Resources remain in `workspace.skyulf_lifecycle_test` with prefix
+`sm33h2_20260926_r1_`: one source, two prediction tables and two three-version
+models. Outputs have 243 rows each; champion v1 is intentional rollback state.
+No new schema or persistent job was created. Report 62 has exact names, metrics,
+run IDs and validation limits. The ignored rehearsal folder retains raw results.
+
+Wheel SHA-256: `d5982ff99ebfc8e9e5e572be05ae1b60a3fd88d974084943cf8336945cba186d`.
+Path: `.cache/sm33h2-cli-final/test_cli_emits_independent_pol0/output/`
+`sm33_generated/dist/skyulf_core-0.9.0-py3-none-any.whl`.
+H3 local implementation, scoped review and approved personal serverless
+acceptance passed. Run 848857785722024 succeeded in 437.664 seconds, all three
+tasks SUCCESS. SM-34 is READY. Matrix63 covers 62 non-model IDs,
+58 calculators and 80 mode rows with bounded evidence and explicit limitations.
+Fixed pre-split normalization, deterministic Deduplicate, opt-in custom filters,
+raw-feature once-only replay, target semantic checks and saved custom approval
+are implemented. Generated Python examples and the walkthrough are updated.
+
+Final affected suites: 289 passed; CLI generation: 56 passed. Full ty, scoped
+Ruff/format, strict docs and strict generated dev Bundle validation passed.
+Thirty new ordinary-route tests cover 11 node recipes on both engines, empty
+vectorizer schema/dtypes and executable custom-filter examples. Prior 30 node
+fixtures passed all 60 runs. TF-IDF/hashing empty test-partition failures were
+reproduced and fixed in the shared Core helper. Optional H3Index/sentence-model
+packaging, temporal history/CV policy and custom value normalization remain
+explicit limitations; see report62 and matrix63, not a blanket all-mode claim.
+
+H3 wheel: `.cache/sm33h3-cli-final/test_cli_emits_independent_pol0/output/`
+`sm33_generated/dist/skyulf_core-0.9.0-py3-none-any.whl`.
+SHA-256: `ad08f6d91e3f329eb03294e36ed7d2004019fe14bfcca13cbda51aa196369c24`.
+All 248 Python files matched the current source. The earlier H2 digest above
+identifies only the already-completed H2 run.
+
+H3 live: both engines retained 47/240 rows (35 train, 12 holdout), logged 30
+identical metrics, and approved champion v1 using saved custom source in a
+separate task. Each score wrote 240 then 3 rows; original predictions stayed
+unchanged; noop=true left Delta version 2 unchanged. Direct local/MLflow
+predictions matched without target/filter-only inputs. Report62 and rehearsal
+README contain exact resources, run IDs, metrics and limits.
+
+Next: SM-34 independent score/train schedules and training windows. Resources
+remain in workspace.skyulf_lifecycle_test with sm33h3_20260926_r1_ prefix:
+one 243-row source, two 243-row prediction outputs, two one-version models.
+No retry, new schema or persistent job. H2/H3 changes are uncommitted; no push.
+Leave unrelated `.tmp-review-model/` untouched. Matrix/rehearsal files match
+ignore rules and need explicit inclusion in a future requested delivery commit.
+
+## Previous handoff: SM-33H1 committed; SM-33H2 IN PROGRESS
 
 Updated 2026-09-26. Prior temporal guards and cleanup plan committed as
 `522c6e82` with DCO and passing hooks; no push. H1 and the H3/custom-step plan
-are included in the user's requested delivery commit; continuation starts at H2.
+were committed as `55b31ca9`; 227 tests, strict docs and all applicable hooks
+passed. Continuation is H2; its new changes are not part of that commit.
 
 Generated src/preprocessing.py now has optional build_pre_split_steps() beside
 build_preprocessing(). Initial training-only filters are existing Core
