@@ -1,4 +1,49 @@
-# Current handoff: SM-33G answer-driven setup verified
+# Current handoff: Core temporal guards verified; SM-33H1 READY
+
+Updated 2026-09-26. At the user's request, audited lag/rolling before starting
+the pre-split cleanup tasks. Fixed missing declared sort columns silently using
+input order, invalid direct lag shifts, and current-target rolling leaking the
+same row's answer. Core enforces the target rule before fit for all split
+placements and direct calculator target context; backend admission reuses it.
+
+Pandas/Polars grouped causal prefixes and batch-local history behavior are pinned.
+Artifacts retain configuration only: automatic training-history retrieval, result
+availability, forecast horizons and context trimming are NOT delivered. Those
+remain SM-36a; do not admit lag/rolling into the initial pre-split cleanup recipe.
+
+Validation: 1,981 Core tests and 1,731 backend tests passed; scoped Ruff, repository
+ty and strict MkDocs passed. Regression reproduction was red before the fix
+(17 Core failures, 3 backend failures). Documentation is in
+`docs/user_guide/preprocessing_placement.md`; report 62 records scope and evidence.
+
+Changes are uncommitted. Next: SM-33H1, then SM-33H2, then SM-34. Report 62 is
+ignored by Git: force-add only that report at the next requested commit.
+No cloud execution or deployment. Leave `.tmp-review-model/` untouched.
+
+## Previous handoff: pre-split cleanup audit complete; SM-33H1 READY
+
+Updated 2026-09-26. Baseline SM-33F/G committed as `8a88b2b2` with DCO and
+passing hooks. User asked to inspect existing pre-split nodes and leakage guards
+and add concrete tasks. This turn changes plans/queue only, not runtime.
+
+Report 62 records the operation-level matrix, reuse paths and acceptance steps.
+The existing Core classifier already distinguishes fixed vs learned modes and
+is shared by backend DAG checks. 940 Core and 109 backend tests passed; real
+DropMissingRows -> ManualBounds execution preserved keys/labels on both engines.
+Deduplicate is currently classified learned/blocked before split. Lag/rolling
+being flagged not learned does not establish point-in-time safety.
+
+Next: SM-33H1 (initial row-filter recipe in the same preprocessing.py using Core),
+then SM-33H2 (saved cleanup/holdout evidence and lifecycle replay), then SM-34.
+Do not call a no-split advisory a rejection gate. Unknown custom code remains
+blocked before split; no unrestricted frame callback. Shared feature transforms,
+duplicate/group policy, scoring exclusions and temporal context remain SM-36a.
+
+Plan changes are uncommitted. Report 62 is under the ignored initiatives tree;
+force-add only that report at the next requested commit. No cloud run/deployment.
+Leave `.tmp-review-model/` untouched.
+
+## Previous handoff: SM-33G answer-driven setup verified
 
 Updated 2026-09-26. User approved conditional questions without reading data.
 Initializer now asks how a used date column is stored: timestamp, local timestamp,

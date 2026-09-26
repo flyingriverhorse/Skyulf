@@ -55,11 +55,15 @@ def test_coerce_aggregations(
 
 @pytest.mark.parametrize(*_sort_pandas_cases)
 def test_sort_pandas(df_data: dict, sort_by: str | None, expected_cols: dict) -> None:
-    """``sort_pandas`` stable-sorts by ``sort_by`` when present, and is a no-op otherwise.
+    """A declared sort column must exist; only an omitted sort is a no-op.
 
     Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``sort_pandas``).
     """
     df = pd.DataFrame(df_data)
+    if sort_by and sort_by not in df.columns:
+        with pytest.raises(ValueError, match="sort_by.*missing"):
+            sort_pandas(df, sort_by)
+        return
     result = sort_pandas(df, sort_by)
     for col, expected in expected_cols.items():
         assert list(result[col]) == expected

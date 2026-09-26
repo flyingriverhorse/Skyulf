@@ -87,14 +87,16 @@ def sort_with_positions_pandas(df: pd.DataFrame, sort_by: str | None) -> tuple[p
     ``None`` positions mean the frame was not reordered, i.e. ``y`` needs no
     change either.
     """
-    if not sort_by or sort_by not in df.columns:
+    if not sort_by:
         return df, None
+    if sort_by not in df.columns:
+        raise ValueError(f"sort_by column {sort_by!r} is missing; cannot establish temporal order.")
     positions = df[sort_by].reset_index(drop=True).sort_values(kind="mergesort").index.to_numpy()
     return df.iloc[positions], positions
 
 
 def sort_pandas(df: pd.DataFrame, sort_by: str | None) -> pd.DataFrame:
-    """Stable-sort a pandas frame by ``sort_by`` when present."""
+    """Stable-sort a pandas frame; reject a declared but missing sort column."""
     return sort_with_positions_pandas(df, sort_by)[0]
 
 
@@ -106,7 +108,9 @@ def sort_with_positions_polars(X: Any, sort_by: str | None) -> tuple[Any, Any]:
     equals the ``X.sort(...)`` this replaces; verified on ties, nulls, dates and
     single-row frames.
     """
-    if not sort_by or sort_by not in X.columns:
+    if not sort_by:
         return X, None
+    if sort_by not in X.columns:
+        raise ValueError(f"sort_by column {sort_by!r} is missing; cannot establish temporal order.")
     order = X.select(pl.arg_sort_by(sort_by, nulls_last=True, maintain_order=True)).to_series()
     return X.gather(order), order

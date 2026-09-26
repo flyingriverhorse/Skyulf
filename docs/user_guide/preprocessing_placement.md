@@ -172,6 +172,36 @@ input can expose the answer directly. A lagged target is useful only when that
 target observation is actually available at the intended prediction time. Merely
 moving a temporal node after a random split does not establish a valid protocol.
 
+Core rejects `RollingAggregate(columns=[target_column])` when the target is known
+from the pipeline, splitter or explicit calculator context. This applies before
+or after splitting, including external `SplitDataset` inputs. Backend admission
+uses the same check for the selected execution branch. This invalid feature
+definition is rejected even with `on_leakage="warn"` or `"ignore"`. Without target
+context, a standalone calculator cannot identify which column contains the answer.
+
+For both nodes, a configured `sort_by` column must exist: a typo raises rather than
+silently using input row order. Omitting `sort_by` still means input row order.
+The lag applier rejects nonpositive or noninteger lags in directly supplied artifacts;
+the calculator retains its existing positive-lag normalization. Sorting remains a
+stable ascending sort of the stored values, not automatic date parsing. Parse date
+strings first and establish a meaningful order for missing or tied timestamps.
+
+Artifacts store configuration, **not a history buffer**. If fitting sees values
+`[10, 20]` and the next apply call sees `[30, 40]`, lag 1 produces `[missing, 30]`
+and rolling mean with window 2 produces `[30, 35]`. The new batch does not inherit
+`20` from training. Supplying `[20, 30, 40]` explicitly supplies that context, but
+the caller must then identify the requested output rows and exclude context rows.
+Ordinary saved-model inference does not automatically fetch or trim this history.
+
+Positive lags and ascending sorting are not a point-in-time availability guarantee.
+For example, yesterday's target might only become available next week. Held-out
+target history is also invalid for a forecast made before those outcomes occur.
+Use entity grouping and a temporal evaluation protocol consistent with the actual
+forecast horizon and result availability. Single-row live requests, separate batch
+boundaries and partitioned execution require an explicit history contract; these
+nodes do not provide that service. Automatic temporal history remains outside the
+initial Bundle pre-split cleanup scope.
+
 Newly fitted `DateFeatures` steps extract calendar parts in UTC. For example,
 `2024-01-01 00:30+02:00` produces year 2023, day 31 and hour 22. Naive dates
 are interpreted as UTC without moving their clock time; mixed offsets and DST

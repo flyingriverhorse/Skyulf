@@ -215,6 +215,21 @@ next model's input.
 
 Dependency: SM-33D. Execute after SM-36 in the local improvement sequence.
 
+User update 2026-09-26: [report 62](62-pre-split-cleaning-and-leakage-plan.md)
+audits the existing operation-aware leakage classifier. SM-33H1/H2 bring forward
+the initial pre-split training filters and saved-rule lifecycle replay before
+SM-34. They do not add general custom callbacks or weaken Deduplicate's current
+pre-split rejection. Broader work below stays here:
+
+- [ ] Review deterministic duplicate/group separation and label conflicts before
+  changing Core/backend policy; do not mark all dedup operations stateless.
+- [ ] Define raw-input replay for any feature-changing pre-split transforms,
+  avoiding omitted or double-applied normalization during model inference.
+- [ ] Define keyed scoring exclusions with reasons/coverage and incremental
+  progress; training-only target filters must never run on unlabeled score input.
+- [ ] Review lag/rolling history and point-in-time boundaries separately from
+  the fit-statistics leakage flag.
+
 - [ ] Add an opt-in project Python package, with an editable feature-engineering
   module (for example `src/<project_package>/features.py`). Reuse existing
   Calculator/Applier registration; avoid editing Skyulf source per project.

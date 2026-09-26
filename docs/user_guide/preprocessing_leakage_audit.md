@@ -254,6 +254,14 @@ are insufficient evidence for these properties.
 
 ## Validation record for this audit
 
+Follow-up on 2026-09-26: the temporal review rejects missing declared sort columns,
+invalid direct lag shifts, and rolling the known current target. Backend admission
+reuses the Core target rule. Relevant suites passed 1,981 Core and 1,731 backend
+tests; Ruff, ty and strict MkDocs passed. The new temporal regression tests also
+pin grouped causal prefixes and the absence of an automatic history buffer.
+See [temporal placement and history](preprocessing_placement.md#target-encoders-lags-and-rolling-windows)
+for the remaining prediction-time availability and batch-boundary responsibilities.
+
 The final consolidated runs completed on 2026-09-08:
 
 | Layer | Passing tests | Scope |

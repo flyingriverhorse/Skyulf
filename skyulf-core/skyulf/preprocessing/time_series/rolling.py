@@ -7,6 +7,7 @@ import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
+from ...leakage import validate_temporal_target
 from ...registry import NodeRegistry
 from .._artifacts import RollingAggregateArtifact
 from .._helpers import select_rows_by_position
@@ -161,7 +162,11 @@ class RollingAggregateApplier(BaseApplier):
     learns_from_data=False,
 )
 class RollingAggregateCalculator(BaseCalculator):
-    """Normalize the rolling-window configuration into the artifact."""
+    """Save rolling configuration, not training history.
+
+    Apply includes the current row and only sees the supplied frame. Rolling
+    the known target is rejected; other inputs must be available at prediction time.
+    """
 
     def fit(
         self,
@@ -169,6 +174,9 @@ class RollingAggregateCalculator(BaseCalculator):
         config: dict[str, Any],
     ) -> RollingAggregateArtifact:
         """Record the window, recognized aggregations, and sort/group settings."""
+        validate_temporal_target(
+            "RollingAggregate", config, target_column=config.get("target_column")
+        )
         return {
             "type": "rolling_aggregate",
             "columns": config.get("columns", []),

@@ -18,6 +18,36 @@ from backend.ml_pipeline._execution._leakage_validation import (
 from backend.ml_pipeline._execution.schemas import NodeConfig
 
 
+@pytest.mark.parametrize("placement", ["before", "after", "no_split"])
+def test_known_target_rolling_rejected_independently_of_split(placement):
+    """API admission must reuse the Core guard against rolling the current answer."""
+    source = _node("load", "DataLoader", [])
+    rolling = _node("roll", "RollingAggregate", ["load"], {"columns": ["y"]})
+    split = _node("split", "TrainTestSplitter", ["roll"], {"target_column": "y"})
+    model = _node("model", "training", ["split"], {"target_column": "y"})
+    nodes = [source, rolling, split, model]
+    if placement == "after":
+        split.inputs, rolling.inputs, model.inputs = ["load"], ["split"], ["roll"]
+    elif placement == "no_split":
+        model.inputs = ["roll"]
+        nodes = [source, rolling, model]
+    with pytest.raises(ValueError, match="RollingAggregate.*target.*current row"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_target_rolling_on_unselected_branch_does_not_block_other_branch():
+    """A sibling branch must not grant target context to the selected feature transform."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("split", "TrainTestSplitter", ["load"], {"target_column": "y"}),
+        _node("roll", "RollingAggregate", ["split"], {"columns": ["y"]}),
+        _node("bad", "training", ["roll"], {"target_column": "y"}),
+        _node("good", "training", ["split"], {"target_column": "y"}),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, target_node_id="good")
+    assert verdict["status"] == "passed"
+
+
 def _node(
     node_id: str, step_type: str, inputs: list[str], params: dict | None = None
 ) -> NodeConfig:

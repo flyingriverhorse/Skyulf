@@ -1,5 +1,6 @@
 """Lag features: shift columns by N rows to expose past values to the model."""
 
+from numbers import Integral
 from typing import Any
 
 import numpy as np
@@ -98,6 +99,11 @@ class LagFeaturesApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Add lag columns; ``drop_na`` drops rows containing nulls or floating NaN."""
+        if any(
+            not isinstance(lag, Integral) or isinstance(lag, bool) or lag <= 0
+            for lag in params.get("lags", [])
+        ):
+            raise ValueError("LagFeatures artifact lags must be positive integers.")
         return apply_dual_engine(
             (X, _y) if _y is not None else X,
             params,
@@ -116,7 +122,11 @@ class LagFeaturesApplier(BaseApplier):
     learns_from_data=False,
 )
 class LagFeaturesCalculator(BaseCalculator):
-    """Normalize the lag configuration into the artifact."""
+    """Save lag configuration, not training history.
+
+    Apply uses only rows in the supplied frame. Callers must supply correctly
+    ordered, prediction-time-available history and the appropriate entity groups.
+    """
 
     def fit(
         self,

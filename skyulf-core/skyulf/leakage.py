@@ -231,6 +231,32 @@ def step_learns_from_data(
     return metadata.get("learns_from_data") is not False
 
 
+def validate_temporal_target(
+    step_type: str,
+    params: dict[str, Any],
+    *,
+    target_column: str | None,
+) -> None:
+    """Reject rolling the known current target into a model feature.
+
+    Rolling windows include the current row. This is an invalid feature
+    definition regardless of the train/test boundary or leakage warning mode.
+    A separate observed feature is allowed; its availability at prediction
+    time remains the caller's responsibility.
+    """
+    if (
+        step_type == "RollingAggregate"
+        and target_column is not None
+        and target_column in (params.get("columns") or [])
+        and params.get("aggregations", ["mean"])
+    ):
+        raise ValueError(
+            f"RollingAggregate cannot use target column {target_column!r}: its window includes "
+            "the current row and would expose that row's answer as a feature. "
+            "Use a separate historical feature available at prediction time."
+        )
+
+
 def validate_leakage_safety(
     pipeline_config: PipelineConfig | dict[str, Any],
     on_leakage: OnLeakage = "raise",
@@ -254,19 +280,23 @@ def validate_leakage_safety(
 
     No-split configurations receive an advisory rather than an exception.
     An external SplitDataset supplies a boundary before all configured steps.
-    Neither warn nor ignore repairs an unsafe ordering.
+    Neither warn nor ignore repairs an unsafe ordering. Rolling the known
+    current target is an invalid feature definition and always raises.
     """
     if on_leakage not in _ON_LEAKAGE_MODES:
         raise ValueError(
             f"on_leakage must be one of {sorted(_ON_LEAKAGE_MODES)}, got {on_leakage!r}"
         )
-    if already_split:
-        return []
-
     preprocessing = pipeline_config.get("preprocessing", [])
     splitters = train_test_splitters()
     if target_column is None:
         target_column = _find_pipeline_target(preprocessing, splitters)
+    for step in preprocessing:
+        validate_temporal_target(
+            step.get("transformer") or "", step.get("params") or {}, target_column=target_column
+        )
+    if already_split:
+        return []
     splitter = _first_pipeline_splitter(preprocessing, splitters)
     if splitter is None:
         return [] if on_leakage == "ignore" else [NO_SPLIT_DIAGNOSTIC]
