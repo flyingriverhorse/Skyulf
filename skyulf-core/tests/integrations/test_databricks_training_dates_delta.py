@@ -334,3 +334,35 @@ def test_sample_key_named_count_and_nan_target_validation(delta_spark, source_ta
     ).write.format("delta").mode("append").saveAsTable(source_table)
     with pytest.raises(ValueError, match="nonnull targets"):
         read_training_snapshot(delta_spark, replace(spec, version=1))
+
+
+def test_explicit_target_filter_runs_after_bounded_sample(delta_spark, source_table):
+    """A declared missing-target filter consumes a sample slot and never refills it."""
+    rows = [(i, float(i), None if i == 3 else float(i * 2), float(i)) for i in range(12)]
+    delta_spark.createDataFrame(rows, "id long, x double, target double, age double").write.format(
+        "delta"
+    ).saveAsTable(source_table)
+    step = {
+        "name": "known_target",
+        "transformer": "DropMissingRows",
+        "params": {"subset": ["target"]},
+    }
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=12,
+        max_bytes=100000,
+        training_sample_rows=12,
+        pre_split_steps=(step,),
+    )
+    assert spec.source_columns == ("id", "x", "target")
+    frame = read_training_snapshot(delta_spark, spec)
+    assert len(frame) == 12
+    train, heldout, _ = split_labeled_snapshot(frame, spec)
+    assert len(train) + len(heldout) == 11
+    assert heldout.attrs["pre_split_filter_counts"][0]["excluded_rows"] == 1
+    with pytest.raises(ValueError, match="nonnull targets"):
+        read_training_snapshot(delta_spark, replace(spec, pre_split_steps=()))

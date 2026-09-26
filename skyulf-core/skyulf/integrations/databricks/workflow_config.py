@@ -20,6 +20,7 @@ from .training_dates import training_date_spec
 
 _ACTIONS = {"train", "train_monthly", "score", "approve", "reject", "rollback"}
 _FIELDS = {
+    "pre_split_steps",
     *CV_FIELDS,
     "training_sample_rows",
     "training_sample_seed",
@@ -292,11 +293,23 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         f"(includes final holdout); seed={checked.get('training_sample_seed', 42)}",
         f"Local input limits: {checked['max_rows']} rows, {checked['max_input_mb']} MiB "
         "(not total training memory)",
+        "Phase order: source window -> optional seeded sample -> bounded read -> "
+        "availability -> training filters -> final split -> fold-local preprocessing/model.",
+        "With sampling, availability is selected before the seeded sample; without "
+        "sampling, it is selected after the bounded read.",
         f"Final holdout: {checked.get('split_strategy', 'random')} | "
         f"fraction={checked.get('test_size', 0.2)} | start={holdout_start}",
         f"Manual training: {manual_status}",
-        "Preprocessing (execution order; edit pipeline.preprocessing):",
+        "Training filters (after bounded source read, before final split; edit build_pre_split_steps()):",
     ]
+    for index, step in enumerate(checked.get("pre_split_steps", []), 1):
+        lines.append(
+            f"  {index}. {step['name']} -> {step['transformer']} "
+            f"{json.dumps(step.get('params', {}), sort_keys=True)}"
+        )
+    if not checked.get("pre_split_steps"):
+        lines.append("  No training filters.")
+    lines.append("Fold-local preprocessing (after final split; edit build_preprocessing()):")
     for index, step in enumerate(checked["pipeline"].get("preprocessing", []), 1):
         lines.append(
             f"  {index}. {step['name']} -> {step['transformer']} "

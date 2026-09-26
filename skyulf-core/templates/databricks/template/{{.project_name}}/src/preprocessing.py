@@ -11,6 +11,20 @@ from skyulf.inference.project_code import custom_step
 from skyulf.preprocessing.base import BaseApplier, BaseCalculator, apply_method, fit_method
 
 
+def build_pre_split_steps():
+    """Declare optional Core row filters before the final train/holdout split.
+
+    Use explicit source columns. These are training eligibility rules, so keep
+    learned preprocessing in build_preprocessing() below.
+    """
+    return [
+        # {"name": "known_target", "transformer": "DropMissingRows",
+        #  "params": {"subset": ["target"], "how": "any"}},
+        # {"name": "valid_age", "transformer": "ManualBounds",
+        #  "params": {"bounds": {"age": {"lower": 0, "upper": 120}}}},
+    ]
+
+
 def build_preprocessing():
     """Return steps in execution order; change column names to match your input."""
     return [

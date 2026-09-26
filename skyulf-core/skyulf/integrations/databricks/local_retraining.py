@@ -24,6 +24,7 @@ import polars as pl
 
 from ...data.dataset import SplitDataset
 from ...inference.local_evaluation import evaluate_local_holdout
+from ...leakage import step_learns_from_data
 from ...preprocessing.split import DataSplitter
 from ...registry import NodeRegistry
 from ..mlflow.registry import ResolvedModel, register_model, resolve_model
@@ -69,6 +70,7 @@ class LocalTrainingSpec:
     training_sample_rows: int | None = None
     training_sample_seed: int = 42
     sample_key_sha256: str | None = None
+    pre_split_steps: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         """Reject incomplete or contradictory policies before opening a Spark reader."""
@@ -137,10 +139,19 @@ class LocalTrainingSpec:
             )
         if not self.record_key_columns or not self.input_columns:
             raise ValueError("record_key_columns and input_columns must be nonempty.")
+        _pre_split_columns(self.pre_split_steps, self.target_column)
         names = self.source_columns
         for name in names:
             column_name(name)
-        if len({name.lower() for name in names}) != len(names):
+        base_names = (
+            *self.record_key_columns,
+            self.event_column,
+            self.result_available_at_column,
+            *self.input_columns,
+            self.target_column,
+        )
+        base_names = tuple(name for name in base_names if name is not None)
+        if len({name.lower() for name in base_names}) != len(base_names):
             raise ValueError("Training columns must be distinct.")
         if type(self.max_rows) is not int or self.max_rows <= 0:
             raise ValueError("max_rows must be positive.")
@@ -172,12 +183,19 @@ class LocalTrainingSpec:
             for name in (self.event_column, self.result_available_at_column)
             if name is not None
         )
-        return (*self.record_key_columns, *dates, *self.input_columns, self.target_column)
+        base = (*self.record_key_columns, *dates, *self.input_columns, self.target_column)
+        extra = _pre_split_columns(self.pre_split_steps, self.target_column)
+        return (
+            *base,
+            *(name for name in extra if name.casefold() not in {item.casefold() for item in base}),
+        )
 
     @property
     def dataset_id(self) -> str:
         """Pin source, selection, split and seed independently of mutable driver limits."""
         settings = asdict(self)
+        if not self.pre_split_steps:
+            settings.pop("pre_split_steps")
         for field in ("max_rows", "max_bytes"):
             settings.pop(field)
         for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -185,6 +203,90 @@ class LocalTrainingSpec:
             settings[field] = None if value is None else value.astimezone(UTC).isoformat()
         digest = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
         return f"{self.table}@{self.version}/{self.split_strategy}/{digest}"
+
+
+def _pre_split_columns(steps: Any, target_column: str) -> tuple[str, ...]:
+    """Admit only explicit Core row filters and return their source dependencies."""
+    if not isinstance(steps, (tuple, list)):
+        raise ValueError("pre_split_steps must be an ordered sequence of Core steps.")
+    columns: list[str] = []
+    for index, step in enumerate(steps, 1):
+        if not isinstance(step, dict) or not isinstance(step.get("name"), str) or not step["name"]:
+            raise ValueError(f"pre_split_steps[{index}] requires a name.")
+        step_type = step.get("transformer")
+        params = step.get("params", {})
+        if not isinstance(params, dict) or not isinstance(step_type, str):
+            raise ValueError(f"pre_split_steps[{index}] requires a Core transformer and params.")
+        if step_learns_from_data(step_type, params, target_column=target_column):
+            raise ValueError(f"pre_split_steps[{index}] cannot learn from data before split.")
+        if step_type == "DropMissingRows":
+            subset = params.get("subset")
+            if (
+                not isinstance(subset, list)
+                or not subset
+                or any(not isinstance(c, str) for c in subset)
+            ):
+                raise ValueError(
+                    "pre_split_steps DropMissingRows requires explicit subset columns."
+                )
+            if params.get("how", "any") not in ("any", "all") or set(params) - {
+                "subset",
+                "how",
+                "threshold",
+                "missing_threshold",
+            }:
+                raise ValueError("pre_split_steps DropMissingRows has invalid row-filter params.")
+            threshold = params.get("threshold")
+            if threshold is not None and (
+                type(threshold) is not int or not 0 <= threshold <= len(subset)
+            ):
+                raise ValueError(
+                    "pre_split_steps threshold must be an integer from 0 to subset size."
+                )
+            missing_threshold = params.get("missing_threshold")
+            if missing_threshold is not None and (
+                type(missing_threshold) not in (int, float)
+                or not math.isfinite(missing_threshold)
+                or not 0 <= missing_threshold <= 100
+            ):
+                raise ValueError("pre_split_steps missing_threshold must be between 0 and 100.")
+            columns.extend(subset)
+        elif step_type == "ManualBounds":
+            bounds = params.get("bounds")
+            if set(params) - {"bounds"}:
+                raise ValueError("pre_split_steps ManualBounds supports only bounds.")
+            if not isinstance(bounds, dict) or not bounds:
+                raise ValueError("pre_split_steps ManualBounds requires explicit bounds.")
+            for column, limit in bounds.items():
+                if not isinstance(column, str) or not isinstance(limit, dict) or not limit:
+                    raise ValueError("pre_split_steps ManualBounds requires named column bounds.")
+                if set(limit) - {"lower", "upper"} or not any(
+                    key in limit and limit[key] is not None for key in ("lower", "upper")
+                ):
+                    raise ValueError("pre_split_steps ManualBounds requires lower or upper.")
+                for value in limit.values():
+                    if value is not None and (
+                        type(value) not in (int, float) or not math.isfinite(value)
+                    ):
+                        raise ValueError(
+                            "pre_split_steps ManualBounds requires finite numeric bounds."
+                        )
+                if (
+                    limit.get("lower") is not None
+                    and limit.get("upper") is not None
+                    and limit["lower"] > limit["upper"]
+                ):
+                    raise ValueError("pre_split_steps ManualBounds lower must not exceed upper.")
+                columns.append(column)
+        else:
+            raise ValueError(
+                f"pre_split_steps[{index}] permits only DropMissingRows or ManualBounds."
+            )
+        if set(step) - {"name", "transformer", "params"}:
+            raise ValueError(f"pre_split_steps[{index}] contains unsupported step fields.")
+    for column in columns:
+        column_name(column)
+    return tuple(dict.fromkeys(columns))
 
 
 def _validate_instant(value: Any, name: str) -> datetime:
@@ -219,6 +321,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     """Project and cap a versioned Delta read before materializing driver rows."""
     if not isinstance(spec, LocalTrainingSpec):
         raise TypeError("spec must be LocalTrainingSpec.")
+    _pre_split_columns(spec.pre_split_steps, spec.target_column)
     names = spec.source_columns
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
     source = normalize_training_dates(
@@ -299,7 +402,11 @@ def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, 
     invalid_target = F.col(spec.target_column).isNull()
     if spec.target_column in floating:
         invalid_target = invalid_target | F.isnan(F.col(spec.target_column))
-    if source.where(invalid_target).limit(1).count():
+    target_filter = any(
+        step["transformer"] == "DropMissingRows" and spec.target_column in step["params"]["subset"]
+        for step in spec.pre_split_steps
+    )
+    if not target_filter and source.where(invalid_target).limit(1).count():
         raise ValueError("Available labels must have nonnull targets before sampling.")
     # Struct field order, UTC timestamp rendering and the tie-break keys are
     # explicit so partition layout and Spark session timezone cannot change membership.
@@ -337,13 +444,23 @@ def _key_digest(frame: pd.DataFrame, keys: tuple[str, ...]) -> str:
 
 
 def split_labeled_snapshot(
-    frame: pd.DataFrame, spec: LocalTrainingSpec, *, keep_training_event: bool = False
+    frame: pd.DataFrame,
+    spec: LocalTrainingSpec,
+    *,
+    keep_training_event: bool = False,
+    engine: str = "pandas",
 ) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     """Make disjoint, reproducible fit and holdout sets from available labels."""
     if not isinstance(frame, pd.DataFrame) or not isinstance(spec, LocalTrainingSpec):
         raise TypeError("Expected a pandas frame and LocalTrainingSpec.")
-    if not set(spec.source_columns).issubset(frame.columns):
-        raise ValueError("Training snapshot is missing required columns.")
+    _pre_split_columns(spec.pre_split_steps, spec.target_column)
+    if engine not in ("pandas", "polars"):
+        raise ValueError("engine must be pandas or polars.")
+    missing_columns = sorted(set(spec.source_columns) - set(frame.columns))
+    if missing_columns:
+        raise ValueError(
+            f"Training snapshot is missing required source columns: {missing_columns}."
+        )
     if len(frame) > spec.max_rows or _frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Training snapshot exceeds max_rows or max_bytes.")
     if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
@@ -377,8 +494,6 @@ def split_labeled_snapshot(
         if events is not None and ((labels < events) & labels.notna()).any():
             raise ValueError("Label availability precedes event time.")
         available = labels.notna() & (labels <= spec.result_cutoff)
-    if frame.loc[available, spec.target_column].isna().any():
-        raise ValueError("Available labels must have nonnull targets.")
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = selected.loc[available].sort_values(ordering, kind="stable").reset_index(drop=True)
     sample_digest = None
@@ -388,6 +503,74 @@ def split_labeled_snapshot(
         sample_digest = _key_digest(selected, spec.record_key_columns)
         if spec.sample_key_sha256 is not None and sample_digest != spec.sample_key_sha256:
             raise ValueError("Training sample membership differs from saved evidence.")
+    filter_counts = []
+    native = pl.from_pandas(selected) if spec.pre_split_steps and engine == "polars" else selected
+    for step in spec.pre_split_steps:
+        columns = (
+            step["params"]["subset"]
+            if step["transformer"] == "DropMissingRows"
+            else step["params"]["bounds"]
+        )
+        if any(column not in native.columns for column in columns):
+            missing = sorted(set(columns) - set(native.columns))
+            raise ValueError(f"pre_split_steps {step['name']} missing source columns: {missing}.")
+        if step["transformer"] == "ManualBounds":
+            for column in columns:
+                if not pd.api.types.is_numeric_dtype(
+                    selected[column]
+                ) or pd.api.types.is_bool_dtype(selected[column]):
+                    raise ValueError(
+                        f"pre_split_steps ManualBounds requires numeric column {column}."
+                    )
+        keys = list(spec.record_key_columns)
+        before_keys = (
+            list(native.select(keys).iter_rows())
+            if isinstance(native, pl.DataFrame)
+            else list(native[keys].itertuples(index=False, name=None))
+        )
+        before_targets = native[spec.target_column].to_list()
+        artifact = NodeRegistry.get_calculator(step["transformer"])().fit(native, step["params"])
+        filtered = NodeRegistry.get_applier(step["transformer"])().apply(native, artifact)
+        if not isinstance(filtered, type(native)):
+            raise ValueError("pre_split_steps filter did not return a frame.")
+        if list(filtered.columns) != list(native.columns):
+            raise ValueError("pre_split_steps must preserve all source columns.")
+        after_keys = (
+            list(filtered.select(keys).iter_rows())
+            if isinstance(filtered, pl.DataFrame)
+            else list(filtered[keys].itertuples(index=False, name=None))
+        )
+        positions = {key: index for index, key in enumerate(before_keys)}
+        if any(key not in positions for key in after_keys) or [
+            positions[key] for key in after_keys
+        ] != sorted({positions[key] for key in after_keys}):
+            raise ValueError("pre_split_steps must preserve row identities and order.")
+        after_targets = filtered[spec.target_column].to_list()
+        for key, value in zip(after_keys, after_targets, strict=True):
+            expected = before_targets[positions[key]]
+            if not (pd.isna(expected) and pd.isna(value)) and expected != value:
+                raise ValueError("pre_split_steps must preserve target pairing.")
+        filter_counts.append(
+            {
+                "name": step["name"],
+                "transformer": step["transformer"],
+                "input_rows": len(before_keys),
+                "excluded_rows": len(before_keys) - len(filtered),
+                "output_rows": len(filtered),
+            }
+        )
+        native = filtered
+    if spec.pre_split_steps:
+        selected = native.to_pandas() if isinstance(native, pl.DataFrame) else native
+        selected = selected.reset_index(drop=True)
+    if selected[spec.target_column].isna().any():
+        raise ValueError(
+            "Available labels must have nonnull targets; add explicit DropMissingRows for the target."
+        )
+    if spec.pre_split_steps and len(selected) < 4:
+        raise ValueError(
+            "Training filters leave fewer than four eligible rows for train and holdout."
+        )
     if spec.split_strategy == "random":
         if spec.stratify:
             counts = selected[spec.target_column].value_counts()
@@ -419,6 +602,7 @@ def split_labeled_snapshot(
     holdout_frame = heldout.loc[:, columns].reset_index(drop=True)
     holdout_frame.attrs["holdout_key_sha256"] = digest
     holdout_frame.attrs["sample_key_sha256"] = sample_digest
+    holdout_frame.attrs["pre_split_filter_counts"] = filter_counts
     unavailable = int((~available).sum()) + frame.attrs.get("training_selection", {}).get(
         "unavailable_labels", 0
     )
@@ -467,6 +651,7 @@ def train_local_candidate(
     cv = LocalCVSpec() if cv is None else cv
     if not isinstance(cv, LocalCVSpec):
         raise TypeError("cv must be LocalCVSpec.")
+    _pre_split_columns(spec.pre_split_steps, spec.target_column)
     cv.validate_pipeline(config, target_column=spec.target_column, event_column=spec.event_column)
     if spec.stratify and (
         NodeRegistry.get_calculator(config["modeling"]["type"])().problem_type != "classification"
@@ -505,7 +690,7 @@ def train_local_candidate(
     frame = read_training_snapshot(spark, spec)
     temporal_cv = cv.enabled and cv.method == "time_series_split"
     train_frame, holdout, unavailable = split_labeled_snapshot(
-        frame, spec, keep_training_event=temporal_cv
+        frame, spec, keep_training_event=temporal_cv, engine=engine
     )
     spec = replace(
         spec,
@@ -600,6 +785,19 @@ def train_local_candidate(
         run.set_tags(tags)
         run.client.log_dict(
             run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json"
+        )
+        run.client.log_dict(
+            run.run_id,
+            {
+                "requested_steps": list(spec.pre_split_steps),
+                "counts": holdout.attrs["pre_split_filter_counts"],
+                "source_rows": len(frame),
+                "eligible_rows": len(train_frame) + len(holdout),
+                "excluded_rows": sum(
+                    item["excluded_rows"] for item in holdout.attrs["pre_split_filter_counts"]
+                ),
+            },
+            "pre_split_filters.json",
         )
         saved_spec = asdict(spec)
         if spec.training_sample_rows is not None:

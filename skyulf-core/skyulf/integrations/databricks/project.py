@@ -16,6 +16,8 @@ def load_project_workflow(config: dict[str, Any], path: str | Path) -> dict[str,
     """
     if config.get("pipeline", {}).get("preprocessing"):
         raise ValueError("Configure preprocessing in the Python file; leave the JSON list empty.")
+    if config.get("pre_split_steps"):
+        raise ValueError("Configure pre_split_steps in the Python file; leave the JSON list empty.")
     with Path(path).open("rb") as stream:
         payload = stream.read(MAX_PROJECT_SOURCE_BYTES + 1)
     if len(payload) > MAX_PROJECT_SOURCE_BYTES:
@@ -29,7 +31,15 @@ def load_project_workflow(config: dict[str, Any], path: str | Path) -> dict[str,
     if not isinstance(steps, list):
         raise ValueError("build_preprocessing() must return a list of Core steps.")
     validate_preprocessing_steps(steps)
+    pre_split_factory = getattr(module, "build_pre_split_steps", None)
+    if pre_split_factory is not None and not callable(pre_split_factory):
+        raise ValueError("build_pre_split_steps must be a function returning Core steps.")
+    pre_split_steps = pre_split_factory() if pre_split_factory is not None else []
+    if not isinstance(pre_split_steps, list):
+        raise ValueError("build_pre_split_steps() must return a list of Core steps.")
+    validate_preprocessing_steps(pre_split_steps)
     result = deepcopy(config)
     result["pipeline"]["preprocessing"] = steps
     result["pipeline"]["project_python_source"] = source
+    result["pre_split_steps"] = deepcopy(pre_split_steps)
     return result

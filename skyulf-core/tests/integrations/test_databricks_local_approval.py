@@ -18,8 +18,9 @@ mlflow = pytest.importorskip("mlflow")
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("evidence_mode", ["explicit", "saved"])
+@pytest.mark.parametrize("cleanup", [False, True])
 def test_manual_approval_reuses_registered_versions_and_replays_receipt(
-    tmp_path, monkeypatch, engine, evidence_mode
+    tmp_path, monkeypatch, engine, evidence_mode, cleanup
 ):
     """Approval, including bootstrap and retry, must never retrain or register a new model."""
     frame = pd.DataFrame(
@@ -31,6 +32,9 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             "label_at": pd.to_datetime(["2026-01-11"] * 8 + ["2026-02-11"] * 4, utc=True),
         }
     )
+    if cleanup:
+        frame["age"] = [float(i) for i in range(12)]
+        frame.loc[frame.id.isin([1, 8]), "age"] = -1.0
     frame["event_time"] = (
         frame["event_time"].dt.tz_convert("Asia/Tokyo").dt.strftime("%d/%m/%Y %H:%M")
     )
@@ -41,7 +45,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     uri = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
     client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
     client.create_experiment("approval", artifact_location=(tmp_path / "runs").as_uri())
-    config = {
+    config: dict[str, Any] = {
         "engine": engine,
         "training_table": "workspace.test.source",
         "training_version": 4,
@@ -76,6 +80,14 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             "modeling": {"type": "linear_regression", "params": {"fit_intercept": False}},
         },
     }
+    if cleanup:
+        config["pre_split_steps"] = [
+            {
+                "name": "valid_age",
+                "transformer": "ManualBounds",
+                "params": {"bounds": {"age": {"lower": 0}}},
+            }
+        ]
 
     def operator_action(spark, config, action, **kwargs):
         """Exercise real operator parameter decoding and copyable evidence with MLflow artifacts."""
@@ -151,6 +163,9 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     assert read_snapshot.call_count == 2
     assert read_snapshot.call_args.args[1].version == 4
     replay_spec = read_snapshot.call_args.args[1]
+    if cleanup:
+        assert replay_spec.pre_split_steps == tuple(config["pre_split_steps"])
+        assert "age" in replay_spec.source_columns and "age" not in replay_spec.input_columns
     assert replay_spec.event_time_parsing == TrainingDateSpec(
         format="%d/%m/%Y %H:%M", timezone="Asia/Tokyo"
     )

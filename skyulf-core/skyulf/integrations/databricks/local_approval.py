@@ -113,6 +113,7 @@ def _load_evidence(
         saved_spec[field] = None if value is None else datetime.fromisoformat(value)
     for field in ("record_key_columns", "input_columns"):
         saved_spec[field] = tuple(saved_spec[field])
+    saved_spec["pre_split_steps"] = tuple(saved_spec.get("pre_split_steps", ()))
     for field in ("event_time_parsing", "result_time_parsing"):
         saved_spec[field] = training_date_spec(saved_spec[field])
     spec = LocalTrainingSpec(**saved_spec)
@@ -271,7 +272,7 @@ def approve_local_candidate(
         max_bytes=min(spec.max_bytes, max_bytes),
     )
     frame = local_retraining.read_training_snapshot(spark, bounded_spec)
-    _, heldout, _ = local_retraining.split_labeled_snapshot(frame, bounded_spec)
+    _, heldout, _ = local_retraining.split_labeled_snapshot(frame, bounded_spec, engine=engine)
     native = pl.from_pandas(heldout) if engine == "polars" else heldout
     options = {
         "target_column": spec.target_column,

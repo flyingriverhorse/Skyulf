@@ -1,4 +1,40 @@
-# Current handoff: Core temporal guards verified; SM-33H1 READY
+# Current handoff: SM-33H1 verified; SM-33H2 READY
+
+Updated 2026-09-26. Prior temporal guards and cleanup plan committed as
+`522c6e82` with DCO and passing hooks; no push. H1 and the H3/custom-step plan
+are included in the user's requested delivery commit; continuation starts at H2.
+
+Generated src/preprocessing.py now has optional build_pre_split_steps() beside
+build_preprocessing(). Initial training-only filters are existing Core
+DropMissingRows and ManualBounds. Learned/unknown steps are rejected; both
+engines preserve keys, order and target pairing. Filter-only columns are read
+without becoming model features. Limits/sample membership precede cleanup;
+filters never refill a sample. Invalid keys remain errors before filtering.
+
+Saved training spec carries the recipe; pre_split_filters.json logs per-step
+counts. Automatic comparison and manual approval replay the same filtered split.
+This minimum replay is H1; full code/survivor integrity, fresh-process MLflow and
+live acceptance remain H2. Scoring never applies target-based training filters.
+
+Final affected group: 71 passed; CLI generation: 56 passed; real local WSL Delta:
+1 passed. Earlier affected group: 202 passed. Broader Bundle/runtime/CV had 128
+passes and four stale notebook fixtures; repaired notebook module: 16 passed,
+included in the final 71. Ruff/format, full ty, strict docs and generated dev
+Bundle validation passed. Scoped review approved all fixes. No live job/deploy.
+
+Next: SM-33H2, then newly requested SM-33H3, then SM-34. H3 routes every existing
+node/mode to the correct pre-split or ordinary preprocessing phase, reusing Core
+and the same Python file. It includes fixed normalization, existing dedup and
+artifact/inference replay; learned nodes remain after split and resampling stays
+train-only. No new generic row-filter node, group split or data-quality threshold
+system is requested now; those suggestions are parked. Report 62 has remaining
+acceptance tasks. Keep unrelated .tmp-review-model/ untouched. New Core test
+module must be included at the next requested commit.
+Follow-up planning adds opt-in custom pre-split logic to H3 in the same Python
+file, reusing saved source with explicit row effects and replay checks. H1 still
+rejects custom steps; this extension has not been implemented.
+
+## Previous handoff: Core temporal guards verified; SM-33H1 READY
 
 Updated 2026-09-26. At the user's request, audited lag/rolling before starting
 the pre-split cleanup tasks. Fixed missing declared sort columns silently using

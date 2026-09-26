@@ -5,6 +5,7 @@ import runpy
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -65,7 +66,7 @@ def test_notebook_delegates_bound_target_and_selected_action(
         / "templates/databricks/template/{{.project_name}}/src"
         / ("score.py" if action == "score" else "workflow.py")
     )
-    config = {
+    config: dict[str, Any] = {
         **workflow_config,
         "engine": engine,
         "score_model_selection": "pinned_version",
@@ -76,8 +77,24 @@ def test_notebook_delegates_bound_target_and_selected_action(
             for key in ("training_table", "score_source_table", "prediction_table", "model_name")
         },
     }
-    config_path = tmp_path / "workflow.json"
+    config_path = tmp_path / "config" / "workflow.json"
+    config_path.parent.mkdir()
     config_path.write_text(json.dumps(config))
+    project_source = (
+        "def build_preprocessing():\n    return []\n\n"
+        "def build_pre_split_steps():\n"
+        "    return [{'name': 'known_target', 'transformer': 'DropMissingRows', "
+        "'params': {'subset': ['target']}}]\n"
+    )
+    project_path = tmp_path / "src" / "preprocessing.py"
+    project_path.parent.mkdir()
+    project_path.write_text(
+        project_source
+        if action.startswith("train")
+        else "raise RuntimeError('score must not load project')",
+        encoding="utf-8",
+        newline="\n",
+    )
     values = {
         "config_path": str(config_path),
         "workflow_contract": "1",
@@ -125,22 +142,28 @@ def test_notebook_delegates_bound_target_and_selected_action(
             ),
         },
     )
-    assert run.call_args.args == (
-        spark,
-        {
-            **config,
-            **{
-                key: "workspace.test." + key
-                for key in (
-                    "training_table",
-                    "score_source_table",
-                    "prediction_table",
-                    "model_name",
-                )
-            },
+    resolved = {
+        **config,
+        **{
+            key: "workspace.test." + key
+            for key in (
+                "training_table",
+                "score_source_table",
+                "prediction_table",
+                "model_name",
+            )
         },
-        action,
-    )
+    }
+    if action.startswith("train"):
+        resolved["pipeline"] = {**config["pipeline"], "project_python_source": project_source}
+        resolved["pre_split_steps"] = [
+            {
+                "name": "known_target",
+                "transformer": "DropMissingRows",
+                "params": {"subset": ["target"]},
+            }
+        ]
+    assert run.call_args.args == (spark, resolved, action)
     assert run.call_args.kwargs.get("experiment_name") == (
         "/test/experiment" if action.startswith("train") else None
     )

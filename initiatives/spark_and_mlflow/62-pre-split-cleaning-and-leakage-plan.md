@@ -1,6 +1,6 @@
 # Pre-split cleaning and existing leakage safeguards
 
-Date: 2026-09-26. Cleanup audit complete; SM-33H1/H2 remain planned, not delivered.
+Date: 2026-09-26. SM-33H1 implemented and locally verified; SM-33H2 extended evidence remains open.
 Baseline: `8a88b2b2`. User requested inspecting existing nodes/leakage controls
 before adding Bundle tasks. A subsequent requested Core temporal review is recorded
 below; no cloud resources were changed.
@@ -19,7 +19,7 @@ and the shared classifier; do not copy algorithms or maintain another leakage li
 **Tech stack:** Existing pandas/Polars Core, bounded Delta reads, Python project
 source snapshots, MLflow artifacts and Databricks Bundle entrypoints.
 
-## What already exists
+## Baseline before SM-33H1
 
 - `skyulf/leakage.py`: `step_learns_from_data`, `leakage_exemption_reason` and
   `validate_leakage_safety`. Actual parameters refine conservative registry flags.
@@ -107,44 +107,52 @@ repository ty and strict MkDocs passed. No Databricks execution was performed.
 
 ## SM-33H1 — Core-backed training filters before split
 
-Status: READY. Dependency: SM-33G. First scope: DropMissingRows and ManualBounds.
+Status: DONE for H1 scope. Dependency: SM-33G. First scope: DropMissingRows and ManualBounds.
+Implementation baseline: `522c6e82` (temporal guard review committed with passing hooks).
+
+Implementation boundary: because both automatic promotion and manual approval
+reconstruct the holdout through the shared splitter, H1 must carry the recipe in
+the saved training specification and use it on those paths. This minimum replay
+coherence belongs to H1; H2 retains extended membership/code evidence, tampering,
+fresh-process MLflow and live acceptance tests. Do not expose a cleaned training
+path with an unfiltered promotion holdout.
 
 Primary files: `integrations/databricks/project.py`, `local_retraining.py`,
 `workflow_config.py`, `job_runtime.py`, generated `src/preprocessing.py`, preview,
 and the existing integration test modules. Reuse `leakage.py`, registry and node
 implementations; only amend Core if a reproduced shared defect requires it.
 
-- [ ] Add failing tests for configured filters executing BEFORE the real Bundle
+- [x] Add failing tests for configured filters executing BEFORE the real Bundle
   split and for StandardScaler/mean imputation/unknown custom code being refused
   before reading/fitting data. Test the actual train entrypoint, not only a helper.
-- [ ] Add optional `build_pre_split_steps()` in the SAME project Python file;
+- [x] Add optional `build_pre_split_steps()` in the SAME project Python file;
   absent/empty means existing behavior. It returns ordinary Core step dictionaries.
-  The name is a planned API until implemented. Keep build_preprocessing unchanged.
-- [ ] Reuse step_learns_from_data with authoritative target context for admission;
+  build_preprocessing remains unchanged.
+- [x] Reuse step_learns_from_data with authoritative target context for admission;
   independently enforce the narrower initial row-filter contract. Do not treat
   on_leakage=warn/ignore or a no-split advisory as permission to bypass that contract.
-- [ ] Require explicit existing filter columns/bounds, rejecting missing-column
+- [x] Require explicit existing filter columns/bounds, rejecting missing-column
   silent no-ops. Preserve identities and target pairing. Training-target missingness
   may be an explicit filter, never an automatic inference rule.
-- [ ] Apply filters via existing calculators/appliers using the selected engine,
+- [x] Apply filters via existing calculators/appliers using the selected engine,
   then convert only at the existing splitter boundary if needed. Keep loaded raw
   data within current row/byte limits; cleanup is not a way to exceed read budgets.
-- [ ] Make source projection include declared filter-only columns without exposing
+- [x] Make source projection include declared filter-only columns without exposing
   them as model features. Do not remove/overwrite keys or required time metadata.
   Invalid keys remain explicit errors; duplicate resolution is separate scope.
-- [ ] Fix and document order: source snapshot/window/availability selection,
+- [x] Fix and document order: source snapshot/window/availability selection,
   optional current deterministic source sample, bounded transfer, training filters,
   final train/holdout split, fold-local learned FE/model. Do not silently move or
   refill the existing source sample; report that filters can reduce its final size.
-- [ ] Save requested filters and counts by step. Report empty/undersized partitions
+- [x] Save requested filters and counts by step. Report empty/undersized partitions
   and stratification failures clearly before model publication. Report metrics as
   evaluated on the declared eligible population, with exclusion counts visible.
-- [ ] Test both engines, null/NaN, duplicated pandas indices, missing target,
+- [x] Test both engines, null/NaN, duplicated pandas indices, missing target,
   all-rejected input, explicit bounds, key/order/label preservation, sample size,
   random/temporal split and CV. Preserve existing learned-before-split failures.
-- [ ] Document an English same-file example and offline preview of phase order.
+- [x] Document an English same-file example and offline preview of phase order.
 
-Suggested project recipe (NOT implemented yet):
+Implemented project recipe:
 
 ```python
 def build_pre_split_steps():
@@ -159,11 +167,11 @@ def build_pre_split_steps():
 
 ## SM-33H2 — Saved cleanup evidence, lifecycle replay and acceptance
 
-Status: WAIT for SM-33H1. Required before marking the combined feature complete.
+Status: READY after SM-33H1. Required before marking the combined feature complete.
 
 Primary files: `local_retraining.py`, `local_approval.py`, `local_workflow.py`,
 existing training evidence/manifest helpers, MLflow tests, generated preview/README
-and `docs/user_guide/databricks_bundle.md`.
+and `docs/user_guide/databricks_bundle_walkthrough.md`.
 
 - [ ] Add failing artifact/approval tests first: change the editable Python file
   after training; approval must still reconstruct the exact original holdout.
@@ -185,14 +193,117 @@ and `docs/user_guide/databricks_bundle.md`.
   Databricks rehearsal and execute only within explicit live authorization; record
   local and live results separately. Do not claim local evidence proves live support.
 
+## SM-33H3 — All existing nodes in the correct phase
+
+Status: WAIT for SM-33H2. User-requested on 2026-09-26; required before SM-34.
+This is planned work, not delivered by the inventory audit or H1.
+
+**Goal:** Make every existing Core preprocessing node usable through the local
+Bundle in its appropriate phase, reusing the implementation and preserving
+training, holdout, CV, artifact and inference semantics on pandas and Polars.
+
+**User decision:** Prioritize existing cleaning nodes in the right order. Do not
+implement the newly suggested generic business-rule filter, group-disjoint split
+or data-quality threshold system now. No new cleaning algorithm is requested.
+Broad native Spark expansion and new temporal-history retrieval remain separate.
+
+**Follow-up request:** Allow project-owned custom pre-split logic in the same
+Python file, analogous to custom ordinary preprocessing. This is a planned
+extension; the current H1 gate still rejects custom pre-split nodes. Reuse the
+existing custom-step/source snapshot machinery. The final registration API must
+be settled before implementation; no new callable API is promised by this note.
+
+**Architecture:** Keep `build_pre_split_steps()` and `build_preprocessing()` in
+the same generated `src/preprocessing.py`. Reuse the registry, operation-aware
+leakage classifier, Calculator/Applier implementations and saved project code.
+All-node coverage means valid placement for each node/mode, not permission to
+run every node before split. Ordinary preprocessing already supports many nodes;
+extend only demonstrated integration gaps rather than wrapping each node again.
+
+**Files and responsibilities:**
+
+- `skyulf-core/skyulf/registry.py`, `leakage.py` and `preprocessing/`: authoritative
+  inventory, parameter-dependent placement, fit/apply, row alignment and replay.
+  Change shared behavior only for reproduced defects with regression coverage.
+- `skyulf-core/skyulf/integrations/databricks/project.py`, `local_retraining.py`,
+  `workflow_config.py`, `local_cv.py`, `local_approval.py`, `local_workflow.py`:
+  load ordered recipes, project source columns, enforce phase boundaries and
+  reproduce saved evaluation inputs. Reuse existing paths rather than a parallel
+  node-execution framework.
+- `skyulf-core/skyulf/inference/local_pipeline.py`, `project_code.py` and existing
+  MLflow integration: preserve necessary normalization and fitted state when a
+  raw scoring frame is supplied; never require the training target at inference.
+- Extend `skyulf-core/tests/integrations/test_databricks_pre_split_filters.py`,
+  `test_databricks_project_preprocessing.py`, `test_databricks_local_cv.py`,
+  `test_databricks_local_approval.py` and relevant existing Core node tests.
+- Generated `src/preprocessing.py`, `README.md.tmpl` and
+  `docs/user_guide/databricks_bundle_walkthrough.md`: editable Python examples,
+  placement matrix and explicit training-only versus prediction behavior.
+
+Acceptance sequence:
+
+- [ ] Inventory every current registry node and alias, grouping parameter modes
+  that change placement or row behavior. Start from the audited 58 calculator
+  classes / 62 IDs, but detect registry additions rather than freezing that count.
+  Record valid pre-split, post-split, train-only, heldout and inference behavior,
+  engine/dependency requirements and the test covering each route. Include text,
+  geo, inspection and temporal nodes; do not silently omit optional families.
+- [ ] Add failing tests for missing integration first. Include an ordered
+  `ValueReplacement(-999 -> null) -> DropMissingRows` recipe, text/alias/casting
+  normalization before cleanup and fixed invalid-value handling. Specify how
+  normalization affects keys, target and time columns; preserve source identity
+  and source-window semantics or reject conflicting configurations explicitly.
+- [ ] Integrate safe fixed modes through existing Core implementations. Keep
+  learned imputation/scaling/encoding/binning/feature selection after split and
+  refit them inside training folds. Admit modes using shared leakage rules;
+  constant/fixed and learned modes of one node must not be conflated.
+- [ ] Integrate existing Deduplicate subset/keep behavior with deterministic
+  ordering, preserved X/y alignment and explicit target-conflict handling. Test
+  duplicate source keys separately from duplicate features; do not silently
+  remove current key guards or collapse different observations of one customer.
+  This reuses Deduplicate and does not introduce group-aware splitting.
+- [ ] Cover remaining existing node families in ordinary preprocessing using
+  real recipes. Keep resampling train/fold-only, splitters at the workflow split
+  boundary and inspection nodes read-only. Validate existing lag/rolling order,
+  history requirements and row preservation without inventing history retrieval.
+  A rejection of invalid placement must not substitute for testing valid usage.
+- [ ] Save and replay ordered normalization exactly once for raw heldout/scoring
+  input and manual/automatic comparison. Train-only row exclusions must not drop
+  prediction requests. Handle target-only normalization without requiring target
+  at inference; detect incompatible recipe/schema/state before publication.
+- [ ] Design and implement explicit opt-in custom pre-split steps in the same
+  `src/preprocessing.py`, reusing source-isolated custom Calculator/Applier
+  registration and saved code. Start with fixed training-row eligibility, for
+  example excluding project test accounts, with declared required columns and
+  row effects. Do not create a new built-in business-rule filter for this.
+  Preserve immutable source keys, row order and target pairing; reject added
+  rows, undeclared column changes, missing inputs and invalid return types. For
+  custom normalization, reuse the saved once-only inference replay contract
+  above rather than treating value changes as a row filter. Keep learned custom
+  statistics in post-split/fold-local preprocessing. Metadata is an explicit
+  developer assertion, not proof that arbitrary Python is leakage-free; document
+  this limitation and do not silently exempt all existing custom nodes.
+- [ ] Test custom pre-split behavior on both engines, saved-source approval
+  replay after editing the project file, and target-free inference that omits
+  training-only filters. Include negative row/key/target mutation cases and an
+  English commented Bundle example. Preserve absent/empty-hook behavior and
+  existing custom ordinary preprocessing compatibility.
+- [ ] Test mixed chains and each supported node/mode on pandas and Polars through
+  fit, heldout evaluation, CV and fresh-process local/MLflow artifact loading.
+  Assert feature values/order, row identity, target alignment and prediction
+  equivalence; test unseen categories, nulls and no-op configuration. Exercise
+  optional dependency lanes explicitly and report unverified cases as open.
+- [ ] Update offline preview and English Python examples with the actual order
+  and supported placement for every existing node. Run relevant Core/integration
+  suites, Ruff, full ty, real CLI generation, strict generated Bundle validation
+  and strict docs. Plan a bounded live rehearsal under the applicable explicit
+  authorization; keep local and live evidence separate. Close only after the
+  matrix has evidence or an explicitly tracked remaining limitation per mode.
+
 ## SM-36a remaining policy work (explicitly separate)
 
-- [ ] Review pre-split duplicate handling: exact vs entity duplicates, target conflicts,
-  deterministic keeper ordering and group isolation across folds/holdout. Reproduce
-  current behavior and change shared Core/backend policy only with parity tests.
-- [ ] If feature-changing operations are moved before split, capture/reapply their
-  fixed transformations exactly once for heldout/raw inference. Preserve raw input
-  schema and do not silently omit or double-apply source normalization.
+- Existing Deduplicate integration and fixed normalization replay moved to
+  SM-33H3. Group-disjoint split is parked; it is not part of that dedup task.
 - [ ] Add explicit keyed scoring eligibility/rejection results, coverage counts and
   incremental cursor/publication semantics; no silent row loss or retry loops.
 - [ ] Separately assess lag/rolling history, group and temporal boundaries and serving
@@ -216,3 +327,109 @@ and `docs/user_guide/databricks_bundle.md`.
   Add runtime/approval/MLflow tests above before marking H1/H2 complete. Broaden
   to existing Bundle/runtime/CV suites; run scoped Ruff, full ty, CLI validation
   and docs checks. Commit only after the applicable checks pass.
+
+
+## SM-33H1 delivery evidence (2026-09-26)
+
+Baseline temporal guards were committed as `522c6e82` with DCO and passing hooks.
+The H1 implementation is included in the requested delivery commit. Initial real training tests failed before
+implementation; the affected integration group then passed 202 tests. Review
+found repeated engine conversions, large-integer target comparison loss and a
+missing saved-cleanup manual approval test. All were fixed; scoped re-review
+approved the changes. Polars now stays native across the complete filter chain.
+
+Final verification after those fixes:
+
+- 71 affected tests passed, including both engines, real local-MLflow approval
+  replay, generated-notebook loading and post-filter stratification failure.
+- The broader Bundle/runtime/CV run passed 128 tests and exposed four stale
+  generated-notebook fixtures. After repairing their directory layout, the full
+  notebook module passed all 16 tests (also included in the final 71 above).
+- 56 real Databricks CLI generation tests passed. A newly built wheel was placed
+  in a generated project's dist directory; strict dev Bundle validation passed.
+- Real local WSL Spark/Delta regression passed (1 test, 14 deselected): source
+  sampling precedes explicit target cleanup, with no sample refill. The Windows
+  environment's missing-Delta skip is not counted as verification.
+- Focused Ruff/format, repository ty and final strict MkDocs passed.
+
+The saved training specification carries the recipe, and pre_split_filters.json
+reports requested steps and per-step exclusions. Automatic/manual comparison
+replays the filtered split. H2 still owns extended code/survivor integrity,
+fresh-process MLflow and live acceptance. No deployment or live Databricks job
+was executed in H1. Initial bounds accept numeric non-Boolean columns only.
+
+## Full preprocessing inventory and reuse correction (2026-09-26)
+
+The follow-up review inventoried all 94 Python files under preprocessing:
+58 registered calculator classes expose 62 registration IDs, including aliases.
+It inspected registrations, fit/apply entrypoints, parameter modes and execution
+helpers, with deeper source review and targeted tests for the cleaning, casting,
+validation, filtering, split and inference behaviors discussed with the user.
+This is a capability/placement audit, not a claim that every node was retested
+on every engine or on Databricks.
+
+Earlier conversational suggestions overstated missing functionality. Reuse the
+following implementations instead of adding parallel cleaning algorithms.
+
+| Family | Existing implementations | Placement and remaining integration |
+| --- | --- | --- |
+| Text normalization | TextCleaning: trim, case, special characters, regex operations | Existing saved FE; not admitted to H1's row-filter-only pre-split recipe. |
+| Explicit value mapping | ValueReplacement: flat/per-column mapping and to_replace/value; AliasReplacement: boolean, country, custom aliases | Sentinel and category normalization already exist. They are value transformations, not generic row predicates. |
+| Invalid numeric values | InvalidValueReplacement: positive/negative infinity, negative/zero rules, configured ranges and age/percentage presets | Replacement already exists; distinguishes replacing a cell from removing its row. |
+| Types | Casting: numeric, integer, Boolean, text, datetime and categorical modes; coerce_on_error | Strict/coercing modes already exist. Categorical vocabulary is learned. Casting uses mixed date parsing; it is not the Bundle's explicit timestamp/timezone policy. |
+| Missingness | DropMissingRows, DropMissingColumns, MissingIndicator | H1 admits explicit row cleanup. Positive column-missingness thresholds and automatic missing-indicator selection learn from data. |
+| Duplicate rows | Deduplicate: subset, first/last/none, aligned target filtering on both engines | Algorithm exists. Pre-split eligibility, deterministic keeper policy and group leakage remain separate work. H1 rejects duplicate record keys before filtering. |
+| Bounds/outliers | ManualBounds, IQR, ZScore, EllipticEnvelope, Winsorize | ManualBounds is admitted in H1. Statistical methods fit after split. Winsorize clips values and does not remove rows. |
+| Imputation | SimpleImputer, KNNImputer, IterativeImputer | Reuse learned train/fold state. Constant imputation is a fixed mode, but remains ordinary FE in H1. |
+| Scaling | StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler | Existing learned FE, after split and inside training folds. |
+| Encoding | LabelEncoder, OrdinalEncoder, OneHotEncoder, DummyEncoder, HashEncoder, TargetEncoder, WOEEncoder | Existing encoders; target encoding is not target-domain validation. Hash and target-only modes have parameter-specific leakage rules. |
+| Binning/transforms | GeneralBinning, CustomBinning, KBinsDiscretizer, SimpleTransformation, GeneralTransformation, PowerTransformer | Fixed edges/formulas differ from learned edges/power parameters; reuse operation-aware admission. |
+| Feature construction | FeatureGeneration/FeatureMath aliases, FeatureInteraction, PolynomialFeatures aliases | Arithmetic, ratio, similarity, datetime extraction and training-fitted group aggregates exist. No generic Boolean row-filter node was found. Group aggregates are not group-aware splitting. |
+| Feature selection | VarianceThreshold, CorrelationThreshold, UnivariateSelection, ModelBasedSelection and feature_selection facade | Existing learned selection; reuse after split. |
+| Time/geography | DateFeatures, LagFeatures, RollingAggregate, GeoDistance, H3Index | Existing feature generation. Temporal history/availability constraints remain explicit; the guard fixes do not provide historical data retrieval. |
+| Text vectors | tokenizer, count_vectorizer, tfidf_vectorizer, hashing_vectorizer, sentence_embedder | Existing implementations; not required to add pre-split cleaning. Optional dependencies and inference portability remain node-specific. |
+| Class balance | Oversampling and Undersampling, including random/SMOTE-family and cleaning methods | Already implemented. Train/fold-only; never use synthetic/resampled rows as the holdout. |
+| Splitting | Split/TrainTestSplitter aliases, feature_target_split | Random/stratified split exists here; Bundle temporal selection exists outside this folder. No group-disjoint split configuration was found in the audited Core/Bundle split paths. |
+| Inspection | DatasetProfile and DataSnapshot | Existing statistics/sample artifacts, not automatic quality-threshold enforcement. |
+| Shared execution | base, dispatcher, pipeline, fold_adapter, schema/artifact/portable-state helpers and Spark adapters | Reuse existing fit/apply, row alignment, schema checks and fold-local fitting. Local support does not imply native Spark support. |
+
+Related existing validation outside preprocessing also matters:
+
+- `skyulf/profiling/expect.py` provides `expect_columns_exist`, `expect_no_nulls`,
+  `expect_unique` and `expect_value_range`, with pandas/Polars handling. These
+  raise validation errors; they do not remove rows. Range checks ignore missing
+  values, so combine with a no-null check when missing values are forbidden.
+- `skyulf/core/schema.py` supplies schema compatibility checks, including opt-in
+  dtype and column-order checks. A schema check is not a full value-quality check.
+- H1 already records per-step exclusions and guards key/target alignment. Those
+  counts are not yet a configurable maximum-exclusion-rate or class-loss gate.
+
+Audit candidates below are historical suggestions, not newly implemented work.
+The subsequent user decision activates existing-node integration under SM-33H3;
+new predicates, group splitting and data-quality thresholds are parked.
+
+1. A declared row-predicate contract for equality/membership/AND/OR and column
+   comparisons. Check null semantics, identity preservation and replay before
+   admitting it; do not pretend an arbitrary Python callback is validated.
+2. Reuse fixed normalization nodes before filtering only with an explicit saved
+   train/inference normalization contract. Otherwise keep them in ordinary FE
+   or in the source preparation shared by training and scoring.
+3. Reuse Deduplicate with a reviewed duplicate policy; add group-disjoint splitting
+   where the evaluation objective requires it. Repeated customer observations
+   are not automatically duplicate records.
+4. Connect existing expectations/counts to configurable quality gates. Extend
+   only missing rules such as allowed target labels, cross-column consistency
+   and maximum exclusion fraction. These are not all preprocessing nodes.
+5. Feature availability and join cardinality belong to source/temporal contracts;
+   neither a splitter nor a fixed-transformation flag proves those properties.
+
+The updated sequence is SM-33H2 -> SM-33H3 -> SM-34. SM-36a retains the separate
+scope above. This review does not open every existing node to pre-split use or
+modify runtime code.
+
+Fresh verification: 1,448 focused cleaning/casting/missingness/leakage/schema/
+expectation/Bundle tests passed; 147 additional value-replacement, inspection,
+split and resampling tests passed (1,595 total). One joblib Windows physical-CPU
+detection warning fell back to logical cores. No Databricks execution occurred.
+Logs: `.cache/preprocessing-audit-20260926.log` and
+`.cache/preprocessing-audit-extra-20260926.log`.

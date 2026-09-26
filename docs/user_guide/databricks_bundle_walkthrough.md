@@ -19,6 +19,19 @@ the generated dev bindings; supply the matching catalog/schema/suffix arguments
 when reviewing another target. Edit preprocessing and custom fit/apply code in
 `src/preprocessing.py`; keep model hyperparameters in `config/workflow.json`.
 Preview executes the trusted recipe without itself fitting or reading data.
+The same file can define `build_pre_split_steps()` for explicit training
+eligibility. It accepts `DropMissingRows` with named columns and optional Core
+`how`, `threshold`, or `missing_threshold` rules; `ManualBounds` requires numeric,
+non-Boolean columns and explicit finite bounds. Learned steps remain in
+`build_preprocessing()`. The order
+is snapshot/window selection, optional seeded source sample, bounded transfer,
+label-availability selection, training filters, final split, then fold-local
+preprocessing and model fit. Sampling selects available labels before its
+seeded key choice; without sampling, availability is selected after the bounded
+transfer. Filtering can shrink the selected sample without refilling it.
+Holdout metrics cover the remaining eligible rows; `pre_split_filters.json`
+records the requested steps and exclusions per step. Preview shows the phase
+order without reading source data or predicting exclusion counts.
 Training saves the Python source with the model, so later file edits do not
 change existing-model inference. Model/node listings come from the Core registry.
 See [guided setup](databricks_bundle.md#guided-setup-and-offline-preview).

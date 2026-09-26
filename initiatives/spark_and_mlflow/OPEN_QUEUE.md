@@ -43,7 +43,7 @@ The user added a mandatory pre-SM-34 sequence for optional dates, clear names,
 explicit timezone parsing and Core split/CV reuse. Read the
 [training data contract plan](54-training-data-contract-plan.md).
 SM-33 was committed as `0c0fd17f`; subsequent tasks are separate work.
-**SM-32 through SM-33G are DONE for their documented scopes. SM-33H1 is READY: reuse existing Core leakage rules for pre-split training cleanup. SM-33H2 covers saved evidence/replay. SM-34 waits for this new user-requested sequence.**
+**SM-32 through SM-33H1 are DONE for their documented scopes. SM-33H2 is READY: extended saved cleanup evidence/replay validation. SM-33H3 then integrates every existing preprocessing node in its correct phase. SM-34 waits for both. New generic row predicates, group-aware splitting and data-quality thresholds are parked at the user's request.**
 See [the operation audit and implementation tasks](62-pre-split-cleaning-and-leakage-plan.md).
 See [guided setup and live acceptance](60-sm33e-guided-setup-and-live-validation.md):
 both engines passed training/CV/MLflow/approval, 240 + 3 predictions and no-op
@@ -92,12 +92,13 @@ on an existing candidate without retraining or reuploading the model.
 | SM-33E | Training setup examples, operator guide and live acceptance | SM-33A through SM-33D | DONE | Guided setup/preview; 48 actual CLI tests; live pandas/Polars train/CV/MLflow/approval, 240 + 3 rows and no-op; [evidence](60-sm33e-guided-setup-and-live-validation.md) |
 | SM-33F | Clear initializer questions and task-specific choices | SM-33E | DONE | Plain columns, named prediction output, Python Core/custom FE with saved source, task-specific menus and enabled generic cron; 56 CLI + 227 local tests; [evidence](61-bundle-initializer-usability.md) |
 | SM-33G | Answer-driven setup without data inspection | SM-33F | DONE | Declare timestamp/local clock/date/text; only relevant parsing questions; CV/schedule/compute branches verified; 37 local + 56 CLI tests, strict dev validation; [evidence](61-bundle-initializer-usability.md#sm-33g-follow-up-answer-driven-questions) |
-| SM-33H1 | Core-backed pre-split training cleanup | SM-33G | READY | Same-file ordered recipe, shared operation-aware leakage gate; initially DropMissingRows/ManualBounds; keys/labels, limits, sampling order and both engines; [plan](62-pre-split-cleaning-and-leakage-plan.md) |
-| SM-33H2 | Cleanup artifact evidence and lifecycle replay | SM-33H1 | WAIT | Saved rules/code/survivors, identical approval holdout, candidate/champion comparison population, CV/MLflow parity and scoring without target; local/live evidence kept separate |
-| SM-34 | Independent score/train schedules and training windows | SM-33H2 | WAIT | Editable independent score/train cron/timezone/pause controls; selected schedules enabled by default; explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
+| SM-33H1 | Core-backed pre-split training cleanup | SM-33G | DONE | Same-file DropMissingRows/ManualBounds recipe, Core leakage admission, both engines, saved recipe and minimum approval replay; local Delta and CLI validation passed; [evidence](62-pre-split-cleaning-and-leakage-plan.md) |
+| SM-33H2 | Cleanup artifact evidence and lifecycle replay | SM-33H1 | READY | Extended saved code/survivor evidence, identical approval holdout, candidate/champion comparison population, CV/MLflow parity and scoring without target; local/live evidence kept separate |
+| SM-33H3 | All existing nodes in the correct pre-split/preprocessing phase | SM-33H2 | WAIT | Registry-complete node/mode matrix; reuse Core nodes, ordered fixed cleanup and existing dedup, fold-local learned FE, train-only resampling, saved normalization/inference replay, pandas/Polars tests and Python examples; [scope](62-pre-split-cleaning-and-leakage-plan.md#sm-33h3--all-existing-nodes-in-the-correct-phase) |
+| SM-34 | Independent score/train schedules and training windows | SM-33H3 | WAIT | Editable independent score/train cron/timezone/pause controls; selected schedules enabled by default; explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
 | SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |
 | SM-36 | Core tuning, model search and optional explainability | SM-35 | WAIT | Guided advanced search on a selected base model; existing hyperparameter_tuner/TuningConfig and shared CV settings; Core spaces/trials/FE, validated budgets, protected holdout and MLflow/inference parity; routing audit in report 58 |
-| SM-36a | Project-owned feature engineering and output rules | SM-33D, SM-33H2 | WAIT | SM-33F delivers single-file custom FE. Remaining: duplicate/group/temporal policy, shared normalization replay, keyed scoring exclusions, broader packaging and output rules; reports 58/62 |
+| SM-36a | Project-owned feature engineering and output rules | SM-33D, SM-33H3 | WAIT | SM-33F delivers single-file custom FE; existing node placement/normalization/dedup moves to H3. Remaining: temporal context, keyed scoring exclusions, broader packaging and output rules. New group-split/predicate/data-quality gates are parked; reports 58/62 |
 | SM-36b | Multiple training branches from one pinned source | SM-36, SM-36a | WAIT | Per-target pipelines/labels/tuning/metrics, linked MLflow runs, reproducible splits and bounded execution; keep multiple models rather than selecting one winner |
 | SM-36c | Composed multi-model scoring and model-set lifecycle | SM-36b | WAIT | Pin component versions and rule code in a versioned set; keyed outputs, all-or-nothing final publication, append/full provenance and coherent rollback |
 | SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | WAIT | Per-target run_as/permissions/hosts/roots; one lifecycle writer; scoring cannot move aliases; actual denial and lifecycle queue evidence |
@@ -128,8 +129,18 @@ first sections, SM-36/36a/b/c extend them, and SM-42 completes the combined setu
 The initial guided sections and fixed-model CV are delivered through SM-33D/E.
 Single-file custom feature code is delivered in SM-33F. Advanced search, broader
 packaging and multiple-model scenarios remain planned. The user's pre-split
-cleanup request adds SM-33H1/H2 before SM-34; the first slice reuses existing
+cleanup request adds SM-33H1/H2/H3 before SM-34; the first slice reuses existing
 DropMissingRows/ManualBounds and Core leakage checks, not a new cleaning engine.
+The latest user decision prioritizes using ALL existing nodes in their correct
+phases through the same Python recipe. H3 covers mode-aware placement and
+train/holdout/CV/artifact/inference behavior on pandas and Polars. It does not
+permit learned nodes before split or enable a second split inside the workflow.
+New generic business-rule filters, group-disjoint splitting and configurable
+data-quality rejection thresholds are outside this active sequence.
+The user's follow-up adds opt-in custom pre-split code to H3 using the same
+preprocessing.py and existing saved-source mechanism. Explicit row/column
+contracts and replay tests are required; arbitrary Python is not automatically
+leakage-certified. This is extensibility, not a new built-in filter node.
 
 The requested pre-task temporal review is complete (2026-09-26): Core now rejects
 missing declared sort columns, invalid direct lag shifts and known current-target
@@ -137,7 +148,10 @@ rolling; backend admission shares the target guard. Verified with 1,981 Core and
 1,731 backend tests, Ruff, ty and strict MkDocs. This does not deliver automatic
 history/availability handling: forecast horizon, cross-batch context retrieval,
 missing/tied time policy and context-row removal remain SM-36a (report 62).
-SM-33H1 remains the next READY implementation task.
+SM-33H1 completed after committing the review as `522c6e82`; its implementation
+and the H3 plan are included in the requested delivery commit. Final affected tests: 71 passed; CLI generation: 56
+passed; real local WSL Delta: 1 passed. Ruff, full ty, strict docs and generated
+dev Bundle validation passed. No deployment or live Databricks job in this slice.
 
 | Task | Status | Dependency / scope |
 | --- | --- | --- |

@@ -192,6 +192,7 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         record_key_columns=tuple(config["record_key_columns"]),
         input_columns=tuple(config["input_columns"]),
         target_column=config["target_column"],
+        pre_split_steps=tuple(config.get("pre_split_steps", ())),
         max_rows=config["max_rows"],
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         event_time_parsing=training_date_spec(
@@ -325,7 +326,7 @@ def _automatic_promotion(
     report = candidate.comparison
     spec = replace(spec, holdout_key_sha256=candidate.holdout_key_sha256)
     frame = read_training_snapshot(spark, spec)
-    _, heldout, _ = split_labeled_snapshot(frame, spec)
+    _, heldout, _ = split_labeled_snapshot(frame, spec, engine=config["engine"])
     native = pl.from_pandas(heldout) if config["engine"] == "polars" else heldout
     options = {
         "target_column": spec.target_column,

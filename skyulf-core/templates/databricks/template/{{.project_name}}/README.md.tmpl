@@ -35,7 +35,7 @@ missing manual training pins. `--action train` additionally requires a concrete
 source version and any manual dates. `--action train_monthly` checks the automatic
 selection policy. Preview executes your trusted Python recipe to list its steps;
 it does not itself read data, train or deploy. Keep data access and training out
-of module-level code and `build_preprocessing()`. The preview
+of module-level code and both recipe functions. The preview
 uses the generated dev catalog/schema defaults; for another target pass
 `--catalog`, `--input-schema`, `--output-schema`, `--metadata-schema` and
 `--resource-suffix` with the same values used by your Bundle target/overrides.
@@ -47,6 +47,35 @@ It starts empty. Keep `pipeline.preprocessing` empty in JSON; the Python recipe
 supplies the actual Core step list. IDs and metadata defaults come
 from the installed Core registry via the list commands above; a registry listing
 does not guarantee every option/dependency is usable in your target environment.
+
+For training eligibility, edit `build_pre_split_steps()` in the same Python
+file. It starts empty and accepts only Core `DropMissingRows` with an explicit
+`subset` (and optional `how`, `threshold`, or `missing_threshold`), or
+`ManualBounds` with explicit finite numeric bounds. For example:
+
+```python
+def build_pre_split_steps():
+    """Keep known targets and plausible ages for training and evaluation."""
+    return [
+        {"name": "known_target", "transformer": "DropMissingRows",
+         "params": {"subset": ["target"], "how": "any"}},
+        {"name": "valid_age", "transformer": "ManualBounds",
+         "params": {"bounds": {"age": {"lower": 0, "upper": 120}}}},
+    ]
+```
+
+The named columns must exist in the training source. `age` may be used only
+for filtering; it need not be a model input. Bounds require numeric source
+columns; Boolean columns are rejected. These filters run after source snapshot/window selection, the optional
+seeded source sample, bounded local read, and label-availability selection.
+Availability is selected before sampling when sampling is enabled; without a
+sample it is selected after the bounded read. Filters run before the final
+train/holdout split and fold-local learned preprocessing.
+The sample is never refilled: filtering can leave fewer rows than requested.
+Both fit and held-out metrics use the remaining eligible population, with
+requested steps and per-step exclusions in `pre_split_filters.json`. Missing
+training targets require an explicit target filter; otherwise training fails.
+Keep learned imputation, scaling and custom code in `build_preprocessing()`.
 
 For example, replace the empty Python recipe with the following steps
 after changing `income` and `age` to your actual numeric feature names:
