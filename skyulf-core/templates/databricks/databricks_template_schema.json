@@ -5,300 +5,899 @@
       "order": 1,
       "type": "string",
       "default": "skyulf_local",
-      "description": "Bundle name (letters, digits and underscores)",
+      "description": "1. Basics and data | Bundle name (letters, digits and underscores)",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
     "engine": {
       "order": 2,
       "type": "string",
       "default": "pandas",
-      "description": "Local fit and prediction engine",
-      "enum": ["pandas", "polars"]
+      "description": "1. Basics and data | Local fit and prediction engine",
+      "enum": [
+        "pandas",
+        "polars"
+      ]
     },
-    "retraining_mode": {
-      "order": 12,
+    "task": {
+      "order": 3,
       "type": "string",
-      "default": "manual",
-      "description": "Train manually, or add a paused monthly schedule to the same train job",
-      "enum": ["manual", "monthly_paused"]
-    },
-    "model_change_mode": {
-      "order": 13,
-      "type": "string",
-      "default": "incremental_append",
-      "description": "Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
-      "enum": ["incremental_append", "full_rebuild"]
-    },
-    "score_model_selection": {
-      "order": 16,
-      "type": "string",
-      "default": "pinned_version",
-      "description": "Score with one pinned version or resolve the controlled champion on each run",
-      "enum": ["pinned_version", "champion"]
-    },
-    "promotion_policy": {
-      "order": 17,
-      "type": "string",
-      "default": "manual_approval",
-      "description": "Require operator approval or promote automatically after quality gates pass",
-      "enum": ["manual_approval", "automatic"]
-    },
-    "score_handoff": {
-      "order": 18,
-      "type": "string",
-      "default": "disabled",
-      "description": "Optionally run the existing score job after champion initialization, promotion or rollback; score keeps its selected model policy",
-      "enum": ["disabled", "after_alias_change"]
-    },
-    "metric": {
-      "order": 19,
-      "type": "string",
-      "default": "auto",
-      "description": "Heldout comparison metric; auto selects RMSE for regression or accuracy for classification",
-      "enum": ["auto", "heldout_mae", "heldout_mse", "heldout_rmse", "heldout_r2", "heldout_mape", "heldout_explained_variance", "heldout_accuracy", "heldout_balanced_accuracy", "heldout_precision_weighted", "heldout_recall_weighted", "heldout_f1_weighted", "heldout_matthews_corrcoef", "heldout_precision", "heldout_recall", "heldout_f1", "heldout_g_score", "heldout_log_loss", "heldout_roc_auc", "heldout_pr_auc", "heldout_roc_auc_ovr_weighted", "heldout_roc_auc_weighted", "heldout_roc_auc_ovr", "heldout_roc_auc_ovo", "heldout_roc_auc_ovo_weighted", "heldout_pr_auc_weighted"]
-    },
-    "min_improvement": {
-      "order": 20,
-      "type": "number",
-      "default": 0.0,
-      "minimum": 0,
-      "description": "Minimum metric improvement required for manual or automatic promotion; ties never pass"
-    },
-    "quality_threshold": {
-      "order": 21,
-      "type": "string",
-      "default": "null",
-      "description": "Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
-      "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$"
-    },
-    "retraining_cron_expression": {
-      "order": 14,
-      "type": "string",
-      "default": "0 0 3 3 * ?",
-      "description": "Editable Quartz cron for the paused training job; use one run per month",
-      "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
-      "skip_prompt_if": {"properties": {"retraining_mode": {"const": "manual"}}}
-    },
-    "retraining_timezone_id": {
-      "order": 15,
-      "type": "string",
-      "default": "UTC",
-      "description": "IANA timezone used by the paused training schedule; training windows remain UTC months",
-      "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
-      "skip_prompt_if": {"properties": {"retraining_mode": {"const": "manual"}}}
-    },
-    "compute_mode": {
-      "order": 4,
-      "type": "string",
-      "default": "serverless",
-      "description": "Job compute mode for this project",
-      "enum": ["serverless", "policy_cluster"]
+      "default": "regression",
+      "description": "1. Basics and data | Model task; selects a starting estimator and automatic heldout metric",
+      "enum": [
+        "regression",
+        "classification"
+      ]
     },
     "catalog": {
-      "order": 5,
+      "order": 4,
       "type": "string",
       "default": "workspace",
-      "description": "Existing dev Unity Catalog catalog",
+      "description": "1. Basics and data | Existing dev Unity Catalog catalog",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "schema": {
-      "order": 6,
+      "order": 5,
       "type": "string",
       "default": "default",
-      "description": "Existing dev Unity Catalog schema",
+      "description": "1. Basics and data | Existing dev Unity Catalog schema",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
-    "cluster_policy_name": {
-      "order": 7,
-      "type": "string",
-      "default": "REPLACE_WITH_APPROVED_POLICY",
-      "description": "Approved job-cluster policy name",
-      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
-    },
-    "spark_version": {
-      "order": 8,
-      "type": "string",
-      "default": "17.3.x-cpu-ml-scala2.13",
-      "description": "Approved Databricks ML Runtime for the job cluster",
-      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
-    },
-    "node_type_id": {
-      "order": 9,
-      "type": "string",
-      "default": "REPLACE_WITH_NODE_TYPE",
-      "description": "Approved job-cluster node type",
-      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
-    },
-    "cost_tag_key": {
-      "order": 10,
-      "type": "string",
-      "default": "CostCenter",
-      "description": "Approved cluster cost tag key, for example CostCenter or PayingRegNo",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
-    },
-    "cost_tag_value": {
-      "order": 11,
-      "type": "string",
-      "default": "REPLACE_WITH_COST_TAG",
-      "description": "Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
-      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
-    },
-    "risk_category": {
-      "order": 22,
-      "type": "string",
-      "default": "",
-      "description": "Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
-      "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$"
-    },
-    "task": {
-      "order": 23,
-      "type": "string",
-      "default": "regression",
-      "description": "Model task; selects a starting estimator and automatic heldout metric",
-      "enum": ["regression", "classification"]
-    },
     "source_table_name": {
-      "order": 24,
+      "order": 6,
       "type": "string",
       "default": "",
-      "description": "Existing source table name within the input schema; blank uses <project_name>_source",
+      "description": "1. Basics and data | Existing source table name within the input schema; blank uses <project_name>_source",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
     "score_source_table_name": {
-      "order": 25,
+      "order": 7,
       "type": "string",
       "default": "",
-      "description": "Existing scoring table name within the input schema; blank reuses the training source",
+      "description": "1. Basics and data | Existing scoring table name within the input schema; blank reuses the training source",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
     "record_key_columns_json": {
-      "order": 3,
+      "order": 8,
       "type": "string",
       "default": "[\"entity_id\"]",
-      "description": "Existing record identity columns as a JSON array, e.g. [\"customer_id\"] or [\"customer_id\", \"observation_id\"]",
+      "description": "1. Basics and data | Existing record identity columns as a JSON array, e.g. [\"customer_id\"] or [\"customer_id\", \"observation_id\"]",
       "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
     },
     "input_columns_json": {
-      "order": 26,
+      "order": 9,
       "type": "string",
       "default": "[\"feature_value\"]",
-      "description": "JSON array of existing model feature columns; exclude keys and target",
+      "description": "1. Basics and data | JSON array of existing model feature columns; exclude keys and target",
       "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
     },
     "target_column": {
-      "order": 27,
+      "order": 10,
       "type": "string",
       "default": "target",
-      "description": "Existing training label column",
+      "description": "1. Basics and data | Existing training label column",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
-    "event_column": {
-      "order": 33,
-      "type": "string",
-      "default": "",
-      "description": "Existing event timestamp column for the temporal training split",
-      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
-    },
-    "result_available_at_column": {
-      "order": 34,
-      "type": "string",
-      "default": "",
-      "description": "Existing per-row target availability timestamp; required only when filtering unavailable results",
-      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-      "skip_prompt_if": {"properties": {"filter_unavailable_results": {"const": "false"}}}
-    },
     "training_version": {
-      "order": 35,
+      "order": 11,
       "type": "string",
       "default": "null",
-      "description": "Concrete nonnegative Delta source version for manual training; null requires configuration before running",
+      "description": "1. Basics and data | Concrete nonnegative Delta source version for manual training; null requires configuration before running",
       "pattern": "^(?:null|0|[1-9][0-9]*)$"
-    },
-    "start": {
-      "order": 36,
-      "type": "string",
-      "default": "",
-      "description": "Manual temporal observation window start (inclusive), as a timezone-aware ISO timestamp",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
-    },
-    "holdout_start": {
-      "order": 37,
-      "type": "string",
-      "default": "",
-      "description": "Manual temporal holdout start (inclusive), as a timezone-aware ISO timestamp",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
-    },
-    "cutoff": {
-      "order": 38,
-      "type": "string",
-      "default": "",
-      "description": "Manual observation window end (exclusive), as a timezone-aware ISO timestamp",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
-    },
-    "max_rows": {
-      "order": 40,
-      "type": "string",
-      "default": "10000",
-      "description": "Positive row limit for each bounded local data transfer",
-      "pattern": "^[1-9][0-9]*$"
-    },
-    "max_input_mb": {
-      "order": 41,
-      "type": "string",
-      "default": "64",
-      "description": "Positive local input limit in MiB (1 unit = 1024 * 1024 bytes); not total training RAM",
-      "pattern": "^[1-9][0-9]*$"
     },
     "split_strategy": {
       "type": "string",
       "default": "random",
-      "description": "Final evaluation split: random needs no event dates; temporal holds out the latest observation window",
-      "enum": ["random", "temporal"],
-      "order": 28
+      "description": "1. Basics and data | Final evaluation split: random needs no event dates; temporal holds out the latest observation window",
+      "enum": [
+        "random",
+        "temporal"
+      ],
+      "order": 12
     },
     "test_size": {
       "type": "string",
       "default": "0.2",
-      "description": "Random holdout fraction strictly between 0 and 1",
+      "description": "1. Basics and data | Random holdout fraction strictly between 0 and 1",
       "pattern": "^0\\.[0-9]*[1-9][0-9]*$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
-      "order": 29
+      "skip_prompt_if": {
+        "properties": {
+          "split_strategy": {
+            "const": "temporal"
+          }
+        }
+      },
+      "order": 13
     },
     "random_state": {
       "type": "string",
       "default": "42",
-      "description": "Random split seed; stable keys and a pinned snapshot make membership reproducible",
+      "description": "1. Basics and data | Random split seed; stable keys and a pinned snapshot make membership reproducible",
       "pattern": "^(?:0|[1-9][0-9]*)$",
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
-      "order": 30
+      "skip_prompt_if": {
+        "properties": {
+          "split_strategy": {
+            "const": "temporal"
+          }
+        }
+      },
+      "order": 14
     },
     "stratify": {
       "type": "string",
       "default": "false",
-      "description": "Preserve target class proportions in the random split (classification only)",
-      "enum": ["false", "true"],
-      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
-      "order": 31
+      "description": "1. Basics and data | Preserve target class proportions in the random split (classification only)",
+      "enum": [
+        "false",
+        "true"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "split_strategy": {
+                "const": "temporal"
+              }
+            }
+          },
+          {
+            "properties": {
+              "task": {
+                "const": "regression"
+              }
+            }
+          }
+        ]
+      },
+      "order": 15
+    },
+    "training_window_mode": {
+      "type": "string",
+      "default": "auto",
+      "description": "1. Basics and data | Source selection: auto means full snapshot for random split, rolling calendar for temporal split",
+      "enum": [
+        "auto",
+        "full_snapshot",
+        "fixed_window",
+        "rolling_calendar"
+      ],
+      "order": 16
+    },
+    "window_timezone": {
+      "type": "string",
+      "default": "UTC",
+      "description": "1. Basics and data | Calendar timezone for rolling selection; independent of source parsing and cron timezone",
+      "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "fixed_window"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 17
+    },
+    "monthly_lookback_months": {
+      "type": "string",
+      "default": "4",
+      "description": "1. Basics and data | Completed calendar months to select: 1-120 (at least 2 for temporal holdout)",
+      "pattern": "^[1-9][0-9]*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "fixed_window"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 18
+    },
+    "event_column": {
+      "order": 19,
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Existing observation timestamp used for window selection and temporal splitting/CV",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "event_time_format": {
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Explicit numeric string format, e.g. %d/%m/%Y %H:%M; blank for native timestamps",
+      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 20
+    },
+    "event_time_timezone": {
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Source IANA timezone for naive timestamps; blank for offset-aware values",
+      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 21
+    },
+    "event_date_only": {
+      "type": "string",
+      "default": "reject",
+      "description": "1. Basics and data | Date-only sources: reject, or explicit midnight in the declared source timezone",
+      "enum": [
+        "reject",
+        "midnight"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 22
+    },
+    "start": {
+      "order": 23,
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Manual observation window start (inclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "holdout_start": {
+      "order": 24,
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Manual temporal holdout start (inclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {
+        "properties": {
+          "split_strategy": {
+            "const": "random"
+          }
+        }
+      }
+    },
+    "cutoff": {
+      "order": 25,
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Manual observation window end (exclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
     },
     "filter_unavailable_results": {
       "type": "string",
       "default": "false",
-      "description": "Exclude rows whose target outcome was unknown or became available after result_cutoff",
-      "enum": ["false", "true"],
-      "order": 32
+      "description": "1. Basics and data | Exclude rows whose target outcome was unknown or became available after result_cutoff",
+      "enum": [
+        "false",
+        "true"
+      ],
+      "order": 26
+    },
+    "result_available_at_column": {
+      "order": 27,
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Existing per-row target availability timestamp; required only when filtering unavailable results",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+      "skip_prompt_if": {
+        "properties": {
+          "filter_unavailable_results": {
+            "const": "false"
+          }
+        }
+      }
+    },
+    "result_time_format": {
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Explicit numeric string format, e.g. %d/%m/%Y %H:%M; blank for native timestamps",
+      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+      "skip_prompt_if": {
+        "properties": {
+          "filter_unavailable_results": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 28
+    },
+    "result_time_timezone": {
+      "type": "string",
+      "default": "",
+      "description": "1. Basics and data | Source IANA timezone for naive timestamps; blank for offset-aware values",
+      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+      "skip_prompt_if": {
+        "properties": {
+          "filter_unavailable_results": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 29
+    },
+    "result_date_only": {
+      "type": "string",
+      "default": "reject",
+      "description": "1. Basics and data | Date-only sources: reject, or explicit midnight in the declared source timezone",
+      "enum": [
+        "reject",
+        "midnight"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "filter_unavailable_results": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 30
     },
     "result_cutoff": {
       "type": "string",
       "default": "",
-      "description": "Manual result-availability cutoff (inclusive), independent of the observation window end",
+      "description": "1. Basics and data | Manual result-availability cutoff (inclusive), independent of the observation window end",
       "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
-      "skip_prompt_if": {"properties": {"filter_unavailable_results": {"const": "false"}}},
+      "skip_prompt_if": {
+        "properties": {
+          "filter_unavailable_results": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 31
+    },
+    "max_rows": {
+      "order": 32,
+      "type": "string",
+      "default": "10000",
+      "description": "1. Basics and data | Positive row limit for each bounded local data transfer",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "max_input_mb": {
+      "order": 33,
+      "type": "string",
+      "default": "64",
+      "description": "1. Basics and data | Positive local input limit in MiB (1 unit = 1024 * 1024 bytes); not total training RAM",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "training_sample_rows": {
+      "type": "string",
+      "default": "null",
+      "description": "1. Basics and data | Optional deterministic training sample size, including holdout; null reads all eligible rows within limits",
+      "pattern": "^(?:null|[1-9][0-9]*)$",
+      "order": 34
+    },
+    "training_sample_seed": {
+      "type": "string",
+      "default": "42",
+      "description": "1. Basics and data | Seed for repeatable sampling by record keys; does not sample scoring rows",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "skip_prompt_if": {
+        "properties": {
+          "training_sample_rows": {
+            "const": "null"
+          }
+        }
+      },
+      "order": 35
+    },
+    "preprocessing": {
+      "type": "string",
+      "default": "none",
+      "description": "2. Preprocessing | Start with no steps or numeric mean imputation then standard scaling on ALL input_columns; edit ordered Core steps in workflow.json",
+      "enum": [
+        "none",
+        "numeric_impute_scale"
+      ],
+      "order": 36
+    },
+    "model_type": {
+      "type": "string",
+      "default": "auto",
+      "description": "3. Model | Core model ID; auto chooses LinearRegression or LogisticRegression for the task. Edit hyperparameters in pipeline.modeling.params",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "order": 37
+    },
+    "cv_enabled": {
+      "type": "string",
+      "default": "false",
+      "description": "4. Evaluation CV | Evaluate fixed model using fold-local preprocessing on training rows only; does not tune parameters",
+      "enum": [
+        "false",
+        "true"
+      ],
+      "order": 38
+    },
+    "cv_folds": {
+      "type": "string",
+      "default": "5",
+      "description": "4. Evaluation CV | Evaluation folds (2-20); final holdout remains separate",
+      "pattern": "^(?:[2-9]|1[0-9]|20)$",
+      "skip_prompt_if": {
+        "properties": {
+          "cv_enabled": {
+            "const": "false"
+          }
+        }
+      },
       "order": 39
+    },
+    "cv_type": {
+      "type": "string",
+      "default": "k_fold",
+      "description": "4. Evaluation CV | Core CV method; stratified is classification-only, time series requires an event column and shuffle=false",
+      "enum": [
+        "k_fold",
+        "stratified_k_fold",
+        "time_series_split",
+        "shuffle_split"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "cv_enabled": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 40
+    },
+    "cv_shuffle": {
+      "type": "string",
+      "default": "true",
+      "description": "4. Evaluation CV | Shuffle evaluation folds: false for time_series_split, true for shuffle_split",
+      "enum": [
+        "false",
+        "true"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "cv_enabled": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 41
+    },
+    "cv_random_state": {
+      "type": "string",
+      "default": "42",
+      "description": "4. Evaluation CV | Evaluation fold seed; independent of final holdout and sampling seeds",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "skip_prompt_if": {
+        "properties": {
+          "cv_enabled": {
+            "const": "false"
+          }
+        }
+      },
+      "order": 42
+    },
+    "retraining_mode": {
+      "order": 43,
+      "type": "string",
+      "default": "manual",
+      "description": "5. Lifecycle | Train manually, or add a paused monthly schedule to the same train job",
+      "enum": [
+        "manual",
+        "monthly_paused"
+      ]
+    },
+    "retraining_cron_expression": {
+      "order": 44,
+      "type": "string",
+      "default": "0 0 3 3 * ?",
+      "description": "5. Lifecycle | Editable Quartz cron for the paused training job; use one run per month",
+      "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
+      "skip_prompt_if": {
+        "properties": {
+          "retraining_mode": {
+            "const": "manual"
+          }
+        }
+      }
+    },
+    "retraining_timezone_id": {
+      "order": 45,
+      "type": "string",
+      "default": "UTC",
+      "description": "5. Lifecycle | IANA timezone for the paused job schedule; independent of window and source timezones",
+      "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+      "skip_prompt_if": {
+        "properties": {
+          "retraining_mode": {
+            "const": "manual"
+          }
+        }
+      }
+    },
+    "model_change_mode": {
+      "order": 46,
+      "type": "string",
+      "default": "incremental_append",
+      "description": "5. Lifecycle | Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
+      "enum": [
+        "incremental_append",
+        "full_rebuild"
+      ]
+    },
+    "score_model_selection": {
+      "order": 47,
+      "type": "string",
+      "default": "pinned_version",
+      "description": "5. Lifecycle | Score with one pinned version or resolve the controlled champion on each run",
+      "enum": [
+        "pinned_version",
+        "champion"
+      ]
+    },
+    "promotion_policy": {
+      "order": 48,
+      "type": "string",
+      "default": "manual_approval",
+      "description": "5. Lifecycle | Require operator approval or promote automatically after quality gates pass",
+      "enum": [
+        "manual_approval",
+        "automatic"
+      ]
+    },
+    "score_handoff": {
+      "order": 49,
+      "type": "string",
+      "default": "disabled",
+      "description": "5. Lifecycle | Optionally run the existing score job after champion initialization, promotion or rollback; score keeps its selected model policy",
+      "enum": [
+        "disabled",
+        "after_alias_change"
+      ]
+    },
+    "metric": {
+      "order": 50,
+      "type": "string",
+      "default": "auto",
+      "description": "5. Lifecycle | Heldout comparison metric; auto selects RMSE for regression or accuracy for classification",
+      "enum": [
+        "auto",
+        "heldout_mae",
+        "heldout_mse",
+        "heldout_rmse",
+        "heldout_r2",
+        "heldout_mape",
+        "heldout_explained_variance",
+        "heldout_accuracy",
+        "heldout_balanced_accuracy",
+        "heldout_precision_weighted",
+        "heldout_recall_weighted",
+        "heldout_f1_weighted",
+        "heldout_matthews_corrcoef",
+        "heldout_precision",
+        "heldout_recall",
+        "heldout_f1",
+        "heldout_g_score",
+        "heldout_log_loss",
+        "heldout_roc_auc",
+        "heldout_pr_auc",
+        "heldout_roc_auc_ovr_weighted",
+        "heldout_roc_auc_weighted",
+        "heldout_roc_auc_ovr",
+        "heldout_roc_auc_ovo",
+        "heldout_roc_auc_ovo_weighted",
+        "heldout_pr_auc_weighted"
+      ]
+    },
+    "min_improvement": {
+      "order": 51,
+      "type": "number",
+      "default": 0.0,
+      "minimum": 0,
+      "description": "5. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass"
+    },
+    "quality_threshold": {
+      "order": 52,
+      "type": "string",
+      "default": "null",
+      "description": "5. Lifecycle | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
+      "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$"
+    },
+    "risk_category": {
+      "order": 53,
+      "type": "string",
+      "default": "",
+      "description": "5. Lifecycle | Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
+      "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$"
+    },
+    "compute_mode": {
+      "order": 54,
+      "type": "string",
+      "default": "serverless",
+      "description": "6. Compute | Job compute mode for this project",
+      "enum": [
+        "serverless",
+        "policy_cluster"
+      ]
+    },
+    "cluster_policy_name": {
+      "order": 55,
+      "type": "string",
+      "default": "REPLACE_WITH_APPROVED_POLICY",
+      "description": "6. Compute | Approved job-cluster policy name",
+      "skip_prompt_if": {
+        "properties": {
+          "compute_mode": {
+            "const": "serverless"
+          }
+        }
+      }
+    },
+    "spark_version": {
+      "order": 56,
+      "type": "string",
+      "default": "17.3.x-cpu-ml-scala2.13",
+      "description": "6. Compute | Approved Databricks ML Runtime for the job cluster",
+      "skip_prompt_if": {
+        "properties": {
+          "compute_mode": {
+            "const": "serverless"
+          }
+        }
+      }
+    },
+    "node_type_id": {
+      "order": 57,
+      "type": "string",
+      "default": "REPLACE_WITH_NODE_TYPE",
+      "description": "6. Compute | Approved job-cluster node type",
+      "skip_prompt_if": {
+        "properties": {
+          "compute_mode": {
+            "const": "serverless"
+          }
+        }
+      }
+    },
+    "cost_tag_key": {
+      "order": 58,
+      "type": "string",
+      "default": "CostCenter",
+      "description": "6. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "skip_prompt_if": {
+        "properties": {
+          "compute_mode": {
+            "const": "serverless"
+          }
+        }
+      }
+    },
+    "cost_tag_value": {
+      "order": 59,
+      "type": "string",
+      "default": "REPLACE_WITH_COST_TAG",
+      "description": "6. Compute | Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
+      "skip_prompt_if": {
+        "properties": {
+          "compute_mode": {
+            "const": "serverless"
+          }
+        }
+      }
     }
   }
 }

@@ -40,8 +40,13 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         risk_category=risk_category,
     )
     content = template.read_text(encoding="utf-8")
+    content = content[content.index("{\n") :].replace("{{$window}}", "full_snapshot")
     for name in (
         "risk_category",
+        "event_time_format",
+        "event_time_timezone",
+        "result_time_format",
+        "result_time_timezone",
         "event_column",
         "result_available_at_column",
         "start",
@@ -73,7 +78,26 @@ def _render_default_config(record_key="entity_id", risk_category=""):
             "customer_model_source",
         )
     )
-    content = content.replace('{{if eq .split_strategy "temporal"}}4{{else}}null{{end}}', "null")
+    content = (
+        content.replace(
+            '{{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}}',
+            "null",
+        )
+        .replace(
+            '{{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}}',
+            "null",
+        )
+        .replace(
+            '{{if eq .model_type "auto"}}linear_regression{{else}}{{.model_type}}{{end}}',
+            "linear_regression",
+        )
+    )
+    content = re.sub(
+        r'{{if eq \.preprocessing "numeric_impute_scale"}}.*?{{end}}',
+        "",
+        content,
+        flags=re.DOTALL,
+    )
     for name, value in values.items():
         content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)

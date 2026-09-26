@@ -1,5 +1,6 @@
 """Offline validation and explicit migration of local Databricks Bundle settings."""
 
+import json
 import math
 import re
 from copy import deepcopy
@@ -11,13 +12,19 @@ from ...modeling.base import BaseModelCalculator
 from ...registry import NodeRegistry
 from ..mlflow.validation import _CLASSIFICATION, _MINIMIZE, _REGRESSION
 from ._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
+from .local_cv import CV_FIELDS, LocalCVSpec
 from .local_sdk import ModelSelection
-from .local_workflow import _training_spec
+from .local_workflow import _training_spec, _training_window_mode
 from .prediction_output import _IDENTIFIER, _TABLE_NAME
 from .training_dates import training_date_spec
 
 _ACTIONS = {"train", "train_monthly", "score", "approve", "reject", "rollback"}
 _FIELDS = {
+    *CV_FIELDS,
+    "training_sample_rows",
+    "training_sample_seed",
+    "training_window_mode",
+    "window_timezone",
     "config_version",
     "task",
     "engine",
@@ -109,14 +116,9 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
     """Validate explicit policies while requiring manual pins only for manual training."""
     settings = dict(config)
     strategy = config.get("split_strategy", "random")
-    if strategy == "random" and config.get("monthly_lookback_months") is not None:
-        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
+    mode = _training_window_mode(config)
     if config.get("stratify") is True and config["task"] != "classification":
         raise ValueError("stratify requires a classification task.")
-    if action == "train_monthly" and strategy == "temporal":
-        months = config.get("monthly_lookback_months")
-        if type(months) is not int or not 2 <= months <= 120:
-            raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
     if action == "train":
         version = config.get("training_version")
         if type(version) is not int or version < 0:
@@ -126,8 +128,11 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
     else:
         settings["training_version"] = 0
         # These actions use saved evidence or derive fresh boundaries at invocation.
-        if strategy == "temporal":
-            for key, month in (("start", 1), ("holdout_start", 2), ("cutoff", 3)):
+        if mode != "full_snapshot" and (action != "train_monthly" or mode == "rolling_calendar"):
+            boundaries = {"start": 1, "cutoff": 3}
+            if strategy == "temporal":
+                boundaries["holdout_start"] = 2
+            for key, month in boundaries.items():
                 settings[key] = datetime(2000, month, 1, tzinfo=UTC).isoformat()
         if config.get("filter_unavailable_results") is True:
             settings["result_cutoff"] = datetime(2000, 3, 1, tzinfo=UTC).isoformat()
@@ -234,7 +239,90 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
         if issubclass(NodeRegistry.get_calculator(step["transformer"]), BaseModelCalculator):
             raise ValueError("pipeline.preprocessing cannot contain a model calculator.")
     _training_contract(config, action)
+    LocalCVSpec.from_workflow(config).validate_pipeline(
+        pipeline, target_column=config["target_column"], event_column=config.get("event_column")
+    )
     return deepcopy(config)
+
+
+def preview_workflow_config(config: dict[str, Any], *, action: str = "score") -> str:
+    """Describe resolved settings offline using the same preflight as job execution.
+
+    The default checks the configuration without requiring manual training pins.
+    Pass ``action='train'`` or ``'train_monthly'`` for action-specific validation.
+    This cannot check source values, installed worker dependencies or permissions.
+    """
+    checked = validate_workflow_config(config, action=action)
+    model = checked["pipeline"]["modeling"]
+    cv = LocalCVSpec.from_workflow(checked)
+    manual_status = "configured (source data and permissions not checked)"
+    try:
+        validate_workflow_config(checked, action="train")
+    except ValueError as exc:
+        manual_status = f"needs configuration: {exc}"
+    sample = checked.get("training_sample_rows")
+    window = _training_window_mode(checked)
+    monthly = action == "train_monthly"
+    version = "latest snapshot at invocation" if monthly else checked.get("training_version")
+    observation_window = f"[{checked.get('start')}, {checked.get('cutoff')})"
+    holdout_start = checked.get("holdout_start")
+    result_cutoff = checked.get("result_cutoff")
+    if monthly:
+        if window == "rolling_calendar":
+            observation_window = "completed calendar months at invocation"
+            if checked.get("split_strategy") == "temporal":
+                holdout_start = "last completed calendar month"
+        if checked.get("filter_unavailable_results"):
+            result_cutoff = "invocation time"
+    lines = [
+        "Skyulf workflow preview",
+        "No data read, training, registry mutation or deployment.",
+        f"Engine: {checked['engine']} | Task: {checked['task']}",
+        f"Training source: {checked['training_table']} @ {version}",
+        f"Record keys: {', '.join(checked['record_key_columns'])}",
+        f"Features: {', '.join(checked['input_columns'])} | Target: {checked['target_column']}",
+        f"Source selection: {window} | Event column: {checked.get('event_column')}",
+        f"Window: {observation_window}",
+        f"Calendar: {checked.get('monthly_lookback_months')} months, "
+        f"timezone={checked.get('window_timezone')}",
+        f"Result availability: {checked.get('result_available_at_column')} | "
+        f"filter={checked.get('filter_unavailable_results', False)} | "
+        f"cutoff={result_cutoff}",
+        f"Training sample: {sample if sample is not None else 'all eligible rows'} "
+        f"(includes final holdout); seed={checked.get('training_sample_seed', 42)}",
+        f"Local input limits: {checked['max_rows']} rows, {checked['max_input_mb']} MiB "
+        "(not total training memory)",
+        f"Final holdout: {checked.get('split_strategy', 'random')} | "
+        f"fraction={checked.get('test_size', 0.2)} | start={holdout_start}",
+        f"Manual training: {manual_status}",
+        "Preprocessing (execution order; edit pipeline.preprocessing):",
+    ]
+    for index, step in enumerate(checked["pipeline"].get("preprocessing", []), 1):
+        lines.append(
+            f"  {index}. {step['name']} -> {step['transformer']} "
+            f"{json.dumps(step.get('params', {}), sort_keys=True)}"
+        )
+    if not checked["pipeline"].get("preprocessing"):
+        lines.append("  No preprocessing steps.")
+    lines.extend(
+        [
+            f"Model: {model['type']} | Explicit params: {json.dumps(model.get('params', {}))}",
+            "Unspecified model parameters use Core defaults.",
+            f"CV: {cv.method}, {cv.folds} folds, training partition only; "
+            "preprocessing refitted per fold, no parameter search."
+            if cv.enabled
+            else "CV: disabled (final holdout evaluation still runs).",
+            f"Promotion: {checked['promotion_policy']} | Metric: {checked['metric']} | "
+            f"Threshold: {checked.get('quality_threshold')} | "
+            f"Minimum improvement: {checked['min_improvement']}",
+            f"Scoring source: {checked['score_source_table']}",
+            f"Score model: {checked['model_name']} | {checked['score_model_selection']} | "
+            f"pin={checked.get('model_version')} | handoff={checked['score_handoff']}",
+            f"Prediction output: {checked['prediction_table']} | {checked['model_change_mode']}",
+            "Scoring is never sampled. Validate source values and worker dependencies separately.",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def migrate_workflow_config(

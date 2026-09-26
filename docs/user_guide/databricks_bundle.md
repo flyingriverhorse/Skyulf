@@ -14,12 +14,10 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
-Initialization asks for project name, task, engine, existing source tables,
-row keys (including composite keys), feature and label columns, model-change
-mode, independent scoring and promotion policies, optional
-score handoff, retraining mode and cron, serverless
-or policy-backed job compute and the existing `dev`
-catalog/schema. Serverless is the default. Reviewable
+Initialization follows six sections: **basics/data, preprocessing, model,
+evaluation CV, lifecycle, compute**. It asks for existing record keys (including
+composite keys), source columns, independent data-window/split choices, optional
+training sampling, date parsing, scoring/promotion policies and job settings. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
 
@@ -31,12 +29,75 @@ choose a task-compatible model. With a JSON init file, `max_rows` and
 them as numbers. `record_key_columns_json` accepts one or more source key
 columns, for example `["customer_id", "observation_id"]`.
 
+Saved-artifact holdout evaluation uses sequential joblib prediction so parallel
+Random Forest tree summation does not introduce last-bit metric differences into
+exact approval evidence. This affects evaluation only: model hyperparameters and
+normal training/batch inference parallelism are retained. Arbitrary numerical
+runtimes may still be nondeterministic and must pass replay checks.
+
+### Guided setup and offline preview
+
+| Section | What you choose |
+| --- | --- |
+| Basics/data | Engine/task, UC names, keys/features/target, snapshot pin, final holdout, independent source window, availability/date parsing, input limits and optional sample |
+| Preprocessing | `none`, or `numeric_impute_scale` (mean imputation then standard scaling on all numeric input columns) |
+| Model | `auto` starter or a task-compatible Core registry ID; edit hyperparameters in `pipeline.modeling.params` |
+| Evaluation CV | Enable, folds, method, shuffle and seed; evaluates fixed parameters with fold-local preprocessing |
+| Lifecycle | Metric/gates, manual/automatic promotion, score selector/handoff and paused retraining cron |
+| Compute | Serverless or approved policy cluster and cost tags |
+
+The initializer preserves standard Core config. For custom preprocessing, edit
+`pipeline.preprocessing` in execution order with `name`, `transformer`, and `params`
+per step. Select per-step columns when mixing numeric and categorical features.
+The numeric preset is unsuitable for raw categorical columns. No model/FE fitting
+occurs at initialization. Search/Optuna, custom Python feature hooks and multiple
+model branches remain later work; they are not advertised as working init choices.
+
+From the generated project, with the matching Core wheel installed locally:
+
+```powershell
+python src/preview.py
+python src/preview.py --list-models
+python src/preview.py --list-preprocessors
+python src/preview.py --action train
+```
+
+The preview shows the actual pipeline, input selection, final holdout, CV and
+score/promotion policies. The default allows a draft with missing training pins
+and reports what is missing. `--action train` checks manual readiness;
+`--action train_monthly` checks automatic window selection. Both reuse job preflight.
+This is an offline configuration check, not a test of data values, parameter
+combinations, permissions or worker dependencies. Model/node metadata comes from
+Core rather than a duplicated Bundle algorithm catalog.
+
+Preview defaults to the generated dev bindings. To inspect another target, pass
+`--catalog`, `--input-schema`, `--output-schema`, `--metadata-schema` and
+`--resource-suffix` matching that target's resolved Bundle variables. Preview does
+not resolve target YAML or workspace `${...}` substitutions. Run the real Bundle's
+`validate --strict` as well before deployment.
+
+Editable model parameters, for example:
+
+```json
+"modeling": {
+  "type": "random_forest_regressor",
+  "params": {"n_estimators": 100, "max_depth": 8, "random_state": 42}
+}
+```
+
+Published initializer examples now include
+`guided-classification-init.example.json` (Polars, numeric FE, random forest,
+stratified CV and explicit sample) and `random-window-init.example.json`
+(random holdout inside an observation window, separate Copenhagen event and
+Vilnius result parsing). Replace example table/column names and snapshot pins
+with real values. A default model ID or empty parameter object uses Core defaults.
+
 ### Local input limits
 
 `max_rows` bounds the rows read into the local process before train/test splitting.
-For temporal training it applies after observation-window selection, but before
+Without sampling it applies after any observation-window selection, but before
 result-availability filtering. An overflow fails; the reader never silently
-truncates or samples training data. Training sampling is planned separately.
+truncates data. Explicit sampling is available as described below.
 
 `max_input_mb` defaults to `64`. One unit is 1 MiB (1,048,576 bytes). It bounds
 measured decoded input/serialized row sizes and local frames; it does not cap
@@ -145,11 +206,13 @@ Saved training settings include the split policy and a holdout-key digest.
 labels. Approval replays the saved snapshot and verifies that membership before
 comparison; changing today's workflow cannot silently replace the evaluation set.
 Old experimental training evidence must be recreated. Optional training CV and
-selection-window controls remain SM-33D work.
+independent source-window controls are described below.
 
-Inactive fields must stay null/default: a random configuration with an event
-column or temporal boundaries is rejected, as is a result column with availability
-filtering disabled. Missing temporal dates never switch training to random.
+Inactive fields must stay null/default: full-snapshot selection rejects event
+fields; random splitting rejects `holdout_start`. A random split can use an
+explicit event window without becoming a temporal split. A result column with
+availability filtering disabled is rejected. Missing temporal dates never switch
+training to random.
 Initialization hides irrelevant prompts but preserves explicitly supplied values
 so validation can identify conflicts. The examples folder contains
 `date-free-init.example.json`, `random-delayed-results-init.example.json` and
@@ -158,6 +221,124 @@ and snapshot before using them. Their date examples assume native timestamp
 instants; edit parsing rules for other source types. In initializer JSON,
 `test_size`, `random_state`, `stratify` and `filter_unavailable_results` are
 strings; generated workflow JSON stores numbers and booleans.
+
+### Optional Basic-model cross-validation
+
+Edit the generated `config/workflow.json`. These are runtime settings; the
+guided initializer sections remain separate work.
+
+```json
+{
+  "cv_enabled": true,
+  "cv_folds": 2,
+  "cv_type": "stratified_k_fold",
+  "cv_shuffle": true,
+  "cv_random_state": 42
+}
+```
+
+This matches Basic training with fixed model parameters. CV trains independent
+fold models using Core `StatefulEstimator.cross_validate`; it neither searches
+hyperparameters nor changes the model saved for scoring. The final pipeline is
+fitted independently on the complete training partition. Preprocessing is learned
+again inside each fold using Core `FeatureEngineerFoldAdapter`. The outer holdout
+is never passed to CV or preprocessing fit. pandas and Polars both use this path.
+
+- Default: CV disabled, five folds, K-fold, shuffle enabled, seed 42.
+- `cv_folds` supports 2 through 20; each fold needs at least two training and
+  validation rows. Stratified CV requires classification and at least as many
+  training rows per class as folds.
+- Methods: `k_fold`, `stratified_k_fold`, `shuffle_split`, `time_series_split`.
+  Shuffle Split uses Core's 20% validation proportion and requires shuffle.
+- Time-series CV requires an explicit selected window with `event_column` and
+  `cv_shuffle: false`. Its normalized timestamps order the folds and are removed
+  before preprocessing/model fit. Equal timestamps across a fold boundary fail;
+  choose appropriate folds or aggregate observations rather than leaking time.
+- Splitter nodes inside preprocessing are rejected when Bundle CV owns the split.
+  Unsupported methods fail instead of falling back. Core's diagnostic `nested_cv`
+  is not offered as nested hyperparameter search.
+
+MLflow stores `cross_validation.json` with each fold's metrics, aggregate metrics,
+fold-refit counts, source/split dataset identity and engine. Experiment metrics
+include `cv_rmse_mean`, `cv_rmse_std` and equivalent supported metrics. The
+`heldout_*` metrics remain the separate candidate/champion promotion evidence.
+CV disabled means no additional fold fits. Advanced search/Optuna integration is
+still SM-36; enabling this section does not enable tuning.
+
+### Explicit training sampling
+
+```json
+{
+  "training_sample_rows": 10000,
+  "training_sample_seed": 42,
+  "max_rows": 10000,
+  "max_input_mb": 64
+}
+```
+
+`training_sample_rows: null` keeps the full selected input and fails on budget
+overflow. When enabled, Spark selects up to the requested number of eligible
+records using a seeded SHA-256 ordering of complete record keys. Selection occurs
+before local transfer, after window and result-availability filtering. Changing
+partition layout does not change the sample. A different seed or source snapshot
+may change it. The requested count must be 4 through `max_rows`.
+
+The count includes the final holdout: a 10,000-row sample with `test_size: 0.2`
+produces 8,000 training and 2,000 test rows. Sampling is without replacement and
+is not class-balanced; split/CV class-count guards still apply. For temporal
+splits it samples within the chosen window; both partitions must remain usable.
+It never samples inference rows. Record keys must be nonnull and unique across
+the selected source, and eligible targets must be nonnull before sampling.
+
+`training_selection.json` records source/eligible/selected counts, seed, algorithm
+and membership digest. Saved training evidence pins both sample and holdout
+membership; approval replays those choices. Row/memory budgets remain enforced.
+Sampling bounds transfer, not Spark scans: validation, counts and hash ordering
+can scan the selected source several times.
+
+### Source windows are independent of splitting and scheduling
+
+| `training_window_mode` | Source selection | Settings |
+| --- | --- | --- |
+| `full_snapshot` | All eligible rows from the pinned snapshot | Random split; event fields, lookback and window timezone null. |
+| `fixed_window` | Explicit `[start, cutoff)` observations | Event column and boundaries; random or temporal split; lookback and window timezone null. |
+| `rolling_calendar` | Completed calendar months, derived for `train_monthly` | Event column, explicit `window_timezone` and `monthly_lookback_months`; random or temporal split. |
+
+New random projects default to `full_snapshot`; temporal projects start with an
+editable `rolling_calendar`, four months and `window_timezone: "UTC"`. Existing
+temporal project configs must explicitly select their window mode. For manual
+`train`, pin `training_version` and window boundaries; the action does not derive
+them from today's date. For `train_monthly`, each mode pins the latest Delta
+version; only `rolling_calendar` derives new observation boundaries. Fixed
+windows stay fixed even if a job runs again a month later.
+
+This is a pre-production contract change: recreate candidates produced before
+SM-33D. Added sampling fields participate in the saved dataset identity even when
+sampling is disabled; earlier evidence is not silently upgraded for approval.
+
+For example, `window_timezone: "Europe/Vilnius"` uses Vilnius month boundaries,
+including the correct seasonal UTC offsets. Four months includes the temporal
+holdout month: three months for fit, the last completed month for final test.
+Random splitting instead divides the selected four-month data by `test_size`
+and leaves `holdout_start` null. Temporal lookback is 2Ã¢â‚¬â€œ120 months; random is
+1Ã¢â‚¬â€œ120. Source parsing timezone, window timezone and cron timezone serve different
+purposes. Neither the cron day nor the source timestamp format determines the
+calendar implicitly. Availability cutoff remains the invocation instant for
+`train_monthly` when that independent filter is enabled.
+
+```mermaid
+flowchart LR
+    Source["Pinned Delta source"] --> Window["Full, fixed or rolling selection"]
+    Window --> Sample["Optional eligible-row sample on Spark"]
+    Sample --> Split["Random or temporal outer split"]
+    Split --> Train["Training rows"]
+    Split --> Test["Protected final holdout"]
+    Train --> CV["Optional Core CV with fold-local preprocessing"]
+    Train --> Fit["Final pipeline fit with fixed parameters"]
+    CV --> Report["MLflow CV report"]
+    Fit --> Evaluation["Final evaluation and champion comparison"]
+    Test --> Evaluation
+```
 
 ### Source date formats and timezones
 
@@ -588,7 +769,7 @@ For example, a regression project can select its gate in the generated config:
 These example values mean RMSE must be at most `5.0`; a later candidate must
 reduce champion's RMSE by at least `0.1` on the same holdout. Improvement is
 an absolute metric difference, not a percentage. Skyulf derives the direction
-from the metric: RMSE/MAE/log loss are minimized, while R²/accuracy/F1 are
+from the metric: RMSE/MAE/log loss are minimized, while RÃ‚Â²/accuracy/F1 are
 maximized. Use a metric supported by the configured model task. The first
 comparison reports `reason=no_champion` and `eligible=false` because no
 baseline exists; successful bootstrap is recorded separately as
@@ -681,10 +862,10 @@ The optional monthly `train` schedule defaults to 03:00 UTC on day three and
 starts paused. Edit its Bundle cron and timezone variables for the desired
 monthly run time. After configuring real labeled data and verifying a manual
 run, unpause it deliberately. Each run pins the source's latest Delta version.
-Random mode uses the whole bounded snapshot with its saved split settings and
-no date window or lookback. Temporal mode uses the first day of the current UTC
-month as the observation cutoff, holds out the preceding month and uses
-`monthly_lookback_months` (default four) for the full window including holdout.
+The separate `training_window_mode` selects full data, a fixed window or completed
+calendar months. Rolling selection uses `window_timezone`; a temporal split holds
+out the last completed month, included in `monthly_lookback_months`. The schedule
+timezone controls execution only. Sampling and CV are independent optional settings.
 When availability filtering is enabled, the separate result cutoff is the job's
 invocation instant. The source must truthfully record per-row availability. `@champion` is resolved to a
 concrete version for comparison if present. Manual approval leaves champion
@@ -700,3 +881,12 @@ commit. The later two-job design passed a separate personal serverless
 rehearsal: 650 existing source rows, one later insert, and a no-op replay
 left one prediction table with 651 rows. The `test`, `syst` and `prod`
 placeholders have not been deployed in a company workspace.
+
+### Explicit retry policy
+
+Generated notebook tasks set `max_retries: 0`; serverless tasks additionally set
+`disable_auto_optimization: true` because serverless auto-optimization can add
+retries independently. A training retry can register another candidate version.
+Inspect failed run evidence and registry state before rerunning; retry score
+separately after an already-committed approval. This is not an exactly-once
+training guarantee. See the [Databricks serverless retry behavior](https://docs.databricks.com/aws/en/jobs/run-serverless-jobs).

@@ -24,6 +24,7 @@ resources:
 {{end}}
       tasks:
         - task_key: train
+          max_retries: 0
           notebook_task:
             notebook_path: ../src/workflow.py
             base_parameters:
@@ -43,6 +44,7 @@ resources:
               resource_suffix: ${var.resource_suffix}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
+          disable_auto_optimization: true
 {{else}}
           job_cluster_key: skyulf
           libraries:
@@ -53,6 +55,7 @@ resources:
         - task_key: should_score
           depends_on:
             - task_key: train
+          max_retries: 0
           condition_task:
             op: EQUAL_TO
             left: '{{"{{tasks.train.values.score_requested}}"}}'
@@ -96,6 +99,7 @@ resources:
           default: ""
       tasks:
         - task_key: score
+          max_retries: 0
           notebook_task:
             notebook_path: ../src/score.py
             base_parameters:
@@ -110,6 +114,7 @@ resources:
               resource_suffix: ${var.resource_suffix}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
+          disable_auto_optimization: true
 {{else}}
           job_cluster_key: skyulf
           libraries:

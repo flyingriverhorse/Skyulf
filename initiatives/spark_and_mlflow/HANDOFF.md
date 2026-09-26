@@ -1,3 +1,72 @@
+# Current handoff: SM-33E live acceptance passed
+
+Updated 2026-09-26. Baseline `fe3897c4`, branch `090`; SM-33D and SM-33E are
+uncommitted (SM-33D staged, most SM-33E changes unstaged). No push or commit in
+this continuation. Leave unrelated `.tmp-review-model/` untouched.
+
+SM-33E adds guided Bundle setup, Core registry model/preprocessor discovery,
+offline preview, optional CV/sampling/windows/date parsing and English examples.
+Custom ordered preprocessing and estimator parameters remain editable in
+workflow.json. Advanced search and custom/multiple-model scenarios remain later.
+See [report 60](60-sm33e-guided-setup-and-live-validation.md).
+
+Local checks: 164 focused native integration tests, 48 actual CLI generation
+tests, and 110 evaluation/lifecycle regression tests passed (one native Spark
+module skipped). Suites overlap. Full ty, scoped Ruff/format, strict MkDocs,
+wheel build and strict generated dev validation passed; review findings fixed.
+
+Live personal serverless acceptance passed for pandas classification and Polars
+temporal regression: imputation/scaling, Random Forest, three-fold CV, MLflow
+metrics/artifacts, saved-evidence approval, 240 initial predictions, three new
+rows and no-op with target Delta version unchanged at 2. Final read-only audit
+`626395227690495` and local saved-response assertions passed. Live fixes address
+parallel forest evaluation sums and serverless automatic retries; report 60
+records failures and limitations. A timestamp-preserving test harness copy was
+also corrected, with remote config read-back added before model-specific runs.
+
+Existing schema `workspace.skyulf_lifecycle_test`; source `sm33e_source_r1`.
+Models `sm33e_pandas_classification_r1` champion v1 and
+`sm33e_polars_regression_r1` champion v3, each with `_predictions` output.
+Existing train job `155738051514173` and score job `684955889505992` now point to
+the pandas configuration. Both are idle after acceptance; schedules stay
+paused/absent. No new persistent Bundle jobs/schema or destructive cleanup.
+Helpers/evidence: `rehearsals/sm33e_live/`; current deployed project remains
+`rehearsals/sm30_live/generated/skyulf_lifecycle` with its deployment identity.
+
+Next READY: **SM-34**, independent paused train/score schedules and explicit
+window controls. Preserve SM-33D's independent full/fixed/rolling selection and
+timezone contracts; cron must not choose a split/window implicitly. Company
+production acceptance remains SM-43b. At the next requested commit include all
+intended SM-33D/E files and force-add exactly reports 59 and 60 (initiative ignore
+rules); do not add generated rehearsal projects, response dumps or wheels.
+
+## Historical snapshot: SM-33D local verification
+
+# Current handoff: SM-33D locally verified
+
+Baseline `fe3897c4` is committed on branch `090`; SM-33D changes are uncommitted.
+Implemented optional Core CV with fold-local FE, separate MLflow CV evidence,
+seeded Spark-side training sampling with pinned membership, and independent
+full/fixed/rolling windows with explicit business timezone. Both local engines
+are covered. See [validation and boundaries](59-sm33d-cv-sampling-and-window-validation.md).
+
+Verification: 274 native integration tests + 41 actual CLI generation tests +
+14 real local WSL Spark/Delta tests passed. Full ty, scoped Ruff/format, strict
+MkDocs, new wheel build and strict generated dev Bundle validation passed.
+Independent review found no actionable issues. No cloud job/model/table/alias
+was changed; no deployment or push occurred.
+
+Next READY: SM-33E guided basics/preprocessing/model/CV initialization and
+combined personal-serverless acceptance. SM-34 remains WAIT. SM-36 remains the
+advanced tuning/search integration; current CV evaluates fixed parameters only.
+Prior experimental evidence must be recreated for the new dataset identity.
+
+At the next requested commit include new `local_cv.py`, CV/window tests and
+force-add exactly report 59 (initiatives ignores new files). Leave unrelated
+`.tmp-review-model/` untouched. The current turn did not request another commit.
+
+## Historical snapshot: SM-33C delivery
+
 # Current handoff: SM-33C locally verified
 
 Commit preparation (2026-09-25): the user requested committing SM-33C, the

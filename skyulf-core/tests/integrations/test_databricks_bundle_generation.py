@@ -93,6 +93,115 @@ def _read_validated_config(project):
     return config
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("task", ["regression", "classification"])
+def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
+    """The real initializer must preserve selected Core steps/model/CV on both engines."""
+    import sys
+
+    import numpy as np
+    import pandas as pd
+    import polars as pl
+
+    from skyulf.data.dataset import SplitDataset
+    from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+    from skyulf.integrations.databricks.local_batch import fit_local_workflow
+
+    model = "random_forest_classifier" if task == "classification" else "random_forest_regressor"
+    project = _generate_project(
+        tmp_path,
+        engine=engine,
+        task=task,
+        training_version="0",
+        preprocessing="numeric_impute_scale",
+        model_type=model,
+        cv_enabled="true",
+        cv_folds="3",
+        cv_type="k_fold",
+        training_sample_rows="500",
+        training_sample_seed="19",
+    )
+    config = _read_validated_config(project)
+    jobs = yaml.safe_load((project / "resources/workflow.jobs.yml").read_text())["resources"][
+        "jobs"
+    ]
+    for job in jobs.values():
+        for entry in job["tasks"]:
+            if "notebook_task" in entry:
+                assert entry["max_retries"] == 0
+                assert entry["disable_auto_optimization"] is True
+    assert config["pipeline"]["modeling"] == {"type": model, "params": {}}
+    assert [s["transformer"] for s in config["pipeline"]["preprocessing"]] == [
+        "SimpleImputer",
+        "StandardScaler",
+    ]
+    assert config["cv_enabled"] is True and config["cv_folds"] == 3
+    assert config["training_sample_rows"] == 500 and config["training_sample_seed"] == 19
+    preview = subprocess.run(
+        [sys.executable, str(project / "src/preview.py"), "--action", "train"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=project,
+    )
+    assert preview.returncode == 0, preview.stdout + preview.stderr
+    assert f"Engine: {engine}" in preview.stdout
+    assert model in preview.stdout
+    assert "training partition only" in preview.stdout
+    frame = pd.DataFrame(
+        {
+            "feature_value": [float(i) if i % 7 else np.nan for i in range(40)],
+            "target": [i % 2 if task == "classification" else i * 2.0 for i in range(40)],
+        }
+    )
+    data = pl.from_pandas(frame) if engine == "polars" else frame
+    artifact = tmp_path / "pipeline.pkl"
+    fit_local_workflow(
+        config["pipeline"],
+        SplitDataset(train=data, test=data[:0]),
+        target_column="target",
+        artifact_path=artifact,
+        max_rows=100,
+        max_bytes=1048576,
+    )
+    incoming = pd.DataFrame({"feature_value": [None, 5.0, 8.0]})
+    if engine == "polars":
+        incoming = pl.from_pandas(incoming)
+    predictions = predict_local_pipeline(incoming, load_local_pipeline(artifact))
+    assert len(predictions) == 3
+    assert np.isfinite(np.asarray(predictions)).all()
+
+
+def test_cli_random_window_and_non_utc_source_rules(tmp_path):
+    """Random holdout and source calendar selection are independent initializer choices."""
+    project = _generate_project(
+        tmp_path,
+        training_window_mode="fixed_window",
+        split_strategy="random",
+        event_column="observed_at",
+        event_time_format="%d/%m/%Y %H:%M",
+        event_time_timezone="Europe/Copenhagen",
+        training_version="0",
+        start="2026-06-01T00:00:00+02:00",
+        cutoff="2026-09-01T00:00:00+02:00",
+        filter_unavailable_results="true",
+        result_available_at_column="confirmed_at",
+        result_time_format="%Y-%m-%d",
+        result_time_timezone="Europe/Vilnius",
+        result_date_only="midnight",
+        result_cutoff="2026-09-15T00:00:00+03:00",
+    )
+    config = _read_validated_config(project)
+    assert config["training_window_mode"] == "fixed_window"
+    assert config["monthly_lookback_months"] is None and config["window_timezone"] is None
+    assert config["event_time_parsing"] == {
+        "format": "%d/%m/%Y %H:%M",
+        "timezone": "Europe/Copenhagen",
+        "date_only": "reject",
+    }
+    assert config["result_time_parsing"]["date_only"] == "midnight"
+
+
 @pytest.mark.parametrize(
     ("task", "model", "metric"),
     [
@@ -281,6 +390,10 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
     )
     validate_workflow_config(resolved, action="train")
     assert config["split_strategy"] == "random"
+    assert config["training_window_mode"] == "full_snapshot"
+    assert config["window_timezone"] is None
+    assert config["cv_enabled"] is False and config["cv_folds"] == 5
+    assert config["training_sample_rows"] is None
     assert config["engine"] == engine
     assert config["test_size"] == 0.2 and config["random_state"] == 42
     assert config["stratify"] == (task == "classification")
@@ -321,6 +434,8 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
         "date-free-init.example.json",
         "random-delayed-results-init.example.json",
         "temporal-delayed-results-init.example.json",
+        "guided-classification-init.example.json",
+        "random-window-init.example.json",
     ],
 )
 def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):

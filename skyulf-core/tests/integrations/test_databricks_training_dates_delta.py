@@ -4,8 +4,10 @@ import os
 import time
 from dataclasses import replace
 from datetime import UTC, datetime
+from importlib import import_module
 from uuid import uuid4
 
+import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.local_retraining import (
@@ -238,3 +240,97 @@ def test_native_local_dates_require_calendar_rules(
         delta_spark, _spec(source_table, event_time_parsing=parser, result_time_parsing=parser)
     )
     assert frame.iloc[0]["event_at"].to_pydatetime() == datetime(2026, 1, 1, 15, tzinfo=UTC)
+
+
+def test_seeded_sample_selects_before_local_transfer_and_replays(delta_spark, source_table):
+    """A 100k-row pinned source must yield a deterministic bounded 10k-row training input."""
+    F = import_module("pyspark.sql.functions")
+
+    source = delta_spark.range(100000).selectExpr(
+        "id", "cast(id as double) x", "cast(id * 2 as double) target"
+    )
+    source.repartition(3).write.format("delta").saveAsTable(source_table)
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=10000,
+        max_bytes=5000000,
+        training_sample_rows=10000,
+        training_sample_seed=23,
+    )
+    frame = read_training_snapshot(delta_spark, spec)
+    assert len(frame) == 10000
+    assert frame.attrs["training_selection"]["eligible_rows"] == 100000
+    train, holdout, _ = split_labeled_snapshot(frame, spec)
+    pinned = replace(spec, sample_key_sha256=holdout.attrs["sample_key_sha256"])
+    source.orderBy(F.desc("id")).repartition(5).write.format("delta").mode("overwrite").saveAsTable(
+        source_table
+    )
+    same_rows_new_layout = read_training_snapshot(delta_spark, replace(spec, version=1))
+    assert frame.id.tolist() == same_rows_new_layout.id.tolist()
+    replay = split_labeled_snapshot(read_training_snapshot(delta_spark, pinned), pinned)
+    pd.testing.assert_frame_equal(train, replay[0])
+    pd.testing.assert_frame_equal(holdout, replay[1])
+    other = read_training_snapshot(delta_spark, replace(spec, training_sample_seed=24))
+    assert frame.id.tolist() != other.id.tolist()
+    with pytest.raises(ValueError, match="max_rows"):
+        read_training_snapshot(delta_spark, replace(spec, training_sample_rows=None))
+
+
+def test_sampling_filters_availability_before_selecting_keys(delta_spark, source_table):
+    """Late labels cannot consume sample slots and source key defects cannot hide outside the sample."""
+    rows = [
+        (i, datetime(2026, 1 if i < 30 else 3, 1, tzinfo=UTC), float(i), float(i * 2))
+        for i in range(100)
+    ]
+    delta_spark.createDataFrame(
+        rows, "id long, available timestamp, x double, target double"
+    ).write.format("delta").saveAsTable(source_table)
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=20,
+        max_bytes=100000,
+        training_sample_rows=20,
+        filter_unavailable_results=True,
+        result_available_at_column="available",
+        result_cutoff=datetime(2026, 2, 1, tzinfo=UTC),
+    )
+    frame = read_training_snapshot(delta_spark, spec)
+    assert len(frame) == 20 and frame.id.max() < 30
+    assert split_labeled_snapshot(frame, spec)[2] == 70
+    delta_spark.createDataFrame(
+        [rows[0]], "id long, available timestamp, x double, target double"
+    ).write.format("delta").mode("append").saveAsTable(source_table)
+    with pytest.raises(ValueError, match="unique"):
+        read_training_snapshot(delta_spark, replace(spec, version=1))
+
+
+def test_sample_key_named_count_and_nan_target_validation(delta_spark, source_table):
+    """Aggregation helper names cannot collide with business keys or hide non-finite labels."""
+    rows = [(i, float(i), float(i)) for i in range(10)]
+    delta_spark.createDataFrame(rows, "count long, x double, target double").write.format(
+        "delta"
+    ).saveAsTable(source_table)
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("count",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=6,
+        max_bytes=100000,
+        training_sample_rows=6,
+    )
+    assert len(read_training_snapshot(delta_spark, spec)) == 6
+    delta_spark.createDataFrame(
+        [(99, 99.0, float("nan"))], "count long, x double, target double"
+    ).write.format("delta").mode("append").saveAsTable(source_table)
+    with pytest.raises(ValueError, match="nonnull targets"):
+        read_training_snapshot(delta_spark, replace(spec, version=1))

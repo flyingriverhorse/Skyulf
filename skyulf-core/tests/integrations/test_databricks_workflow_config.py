@@ -11,6 +11,7 @@ def test_random_workflow_allows_null_inactive_dates_and_explicit_snapshot(workfl
     from skyulf.integrations.databricks.workflow_config import validate_workflow_config
 
     settings = {**workflow_config, "split_strategy": "random", "filter_unavailable_results": False}
+    settings.update(training_window_mode="full_snapshot", window_timezone=None)
     for field in (
         "start",
         "holdout_start",
@@ -38,6 +39,8 @@ def test_random_stratification_requires_classification_in_workflow(workflow_conf
         **workflow_config,
         "split_strategy": "random",
         "stratify": True,
+        "training_window_mode": "full_snapshot",
+        "window_timezone": None,
         "filter_unavailable_results": False,
     }
     for field in (

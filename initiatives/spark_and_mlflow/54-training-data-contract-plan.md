@@ -127,31 +127,31 @@ search/trial tuning and explainability remain SM-36 scope.
 
 - [x] Inspect Core ordinary-model CV and tuning routes; record the API mapping,
   limitations and 96-test evidence in report 58's Core routing audit.
-- [ ] Reuse existing CV entrypoints and FE fold-refitting rules.
+- [x] Reuse existing CV entrypoints and FE fold-refitting rules.
   Reject unsupported combinations rather than silently downgrade requested CV.
-- [ ] Route ordinary-model CV through `StatefulEstimator.cross_validate` using
+- [x] Route ordinary-model CV through `StatefulEstimator.cross_validate` using
   raw training rows and `FeatureEngineerFoldAdapter`, then fit the final pipeline.
   Preserve model defaults unless explicitly overridden; CV itself does not tune.
   Keep one CV settings contract that SM-36 can map to the tuner's `cv_*` fields.
-- [ ] Carry explicit temporal ordering metadata across source splitting without
+- [x] Carry explicit temporal ordering metadata across source splitting without
   including it in model features. Exclude final holdout from every fold. Do not
   expose diagnostic `nested_cv` as nested hyperparameter search.
-- [ ] Wire optional CV with deterministic seeds/folds and MLflow evidence;
+- [x] Wire optional CV with deterministic seeds/folds and MLflow evidence;
   tests must show heldout rows never reach fitting or fold preprocessing.
-- [ ] Add explicit optional training sampling independently of `max_rows`:
+- [x] Add explicit optional training sampling independently of `max_rows`:
   choose up to a requested row count with a recorded seed and stable record-key
   identity on the pinned source before driver transfer. Apply availability rules
   before selecting eligible rows. Preserve an explicit final-evaluation policy
   and classification/temporal semantics; never sample scoring implicitly. Test
   100,000 source rows selecting 10,000 reproducibly, partition/order changes,
   bounded transfer and approval replay. Keep overflow-fail as the default.
-- [ ] Make full-snapshot selection and rolling-calendar selection explicit.
+- [x] Make full-snapshot selection and rolling-calendar selection explicit.
   Rolling lookback names its event column and window timezone; clarify whether
   counts include the holdout period. Document the chosen semantics explicitly,
   without an unexplained default in date-free mode.
-- [ ] Separate job execution date/cron from data selection. Monthly invocation
+- [x] Separate job execution date/cron from data selection. Monthly invocation
   of random full-snapshot training must not require event dates or lookback.
-- [ ] Verify month/year boundaries, source ordering, time-series folds and
+- [x] Verify month/year boundaries, source ordering, time-series folds and
   recorded candidate/champion comparison on the same final evaluation rows.
 
 ## SM-33E — Generic template, operator documentation and live acceptance
@@ -160,26 +160,32 @@ search/trial tuning and explainability remain SM-36 scope.
 Mermaid walkthrough; focused generated-project tests; a new initiative report
 and bounded rehearsal driver using existing personal workspace resources.
 
-- [ ] Introduce guided setup sections for basics/data, ordered preprocessing,
+- [x] Introduce guided setup sections for basics/data, ordered preprocessing,
   task-compatible model/parameters and optional CV. Reuse Core contracts and
   keep advanced settings editable in the generated workflow config. Support
   equivalent noninteractive inputs and show a readable execution preview.
   Tuning/custom/multi-model sections arrive with SM-36/36a/36b/36c, not as empty
   advertised options. See the modular setup contract in report 58.
-- [ ] Hide irrelevant date prompts for random/no-availability initialization;
+- [x] Hide irrelevant date prompts for random/no-availability initialization;
   show explicit column, format, source zone and cutoff controls only when used.
-- [ ] Provide complete English random/date-free and temporal/delayed-result
+- [x] Provide complete English random/date-free and temporal/delayed-result
   examples, including optional availability with random splitting.
-- [ ] Explain source schema, per-row dates vs global boundaries, missing targets,
+- [x] Explain source schema, per-row dates vs global boundaries, missing targets,
   composite keys, split vs CV vs cron, lookback and migration in Mermaid/tables.
-- [ ] Generate/strictly validate projects for both engines and both task types.
-- [ ] Exercise actual Databricks training, MLflow metrics/artifacts, saved
+- [x] Generate/strictly validate projects for both engines and both task types.
+- [x] Exercise actual Databricks training, MLflow metrics/artifacts, saved
   evidence approval, scoring/new rows/no-op with date-free and temporal inputs.
   Include non-UTC boundaries and delayed-result eligibility. Reuse existing test
   schema/jobs where possible; no destructive cleanup or production mutation.
-- [ ] Record exact live resources/runs, local checks and limitations. Mark
+- [x] Record exact live resources/runs, local checks and limitations. Mark
   SM-34 READY only after this acceptance passes; company production remains a
   separate later gate.
+
+Completed 2026-09-26; see [SM-33E acceptance](60-sm33e-guided-setup-and-live-validation.md).
+Initializer presets are intentionally small; arbitrary ordered steps and model
+parameters remain editable in generated config and visible in offline preview.
+Live acceptance covered pandas classification and Polars temporal regression;
+local generated-project tests covered both engines and both task types.
 
 ## Rulings
 
@@ -214,3 +220,8 @@ and bounded rehearsal driver using existing personal workspace resources.
   instead of `max_bytes`. Keep lower-level byte contracts and convert in existing
   integration modules. Random training subsampling is an explicit SM-33D selection
   option; do not change current overflow-fail or prediction completeness silently.
+
+- 2026-09-25 (SM-33D): Core CV, optional eligible-row sampling and independent
+  source windows passed local acceptance; see report 59. Sample size includes
+  final holdout. Rolling calendars use an explicit IANA zone; fixed windows stay
+  fixed. Guided initializer controls and cloud acceptance remain SM-33E.

@@ -37,6 +37,7 @@ def _config():
         "input_columns": ["x"],
         "target_column": "target",
         "split_strategy": "temporal",
+        "training_window_mode": "fixed_window",
         "filter_unavailable_results": True,
         "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",
@@ -252,6 +253,7 @@ def test_monthly_window_pins_current_delta_version_across_year_boundary():
     spark.sql.return_value = history
     config = _config()
     config["monthly_lookback_months"] = 4
+    config.update(training_window_mode="rolling_calendar", window_timezone="UTC")
     spec = workflow._monthly_training_spec(
         spark, config, datetime(2027, 1, 3, 5, tzinfo=timezone(timedelta(hours=2)))
     )
@@ -271,6 +273,7 @@ def test_monthly_training_rejects_missing_version_and_invalid_lookback():
     spark.sql.return_value.select.return_value.orderBy.return_value.first.return_value = None
     config = _config()
     config["monthly_lookback_months"] = 1
+    config.update(training_window_mode="rolling_calendar", window_timezone="UTC")
     with pytest.raises(ValueError, match="monthly_lookback_months"):
         workflow._monthly_training_spec(spark, config, datetime(2027, 1, 3, tzinfo=UTC))
     config["monthly_lookback_months"] = 3

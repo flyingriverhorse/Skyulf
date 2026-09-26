@@ -2,6 +2,7 @@
 
 import pandas as pd
 import polars as pl
+from joblib import parallel_config
 
 from ..modeling._evaluation.common import sanitize_metrics
 from ..modeling._evaluation.metrics import (
@@ -22,6 +23,10 @@ def evaluate_local_holdout(
     The caller owns the split. This function never fits preprocessing or a model;
     it predicts with the loaded artifact and records only held-out metrics.
     Binary F1 uses the artifact's second class as the positive label.
+    Evaluation uses sequential joblib prediction to keep parallel forest sums
+    reproducible for exact registry evidence checks. Saved model parameters and
+    normal training/batch prediction parallelism remain unchanged. This does not
+    guarantee determinism for arbitrary models or other numerical runtimes.
     """
     if not isinstance(artifact, LocalPipelineArtifact):
         raise TypeError("artifact must be a LocalPipelineArtifact.")
@@ -36,7 +41,8 @@ def evaluate_local_holdout(
         heldout.select(columns) if isinstance(heldout, pl.DataFrame) else heldout.loc[:, columns]
     )
     actual = heldout[target_column].to_numpy()
-    predictions = predict_local_pipeline(features, artifact)
+    with parallel_config(backend="sequential"):
+        predictions = predict_local_pipeline(features, artifact)
     estimator = artifact.pipeline.model_estimator
     if estimator is None:
         raise ValueError("Local artifact has no fitted model.")

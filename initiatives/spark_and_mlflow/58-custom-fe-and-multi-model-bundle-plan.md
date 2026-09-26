@@ -1,7 +1,8 @@
 # Custom feature engineering and multiple models in one Bundle
 
 Date: 2026-09-25. Status: planned only; no new runtime support delivered here.
-Next active queue item remains SM-33D. The company example migration is later,
+Update 2026-09-26: SM-33D/E are complete for their documented local/personal
+serverless scopes (reports 59/60); SM-34 is next. The company example migration is later,
 after the generic Bundle gate, as requested by the user.
 
 ## Current capability
@@ -20,8 +21,9 @@ model version per training/scoring invocation.
 ## Guided, modular Bundle setup
 
 User refinement: expose the workflow in progressive setup sections, with
-optional scenarios. This is the planned setup experience, not an implemented
-new wizard or a finalized JSON schema. Retain one editable, validated workflow
+optional scenarios. SM-33E delivered the initial sections, a numeric FE preset,
+registered model selection, fixed-model CV and offline preview. Advanced search,
+custom code and multiple-model scenarios below remain planned. Retain one editable, validated workflow
 configuration as the runtime source of truth; initialization produces it.
 
 | Setup section | User choices | Default / conditional behavior |
@@ -72,7 +74,7 @@ sections yet. SM-44 remains the later company migration.
 ## Core CV and tuning routing audit
 
 Source inspected on 2026-09-25. This defines the implementation contract;
-the Bundle CV/search wiring is still planned.
+the fixed-model CV wiring is now locally verified in report 59; search remains planned.
 
 User decision: offer ordinary model training first, with optional CV. Advanced
 search adds strategy, search space and budgets to the selected base model.

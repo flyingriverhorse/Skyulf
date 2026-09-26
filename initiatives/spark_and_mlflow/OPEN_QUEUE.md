@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-25. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b, SM-20a/20R/20S and SM-27/29 complete for their documented scopes. Target: 0.9.0.**
+Updated: 2026-09-26. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b, SM-20a/20R/20S and SM-27/29 complete for their documented scopes. Target: 0.9.0.**
 The pre-Spark local Bundle lifecycle gate passed live: selectable rescoring,
 automatic champion selection, failed-score recovery and serialized handoff.
 This is functional completion for the selected workflow. Production must
@@ -43,7 +43,10 @@ The user added a mandatory pre-SM-34 sequence for optional dates, clear names,
 explicit timezone parsing and Core split/CV reuse. Read the
 [training data contract plan](54-training-data-contract-plan.md).
 SM-33 was committed as `0c0fd17f`; subsequent tasks are separate work.
-**SM-32 is DONE for the documented local/personal-serverless scope; SM-33 is DONE; SM-33A is DONE; SM-33B is DONE; SM-33C is DONE; SM-33D is READY. SM-34 waits for SM-33A through SM-33E.**
+**SM-32 through SM-33E are DONE for their documented scopes. SM-33E passed combined local/personal-serverless acceptance; SM-34 is READY.**
+See [guided setup and live acceptance](60-sm33e-guided-setup-and-live-validation.md):
+both engines passed training/CV/MLflow/approval, 240 + 3 predictions and no-op
+checks. SM-33D/SM-33E remain uncommitted; company production acceptance is later.
 User-requested operator usability follow-up: readable notebook reports and
 automatic full-proof lookup are implemented and verified locally and in the
 same personal Bundle; see [the follow-up evidence](52-sm32-operator-output-and-evidence.md).
@@ -84,9 +87,9 @@ on an existing candidate without retraining or reuploading the model.
 | SM-33A | Direct readable record/result field names | SM-33 | DONE | No aliases/adapter; regenerate experimental projects/models. Verified pandas/Polars, Spark, Delta and CLI; [evidence](55-sm33a-field-naming-validation.md) |
 | SM-33B | Explicit date parsing, source timezone and UTC-safe reads | SM-33A | DONE | Strict parsing before filters; saved-rule approval replay; non-UTC real Delta transport. [Validation](56-sm33b-training-date-validation.md) |
 | SM-33C | Date-free training and optional per-row result availability | SM-33B | DONE | Explicit random/temporal split; Core splitter reuse; optional dates, delayed labels, pinned snapshot/holdout and approval replay |
-| SM-33D | Core CV, explicit training sampling and independent data-window selection | SM-33C | READY | Protected final holdout; existing random/stratified/time-series CV; explicit seeded training sample; lookback source/zone and monthly date-free training |
-| SM-33E | Training setup examples, operator guide and live acceptance | SM-33A through SM-33D | WAIT | Guided basics/preprocessing/model/optional-CV setup; both engines/tasks; date-free/temporal generation and live train/MLflow/approval/score |
-| SM-34 | Independent score/train schedules and training windows | SM-33E | WAIT | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
+| SM-33D | Core CV, explicit training sampling and independent data-window selection | SM-33C | DONE | 274 native + 41 CLI + 14 local Delta checks; Core CV/FE isolation, deterministic sample/replay, explicit calendar zone; [evidence](59-sm33d-cv-sampling-and-window-validation.md). No cloud deployment |
+| SM-33E | Training setup examples, operator guide and live acceptance | SM-33A through SM-33D | DONE | Guided setup/preview; 48 actual CLI tests; live pandas/Polars train/CV/MLflow/approval, 240 + 3 rows and no-op; [evidence](60-sm33e-guided-setup-and-live-validation.md) |
+| SM-34 | Independent score/train schedules and training windows | SM-33E | READY | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
 | SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |
 | SM-36 | Core tuning, model search and optional explainability | SM-35 | WAIT | Guided advanced search on a selected base model; existing hyperparameter_tuner/TuningConfig and shared CV settings; Core spaces/trials/FE, validated budgets, protected holdout and MLflow/inference parity; routing audit in report 58 |
 | SM-36a | Project-owned feature engineering and output rules | SM-33D | WAIT | Registered custom fit/apply nodes, fold-safe learned state, packaged code/dependencies and fresh-process MLflow inference; explicit eligibility and post-prediction rules |
@@ -117,7 +120,9 @@ Setup will be progressive: basics/data, preprocessing, model, optional CV/search
 then lifecycle/output. Advanced and multi-model scenario questions appear only
 when selected; existing Core contracts remain authoritative. SM-33E delivers the
 first sections, SM-36/36a/b/c extend them, and SM-42 completes the combined setup.
-These are planned features, not delivered support. SM-33D remains the next task.
+The initial guided sections and fixed-model CV are delivered through SM-33D/E.
+Advanced search, custom feature code and multiple-model scenarios remain planned.
+SM-34 is next.
 
 | Task | Status | Dependency / scope |
 | --- | --- | --- |

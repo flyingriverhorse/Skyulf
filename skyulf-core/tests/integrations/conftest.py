@@ -29,6 +29,8 @@ def workflow_config():
         "input_columns": ["x"],
         "target_column": "target",
         "split_strategy": "temporal",
+        "training_window_mode": "rolling_calendar",
+        "window_timezone": "UTC",
         "filter_unavailable_results": True,
         "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",

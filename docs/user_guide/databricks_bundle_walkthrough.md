@@ -5,6 +5,30 @@ view. Training and prediction use pandas or Polars; Spark reads bounded Delta
 data and writes predictions. Start with the [Bundle configuration guide](databricks_bundle.md)
 for installation, target bindings and source requirements.
 
+After initialization, review the generated project locally before deploying:
+
+```powershell
+python src/preview.py
+python src/preview.py --action train
+```
+
+The first command explains the setup and missing manual training pins. The second
+checks the configuration for manual training without starting a job. Use
+`--action train_monthly` to inspect runtime window selection instead. Preview uses
+the generated dev bindings; supply the matching catalog/schema/suffix arguments
+when reviewing another target. Custom ordered preprocessing and hyperparameters
+stay in `config/workflow.json`; model/node listings come from the Core registry.
+See [guided setup](databricks_bundle.md#guided-setup-and-offline-preview).
+
+Before training, review three separate data settings in `config/workflow.json`:
+`training_window_mode` selects full/fixed/rolling source data, optional
+`training_sample_rows` selects a bounded eligible sample on Spark, and
+`split_strategy` assigns training versus final-test rows. Optional `cv_enabled`
+evaluates fixed model parameters only inside the training partition. Inspect
+`cross_validation.json` and the `cv_*` Experiment metrics for fold results;
+promotion continues to use the separate `heldout_*` metrics. See
+[CV, sampling and calendar examples](databricks_bundle.md#optional-basic-model-cross-validation).
+
 ## Three independent decisions
 
 Configure these in the generated project's `config/workflow.json`:

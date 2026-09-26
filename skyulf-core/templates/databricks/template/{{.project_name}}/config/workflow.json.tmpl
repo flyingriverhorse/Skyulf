@@ -1,15 +1,28 @@
+{{- $window := .training_window_mode -}}
+{{- if eq $window "auto" -}}
+{{- if eq .split_strategy "temporal" -}}{{- $window = "rolling_calendar" -}}{{- else -}}{{- $window = "full_snapshot" -}}{{- end -}}
+{{- end -}}
 {
   "config_version": 1,
   "task": "{{.task}}",
   "engine": "{{.engine}}",
   "split_strategy": "{{.split_strategy}}",
+  "training_window_mode": "{{$window}}",
+  "window_timezone": {{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}},
   "test_size": {{.test_size}},
   "random_state": {{.random_state}},
   "stratify": {{.stratify}},
+  "cv_enabled": {{.cv_enabled}},
+  "cv_folds": {{.cv_folds}},
+  "cv_type": "{{.cv_type}}",
+  "cv_shuffle": {{.cv_shuffle}},
+  "cv_random_state": {{.cv_random_state}},
+  "training_sample_rows": {{.training_sample_rows}},
+  "training_sample_seed": {{.training_sample_seed}},
   "filter_unavailable_results": {{.filter_unavailable_results}},
   "training_table": "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}",
   "training_version": {{.training_version}},
-  "monthly_lookback_months": {{if eq .split_strategy "temporal"}}4{{else}}null{{end}},
+  "monthly_lookback_months": {{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}},
   "score_source_table": "{catalog}.{input_schema}.{{if .score_source_table_name}}{{.score_source_table_name}}{{else}}{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}{{end}}",
   "prediction_table": "{catalog}.{output_schema}.{{.project_name}}_predictions{resource_suffix}",
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
@@ -25,8 +38,8 @@
   "target_column": "{{.target_column}}",
   "event_column": {{if .event_column}}"{{.event_column}}"{{else}}null{{end}},
   "result_available_at_column": {{if .result_available_at_column}}"{{.result_available_at_column}}"{{else}}null{{end}},
-  "event_time_parsing": {"format": null, "timezone": null, "date_only": "reject"},
-  "result_time_parsing": {"format": null, "timezone": null, "date_only": "reject"},
+  "event_time_parsing": {"format": {{if .event_time_format}}"{{.event_time_format}}"{{else}}null{{end}}, "timezone": {{if .event_time_timezone}}"{{.event_time_timezone}}"{{else}}null{{end}}, "date_only": "{{.event_date_only}}"},
+  "result_time_parsing": {"format": {{if .result_time_format}}"{{.result_time_format}}"{{else}}null{{end}}, "timezone": {{if .result_time_timezone}}"{{.result_time_timezone}}"{{else}}null{{end}}, "date_only": "{{.result_date_only}}"},
   "start": {{if .start}}"{{.start}}"{{else}}null{{end}},
   "holdout_start": {{if .holdout_start}}"{{.holdout_start}}"{{else}}null{{end}},
   "cutoff": {{if .cutoff}}"{{.cutoff}}"{{else}}null{{end}},
@@ -37,7 +50,10 @@
   "min_improvement": {{.min_improvement}},
   "quality_threshold": {{.quality_threshold}},
   "pipeline": {
-    "preprocessing": [],
-    "modeling": {"type": "{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}"}
+    "preprocessing": [{{if eq .preprocessing "numeric_impute_scale"}}
+      {"name": "impute", "transformer": "SimpleImputer", "params": {"columns": {{.input_columns_json}}, "strategy": "mean"}},
+      {"name": "scale", "transformer": "StandardScaler", "params": {"columns": {{.input_columns_json}}}}
+    {{end}}],
+    "modeling": {"type": "{{if eq .model_type "auto"}}{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}{{else}}{{.model_type}}{{end}}", "params": {}}
   }
 }

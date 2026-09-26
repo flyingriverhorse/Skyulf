@@ -56,6 +56,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         "input_columns": ["x"],
         "target_column": "target",
         "split_strategy": "temporal",
+        "training_window_mode": "fixed_window",
         "filter_unavailable_results": True,
         "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",

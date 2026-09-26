@@ -43,6 +43,7 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
         "input_columns": ["x"],
         "target_column": "target",
         "split_strategy": "temporal",
+        "training_window_mode": "fixed_window",
         "filter_unavailable_results": True,
         "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",

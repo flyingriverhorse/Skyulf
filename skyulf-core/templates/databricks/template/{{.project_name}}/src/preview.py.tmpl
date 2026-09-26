@@ -1,0 +1,50 @@
+"""Inspect this project's Core configuration without starting a cloud job."""
+
+import argparse
+import json
+from pathlib import Path
+
+from skyulf.integrations.databricks.local_workflow import resolve_target_config
+from skyulf.integrations.databricks.workflow_config import preview_workflow_config
+from skyulf.modeling.base import BaseModelCalculator
+from skyulf.registry import NodeRegistry
+
+
+def main():
+    """Show the selected pipeline or discover installed Core model/node metadata."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--action", choices=["score", "train", "train_monthly"], default="score")
+    parser.add_argument("--catalog", default="{{.catalog}}")
+    parser.add_argument("--input-schema", default="{{.schema}}")
+    parser.add_argument("--output-schema", default="{{.schema}}")
+    parser.add_argument("--metadata-schema", default="{{.schema}}")
+    parser.add_argument("--resource-suffix", default="")
+    parser.add_argument("--list-models", action="store_true")
+    parser.add_argument("--list-preprocessors", action="store_true")
+    args = parser.parse_args()
+    path = Path(__file__).resolve().parents[1] / "config/workflow.json"
+    config = json.loads(path.read_text(encoding="utf-8"))
+    if args.list_models or args.list_preprocessors:
+        for node_id, meta in sorted(NodeRegistry.get_all_metadata().items()):
+            calculator = NodeRegistry.get_calculator(node_id)
+            is_model = issubclass(calculator, BaseModelCalculator)
+            if is_model:
+                if not args.list_models or calculator().problem_type != config["task"]:
+                    continue
+            elif not args.list_preprocessors:
+                continue
+            print(f"{node_id}: {meta['name']} | {meta['description']}")
+            print("  Metadata defaults:", json.dumps(meta.get("params", {})))
+        print("Availability depends on installed dependencies and the selected node options.")
+        return
+    bindings = {key: getattr(args, key) for key in (
+        "catalog", "input_schema", "output_schema", "metadata_schema", "resource_suffix"
+    )}
+    try:
+        print(preview_workflow_config(resolve_target_config(config, bindings), action=args.action))
+    except ValueError as exc:
+        parser.exit(2, f"Configuration error: {exc}\n")
+
+
+if __name__ == "__main__":
+    main()

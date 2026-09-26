@@ -14,6 +14,7 @@ import pickle
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
+from importlib import import_module
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -30,6 +31,7 @@ from ..mlflow.tracking import TrackingConfig, track_run
 from ..mlflow.validation import ModelComparisonReport, compare_registered_local_models
 from ._contracts import column_name, table_name
 from .local_batch import _frame_bytes, fit_local_workflow
+from .local_cv import CV_FIELDS, LocalCVSpec, evaluate_training_cv
 from .training_dates import (
     TrainingDateSpec,
     instant_from_microseconds,
@@ -64,6 +66,9 @@ class LocalTrainingSpec:
     event_time_parsing: TrainingDateSpec = TrainingDateSpec()
     result_time_parsing: TrainingDateSpec = TrainingDateSpec()
     holdout_key_sha256: str | None = None
+    training_sample_rows: int | None = None
+    training_sample_seed: int = 42
+    sample_key_sha256: str | None = None
 
     def __post_init__(self) -> None:
         """Reject incomplete or contradictory policies before opening a Spark reader."""
@@ -78,14 +83,19 @@ class LocalTrainingSpec:
         if type(self.filter_unavailable_results) is not bool:
             raise ValueError("filter_unavailable_results must be boolean.")
         if self.split_strategy == "random":
-            if (
-                any(
-                    value is not None
-                    for value in (self.event_column, self.start, self.holdout_start, self.cutoff)
-                )
+            if self.holdout_start is not None:
+                raise ValueError("Random split requires inactive holdout_start to be null.")
+            if self.event_column is None and (
+                self.start is not None
+                or self.cutoff is not None
                 or self.event_time_parsing != TrainingDateSpec()
             ):
                 raise ValueError("Random split requires inactive event/date fields to be null.")
+            if self.event_column is not None:
+                start = _validate_instant(self.start, "start")
+                cutoff = _validate_instant(self.cutoff, "cutoff")
+                if start >= cutoff:
+                    raise ValueError("Require start < cutoff for event selection.")
             if (
                 self.test_size is None
                 or type(self.test_size) not in (int, float)
@@ -136,12 +146,23 @@ class LocalTrainingSpec:
             raise ValueError("max_rows must be positive.")
         if type(self.max_bytes) is not int or self.max_bytes <= 0:
             raise ValueError("max_bytes must be positive.")
-        if self.holdout_key_sha256 is not None and (
-            not isinstance(self.holdout_key_sha256, str)
-            or len(self.holdout_key_sha256) != 64
-            or any(char not in "0123456789abcdef" for char in self.holdout_key_sha256)
+        if self.training_sample_rows is not None and (
+            type(self.training_sample_rows) is not int
+            or not 4 <= self.training_sample_rows <= self.max_rows
         ):
-            raise ValueError("holdout_key_sha256 must be a SHA-256 digest.")
+            raise ValueError("training_sample_rows must be null or an integer from 4 to max_rows.")
+        if type(self.training_sample_seed) is not int or not 0 <= self.training_sample_seed < 2**32:
+            raise ValueError("training_sample_seed must be an integer from 0 to 2**32 - 1.")
+        for field in ("holdout_key_sha256", "sample_key_sha256"):
+            digest = getattr(self, field)
+            if digest is not None and (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+            ):
+                raise ValueError(f"{field} must be a SHA-256 digest.")
+        if self.sample_key_sha256 is not None and self.training_sample_rows is None:
+            raise ValueError("sample_key_sha256 requires training_sample_rows.")
 
     @property
     def source_columns(self) -> tuple[str, ...]:
@@ -207,13 +228,16 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
         event_spec=spec.event_time_parsing,
         result_spec=spec.result_time_parsing,
     )
-    if spec.split_strategy == "temporal":
+    if spec.event_column is not None:
         start = instant_microseconds(cast(datetime, spec.start))
         cutoff = instant_microseconds(cast(datetime, spec.cutoff))
         source = source.where(
             f"{column_name(cast(str, spec.event_column))} >= {start} AND "
             f"{column_name(cast(str, spec.event_column))} < {cutoff}"
         )
+    selection = None
+    if spec.training_sample_rows is not None:
+        source, selection = _sample_training_source(source, spec)
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     records: list[dict[str, Any]] = []
@@ -232,11 +256,88 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     frame = pd.DataFrame.from_records(records, columns=names)
     if _frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Training frame exceeds max_bytes.")
+    if selection is not None:
+        frame.attrs["training_selection"] = {**selection, "selected_rows": len(frame)}
     return frame
 
 
+def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, dict[str, Any]]:
+    """Select eligible keys by a seeded hash on Spark before transferring any training rows."""
+    F = import_module("pyspark.sql.functions")
+
+    keys = list(spec.record_key_columns)
+    floating = {
+        field.name
+        for field in source.schema.fields
+        if field.dataType.typeName() in {"double", "float"}
+    }
+    null_keys = " OR ".join(
+        f"({column_name(key)} IS NULL OR isnan({column_name(key)}))"
+        if key in floating
+        else f"{column_name(key)} IS NULL"
+        for key in keys
+    )
+    if source.where(null_keys).limit(1).count():
+        raise ValueError("Training row keys must not be null.")
+    count_name = "_sample_count"
+    while count_name.casefold() in {key.casefold() for key in keys}:
+        count_name += "_"
+    counts = source.groupBy(*keys).agg(F.count(F.lit(1)).alias(count_name))
+    if counts.where(F.col(count_name) > 1).limit(1).count():
+        raise ValueError("Training row keys must be unique before sampling.")
+    source_rows = source.count()
+    if spec.filter_unavailable_results:
+        result = column_name(cast(str, spec.result_available_at_column))
+        if (
+            spec.event_column is not None
+            and source.where(f"{result} < {column_name(spec.event_column)}").limit(1).count()
+        ):
+            raise ValueError("Label availability precedes event time.")
+        cutoff = instant_microseconds(cast(datetime, spec.result_cutoff))
+        source = source.where(f"{result} IS NOT NULL AND {result} <= {cutoff}")
+    eligible_rows = source.count() if spec.filter_unavailable_results else source_rows
+    invalid_target = F.col(spec.target_column).isNull()
+    if spec.target_column in floating:
+        invalid_target = invalid_target | F.isnan(F.col(spec.target_column))
+    if source.where(invalid_target).limit(1).count():
+        raise ValueError("Available labels must have nonnull targets before sampling.")
+    # Struct field order, UTC timestamp rendering and the tie-break keys are
+    # explicit so partition layout and Spark session timezone cannot change membership.
+    key_json = F.to_json(
+        F.struct(
+            F.lit(spec.training_sample_seed).alias("sample_seed"),
+            *[F.col(key).alias(f"key_{index}") for index, key in enumerate(keys)],
+        ),
+        options={"timeZone": "UTC", "ignoreNullFields": "false"},
+    )
+    selected = source.orderBy(F.sha2(key_json, 256), *keys).limit(spec.training_sample_rows)
+    return selected, {
+        "method": "sha256_keys_v1",
+        "seed": spec.training_sample_seed,
+        "requested_rows": spec.training_sample_rows,
+        "source_rows": source_rows,
+        "eligible_rows": eligible_rows,
+        "unavailable_labels": source_rows - eligible_rows,
+    }
+
+
+def _key_digest(frame: pd.DataFrame, keys: tuple[str, ...]) -> str:
+    """Hash typed ordered identities without treating them as model inputs."""
+    payload = json.dumps(
+        {
+            "columns": list(keys),
+            "rows": [
+                [(type(value).__name__, str(value)) for value in row]
+                for row in frame.loc[:, list(keys)].itertuples(index=False, name=None)
+            ],
+        },
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def split_labeled_snapshot(
-    frame: pd.DataFrame, spec: LocalTrainingSpec
+    frame: pd.DataFrame, spec: LocalTrainingSpec, *, keep_training_event: bool = False
 ) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     """Make disjoint, reproducible fit and holdout sets from available labels."""
     if not isinstance(frame, pd.DataFrame) or not isinstance(spec, LocalTrainingSpec):
@@ -280,6 +381,13 @@ def split_labeled_snapshot(
         raise ValueError("Available labels must have nonnull targets.")
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = selected.loc[available].sort_values(ordering, kind="stable").reset_index(drop=True)
+    sample_digest = None
+    if spec.training_sample_rows is not None:
+        if len(selected) > spec.training_sample_rows:
+            raise ValueError("Training snapshot was not bounded by training_sample_rows.")
+        sample_digest = _key_digest(selected, spec.record_key_columns)
+        if spec.sample_key_sha256 is not None and sample_digest != spec.sample_key_sha256:
+            raise ValueError("Training sample membership differs from saved evidence.")
     if spec.split_strategy == "random":
         if spec.stratify:
             counts = selected[spec.target_column].value_counts()
@@ -300,25 +408,21 @@ def split_labeled_snapshot(
     if len(train) < 2 or len(heldout) < 2:
         raise ValueError("Training and holdout each need at least two labeled rows.")
     # Hash the ordered identity tuples only; never include keys in model features.
-    key_frame = heldout.loc[:, list(spec.record_key_columns)]
-    keys = json.dumps(
-        {
-            "columns": list(spec.record_key_columns),
-            "rows": [
-                [(type(value).__name__, str(value)) for value in row]
-                for row in key_frame.itertuples(index=False, name=None)
-            ],
-        },
-        separators=(",", ":"),
-    )
-    digest = hashlib.sha256(keys.encode()).hexdigest()
+    digest = _key_digest(heldout, spec.record_key_columns)
     if spec.holdout_key_sha256 is not None and digest != spec.holdout_key_sha256:
         raise ValueError("Holdout membership differs from saved training evidence.")
     columns = [*spec.input_columns, spec.target_column]
-    train_frame = train.loc[:, columns].reset_index(drop=True)
+    train_columns = (
+        [*columns, spec.event_column] if keep_training_event and spec.event_column else columns
+    )
+    train_frame = train.loc[:, train_columns].reset_index(drop=True)
     holdout_frame = heldout.loc[:, columns].reset_index(drop=True)
     holdout_frame.attrs["holdout_key_sha256"] = digest
-    return train_frame, holdout_frame, int((~available).sum())
+    holdout_frame.attrs["sample_key_sha256"] = sample_digest
+    unavailable = int((~available).sum()) + frame.attrs.get("training_selection", {}).get(
+        "unavailable_labels", 0
+    )
+    return train_frame, holdout_frame, unavailable
 
 
 def _log_local_model(artifact_path: str | Path, *, run_id: str, tracking_uri: str) -> str:
@@ -348,6 +452,7 @@ def train_local_candidate(
     quality_threshold: float | None = None,
     on_registered: Callable[[ResolvedModel], None] | None = None,
     risk_category: str | None = None,
+    cv: LocalCVSpec | None = None,
 ) -> LocalCandidateResult:
     """Fit, register and compare; optionally notify an explicit lifecycle owner.
 
@@ -359,6 +464,10 @@ def train_local_candidate(
         raise TypeError("spec must be LocalTrainingSpec.")
     if engine not in ("pandas", "polars"):
         raise ValueError("engine must be pandas or polars.")
+    cv = LocalCVSpec() if cv is None else cv
+    if not isinstance(cv, LocalCVSpec):
+        raise TypeError("cv must be LocalCVSpec.")
+    cv.validate_pipeline(config, target_column=spec.target_column, event_column=spec.event_column)
     if spec.stratify and (
         NodeRegistry.get_calculator(config["modeling"]["type"])().problem_type != "classification"
     ):
@@ -394,10 +503,31 @@ def train_local_candidate(
         else None
     )
     frame = read_training_snapshot(spark, spec)
-    train_frame, holdout, unavailable = split_labeled_snapshot(frame, spec)
-    spec = replace(spec, holdout_key_sha256=holdout.attrs["holdout_key_sha256"])
+    temporal_cv = cv.enabled and cv.method == "time_series_split"
+    train_frame, holdout, unavailable = split_labeled_snapshot(
+        frame, spec, keep_training_event=temporal_cv
+    )
+    spec = replace(
+        spec,
+        holdout_key_sha256=holdout.attrs["holdout_key_sha256"],
+        sample_key_sha256=holdout.attrs["sample_key_sha256"],
+    )
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
     native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
+    cv_results = evaluate_training_cv(
+        native_train,
+        config,
+        cv,
+        target_column=spec.target_column,
+        event_column=spec.event_column if temporal_cv else None,
+    )
+    if temporal_cv:
+        model_columns = [*spec.input_columns, spec.target_column]
+        native_train = (
+            native_train.select(model_columns)
+            if isinstance(native_train, pl.DataFrame)
+            else native_train.loc[:, model_columns]
+        )
     artifact = fit_local_workflow(
         config,
         SplitDataset(train=native_train, test=native_train.head(0)),
@@ -419,6 +549,19 @@ def train_local_candidate(
         if run.run_id is None:
             raise RuntimeError("MLflow did not provide a run ID.")
         run.log_config(config, artifact_file="skyulf_pipeline_config.json")
+        run.log_params({key: getattr(cv, field) for key, field in CV_FIELDS.items()})
+        if cv_results is not None:
+            cv_results.update(
+                dataset_id=spec.dataset_id, training_rows=len(train_frame), engine=engine
+            )
+            run.client.log_dict(run.run_id, cv_results, "cross_validation.json")
+            run.log_metrics(
+                {
+                    f"cv_{name}_{stat}": value
+                    for name, statistics in cv_results["aggregated_metrics"].items()
+                    for stat, value in statistics.items()
+                }
+            )
         run.log_params(
             {
                 "source_table": spec.table,
@@ -459,6 +602,16 @@ def train_local_candidate(
             run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json"
         )
         saved_spec = asdict(spec)
+        if spec.training_sample_rows is not None:
+            run.client.log_dict(
+                run.run_id,
+                {
+                    **frame.attrs.get("training_selection", {}),
+                    "sample_key_sha256": spec.sample_key_sha256,
+                    "dataset_id": spec.dataset_id,
+                },
+                "training_selection.json",
+            )
         for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
             value = getattr(spec, field)
             saved_spec[field] = None if value is None else value.isoformat()

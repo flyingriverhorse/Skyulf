@@ -114,6 +114,34 @@ def test_null_target_is_rejected_in_labeled_dataset_mode():
 @pytest.mark.parametrize(
     "changes",
     [
+        {"training_sample_rows": 3},
+        {"training_sample_rows": 101},
+        {"training_sample_rows": True},
+        {"training_sample_seed": -1},
+    ],
+)
+def test_explicit_training_sample_respects_the_independent_read_budget(changes):
+    """Sampling cannot bypass the row guard or silently accept malformed settings."""
+    with pytest.raises(ValueError, match="training_sample"):
+        _spec(**changes)
+
+
+def test_sample_membership_is_pinned_separately_from_holdout_membership():
+    """Approval must detect sample drift even if final holdout keys happened to stay the same."""
+    spec = _spec(training_sample_rows=20)
+    frame = _frame()
+    _, heldout, _ = retraining.split_labeled_snapshot(frame, spec)
+    pinned = replace(spec, sample_key_sha256=heldout.attrs["sample_key_sha256"])
+    changed = frame.copy()
+    changed.loc[0, "id"] = 999
+    with pytest.raises(ValueError, match="sample membership"):
+        retraining.split_labeled_snapshot(changed, pinned)
+    assert replace(spec, training_sample_seed=7).dataset_id != spec.dataset_id
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
         {"event_column": "event"},
         {"start": datetime(2026, 1, 1, tzinfo=UTC)},
         {"result_available_at_column": "available"},
@@ -236,10 +264,12 @@ def test_date_free_monthly_pins_full_latest_snapshot_and_invocation_result_cutof
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("sampled", [False, True])
 def test_random_candidate_approval_replays_saved_membership_after_config_changes(
     monkeypatch,
     tmp_path,
     engine,
+    sampled,
 ):
     """Persisted MLflow evidence must preserve date-free approval after later workflow edits."""
     import hashlib
@@ -275,6 +305,9 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         "metric": "heldout_rmse",
         "min_improvement": 0.0,
         "quality_threshold": 0.01,
+        "cv_enabled": True,
+        "cv_folds": 2,
+        "training_sample_rows": 20 if sampled else None,
         "pipeline": {
             "preprocessing": [
                 {"name": "scale", "transformer": "StandardScaler", "params": {"columns": ["x"]}}
@@ -303,10 +336,18 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         json.dumps(asdict(candidate.comparison), sort_keys=True, allow_nan=False).encode()
     ).hexdigest()
     assert observed_fit_rows == [16]
+    cv_path = client.download_artifacts(candidate.run_id, "cross_validation.json", str(tmp_path))
+    cv_report = json.loads(Path(cv_path).read_text(encoding="utf-8"))
+    assert cv_report["fold_refit"]["max_fit_rows"] == 8
+    assert cv_report["fold_refit"]["fit_calls"] == 2
+    logged_metrics = client.get_run(candidate.run_id).data.metrics
+    assert logged_metrics["cv_rmse_mean"] == pytest.approx(0, abs=1e-8)
+    assert logged_metrics["heldout_rmse"] == pytest.approx(0, abs=1e-8)
     saved_path = client.download_artifacts(
         candidate.run_id, "candidate_training_spec.json", str(tmp_path)
     )
     saved = json.loads(Path(saved_path).read_text(encoding="utf-8"))
+    assert (saved["sample_key_sha256"] is not None) == sampled
     client.log_dict(
         candidate.run_id, {**saved, "holdout_key_sha256": "a" * 64}, "candidate_training_spec.json"
     )

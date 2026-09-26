@@ -109,6 +109,20 @@ for the four supported combinations.
 
 ## Fit and score a small batch
 
+Candidate training also accepts `cv=LocalCVSpec(enabled=True, folds=3)` from
+`skyulf.integrations.databricks.local_cv`. It reuses Core CV on training rows,
+refits preprocessing per fold and logs a separate report to the candidate's
+MLflow run. Use `method="stratified_k_fold"` for classification; time-series CV
+requires an explicit event window and `shuffle=False`. The saved final pipeline
+and its protected holdout are independent of the fold fits.
+
+`LocalTrainingSpec(training_sample_rows=10_000, training_sample_seed=42, ...)`
+opts into seeded Spark-side selection before local transfer. The limit includes
+training and final holdout rows and cannot exceed `max_rows`. Sample membership
+is pinned for approval replay. Leaving it null preserves overflow-fail behavior.
+See [Bundle CV, sampling and selection](databricks_bundle.md#optional-basic-model-cross-validation)
+for full contracts and the separate `train_monthly` calendar settings.
+
 Install the same `skyulf-core`, pandas, Polars and scikit-learn versions in the
 training and scoring environments. The local artifact records those versions,
 the fit engine and the raw/feature schemas. It contains trusted Python pickle;

@@ -5,6 +5,77 @@ bounded Unity Catalog Delta rows and writes predictions. The selected job
 compute mode is **{{.compute_mode}}**. `dev`, `test`, `syst` and `prod` use the
 same Skyulf workflow code with different target bindings.
 
+## Review your training setup first
+
+Initialization is ordered: **basics/data -> preprocessing -> model -> evaluation CV
+-> lifecycle -> compute**. Date prompts are hidden when irrelevant. The same
+choices can be supplied in a JSON init file.
+
+Install the matching Skyulf wheel locally, then run from the generated project:
+
+```powershell
+python src/preview.py
+python src/preview.py --list-models
+python src/preview.py --list-preprocessors
+python src/preview.py --action train
+```
+
+The default preview validates structure, shows the ordered pipeline, and explains
+missing manual training pins. `--action train` additionally requires a concrete
+source version and any manual dates. `--action train_monthly` checks the automatic
+selection policy. None of these commands reads data, trains or deploys. The preview
+uses the generated dev catalog/schema defaults; for another target pass
+`--catalog`, `--input-schema`, `--output-schema`, `--metadata-schema` and
+`--resource-suffix` with the same values used by your Bundle target/overrides.
+It does not resolve Databricks target variables or check cloud permissions.
+
+`preprocessing=numeric_impute_scale` creates ordered Core `SimpleImputer` (mean)
+and `StandardScaler` steps on **all configured input columns**, which must be
+numeric for this preset. `none` creates no steps. For mixed/custom inputs edit
+`pipeline.preprocessing` in `config/workflow.json`: select each node's columns,
+add encoders, reorder steps or remove the preset. This is the actual Core step
+list, not a second preprocessing implementation. IDs and metadata defaults come
+from the installed Core registry via the list commands above; a registry listing
+does not guarantee every option/dependency is usable in your target environment.
+
+`model_type=auto` chooses the task's starter model. Any task-compatible registered
+Core model ID can replace it; incompatibility fails preflight. Set explicit model
+hyperparameters in `pipeline.modeling.params`; an empty object uses Core defaults.
+For example, with `random_forest_classifier` or `random_forest_regressor`:
+
+```json
+"modeling": {
+  "type": "random_forest_classifier",
+  "params": {"n_estimators": 100, "max_depth": 8, "random_state": 42}
+}
+```
+
+The native initializer offers the preset/model ID; arbitrary ordered JSON steps
+and model parameter objects are edited in the generated workflow. Re-run preview
+after editing. Preflight is structural; node-specific data/parameter validity is
+still checked by Core during execution. Do not treat preview as a successful fit.
+
+`cv_enabled=true` evaluates fixed parameters on the training partition, refitting
+preprocessing within each fold. It never uses the final holdout or selects new
+parameters. Choose `cv_type`, `cv_folds`, `cv_shuffle`, `cv_random_state`. Time-series
+CV requires a mapped event column and `cv_shuffle=false`; stratified CV requires
+classification. Parameter search/Optuna integration is a later task.
+
+`training_window_mode=auto` resolves to full snapshot for random splitting or
+rolling calendar for temporal splitting. Choose `fixed_window` or
+`rolling_calendar` explicitly to select an observation window **and then** use a
+random holdout. Rolling selection has separate `monthly_lookback_months` and
+`window_timezone`. Source parsing uses `event_time_format`, `event_time_timezone`,
+`event_date_only` (and corresponding `result_*` inputs); these become the two
+`*_time_parsing` objects. String formats use numeric Python-style directives.
+Leave format/timezone blank for native timezone-aware timestamps; local/date-only
+sources need explicit rules. Neither the schedule nor window timezone supplies
+an omitted source timezone.
+
+`training_sample_rows` defaults to `null`: no sample, overflow fails. An explicit
+size samples eligible source records before splitting; it includes the holdout.
+`training_sample_seed` pins repeatable key-based selection. Scoring is never sampled.
+
 ## What deployment creates
 
 `src/workflow.py` and `src/score.py` are thin, fixed-role entry points. The
@@ -112,12 +183,14 @@ In monthly mode, the schedule starts paused. Its Quartz cron and IANA timezone
 are selected at initialization and remain editable as
 `retraining_cron_expression` and `retraining_timezone_id` Bundle variables.
 The default is 03:00 UTC on the third day of each month. Configure one run per
-month; a different cadence can retrain the same UTC month more than once.
+month; a different cadence can retrain the same selected data more than once.
 After you unpause it, each run captures the latest concrete Delta source
-version. Random splitting uses the whole bounded snapshot, with no dates or
-lookback. Temporal splitting uses the first day of that month as its UTC
-observation cutoff, holds out the preceding calendar month, and selects
-`monthly_lookback_months` months including holdout (default four). If result
+version. `training_window_mode` independently selects `full_snapshot`,
+`fixed_window` or `rolling_calendar`. Rolling selection uses the explicit
+`window_timezone` and `monthly_lookback_months` (initial temporal project:
+UTC and four months). With a temporal split the last completed month is the
+holdout, included in that count. Random splitting divides the selected data by
+`test_size`; a fixed window never advances with the schedule. If result
 availability filtering is enabled, its separate cutoff is the job invocation
 instant. The captured Delta version is pinned at run start; it is not a
 historical snapshot as of the observation cutoff. If the source has too few
@@ -170,6 +243,17 @@ The default `split_strategy: random` requires no date columns. Set `test_size`
 saved snapshot, split policy and holdout-key digest; input row ordering cannot
 silently change evaluation membership. A different snapshot can change the split.
 
+Optional Basic-model CV is configured in this same workflow file with
+`cv_enabled`, `cv_folds` (2â€“20), `cv_type`, `cv_shuffle`, and `cv_random_state`.
+It defaults to disabled. `stratified_k_fold` is for classification; `k_fold` and
+`shuffle_split` also support regression. `time_series_split` uses the normalized
+`event_column` from window selection and requires shuffle disabled. The timestamp
+is removed before fold feature engineering; tied timestamps crossing a fold
+boundary are rejected. Core refits preprocessing inside each fold, independently
+of the saved final model. MLflow contains `cross_validation.json` and `cv_*`
+metrics; the `heldout_*` promotion metrics still use untouched final test rows.
+This is evaluation with fixed parameters, not Optuna/search support.
+
 | Split | Availability filter | Date settings |
 | --- | --- | --- |
 | Random | Disabled | None; all targets must be known. |
@@ -220,14 +304,18 @@ need to publish to one target.
    and quality threshold, and positive `max_rows`/`max_input_mb` transfer limits.
    `max_input_mb` defaults to 64 MiB (one unit = 1024 * 1024 bytes), limiting
    local input size rather than total training RAM. `max_rows` bounds input
-   before train/test splitting; overflow fails without sampling or truncation.
+   before train/test splitting; overflow fails without implicit truncation.
+   Optional `training_sample_rows`/`training_sample_seed` select eligible records
+   on Spark before local transfer. The sample count includes final holdout rows;
+   scoring is never sampled. Leave `training_sample_rows` null to use all data.
    In an initialization config file, supply those limits as integer strings
    (for example, `"max_rows": "10000"`); generated workflow limits are numbers.
    For manual training, explicitly set `training_version`. Random splitting
    needs no dates. Temporal splitting requires an event column and aware
    `start < holdout_start < cutoff`. Availability filtering requires a result
    column and independent `result_cutoff`. Monthly training derives its snapshot
-   per run and, only in temporal mode, its UTC observation window.
+   per run and derives observation boundaries only for `rolling_calendar`,
+   using `window_timezone` independently of the cron timezone.
    Enable Delta Change
    Data Feed on the scoring source before new rows arrive. Check that the
    source's initial rows are the rows you intend to score: the first `score`
@@ -310,3 +398,12 @@ leaves the old view active. The new generation must retain the active output
 schema; an incompatible model needs a new logical view or an explicit migration.
 The training schedule uses the same promotion and handoff choices. There is no online
 endpoint or Spark-native FE/model execution in this starting project.
+
+### Explicit retry policy
+
+Generated notebook tasks set `max_retries: 0`; serverless tasks additionally set
+`disable_auto_optimization: true` because serverless auto-optimization can add
+retries independently. A training retry can register another candidate version.
+Inspect failed run evidence and registry state before rerunning; retry score
+separately after an already-committed approval. This is not an exactly-once
+training guarantee. See the [Databricks serverless retry behavior](https://docs.databricks.com/aws/en/jobs/run-serverless-jobs).

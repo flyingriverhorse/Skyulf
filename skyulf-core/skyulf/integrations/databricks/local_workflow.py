@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import polars as pl
 
@@ -26,6 +27,7 @@ from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
 from ._contracts import input_budget_bytes
 from .admission import SingleWriterAdmission
 from .local_approval import approve_local_candidate, reject_local_candidate
+from .local_cv import LocalCVSpec
 from .local_incremental import run_incremental_local_batch
 from .local_retraining import (
     LocalTrainingSpec,
@@ -165,11 +167,7 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
 
 def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     """Keep the evaluation split and source snapshot identical across actions."""
-    if (
-        config.get("split_strategy", "random") == "random"
-        and config.get("monthly_lookback_months") is not None
-    ):
-        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
+    _training_window_mode(config)
     version = config.get("training_version")
     if type(version) is not int or version < 0:
         raise ValueError(
@@ -182,6 +180,8 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         test_size=config.get("test_size", 0.2),
         random_state=config.get("random_state", 42),
         stratify=config.get("stratify", False),
+        training_sample_rows=config.get("training_sample_rows"),
+        training_sample_seed=config.get("training_sample_seed", 42),
         start=_optional_boundary(config, "start"),
         holdout_start=_optional_boundary(config, "holdout_start"),
         cutoff=_optional_boundary(config, "cutoff"),
@@ -218,29 +218,70 @@ def _optional_boundary(config: dict[str, Any], field: str) -> datetime | None:
         raise ValueError(f"{field} must be an ISO timestamp with timezone.") from exc
 
 
+def _training_window_mode(config: dict[str, Any]) -> str:
+    """Validate source selection independently of the random/temporal evaluation split."""
+    mode = config.get("training_window_mode", "full_snapshot")
+    if mode not in ("full_snapshot", "fixed_window", "rolling_calendar"):
+        raise ValueError(
+            "training_window_mode must be full_snapshot, fixed_window or rolling_calendar."
+        )
+    if mode == "full_snapshot":
+        if (
+            config.get("event_column") is not None
+            or config.get("split_strategy", "random") == "temporal"
+        ):
+            raise ValueError(
+                "Full-snapshot selection requires inactive event fields and random splitting."
+            )
+    elif not config.get("event_column"):
+        raise ValueError("Window selection requires an explicit event_column.")
+    if mode == "rolling_calendar":
+        months = config.get("monthly_lookback_months")
+        minimum = 2 if config.get("split_strategy") == "temporal" else 1
+        if type(months) is not int or not minimum <= months <= 120:
+            raise ValueError(f"monthly_lookback_months must be an integer from {minimum} to 120.")
+        zone = config.get("window_timezone")
+        if not isinstance(zone, str) or not zone:
+            raise ValueError("Rolling-calendar selection requires window_timezone.")
+        try:
+            ZoneInfo(zone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("window_timezone must name an IANA timezone.") from exc
+    elif (
+        config.get("monthly_lookback_months") is not None
+        or config.get("window_timezone") is not None
+    ):
+        raise ValueError(
+            "Non-rolling selection requires null monthly_lookback_months and window_timezone."
+        )
+    return mode
+
+
 def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
-    """Pin latest full data or an explicit UTC temporal window at the invocation instant."""
+    """Pin latest source and the explicitly selected full, fixed or rolling window."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Monthly training needs a timezone-aware run instant.")
     settings = dict(config)
-    if config.get("split_strategy", "random") == "temporal":
-        lookback = config.get("monthly_lookback_months")
-        if type(lookback) is not int or not 2 <= lookback <= 120:
-            raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
-        cutoff = now.astimezone(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    mode = _training_window_mode(config)
+    if mode == "rolling_calendar":
+        lookback = config["monthly_lookback_months"]
+        zone = ZoneInfo(config["window_timezone"])
+        cutoff = now.astimezone(zone).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0, fold=0
+        )
 
         def months_before(count: int) -> datetime:
             """Preserve the first-of-month boundary across year rollover."""
             index = cutoff.year * 12 + cutoff.month - 1 - count
-            return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
+            return datetime(index // 12, index % 12 + 1, 1, tzinfo=zone)
 
         settings.update(
             start=months_before(lookback).isoformat(),
-            holdout_start=months_before(1).isoformat(),
+            holdout_start=(
+                months_before(1).isoformat() if config.get("split_strategy") == "temporal" else None
+            ),
             cutoff=cutoff.isoformat(),
         )
-    elif config.get("monthly_lookback_months") is not None:
-        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
     if config.get("filter_unavailable_results", False):
         settings["result_cutoff"] = now.astimezone(UTC).isoformat()
     # Validate all selection policies before contacting the source history.
@@ -379,6 +420,12 @@ def run_action(
         monthly = action == "train_monthly"
         if policy == "automatic" and config.get("quality_threshold") is None:
             raise ValueError("Automatic promotion requires an absolute quality_threshold.")
+        cv = LocalCVSpec.from_workflow(config)
+        cv.validate_pipeline(
+            config["pipeline"],
+            target_column=config["target_column"],
+            event_column=config.get("event_column"),
+        )
         spec = (
             _monthly_training_spec(spark, config, now or datetime.now(UTC))
             if monthly
@@ -425,6 +472,7 @@ def run_action(
                 quality_threshold=config.get("quality_threshold"),
                 on_registered=lifecycle.registered,
                 risk_category=config.get("risk_category"),
+                cv=cv,
             )
             alias_change = _automatic_promotion(
                 spark,
