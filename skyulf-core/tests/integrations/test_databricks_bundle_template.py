@@ -13,11 +13,114 @@ WORKFLOW = (
 )
 
 
+@pytest.mark.parametrize("task", ["regression", "classification"])
+def test_initializer_only_shows_task_specific_models_and_metrics(task):
+    """Changing task must change visible menus while keeping them aligned with Core."""
+    from jsonschema import Draft7Validator
+
+    from skyulf.integrations.mlflow.validation import _CLASSIFICATION, _REGRESSION
+    from skyulf.modeling.base import BaseModelCalculator
+    from skyulf.registry import NodeRegistry
+
+    schema = json.loads((WORKFLOW.parents[3] / "databricks_template_schema.json").read_text())
+    properties = schema["properties"]
+    other = "regression" if task == "classification" else "classification"
+    for suffix in ("model", "metric"):
+        assert not Draft7Validator(properties[f"{task}_{suffix}"]["skip_prompt_if"]).is_valid(
+            {"task": task}
+        )
+        assert Draft7Validator(properties[f"{other}_{suffix}"]["skip_prompt_if"]).is_valid(
+            {"task": task}
+        )
+    expected_models = set()
+    for name in NodeRegistry.get_all_metadata():
+        calculator = NodeRegistry.get_calculator(name)
+        if issubclass(calculator, BaseModelCalculator) and calculator().problem_type == task:
+            expected_models.add(name)
+    assert set(properties[f"{task}_model"]["enum"]) == expected_models
+    assert set(properties[f"{task}_metric"]["enum"]) == (
+        _CLASSIFICATION if task == "classification" else _REGRESSION
+    )
+    assert "preprocessing" not in properties
+
+
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
     from skyulf.integrations.databricks import local_workflow
 
     return local_workflow
+
+
+@pytest.mark.parametrize("prefix", ["event", "result"])
+@pytest.mark.parametrize(
+    "kind,text_kind,details",
+    [
+        ("timestamp", "local_datetime", set()),
+        ("local_timestamp", "local_datetime", {"time_timezone"}),
+        ("date", "local_datetime", {"time_timezone", "date_only"}),
+        ("text", "offset_datetime", {"text_kind", "time_format"}),
+        ("text", "local_datetime", {"text_kind", "time_format", "time_timezone"}),
+        ("text", "date", {"text_kind", "time_format", "time_timezone", "date_only"}),
+    ],
+)
+def test_date_questions_follow_declared_representation(prefix, kind, text_kind, details):
+    """Users should only answer parsing questions relevant to their declared column format."""
+    from jsonschema import Draft7Validator
+
+    properties = json.loads((WORKFLOW.parents[3] / "databricks_template_schema.json").read_text())[
+        "properties"
+    ]
+    values = {key: spec["default"] for key, spec in properties.items()}
+    values.update(split_strategy="temporal", filter_unavailable_results="true")
+    values.update({f"{prefix}_time_kind": kind, f"{prefix}_text_kind": text_kind})
+    assert f"{prefix}_time_kind" in properties
+    visible = {
+        suffix
+        for suffix in ("text_kind", "time_format", "time_timezone", "date_only")
+        if not Draft7Validator(properties[f"{prefix}_{suffix}"]["skip_prompt_if"]).is_valid(values)
+    }
+    assert visible == details
+
+
+@pytest.mark.parametrize("prefix", ["event", "result"])
+def test_unused_dates_hide_all_followup_questions(prefix):
+    """A date-free workflow must never ask about date types or parsing details."""
+    from jsonschema import Draft7Validator
+
+    properties = json.loads((WORKFLOW.parents[3] / "databricks_template_schema.json").read_text())[
+        "properties"
+    ]
+    values = {key: spec["default"] for key, spec in properties.items()}
+    for suffix in ("time_kind", "text_kind", "time_format", "time_timezone", "date_only"):
+        assert Draft7Validator(properties[f"{prefix}_{suffix}"]["skip_prompt_if"]).is_valid(values)
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_optional_setup_sections_hide_their_details_until_selected(enabled):
+    """CV, scheduling and cluster settings must not clutter the default setup."""
+    from jsonschema import Draft7Validator
+
+    properties = json.loads((WORKFLOW.parents[3] / "databricks_template_schema.json").read_text())[
+        "properties"
+    ]
+    values = {key: spec["default"] for key, spec in properties.items()}
+    if enabled:
+        values.update(cv_enabled="true", retraining_mode="scheduled", compute_mode="policy_cluster")
+    for name in (
+        "cv_folds",
+        "cv_type",
+        "cv_shuffle",
+        "cv_random_state",
+        "retraining_cron_expression",
+        "retraining_timezone_id",
+        "cluster_policy_name",
+        "spark_version",
+        "node_type_id",
+        "cost_tag_key",
+        "cost_tag_value",
+    ):
+        hidden = Draft7Validator(properties[name]["skip_prompt_if"]).is_valid(values)
+        assert hidden is not enabled
 
 
 def _output():
@@ -36,11 +139,15 @@ def _render_default_config(record_key="entity_id", risk_category=""):
     values = {key: spec["default"] for key, spec in schema["properties"].items()}
     values.update(
         project_name="customer_model",
-        record_key_columns_json=json.dumps([record_key]),
+        record_key_columns=record_key,
         risk_category=risk_category,
     )
     content = template.read_text(encoding="utf-8")
     content = content[content.index("{\n") :].replace("{{$window}}", "full_snapshot")
+    content = content.replace(
+        "{{if .prediction_table_name}}{{.prediction_table_name}}{{else}}{{.project_name}}_predictions{{end}}",
+        "{{.project_name}}_predictions",
+    )
     for name in (
         "risk_category",
         "event_time_format",
@@ -60,12 +167,11 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         )
     content = (
         content.replace(
-            '{{if eq .metric "auto"}}{{if eq .task "classification"}}heldout_accuracy'
-            "{{else}}heldout_rmse{{end}}{{else}}{{.metric}}{{end}}",
+            '{{if eq .task "classification"}}{{.classification_metric}}{{else}}{{.regression_metric}}{{end}}',
             "heldout_rmse",
         )
         .replace(
-            '{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}',
+            '{{if eq .task "classification"}}{{.classification_model}}{{else}}{{.regression_model}}{{end}}',
             "linear_regression",
         )
         .replace(
@@ -78,26 +184,22 @@ def _render_default_config(record_key="entity_id", risk_category=""):
             "customer_model_source",
         )
     )
-    content = (
-        content.replace(
-            '{{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}}',
-            "null",
-        )
-        .replace(
-            '{{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}}',
-            "null",
-        )
-        .replace(
-            '{{if eq .model_type "auto"}}linear_regression{{else}}{{.model_type}}{{end}}',
-            "linear_regression",
-        )
+    content = content.replace(
+        '{{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}}',
+        "null",
+    ).replace(
+        '{{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}}',
+        "null",
     )
-    content = re.sub(
-        r'{{if eq \.preprocessing "numeric_impute_scale"}}.*?{{end}}',
-        "",
-        content,
-        flags=re.DOTALL,
-    )
+    for name in ("record_key_columns", "input_columns"):
+        expression = (
+            '[{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .'
+            + name
+            + ' -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}]'
+        )
+        content = content.replace(
+            expression, json.dumps([v.strip() for v in values[name].split(",")])
+        )
     for name, value in values.items():
         content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)
@@ -195,7 +297,7 @@ def test_init_record_key_becomes_prediction_table_key():
     """A chosen source identity must be carried into the generated output schema."""
     root = WORKFLOW.parents[3]
     schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
-    assert json.loads(schema["properties"]["record_key_columns_json"]["default"]) == ["entity_id"]
+    assert schema["properties"]["record_key_columns"]["default"] == "entity_id"
 
     config = _render_default_config("customer_id")
     source = SimpleNamespace(
@@ -226,9 +328,9 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
     assert re.search(
         r"^    train:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
     )
-    assert 'if eq .retraining_mode "monthly_paused"' in template
-    assert "pause_status: PAUSED" in template
-    assert 'default: {{if eq .retraining_mode "monthly_paused"}}train_monthly' in template
+    assert 'if eq .retraining_mode "scheduled"' in template
+    assert "pause_status: UNPAUSED" in template
+    assert 'default: {{if eq .retraining_mode "scheduled"}}train_monthly' in template
     assert "quartz_cron_expression: ${var.retraining_cron_expression}" in template
     assert "timezone_id: ${var.retraining_timezone_id}" in template
 
@@ -256,8 +358,8 @@ def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
         "champion",
     ]
     assert properties["promotion_policy"]["enum"] == ["manual_approval", "automatic"]
-    assert "heldout_rmse" in properties["metric"]["enum"]
-    assert "heldout_f1" in properties["metric"]["enum"]
+    assert "heldout_rmse" in properties["regression_metric"]["enum"]
+    assert "heldout_f1" in properties["classification_metric"]["enum"]
     assert properties["quality_threshold"]["type"] == "string"
     assert properties["quality_threshold"]["default"] == "null"
     config = (WORKFLOW.parents[1] / "config/workflow.json.tmpl").read_text(encoding="utf-8")

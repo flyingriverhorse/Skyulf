@@ -16,8 +16,11 @@ The first command explains the setup and missing manual training pins. The secon
 checks the configuration for manual training without starting a job. Use
 `--action train_monthly` to inspect runtime window selection instead. Preview uses
 the generated dev bindings; supply the matching catalog/schema/suffix arguments
-when reviewing another target. Custom ordered preprocessing and hyperparameters
-stay in `config/workflow.json`; model/node listings come from the Core registry.
+when reviewing another target. Edit preprocessing and custom fit/apply code in
+`src/preprocessing.py`; keep model hyperparameters in `config/workflow.json`.
+Preview executes the trusted recipe without itself fitting or reading data.
+Training saves the Python source with the model, so later file edits do not
+change existing-model inference. Model/node listings come from the Core registry.
 See [guided setup](databricks_bundle.md#guided-setup-and-offline-preview).
 
 Before training, review three separate data settings in `config/workflow.json`:
@@ -489,7 +492,7 @@ receipt tags or move controlled aliases directly through Catalog UI.
   evidence before retrying. Do not force a competing alias update.
 - If promotion succeeds and the child score fails, fix scoring and run the
   score job again. Do not retrain to repair a prediction failure.
-- Optional monthly training starts paused. Its cron/timezone are Bundle
+- Optional scheduled training starts enabled after deployment. Its cron/timezone are Bundle
   settings; choosing handoff does not itself create a scoring schedule.
 - Full-rebuild rollback can revisit an earlier generation. It follows that
   generation's committed progress; it does not erase previously written data.

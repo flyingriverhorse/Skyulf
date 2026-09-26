@@ -1,7 +1,6 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
-  "record_key_columns_json": "[\"entity_id\"]",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
   "score_model_selection": "pinned_version",
@@ -14,5 +13,6 @@
   "spark_version": "17.3.x-cpu-ml-scala2.13",
   "node_type_id": "REPLACE_WITH_NODE_TYPE",
   "cost_tag_key": "CostCenter",
-  "cost_tag_value": "REPLACE_WITH_COST_TAG"
+  "cost_tag_value": "REPLACE_WITH_COST_TAG",
+  "record_key_columns": "entity_id"
 }

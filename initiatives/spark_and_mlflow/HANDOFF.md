@@ -1,3 +1,57 @@
+# Current handoff: SM-33G answer-driven setup verified
+
+Updated 2026-09-26. User approved conditional questions without reading data.
+Initializer now asks how a used date column is stored: timestamp, local timestamp,
+date or text. Text asks whether it includes an offset, a local clock or only a day.
+Only applicable format/timezone/date-only questions follow. Disabled observation
+or result-date use hides the whole branch. Existing CV, scheduling and policy
+compute visibility was tested. No new runtime config or data-reading logic.
+
+37 template/preview tests and 56 real CLI generation tests passed; scoped Ruff,
+ty, strict MkDocs and strict dev Bundle validation passed. Reports are in the
+SM-33G section of report 61; details in the Bundle guide and generated README.
+The user requested one SM-33F/G delivery commit, including report 61 and these
+handoff/queue updates. Fresh tests and commit hooks gate that commit. Changelog
+line endings were normalized to the repository's existing LF rule; no global
+Git settings were changed. No deployment or cloud execution was performed.
+Commit verification: 243 local tests passed (one optional PySpark skip), 56 CLI
+generation tests passed, and all applicable pre-commit hooks passed.
+SM-34 remains the next READY task. Exclude unrelated `.tmp-review-model/`.
+
+## Previous handoff: SM-33F initializer usability verified
+
+Updated 2026-09-26. User-requested SM-33D/E commit completed as `516b3f86`
+with DCO sign-off and all applicable hooks passed; no push. The new usability
+changes below are uncommitted, separately from that requested baseline commit.
+
+SM-33F accepts comma-separated key/feature names, task-specific model/metric
+menus and a chosen prediction output name. Source/output tables, dates, snapshots,
+availability, CV and scheduling have concrete explanations. Preprocessing moves
+to generated src/preprocessing.py: standard Core steps plus self-contained custom
+Calculator/Applier classes. Training snapshots code with learned state; local and
+MLflow loading restore it, with fold-local CV and model-version isolation. Keep
+the JSON preprocessing list empty; model settings remain in config/workflow.json.
+`scheduled` enables the selected cron after deployment, including dev. Runtime
+`train_monthly` selects data automatically; it does not force monthly frequency.
+See [report 61](61-bundle-initializer-usability.md) for input changes and evidence.
+
+Validation: 56 actual CLI generation tests, 15 custom Python tests, 201 integration
+regressions (one optional PySpark test skipped) and 11 existing local MLflow/
+preview tests passed. Full ty, scoped Ruff/format, strict MkDocs and strict generated dev
+validation passed. The current wheel contains both new source-loading modules;
+resolved six-month cron is UNPAUSED and sync includes the Python recipe. Review
+findings about regression wording and stale JSON instructions were fixed. No live
+deployment or cloud resource change. Existing user-generated projects were not edited.
+
+Next READY remains SM-34 (independent score/train scheduling and further window
+controls). SM-33F brings forward only SM-36a's self-contained Python path;
+dependency shipping, sibling modules, eligibility/output rules remain open.
+At the next requested commit include updated reports 37/58 and force-add report 61; keep
+ignored rehearsal outputs and unrelated `.tmp-review-model/`
+out of the commit. Reports 59/60 were included in `516b3f86`.
+
+## Historical snapshot: SM-33E acceptance before commit
+
 # Current handoff: SM-33E live acceptance passed
 
 Updated 2026-09-26. Baseline `fe3897c4`, branch `090`; SM-33D and SM-33E are

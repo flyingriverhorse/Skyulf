@@ -5,6 +5,14 @@ Update 2026-09-26: SM-33D/E are complete for their documented local/personal
 serverless scopes (reports 59/60); SM-34 is next. The company example migration is later,
 after the generic Bundle gate, as requested by the user.
 
+Update 2026-09-26 (SM-33F): the user replaced preprocessing questions/presets with
+`src/preprocessing.py`. The generated `build_preprocessing()` recipe returns Core
+steps and supports self-contained custom Calculator/Applier classes. Source and
+learned state are saved with the model for local/MLflow inference; fold-local CV
+uses the same path. This brings the single-file part of SM-36a forward. Package
+dependency shipping, sibling modules, eligibility/filter/output rules and multiple
+model branches remain planned; SM-36a is not complete. See report 61 for evidence.
+
 ## Current capability
 
 The local Bundle already accepts `pipeline.preprocessing` and `pipeline.modeling`.
@@ -23,7 +31,7 @@ model version per training/scoring invocation.
 User refinement: expose the workflow in progressive setup sections, with
 optional scenarios. SM-33E delivered the initial sections, a numeric FE preset,
 registered model selection, fixed-model CV and offline preview. Advanced search,
-custom code and multiple-model scenarios below remain planned. Retain one editable, validated workflow
+broader custom packaging and multiple-model scenarios below remain planned. Retain one editable, validated workflow
 configuration as the runtime source of truth; initialization produces it.
 
 | Setup section | User choices | Default / conditional behavior |

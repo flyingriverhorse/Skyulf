@@ -204,11 +204,14 @@ def run_notebook(
     task_role: str,
     display_html: Callable[[str], Any] | None = None,
     exit_notebook: bool = True,
+    preprocessing_path: str | Path | None = None,
 ) -> str:
     """Run the fixed role and render results, optionally deferring the notebook exit.
 
     Generated notebooks defer exit to a separate cell: Databricks otherwise
     replaces the readable report with the exit value in the same cell.
+    A preprocessing path is relative to the config directory and used only for
+    training. Scoring and operator actions retain the saved artifact's code.
     """
     values = dbutils.widgets.getAll()
     # Databricks pushes parent job parameters into Run Job children. The score
@@ -247,6 +250,16 @@ def run_notebook(
     validate_deployed_contract(config, parameters)
     if config.get("config_version") != 1:
         raise ValueError("config_version must be 1; migrate and regenerate/redeploy this Bundle.")
+    if (
+        preprocessing_path is not None
+        and task_role == "lifecycle"
+        and parameters.get("lifecycle_action") in {"train", "train_monthly"}
+    ):
+        from .project import load_project_workflow  # noqa: PLC0415 - project code is training-only
+
+        config = load_project_workflow(
+            config, Path(values["config_path"]).parent / preprocessing_path
+        )
     with tempfile.TemporaryDirectory(prefix="skyulf-bundle-") as directory:
         outcome = run_bundle_action(
             spark,

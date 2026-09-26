@@ -7,9 +7,19 @@ same Skyulf workflow code with different target bindings.
 
 ## Review your training setup first
 
-Initialization is ordered: **basics/data -> preprocessing -> model -> evaluation CV
+Initialization is ordered: **data -> model -> evaluation CV
 -> lifecycle -> compute**. Date prompts are hidden when irrelevant. The same
 choices can be supplied in a JSON init file.
+
+Setup uses your answers and does not inspect data. Observation-date questions
+are hidden for random full-snapshot training; answer-availability dates are
+separate and appear only if that filter is enabled. For each used date column,
+choose `timestamp` (database instant), `local_timestamp` (clock without timezone),
+`date` (day only), or `text` (string). Text asks what it contains and its format.
+Timezone is asked only for local clocks/dates; the midnight/reject choice only
+for days without a time. A database timestamp needs none of those follow-ups.
+CV, cron and cluster details also stay hidden until their option is selected.
+These choices guide the questions; runtime validates the actual source values.
 
 Install the matching Skyulf wheel locally, then run from the generated project:
 
@@ -23,24 +33,55 @@ python src/preview.py --action train
 The default preview validates structure, shows the ordered pipeline, and explains
 missing manual training pins. `--action train` additionally requires a concrete
 source version and any manual dates. `--action train_monthly` checks the automatic
-selection policy. None of these commands reads data, trains or deploys. The preview
+selection policy. Preview executes your trusted Python recipe to list its steps;
+it does not itself read data, train or deploy. Keep data access and training out
+of module-level code and `build_preprocessing()`. The preview
 uses the generated dev catalog/schema defaults; for another target pass
 `--catalog`, `--input-schema`, `--output-schema`, `--metadata-schema` and
 `--resource-suffix` with the same values used by your Bundle target/overrides.
 It does not resolve Databricks target variables or check cloud permissions.
 
-`preprocessing=numeric_impute_scale` creates ordered Core `SimpleImputer` (mean)
-and `StandardScaler` steps on **all configured input columns**, which must be
-numeric for this preset. `none` creates no steps. For mixed/custom inputs edit
-`pipeline.preprocessing` in `config/workflow.json`: select each node's columns,
-add encoders, reorder steps or remove the preset. This is the actual Core step
-list, not a second preprocessing implementation. IDs and metadata defaults come
+Preprocessing is not a setup question. Edit `build_preprocessing()` in
+`src/preprocessing.py`: select columns, add Skyulf nodes and reorder steps.
+It starts empty. Keep `pipeline.preprocessing` empty in JSON; the Python recipe
+supplies the actual Core step list. IDs and metadata defaults come
 from the installed Core registry via the list commands above; a registry listing
 does not guarantee every option/dependency is usable in your target environment.
 
-`model_type=auto` chooses the task's starter model. Any task-compatible registered
-Core model ID can replace it; incompatibility fails preflight. Set explicit model
-hyperparameters in `pipeline.modeling.params`; an empty object uses Core defaults.
+For example, replace the empty Python recipe with the following steps
+after changing `income` and `age` to your actual numeric feature names:
+
+```python
+def build_preprocessing():
+    """Learn numeric cleanup and scaling from training rows only."""
+    return [
+        {"name": "impute", "transformer": "SimpleImputer",
+         "params": {"columns": ["income", "age"], "strategy": "mean"}},
+        {"name": "scale", "transformer": "StandardScaler",
+         "params": {"columns": ["income", "age"]}},
+    ]
+```
+
+For your own transformation, define top-level Calculator/Applier classes in
+the same file and return `custom_step(...)` alongside the standard nodes.
+The generated `CenterCalculator`/`CenterApplier` example shows both pandas and
+Polars handling: fit learns a mean, apply reuses it. Enable it by adding
+`example_custom_step("income")` to the returned list. Custom steps must preserve
+row count/order and store learned values in the returned fit state. CV fits
+these steps separately within each fold.
+
+Training snapshots this file with the fitted pipeline. Local and MLflow loading
+restore that code before loading the saved model; scoring, approval and rollback
+do not execute the current editable file. Code changes affect the next training
+run. This supports one self-contained Python file (up to 64 KiB); imported packages
+must be installed on the job. Sibling project modules are not bundled automatically.
+Model source and pickle are trusted executable artifacts, not sandboxed code.
+
+The model menu shows only registered models for your selected task. Some models
+need optional packages or additional settings (for example, ensemble members);
+appearing in the menu is not a guarantee that default settings fit your data.
+In `config/workflow.json`, `pipeline.modeling.params` means the `params` object
+inside `modeling`: add settings there, or keep `{}` for Core defaults.
 For example, with `random_forest_classifier` or `random_forest_regressor`:
 
 ```json
@@ -50,8 +91,8 @@ For example, with `random_forest_classifier` or `random_forest_regressor`:
 }
 ```
 
-The native initializer offers the preset/model ID; arbitrary ordered JSON steps
-and model parameter objects are edited in the generated workflow. Re-run preview
+The native initializer offers a task-specific model menu. Edit preprocessing in
+Python and model parameters in JSON. Re-run preview
 after editing. Preflight is structural; node-specific data/parameter validity is
 still checked by Core during execution. Do not treat preview as a successful fit.
 
@@ -76,17 +117,49 @@ an omitted source timezone.
 size samples eligible source records before splitting; it includes the holdout.
 `training_sample_seed` pins repeatable key-based selection. Scoring is never sampled.
 
+## Setup questions in plain language
+
+| Setting | Meaning |
+| --- | --- |
+| Training input | Existing rows with features and known answers. |
+| Prediction input | Existing rows the model will read to predict; blank reuses training input. This is not the output table. |
+| Prediction output | Choose `prediction_table_name` during setup, e.g. `customer_predictions`; blank defaults to a project-named output. The configured output schema and target suffix apply. |
+| Record keys | Enter `customer_id` or `customer_id, observation_id`; these identify one row. |
+| Feature columns | Enter `income, age`; these are inputs the model learns from. |
+| Training version | Delta snapshot number from the source table's History, such as 12. It pins data, not a model version. `null` means configure it before manual training; scheduled runs select latest. |
+| Source window | All rows (`full_snapshot`), fixed observation dates (`fixed_window`), or recent complete months (`rolling_calendar`). `auto` picks all rows for random splitting and rolling months for temporal splitting. |
+| Result availability | A column such as `claim_confirmed_at` tells when each answer became known. Availability filtering excludes answers known after `result_cutoff`; scheduled runs use their invocation time. |
+| Text date format | `10/08/2026 14:30` uses `%d/%m/%Y %H:%M`; `2026-08-10` uses `%Y-%m-%d`. Database timestamp/date columns need no text format. |
+| Source timezone | For a clock value with no offset, enter its location, e.g. `Europe/Copenhagen`. A value ending in `+02:00` already identifies its offset. |
+| Date only | `reject` stops; `midnight` treats a date with no clock time as 00:00 in the declared source timezone. |
+| Training sample | 10,000 means at most 10,000 eligible rows total, then split into training/test. `null` disables sampling; read limits still apply. |
+| CV | Several evaluations on different training-row splits; final test data stays separate. It evaluates settings, not parameter tuning. |
+
+All date fields can remain unused for a random full-snapshot split with result
+availability filtering disabled. Date parsing, data-window timezone and job
+clock timezone are separate because they answer different questions.
+
 ## What deployment creates
 
 `src/workflow.py` and `src/score.py` are thin, fixed-role entry points. The
 installed `job_runtime` adapter handles widgets/JSON and calls Core's existing
-`local_workflow` and `prediction_output` services. Customize your pipeline in
-`config/workflow.json`; common workflow changes belong in the Skyulf wheel.
+`local_workflow` and `prediction_output` services. Customize preprocessing in
+`src/preprocessing.py` and model/workflow settings in `config/workflow.json`;
+common workflow changes belong in the Skyulf wheel.
 
 `bundle deploy` uploads the wheel, notebook and configuration, and creates
 two jobs. It creates **no** Unity Catalog table or registered model.
-The initialization choice `retraining_mode=monthly_paused` adds a paused
+The initialization choice `retraining_mode=scheduled` adds an enabled
 schedule to the existing `train` job; the default `manual` choice adds none.
+`pause_status: UNPAUSED` keeps the selected schedule active even in dev mode.
+It starts at the next matching cron time after deployment; initialization only
+creates local files.
+Your Quartz cron controls frequency. For example, `0 0 3 1 1,7 ?` runs at 03:00
+on January 1 and July 1 in the chosen schedule timezone. There is no additional
+monthly timer overriding it. The runtime action is still named `train_monthly`;
+it selects the latest snapshot and derives configured data windows at invocation.
+The data window is independent: running every six months does not automatically
+read six months of data. Independent score scheduling remains later work.
 
 | Job | Run it when | UC effect |
 | --- | --- | --- |
@@ -179,12 +252,11 @@ training. An unknown alias write leaves a pending marker requiring reconciliatio
 `previous_challenger` retains displaced candidates and clears if that version
 becomes champion/challenger again. Model versions and evidence remain available.
 
-In monthly mode, the schedule starts paused. Its Quartz cron and IANA timezone
+In scheduled mode, the schedule starts enabled. Its Quartz cron and IANA timezone
 are selected at initialization and remain editable as
 `retraining_cron_expression` and `retraining_timezone_id` Bundle variables.
-The default is 03:00 UTC on the third day of each month. Configure one run per
-month; a different cadence can retrain the same selected data more than once.
-After you unpause it, each run captures the latest concrete Delta source
+The default is 03:00 UTC on the third day of each month; choose any supported
+Quartz cron cadence. Each run captures the latest concrete Delta source
 version. `training_window_mode` independently selects `full_snapshot`,
 `fixed_window` or `rolling_calendar`. Rolling selection uses the explicit
 `window_timezone` and `monthly_lookback_months` (initial temporal project:
@@ -220,8 +292,9 @@ Moving an already deployed append-mode table to full mode under the same
 logical name is rejected; choose a new view name or migrate deliberately.
 `model_name` is a registered UC model, not a table. The Bundle creates no
 admission table.
-The `record_key_columns_json` initialization input names existing source keys,
-for example `["customer_id"]` or `["customer_id", "observation_id"]`.
+The `record_key_columns` initialization input names existing source keys as
+comma-separated text (for example, `customer_id, observation_id`).
+The generated config stores it as `["customer_id", "observation_id"]`.
 `score` copies them into the prediction table for SQL lookups. Each key must be
 non-null and `STRING` or `BIGINT`; the combination must uniquely identify records
 across all scored rows, including later inserts. The resulting
@@ -295,11 +368,12 @@ need to publish to one target.
 1. Build a matching, trusted wheel from a Skyulf checkout with `uv build
    --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core`.
 2. Edit `config/workflow.json` for real source/model names, row keys, model
-   inputs, preprocessing, estimator, split policy and size limits. The
+   inputs, estimator, split policy and size limits. The
    initialized task is **{{.task}}**: regression starts with linear regression
-   and RMSE; classification starts with logistic regression and accuracy when
-   `metric=auto`. Select existing features with `input_columns_json`, then edit
-   the generated `pipeline` for your preprocessing and estimator. Feature
+   and RMSE; classification defaults to logistic regression and accuracy. The
+   initializer lets you select other task-compatible models/metrics. Enter
+   `input_columns` as comma-separated names, then edit
+   `src/preprocessing.py` for preprocessing and `pipeline.modeling` for the estimator. Feature
    engineering is not inferred automatically. Set a task-compatible metric
    and quality threshold, and positive `max_rows`/`max_input_mb` transfer limits.
    `max_input_mb` defaults to 64 MiB (one unit = 1024 * 1024 bytes), limiting

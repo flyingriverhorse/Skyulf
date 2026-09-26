@@ -61,12 +61,12 @@ def _generate_project(tmp_path, **overrides):
         ("max_input_mb", "-1"),
         ("max_rows", "1.5"),
         ("max_input_mb", "1e3"),
-        ("record_key_columns_json", '[\f"id"]'),
-        ("input_columns_json", '["x",\f"y"]'),
-        ("record_key_columns_json", '["id"], "task": "classification"'),
+        ("record_key_columns", "\fid"),
+        ("input_columns", "x,\fy"),
+        ("record_key_columns", 'id, "task": "classification"'),
     ],
 )
-def test_cli_rejects_invalid_limits_and_non_json_column_arrays(tmp_path, field, value):
+def test_cli_rejects_invalid_limits_and_column_text(tmp_path, field, value):
     """Invalid init values must fail before writing malformed or unusable config."""
     generated, _ = _initialize_project(tmp_path, **{field: value})
     assert generated.returncode != 0
@@ -93,6 +93,76 @@ def _read_validated_config(project):
     return config
 
 
+def test_cli_plain_column_lists_preserve_order_and_empty_preprocessing(tmp_path):
+    """Operators can enter comma-separated names without inserting JSON syntax."""
+    project = _generate_project(
+        tmp_path,
+        record_key_columns="customer_id, observation_id",
+        input_columns="income, age, balance",
+        regression_model="random_forest_regressor",
+        regression_metric="heldout_mae",
+    )
+    config = _read_validated_config(project)
+    assert config["record_key_columns"] == ["customer_id", "observation_id"]
+    assert config["input_columns"] == ["income", "age", "balance"]
+    assert config["pipeline"] == {
+        "preprocessing": [],
+        "modeling": {"type": "random_forest_regressor", "params": {}},
+    }
+    assert config["metric"] == "heldout_mae"
+
+
+def test_cli_named_prediction_output_is_separate_from_prediction_input(tmp_path):
+    """Choosing the output name must not replace the input table or its target bindings."""
+    project = _generate_project(
+        tmp_path,
+        score_source_table_name="customers_to_score",
+        prediction_table_name="customer_predictions",
+    )
+    config = _read_validated_config(project)
+    assert config["score_source_table"] == "{catalog}.{input_schema}.customers_to_score"
+    assert (
+        config["prediction_table"]
+        == "{catalog}.{output_schema}.customer_predictions{resource_suffix}"
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("record_key_columns", "customer_id,,event_id"),
+        ("input_columns", 'income, age"'),
+        ("input_columns", "income,"),
+        ("regression_model", "random_forest_classifier"),
+        ("classification_metric", "heldout_rmse"),
+    ],
+)
+def test_cli_rejects_invalid_plain_columns_and_cross_task_choices(tmp_path, field, value):
+    """The friendlier input must still reject malformed names and wrong-task selections."""
+    generated, _ = _initialize_project(tmp_path, **{field: value})
+    assert generated.returncode != 0
+    assert field in generated.stderr
+
+
+def test_cli_six_month_schedule_keeps_data_window_independent(tmp_path):
+    """A six-month job cadence must not silently impose a six-month training window."""
+    project = _generate_project(
+        tmp_path,
+        retraining_mode="scheduled",
+        retraining_cron_expression="0 0 3 1 1,7 ?",
+        retraining_timezone_id="Europe/Copenhagen",
+        training_window_mode="full_snapshot",
+    )
+    bundle = yaml.safe_load((project / "databricks.yml").read_text())
+    jobs = yaml.safe_load((project / "resources/workflow.jobs.yml").read_text())["resources"][
+        "jobs"
+    ]
+    assert bundle["variables"]["retraining_cron_expression"]["default"] == "0 0 3 1 1,7 ?"
+    assert bundle["variables"]["retraining_timezone_id"]["default"] == "Europe/Copenhagen"
+    assert jobs["train"]["schedule"]["pause_status"] == "UNPAUSED"
+    assert _read_validated_config(project)["training_window_mode"] == "full_snapshot"
+
+
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("task", ["regression", "classification"])
 def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
@@ -113,8 +183,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
         engine=engine,
         task=task,
         training_version="0",
-        preprocessing="numeric_impute_scale",
-        model_type=model,
+        **{f"{task}_model": model},
         cv_enabled="true",
         cv_folds="3",
         cv_type="k_fold",
@@ -131,10 +200,26 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
                 assert entry["max_retries"] == 0
                 assert entry["disable_auto_optimization"] is True
     assert config["pipeline"]["modeling"] == {"type": model, "params": {}}
-    assert [s["transformer"] for s in config["pipeline"]["preprocessing"]] == [
-        "SimpleImputer",
-        "StandardScaler",
+    assert config["pipeline"]["preprocessing"] == []
+    # Operators add their own steps after initialization; test that edited path.
+    steps = [
+        {
+            "name": "impute",
+            "transformer": "SimpleImputer",
+            "params": {"columns": ["feature_value"], "strategy": "mean"},
+        },
+        {
+            "name": "scale",
+            "transformer": "StandardScaler",
+            "params": {"columns": ["feature_value"]},
+        },
     ]
+    source_path = project / "src/preprocessing.py"
+    with source_path.open("a", encoding="utf-8") as stream:
+        stream.write("\n\ndef build_preprocessing():\n    return " + repr(steps) + "\n")
+    from skyulf.integrations.databricks.project import load_project_workflow
+
+    config = load_project_workflow(config, source_path)
     assert config["cv_enabled"] is True and config["cv_folds"] == 3
     assert config["training_sample_rows"] == 500 and config["training_sample_seed"] == 19
     preview = subprocess.run(
@@ -179,6 +264,8 @@ def test_cli_random_window_and_non_utc_source_rules(tmp_path):
         training_window_mode="fixed_window",
         split_strategy="random",
         event_column="observed_at",
+        event_time_kind="text",
+        event_text_kind="local_datetime",
         event_time_format="%d/%m/%Y %H:%M",
         event_time_timezone="Europe/Copenhagen",
         training_version="0",
@@ -186,6 +273,8 @@ def test_cli_random_window_and_non_utc_source_rules(tmp_path):
         cutoff="2026-09-01T00:00:00+02:00",
         filter_unavailable_results="true",
         result_available_at_column="confirmed_at",
+        result_time_kind="text",
+        result_text_kind="date",
         result_time_format="%Y-%m-%d",
         result_time_timezone="Europe/Vilnius",
         result_date_only="midnight",
@@ -232,8 +321,8 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         task="classification",
         source_table_name="labeled_customers",
         score_source_table_name="new_customers",
-        record_key_columns_json='[\n "customer_id",\t"observation_id"\r\n]',
-        input_columns_json='[\t"income", "age"\n]',
+        record_key_columns=" customer_id,\tobservation_id ",
+        input_columns="\tincome, age ",
         target_column="churn",
         split_strategy="temporal",
         filter_unavailable_results="true",
@@ -246,7 +335,7 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         result_cutoff="2026-09-01T00:00:00+00:00",
         max_rows="500",
         max_input_mb="1",
-        metric="heldout_f1",
+        classification_metric="heldout_f1",
         quality_threshold="0.8",
     )
     config = _read_validated_config(project)
@@ -271,7 +360,7 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
 def test_cli_reuses_named_training_source_and_existing_single_key(tmp_path):
     """An omitted scoring table and composite key must preserve the simpler setup."""
     project = _generate_project(
-        tmp_path, source_table_name="customers", record_key_columns_json='["customer_id"]'
+        tmp_path, source_table_name="customers", record_key_columns="customer_id"
     )
     config = _read_validated_config(project)
     assert config["record_key_columns"] == ["customer_id"]
@@ -296,7 +385,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         compute_mode=compute,
         engine="polars" if policy == "automatic" else "pandas",
         quality_threshold="100.0",
-        retraining_mode="monthly_paused" if monthly else "manual",
+        retraining_mode="scheduled" if monthly else "manual",
     )
     jobs = yaml.safe_load((project / "resources/workflow.jobs.yml").read_text())["resources"][
         "jobs"
@@ -348,7 +437,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     assert config["quality_threshold"] == 100.0  # Manual gates must not be erased.
     assert "model_selection_mode" not in config
     if monthly:
-        assert jobs["train"]["schedule"]["pause_status"] == "PAUSED"
+        assert jobs["train"]["schedule"]["pause_status"] == "UNPAUSED"
     else:
         assert "schedule" not in jobs["train"]
     if compute == "serverless":

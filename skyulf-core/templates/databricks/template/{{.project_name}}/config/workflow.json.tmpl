@@ -24,7 +24,7 @@
   "training_version": {{.training_version}},
   "monthly_lookback_months": {{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}},
   "score_source_table": "{catalog}.{input_schema}.{{if .score_source_table_name}}{{.score_source_table_name}}{{else}}{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}{{end}}",
-  "prediction_table": "{catalog}.{output_schema}.{{.project_name}}_predictions{resource_suffix}",
+  "prediction_table": "{catalog}.{output_schema}.{{if .prediction_table_name}}{{.prediction_table_name}}{{else}}{{.project_name}}_predictions{{end}}{resource_suffix}",
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
   "model_version": "1",
   "model_change_mode": "{{.model_change_mode}}",
@@ -33,8 +33,8 @@
   "score_handoff": "{{.score_handoff}}",
   "champion_version": null,
   "risk_category": {{if .risk_category}}"{{.risk_category}}"{{else}}null{{end}},
-  "record_key_columns": {{.record_key_columns_json}},
-  "input_columns": {{.input_columns_json}},
+  "record_key_columns": [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .record_key_columns -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}],
+  "input_columns": [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .input_columns -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}],
   "target_column": "{{.target_column}}",
   "event_column": {{if .event_column}}"{{.event_column}}"{{else}}null{{end}},
   "result_available_at_column": {{if .result_available_at_column}}"{{.result_available_at_column}}"{{else}}null{{end}},
@@ -46,14 +46,11 @@
   "result_cutoff": {{if .result_cutoff}}"{{.result_cutoff}}"{{else}}null{{end}},
   "max_rows": {{.max_rows}},
   "max_input_mb": {{.max_input_mb}},
-  "metric": "{{if eq .metric "auto"}}{{if eq .task "classification"}}heldout_accuracy{{else}}heldout_rmse{{end}}{{else}}{{.metric}}{{end}}",
+  "metric": "{{if eq .task "classification"}}{{.classification_metric}}{{else}}{{.regression_metric}}{{end}}",
   "min_improvement": {{.min_improvement}},
   "quality_threshold": {{.quality_threshold}},
   "pipeline": {
-    "preprocessing": [{{if eq .preprocessing "numeric_impute_scale"}}
-      {"name": "impute", "transformer": "SimpleImputer", "params": {"columns": {{.input_columns_json}}, "strategy": "mean"}},
-      {"name": "scale", "transformer": "StandardScaler", "params": {"columns": {{.input_columns_json}}}}
-    {{end}}],
-    "modeling": {"type": "{{if eq .model_type "auto"}}{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}{{else}}{{.model_type}}{{end}}", "params": {}}
+    "preprocessing": [],
+    "modeling": {"type": "{{if eq .task "classification"}}{{.classification_model}}{{else}}{{.regression_model}}{{end}}", "params": {}}
   }
 }

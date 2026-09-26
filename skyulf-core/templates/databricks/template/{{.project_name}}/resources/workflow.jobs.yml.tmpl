@@ -7,7 +7,7 @@ resources:
         enabled: true
       parameters:
         - name: lifecycle_action
-          default: {{if eq .retraining_mode "monthly_paused"}}train_monthly{{else}}train{{end}}
+          default: {{if eq .retraining_mode "scheduled"}}train_monthly{{else}}train{{end}}
         - name: candidate_version
           default: ""
         - name: expected_champion_version
@@ -16,11 +16,11 @@ resources:
           default: ""
         - name: promotion_receipt_json
           default: ""
-{{if eq .retraining_mode "monthly_paused"}}
+{{if eq .retraining_mode "scheduled"}}
       schedule:
         quartz_cron_expression: ${var.retraining_cron_expression}
         timezone_id: ${var.retraining_timezone_id}
-        pause_status: PAUSED
+        pause_status: UNPAUSED
 {{end}}
       tasks:
         - task_key: train

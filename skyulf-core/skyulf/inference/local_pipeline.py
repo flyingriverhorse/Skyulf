@@ -22,6 +22,7 @@ from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
 from ._manifest import checksum, runtime_requirements
+from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
 
 _MAX_MANIFEST_BYTES = 64 * 1024
 _MAX_PIPELINE_BYTES = 256 * 1024 * 1024
@@ -44,6 +45,7 @@ class LocalPipelineManifest(BaseModel):
     task: Literal["regression", "classification"]
     classes: tuple[str | int | float | bool, ...] = ()
     use_tuned_thresholds: bool = False
+    project_source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -94,6 +96,11 @@ def _manifest(
         task="classification" if classification else "regression",
         classes=classes,
         use_tuned_thresholds=use_tuned_thresholds,
+        project_source_sha256=(
+            project_source_digest(pipeline.config["project_python_source"])
+            if "project_python_source" in pipeline.config
+            else None
+        ),
     )
 
 
@@ -134,6 +141,10 @@ def save_local_pipeline(
     destination.mkdir(parents=True, exist_ok=False)
     (destination / "manifest.json").write_bytes(metadata)
     (destination / "pipeline.pkl").write_bytes(payload)
+    if manifest.project_source_sha256 is not None:
+        (destination / "preprocessing.py").write_text(
+            pipeline.config["project_python_source"], encoding="utf-8", newline="\n"
+        )
 
 
 def _read_bounded(path: Path, limit: int) -> bytes:
@@ -168,6 +179,11 @@ def load_local_pipeline(path: str | Path) -> LocalPipelineArtifact:
     payload = _read_bounded(source / "pipeline.pkl", _MAX_PIPELINE_BYTES)
     if checksum(payload) != manifest.pipeline_sha256:
         raise ValueError("Local pipeline payload checksum mismatch.")
+    if manifest.project_source_sha256 is not None:
+        code = _read_bounded(source / "preprocessing.py", MAX_PROJECT_SOURCE_BYTES).decode("utf-8")
+        if project_source_digest(code) != manifest.project_source_sha256:
+            raise ValueError("Project preprocessing source checksum mismatch.")
+        load_project_module(code)
     pipeline = pickle.loads(payload)  # nosec B301 -- trusted producer only, after size/runtime/checksum checks
     if type(pipeline) is not SkyulfPipeline:
         raise ValueError("Local artifact payload is not a SkyulfPipeline.")

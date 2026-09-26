@@ -1,7 +1,6 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
-  "record_key_columns_json": "[\"customer_id\"]",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
   "score_model_selection": "pinned_version",
@@ -15,5 +14,6 @@
   "node_type_id": "REPLACE_WITH_NODE_TYPE",
   "cost_tag_key": "PayingRegNo",
   "cost_tag_value": "REPLACE_WITH_PAYING_REG_NO",
-  "risk_category": "Low"
+  "risk_category": "Low",
+  "record_key_columns": "customer_id"
 }

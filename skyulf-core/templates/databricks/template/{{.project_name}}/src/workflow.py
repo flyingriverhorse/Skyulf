@@ -8,6 +8,7 @@ if __name__ == "__main__":
         globals()["spark"],
         globals()["dbutils"],
         task_role="lifecycle",
+        preprocessing_path="../src/preprocessing.py",
         display_html=globals().get("displayHTML"),
         exit_notebook=False,
     )

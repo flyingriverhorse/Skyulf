@@ -14,7 +14,7 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
-Initialization follows six sections: **basics/data, preprocessing, model,
+Initialization follows five sections: **data, model,
 evaluation CV, lifecycle, compute**. It asks for existing record keys (including
 composite keys), source columns, independent data-window/split choices, optional
 training sampling, date parsing, scoring/promotion policies and job settings. Serverless is the default. Reviewable
@@ -26,8 +26,11 @@ classification starts with `logistic_regression` and `heldout_accuracy`.
 The pipeline remains editable: add registered Core preprocessing nodes and
 choose a task-compatible model. With a JSON init file, `max_rows` and
 `max_input_mb` are positive integer **strings**; the generated workflow stores
-them as numbers. `record_key_columns_json` accepts one or more source key
-columns, for example `["customer_id", "observation_id"]`.
+them as numbers. Enter `record_key_columns` as `customer_id, observation_id`
+and `input_columns` as `income, age`, with no brackets or quotes. The generated
+workflow stores ordered JSON arrays automatically. Init examples now use these
+plain-text fields and task-specific `regression_model`/`classification_model`
+and `regression_metric`/`classification_metric`; regenerate old init inputs.
 
 Saved-artifact holdout evaluation uses sequential joblib prediction so parallel
 Random Forest tree summation does not introduce last-bit metric differences into
@@ -37,21 +40,94 @@ runtimes may still be nondeterministic and must pass replay checks.
 
 ### Guided setup and offline preview
 
+Setup follows your answers; it does not inspect source tables or sample rows.
+Random full-snapshot training hides observation-date questions. Result-availability
+questions appear only when you enable that separate filter. CV, scheduled training
+and policy-cluster details likewise appear only when selected.
+
+For each date column you actually use, declare how it is stored:
+
+| Your answer | Follow-up questions |
+| --- | --- |
+| `timestamp`: database timestamp representing an instant | No text format, source timezone or date-only question |
+| `local_timestamp`: database clock time without a timezone | Which timezone this clock belongs to |
+| `date`: day with no clock time | Source timezone, then whether to treat the day as midnight or reject it |
+| `text`: dates stored as strings | Whether the text contains a date only, local date/time, or date/time with an offset; then its format and only the applicable timezone/date-only questions |
+
+For example, date-only text `2026-08-10` asks for its format, timezone and
+permission to use 00:00. Text `2026-08-10T14:30:00+02:00` asks for its format
+but not another timezone or midnight rule. Initialization fields
+`event_time_kind`/`result_time_kind` and `event_text_kind`/`result_text_kind`
+control these questions only; the generated workflow keeps the existing parsing
+contract. Runtime still validates actual values against your declared rules.
+
+The initializer asks for two **input** tables. `source_table_name` contains the
+training examples and known answers. `score_source_table_name` contains records
+to predict; leave it blank to reuse the training input. Neither is the output.
+Choose the result name in the `prediction_table_name` setup question, for example
+`customer_predictions`. It becomes `prediction_table` in the configured output
+schema, with any target resource suffix. Blank uses `<project_name>_predictions`.
+
+| Question | Meaning and example |
+| --- | --- |
+| Training version | A saved Delta table snapshot from the table's History, such as version 12. This pins the input data for repeatable manual training; it is not model v12. `null` means fill it before manual training. Scheduled training resolves the latest snapshot. |
+| Source selection | `full_snapshot`: use all eligible rows from that snapshot. `fixed_window`: use observation dates between your boundaries. `rolling_calendar`: derive recent complete months per scheduled invocation. `auto`: full snapshot for random splitting, rolling calendar for temporal splitting. |
+| Result availability column | A column such as `claim_confirmed_at`, recording when that row's answer became known. Only needed if availability filtering is enabled. |
+| Result cutoff | Keep answers known **by** this instant, including equality. For a cutoff of September 15, an answer confirmed September 20 is excluded even if the observation occurred in August. Scheduled runs use their invocation time. |
+| Date format | For a text value `10/08/2026 14:30`, use `%d/%m/%Y %H:%M` (day/month/year hour:minute). For `2026-08-10`, use `%Y-%m-%d`. Database timestamp/date columns do not need a text format. |
+| Source timezone | For values such as `2026-08-10 14:30` with no offset, specify where that clock time belongs, e.g. `Europe/Copenhagen`. Offset-bearing values such as `2026-08-10T14:30:00+02:00` identify their offset already. |
+| Date-only policy | `reject` stops on values without clock time. `midnight` interprets `2026-08-10` as 00:00 in the explicitly selected source timezone. |
+| Training sample | `10000` selects up to 10,000 eligible rows before splitting; with a 20% test split this usually means 8,000 train and 2,000 test. `null` uses all eligible rows within read limits. Prediction never samples. |
+| CV | With five folds, train/evaluate five fold-specific copies using training rows only. Learned preprocessing is fitted within each fold. The final test set remains separate; this does not search for better model settings. |
+| Cron timezone | The timezone of the job clock. A 03:00 schedule with `Europe/Copenhagen` uses Copenhagen time, including daylight saving. This does not interpret source dates or change the selected data window. |
+
+For training every six months on January 1 and July 1 at 03:00, choose
+`scheduled` and enter `0 0 3 1 1,7 ?`. The cron is the schedule; nothing
+overrides it with a second monthly timer. The current runtime action name
+`train_monthly` describes automatic snapshot/window selection and does not impose
+monthly execution. `monthly_lookback_months` separately controls how many complete
+months of data a rolling window reads. Independent score scheduling is SM-34.
+
 | Section | What you choose |
 | --- | --- |
 | Basics/data | Engine/task, UC names, keys/features/target, snapshot pin, final holdout, independent source window, availability/date parsing, input limits and optional sample |
-| Preprocessing | `none`, or `numeric_impute_scale` (mean imputation then standard scaling on all numeric input columns) |
-| Model | `auto` starter or a task-compatible Core registry ID; edit hyperparameters in `pipeline.modeling.params` |
+| Model | A menu containing only models for the selected regression/classification task; defaults remain editable in the generated file |
 | Evaluation CV | Enable, folds, method, shuffle and seed; evaluates fixed parameters with fold-local preprocessing |
-| Lifecycle | Metric/gates, manual/automatic promotion, score selector/handoff and paused retraining cron |
+| Lifecycle | Metric/gates, manual/automatic promotion, score selector/handoff and enabled retraining cron |
 | Compute | Serverless or approved policy cluster and cost tags |
 
-The initializer preserves standard Core config. For custom preprocessing, edit
-`pipeline.preprocessing` in execution order with `name`, `transformer`, and `params`
-per step. Select per-step columns when mixing numeric and categorical features.
-The numeric preset is unsuitable for raw categorical columns. No model/FE fitting
-occurs at initialization. Search/Optuna, custom Python feature hooks and multiple
-model branches remain later work; they are not advertised as working init choices.
+Preprocessing is edited in the generated **`src/preprocessing.py`** file, not in
+the initializer or JSON. `build_preprocessing()` returns normal Core steps in
+execution order. Keep the JSON `pipeline.preprocessing` list empty.
+
+```python
+def build_preprocessing():
+    """Fit numeric cleanup and scaling with the selected Core engine."""
+    return [
+        {"name": "impute", "transformer": "SimpleImputer",
+         "params": {"columns": ["income", "age"], "strategy": "mean"}},
+        {"name": "scale", "transformer": "StandardScaler",
+         "params": {"columns": ["income", "age"]}},
+    ]
+```
+
+Select per-step columns when mixing numeric and categorical features. For your
+own logic, define top-level Calculator/Applier classes in the same file and add
+`custom_step("my_step", MyCalculator, MyApplier, params={...})` to this list.
+The generated file includes a working mean-centering example for pandas/Polars;
+add `example_custom_step("income")` to enable it. Fit returns learned state;
+apply uses it without learning again. Preserve row count/order and implement
+the engines your project uses. CV refits the custom step within every fold.
+
+Training saves the exact Python source with the fitted artifact. Both local
+and MLflow loading restore this saved source, including custom classes. Changing
+the project file affects future training; score, approve and rollback continue
+using saved model code/state. Different source versions use distinct module
+identities. This supports a self-contained file up to 64 KiB, with imports from
+installed packages. Sibling files and new package dependencies are not packaged
+automatically. Only load trusted code/models, as with existing pickle artifacts.
+Broader project packaging, row filtering/output rules, Optuna and multiple model
+branches remain later tasks.
 
 From the generated project, with the matching Core wheel installed locally:
 
@@ -62,7 +138,9 @@ python src/preview.py --list-preprocessors
 python src/preview.py --action train
 ```
 
-The preview shows the actual pipeline, input selection, final holdout, CV and
+Preview executes the trusted Python recipe to resolve its steps. Keep data access
+and training out of module-level code and `build_preprocessing()`. The preview
+shows the actual pipeline, input selection, final holdout, CV and
 score/promotion policies. The default allows a draft with missing training pins
 and reports what is missing. `--action train` checks manual readiness;
 `--action train_monthly` checks automatic window selection. Both reuse job preflight.
@@ -86,7 +164,7 @@ Editable model parameters, for example:
 ```
 
 Published initializer examples now include
-`guided-classification-init.example.json` (Polars, numeric FE, random forest,
+`guided-classification-init.example.json` (Polars, random forest,
 stratified CV and explicit sample) and `random-window-init.example.json`
 (random holdout inside an observation window, separate Copenhagen event and
 Vilnius result parsing). Replace example table/column names and snapshot pins
@@ -142,7 +220,7 @@ different availability dates. With `filter_unavailable_results: true`, exclude
 unknown results and results later than the independent `result_cutoff`. Skyulf does not invent
 those timestamps or fill them with the job's execution time.
 
-Use `record_key_columns_json` and `result_available_at_column` in initialization
+Use `record_key_columns` and `result_available_at_column` in initialization
 files. The default example identity column is `entity_id`; date mappings default
 to null. Initialization does not create columns or generate timestamps.
 
@@ -500,8 +578,8 @@ evaluation, registry changes and prediction use existing Core services.
 `prediction_output` creates output tables and safely switches full-rebuild
 views. Imports do not create a Spark session or cloud resource.
 
-Edit the business pipeline in `config/workflow.json`. Model/preprocessing
-choices remain project configuration; common workflow fixes ship in the
+Edit preprocessing in `src/preprocessing.py` and model/workflow settings in
+`config/workflow.json`. These remain project choices; common workflow fixes ship in the
 Skyulf wheel instead of requiring edits to every generated notebook.
 
 ### Independent scoring and promotion policies
@@ -699,11 +777,14 @@ including replacement, explicit rejection and rollback while retaining a contend
 | `train` | Train/evaluate a candidate or execute approve/reject/rollback | Model/version only for training |
 | `score` | Score initial and later CDF rows | Prediction output and rows |
 
-The default project has no schedule. Choosing `monthly_paused` at initialization
-adds a paused schedule to the existing `train` job, without adding a third
+The default project has no schedule. Choosing `scheduled` at initialization
+adds an enabled schedule to the existing `train` job, without adding a third
 job or running it at deployment. The Quartz cron and timezone are selected
 at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
 created by deployment alone.
+The generated `schedule.pause_status: UNPAUSED` also overrides development mode's
+default pause. Once deployed, the job runs at the next matching cron time.
+Initialization alone does not deploy or start any job.
 `promotion_policy=automatic` uses the same train job to compare candidate and
 champion on the same pinned holdout, independently of the score selector. The
 selected `metric`, `min_improvement`, and absolute `quality_threshold` stay
@@ -800,8 +881,8 @@ version and artifact digest. Scoring rejects an existing table at that name
 when its model provenance differs. A new model with the same numeric version
 needs a different logical prediction name or a new model version.
 
-The initialization question `record_key_columns_json` accepts `["customer_id"]`
-or multiple existing key columns. It becomes `record_key_columns` in the generated
+The initialization question `record_key_columns` accepts `customer_id`
+or `customer_id, observation_id`. It becomes an ordered JSON array in the generated
 configuration, and the same column appears in the prediction table. It must
 be non-null, `STRING` or `BIGINT`, and unique across the initial data and all
 later inserts. For multiple predictions per customer, edit the generated
@@ -820,8 +901,9 @@ WHERE customer_id = 'C123';
 ## First run
 
 Build and place the matching Skyulf wheel in the generated project's `dist/`,
-then edit `config/workflow.json` for real source columns, preprocessing, model,
-split policy and size limits. The JSON values are an example, not a dataset.
+then edit `config/workflow.json` for real source columns, model, split policy
+and size limits, and `src/preprocessing.py` for feature engineering.
+The JSON values are an example, not a dataset.
 Enable Change Data Feed on the scoring source before later inserts arrive.
 
 ```powershell
@@ -858,10 +940,11 @@ job's identity. For multiple publishers, use Skyulf Core's shared admission
 provider. Online endpoints and Spark-native FE/model execution remain
 separate work.
 
-The optional monthly `train` schedule defaults to 03:00 UTC on day three and
-starts paused. Edit its Bundle cron and timezone variables for the desired
-monthly run time. After configuring real labeled data and verifying a manual
-run, unpause it deliberately. Each run pins the source's latest Delta version.
+The optional `scheduled` mode starts the train schedule enabled after deployment,
+including the dev target. Its default is 03:00 UTC on day three of each month;
+edit the cron and timezone to choose another cadence, including every six months.
+The default `manual` mode creates no schedule. Each scheduled run pins the source's
+latest Delta version.
 The separate `training_window_mode` selects full data, a fixed window or completed
 calendar months. Rolling selection uses `window_timezone`; a temporal split holds
 out the last completed month, included in `monthly_lookback_months`. The schedule

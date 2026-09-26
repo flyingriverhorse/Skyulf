@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from skyulf.integrations.databricks.local_workflow import resolve_target_config
+from skyulf.integrations.databricks.project import load_project_workflow
 from skyulf.integrations.databricks.workflow_config import preview_workflow_config
 from skyulf.modeling.base import BaseModelCalculator
 from skyulf.registry import NodeRegistry
@@ -24,6 +25,7 @@ def main():
     args = parser.parse_args()
     path = Path(__file__).resolve().parents[1] / "config/workflow.json"
     config = json.loads(path.read_text(encoding="utf-8"))
+    config = load_project_workflow(config, path.parents[1] / "src/preprocessing.py")
     if args.list_models or args.list_preprocessors:
         for node_id, meta in sorted(NodeRegistry.get_all_metadata().items()):
             calculator = NodeRegistry.get_calculator(node_id)

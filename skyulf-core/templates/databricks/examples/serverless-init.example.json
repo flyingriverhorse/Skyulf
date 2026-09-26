@@ -1,7 +1,6 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
-  "record_key_columns_json": "[\"customer_id\"]",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
   "score_model_selection": "pinned_version",
@@ -9,5 +8,6 @@
   "score_handoff": "disabled",
   "compute_mode": "serverless",
   "catalog": "workspace",
-  "schema": "my_dev_schema"
+  "schema": "my_dev_schema",
+  "record_key_columns": "customer_id"
 }

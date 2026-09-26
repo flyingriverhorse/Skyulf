@@ -39,6 +39,7 @@ class PipelineConfig(TypedDict, total=False):
 
     preprocessing: list[PreprocessingStepConfig]
     modeling: ModelConfig
+    project_python_source: str
 
 
 class NodeMetadataDict(TypedDict, total=False):

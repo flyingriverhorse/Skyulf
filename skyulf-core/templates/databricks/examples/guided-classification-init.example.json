@@ -5,14 +5,10 @@
   "catalog": "workspace",
   "schema": "my_dev_schema",
   "source_table_name": "labeled_customers",
-  "record_key_columns_json": "[\"customer_id\"]",
-  "input_columns_json": "[\"income\", \"age\"]",
   "target_column": "churn",
   "training_version": "12",
   "split_strategy": "random",
   "stratify": "true",
-  "preprocessing": "numeric_impute_scale",
-  "model_type": "random_forest_classifier",
   "cv_enabled": "true",
   "cv_folds": "3",
   "cv_type": "stratified_k_fold",
@@ -22,5 +18,8 @@
   "score_model_selection": "champion",
   "promotion_policy": "manual_approval",
   "quality_threshold": "0.7",
-  "metric": "heldout_f1_weighted"
+  "record_key_columns": "customer_id",
+  "input_columns": "income, age",
+  "classification_model": "random_forest_classifier",
+  "classification_metric": "heldout_f1_weighted"
 }

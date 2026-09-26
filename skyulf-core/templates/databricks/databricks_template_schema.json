@@ -1,18 +1,18 @@
 {
-  "welcome_message": "Create a bounded Skyulf pandas/Polars Bundle. dev is ready for your CLI profile; edit test, syst and prod target settings before using them.",
+  "welcome_message": "Create a Skyulf training and prediction project. Column names can be comma-separated. Edit Skyulf preprocessing steps and custom transformations afterward in src/preprocessing.py. Initialization creates local files only.",
   "properties": {
     "project_name": {
       "order": 1,
       "type": "string",
       "default": "skyulf_local",
-      "description": "1. Basics and data | Bundle name (letters, digits and underscores)",
+      "description": "1. Data | Project folder and Bundle name (letters, digits and underscores)",
       "pattern": "^[a-z][a-z0-9_]*$"
     },
     "engine": {
       "order": 2,
       "type": "string",
       "default": "pandas",
-      "description": "1. Basics and data | Local fit and prediction engine",
+      "description": "1. Data | Library used for training and prediction: pandas or Polars; both can run inside Databricks",
       "enum": [
         "pandas",
         "polars"
@@ -22,7 +22,7 @@
       "order": 3,
       "type": "string",
       "default": "regression",
-      "description": "1. Basics and data | Model task; selects a starting estimator and automatic heldout metric",
+      "description": "1. Data | What will the model predict? regression = a number; classification = a category",
       "enum": [
         "regression",
         "classification"
@@ -46,73 +46,66 @@
       "order": 6,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Existing source table name within the input schema; blank uses <project_name>_source",
+      "description": "1. Data | Training INPUT table: existing rows with features and known answers. Enter table name only; blank uses <project_name>_source",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
     "score_source_table_name": {
       "order": 7,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Existing scoring table name within the input schema; blank reuses the training source",
+      "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
-    "record_key_columns_json": {
+    "prediction_table_name": {
       "order": 8,
       "type": "string",
-      "default": "[\"entity_id\"]",
-      "description": "1. Basics and data | Existing record identity columns as a JSON array, e.g. [\"customer_id\"] or [\"customer_id\", \"observation_id\"]",
-      "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
+      "default": "",
+      "description": "1. Data | Prediction OUTPUT table name, e.g. customer_predictions. Results are written here; blank uses <project_name>_predictions",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
-    "input_columns_json": {
+    "record_key_columns": {
       "order": 9,
       "type": "string",
-      "default": "[\"feature_value\"]",
-      "description": "1. Basics and data | JSON array of existing model feature columns; exclude keys and target",
-      "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
+      "default": "entity_id",
+      "description": "1. Data | Columns identifying one record, e.g. customer_id or customer_id, observation_id. Separate names with commas; no brackets or quotes",
+      "pattern": "^[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*(?:,[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*)*$"
     },
-    "target_column": {
+    "input_columns": {
       "order": 10,
       "type": "string",
+      "default": "feature_value",
+      "description": "1. Data | Columns the model learns from, e.g. income, age, balance. Separate names with commas; exclude record keys and the answer column",
+      "pattern": "^[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*(?:,[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*)*$"
+    },
+    "target_column": {
+      "order": 11,
+      "type": "string",
       "default": "target",
-      "description": "1. Basics and data | Existing training label column",
+      "description": "1. Data | Column containing the known answer during training, e.g. churn or claim_amount",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "training_version": {
-      "order": 11,
+      "order": 12,
       "type": "string",
       "default": "null",
-      "description": "1. Basics and data | Concrete nonnegative Delta source version for manual training; null requires configuration before running",
+      "description": "1. Data | Training table snapshot number from Databricks table History, e.g. 0 or 12 (not a model version). null = fill later before manual training; scheduled training selects latest",
       "pattern": "^(?:null|0|[1-9][0-9]*)$"
     },
     "split_strategy": {
       "type": "string",
       "default": "random",
-      "description": "1. Basics and data | Final evaluation split: random needs no event dates; temporal holds out the latest observation window",
+      "description": "1. Data | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training",
       "enum": [
         "random",
         "temporal"
       ],
-      "order": 12
+      "order": 13
     },
     "test_size": {
       "type": "string",
       "default": "0.2",
-      "description": "1. Basics and data | Random holdout fraction strictly between 0 and 1",
+      "description": "1. Data | Share of rows reserved for final testing: 0.2 means 20% test and 80% training",
       "pattern": "^0\\.[0-9]*[1-9][0-9]*$",
-      "skip_prompt_if": {
-        "properties": {
-          "split_strategy": {
-            "const": "temporal"
-          }
-        }
-      },
-      "order": 13
-    },
-    "random_state": {
-      "type": "string",
-      "default": "42",
-      "description": "1. Basics and data | Random split seed; stable keys and a pinned snapshot make membership reproducible",
-      "pattern": "^(?:0|[1-9][0-9]*)$",
       "skip_prompt_if": {
         "properties": {
           "split_strategy": {
@@ -122,10 +115,24 @@
       },
       "order": 14
     },
+    "random_state": {
+      "type": "string",
+      "default": "42",
+      "description": "1. Data | Seed for repeatable random splitting. Keep 42 unless you want a different split",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "skip_prompt_if": {
+        "properties": {
+          "split_strategy": {
+            "const": "temporal"
+          }
+        }
+      },
+      "order": 15
+    },
     "stratify": {
       "type": "string",
       "default": "false",
-      "description": "1. Basics and data | Preserve target class proportions in the random split (classification only)",
+      "description": "1. Data | Keep similar proportions of each target class in training and test rows?",
       "enum": [
         "false",
         "true"
@@ -148,68 +155,25 @@
           }
         ]
       },
-      "order": 15
+      "order": 16
     },
     "training_window_mode": {
       "type": "string",
       "default": "auto",
-      "description": "1. Basics and data | Source selection: auto means full snapshot for random split, rolling calendar for temporal split",
+      "description": "1. Data | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; auto = all for random, recent months for temporal",
       "enum": [
         "auto",
         "full_snapshot",
         "fixed_window",
         "rolling_calendar"
       ],
-      "order": 16
+      "order": 17
     },
     "window_timezone": {
       "type": "string",
       "default": "UTC",
-      "description": "1. Basics and data | Calendar timezone for rolling selection; independent of source parsing and cron timezone",
+      "description": "1. Data | Timezone defining calendar month boundaries, e.g. Europe/Copenhagen. This controls selected data, not when the job runs",
       "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
-      "skip_prompt_if": {
-        "anyOf": [
-          {
-            "properties": {
-              "training_window_mode": {
-                "const": "full_snapshot"
-              }
-            }
-          },
-          {
-            "properties": {
-              "training_window_mode": {
-                "const": "fixed_window"
-              }
-            }
-          },
-          {
-            "allOf": [
-              {
-                "properties": {
-                  "training_window_mode": {
-                    "const": "auto"
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "split_strategy": {
-                    "const": "random"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "order": 17
-    },
-    "monthly_lookback_months": {
-      "type": "string",
-      "default": "4",
-      "description": "1. Basics and data | Completed calendar months to select: 1-120 (at least 2 for temporal holdout)",
-      "pattern": "^[1-9][0-9]*$",
       "skip_prompt_if": {
         "anyOf": [
           {
@@ -248,11 +212,54 @@
       },
       "order": 18
     },
+    "monthly_lookback_months": {
+      "type": "string",
+      "default": "4",
+      "description": "1. Data | Number of complete past months to read per scheduled training run. Temporal split uses the last month for testing; enter at least 2",
+      "pattern": "^[1-9][0-9]*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "full_snapshot"
+              }
+            }
+          },
+          {
+            "properties": {
+              "training_window_mode": {
+                "const": "fixed_window"
+              }
+            }
+          },
+          {
+            "allOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "split_strategy": {
+                    "const": "random"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "order": 19
+    },
     "event_column": {
-      "order": 19,
+      "order": 20,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Existing observation timestamp used for window selection and temporal splitting/CV",
+      "description": "1. Data | Column containing when each record was observed, e.g. observation_date; used to select older/newer data",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
       "skip_prompt_if": {
         "anyOf": [
@@ -284,85 +291,16 @@
         ]
       }
     },
-    "event_time_format": {
+    "event_time_kind": {
+      "order": 21,
       "type": "string",
-      "default": "",
-      "description": "1. Basics and data | Explicit numeric string format, e.g. %d/%m/%Y %H:%M; blank for native timestamps",
-      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
-      "skip_prompt_if": {
-        "anyOf": [
-          {
-            "properties": {
-              "training_window_mode": {
-                "const": "full_snapshot"
-              }
-            }
-          },
-          {
-            "allOf": [
-              {
-                "properties": {
-                  "training_window_mode": {
-                    "const": "auto"
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "split_strategy": {
-                    "const": "random"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "order": 20
-    },
-    "event_time_timezone": {
-      "type": "string",
-      "default": "",
-      "description": "1. Basics and data | Source IANA timezone for naive timestamps; blank for offset-aware values",
-      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
-      "skip_prompt_if": {
-        "anyOf": [
-          {
-            "properties": {
-              "training_window_mode": {
-                "const": "full_snapshot"
-              }
-            }
-          },
-          {
-            "allOf": [
-              {
-                "properties": {
-                  "training_window_mode": {
-                    "const": "auto"
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "split_strategy": {
-                    "const": "random"
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "order": 21
-    },
-    "event_date_only": {
-      "type": "string",
-      "default": "reject",
-      "description": "1. Basics and data | Date-only sources: reject, or explicit midnight in the declared source timezone",
+      "default": "timestamp",
+      "description": "1. Data | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
       "enum": [
-        "reject",
-        "midnight"
+        "timestamp",
+        "local_timestamp",
+        "date",
+        "text"
       ],
       "skip_prompt_if": {
         "anyOf": [
@@ -392,14 +330,278 @@
             ]
           }
         ]
-      },
-      "order": 22
+      }
     },
-    "start": {
-      "order": 23,
+    "event_text_kind": {
+      "order": 22,
+      "type": "string",
+      "default": "local_datetime",
+      "description": "1. Data | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
+      "enum": [
+        "offset_datetime",
+        "local_datetime",
+        "date"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "full_snapshot"
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "training_window_mode": {
+                        "const": "auto"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "split_strategy": {
+                        "const": "random"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "properties": {
+                "event_time_kind": {
+                  "enum": [
+                    "text"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "event_time_format": {
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Manual observation window start (inclusive), as a timezone-aware ISO timestamp",
+      "description": "1. Data | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
+      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "full_snapshot"
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "training_window_mode": {
+                        "const": "auto"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "split_strategy": {
+                        "const": "random"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "properties": {
+                "event_time_kind": {
+                  "enum": [
+                    "text"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "order": 23
+    },
+    "event_time_timezone": {
+      "type": "string",
+      "default": "",
+      "description": "1. Data | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
+      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "full_snapshot"
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "training_window_mode": {
+                        "const": "auto"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "split_strategy": {
+                        "const": "random"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "event_time_kind": {
+                      "enum": [
+                        "local_timestamp",
+                        "date"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "event_time_kind": {
+                          "enum": [
+                            "text"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "event_text_kind": {
+                          "enum": [
+                            "local_datetime",
+                            "date"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "order": 24
+    },
+    "event_date_only": {
+      "type": "string",
+      "default": "reject",
+      "description": "1. Data | This column has a day but no time. May we treat it as the start of that day? midnight = yes, 00:00 in your chosen timezone; reject = stop if such a value is encountered",
+      "enum": [
+        "reject",
+        "midnight"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "properties": {
+                  "training_window_mode": {
+                    "const": "full_snapshot"
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "training_window_mode": {
+                        "const": "auto"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "split_strategy": {
+                        "const": "random"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "event_time_kind": {
+                      "enum": [
+                        "date"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "event_time_kind": {
+                          "enum": [
+                            "text"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "event_text_kind": {
+                          "enum": [
+                            "date"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "order": 25
+    },
+    "start": {
+      "order": 26,
+      "type": "string",
+      "default": "",
+      "description": "1. Data | Earliest observation to include, e.g. 2026-06-01T00:00:00+02:00. Blank = configure later; rolling scheduled runs calculate it",
       "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
       "skip_prompt_if": {
         "anyOf": [
@@ -432,10 +634,10 @@
       }
     },
     "holdout_start": {
-      "order": 24,
+      "order": 27,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Manual temporal holdout start (inclusive), as a timezone-aware ISO timestamp",
+      "description": "1. Data | Observations from this time onward are test rows, e.g. 2026-08-01T00:00:00+02:00. Older selected rows train the model; rolling runs calculate it",
       "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
       "skip_prompt_if": {
         "properties": {
@@ -446,10 +648,10 @@
       }
     },
     "cutoff": {
-      "order": 25,
+      "order": 28,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Manual observation window end (exclusive), as a timezone-aware ISO timestamp",
+      "description": "1. Data | Stop before this observation time, e.g. 2026-09-01T00:00:00+02:00. This is a data boundary, not the job date; rolling runs calculate it",
       "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
       "skip_prompt_if": {
         "anyOf": [
@@ -484,18 +686,18 @@
     "filter_unavailable_results": {
       "type": "string",
       "default": "false",
-      "description": "1. Basics and data | Exclude rows whose target outcome was unknown or became available after result_cutoff",
+      "description": "1. Data | Do answers become known later? true = exclude rows whose answer was not yet available at the chosen time; false = use supplied answers",
       "enum": [
         "false",
         "true"
       ],
-      "order": 26
+      "order": 29
     },
     "result_available_at_column": {
-      "order": 27,
+      "order": 30,
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Existing per-row target availability timestamp; required only when filtering unavailable results",
+      "description": "1. Data | Column recording when each answer became known, e.g. claim_confirmed_at. This is a column name, not a date you enter",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
       "skip_prompt_if": {
         "properties": {
@@ -505,41 +707,16 @@
         }
       }
     },
-    "result_time_format": {
+    "result_time_kind": {
+      "order": 31,
       "type": "string",
-      "default": "",
-      "description": "1. Basics and data | Explicit numeric string format, e.g. %d/%m/%Y %H:%M; blank for native timestamps",
-      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
-      "skip_prompt_if": {
-        "properties": {
-          "filter_unavailable_results": {
-            "const": "false"
-          }
-        }
-      },
-      "order": 28
-    },
-    "result_time_timezone": {
-      "type": "string",
-      "default": "",
-      "description": "1. Basics and data | Source IANA timezone for naive timestamps; blank for offset-aware values",
-      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
-      "skip_prompt_if": {
-        "properties": {
-          "filter_unavailable_results": {
-            "const": "false"
-          }
-        }
-      },
-      "order": 29
-    },
-    "result_date_only": {
-      "type": "string",
-      "default": "reject",
-      "description": "1. Basics and data | Date-only sources: reject, or explicit midnight in the declared source timezone",
+      "default": "timestamp",
+      "description": "1. Data | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
       "enum": [
-        "reject",
-        "midnight"
+        "timestamp",
+        "local_timestamp",
+        "date",
+        "text"
       ],
       "skip_prompt_if": {
         "properties": {
@@ -547,13 +724,189 @@
             "const": "false"
           }
         }
+      }
+    },
+    "result_text_kind": {
+      "order": 32,
+      "type": "string",
+      "default": "local_datetime",
+      "description": "1. Data | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
+      "enum": [
+        "offset_datetime",
+        "local_datetime",
+        "date"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "filter_unavailable_results": {
+                "const": "false"
+              }
+            }
+          },
+          {
+            "not": {
+              "properties": {
+                "result_time_kind": {
+                  "enum": [
+                    "text"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "result_time_format": {
+      "type": "string",
+      "default": "",
+      "description": "1. Data | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
+      "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "filter_unavailable_results": {
+                "const": "false"
+              }
+            }
+          },
+          {
+            "not": {
+              "properties": {
+                "result_time_kind": {
+                  "enum": [
+                    "text"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       },
-      "order": 30
+      "order": 33
+    },
+    "result_time_timezone": {
+      "type": "string",
+      "default": "",
+      "description": "1. Data | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
+      "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "filter_unavailable_results": {
+                "const": "false"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "result_time_kind": {
+                      "enum": [
+                        "local_timestamp",
+                        "date"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "result_time_kind": {
+                          "enum": [
+                            "text"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "result_text_kind": {
+                          "enum": [
+                            "local_datetime",
+                            "date"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "order": 34
+    },
+    "result_date_only": {
+      "type": "string",
+      "default": "reject",
+      "description": "1. Data | This column has a day but no time. May we treat it as the start of that day? midnight = yes, 00:00 in your chosen timezone; reject = stop if such a value is encountered",
+      "enum": [
+        "reject",
+        "midnight"
+      ],
+      "skip_prompt_if": {
+        "anyOf": [
+          {
+            "properties": {
+              "filter_unavailable_results": {
+                "const": "false"
+              }
+            }
+          },
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "result_time_kind": {
+                      "enum": [
+                        "date"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "allOf": [
+                    {
+                      "properties": {
+                        "result_time_kind": {
+                          "enum": [
+                            "text"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "properties": {
+                        "result_text_kind": {
+                          "enum": [
+                            "date"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "order": 35
     },
     "result_cutoff": {
       "type": "string",
       "default": "",
-      "description": "1. Basics and data | Manual result-availability cutoff (inclusive), independent of the observation window end",
+      "description": "1. Data | Use answers known by this time, INCLUDING this instant, e.g. 2026-09-15T00:00:00+02:00. Later answers are excluded; scheduled runs use their start time",
       "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
       "skip_prompt_if": {
         "properties": {
@@ -562,33 +915,33 @@
           }
         }
       },
-      "order": 31
+      "order": 36
     },
     "max_rows": {
-      "order": 32,
+      "order": 37,
       "type": "string",
       "default": "10000",
-      "description": "1. Basics and data | Positive row limit for each bounded local data transfer",
+      "description": "1. Data | Maximum rows transferred into Python memory per read; exceeding this stops the run. This does not randomly sample rows",
       "pattern": "^[1-9][0-9]*$"
     },
     "max_input_mb": {
-      "order": 33,
+      "order": 38,
       "type": "string",
       "default": "64",
-      "description": "1. Basics and data | Positive local input limit in MiB (1 unit = 1024 * 1024 bytes); not total training RAM",
+      "description": "1. Data | Maximum input data size transferred into Python memory, in MiB (64 = 64 MiB). Model training can use more RAM",
       "pattern": "^[1-9][0-9]*$"
     },
     "training_sample_rows": {
       "type": "string",
       "default": "null",
-      "description": "1. Basics and data | Optional deterministic training sample size, including holdout; null reads all eligible rows within limits",
+      "description": "1. Data | Optional sample: enter 10000 to select up to 10000 eligible rows BEFORE train/test splitting. null = no sampling. Prediction rows are never sampled",
       "pattern": "^(?:null|[1-9][0-9]*)$",
-      "order": 34
+      "order": 39
     },
     "training_sample_seed": {
       "type": "string",
       "default": "42",
-      "description": "1. Basics and data | Seed for repeatable sampling by record keys; does not sample scoring rows",
+      "description": "1. Data | Seed for choosing the same sample from the same table snapshot. Keep 42 unless you want another sample",
       "pattern": "^(?:0|[1-9][0-9]*)$",
       "skip_prompt_if": {
         "properties": {
@@ -597,39 +950,86 @@
           }
         }
       },
-      "order": 35
+      "order": 40
     },
-    "preprocessing": {
+    "regression_model": {
+      "order": 41,
       "type": "string",
-      "default": "none",
-      "description": "2. Preprocessing | Start with no steps or numeric mean imputation then standard scaling on ALL input_columns; edit ordered Core steps in workflow.json",
+      "default": "linear_regression",
+      "description": "2. Model | Choose a regression model. It starts with its default settings; README explains how to change them",
       "enum": [
-        "none",
-        "numeric_impute_scale"
+        "linear_regression",
+        "adaboost_regressor",
+        "decision_tree_regressor",
+        "elasticnet_regression",
+        "extra_trees_regressor",
+        "gradient_boosting_regressor",
+        "hist_gradient_boosting_regressor",
+        "k_neighbors_regressor",
+        "lasso_regression",
+        "lgbm_regressor",
+        "random_forest_regressor",
+        "ridge_regression",
+        "stacking_regressor",
+        "svr",
+        "voting_regressor",
+        "xgboost_regressor"
       ],
-      "order": 36
+      "skip_prompt_if": {
+        "properties": {
+          "task": {
+            "const": "classification"
+          }
+        }
+      }
     },
-    "model_type": {
+    "classification_model": {
+      "order": 42,
       "type": "string",
-      "default": "auto",
-      "description": "3. Model | Core model ID; auto chooses LinearRegression or LogisticRegression for the task. Edit hyperparameters in pipeline.modeling.params",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "order": 37
+      "default": "logistic_regression",
+      "description": "2. Model | Choose a classification model. It starts with its default settings; README explains how to change them",
+      "enum": [
+        "logistic_regression",
+        "adaboost_classifier",
+        "bernoulli_nb",
+        "calibrated_classifier",
+        "decision_tree_classifier",
+        "extra_trees_classifier",
+        "gaussian_nb",
+        "gradient_boosting_classifier",
+        "hist_gradient_boosting_classifier",
+        "k_neighbors_classifier",
+        "lgbm_classifier",
+        "multinomial_nb",
+        "random_forest_classifier",
+        "sgd_classifier",
+        "stacking_classifier",
+        "svc",
+        "voting_classifier",
+        "xgboost_classifier"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "task": {
+            "const": "regression"
+          }
+        }
+      }
     },
     "cv_enabled": {
       "type": "string",
       "default": "false",
-      "description": "4. Evaluation CV | Evaluate fixed model using fold-local preprocessing on training rows only; does not tune parameters",
+      "description": "3. Cross-validation | Also evaluate the model on several train/validation splits (cross-validation)? No parameter search; final test rows stay separate",
       "enum": [
         "false",
         "true"
       ],
-      "order": 38
+      "order": 43
     },
     "cv_folds": {
       "type": "string",
       "default": "5",
-      "description": "4. Evaluation CV | Evaluation folds (2-20); final holdout remains separate",
+      "description": "3. Cross-validation | How many CV splits? 5 means five evaluations; more splits take longer (2-20)",
       "pattern": "^(?:[2-9]|1[0-9]|20)$",
       "skip_prompt_if": {
         "properties": {
@@ -638,12 +1038,12 @@
           }
         }
       },
-      "order": 39
+      "order": 44
     },
     "cv_type": {
       "type": "string",
       "default": "k_fold",
-      "description": "4. Evaluation CV | Core CV method; stratified is classification-only, time series requires an event column and shuffle=false",
+      "description": "3. Cross-validation | CV split method: k_fold = ordinary; stratified_k_fold = preserve class proportions; time_series_split = older to newer; shuffle_split = repeated random splits",
       "enum": [
         "k_fold",
         "stratified_k_fold",
@@ -657,12 +1057,12 @@
           }
         }
       },
-      "order": 40
+      "order": 45
     },
     "cv_shuffle": {
       "type": "string",
       "default": "true",
-      "description": "4. Evaluation CV | Shuffle evaluation folds: false for time_series_split, true for shuffle_split",
+      "description": "3. Cross-validation | Shuffle rows for CV? Use false for time_series_split, true for shuffle_split",
       "enum": [
         "false",
         "true"
@@ -674,12 +1074,12 @@
           }
         }
       },
-      "order": 41
+      "order": 46
     },
     "cv_random_state": {
       "type": "string",
       "default": "42",
-      "description": "4. Evaluation CV | Evaluation fold seed; independent of final holdout and sampling seeds",
+      "description": "3. Cross-validation | Seed for repeatable CV splits. Keep 42 unless you want different splits",
       "pattern": "^(?:0|[1-9][0-9]*)$",
       "skip_prompt_if": {
         "properties": {
@@ -688,23 +1088,23 @@
           }
         }
       },
-      "order": 42
+      "order": 47
     },
     "retraining_mode": {
-      "order": 43,
+      "order": 48,
       "type": "string",
       "default": "manual",
-      "description": "5. Lifecycle | Train manually, or add a paused monthly schedule to the same train job",
+      "description": "4. Lifecycle | Start training yourself, or enable automatic training on your cron schedule after deployment",
       "enum": [
         "manual",
-        "monthly_paused"
+        "scheduled"
       ]
     },
     "retraining_cron_expression": {
-      "order": 44,
+      "order": 49,
       "type": "string",
       "default": "0 0 3 3 * ?",
-      "description": "5. Lifecycle | Editable Quartz cron for the paused training job; use one run per month",
+      "description": "4. Lifecycle | When to train (Quartz cron)? 0 0 3 3 * ? = monthly on day 3 at 03:00; 0 0 3 1 1,7 ? = Jan 1 and Jul 1 at 03:00. Does not set the data window",
       "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
       "skip_prompt_if": {
         "properties": {
@@ -715,10 +1115,10 @@
       }
     },
     "retraining_timezone_id": {
-      "order": 45,
+      "order": 50,
       "type": "string",
       "default": "UTC",
-      "description": "5. Lifecycle | IANA timezone for the paused job schedule; independent of window and source timezones",
+      "description": "4. Lifecycle | Timezone for the job clock: Europe/Copenhagen means 03:00 Copenhagen time. UTC means 03:00 UTC. This does not change dates in your data",
       "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
       "skip_prompt_if": {
         "properties": {
@@ -729,115 +1129,136 @@
       }
     },
     "model_change_mode": {
-      "order": 46,
+      "order": 51,
       "type": "string",
       "default": "incremental_append",
-      "description": "5. Lifecycle | Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
+      "description": "4. Lifecycle | Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
       "enum": [
         "incremental_append",
         "full_rebuild"
       ]
     },
     "score_model_selection": {
-      "order": 47,
+      "order": 52,
       "type": "string",
       "default": "pinned_version",
-      "description": "5. Lifecycle | Score with one pinned version or resolve the controlled champion on each run",
+      "description": "4. Lifecycle | Score with one pinned version or resolve the controlled champion on each run",
       "enum": [
         "pinned_version",
         "champion"
       ]
     },
     "promotion_policy": {
-      "order": 48,
+      "order": 53,
       "type": "string",
       "default": "manual_approval",
-      "description": "5. Lifecycle | Require operator approval or promote automatically after quality gates pass",
+      "description": "4. Lifecycle | Require operator approval or promote automatically after quality gates pass",
       "enum": [
         "manual_approval",
         "automatic"
       ]
     },
     "score_handoff": {
-      "order": 49,
+      "order": 54,
       "type": "string",
       "default": "disabled",
-      "description": "5. Lifecycle | Optionally run the existing score job after champion initialization, promotion or rollback; score keeps its selected model policy",
+      "description": "4. Lifecycle | Optionally run the existing score job after champion initialization, promotion or rollback; score keeps its selected model policy",
       "enum": [
         "disabled",
         "after_alias_change"
       ]
     },
-    "metric": {
-      "order": 50,
+    "regression_metric": {
+      "order": 55,
       "type": "string",
-      "default": "auto",
-      "description": "5. Lifecycle | Heldout comparison metric; auto selects RMSE for regression or accuracy for classification",
+      "default": "heldout_rmse",
+      "description": "4. Lifecycle | Metric for comparing regression models on separate test data (heldout). Lower error is better; higher R2 or explained variance is better",
       "enum": [
-        "auto",
-        "heldout_mae",
-        "heldout_mse",
         "heldout_rmse",
-        "heldout_r2",
-        "heldout_mape",
         "heldout_explained_variance",
+        "heldout_mae",
+        "heldout_mape",
+        "heldout_mse",
+        "heldout_r2"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "task": {
+            "const": "classification"
+          }
+        }
+      }
+    },
+    "classification_metric": {
+      "order": 56,
+      "type": "string",
+      "default": "heldout_accuracy",
+      "description": "4. Lifecycle | Metric for comparing classification models on separate test data (heldout). Some metrics need probabilities or specific class counts",
+      "enum": [
         "heldout_accuracy",
         "heldout_balanced_accuracy",
-        "heldout_precision_weighted",
-        "heldout_recall_weighted",
-        "heldout_f1_weighted",
-        "heldout_matthews_corrcoef",
-        "heldout_precision",
-        "heldout_recall",
         "heldout_f1",
+        "heldout_f1_weighted",
         "heldout_g_score",
         "heldout_log_loss",
-        "heldout_roc_auc",
+        "heldout_matthews_corrcoef",
         "heldout_pr_auc",
-        "heldout_roc_auc_ovr_weighted",
-        "heldout_roc_auc_weighted",
-        "heldout_roc_auc_ovr",
+        "heldout_pr_auc_weighted",
+        "heldout_precision",
+        "heldout_precision_weighted",
+        "heldout_recall",
+        "heldout_recall_weighted",
+        "heldout_roc_auc",
         "heldout_roc_auc_ovo",
         "heldout_roc_auc_ovo_weighted",
-        "heldout_pr_auc_weighted"
-      ]
+        "heldout_roc_auc_ovr",
+        "heldout_roc_auc_ovr_weighted",
+        "heldout_roc_auc_weighted"
+      ],
+      "skip_prompt_if": {
+        "properties": {
+          "task": {
+            "const": "regression"
+          }
+        }
+      }
     },
     "min_improvement": {
-      "order": 51,
+      "order": 57,
       "type": "number",
       "default": 0.0,
       "minimum": 0,
-      "description": "5. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass"
+      "description": "4. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass"
     },
     "quality_threshold": {
-      "order": 52,
+      "order": 58,
       "type": "string",
       "default": "null",
-      "description": "5. Lifecycle | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
+      "description": "4. Lifecycle | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
       "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$"
     },
     "risk_category": {
-      "order": 53,
+      "order": 59,
       "type": "string",
       "default": "",
-      "description": "5. Lifecycle | Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
+      "description": "4. Lifecycle | Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
       "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$"
     },
     "compute_mode": {
-      "order": 54,
+      "order": 60,
       "type": "string",
       "default": "serverless",
-      "description": "6. Compute | Job compute mode for this project",
+      "description": "5. Compute | Job compute mode for this project",
       "enum": [
         "serverless",
         "policy_cluster"
       ]
     },
     "cluster_policy_name": {
-      "order": 55,
+      "order": 61,
       "type": "string",
       "default": "REPLACE_WITH_APPROVED_POLICY",
-      "description": "6. Compute | Approved job-cluster policy name",
+      "description": "5. Compute | Approved job-cluster policy name",
       "skip_prompt_if": {
         "properties": {
           "compute_mode": {
@@ -847,10 +1268,10 @@
       }
     },
     "spark_version": {
-      "order": 56,
+      "order": 62,
       "type": "string",
       "default": "17.3.x-cpu-ml-scala2.13",
-      "description": "6. Compute | Approved Databricks ML Runtime for the job cluster",
+      "description": "5. Compute | Approved Databricks ML Runtime for the job cluster",
       "skip_prompt_if": {
         "properties": {
           "compute_mode": {
@@ -860,10 +1281,10 @@
       }
     },
     "node_type_id": {
-      "order": 57,
+      "order": 63,
       "type": "string",
       "default": "REPLACE_WITH_NODE_TYPE",
-      "description": "6. Compute | Approved job-cluster node type",
+      "description": "5. Compute | Approved job-cluster node type",
       "skip_prompt_if": {
         "properties": {
           "compute_mode": {
@@ -873,10 +1294,10 @@
       }
     },
     "cost_tag_key": {
-      "order": 58,
+      "order": 64,
       "type": "string",
       "default": "CostCenter",
-      "description": "6. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
+      "description": "5. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
       "skip_prompt_if": {
         "properties": {
@@ -887,10 +1308,10 @@
       }
     },
     "cost_tag_value": {
-      "order": 59,
+      "order": 65,
       "type": "string",
       "default": "REPLACE_WITH_COST_TAG",
-      "description": "6. Compute | Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
+      "description": "5. Compute | Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
       "skip_prompt_if": {
         "properties": {
           "compute_mode": {

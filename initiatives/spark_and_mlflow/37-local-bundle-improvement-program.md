@@ -159,8 +159,10 @@ imply that these additional behaviors are implemented.
 Files: template schema, job resources, target variables, workflow config and
 `local_retraining.py`/`local_workflow.py`; schedule/window tests.
 
-- Add independent optional train and score Quartz cron/timezone/pause inputs;
-  start paused. Scoring new data must not require retraining or manual dates.
+- Add independent optional train and score Quartz cron/timezone/pause inputs.
+  User refinement (2026-09-26): selecting a schedule enables it after deployment;
+  do not force it paused. Manual mode adds no schedule. Scoring new data must
+  not require retraining or manual dates.
 - Expose and document lookback, holdout duration and label-availability cutoff.
   Preserve the existing monthly UTC behavior as an explicit default. Changing
   cron must not silently imply a different data-split policy.
