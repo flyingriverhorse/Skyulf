@@ -14,7 +14,7 @@
         <link rel="prev" href="overview.html">
       
       
-        <link rel="next" href="pipeline_quickstart.html">
+        <link rel="next" href="spark.html">
       
       
         
@@ -1552,6 +1552,286 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3272,8 +3552,8 @@
 <li>pip 21 or newer</li>
 </ul>
 <h2 id="install-from-pypi">Install from PyPI</h2>
-<pre><code class="language-bash">pip install skyulf-core
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core
+</code></pre></div>
 <h2 id="optional-extras">Optional extras</h2>
 <p>Install only what you need:</p>
 <table>
@@ -3343,17 +3623,17 @@
 </tbody>
 </table>
 <p>Install all non-geospatial optional runtime features:</p>
-<pre><code class="language-bash">pip install skyulf-core[all]
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>all<span class="o">]</span>
+</code></pre></div>
 <p>Install geospatial functionality separately because it has native dependencies:</p>
-<pre><code class="language-bash">pip install skyulf-core[geo]
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>geo<span class="o">]</span>
+</code></pre></div>
 <h2 id="editable-install-contributor-workflow">Editable install (contributor workflow)</h2>
 <p>If you cloned the repository and want live changes reflected:</p>
-<pre><code class="language-bash">git clone https://github.com/flyingriverhorse/Skyulf.git
-cd Skyulf
-pip install -e ./skyulf-core
-</code></pre>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/flyingriverhorse/Skyulf.git
+<span class="nb">cd</span><span class="w"> </span>Skyulf
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>./skyulf-core
+</code></pre></div>
 <h2 id="runtime-dependencies-auto-installed">Runtime dependencies (auto-installed)</h2>
 <p>These are pulled in automatically by <code>pip install skyulf-core</code>:</p>
 <ul>
@@ -3370,11 +3650,11 @@ pip install -e ./skyulf-core
 <p><a href="../guides/platform_setup.html">Run the separate self-hosted platform</a></p>
 <h2 id="import-check">Import check</h2>
 <p>Verify the installation:</p>
-<pre><code class="language-python">from skyulf import SkyulfPipeline
-from skyulf.data.dataset import SplitDataset
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
 
-print(&quot;skyulf-core installed successfully&quot;)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"skyulf-core installed successfully"</span><span class="p">)</span>
+</code></pre></div>
 
 
 

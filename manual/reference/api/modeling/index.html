@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -5109,8 +5389,8 @@ the tuner can construct a valid meta-estimator.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">256</span>
-<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CalibratedClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">255</span>
+<span class="normal">256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CalibratedClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Calibrated Classifier Applier (well-calibrated predict_proba)."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5172,7 +5452,8 @@ each candidate and the final refit use the selected classifier family.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">260</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">259</span>
+<span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
@@ -5288,8 +5569,7 @@ each candidate and the final refit use the selected classifier family.</p>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"calibrated_classifier"</span><span class="p">,</span> <span class="n">CalibratedClassifierApplier</span><span class="p">)</span>
+<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"calibrated_classifier"</span><span class="p">,</span> <span class="n">CalibratedClassifierApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"calibrated_classifier"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Calibrated Classifier"</span><span class="p">,</span>
@@ -5468,7 +5748,8 @@ overridable defaults, and starts <code>_tuning_base_config</code> empty so
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
+<span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
@@ -5484,8 +5765,7 @@ overridable defaults, and starts <code>_tuning_base_config</code> empty so
 <span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Bind ``CalibratedClassifierCV`` over a logistic-regression base estimator.</span>
 
 <span class="sd">    Fixes ``method="sigmoid"`` and ``cv=5`` alongside that base estimator as</span>
@@ -5525,7 +5805,8 @@ overridable defaults, and starts <code>_tuning_base_config</code> empty so
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
+<span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
@@ -5544,8 +5825,7 @@ overridable defaults, and starts <code>_tuning_base_config</code> empty so
 <span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -5590,15 +5870,15 @@ either the nested <code>params</code> dict or the flat config.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">326</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
+<span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
 <span class="normal">329</span>
 <span class="normal">330</span>
 <span class="normal">331</span>
 <span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_tuning_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">333</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">prepare_tuning_params</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Absorb ``base_estimator`` so it selects an estimator instead of being tuned.</span>
 
 <span class="sd">    Only keys named in :attr:`STRUCTURAL_TUNING_KEYS` are taken, read from</span>
@@ -6357,8 +6637,7 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"logistic_regression"</span><span class="p">,</span> <span class="n">LogisticRegressionApplier</span><span class="p">)</span>
+<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"logistic_regression"</span><span class="p">,</span> <span class="n">LogisticRegressionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"logistic_regression"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Logistic Regression"</span><span class="p">,</span>
@@ -6431,9 +6710,8 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
 <span class="sd">        sklearn &gt;=1.8 deprecates the ``penalty`` constructor arg entirely (in</span>
 <span class="sd">        favor of ``l1_ratio``/``C``) and will remove it in sklearn 1.10. We</span>
 <span class="sd">        keep ``penalty`` ("l1"/"l2"/"elasticnet"/None) as our own public</span>
-<span class="sd">        config/UI field unchanged — it's translated to the newer kwargs here,</span>
-<span class="sd">        right before the sklearn estimator is constructed, so we never pass a</span>
-<span class="sd">        bare ``penalty=`` to sklearn regardless of installed sklearn version.</span>
+<span class="sd">        config/UI field unchanged. Translate it for the newer API while</span>
+<span class="sd">        retaining the native penalty argument on older sklearn versions.</span>
 <span class="sd">        """</span>
         <span class="n">params</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_resolve_fit_params</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">normalize_logistic_regression_params</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
@@ -6871,8 +7149,8 @@ and the resulting pair is then checked against <code>_SOLVER_PENALTIES</code>.</
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">381</span>
-<span class="normal">382</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">380</span>
+<span class="normal">381</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomForestClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Random Forest Classifier Applier."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6926,7 +7204,8 @@ and the resulting pair is then checked against <code>_SOLVER_PENALTIES</code>.</
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">385</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">384</span>
+<span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
 <span class="normal">388</span>
@@ -6956,8 +7235,7 @@ and the resulting pair is then checked against <code>_SOLVER_PENALTIES</code>.</
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"random_forest_classifier"</span><span class="p">,</span> <span class="n">RandomForestClassifierApplier</span><span class="p">)</span>
+<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"random_forest_classifier"</span><span class="p">,</span> <span class="n">RandomForestClassifierApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"random_forest_classifier"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Random Forest Classifier"</span><span class="p">,</span>
@@ -7025,7 +7303,8 @@ All are overridable from <code>fit</code>'s config.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">398</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">397</span>
+<span class="normal">398</span>
 <span class="normal">399</span>
 <span class="normal">400</span>
 <span class="normal">401</span>
@@ -7042,8 +7321,7 @@ All are overridable from <code>fit</code>'s config.</p>
 <span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">415</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Bind ``RandomForestClassifier`` with 50 shallow, constrained trees.</span>
 
 <span class="sd">    ``max_depth=10``, ``min_samples_split=5`` and ``min_samples_leaf=2``</span>
@@ -7558,8 +7836,8 @@ overrides either.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">886</span>
-<span class="normal">887</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SGDClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">885</span>
+<span class="normal">886</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SGDClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Stochastic Gradient Descent Classifier Applier."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7613,7 +7891,8 @@ overrides either.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">890</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">889</span>
+<span class="normal">890</span>
 <span class="normal">891</span>
 <span class="normal">892</span>
 <span class="normal">893</span>
@@ -7659,8 +7938,7 @@ overrides either.</p>
 <span class="normal">933</span>
 <span class="normal">934</span>
 <span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"sgd_classifier"</span><span class="p">,</span> <span class="n">SGDClassifierApplier</span><span class="p">)</span>
+<span class="normal">936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"sgd_classifier"</span><span class="p">,</span> <span class="n">SGDClassifierApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"sgd_classifier"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"SGD Classifier (text / linear)"</span><span class="p">,</span>
@@ -7744,7 +8022,8 @@ inert unless <code>penalty</code> is switched to <code>"elasticnet"</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/classification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">919</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">918</span>
+<span class="normal">919</span>
 <span class="normal">920</span>
 <span class="normal">921</span>
 <span class="normal">922</span>
@@ -7761,8 +8040,7 @@ inert unless <code>penalty</code> is switched to <code>"elasticnet"</code>.</p>
 <span class="normal">933</span>
 <span class="normal">934</span>
 <span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Bind ``SGDClassifier`` as a logistic-regression approximation.</span>
 
 <span class="sd">    ``loss="log_loss"`` replaces sklearn's default ``"hinge"``, and that is</span>
@@ -8807,8 +9085,8 @@ stays generic across estimators.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">566</span>
-<span class="normal">567</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StackingClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">568</span>
+<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StackingClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Stacking Classifier Applier (meta-learner over base classifiers)."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8862,9 +9140,7 @@ stays generic across estimators.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">572</span>
 <span class="normal">573</span>
 <span class="normal">574</span>
 <span class="normal">575</span>
@@ -8894,7 +9170,9 @@ stays generic across estimators.</p>
 <span class="normal">599</span>
 <span class="normal">600</span>
 <span class="normal">601</span>
-<span class="normal">602</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"stacking_classifier"</span><span class="p">,</span> <span class="n">StackingClassifierApplier</span><span class="p">)</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"stacking_classifier"</span><span class="p">,</span> <span class="n">StackingClassifierApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"stacking_classifier"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Stacking Classifier"</span><span class="p">,</span>
@@ -8959,13 +9237,13 @@ stays generic across estimators.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">596</span>
-<span class="normal">597</span>
-<span class="normal">598</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">598</span>
 <span class="normal">599</span>
 <span class="normal">600</span>
 <span class="normal">601</span>
-<span class="normal">602</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Pin the meta-estimator to ``StackingClassifier`` with ``cv=5``."""</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">model_class</span><span class="o">=</span><span class="n">StackingClassifier</span><span class="p">,</span>
@@ -9014,8 +9292,8 @@ stays generic across estimators.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">642</span>
-<span class="normal">643</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StackingRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">644</span>
+<span class="normal">645</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StackingRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Stacking Regressor Applier (meta-learner over base regressors)."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9069,9 +9347,7 @@ stays generic across estimators.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">646</span>
-<span class="normal">647</span>
-<span class="normal">648</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">648</span>
 <span class="normal">649</span>
 <span class="normal">650</span>
 <span class="normal">651</span>
@@ -9101,7 +9377,9 @@ stays generic across estimators.</p>
 <span class="normal">675</span>
 <span class="normal">676</span>
 <span class="normal">677</span>
-<span class="normal">678</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"stacking_regressor"</span><span class="p">,</span> <span class="n">StackingRegressorApplier</span><span class="p">)</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"stacking_regressor"</span><span class="p">,</span> <span class="n">StackingRegressorApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"stacking_regressor"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Stacking Regressor"</span><span class="p">,</span>
@@ -9166,13 +9444,13 @@ stays generic across estimators.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">672</span>
-<span class="normal">673</span>
-<span class="normal">674</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">674</span>
 <span class="normal">675</span>
 <span class="normal">676</span>
 <span class="normal">677</span>
-<span class="normal">678</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Pin the meta-estimator to ``StackingRegressor`` with ``cv=5``."""</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">model_class</span><span class="o">=</span><span class="n">StackingRegressor</span><span class="p">,</span>
@@ -10651,8 +10929,8 @@ against it directly.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">528</span>
-<span class="normal">529</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VotingClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">530</span>
+<span class="normal">531</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VotingClassifierApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Voting Classifier Applier (hard/soft vote over base classifiers)."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10706,9 +10984,7 @@ against it directly.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">534</span>
 <span class="normal">535</span>
 <span class="normal">536</span>
 <span class="normal">537</span>
@@ -10736,7 +11012,9 @@ against it directly.</p>
 <span class="normal">559</span>
 <span class="normal">560</span>
 <span class="normal">561</span>
-<span class="normal">562</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"voting_classifier"</span><span class="p">,</span> <span class="n">VotingClassifierApplier</span><span class="p">)</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"voting_classifier"</span><span class="p">,</span> <span class="n">VotingClassifierApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"voting_classifier"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Voting Classifier"</span><span class="p">,</span>
@@ -10799,13 +11077,13 @@ against it directly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">556</span>
-<span class="normal">557</span>
-<span class="normal">558</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">558</span>
 <span class="normal">559</span>
 <span class="normal">560</span>
 <span class="normal">561</span>
-<span class="normal">562</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Pin the meta-estimator to ``VotingClassifier`` with ``voting="soft"``."""</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">model_class</span><span class="o">=</span><span class="n">VotingClassifier</span><span class="p">,</span>
@@ -10854,8 +11132,8 @@ against it directly.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">606</span>
-<span class="normal">607</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VotingRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">608</span>
+<span class="normal">609</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VotingRegressorApplier</span><span class="p">(</span><span class="n">SklearnApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Voting Regressor Applier (averaged predictions over base regressors)."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10909,9 +11187,7 @@ against it directly.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">610</span>
-<span class="normal">611</span>
-<span class="normal">612</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">612</span>
 <span class="normal">613</span>
 <span class="normal">614</span>
 <span class="normal">615</span>
@@ -10937,7 +11213,9 @@ against it directly.</p>
 <span class="normal">635</span>
 <span class="normal">636</span>
 <span class="normal">637</span>
-<span class="normal">638</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"voting_regressor"</span><span class="p">,</span> <span class="n">VotingRegressorApplier</span><span class="p">)</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"voting_regressor"</span><span class="p">,</span> <span class="n">VotingRegressorApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"voting_regressor"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Voting Regressor"</span><span class="p">,</span>
@@ -10998,13 +11276,13 @@ against it directly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/ensemble.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">632</span>
-<span class="normal">633</span>
-<span class="normal">634</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">634</span>
 <span class="normal">635</span>
 <span class="normal">636</span>
 <span class="normal">637</span>
-<span class="normal">638</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">638</span>
+<span class="normal">639</span>
+<span class="normal">640</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Pin the meta-estimator to ``VotingRegressor``, with no estimator-level defaults."""</span>
     <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
         <span class="n">model_class</span><span class="o">=</span><span class="n">VotingRegressor</span><span class="p">,</span>
@@ -11386,7 +11664,7 @@ omitted, each is (re)computed here exactly as before.</p>
 <span class="normal">212</span>
 <span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_classification_metrics</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">X_np</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11659,7 +11937,7 @@ avoiding a redundant conversion/inference pass on the same data.</p>
 <span class="normal">432</span>
 <span class="normal">433</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_regression_metrics</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">X_np</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

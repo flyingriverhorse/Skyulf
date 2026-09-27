@@ -1659,6 +1659,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3374,10 +3654,10 @@ Data Preview node. Rerun Preview after changing the graph to refresh the results
 <h2 id="merge-combining-multiple-branches">Merge: Combining Multiple Branches</h2>
 <p>When a training node has 2+ incoming edges, Skyulf <strong>automatically merges</strong> the upstream DataFrames before training.</p>
 <h3 id="how-it-works">How It Works</h3>
-<pre><code>Dataset → Scaling    ──┐
+<div class="highlight"><pre><span></span><code>Dataset → Scaling    ──┐
                        ├──→ Training Node (⊕ Merge)
 Dataset → Encoding   ──┘
-</code></pre>
+</code></pre></div>
 <p>The training node collects <strong>all</strong> upstream branch outputs via <code>_resolve_all_inputs()</code> and combines them using <code>_merge_inputs()</code>.</p>
 <h3 id="merge-strategy-auto-detected">Merge Strategy (Auto-Detected)</h3>
 <table>
@@ -3479,10 +3759,10 @@ Design post-split merges accordingly:
 <h2 id="parallel-running-separate-experiments">Parallel: Running Separate Experiments</h2>
 <p>When you have 2+ training nodes on the canvas connected to <strong>separate branches</strong>, each one runs as an independent experiment.</p>
 <h3 id="how-it-works_1">How It Works</h3>
-<pre><code>Dataset → Scaling → Random Forest (Train)
+<div class="highlight"><pre><span></span><code>Dataset → Scaling → Random Forest (Train)
     │
     └──→ Encoding → XGBoost (Train)
-</code></pre>
+</code></pre></div>
 <p>Each training node has its own <strong>Train</strong> button. Clicking it runs <strong>only that branch</strong> — the backend uses <code>target_node_id</code> filtering to isolate the sub-pipeline.</p>
 <h3 id="run-all-experiments">Run All Experiments</h3>
 <p>When 2+ training nodes are connected on separate branches, a <strong>"Run All Experiments"</strong> button (🚀 Rocket icon) appears in the toolbar. Clicking it queues <strong>all branches</strong> at once, returning a list of <code>job_ids</code>.</p>

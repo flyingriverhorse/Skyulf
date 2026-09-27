@@ -1,0 +1,4095 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_local_sdk.html">
+      
+      
+        <link rel="prev" href="databricks_batch.html">
+      
+      
+        <link rel="next" href="databricks_bundle.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Databricks Local SDK (Development) - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#local-engine-sdk-for-databricks-jobs" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Databricks Local SDK (Development)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="databricks_local_sdk.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#train-a-candidate-when-labels-are-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train a candidate when labels are ready
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-and-score-a-small-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fit and score a small batch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-and-custom-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight and custom pipelines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluate-the-held-out-split-in-the-model-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluate the held-out split in the model run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-and-score-a-pinned-uc-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fit and score a pinned UC source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publish-one-local-scored-month-to-a-uc-delta-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish one local-scored month to a UC Delta table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-newly-inserted-rows-automatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Score newly inserted rows automatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#real-data-end-to-end-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Real-data end-to-end example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="local-engine-sdk-for-databricks-jobs">Local-engine SDK for Databricks jobs</h1>
+<p>The first local workflow runs pandas or Polars feature engineering and a fitted
+scikit-learn model <strong>inside one Python process</strong>. <code>runtime="databricks"</code> means
+that process may be a Databricks job task; it does not switch inference to Spark.
+The same code also runs with <code>runtime="local"</code>. No Bundle project or
+<code>databricks.yml</code> is needed to use this SDK.</p>
+<p>SM-25 provides configuration, artifact selection and preflight. It accepts a
+caller-owned, bounded pandas/Polars frame and returns predictions. SM-24a adds
+an explicit, versioned UC Delta source reader for selected-period local batches.
+SM-15L publishes an explicitly selected period to UC Delta. The separate
+incremental runner below discovers new source inserts automatically.</p>
+<h2 id="train-a-candidate-when-labels-are-ready">Train a candidate when labels are ready</h2>
+<p><code>train_local_candidate</code> reads a <strong>specific Delta table version</strong>, filters a
+bounded event window in Spark when temporal splitting is selected. Random
+splitting uses Core <code>DataSplitter</code> on stable record-key order and needs no dates.
+Optional availability filtering excludes unknown results and those after the
+independent <code>result_cutoff</code> from both fit and holdout.
+For temporal splitting, the feature/model pipeline fits only on events before
+<code>holdout_start</code>; later eligible events are reserved for evaluation. The fit engine can be pandas or
+Polars. The run logs the Skyulf config, source and code identities, fitted model,
+held-out metrics and <code>candidate_comparison.json</code>. It registers a new concrete
+model version but never assigns <code>@challenger</code> or <code>@champion</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalTrainingSpec</span><span class="p">,</span> <span class="n">train_local_candidate</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">LocalTrainingSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.labeled_events"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">split_strategy</span><span class="o">=</span><span class="s2">"temporal"</span><span class="p">,</span> <span class="n">filter_unavailable_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">result_cutoff</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">holdout_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">event_column</span><span class="o">=</span><span class="s2">"event_time"</span><span class="p">,</span> <span class="n">result_available_at_column</span><span class="o">=</span><span class="s2">"label_available_at"</span><span class="p">,</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"event_id"</span><span class="p">,),</span> <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"feature_a"</span><span class="p">,</span> <span class="s2">"feature_b"</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">train_local_candidate</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">pipeline_config</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span>
+    <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="n">experiment_name</span><span class="o">=</span><span class="s2">"/Users/me/customer-model"</span><span class="p">,</span> <span class="n">run_name</span><span class="o">=</span><span class="s2">"candidate-2026-03"</span><span class="p">,</span>
+    <span class="n">artifact_path</span><span class="o">=</span><span class="s2">"/tmp/customer-model"</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s2">"heldout_rmse"</span><span class="p">,</span>
+    <span class="n">min_improvement</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">champion_version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>  <span class="c1"># Pin this concrete version before the job starts.</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">eligible</span><span class="p">)</span>
+</code></pre></div>
+<p>The example uses native Spark timestamp instants; their stored instants are
+retained independently of the Spark session timezone. A
+missing or later label is not a training label, even if its target value is
+already present in the pinned table. The source must have unique nonnull row
+keys and distinct feature, target and timestamp columns. A nonempty training
+set and holdout of at least two rows each are required. The row and byte limits
+bound decoded rows and the local frame, not Spark's wire transfer size. The
+caller supplies a concrete <code>champion_version</code>; omit it for the first candidate.
+Review the comparison report, then use the separate guarded staging/promotion
+operations if a human approves a change. If fit, packaging, registration or
+comparison fails, no alias moves; a registered but unapproved candidate may
+remain for inspection. A scheduling policy is separate from this service.</p>
+<p>For string, local-clock or date-only source columns, supply independent rules:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingDateSpec</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+    <span class="n">spec</span><span class="p">,</span>
+    <span class="n">event_time_parsing</span><span class="o">=</span><span class="n">TrainingDateSpec</span><span class="p">(</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s2">"</span><span class="si">%d</span><span class="s2">/%m/%Y %H:%M:%S"</span><span class="p">,</span> <span class="n">timezone</span><span class="o">=</span><span class="s2">"Europe/Copenhagen"</span>
+    <span class="p">),</span>
+    <span class="n">result_time_parsing</span><span class="o">=</span><span class="n">TrainingDateSpec</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s2">"%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%M:%S%z"</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Leave the format unset for native timestamp columns. Naive local timestamps
+need an explicit source timezone; dates additionally require
+<code>date_only="midnight"</code>. The default rejects date-only inputs. Ambiguous and
+nonexistent local times are rejected, and strings are never guessed.
+See the <a href="databricks_bundle.html#source-date-formats-and-timezones">source-date contract</a>
+for examples, boundaries, supported directives and distributed validation cost.
+<code>candidate_training_spec.json</code> retains both parsing rules for approval replay.</p>
+<p>For a table without dates, create the same specification with no time fields:</p>
+<div class="highlight"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">LocalTrainingSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.labeled_customers"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,),</span> <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+    <span class="n">split_strategy</span><span class="o">=</span><span class="s2">"random"</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Pass this spec to the same <code>train_local_candidate</code> call above with either fit
+engine. All targets must be known. Enable <code>filter_unavailable_results</code> and set
+<code>result_available_at_column</code> plus <code>result_cutoff</code> if outcomes arrive later;
+random splitting still needs no observation timestamp. The returned candidate
+and saved spec record holdout membership evidence for approval replay.
+See the <a href="databricks_bundle.html#choose-the-evaluation-split-and-result-availability">split/availability matrix</a>
+for the four supported combinations.</p>
+<h2 id="fit-and-score-a-small-batch">Fit and score a small batch</h2>
+<p>Candidate training also accepts <code>cv=LocalCVSpec(enabled=True, folds=3)</code> from
+<code>skyulf.integrations.databricks.local_cv</code>. It reuses Core CV on training rows,
+refits preprocessing per fold and logs a separate report to the candidate's
+MLflow run. Use <code>method="stratified_k_fold"</code> for classification; time-series CV
+requires an explicit event window and <code>shuffle=False</code>. The saved final pipeline
+and its protected holdout are independent of the fold fits.</p>
+<p><code>LocalTrainingSpec(training_sample_rows=10_000, training_sample_seed=42, ...)</code>
+opts into seeded Spark-side selection before local transfer. The limit includes
+training and final holdout rows and cannot exceed <code>max_rows</code>. Sample membership
+is pinned for approval replay. Leaving it null preserves overflow-fail behavior.
+See <a href="databricks_bundle.html#optional-basic-model-cross-validation">Bundle CV, sampling and selection</a>
+for full contracts and the Bundle's <code>train</code> calendar settings. The Bundle uses
+the same action for manual and scheduled runs: null source version resolves
+latest once, explicit version pins the snapshot, and rolling windows derive at
+invocation. The direct <code>train_local_candidate</code> API still takes a concrete
+<code>LocalTrainingSpec</code> with its source version and any active date boundaries.</p>
+<p>Install the same <code>skyulf-core</code>, pandas, Polars and scikit-learn versions in the
+training and scoring environments. The local artifact records those versions,
+the fit engine and the raw/feature schemas. It contains trusted Python pickle;
+only load packages from your own controlled producer.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.local_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_local_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span>
+    <span class="n">prepare_local_workflow</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+
+<span class="n">train</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">],</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">5</span><span class="p">],</span> <span class="n">test</span><span class="o">=</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">5</span><span class="p">:]),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">save_local_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="s2">"/tmp/customer-model"</span><span class="p">)</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">LocalWorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>  <span class="c1"># or "local" on a workstation</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"pandas"</span><span class="p">,</span>       <span class="c1"># must match the recorded fit engine</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"caller_frame"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"/tmp/customer-model"</span><span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"return_frame"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_local_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">query</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]})</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">prepared</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">feature_order</span> <span class="o">==</span> <span class="p">(</span><span class="s2">"x"</span><span class="p">,)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
+</code></pre></div>
+<p>The example uses a path within one process. A Databricks job's temporary path
+is not a cross-job model store. For separate training and scoring jobs, log the
+artifact with <code>log_local_model</code>, register that run model explicitly, then select
+the registered version in scoring. An alias is read once and converted to a
+concrete <code>models:/name/version</code> reference; later alias changes cannot alter the
+already prepared predictor.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSelection</span>
+
+<span class="n">selection</span> <span class="o">=</span> <span class="n">ModelSelection</span><span class="p">(</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span>
+    <span class="n">alias</span><span class="o">=</span><span class="s2">"champion"</span><span class="p">,</span>  <span class="c1"># or version="7"; never both</span>
+    <span class="n">tracking_uri</span><span class="o">=</span><span class="n">tracking_uri</span><span class="p">,</span>
+    <span class="n">registry_uri</span><span class="o">=</span><span class="n">registry_uri</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">"model"</span><span class="p">:</span> <span class="n">selection</span><span class="p">})</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_local_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>  <span class="c1"># read-only registry resolution and load</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span> <span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_digest</span><span class="p">)</span>
+</code></pre></div>
+<p>Obtain <code>tracking_uri</code> and <code>registry_uri</code> from your job's non-secret settings;
+authenticate through the runtime's credential provider. Do not put tokens or
+passwords into config or store URIs. Registering or changing an alias is a
+separate, explicit operation. The local SDK never promotes a model.</p>
+<h2 id="preflight-and-custom-pipelines">Preflight and custom pipelines</h2>
+<p><code>LocalWorkflowConfig</code> is frozen, serializable and has no implicit source
+snapshot, period or promotion decision. <code>preflight_local(config, artifact=...)</code>
+performs offline checks without a registry call, package load or job submission.
+It returns issues with a code, category and suggested fix. For a registry
+selection, offline preflight reports <code>model_unresolved</code>; call
+<code>prepare_local_workflow</code> when read-only registry access is allowed. That step
+loads the pinned package and performs full preflight before returning a
+predictor. <code>local_issues</code>, <code>remote_issues</code> and <code>remote_checked</code> keep the two
+stages visible. It may deserialize trusted pickle, but creates no cloud resource.
+If representative rows are available before submitting a job, pass
+<code>probe_frame=sample</code> to <code>preflight_local</code> or <code>prepare_local_workflow</code>. The probe
+runs the actual fitted FE and model and reports a <code>prediction_probe_failed</code>
+issue for an incompatible sample. A passing sample is evidence for that sample,
+not a guarantee about every later batch.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.local_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_local_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">preflight_local</span>
+
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">load_local_pipeline</span><span class="p">(</span><span class="s2">"/tmp/customer-model"</span><span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">preflight_local</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">"model"</span><span class="p">:</span> <span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"/tmp/customer-model"</span><span class="p">)</span>
+<span class="p">}),</span> <span class="n">artifact</span><span class="o">=</span><span class="n">artifact</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">issue</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">issues</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">issue</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">issue</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">issue</span><span class="o">.</span><span class="n">fix</span><span class="p">)</span>
+</code></pre></div>
+<p>For custom feature engineering, edit the normal <code>SkyulfPipeline</code> preprocessing
+configuration, fit it on training data, save it, and compare predictions before
+and after loading. The SDK has <strong>no separate node or model allowlist</strong>: it
+restores the fitted <code>SkyulfPipeline</code> and calls its existing prediction path.
+Integration examples cover imputation, scaling, encoding, binning, linear and
+logistic regression, and a MinMaxScaler/random-forest combination on both local
+engines. Other library combinations remain governed by their own fitted
+inference behavior and should receive replay tests before production use.
+The package is not eligible for Spark-native, Spark-worker or row-local HTTP
+execution. The separate <code>portable_bundle</code> selection uses
+<code>InferenceBundle</code> metadata and its own <code>predict_local</code> path for supported
+portable FE; selecting the wrong package kind fails preflight.</p>
+<p>For example, an advanced pipeline may fit explicit binning followed by encoding
+before it is packaged; its saved edges and category positions are then replayed
+by the local artifact:</p>
+<div class="highlight"><pre><span></span><code><span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"bands"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"x"</span><span class="p">],</span> <span class="s2">"bins"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">],</span>
+            <span class="s2">"output_suffix"</span><span class="p">:</span> <span class="s2">"_band"</span><span class="p">,</span>
+        <span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode_bands"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"x_band"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">,</span>
+        <span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="c1"># Fit with SplitDataset, then save_local_pipeline as in the first example.</span>
+</code></pre></div>
+<p><code>InputSource</code> defaults to 100,000 rows and 128 MiB. Set tighter limits for each
+job. <code>PreparedLocalWorkflow.predict</code> checks both before running FE and the model.
+It preserves the caller's input column order and rejects schema mismatches; it
+does not silently collect a Spark DataFrame. On Databricks, supply either a
+bounded caller-owned frame or the explicit pinned UC source adapter below.</p>
+<h2 id="evaluate-the-held-out-split-in-the-model-run">Evaluate the held-out split in the model run</h2>
+<p>Keep labeled test rows outside the fit split. After fitting and loading the
+artifact, <code>evaluate_local_holdout</code> calls the saved pipeline's normal prediction
+path on those raw test features. It returns <code>heldout_mae</code>, <code>heldout_rmse</code> and
+<code>heldout_r2</code> for regression; classification returns <code>heldout_accuracy</code> and
+<code>heldout_f1_weighted</code>, plus <code>heldout_f1</code> for binary models (the model's second
+class is positive). A negative R2 is a valid poor-generalization result, not a
+logging failure. The caller chooses the split and logs metrics to the same
+MLflow run ID that contains the model artifact:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_local_holdout</span><span class="p">,</span> <span class="n">fit_local_workflow</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
+
+<span class="c1"># `frame` is a bounded, labeled pandas or Polars frame with 1,000 rows.</span>
+<span class="n">training</span><span class="p">,</span> <span class="n">heldout</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[:</span><span class="mi">800</span><span class="p">],</span> <span class="n">frame</span><span class="p">[</span><span class="mi">800</span><span class="p">:]</span>
+<span class="n">artifact_path</span> <span class="o">=</span> <span class="s2">"/tmp/customer-model"</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">fit_local_workflow</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">"preprocessing"</span><span class="p">:</span> <span class="n">preprocessing</span><span class="p">,</span> <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="n">model_type</span><span class="p">}},</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">training</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">heldout</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+    <span class="n">artifact_path</span><span class="o">=</span><span class="n">artifact_path</span><span class="p">,</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">max_bytes</span><span class="o">=</span><span class="mi">4_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">evaluate_local_holdout</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">heldout</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">start_run</span><span class="p">(</span><span class="n">run_name</span><span class="o">=</span><span class="s2">"customer-model"</span><span class="p">)</span> <span class="k">as</span> <span class="n">run</span><span class="p">:</span>
+    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_param</span><span class="p">(</span><span class="s2">"heldout_rows"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">heldout</span><span class="p">))</span>
+    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+    <span class="n">model_uri</span> <span class="o">=</span> <span class="n">log_local_model</span><span class="p">(</span>
+        <span class="n">artifact_path</span><span class="p">,</span> <span class="n">run_id</span><span class="o">=</span><span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">,</span>
+        <span class="n">artifact_path</span><span class="o">=</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div>
+<p>The held-out labels are used only for evaluation. Monthly scoring reads raw
+features without labels and applies the already fitted FE and model. The
+SM-24a live validation (<code>initiatives/spark_and_mlflow/10-sm24a-heldout-metrics-report.md</code>)
+uses five model configurations with 800 training and 200 held-out rows each.</p>
+<h2 id="fit-and-score-a-pinned-uc-source">Fit and score a pinned UC source</h2>
+<p><code>fit_local_workflow</code> requires an explicit <code>SplitDataset</code>; it bounds the total
+rows and in-memory bytes before fitting and saves the same trusted artifact as
+<code>save_local_pipeline</code>. Tracking and registration remain opt-in calls through
+<code>track_run</code>, <code>log_local_model</code> and <code>register_model</code>. They do not move an alias.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalSourceSpec</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span>
+    <span class="n">OutputSink</span><span class="p">,</span> <span class="n">prepare_local_workflow</span><span class="p">,</span> <span class="n">score_local_source</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">table</span> <span class="o">=</span> <span class="s2">"catalog.schema.new_entities"</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">LocalWorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>  <span class="c1"># must match the registered artifact's fit engine</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+                       <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+                         <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+                         <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"return_frame"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_local_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>  <span class="c1"># resolves a concrete model version</span>
+<span class="n">period</span> <span class="o">=</span> <span class="n">LocalSourceSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">,),</span>
+    <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"amount"</span><span class="p">,</span> <span class="s2">"city"</span><span class="p">),</span>  <span class="c1"># exact saved raw input order</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">score_local_source</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">prepared</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">predictions</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span>
+</code></pre></div>
+<p>The reader applies the pinned Delta version, half-open UTC period filter,
+column projection, deterministic row-key order and <code>max_rows + 1</code> limit before
+iterating on the driver. It stops when decoded serialized rows or the resulting
+local frame exceed <code>max_bytes</code>, and rejects duplicate row keys. This byte guard
+measures decoded payload and local memory, not Spark's private wire framing;
+very wide individual rows should therefore be excluded or handled by a
+separately proven paged transport. The selected source and its limits must match
+the prepared workflow. The result keeps row keys outside the model input and
+records the source version, period, model digest and concrete model version.
+No prediction table is created here. Whole-frame FE retains local pandas or
+Polars behavior even though Spark performs the bounded UC read.</p>
+<h2 id="publish-one-local-scored-month-to-a-uc-delta-table">Publish one local-scored month to a UC Delta table</h2>
+<p><code>run_local_batch</code> keeps feature engineering and model prediction in the saved
+pandas or Polars engine. Spark reads the pinned UC source and converts only the
+bounded final prediction rows to a DataFrame with the target's explicit schema.
+The guarded Delta writer then replaces exactly the requested half-open period.
+A second month therefore leaves the first month's predictions and run metadata
+unchanged; a backfill must explicitly name the earlier period.</p>
+<p>Provision the source, prediction target and admission control table before the
+job. The source and target must be different Delta tables. The target must have
+the row-key columns with the same Spark types as the source (<code>long</code> or
+<code>string</code>), a <code>timestamp</code> period column, the saved model's output columns at
+their declared types, and three string columns:
+<code>run_id</code>, <code>model_name</code> and <code>model_version</code>.
+Here <code>run_id</code> identifies the prediction publication, not the MLflow training run;
+the incremental writer derives it from the source/model snapshot. Existing test
+targets with <code>__skyulf_*</code> columns retain their historical schema; create a
+new target with these names for the updated writer.</p>
+<p>The control table has exactly one row, <code>target_id STRING</code> equal to the target
+Delta table ID and nullable <code>owner STRING</code> initially null. Every publisher
+of this target must use that same control table. The job identity needs read
+access to the source/model and write access to the target/control tables.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">version</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BatchSpec</span><span class="p">,</span> <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalSourceSpec</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span>
+    <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span> <span class="n">prepare_local_workflow</span><span class="p">,</span> <span class="n">run_local_batch</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+
+<span class="n">source_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.scoring_source"</span>
+<span class="n">target_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.predictions"</span>
+<span class="n">control_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.prediction_admission"</span>
+<span class="n">source_version</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">source</span> <span class="o">=</span> <span class="n">LocalSourceSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="n">source_table</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">,),</span>
+    <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"amount"</span><span class="p">,</span> <span class="s2">"city"</span><span class="p">),</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
+    <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">LocalWorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">source_table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+        <span class="n">max_rows</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">max_rows</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">max_bytes</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+        <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_delta"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">target_table</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_local_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">spec</span> <span class="o">=</span> <span class="n">BatchSpec</span><span class="p">(</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">period_start</span><span class="p">,</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">period_end</span><span class="p">,</span>
+    <span class="n">as_of</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">record_key_columns</span><span class="p">,</span>
+    <span class="n">output_table</span><span class="o">=</span><span class="n">target_table</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+    <span class="n">model_version</span><span class="o">=</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span>
+    <span class="n">model_digest</span><span class="o">=</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_digest</span><span class="p">,</span>
+    <span class="n">source_version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+    <span class="n">code_version</span><span class="o">=</span><span class="n">version</span><span class="p">(</span><span class="s2">"skyulf-core"</span><span class="p">),</span>
+    <span class="n">run_id</span><span class="o">=</span><span class="s2">"january-2026-v1"</span><span class="p">,</span>
+    <span class="n">expected_target_version</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># read and pin before submission</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run_local_batch</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">prepared</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span>
+    <span class="n">admission</span><span class="o">=</span><span class="n">DeltaTableAdmission</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">control_table</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">commit_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">replayed</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">manifest</span><span class="p">)</span>
+</code></pre></div>
+<p>Use a new logical run ID and the current target version for the next month's
+job. Retry an uncertain job with the <em>identical</em> spec, including its original
+run ID and expected target version; a successful replay returns the existing
+receipt. A new run with a stale expected version fails instead of overwriting
+newer results. An empty period fails unless <code>allow_empty=True</code> is explicit.
+The source snapshot must have been committed by <code>as_of</code>. The reader and
+result both enforce the configured local row and memory budgets; this does not
+measure Spark's private wire bytes. The control-row admission protocol protects
+participating writers only; do not let other jobs bypass it or manually clear
+an owner while a writer may still be active.</p>
+<h2 id="score-newly-inserted-rows-automatically">Score newly inserted rows automatically</h2>
+<p><code>run_incremental_local_batch</code> selects records by <strong>Delta source commits</strong>, not
+by calendar date. On the first run it scores the existing bounded snapshot. On
+later runs it reads only inserts after the source version recorded in the last
+prediction-table commit. It appends predictions without replacing an older
+period. A source <code>event_time</code> column is optional; if you want to carry it into
+the target, set <code>period_column="event_time"</code> in the stable job configuration.
+It never filters rows by that column, including late arrivals.</p>
+<p>Provision a distinct, initially empty Delta prediction table with the
+globally unique key, saved model output columns and
+<code>run_id</code>, <code>model_name</code>, <code>model_version</code> string
+columns. If carrying an event timestamp, add a matching Spark <code>timestamp</code>
+column to both tables. Enable Delta Change Data Feed on the source <strong>before</strong>
+any changes that the job must consume. Provision the same shared admission
+control table used by the explicit-period writer; all target writers must use
+that admission authority. The job identity needs source, model, target and
+control-table permissions.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span>
+    <span class="n">prepare_local_workflow</span><span class="p">,</span> <span class="n">run_incremental_local_batch</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">LocalWorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.new_records"</span><span class="p">,</span>
+        <span class="n">read_mode</span><span class="o">=</span><span class="s2">"incremental"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+        <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_delta"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.predictions"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_local_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run_incremental_local_batch</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">prepared</span><span class="p">,</span> <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"event_id"</span><span class="p">,),</span>
+    <span class="n">admission</span><span class="o">=</span><span class="n">DeltaTableAdmission</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">"catalog.schema.prediction_admission"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">input_count</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">commit_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">noop</span><span class="p">)</span>
+</code></pre></div>
+<p>Keep this configuration for scheduled runs; do not supply a period or source
+version on each invocation. A repeat run with no new source inserts makes no
+target write. If an append succeeds but its acknowledgement is lost, the next
+run reads its committed receipt and continues after that source version.
+Source updates and deletes, duplicate keys, a missing or expired change feed,
+and an unrecognized target commit fail without advancing the watermark.
+Key uniqueness must hold across all runs, not only within one batch. Oversized
+increments fail under the same local row/decoded-memory limits; increase the
+budget deliberately or handle such a source with a separate distributed path.
+The target receipt is in the same Delta commit as the predictions. This
+protects participating writers only; changes outside the admission protocol
+must be handled explicitly.</p>
+<h2 id="real-data-end-to-end-example">Real-data end-to-end example</h2>
+<p><code>skyulf-core/examples/databricks_local_real_taxi_job.py</code> is a one-time
+Databricks notebook using the public <code>samples.nyctaxi.trips</code> dataset. It
+materializes a bounded copy in an isolated Unity Catalog schema, trains a
+Skyulf <code>SimpleImputer</code> -&gt; <code>StandardScaler</code> -&gt; <code>OneHotEncoder</code> -&gt;
+<code>random_forest_regressor</code> pipeline, saves its full artifact, logs held-out
+MAE/RMSE/R2 in MLflow and registers a concrete UC model version. Separate
+<code>score_initial</code> and <code>score_append</code> jobs then call the incremental runner on
+200 existing and 100 subsequently inserted trips. Both persist keyed Delta
+predictions; the second job checks prior rows and a no-op replay. See the
+SM-15I real NYC taxi live report under <code>initiatives/spark_and_mlflow/</code> for
+run IDs and measured results.</p>
+<p>The example's trip duration and dropoff ZIP are known only after a trip, so
+it demonstrates retrospective batch fare estimation. Its hard-coded schema,
+experiment and workspace folder are test resources; select your own names
+before using it elsewhere. The example is not a scheduled Bundle job.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

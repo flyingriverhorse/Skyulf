@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/pipeline_quickstart.html">
       
       
-        <link rel="prev" href="installation.html">
+        <link rel="prev" href="databricks_bundle_walkthrough.html">
       
       
         <link rel="next" href="step_by_step_no_config.html">
@@ -1420,6 +1420,286 @@
     
   
     Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
   
 
     
@@ -3247,98 +3527,98 @@
 </ul>
 <h2 id="complete-runnable-example">Complete runnable example</h2>
 <p>This single snippet is intentionally end-to-end (no duplicated setup across steps).</p>
-<pre><code class="language-python">import tempfile
-from pathlib import Path
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-import pandas as pd
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-# 1) Define a pipeline config
-# Each preprocessing step is:
-#   {&quot;name&quot;: &quot;...&quot;, &quot;transformer&quot;: &quot;TransformerType&quot;, &quot;params&quot;: {...}}
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {
-                &quot;test_size&quot;: 0.25,
-                &quot;validation_size&quot;: 0.0,
-                &quot;random_state&quot;: 42,
-                &quot;shuffle&quot;: True,
-                &quot;stratify&quot;: True,
-                &quot;target_column&quot;: &quot;target&quot;,
-            },
-        },
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
-        },
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;random_forest_classifier&quot;,
-        &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42},
-    },
-}
+<span class="c1"># 1) Define a pipeline config</span>
+<span class="c1"># Each preprocessing step is:</span>
+<span class="c1">#   {"name": "...", "transformer": "TransformerType", "params": {...}}</span>
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span>
+                <span class="s2">"validation_size"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+        <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
 
-# 2) Training data (includes the target column)
-df = pd.DataFrame(
-    {
-        &quot;age&quot;: [10, 20, None, 40, 50, 60, None, 80],
-        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
+<span class="c1"># 2) Training data (includes the target column)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">80</span><span class="p">],</span>
+        <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">],</span>
+        <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-# 3) Fit (learn params on train split, apply to test split)
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(df, target_column=&quot;target&quot;)
-print(&quot;Metrics keys:&quot;, list(metrics.keys()))
+<span class="c1"># 3) Fit (learn params on train split, apply to test split)</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Metrics keys:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">metrics</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
 
-preprocessing = metrics[&quot;preprocessing&quot;]
-print(preprocessing[&quot;summary&quot;][&quot;fit_time&quot;])
-print(preprocessing[&quot;steps&quot;][&quot;1:impute&quot;][&quot;details&quot;][&quot;fill_values&quot;])
-# preprocessing[&quot;fit_time&quot;], [&quot;peak_memory_bytes&quot;], [&quot;rows_in&quot;], and
-# [&quot;rows_out&quot;] remain compatibility aliases for the summary values above.
+<span class="n">preprocessing</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">"preprocessing"</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">[</span><span class="s2">"summary"</span><span class="p">][</span><span class="s2">"fit_time"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">[</span><span class="s2">"steps"</span><span class="p">][</span><span class="s2">"1:impute"</span><span class="p">][</span><span class="s2">"details"</span><span class="p">][</span><span class="s2">"fill_values"</span><span class="p">])</span>
+<span class="c1"># preprocessing["fit_time"], ["peak_memory_bytes"], ["rows_in"], and</span>
+<span class="c1"># ["rows_out"] remain compatibility aliases for the summary values above.</span>
 
-# 4) Predict (feature-only dataframe)
-incoming = pd.DataFrame({&quot;age&quot;: [25, None], &quot;city&quot;: [&quot;A&quot;, &quot;C&quot;]})
-preds = pipeline.predict(incoming)
-print(&quot;Preds:&quot;)
-print(preds)
+<span class="c1"># 4) Predict (feature-only dataframe)</span>
+<span class="n">incoming</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">]})</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">incoming</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Preds:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span>
 
-# 5) Save / load
-with tempfile.TemporaryDirectory() as tmp:
-    model_path = Path(tmp) / &quot;model.pkl&quot;
-    pipeline.save(model_path)
-    loaded = SkyulfPipeline.load(model_path)
-    preds2 = loaded.predict(incoming)
+<span class="c1"># 5) Save / load</span>
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="n">model_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"model.pkl"</span>
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+    <span class="n">loaded</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+    <span class="n">preds2</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">incoming</span><span class="p">)</span>
 
-print(&quot;Preds after reload:&quot;)
-print(preds2)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Preds after reload:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds2</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="inspecting-a-pipeline">Inspecting a pipeline</h2>
 <p>A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
 docs, PR descriptions, and model registries:</p>
-<pre><code class="language-python">print(pipeline.describe())
-# Human-readable summary: each preprocessing step with its params, then the model.
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>
+<span class="c1"># Human-readable summary: each preprocessing step with its params, then the model.</span>
 
-print(pipeline.to_mermaid())
-# Mermaid flowchart of the topology (data -&gt; steps -&gt; model).
-# Paste into GitHub docs/PRs, or render with any mermaid viewer.
+<span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">())</span>
+<span class="c1"># Mermaid flowchart of the topology (data -&gt; steps -&gt; model).</span>
+<span class="c1"># Paste into GitHub docs/PRs, or render with any mermaid viewer.</span>
 
-card = pipeline.export_model_card()
-# JSON-friendly dict: schema_version, fitted, fingerprint, preprocessing
-# lineage, model + params, fit metrics, and `diagram` (the same mermaid
-# string as to_mermaid()). Intended for audit logs and registries.
-</code></pre>
+<span class="n">card</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">export_model_card</span><span class="p">()</span>
+<span class="c1"># JSON-friendly dict: schema_version, fitted, fingerprint, preprocessing</span>
+<span class="c1"># lineage, model + params, fit metrics, and `diagram` (the same mermaid</span>
+<span class="c1"># string as to_mermaid()). Intended for audit logs and registries.</span>
+</code></pre></div>
 <p>The same surfaces appear across the platform:</p>
 <ul>
 <li><strong>Experiments page</strong> — every completed run persists its mermaid topology

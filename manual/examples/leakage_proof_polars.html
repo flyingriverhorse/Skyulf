@@ -1575,6 +1575,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3292,27 +3572,27 @@ the current release. For the full discussion of what is and is not covered
 (structure gate, and cross-validation / tuning scores), see the
 <a href="leakage_proof_pandas.html#what-is-and-is-not-covered">pandas version's coverage section</a>.</p>
 <h2 id="1-setup-and-data-loading">1. Setup and Data Loading</h2>
-<pre><code class="language-python">import numpy as np
-import polars as pl
-from sklearn.datasets import fetch_openml
-from sklearn.model_selection import train_test_split
-from skyulf import SkyulfPipeline
-from skyulf.data.dataset import SplitDataset
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">fetch_openml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
 
-# Load Titanic Dataset (sklearn serves pandas; we convert to Polars)
-print(&quot;Loading Titanic dataset...&quot;)
-titanic = fetch_openml(&quot;titanic&quot;, version=1, as_frame=True)
-pdf = titanic.frame[['sex', 'age', 'fare', 'survived']].copy()
-pdf['survived'] = pdf['survived'].astype(int)
+<span class="c1"># Load Titanic Dataset (sklearn serves pandas; we convert to Polars)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Loading Titanic dataset..."</span><span class="p">)</span>
+<span class="n">titanic</span> <span class="o">=</span> <span class="n">fetch_openml</span><span class="p">(</span><span class="s2">"titanic"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">pdf</span> <span class="o">=</span> <span class="n">titanic</span><span class="o">.</span><span class="n">frame</span><span class="p">[[</span><span class="s1">'sex'</span><span class="p">,</span> <span class="s1">'age'</span><span class="p">,</span> <span class="s1">'fare'</span><span class="p">,</span> <span class="s1">'survived'</span><span class="p">]]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">pdf</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">]</span> <span class="o">=</span> <span class="n">pdf</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
 
-df = pl.from_pandas(pdf)
+<span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">pdf</span><span class="p">)</span>
 
-print(f&quot;Dataset Shape: {df.shape}&quot;)
-print(df.head())
-print(&quot;\nMissing Values:\n&quot;, {c: df[c].null_count() for c in df.columns})
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Loading Titanic dataset...
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Dataset Shape: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Missing Values:</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="n">c</span><span class="p">]</span><span class="o">.</span><span class="n">null_count</span><span class="p">()</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">})</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Loading Titanic dataset...
 Dataset Shape: (1309, 4)
 shape: (5, 4)
 ┌────────┬────────┬──────────┬──────────┐
@@ -3329,57 +3609,57 @@ shape: (5, 4)
 
 Missing Values:
  {'sex': 0, 'age': 263, 'fare': 1, 'survived': 0}
-</code></pre>
+</code></pre></div></p>
 <h2 id="2-split-data">2. Split Data</h2>
 <p>We split <strong>BEFORE</strong> any processing, then hand the pipeline <strong>Polars</strong> frames.
 The engine is picked per-frame: because both halves are <code>pl.DataFrame</code>,
 every preprocessing node runs its Polars implementation.</p>
-<pre><code class="language-python">X = pdf.drop(columns=['survived'])
-y = pdf['survived']
+<div class="highlight"><pre><span></span><code><span class="n">X</span> <span class="o">=</span> <span class="n">pdf</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">])</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">pdf</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">]</span>
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 
-dataset = SplitDataset(
-    train=pl.from_pandas(X_train.assign(survived=y_train)),
-    test=pl.from_pandas(X_test.assign(survived=y_test)),
-)
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
+    <span class="n">train</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">X_train</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">y_train</span><span class="p">)),</span>
+    <span class="n">test</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">y_test</span><span class="p">)),</span>
+<span class="p">)</span>
 
-print(f&quot;Train Shape: {dataset.train.shape}&quot;)
-print(f&quot;Test Shape: {dataset.test.shape}&quot;)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Train Shape: (916, 4)
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Train Shape: </span><span class="si">{</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Test Shape: </span><span class="si">{</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Train Shape: (916, 4)
 Test Shape: (393, 4)
-</code></pre>
+</code></pre></div></p>
 <h2 id="3-define-pipeline">3. Define Pipeline</h2>
 <p>The same leakage-prone recipe as the pandas proof: mean imputation, standard
 scaling and target encoding — all fitted through the Polars code paths.</p>
-<pre><code class="language-python">config = {
-    &quot;preprocessing&quot;: [
-        {&quot;name&quot;: &quot;impute_age&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-         &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}},
-        {&quot;name&quot;: &quot;impute_fare&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-         &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;fare&quot;]}},
-        {&quot;name&quot;: &quot;scale_fare&quot;, &quot;transformer&quot;: &quot;StandardScaler&quot;,
-         &quot;params&quot;: {&quot;columns&quot;: [&quot;fare&quot;]}},
-        {&quot;name&quot;: &quot;encode_sex&quot;, &quot;transformer&quot;: &quot;TargetEncoder&quot;,
-         &quot;params&quot;: {&quot;columns&quot;: [&quot;sex&quot;], &quot;target_column&quot;: &quot;survived&quot;}},
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;random_forest_classifier&quot;,
-        &quot;params&quot;: {&quot;n_estimators&quot;: 10, &quot;random_state&quot;: 42},
-    },
-}
+<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute_age"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute_fare"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"fare"</span><span class="p">]}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale_fare"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"fare"</span><span class="p">]}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode_sex"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TargetEncoder"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"sex"</span><span class="p">],</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"survived"</span><span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+        <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-print(&quot;Running pipeline (polars engine)...&quot;)
-metrics = pipeline.fit(dataset, target_column=&quot;survived&quot;)
-print(&quot;Pipeline execution complete.&quot;)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Running pipeline (polars engine)...
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Running pipeline (polars engine)..."</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"survived"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Pipeline execution complete."</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Running pipeline (polars engine)...
 Pipeline execution complete.
-</code></pre>
+</code></pre></div></p>
 <blockquote>
 <p>Same note as the pandas version: the split is provided <em>externally</em> via
 <code>SplitDataset</code> (no splitter node in the config), so
@@ -3388,77 +3668,77 @@ diagnostic for this config and never raises. The proofs below verify the
 per-step guarantee directly.</p>
 </blockquote>
 <h2 id="4-verification-1-imputation">4. Verification 1: Imputation</h2>
-<pre><code class="language-python">imputer_step = pipeline.feature_engineer.fitted_steps[0]
-assert imputer_step['name'] == 'impute_age'
-fill_values = imputer_step['artifact']['fill_values']
+<div class="highlight"><pre><span></span><code><span class="n">imputer_step</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">imputer_step</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'impute_age'</span>
+<span class="n">fill_values</span> <span class="o">=</span> <span class="n">imputer_step</span><span class="p">[</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'fill_values'</span><span class="p">]</span>
 
-train_age_mean = X_train['age'].mean()
-learned_mean = fill_values['age']
-print(f&quot;Train Age Mean: {train_age_mean:.4f}&quot;)
-print(f&quot;Imputer Learned Mean: {learned_mean:.4f}&quot;)
-np.testing.assert_allclose(train_age_mean, learned_mean)
+<span class="n">train_age_mean</span> <span class="o">=</span> <span class="n">X_train</span><span class="p">[</span><span class="s1">'age'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">learned_mean</span> <span class="o">=</span> <span class="n">fill_values</span><span class="p">[</span><span class="s1">'age'</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Train Age Mean: </span><span class="si">{</span><span class="n">train_age_mean</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Imputer Learned Mean: </span><span class="si">{</span><span class="n">learned_mean</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">train_age_mean</span><span class="p">,</span> <span class="n">learned_mean</span><span class="p">)</span>
 
-full_age_mean = pdf['age'].mean()
-print(f&quot;Full Dataset Age Mean: {full_age_mean:.4f}&quot;)
-assert abs(learned_mean - full_age_mean) &gt; 1e-4
-print(&quot;✅ Imputation proof OK (polars)&quot;)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Train Age Mean: 29.1023
+<span class="n">full_age_mean</span> <span class="o">=</span> <span class="n">pdf</span><span class="p">[</span><span class="s1">'age'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Full Dataset Age Mean: </span><span class="si">{</span><span class="n">full_age_mean</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">learned_mean</span> <span class="o">-</span> <span class="n">full_age_mean</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1e-4</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"✅ Imputation proof OK (polars)"</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Train Age Mean: 29.1023
 Imputer Learned Mean: 29.1023
 Full Dataset Age Mean: 29.8811
 ✅ Imputation proof OK (polars)
-</code></pre>
+</code></pre></div></p>
 <p>Note the polars-specific detail the node handles for you: pandas' <code>isna()</code>
 counts <code>NaN</code> as missing while polars' <code>null_count()</code> does not, so the Polars
 missing-count path adds an explicit <code>is_nan()</code> term on float columns to keep
 both engines in parity.</p>
 <h2 id="5-verification-2-scaling">5. Verification 2: Scaling</h2>
-<pre><code class="language-python">scaler_step = pipeline.feature_engineer.fitted_steps[2]
-assert scaler_step['name'] == 'scale_fare'
-artifact = scaler_step['artifact']
+<div class="highlight"><pre><span></span><code><span class="n">scaler_step</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">scaler_step</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'scale_fare'</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">scaler_step</span><span class="p">[</span><span class="s1">'artifact'</span><span class="p">]</span>
 
-train_fare_imputed = X_train[&quot;fare&quot;].fillna(X_train[&quot;fare&quot;].mean())
-train_fare_mean = train_fare_imputed.mean()
-train_fare_std = train_fare_imputed.std(ddof=0)
+<span class="n">train_fare_imputed</span> <span class="o">=</span> <span class="n">X_train</span><span class="p">[</span><span class="s2">"fare"</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="n">X_train</span><span class="p">[</span><span class="s2">"fare"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="n">train_fare_mean</span> <span class="o">=</span> <span class="n">train_fare_imputed</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">train_fare_std</span> <span class="o">=</span> <span class="n">train_fare_imputed</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">ddof</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-columns = artifact['columns']
-fare_idx = columns.index('fare')
-print(f&quot;Train Fare Mean: {train_fare_mean:.4f}, Std: {train_fare_std:.4f}&quot;)
-print(f&quot;Scaler Learned Mean: {artifact['mean'][fare_idx]:.4f}, &quot;
-      f&quot;Scale: {artifact['scale'][fare_idx]:.4f}&quot;)
-np.testing.assert_allclose(train_fare_mean, artifact['mean'][fare_idx])
-np.testing.assert_allclose(train_fare_std, artifact['scale'][fare_idx])
-print(&quot;✅ Scaling proof OK (polars)&quot;)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Train Fare Mean: 33.7092, Std: 52.7829
+<span class="n">columns</span> <span class="o">=</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">'columns'</span><span class="p">]</span>
+<span class="n">fare_idx</span> <span class="o">=</span> <span class="n">columns</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">'fare'</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Train Fare Mean: </span><span class="si">{</span><span class="n">train_fare_mean</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, Std: </span><span class="si">{</span><span class="n">train_fare_std</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Scaler Learned Mean: </span><span class="si">{</span><span class="n">artifact</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">][</span><span class="n">fare_idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">, "</span>
+      <span class="sa">f</span><span class="s2">"Scale: </span><span class="si">{</span><span class="n">artifact</span><span class="p">[</span><span class="s1">'scale'</span><span class="p">][</span><span class="n">fare_idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">train_fare_mean</span><span class="p">,</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">][</span><span class="n">fare_idx</span><span class="p">])</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">train_fare_std</span><span class="p">,</span> <span class="n">artifact</span><span class="p">[</span><span class="s1">'scale'</span><span class="p">][</span><span class="n">fare_idx</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"✅ Scaling proof OK (polars)"</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Train Fare Mean: 33.7092, Std: 52.7829
 Scaler Learned Mean: 33.7092, Scale: 52.7829
 ✅ Scaling proof OK (polars)
-</code></pre>
+</code></pre></div></p>
 <h2 id="6-verification-3-target-encoding">6. Verification 3: Target Encoding</h2>
-<pre><code class="language-python">encoder_step = pipeline.feature_engineer.fitted_steps[3]
-assert encoder_step['name'] == 'encode_sex'
-encoder = encoder_step['artifact']['encoder_object']
+<div class="highlight"><pre><span></span><code><span class="n">encoder_step</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">encoder_step</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'encode_sex'</span>
+<span class="n">encoder</span> <span class="o">=</span> <span class="n">encoder_step</span><span class="p">[</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'encoder_object'</span><span class="p">]</span>
 
-train_sex_means = (X_train.assign(survived=y_train)
-                   .groupby('sex', observed=True)['survived'].mean())
-categories = encoder.categories_[0]
-encodings = encoder.encodings_[0]
-print(&quot;Train Target Means:\n&quot;, train_sex_means)
-print(&quot;Encoder Learned Means:&quot;)
-for cat, enc in zip(categories, encodings):
-    print(f&quot;  {cat}: {enc:.6f}&quot;)
+<span class="n">train_sex_means</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_train</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">y_train</span><span class="p">)</span>
+                   <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">'sex'</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">'survived'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="n">categories</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">categories_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">encodings</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">encodings_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Train Target Means:</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">train_sex_means</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Encoder Learned Means:"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">cat</span><span class="p">,</span> <span class="n">enc</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">categories</span><span class="p">,</span> <span class="n">encodings</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">cat</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">enc</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-full_sex_means = (pdf.drop(columns=['survived']).assign(survived=pdf['survived'])
-                  .groupby('sex', observed=True)['survived'].mean())
-male_encoded = encodings[list(categories).index('male')]
-assert abs(male_encoded - full_sex_means['male']) &gt; 1e-4, \
-    &quot;Leakage detected! Encoded value matches Full Mean.&quot;
-print(&quot;✅ Target encoding proof OK (polars)&quot;)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Train Target Means:
+<span class="n">full_sex_means</span> <span class="o">=</span> <span class="p">(</span><span class="n">pdf</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">])</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">pdf</span><span class="p">[</span><span class="s1">'survived'</span><span class="p">])</span>
+                  <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">'sex'</span><span class="p">,</span> <span class="n">observed</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s1">'survived'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="n">male_encoded</span> <span class="o">=</span> <span class="n">encodings</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">categories</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">'male'</span><span class="p">)]</span>
+<span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">male_encoded</span> <span class="o">-</span> <span class="n">full_sex_means</span><span class="p">[</span><span class="s1">'male'</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mf">1e-4</span><span class="p">,</span> \
+    <span class="s2">"Leakage detected! Encoded value matches Full Mean."</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"✅ Target encoding proof OK (polars)"</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Train Target Means:
  sex
 female    0.694444
 male      0.179054
@@ -3467,54 +3747,52 @@ Encoder Learned Means:
   female: 0.693502
   male: 0.179250
 ✅ Target encoding proof OK (polars)
-</code></pre>
+</code></pre></div></p>
 <p>The encodings are smoothed/cross-fitted, so they are <em>near</em> — not exactly
 equal to — the raw train conditional means, and provably different from the
 full-dataset means (<code>male</code> full mean is 0.190985).</p>
 <h2 id="7-the-poisoned-dataset-polars">7. The Poisoned Dataset (Polars)</h2>
 <p>Same adversarial experiment: corrupt the test half, refit a fresh pipeline,
 compare artifacts. With no leakage, nothing can change.</p>
-<pre><code class="language-python">X_test_poisoned = X_test.copy()
-X_test_poisoned['age'] = 10000.0
-X_test_poisoned['fare'] = 1000000.0
-y_test_poisoned = 1 - y_test
+<div class="highlight"><pre><span></span><code><span class="n">X_test_poisoned</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">X_test_poisoned</span><span class="p">[</span><span class="s1">'age'</span><span class="p">]</span> <span class="o">=</span> <span class="mf">10000.0</span>
+<span class="n">X_test_poisoned</span><span class="p">[</span><span class="s1">'fare'</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1000000.0</span>
+<span class="n">y_test_poisoned</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">y_test</span>
 
-dataset_poisoned = SplitDataset(
-    train=pl.from_pandas(X_train.assign(survived=y_train)),
-    test=pl.from_pandas(X_test_poisoned.assign(survived=y_test_poisoned)),
-)
+<span class="n">dataset_poisoned</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
+    <span class="n">train</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">X_train</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">y_train</span><span class="p">)),</span>
+    <span class="n">test</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">X_test_poisoned</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">survived</span><span class="o">=</span><span class="n">y_test_poisoned</span><span class="p">)),</span>
+<span class="p">)</span>
 
-pipeline_poisoned = SkyulfPipeline(config)
-print(&quot;Running pipeline on Poisoned Dataset (polars)...&quot;)
-pipeline_poisoned.fit(dataset_poisoned, target_column=&quot;survived&quot;)
+<span class="n">pipeline_poisoned</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Running pipeline on Poisoned Dataset (polars)..."</span><span class="p">)</span>
+<span class="n">pipeline_poisoned</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset_poisoned</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"survived"</span><span class="p">)</span>
 
-# Imputation
-orig_age = pipeline.feature_engineer.fitted_steps[0]['artifact']['fill_values']['age']
-pois_age = pipeline_poisoned.feature_engineer.fitted_steps[0]['artifact']['fill_values']['age']
-np.testing.assert_allclose(orig_age, pois_age)
-print(f&quot;✅ Imputation invariant: {orig_age:.4f} == {pois_age:.4f}&quot;)
+<span class="c1"># Imputation</span>
+<span class="n">orig_age</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'fill_values'</span><span class="p">][</span><span class="s1">'age'</span><span class="p">]</span>
+<span class="n">pois_age</span> <span class="o">=</span> <span class="n">pipeline_poisoned</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'fill_values'</span><span class="p">][</span><span class="s1">'age'</span><span class="p">]</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">orig_age</span><span class="p">,</span> <span class="n">pois_age</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"✅ Imputation invariant: </span><span class="si">{</span><span class="n">orig_age</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> == </span><span class="si">{</span><span class="n">pois_age</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# Scaling
-o_s = pipeline.feature_engineer.fitted_steps[2]['artifact']
-p_s = pipeline_poisoned.feature_engineer.fitted_steps[2]['artifact']
-np.testing.assert_allclose(o_s['mean'], p_s['mean'])
-np.testing.assert_allclose(o_s['scale'], p_s['scale'])
-print(f&quot;✅ Scaling invariant: mean {o_s['mean']}, scale {o_s['scale']}&quot;)
+<span class="c1"># Scaling</span>
+<span class="n">o_s</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">]</span>
+<span class="n">p_s</span> <span class="o">=</span> <span class="n">pipeline_poisoned</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">]</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">o_s</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">],</span> <span class="n">p_s</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">])</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">o_s</span><span class="p">[</span><span class="s1">'scale'</span><span class="p">],</span> <span class="n">p_s</span><span class="p">[</span><span class="s1">'scale'</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"✅ Scaling invariant: mean </span><span class="si">{</span><span class="n">o_s</span><span class="p">[</span><span class="s1">'mean'</span><span class="p">]</span><span class="si">}</span><span class="s2">, scale </span><span class="si">{</span><span class="n">o_s</span><span class="p">[</span><span class="s1">'scale'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# Target encoding
-o_e = pipeline.feature_engineer.fitted_steps[3]['artifact']['encoder_object'].encodings_[0]
-p_e = pipeline_poisoned.feature_engineer.fitted_steps[3]['artifact']['encoder_object'].encodings_[0]
-np.testing.assert_allclose(o_e, p_e)
-print(f&quot;✅ Encodings invariant: {o_e}&quot;)
-
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">Running pipeline on Poisoned Dataset (polars)...
+<span class="c1"># Target encoding</span>
+<span class="n">o_e</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'encoder_object'</span><span class="p">]</span><span class="o">.</span><span class="n">encodings_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">p_e</span> <span class="o">=</span> <span class="n">pipeline_poisoned</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="s1">'artifact'</span><span class="p">][</span><span class="s1">'encoder_object'</span><span class="p">]</span><span class="o">.</span><span class="n">encodings_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span><span class="n">o_e</span><span class="p">,</span> <span class="n">p_e</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"✅ Encodings invariant: </span><span class="si">{</span><span class="n">o_e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>Running pipeline on Poisoned Dataset (polars)...
 ✅ Imputation invariant: 29.1023 == 29.1023
 ✅ Scaling invariant: mean [33.70922076502732], scale [52.7829380540588]
 ✅ Encodings invariant: [0.69350186 0.17924998]
-
-</code></pre>
+</code></pre></div></p>
 <h2 id="conclusion">Conclusion</h2>
 <p>Every fitted artifact is bit-identical to the pandas proof (same dataset,
 same split seed): the Polars engine computes imputation, scaling and target

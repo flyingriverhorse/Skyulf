@@ -1,0 +1,4296 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/spark.html">
+      
+      
+        <link rel="prev" href="installation.html">
+      
+      
+        <link rel="next" href="inference_bundles.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Spark (Development) - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spark-development-setup-and-current-support" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Spark (Development)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="spark.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-a-separate-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a separate environment?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#install-from-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install from the repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#minimal-runtime-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal runtime example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spark-engine-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spark engine adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution contracts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#keyed-spark-featureengineer-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyed Spark FeatureEngineer entry point
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Keyed Spark FeatureEngineer entry point">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#validation-actions-and-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation actions and metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#native-simpleimputer-fit-once-apply-without-relearning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native SimpleImputer: fit once, apply without relearning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#native-standardscaler-center-and-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native StandardScaler: center and scale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portable-learned-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portable learned state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save-and-restore-a-fitted-feature-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save and restore a fitted feature pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-inference-after-native-fe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model inference after native FE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capability-declarations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capability declarations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Capability declarations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-declared-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting declared support
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#declaring-custom-operation-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring custom operation support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting-and-support-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting and support boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="spark-development-setup-and-current-support">Spark: development setup and current support</h1>
+<p>Spark support is under development for 0.9.0. The optional dependency and
+runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
+available in the development checkout.
+<strong>Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.</strong>
+Their fitted pipeline can be exported and restored across pandas, Polars and Spark.
+The <a href="inference_bundles.html">standalone inference bundle</a> packages this state with
+a fitted model and validates local raw/features prediction. The Spark runner
+applies native FE and runs a Python regression model in worker batches.
+Other native nodes and distributed classification remain under development.
+Installing the extra does not convert a pandas/Polars pipeline to Spark.</p>
+<p><a href="inference_flow.html">How inference works</a> explains how the saved FE and
+model are reused, with diagrams for local, native Spark and worker FE paths.</p>
+<h2 id="why-a-separate-environment">Why a separate environment?</h2>
+<p><code>.venv-spark</code> isolates PySpark and its dependencies from the web application's
+existing <code>.venv</code>. It is a local development convention, not a runtime requirement
+or a directory shipped with Skyulf. Both environments are excluded from Git.
+Use your own environment name if preferred.</p>
+<p>The initial test target is Python 3.12, PySpark 4.0.3 and Java 17. Java must be
+installed separately. <code>JAVA_HOME</code> should point to the JDK directory. Consult
+the <a href="https://spark.apache.org/docs/4.0.3/api/python/getting_started/install.html">Spark installation documentation</a>
+for runtime requirements. Databricks Runtime and Connect require their own
+validated dependency profiles; do not replace a managed runtime's PySpark
+installation with this development environment.</p>
+<h2 id="install-from-the-repository">Install from the repository</h2>
+<p>Run these commands from the repository root. Create the environment only once.</p>
+<div class="highlight"><pre><span></span><code><span class="n">uv</span> <span class="n">venv</span> <span class="p">.</span><span class="n">venv-spark</span> <span class="p">-</span><span class="n">-python</span> <span class="n">3</span><span class="p">.</span><span class="n">12</span>
+<span class="n">uv</span> <span class="n">pip</span> <span class="n">install</span> <span class="p">-</span><span class="n">-python</span> <span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-r</span> <span class="n">requirements-spark</span><span class="p">.</span><span class="n">txt</span>
+<span class="nv">$env:JAVA_HOME</span> <span class="p">=</span> <span class="s1">'C:\path\to\jdk-17'</span>
+<span class="nv">$env:SKYULF_REQUIRE_SPARK</span> <span class="p">=</span> <span class="s1">'1'</span>
+<span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">-m</span> <span class="n">pytest</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">tests</span><span class="p">/</span><span class="n">spark</span> <span class="n">-q</span> <span class="n">-o</span> <span class="n">addopts</span><span class="p">=</span>
+</code></pre></div>
+<p>On Linux/macOS:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>.venv-spark<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12
+uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv-spark/bin/python<span class="w"> </span>-r<span class="w"> </span>requirements-spark.txt
+<span class="nb">export</span><span class="w"> </span><span class="nv">JAVA_HOME</span><span class="o">=</span>/path/to/jdk-17
+<span class="nv">SKYULF_REQUIRE_SPARK</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>.venv-spark/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>skyulf-core/tests/spark<span class="w"> </span>-q<span class="w"> </span>-o<span class="w"> </span><span class="nv">addopts</span><span class="o">=</span>
+</code></pre></div>
+<p>The tests execute a distributed aggregate and an Arrow/Python worker transform.
+The mandatory lane fails when PySpark is missing. In the ordinary core suite,
+the optional runtime tests skip if PySpark is not installed. A skip does not
+prove Spark compatibility.</p>
+<h2 id="minimal-runtime-example">Minimal runtime example</h2>
+<p>This is a plain PySpark example, not a Skyulf feature-engineering pipeline.
+Run it using the Spark environment's Python interpreter.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span><span class="p">,</span> <span class="n">functions</span> <span class="k">as</span> <span class="n">F</span>
+
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"PYSPARK_PYTHON"</span><span class="p">]</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">executable</span>
+<span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">master</span><span class="p">(</span><span class="s2">"local[2]"</span><span class="p">)</span><span class="o">.</span><span class="n">appName</span><span class="p">(</span><span class="s2">"spark-check"</span><span class="p">)</span><span class="o">.</span><span class="n">getOrCreate</span><span class="p">()</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">"total"</span><span class="p">))</span><span class="o">.</span><span class="n">first</span><span class="p">()[</span><span class="s2">"total"</span><span class="p">]</span>
+    <span class="k">assert</span> <span class="n">total</span> <span class="o">==</span> <span class="mi">4950</span>
+<span class="k">finally</span><span class="p">:</span>
+    <span class="n">spark</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</code></pre></div>
+<p>Only one aggregate row is returned to Python. Supported native FE operations
+keep the dataset in Spark and transfer bounded learned state when supported.
+Python model inference on Spark workers is a separate capability from native
+Spark model training.</p>
+<h2 id="spark-engine-adapter">Spark engine adapter</h2>
+<p>The adapter detects real Spark dataframes without changing the default local
+engine. Importing Skyulf does not import PySpark or MLflow. Requesting the Spark
+engine without its optional dependency raises an explicit installation error.</p>
+<p>After creating your own <code>spark</code> session, you can run:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span><span class="p">,</span> <span class="n">SparkEngine</span><span class="p">,</span> <span class="n">get_engine</span>
+
+<span class="n">local_default</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">()</span>
+<span class="n">frame</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span> <span class="ow">is</span> <span class="n">SparkEngine</span>
+<span class="n">wrapped</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="o">.</span><span class="n">wrap</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+<span class="n">selected</span> <span class="o">=</span> <span class="n">wrapped</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s2">"id"</span><span class="p">])</span>
+<span class="k">assert</span> <span class="n">selected</span><span class="o">.</span><span class="n">columns</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">selected</span><span class="o">.</span><span class="n">schema</span> <span class="o">==</span> <span class="n">frame</span><span class="o">.</span><span class="n">schema</span>
+<span class="k">assert</span> <span class="n">selected</span><span class="o">.</span><span class="n">to_native</span><span class="p">()</span><span class="o">.</span><span class="n">count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">10</span>  <span class="c1"># Explicit native Spark action.</span>
+<span class="k">assert</span> <span class="n">get_engine</span><span class="p">()</span> <span class="ow">is</span> <span class="n">local_default</span>
+</code></pre></div>
+<p>The separate <code>DistributedDataFrame</code> protocol exposes <code>columns</code>, <code>schema</code>,
+<code>select</code> and <code>to_native</code>. Projection treats names literally, including dots and
+backticks; an empty projection keeps the rows. Schema access can require query
+analysis, but these adapter operations do not collect rows or count them.</p>
+<p>The local <code>SkyulfDataFrame</code> protocol remains for pandas/Polars. Spark wrappers
+reject <code>len</code>, <code>shape</code>, <code>to_pandas</code>, <code>to_numpy</code> and <code>to_arrow</code> with
+<code>DistributedMaterializationError</code>. <code>SparkEngine.to_numpy</code> and <code>SklearnBridge</code>
+also reject distributed features or targets. Worker inference will have its own
+explicit entry point; it is not enabled by this adapter.</p>
+<p>Skyulf neither creates nor retains a Spark session. Use your own
+<code>spark.createDataFrame(...)</code> to create input; <code>SparkEngine.from_pandas</code> and
+<code>create_dataframe</code> reject calls with this guidance. <code>to_native()</code> returns the
+original distributed frame: native actions you call explicitly remain your
+responsibility. In particular, Spark's
+<a href="https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html"><code>toPandas</code></a>
+collects data into driver memory.</p>
+<p>Validation covers classic PySpark 4.0.3 locally and a limited live Databricks
+serverless Spark Connect 4.2.0 inference path. The latter loads a Polars-trained
+regression bundle from Unity Catalog and applies mean imputation/StandardScaler
+in both inference modes. It does not certify every Spark fit operation or compute
+type. Engine detection does not authorize local-only FE nodes on Spark input.</p>
+<p>Serverless hides <code>spark.sql.caseSensitive</code>. Skyulf handles that specific
+unavailable-configuration condition with conservative case-insensitive collision
+checks; unrelated connection and permission failures still propagate.</p>
+<h2 id="execution-contracts">Execution contracts</h2>
+<p>The development API can validate a future execution request without starting
+Spark or changing the current pandas/Polars engine:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
+
+<span class="n">options</span> <span class="o">=</span> <span class="n">ExecutionOptions</span><span class="o">.</span><span class="n">from_config</span><span class="p">({</span>
+    <span class="s2">"engine"</span><span class="p">:</span> <span class="s2">"spark"</span><span class="p">,</span>
+    <span class="s2">"python_batch_rows"</span><span class="p">:</span> <span class="mi">4096</span><span class="p">,</span>
+    <span class="s2">"state_max_bytes"</span><span class="p">:</span> <span class="mi">8</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
+<span class="p">})</span>
+<span class="n">identity</span> <span class="o">=</span> <span class="n">FrameSpec</span><span class="p">(</span><span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,</span> <span class="s2">"event_id"</span><span class="p">),</span> <span class="n">target</span><span class="o">=</span><span class="s2">"label"</span><span class="p">)</span>
+</code></pre></div>
+<p>Engine values are <code>pandas</code>, <code>polars</code> and <code>spark</code>; <code>databricks</code> names a platform,
+not an engine. Unknown configuration fields and nonpositive/noninteger limits
+are rejected. These immutable objects declare requirements; they do not apply
+memory limits themselves. The Spark FeatureEngineer entry point validates actual
+key values as described below and enforces <code>state_max_bytes</code> for nodes declaring
+the portable codec. Model budgets belong to later inference stages.</p>
+<h2 id="keyed-spark-featureengineer-entry-point">Keyed Spark FeatureEngineer entry point</h2>
+<p>Use a single Spark dataframe with explicit identity columns. The initial path
+supports flat scalar schemas and native operations that preserve rows. Nested
+array/map/struct, Decimal and other unsupported types are rejected. Column names
+must be unambiguous under the session's case-sensitivity setting.</p>
+<p>This working example exercises the input boundary with an empty pipeline;
+it does not perform feature transformations:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)],</span>
+    <span class="p">[</span><span class="s2">"customer_id"</span><span class="p">,</span> <span class="s2">"amount"</span><span class="p">,</span> <span class="s2">"label"</span><span class="p">],</span>
+<span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">engineer</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="p">(</span>
+    <span class="p">[],</span>
+    <span class="n">frame_spec</span><span class="o">=</span><span class="n">FrameSpec</span><span class="p">(</span><span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,),</span> <span class="n">target</span><span class="o">=</span><span class="s2">"label"</span><span class="p">),</span>
+    <span class="n">execution_options</span><span class="o">=</span><span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">training</span><span class="p">,</span> <span class="n">metrics</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="n">inference</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">"label"</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">inference</span><span class="o">.</span><span class="n">columns</span> <span class="o">==</span> <span class="p">[</span><span class="s2">"customer_id"</span><span class="p">,</span> <span class="s2">"amount"</span><span class="p">]</span>
+<span class="k">assert</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">"summary"</span><span class="p">][</span><span class="s2">"rows_in"</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span>
+</code></pre></div>
+<p>Both options are required for Spark. The target must exist during fit when
+declared; it can be absent during transform. Composite keys must be unique and
+non-null on each input. Separate Spark <code>(X, y)</code> pairs and <code>SplitDataset</code> inputs
+are rejected; label alignment never depends on partition or row position.
+<code>target_column</code>, if passed to fit, must agree with <code>FrameSpec.target</code>.
+The <code>on_split</code> callback is unavailable on this single-frame entry point.</p>
+<p>Automatic feature selection excludes keys and target. Explicit <code>columns</code> cannot
+select either. Names are exact and literal, including dots/backticks. Raw inputs
+produce raw Spark outputs; wrapped inputs retain their wrapper convention.</p>
+<p>Every step must declare both fit and apply support before fitting starts. Apply
+also checks all fitted steps before execution. This path accepts native,
+row-preserving operations with row-local apply behavior. Worker Python, window,
+filtering and expansion paths require later implementations. SimpleImputer
+mean/constant and StandardScaler are available; unsupported nodes or strategies fail before any
+validation action or fit. The runner normalizes registered node defaults before
+checking capabilities, so an omitted SimpleImputer strategy means <code>mean</code>, and
+StandardScaler defaults to <code>with_mean=True, with_std=True</code>.
+Custom native nodes use the existing engine-keyed dispatcher mapping with a
+<code>"spark"</code> implementation. It receives the full native frame, <code>y=None</code> and the
+resolved feature names in <code>config["columns"]</code>; the returned frame retains keys
+and any target. Fitted parameters must contain what its applier needs.</p>
+<h3 id="validation-actions-and-metrics">Validation actions and metrics</h3>
+<p>Key validation performs a distributed group/count and returns at most one
+invalid group to the driver. After each step, distributed multiset comparisons
+check that the protected key/target projection is unchanged. These checks detect
+changed labels, keys, dropped rows and duplicates even when a custom node claims
+to preserve rows. They can scan/shuffle the data and execute the lazy plan again;
+this initial correctness path is not a claim of optimized cluster performance.
+Only a bounded validation result is collected, never the whole dataset.</p>
+<p>The default metrics do not run a separate dataframe <code>count()</code> or local memory
+profiler. <code>rows_in</code>, <code>rows_out</code>, <code>fit_time</code> and <code>peak_memory_bytes</code> are <code>None</code>,
+meaning unknown. Per-step <code>driver_elapsed_seconds</code> measures caller-observed time
+including validation; it is not distributed CPU time or cluster peak memory.
+Explicit distributed aggregate metrics are not implemented yet.
+The local <code>get_data_stats</code> helper rejects Spark input; use the Spark FE metrics.</p>
+<p>Transform preserves key identity, not physical row order, including when
+<code>preserve_rows=True</code>. Consumers must match outputs by keys. A successful refit
+replaces fitted steps; a failed refit leaves the last successful fitted steps
+available. The portable learned-state codec is described below.</p>
+<h2 id="native-simpleimputer-fit-once-apply-without-relearning">Native SimpleImputer: fit once, apply without relearning</h2>
+<p>The following pipeline learns the mean on training data and applies that same
+value to an unlabeled batch. Use a caller-owned Spark session as above:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
+
+<span class="n">train</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span>
+    <span class="s2">"customer_id long, amount double, label long"</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">engineer</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="p">(</span>
+    <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fill"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+      <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}}],</span>
+    <span class="n">frame_spec</span><span class="o">=</span><span class="n">FrameSpec</span><span class="p">(</span><span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,),</span> <span class="n">target</span><span class="o">=</span><span class="s2">"label"</span><span class="p">),</span>
+    <span class="n">execution_options</span><span class="o">=</span><span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">,</span> <span class="n">state_max_bytes</span><span class="o">=</span><span class="mi">8192</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">training</span><span class="p">,</span> <span class="n">metrics</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">train</span><span class="p">)</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">100.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="kc">None</span><span class="p">)],</span> <span class="s2">"customer_id long, amount double"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span>
+<span class="c1"># Collect only this tiny demonstration; production output remains a Spark frame.</span>
+<span class="k">assert</span> <span class="p">[</span><span class="n">row</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">orderBy</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">()]</span> <span class="o">==</span> <span class="p">[</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]</span>
+</code></pre></div>
+<p><code>mean</code> fit aggregates means and missing counts together, returning one statistics
+row to the driver. <code>constant</code> fit also aggregates missing counts for the artifact;
+the fill value itself is supplied in <code>fill_value</code>. Both null and floating NaN
+count as missing. Direct node apply constructs native Spark expressions without
+a data action, Python UDF or pandas conversion. FeatureEngineer additionally
+performs the key/target validation actions described above.</p>
+<p>Selection and dtype rules:</p>
+<ul>
+<li>Explicit <code>columns=[]</code> is a no-op. Omitted columns select numeric mean
+  candidates automatically, excluding all-missing, constant and binary columns.
+  Automatic detection adds min/max, distinct-count and binary checks to the same
+  aggregate query; Spark may shuffle data internally. Explicit columns avoid
+  this selection cost and can include binary or constant numeric columns.</li>
+<li>The pipeline protects keys and target. A direct calculator has no <code>FrameSpec</code>;
+  specify its feature columns explicitly to avoid learning from identifiers.</li>
+<li>Mean supports Spark byte/short/integer/long/float/double columns. Mean filling
+  can promote integers to double; it does not promise exact large-integer output.
+  Explicitly selected all-missing numeric columns retain an undefined mean and
+  remain missing. Spark/Polars use <code>None</code> for that mean; pandas can use NaN.</li>
+<li>Numeric constant defaults to zero. String and boolean columns require an
+  explicit compatible string or boolean value. Integer constants must fit
+  signed 64-bit integers; integer-only filling preserves large integer values.
+  Decimal, date/time and nested imputation are not supported.</li>
+<li>Non-finite computed means are rejected. Median and most-frequent/mode remain
+  unsupported on Spark; there is no local fallback. Exact feature names and
+  Spark's case-sensitivity setting must not produce ambiguous columns.</li>
+</ul>
+<p>Learned state can also cross engines explicitly. This example fits on pandas and
+applies to Spark; swapping the fit/apply engines follows the same codec contract:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.portable_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">encode_state</span><span class="p">,</span> <span class="n">decode_state</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation.simple</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SimpleImputerCalculator</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]}),</span>
+    <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">payload</span> <span class="o">=</span> <span class="n">encode_state</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">8192</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">restored</span> <span class="o">=</span> <span class="n">decode_state</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">8192</span><span class="p">)</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">([(</span><span class="mf">100.0</span><span class="p">,),</span> <span class="p">(</span><span class="kc">None</span><span class="p">,)],</span> <span class="s2">"amount double"</span><span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">restored</span><span class="p">)</span>
+<span class="k">assert</span> <span class="p">[</span><span class="n">row</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">collect</span><span class="p">()]</span> <span class="o">==</span> <span class="p">[</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]</span>
+</code></pre></div>
+<p>Only the small artifact crosses engines. The Spark dataset remains distributed.
+Existing input column order is retained; direct apply appends missing learned
+columns when a usable fill value exists. The keyed pipeline requires configured
+input feature columns to be present. Output rows must still be matched by keys.</p>
+<h2 id="native-standardscaler-center-and-scale">Native StandardScaler: center and scale</h2>
+<p>StandardScaler learns per-column statistics on Spark and applies them with native
+expressions. Its population variance matches the local node's <code>ddof=0</code> convention,
+as documented by <a href="https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html">scikit-learn</a>.
+It uses Spark's native
+<a href="https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.var_pop.html"><code>var_pop</code></a>
+on shifted values to reduce numerical error.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
+
+<span class="n">train</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)],</span> <span class="s2">"id long, amount double, label long"</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">scaler</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="p">(</span>
+    <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+      <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span> <span class="s2">"with_mean"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"with_std"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}}],</span>
+    <span class="n">frame_spec</span><span class="o">=</span><span class="n">FrameSpec</span><span class="p">(</span><span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"id"</span><span class="p">,),</span> <span class="n">target</span><span class="o">=</span><span class="s2">"label"</span><span class="p">),</span>
+    <span class="n">execution_options</span><span class="o">=</span><span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">,</span> <span class="n">state_max_bytes</span><span class="o">=</span><span class="mi">8192</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">scaled_train</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">train</span><span class="p">)</span>
+<span class="k">assert</span> <span class="p">[</span><span class="n">r</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">scaled_train</span><span class="o">.</span><span class="n">orderBy</span><span class="p">(</span><span class="s2">"id"</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">()]</span> <span class="o">==</span> <span class="p">[</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">([(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)],</span> <span class="s2">"id long, amount double"</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">scaler</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span><span class="o">.</span><span class="n">amount</span> <span class="o">==</span> <span class="mf">3.0</span>
+</code></pre></div>
+<p>The same mean/variance/scale artifact can be encoded with
+<code>encode_state("StandardScaler", state, max_bytes=...)</code> and applied using
+<code>StandardScalerApplier</code> on pandas, Polars or Spark. State list positions follow
+<code>columns</code>; apply matches names and retains input column order. Row order is not
+an identity guarantee.</p>
+<table>
+<thead>
+<tr>
+<th><code>with_mean</code></th>
+<th><code>with_std</code></th>
+<th>Apply formula</th>
+<th>Learned statistics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>True</td>
+<td>True</td>
+<td><code>(x - mean) / scale</code></td>
+<td>mean, population variance, scale</td>
+</tr>
+<tr>
+<td>True</td>
+<td>False</td>
+<td><code>x - mean</code></td>
+<td>mean; variance/scale are None</td>
+</tr>
+<tr>
+<td>False</td>
+<td>True</td>
+<td><code>x / scale</code></td>
+<td>mean, population variance, scale</td>
+</tr>
+<tr>
+<td>False</td>
+<td>False</td>
+<td>unchanged</td>
+<td>mean/variance/scale are None</td>
+</tr>
+</tbody>
+</table>
+<p>Fit performs at most two distributed aggregate queries. The first finds numeric
+reference values and validates selected input; the second calculates means and
+population variances of deviations from those references. This avoids accumulating
+the same large offset in every addition. A range spanning zero keeps a zero
+reference; a same-sign range uses its endpoint nearest zero. Each query returns one O(columns) row,
+never training samples. With both flags disabled, only the first query is needed.
+Automatic selection adds the same binary/constant checks as the imputer. These
+queries and the pipeline's identity checks can scan or shuffle data; this is not
+a single-pass training algorithm.</p>
+<ul>
+<li>Null/NaN observations are excluded from fitting. Apply preserves missing
+  values. Explicit all-missing columns learn NaN statistics; later observed
+  values become NaN when an enabled operation uses those statistics.</li>
+<li>Constant and numerically near-constant features receive unit scale using the
+  local sklearn error-bound rule. A single observation has zero variance and
+  unit scale. Imported zero scales are also treated as one during apply.</li>
+<li><code>columns=[]</code> is a no-op. Explicit feature selection on zero training rows
+  raises an error; automatic selection on empty data has no eligible features.
+  Direct apply skips absent learned columns, matching the local scaler; the
+  keyed pipeline requires its configured feature columns to exist.</li>
+<li>Primitive numeric Spark types and explicitly selected booleans are supported.
+  Enabled operations produce double columns; disabling both retains original
+  types. Automatic selection skips booleans. Strings, Decimal and nested feature
+  types are rejected, without casting text or falling back to pandas.</li>
+<li>Selected training infinities and overflowing aggregates are rejected. Double
+  conversion can lose precision for very large integers. Distributed reduction
+  order can still cause floating-point differences: ordinary parity fixtures use
+  <code>rtol=1e-10, atol=1e-12</code>; the large-offset/small-spread fixture allows <code>rtol=0.002</code>
+  because representable spacing near <code>1e12</code> is significant relative to its spread.</li>
+</ul>
+<p>Direct apply is lazy, with no Python UDF or data action. FeatureEngineer still
+executes the identity checks described above. This implementation has been tested
+on the local PySpark runtime; Databricks/Connect validation remains a later gate.</p>
+<h2 id="portable-learned-state">Portable learned state</h2>
+<p>The development codec transports a small learned-parameter dictionary as
+versioned UTF-8 JSON bytes. It currently supports <code>StandardScaler</code> and
+<code>SimpleImputer</code> with <code>mean</code> or <code>constant</code> strategies, including empty no-op
+artifacts. This example works in the base environment without Spark:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.portable_state</span><span class="w"> </span><span class="kn">import</span> <span class="n">decode_state</span><span class="p">,</span> <span class="n">encode_state</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation.simple</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SimpleImputerApplier</span><span class="p">,</span>
+    <span class="n">SimpleImputerCalculator</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">training</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">]})</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">training</span><span class="p">,</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">budget</span> <span class="o">=</span> <span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">)</span><span class="o">.</span><span class="n">state_max_bytes</span>
+<span class="n">payload</span> <span class="o">=</span> <span class="n">encode_state</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
+<span class="n">node_type</span><span class="p">,</span> <span class="n">restored</span> <span class="o">=</span> <span class="n">decode_state</span><span class="p">(</span><span class="n">payload</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">budget</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">node_type</span> <span class="o">==</span> <span class="s2">"SimpleImputer"</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">]}),</span> <span class="n">restored</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">result</span><span class="p">[</span><span class="s2">"amount"</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="o">==</span> <span class="p">[</span><span class="mf">3.0</span><span class="p">]</span>
+</code></pre></div>
+<p>The v1 envelope contains <code>format_version</code>, <code>codec_version</code>, <code>node_type</code>,
+<code>ordered_columns</code>, <code>learned_parameters</code> and <code>semantic_digest</code>. The original
+artifact retains its options, such as scaler centering/scaling flags. Unknown
+versions, nodes, fields, malformed tags, duplicate columns and inconsistent
+array lengths/counts are rejected. Actual input/output schemas and producer
+metadata are not inferred from statistics; they belong to later bundle metadata.</p>
+<p>Scalar tags distinguish integers, floats, strings, booleans and nulls. Integer
+tags use decimal strings to preserve large category values. Float tags preserve
+finite values and negative zero with hexadecimal notation, and represent NaN
+and positive/negative infinity explicitly. NumPy scalar equivalents normalize
+to Python scalars; arrays, estimators, sessions and arbitrary objects are rejected.
+NaN bit patterns are not separate learned semantics. Column/list order is
+preserved; dictionary insertion order and JSON whitespace are not significant.</p>
+<p>The semantic SHA-256 checksum detects changed content; it is not a signature
+or proof of a trusted producer. It uses canonical tagged values, with no
+arbitrary-object <code>repr</code> or pickle fallback. Existing pipeline pickle save/load
+and fingerprint algorithms remain unchanged.</p>
+<p><code>encode_state</code> requires an explicit positive <code>max_bytes</code> budget.
+<code>decode_state</code> defaults to 8 MiB and checks received byte length before parsing.
+Pass the same custom budget at both ends when changing it. The limit applies to
+wire bytes; it is not a bound on total Python process memory. The codec performs
+no filesystem or network I/O. Callers own storage and transport of these bytes.</p>
+<p>The Spark runner validates each declared v1 artifact through the codec and
+enforces <code>ExecutionOptions.state_max_bytes</code> after fit and before transform
+validation actions. Direct node calls validate state structure but leave wire
+byte limits to explicit encode/decode callers. Use the FeatureEngineer methods
+below to package an ordered pipeline. Worker model loading remains a later stage.
+Codec tests also run without starting a JVM.</p>
+<h2 id="save-and-restore-a-fitted-feature-pipeline">Save and restore a fitted feature pipeline</h2>
+<p><code>FeatureEngineer.export_state()</code> returns bytes for the complete supported FE
+chain. <code>FeatureEngineer.from_state(...)</code> validates those bytes and restores the
+learned transformations without fitting. Both methods work without Spark installed
+when the destination is local. With a caller-owned <code>spark</code> session:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span><span class="p">,</span> <span class="n">FrameSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureEngineer</span>
+
+<span class="n">engineer</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="p">([</span>
+    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fill"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+     <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}},</span>
+    <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+     <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"amount"</span><span class="p">]}},</span>
+<span class="p">])</span>
+<span class="n">engineer</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"amount"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]}))</span>
+<span class="n">payload</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">export_state</span><span class="p">()</span>
+<span class="c1"># Application code may persist these bytes with Path(...).write_bytes(payload).</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="o">.</span><span class="n">from_state</span><span class="p">(</span>
+    <span class="n">payload</span><span class="p">,</span>
+    <span class="n">frame_spec</span><span class="o">=</span><span class="n">FrameSpec</span><span class="p">(</span><span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,)),</span>
+    <span class="n">execution_options</span><span class="o">=</span><span class="n">ExecutionOptions</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">"spark"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">createDataFrame</span><span class="p">(</span>
+    <span class="p">[(</span><span class="mi">20</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="kc">None</span><span class="p">)],</span> <span class="s2">"customer_id long, amount double"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">restored</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">repartition</span><span class="p">(</span><span class="mi">7</span><span class="p">))</span>
+<span class="c1"># Collect only this three-row example; a production caller can write output as a table.</span>
+<span class="n">actual</span> <span class="o">=</span> <span class="p">{</span><span class="n">row</span><span class="o">.</span><span class="n">customer_id</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">amount</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">collect</span><span class="p">()}</span>
+<span class="n">expected</span> <span class="o">=</span> <span class="p">{</span><span class="mi">10</span><span class="p">:</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span> <span class="mi">20</span><span class="p">:</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.5</span><span class="p">),</span> <span class="mi">30</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span>
+<span class="k">assert</span> <span class="n">actual</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">==</span> <span class="n">expected</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+<span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">actual</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">value</span><span class="p">,</span> <span class="n">abs_tol</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">)</span>
+           <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">expected</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+<span class="k">assert</span> <span class="n">restored</span><span class="o">.</span><span class="n">export_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">payload</span>
+</code></pre></div>
+<p>For pandas or Polars apply, omit <code>frame_spec</code> and either omit <code>execution_options</code>
+or select that local engine explicitly. For Spark fit, pass <code>FrameSpec</code> and
+<code>ExecutionOptions("spark")</code> to the initial FeatureEngineer as in the native
+examples above. The training engine does not lock the saved rules to that engine.
+Only learned parameters move; Spark apply keeps the batch distributed.</p>
+<p>The envelope retains step order, names, resolved configuration and each node's
+validated state. Learned column selection is frozen, including selections originally
+made automatically. Restoring and then refitting uses these explicit columns;
+create a new FeatureEngineer from the original configuration to rediscover features.
+Statistics follow the saved column names/order; transforms retain input column order.
+Match output rows by keys, since Spark does not guarantee physical row order.</p>
+<p>Keys, target declarations and runtime objects are not saved. Spark loading requires
+fresh row keys, optionally a target, and explicit execution options. These columns
+cannot overlap learned features. Transform validates actual keys and the required
+input schema before applying the saved rules. Neither loading nor exporting creates
+a session, reads files, contacts a registry or runs a model.</p>
+<p>The current supported chain contains only SimpleImputer <code>mean</code>/<code>constant</code> and
+StandardScaler, including intentionally fitted empty/no-op pipelines. Unsupported
+nodes, custom appliers, partial local fits and arbitrary Python objects fail
+explicitly. This API exports feature transformations only; it is not a model bundle
+or a general replacement for existing pipeline pickle persistence.</p>
+<p><code>ExecutionOptions.state_max_bytes</code> limits the entire pipeline envelope, not only
+individual node artifacts. The default is 8 MiB; loading checks received byte length
+before parsing. Compact UTF-8 wire encoding and escaped JSON have the same semantic
+checksum. Unknown versions, malformed fields, configuration/state disagreement and
+checksum mismatches are rejected. The checksum covers step order and configuration;
+it detects corruption but does not authenticate a producer.</p>
+<p>The runnable repository example also exercises Spark fit and application-owned
+file persistence. From the repository root, with Java configured as above:</p>
+<div class="highlight"><pre><span></span><code><span class="p">.</span><span class="n">venv-spark</span><span class="p">/</span><span class="n">Scripts</span><span class="p">/</span><span class="n">python</span><span class="p">.</span><span class="n">exe</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">examples</span><span class="p">/</span><span class="n">spark_feature_engineering</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-state-path</span> <span class="n">features</span><span class="p">.</span><span class="n">json</span>
+</code></pre></div>
+<p><code>skyulf-core/examples/spark_feature_engineering.py</code> owns and closes its local Spark
+session. Its <code>run_example(spark, state_path)</code> function accepts an existing session.
+The automated gate covers all nine fit/apply engine combinations, file round-trips,
+repartitioning to 1/2/7 partitions, reversed inputs, repeated apply and a 10,000-row
+fixture that rejects unbounded driver collection. Validation currently uses local
+PySpark; Databricks/Connect validation is still pending.</p>
+<h2 id="model-inference-after-native-fe">Model inference after native FE</h2>
+<p>Use <code>predict_spark(..., mode="native_features")</code> with a raw-input inference
+bundle to apply the supported saved transformations natively and run a Python
+regression model on Spark workers. The result is a Spark DataFrame containing
+row keys and predictions. The full dataset remains distributed; pandas/NumPy
+are used for individual worker model batches.</p>
+<p>The <a href="inference_bundles.html#native-spark-fe-and-worker-model-inference">inference bundle guide</a>
+contains a working example, input/order checks and the distinction between
+model chunk size and Arrow transport batches. Its
+<a href="inference_bundles.html#current-support-and-legacy-adapters">legacy artifact section</a>
+explains how existing pipeline pickle and backend joblib artifacts relate to
+the new bundle. Saving fitted FE with a model already existed; distributed
+execution requires explicit support for the transformations in that artifact.</p>
+<p>Distributed inference supports raw regression and classification in both modes,
+with the documented portable FE restrictions. Local training can use pandas or
+Polars. MLflow packaging and registry loading are available. Live Databricks
+serverless regression parity, monthly Delta publication, writer coordination
+and restricted-principal write denial have passed the selected SM-16 workflow.
+This does not extend cloud validation to every node or classification path.</p>
+<h2 id="capability-declarations">Capability declarations</h2>
+<h3 id="inspecting-declared-support">Inspecting declared support</h3>
+<p>A capability check distinguishes fit and apply and never falls back to pandas:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnsupportedExecutionError</span><span class="p">,</span> <span class="n">require_capability</span>
+
+<span class="n">require_capability</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"fit"</span><span class="p">,</span> <span class="s2">"spark"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">})</span>
+<span class="n">require_capability</span><span class="p">(</span><span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"spark"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">"with_mean"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"with_std"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">})</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">require_capability</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"fit"</span><span class="p">,</span> <span class="s2">"spark"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"median"</span><span class="p">})</span>
+<span class="k">except</span> <span class="n">UnsupportedExecutionError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">error</span><span class="o">.</span><span class="n">node_type</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">operation</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="n">error</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+</code></pre></div>
+<p>Mean and StandardScaler succeed; median reports unsupported. The query requires explicit defaults.
+Existing local pipelines continue to work; this new preflight is not yet wired
+into their execution. A local node without an explicit declaration also fails
+this new query, even though its existing local pipeline path remains available.</p>
+<h3 id="declaring-custom-operation-support">Declaring custom operation support</h3>
+<p>Node authors can pass an immutable <code>execution_capabilities</code> tuple to
+<code>NodeRegistry.register</code>. Each <code>ExecutionCapability</code> records:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engine</code>, <code>operation</code></td>
+<td>Exact engine and <code>fit</code> or <code>apply</code></td>
+</tr>
+<tr>
+<td><code>execution_kind</code></td>
+<td><code>native</code>, <code>python_batch</code> or <code>local</code></td>
+</tr>
+<tr>
+<td><code>row_effect</code></td>
+<td><code>preserve</code>, <code>filter</code> or <code>expand</code></td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td><code>row</code>, <code>group</code>, <code>window</code> or <code>global</code></td>
+</tr>
+<tr>
+<td><code>codec_version</code></td>
+<td>Optional positive version of the fitted-state codec</td>
+</tr>
+<tr>
+<td><code>config_match</code></td>
+<td>Immutable tuple of required key/scalar-value pairs</td>
+</tr>
+</tbody>
+</table>
+<p>For example, <code>config_match=(("strategy", "mean"),)</code> allows only an explicit
+mean strategy; absent keys do not match. Normalize node defaults before querying.
+Selectors compare types as well as values, so <code>True</code> is not treated as integer 1.
+Aliases of the same calculator share declarations; subclasses must declare
+their own support. Metadata is an implementation promise: it does not generate
+Spark code, certify compatibility or make a window transform batch-independent.</p>
+<h2 id="troubleshooting-and-support-boundaries">Troubleshooting and support boundaries</h2>
+<ul>
+<li><strong>Java gateway fails:</strong> check Java 17 and the current shell's <code>JAVA_HOME</code>.</li>
+<li><strong>Worker cannot find Python:</strong> use the same interpreter for driver and workers;
+  the test fixture sets <code>PYSPARK_PYTHON</code> explicitly.</li>
+<li><strong>Windows access denied at shutdown:</strong> a process sandbox can prevent Spark's
+  child-process cleanup. A passing calculation does not prove clean shutdown;
+  use an environment that permits the owned JVM processes to terminate.</li>
+<li><strong>Spark dependency unavailable:</strong> install the optional <code>skyulf-core[spark]</code>
+  dependency in a suitable environment, or use the repository requirements above.</li>
+<li><strong>Unsupported node:</strong> SimpleImputer mean/constant and StandardScaler are available. Other built-in
+  native FE nodes are still being implemented; installing Spark does not enable them.</li>
+</ul>
+<p>MLflow tracking, Unity Catalog registration, Databricks jobs, serving endpoints
+and Bundle templates are separate integration stages. This page will gain
+tested fit/apply and inference examples as those capabilities are implemented.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

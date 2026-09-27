@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3302,42 +3582,42 @@ and in test suites (pytest shows them in its warnings summary).</p>
 <h2 id="deprecated-for-callables"><code>@deprecated</code> — for callables</h2>
 <p>Wrap any function or method. Calling it emits a standardised warning while the
 original behaviour and return value are preserved.</p>
-<pre><code class="language-python">from skyulf.core.deprecation import deprecated
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.deprecation</span><span class="w"> </span><span class="kn">import</span> <span class="n">deprecated</span>
 
 
-@deprecated(since=&quot;0.5&quot;, removed_in=&quot;0.7&quot;, replacement=&quot;new_transform&quot;)
-def old_transform(df):
-    return new_transform(df)
-</code></pre>
+<span class="nd">@deprecated</span><span class="p">(</span><span class="n">since</span><span class="o">=</span><span class="s2">"0.5"</span><span class="p">,</span> <span class="n">removed_in</span><span class="o">=</span><span class="s2">"0.7"</span><span class="p">,</span> <span class="n">replacement</span><span class="o">=</span><span class="s2">"new_transform"</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">old_transform</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">new_transform</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+</code></pre></div>
 <p>Calling <code>old_transform(df)</code> emits:</p>
-<pre><code>DeprecationWarning: 'old_transform' is deprecated since v0.5 and is scheduled
+<div class="highlight"><pre><span></span><code>DeprecationWarning: 'old_transform' is deprecated since v0.5 and is scheduled
 for removal in v0.7. Use 'new_transform' instead.
-</code></pre>
+</code></pre></div>
 <h2 id="warn_deprecated-for-everything-else"><code>warn_deprecated</code> — for everything else</h2>
 <p>Use it directly when a decorator cannot wrap the thing being deprecated — for
 example a config key, an enum value, or a positional argument.</p>
-<pre><code class="language-python">from skyulf.core.deprecation import warn_deprecated
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.deprecation</span><span class="w"> </span><span class="kn">import</span> <span class="n">warn_deprecated</span>
 
 
-def fit(self, df, config):
-    if &quot;old_key&quot; in config:
-        warn_deprecated(
-            &quot;config key 'old_key'&quot;,
-            since=&quot;0.5&quot;,
-            removed_in=&quot;0.7&quot;,
-            replacement=&quot;new_key&quot;,
-        )
-        config[&quot;new_key&quot;] = config.pop(&quot;old_key&quot;)
-    ...
-</code></pre>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+    <span class="k">if</span> <span class="s2">"old_key"</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+        <span class="n">warn_deprecated</span><span class="p">(</span>
+            <span class="s2">"config key 'old_key'"</span><span class="p">,</span>
+            <span class="n">since</span><span class="o">=</span><span class="s2">"0.5"</span><span class="p">,</span>
+            <span class="n">removed_in</span><span class="o">=</span><span class="s2">"0.7"</span><span class="p">,</span>
+            <span class="n">replacement</span><span class="o">=</span><span class="s2">"new_key"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">config</span><span class="p">[</span><span class="s2">"new_key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"old_key"</span><span class="p">)</span>
+    <span class="o">...</span>
+</code></pre></div>
 <h2 id="verifying-deprecations-in-tests">Verifying deprecations in tests</h2>
-<pre><code class="language-python">import pytest
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 
 
-def test_old_transform_warns():
-    with pytest.warns(DeprecationWarning):
-        old_transform(df)
-</code></pre>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_old_transform_warns</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">warns</span><span class="p">(</span><span class="ne">DeprecationWarning</span><span class="p">):</span>
+        <span class="n">old_transform</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="api-reference">API reference</h2>
 
 

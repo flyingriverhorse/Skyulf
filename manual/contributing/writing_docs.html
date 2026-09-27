@@ -1548,6 +1548,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3255,19 +3535,19 @@
 <ol>
 <li>
 <p><strong>Install Dependencies</strong>:
-    <code>bash
-    pip install mkdocs mkdocs-material mkdocstrings[python]</code></p>
+    <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>mkdocs<span class="w"> </span>mkdocs-material<span class="w"> </span>mkdocstrings<span class="o">[</span>python<span class="o">]</span>
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Serve Locally</strong>:
-    <code>bash
-    mkdocs serve</code>
+    <div class="highlight"><pre><span></span><code>mkdocs<span class="w"> </span>serve
+</code></pre></div>
     This will start a local server at <code>http://127.0.0.1:8000</code> that auto-reloads when you change files.</p>
 </li>
 </ol>
 <h2 id="directory-structure">Directory Structure</h2>
 <p>The <code>docs/</code> folder is organized by audience and purpose:</p>
-<pre><code>docs/
+<div class="highlight"><pre><span></span><code>docs/
   index.md                  # Landing page
   architecture.md           # System architecture overview
   data_architecture.md      # Data flow and storage design
@@ -3294,7 +3574,7 @@
     api/                    # Module-level API reference
   contributing/             # Contributor guides
     writing_docs.md
-</code></pre>
+</code></pre></div>
 <ul>
 <li><code>mkdocs.yml</code>: The main configuration file (nav, plugins, theme).</li>
 </ul>
@@ -3306,23 +3586,23 @@
 <h2 id="writing-api-documentation">Writing API Documentation</h2>
 <p>We use <code>mkdocstrings</code> to auto-generate API docs from Python docstrings.</p>
 <p>To document a module, class, or function, use the <code>:::</code> directive:</p>
-<pre><code class="language-markdown">::: core.my_module.MyClass
-</code></pre>
+<div class="highlight"><pre><span></span><code>::: core.my_module.MyClass
+</code></pre></div>
 <h3 id="docstring-style">Docstring Style</h3>
 <p>We follow the <strong>Google Style Guide</strong> for docstrings.</p>
-<pre><code class="language-python">def my_function(arg1: int, arg2: str) -&gt; bool:
-    &quot;&quot;&quot;
-    Does something amazing.
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">my_function</span><span class="p">(</span><span class="n">arg1</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">arg2</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Does something amazing.</span>
 
-    Args:
-        arg1: The first argument.
-        arg2: The second argument.
+<span class="sd">    Args:</span>
+<span class="sd">        arg1: The first argument.</span>
+<span class="sd">        arg2: The second argument.</span>
 
-    Returns:
-        True if successful, False otherwise.
-    &quot;&quot;&quot;
-    ...
-</code></pre>
+<span class="sd">    Returns:</span>
+<span class="sd">        True if successful, False otherwise.</span>
+<span class="sd">    """</span>
+    <span class="o">...</span>
+</code></pre></div>
 
 
 

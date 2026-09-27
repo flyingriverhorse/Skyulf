@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3264,240 +3544,240 @@
 <li>sklearn: <code>fit(X_train, y_train)</code> then <code>predict(X_test)</code></li>
 <li>Skyulf: pass <code>SplitDataset(train=(X_train, y_train), test=(X_test, y_test))</code></li>
 </ul>
-<pre><code class="language-python">import pandas as pd
-from sklearn.model_selection import train_test_split
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
 
-from skyulf.data.dataset import SplitDataset
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-# Synthetic classification data
-raw = pd.DataFrame(
-    {
-        &quot;age&quot;: [10, 20, None, 40, 50, 60, None, 80],
-        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
+<span class="c1"># Synthetic classification data</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">80</span><span class="p">],</span>
+        <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">],</span>
+        <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-X = raw.drop(columns=[&quot;target&quot;])
-y = raw[&quot;target&quot;]
+<span class="n">X</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"target"</span><span class="p">])</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">raw</span><span class="p">[</span><span class="s2">"target"</span><span class="p">]</span>
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
-)
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">y</span>
+<span class="p">)</span>
 
-dataset = SplitDataset(train=(X_train, y_train), test=(X_test, y_test), validation=None)
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">test</span><span class="o">=</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 
-# IMPORTANT: because we already split, we do not add TrainTestSplitter here.
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;, &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}},
-}
+<span class="c1"># IMPORTANT: because we already split, we do not add TrainTestSplitter here.</span>
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">}},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(dataset, target_column=&quot;target&quot;)  # target_column ignored for (X, y) tuples
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>  <span class="c1"># target_column ignored for (X, y) tuples</span>
 
-preds = pipeline.predict(X_test)
+<span class="n">preds</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
 
-# Proof-like checks
-assert len(preds) == len(X_test)
-assert preds.index.equals(X_test.index)
-print(&quot;OK: Skyulf fit/predict with sklearn-style train/test split&quot;)
-print(&quot;Metrics keys:&quot;, list(metrics.keys()))
-</code></pre>
+<span class="c1"># Proof-like checks</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">preds</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"OK: Skyulf fit/predict with sklearn-style train/test split"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Metrics keys:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">metrics</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+</code></pre></div>
 <h2 id="1b-side-by-side-run-sklearn-pipeline-vs-skyulfpipeline">1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline</h2>
 <p>This comparison proves both stacks can run the same <em>shape</em> of workflow on the same split.
 We do <strong>not</strong> assert equality of predictions (different defaults / encodings can legitimately differ).</p>
 <p>For a stronger numeric sanity check, we also compute and print test accuracy for both pipelines and the absolute difference.</p>
-<pre><code class="language-python">import numpy as np
-import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.datasets import load_breast_cancer
-from sklearn.impute import SimpleImputer as SkSimpleImputer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline as SkPipeline
-from sklearn.preprocessing import OneHotEncoder as SkOneHotEncoder
-from sklearn.preprocessing import StandardScaler
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.compose</span><span class="w"> </span><span class="kn">import</span> <span class="n">ColumnTransformer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_breast_cancer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.impute</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleImputer</span> <span class="k">as</span> <span class="n">SkSimpleImputer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.linear_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">LogisticRegression</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">accuracy_score</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">classification_report</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">confusion_matrix</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">Pipeline</span> <span class="k">as</span> <span class="n">SkPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">OneHotEncoder</span> <span class="k">as</span> <span class="n">SkOneHotEncoder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">StandardScaler</span>
 
-from skyulf import SkyulfPipeline
-from skyulf.data.dataset import SplitDataset
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
 
-np.random.seed(42)
+<span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 
-# Real dataset + extra categorical feature + missingness
-raw = load_breast_cancer(as_frame=True)
-df = raw.frame.copy().rename(columns={&quot;target&quot;: &quot;label&quot;})
+<span class="c1"># Real dataset + extra categorical feature + missingness</span>
+<span class="n">raw</span> <span class="o">=</span> <span class="n">load_breast_cancer</span><span class="p">(</span><span class="n">as_frame</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">"target"</span><span class="p">:</span> <span class="s2">"label"</span><span class="p">})</span>
 
-df[&quot;radius_band&quot;] = pd.cut(
-    df[&quot;mean radius&quot;],
-    bins=[0, 12, 15, 100],
-    labels=[&quot;small&quot;, &quot;medium&quot;, &quot;large&quot;],
-    include_lowest=True,
-)
+<span class="n">df</span><span class="p">[</span><span class="s2">"radius_band"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">"mean radius"</span><span class="p">],</span>
+    <span class="n">bins</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="mi">100</span><span class="p">],</span>
+    <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">"small"</span><span class="p">,</span> <span class="s2">"medium"</span><span class="p">,</span> <span class="s2">"large"</span><span class="p">],</span>
+    <span class="n">include_lowest</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
 
-missing_idx = np.random.choice(df.index, size=25, replace=False)
-df.loc[missing_idx, &quot;mean texture&quot;] = np.nan
+<span class="n">missing_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">missing_idx</span><span class="p">,</span> <span class="s2">"mean texture"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
 
-target_col = &quot;label&quot;
-cat_cols = [&quot;radius_band&quot;]
-num_cols = [c for c in df.columns if c not in [target_col, *cat_cols]]
+<span class="n">target_col</span> <span class="o">=</span> <span class="s2">"label"</span>
+<span class="n">cat_cols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"radius_band"</span><span class="p">]</span>
+<span class="n">num_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="n">target_col</span><span class="p">,</span> <span class="o">*</span><span class="n">cat_cols</span><span class="p">]]</span>
 
-X = df[num_cols + cat_cols]
-y = df[target_col]
+<span class="n">X</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">num_cols</span> <span class="o">+</span> <span class="n">cat_cols</span><span class="p">]</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span>
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
-)
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="n">y</span>
+<span class="p">)</span>
 
-# --- scikit-learn pipeline ---
-numeric_features = num_cols
-categorical_features = cat_cols
+<span class="c1"># --- scikit-learn pipeline ---</span>
+<span class="n">numeric_features</span> <span class="o">=</span> <span class="n">num_cols</span>
+<span class="n">categorical_features</span> <span class="o">=</span> <span class="n">cat_cols</span>
 
-numeric_pipe = SkPipeline(
-    steps=[
-        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;mean&quot;)),
-        (&quot;scaler&quot;, StandardScaler()),
-    ]
-)
+<span class="n">numeric_pipe</span> <span class="o">=</span> <span class="n">SkPipeline</span><span class="p">(</span>
+    <span class="n">steps</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">"imputer"</span><span class="p">,</span> <span class="n">SkSimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="s2">"mean"</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s2">"scaler"</span><span class="p">,</span> <span class="n">StandardScaler</span><span class="p">()),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
 
-categorical_pipe = SkPipeline(
-    steps=[
-        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;most_frequent&quot;)),
-        (&quot;onehot&quot;, SkOneHotEncoder(handle_unknown=&quot;ignore&quot;, sparse_output=False)),
-    ]
-)
+<span class="n">categorical_pipe</span> <span class="o">=</span> <span class="n">SkPipeline</span><span class="p">(</span>
+    <span class="n">steps</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">"imputer"</span><span class="p">,</span> <span class="n">SkSimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="s2">"most_frequent"</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s2">"onehot"</span><span class="p">,</span> <span class="n">SkOneHotEncoder</span><span class="p">(</span><span class="n">handle_unknown</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">sparse_output</span><span class="o">=</span><span class="kc">False</span><span class="p">)),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
 
-preprocess = ColumnTransformer(
-    transformers=[
-        (&quot;num&quot;, numeric_pipe, numeric_features),
-        (&quot;cat&quot;, categorical_pipe, categorical_features),
-    ],
-    remainder=&quot;drop&quot;,
-)
+<span class="n">preprocess</span> <span class="o">=</span> <span class="n">ColumnTransformer</span><span class="p">(</span>
+    <span class="n">transformers</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">"num"</span><span class="p">,</span> <span class="n">numeric_pipe</span><span class="p">,</span> <span class="n">numeric_features</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"cat"</span><span class="p">,</span> <span class="n">categorical_pipe</span><span class="p">,</span> <span class="n">categorical_features</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">remainder</span><span class="o">=</span><span class="s2">"drop"</span><span class="p">,</span>
+<span class="p">)</span>
 
-sk_model = LogisticRegression(max_iter=1000, random_state=42)
-sk = SkPipeline(steps=[(&quot;preprocess&quot;, preprocess), (&quot;model&quot;, sk_model)])
-sk.fit(X_train, y_train)
-sk_preds = pd.Series(sk.predict(X_test), index=X_test.index)
-sk_acc = accuracy_score(y_test, sk_preds)
+<span class="n">sk_model</span> <span class="o">=</span> <span class="n">LogisticRegression</span><span class="p">(</span><span class="n">max_iter</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="n">sk</span> <span class="o">=</span> <span class="n">SkPipeline</span><span class="p">(</span><span class="n">steps</span><span class="o">=</span><span class="p">[(</span><span class="s2">"preprocess"</span><span class="p">,</span> <span class="n">preprocess</span><span class="p">),</span> <span class="p">(</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">sk_model</span><span class="p">)])</span>
+<span class="n">sk</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="n">sk_preds</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">sk</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">),</span> <span class="n">index</span><span class="o">=</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+<span class="n">sk_acc</span> <span class="o">=</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sk_preds</span><span class="p">)</span>
 
-# --- Skyulf pipeline ---
-train_df = X_train.copy()
-train_df[target_col] = y_train
-test_df = X_test.copy()
-test_df[target_col] = y_test
+<span class="c1"># --- Skyulf pipeline ---</span>
+<span class="n">train_df</span> <span class="o">=</span> <span class="n">X_train</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">train_df</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_train</span>
+<span class="n">test_df</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+<span class="n">test_df</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_test</span>
 
-dataset = SplitDataset(train=train_df, test=test_df, validation=None)
-skyulf_config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: num_cols},
-        },
-        {
-            &quot;name&quot;: &quot;impute_cat&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;most_frequent&quot;, &quot;columns&quot;: cat_cols},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: cat_cols, &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
-        },
-        {
-            &quot;name&quot;: &quot;scale&quot;,
-            &quot;transformer&quot;: &quot;StandardScaler&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: num_cols},
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;, &quot;params&quot;: {&quot;max_iter&quot;: 1000, &quot;random_state&quot;: 42}},
-}
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train_df</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">test_df</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="n">skyulf_config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="n">num_cols</span><span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute_cat"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"most_frequent"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="n">cat_cols</span><span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="n">cat_cols</span><span class="p">,</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="n">num_cols</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"logistic_regression"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"max_iter"</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">}},</span>
+<span class="p">}</span>
 
-sky = SkyulfPipeline(skyulf_config)
-_ = sky.fit(dataset, target_column=target_col)
-sky_preds = sky.predict(X_test)
-sky_acc = accuracy_score(y_test, sky_preds)
-delta = abs(sk_acc - sky_acc)
+<span class="n">sky</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">skyulf_config</span><span class="p">)</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">sky</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="n">target_col</span><span class="p">)</span>
+<span class="n">sky_preds</span> <span class="o">=</span> <span class="n">sky</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="n">sky_acc</span> <span class="o">=</span> <span class="n">accuracy_score</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sky_preds</span><span class="p">)</span>
+<span class="n">delta</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">sk_acc</span> <span class="o">-</span> <span class="n">sky_acc</span><span class="p">)</span>
 
-assert sk_preds.index.equals(X_test.index)
-assert sky_preds.index.equals(X_test.index)
+<span class="k">assert</span> <span class="n">sk_preds</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">sky_preds</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
 
-# Proof-like checks
-assert len(sk_preds) == len(X_test)
-assert sk_preds.index.equals(X_test.index)
-assert len(sky_preds) == len(X_test)
-assert sky_preds.index.equals(X_test.index)
+<span class="c1"># Proof-like checks</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">sk_preds</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">sk_preds</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+<span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">sky_preds</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">sky_preds</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">X_test</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
 
-print(&quot;OK: sklearn Pipeline and SkyulfPipeline both run&quot;)
-print(f&quot;sklearn test accuracy: {sk_acc:.4f}&quot;)
-print(f&quot;skyulf  test accuracy: {sky_acc:.4f}&quot;)
-print(f&quot;delta accuracy: {delta:.4f}&quot;)
+<span class="nb">print</span><span class="p">(</span><span class="s2">"OK: sklearn Pipeline and SkyulfPipeline both run"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"sklearn test accuracy: </span><span class="si">{</span><span class="n">sk_acc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"skyulf  test accuracy: </span><span class="si">{</span><span class="n">sky_acc</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"delta accuracy: </span><span class="si">{</span><span class="n">delta</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# --- Classification metrics (side-by-side) ---
-sk_report = classification_report(y_test, sk_preds, output_dict=True, zero_division=0)
-sky_report = classification_report(y_test, sky_preds, output_dict=True, zero_division=0)
+<span class="c1"># --- Classification metrics (side-by-side) ---</span>
+<span class="n">sk_report</span> <span class="o">=</span> <span class="n">classification_report</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sk_preds</span><span class="p">,</span> <span class="n">output_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">sky_report</span> <span class="o">=</span> <span class="n">classification_report</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sky_preds</span><span class="p">,</span> <span class="n">output_dict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-sk_df = pd.DataFrame(sk_report).T
-sky_df = pd.DataFrame(sky_report).T
+<span class="n">sk_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">sk_report</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+<span class="n">sky_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">sky_report</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
 
-# Keep a consistent row order: class labels first, then summary rows (if present)
-label_rows = [str(v) for v in sorted(pd.unique(y_test))]
-summary_rows = [r for r in [&quot;accuracy&quot;, &quot;macro avg&quot;, &quot;weighted avg&quot;] if r in sk_df.index]
-row_order = [r for r in label_rows if r in sk_df.index] + summary_rows
+<span class="c1"># Keep a consistent row order: class labels first, then summary rows (if present)</span>
+<span class="n">label_rows</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">y_test</span><span class="p">))]</span>
+<span class="n">summary_rows</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"accuracy"</span><span class="p">,</span> <span class="s2">"macro avg"</span><span class="p">,</span> <span class="s2">"weighted avg"</span><span class="p">]</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">sk_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+<span class="n">row_order</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">label_rows</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">sk_df</span><span class="o">.</span><span class="n">index</span><span class="p">]</span> <span class="o">+</span> <span class="n">summary_rows</span>
 
-sk_df = sk_df.loc[row_order]
-sky_df = sky_df.loc[row_order]
+<span class="n">sk_df</span> <span class="o">=</span> <span class="n">sk_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">row_order</span><span class="p">]</span>
+<span class="n">sky_df</span> <span class="o">=</span> <span class="n">sky_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">row_order</span><span class="p">]</span>
 
-side_by_side = pd.concat(
-    {
-        &quot;sklearn&quot;: sk_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
-        &quot;skyulf&quot;: sky_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
-    },
-    axis=1,
-)
+<span class="n">side_by_side</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"sklearn"</span><span class="p">:</span> <span class="n">sk_df</span><span class="p">[[</span><span class="s2">"precision"</span><span class="p">,</span> <span class="s2">"recall"</span><span class="p">,</span> <span class="s2">"f1-score"</span><span class="p">,</span> <span class="s2">"support"</span><span class="p">]],</span>
+        <span class="s2">"skyulf"</span><span class="p">:</span> <span class="n">sky_df</span><span class="p">[[</span><span class="s2">"precision"</span><span class="p">,</span> <span class="s2">"recall"</span><span class="p">,</span> <span class="s2">"f1-score"</span><span class="p">,</span> <span class="s2">"support"</span><span class="p">]],</span>
+    <span class="p">},</span>
+    <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
 
-print(&quot;\nClassification report (side-by-side):&quot;)
-print(side_by_side.to_string())
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Classification report (side-by-side):"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">side_by_side</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
 
-labels = sorted(pd.unique(y_test))
-cm_sk = confusion_matrix(y_test, sk_preds, labels=labels)
-cm_sky = confusion_matrix(y_test, sky_preds, labels=labels)
+<span class="n">labels</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">y_test</span><span class="p">))</span>
+<span class="n">cm_sk</span> <span class="o">=</span> <span class="n">confusion_matrix</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sk_preds</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
+<span class="n">cm_sky</span> <span class="o">=</span> <span class="n">confusion_matrix</span><span class="p">(</span><span class="n">y_test</span><span class="p">,</span> <span class="n">sky_preds</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
 
-cm_index = [f&quot;true_{l}&quot; for l in labels]
-cm_cols = [f&quot;pred_{l}&quot; for l in labels]
+<span class="n">cm_index</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"true_</span><span class="si">{</span><span class="n">l</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">]</span>
+<span class="n">cm_cols</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"pred_</span><span class="si">{</span><span class="n">l</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">]</span>
 
-cm_sk_df = pd.DataFrame(cm_sk, index=cm_index, columns=cm_cols)
-cm_sky_df = pd.DataFrame(cm_sky, index=cm_index, columns=cm_cols)
+<span class="n">cm_sk_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">cm_sk</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">cm_index</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">cm_cols</span><span class="p">)</span>
+<span class="n">cm_sky_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">cm_sky</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">cm_index</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">cm_cols</span><span class="p">)</span>
 
-print(&quot;\nConfusion matrix (sklearn):&quot;)
-print(cm_sk_df.to_string())
-print(&quot;\nConfusion matrix (skyulf):&quot;)
-print(cm_sky_df.to_string())
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Confusion matrix (sklearn):"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cm_sk_df</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Confusion matrix (skyulf):"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cm_sky_df</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
 
-print(&quot;sklearn preds head:&quot;)
-print(sk_preds.head())
-print(&quot;skyulf preds head:&quot;)
-print(sky_preds.head())
+<span class="nb">print</span><span class="p">(</span><span class="s2">"sklearn preds head:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sk_preds</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"skyulf preds head:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sky_preds</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
 
-assert (sk_pred.values == sky_pred.values).all()
-print(&quot;Predictions match exactly.&quot;)
-</code></pre>
+<span class="k">assert</span> <span class="p">(</span><span class="n">sk_pred</span><span class="o">.</span><span class="n">values</span> <span class="o">==</span> <span class="n">sky_pred</span><span class="o">.</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Predictions match exactly."</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="example-output-from-the-notebook">Example output (from the notebook)</h3>
 <p>This is the exact output from one notebook run (same dataset, same random seed/split):</p>
 <p>Classification report (side-by-side):</p>
@@ -3631,37 +3911,37 @@ data-dependent step before the train/test split are rejected before execution
 <a href="../examples/leakage_proof_pandas.html#what-is-and-is-not-covered">"What is and is not covered"</a> for the
 current limits — notably that cross-validation/tuning scores do not yet re-fit preprocessing per
 fold and are therefore optimistic.</p>
-<pre><code class="language-python">import pandas as pd
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf.preprocessing.imputation import SimpleImputerCalculator
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleImputerCalculator</span>
 
-# Train has small ages; test has huge ages.
-X_train = pd.DataFrame({&quot;age&quot;: [1.0, 2.0, None, 2.0]})
-y_train = pd.Series([0, 1, 0, 1])
+<span class="c1"># Train has small ages; test has huge ages.</span>
+<span class="n">X_train</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]})</span>
+<span class="n">y_train</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 
-X_test = pd.DataFrame({&quot;age&quot;: [1000.0, None, 1200.0]})
-y_test = pd.Series([0, 1, 1])
+<span class="n">X_test</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1000.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mf">1200.0</span><span class="p">]})</span>
+<span class="n">y_test</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 
-cfg = {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]}</span>
 
-# What train-only mean should be (ignoring NaNs)
-expected_train_mean = float(pd.Series([1.0, 2.0, 2.0]).mean())
+<span class="c1"># What train-only mean should be (ignoring NaNs)</span>
+<span class="n">expected_train_mean</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">])</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
 
-params = SimpleImputerCalculator().fit((X_train, y_train), cfg)
-learned_mean = float(params[&quot;fill_values&quot;][&quot;age&quot;])
+<span class="n">params</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">cfg</span><span class="p">)</span>
+<span class="n">learned_mean</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"fill_values"</span><span class="p">][</span><span class="s2">"age"</span><span class="p">])</span>
 
-# Proof: learned mean equals train mean (not influenced by test)
-assert abs(learned_mean - expected_train_mean) &lt; 1e-12
+<span class="c1"># Proof: learned mean equals train mean (not influenced by test)</span>
+<span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">learned_mean</span> <span class="o">-</span> <span class="n">expected_train_mean</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-12</span>
 
-# For comparison only: full-data mean would be very different
-full_mean = float(pd.concat([X_train[&quot;age&quot;], X_test[&quot;age&quot;]]).mean())
-assert abs(full_mean - expected_train_mean) &gt; 1.0
+<span class="c1"># For comparison only: full-data mean would be very different</span>
+<span class="n">full_mean</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">X_train</span><span class="p">[</span><span class="s2">"age"</span><span class="p">],</span> <span class="n">X_test</span><span class="p">[</span><span class="s2">"age"</span><span class="p">]])</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">full_mean</span> <span class="o">-</span> <span class="n">expected_train_mean</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1.0</span>
 
-print(&quot;OK: SimpleImputer learns from train only&quot;)
-print(&quot;train_mean:&quot;, expected_train_mean)
-print(&quot;full_mean:&quot;, full_mean)
-print(&quot;learned_mean:&quot;, learned_mean)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"OK: SimpleImputer learns from train only"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"train_mean:"</span><span class="p">,</span> <span class="n">expected_train_mean</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"full_mean:"</span><span class="p">,</span> <span class="n">full_mean</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"learned_mean:"</span><span class="p">,</span> <span class="n">learned_mean</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="3-what-this-proves-and-what-it-doesnt">3) What this proves (and what it doesn't)</h2>
 <ul>
 <li>Proves the API supports sklearn-style <code>X/y</code> workflows and produces aligned predictions.</li>

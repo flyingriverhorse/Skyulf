@@ -1570,6 +1570,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3283,60 +3563,60 @@
 <h2 id="steps-to-add-a-new-engine">Steps to Add a New Engine</h2>
 <h3 id="1-implement-the-engine-class">1. Implement the Engine Class</h3>
 <p>Create a new file in <code>skyulf-core/skyulf/engines/</code> (e.g., <code>dask_engine.py</code>).</p>
-<pre><code class="language-python">from typing import Any, List, Union
-import dask.dataframe as dd
-from skyulf.engines.base import BaseEngine
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">dask.dataframe</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEngine</span>
 
-class DaskEngine(BaseEngine):
-    @property
-    def name(self) -&gt; str:
-        return &quot;dask&quot;
+<span class="k">class</span><span class="w"> </span><span class="nc">DaskEngine</span><span class="p">(</span><span class="n">BaseEngine</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"dask"</span>
 
-    def is_dataframe(self, data: Any) -&gt; bool:
-        return isinstance(data, dd.DataFrame)
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
 
-    def is_series(self, data: Any) -&gt; bool:
-        return isinstance(data, dd.Series)
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span>
 
-    def get_columns(self, df: Any) -&gt; List[str]:
-        return list(df.columns)
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_columns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
 
-    def shape(self, df: Any) -&gt; tuple:
-        # Dask shape is lazy, might need compute() or delayed
-        return (len(df), len(df.columns))
+    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="c1"># Dask shape is lazy, might need compute() or delayed</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
 
-    # ... implement other required methods
-</code></pre>
+    <span class="c1"># ... implement other required methods</span>
+</code></pre></div>
 <h3 id="2-register-the-engine">2. Register the Engine</h3>
 <p>In <code>skyulf-core/skyulf/engines/__init__.py</code> or <code>registry.py</code>, register your new engine.</p>
-<pre><code class="language-python">from .dask_engine import DaskEngine
-from .registry import EngineRegistry
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">.dask_engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">DaskEngine</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span>
 
-EngineRegistry.register(DaskEngine())
-</code></pre>
+<span class="n">EngineRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">DaskEngine</span><span class="p">())</span>
+</code></pre></div>
 <h3 id="3-update-nodes-optional-but-recommended">3. Update Nodes (Optional but Recommended)</h3>
 <p>Most existing nodes use <code>SklearnBridge</code> or generic Python logic.
 *   <strong>SklearnBridge:</strong> If you implement <code>to_numpy()</code> or <code>to_pandas()</code> in your engine (or if the dataframe supports it), many nodes will work out-of-the-box by converting data to local memory (Pandas/Numpy).
 *   <strong>Native Implementation:</strong> For true distributed performance, you should update critical nodes (like <code>Scaling</code>, <code>Join</code>, <code>Aggregation</code>) to use native Dask/Spark API.</p>
 <p>Example of a node supporting multiple engines:</p>
-<pre><code class="language-python">class StandardScalerCalculator(BaseCalculator):
-    def fit(self, df, config):
-        engine = get_engine(df)
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StandardScalerCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
-        if engine.name == &quot;dask&quot;:
-            # Use Dask native logic
-            mean = df.mean().compute()
-            std = df.std().compute()
-            return {&quot;mean&quot;: mean, &quot;std&quot;: std}
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"dask"</span><span class="p">:</span>
+            <span class="c1"># Use Dask native logic</span>
+            <span class="n">mean</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+            <span class="n">std</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="n">mean</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">:</span> <span class="n">std</span><span class="p">}</span>
 
-        elif engine.name == &quot;polars&quot;:
-            # Use Polars logic
-            ...
+        <span class="k">elif</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"polars"</span><span class="p">:</span>
+            <span class="c1"># Use Polars logic</span>
+            <span class="o">...</span>
 
-        else:
-            # Fallback to Pandas/Sklearn
-            ...
-</code></pre>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Fallback to Pandas/Sklearn</span>
+            <span class="o">...</span>
+</code></pre></div>
 <h3 id="4-update-data-ingestion">4. Update Data Ingestion</h3>
 <p>Ensure <code>DataService</code> or your ingestion layer can load data into the new format (e.g., <code>dd.read_csv</code>).</p>
 <h2 id="summary">Summary</h2>

@@ -1542,6 +1542,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3278,9 +3558,9 @@ a job already in <code>queued</code> or <code>running</code> state created withi
 experiment mode), Branch 0 and Branch 1 get different <code>branch_index</code>
 values from the partitioner and are each allowed to create their own
 job.</p>
-<pre><code>Branch 0: Dataset → Encode → [Train]          branch_index=0
+<div class="highlight"><pre><span></span><code>Branch 0: Dataset → Encode → [Train]          branch_index=0
 Branch 1: Dataset → Encode → Scale → [Train]  branch_index=1
-</code></pre>
+</code></pre></div>
 <p>Clicking twice fires two requests per branch.  Request 2 of Branch 0 is
 deduplicated against Request 1 of Branch 0.  Branch 1 is unaffected.</p>
 <h2 id="the-30-second-window">The 30-Second Window</h2>
@@ -3290,18 +3570,18 @@ prevents accidental blocking of legitimate re-runs.</p>
 <h2 id="how-it-works-internally">How It Works Internally</h2>
 <p>The backend uses a per-key <code>asyncio.Lock</code> to make the
 "check if job exists → create if not" step <strong>atomic</strong>:</p>
-<pre><code>Click 1  →  acquires lock  →  no job found  →  creates job J1  →  releases lock
+<div class="highlight"><pre><span></span><code>Click 1  →  acquires lock  →  no job found  →  creates job J1  →  releases lock
 Click 2  →  acquires lock  →  J1 found (queued)  →  returns J1  →  releases lock
-</code></pre>
+</code></pre></div>
 <p>Without the lock, both clicks could see an empty table simultaneously
 before either one committed its new row (a classic read-modify-write race).</p>
 <h2 id="cross-worker-protection">Cross-Worker Protection</h2>
 <p>The in-process <code>asyncio.Lock</code> prevents races within a single uvicorn worker.
 For deployments with <strong>multiple workers</strong> (<code>--workers N</code>), the idempotency
 check additionally uses a <strong>database-level row lock</strong> (<code>SELECT … FOR UPDATE SKIP LOCKED</code>):</p>
-<pre><code>Worker A  →  acquires DB row lock  →  no job found  →  creates job J1  →  commits
+<div class="highlight"><pre><span></span><code>Worker A  →  acquires DB row lock  →  no job found  →  creates job J1  →  commits
 Worker B  →  waits for lock  →  J1 now found  →  returns J1
-</code></pre>
+</code></pre></div>
 <p>This provides strong protection on <strong>PostgreSQL</strong>.</p>
 <blockquote>
 <p><strong>Note (SQLite):</strong> SQLite does not support <code>SELECT FOR UPDATE</code>. Under SQLite with multiple

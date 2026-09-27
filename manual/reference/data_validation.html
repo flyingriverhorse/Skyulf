@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3379,50 +3659,50 @@ automatically. You call them yourself in two main places:</p>
 An ingestion that unexpectedly returns zero rows therefore raises
 <code>ExpectationError</code>, even if the expected columns are present.</p>
 <p>If empty partitions are valid in your workflow, explicitly opt in on each check:</p>
-<pre><code class="language-python">import pandas as pd
-from skyulf import expect_no_nulls, expect_unique, expect_value_range
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">expect_no_nulls</span><span class="p">,</span> <span class="n">expect_unique</span><span class="p">,</span> <span class="n">expect_value_range</span>
 
-empty = pd.DataFrame({&quot;age&quot;: pd.Series(dtype=&quot;float64&quot;)})
-expect_no_nulls(empty, [&quot;age&quot;], allow_empty=True)
-expect_value_range(empty, &quot;age&quot;, minimum=0, maximum=120, allow_empty=True)
-expect_unique(empty, [&quot;age&quot;], allow_empty=True)
-</code></pre>
+<span class="n">empty</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="s2">"float64"</span><span class="p">)})</span>
+<span class="n">expect_no_nulls</span><span class="p">(</span><span class="n">empty</span><span class="p">,</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">],</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">expect_value_range</span><span class="p">(</span><span class="n">empty</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">,</span> <span class="n">minimum</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">expect_unique</span><span class="p">(</span><span class="n">empty</span><span class="p">,</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">],</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
 <p>Previously these checks accepted empty frames automatically; existing callers
 that rely on that behavior must add <code>allow_empty=True</code>. Requested columns must
 still exist. <code>expect_columns_exist</code> only checks the schema and accepts zero rows.
 Range checks continue to ignore null values, including an all-null column in a
 frame that has rows; combine them with <code>expect_no_nulls</code> when nulls are invalid.</p>
 <h2 id="example-a-dataset-contract-in-ci">Example: a dataset contract in CI</h2>
-<pre><code class="language-python">import pandas as pd
-from skyulf import (
-    ExpectationError,
-    expect_columns_exist,
-    expect_no_nulls,
-    expect_unique,
-    expect_value_range,
-)
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ExpectationError</span><span class="p">,</span>
+    <span class="n">expect_columns_exist</span><span class="p">,</span>
+    <span class="n">expect_no_nulls</span><span class="p">,</span>
+    <span class="n">expect_unique</span><span class="p">,</span>
+    <span class="n">expect_value_range</span><span class="p">,</span>
+<span class="p">)</span>
 
 
-def validate_customers(df: pd.DataFrame) -&gt; None:
-    &quot;&quot;&quot;Raises ExpectationError if the customers frame breaks its contract.&quot;&quot;&quot;
-    expect_columns_exist(df, [&quot;customer_id&quot;, &quot;age&quot;, &quot;signup_date&quot;])
-    expect_unique(df, [&quot;customer_id&quot;])
-    expect_no_nulls(df, [&quot;customer_id&quot;, &quot;signup_date&quot;])
-    expect_value_range(df, &quot;age&quot;, minimum=0, maximum=120)
-</code></pre>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_customers</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Raises ExpectationError if the customers frame breaks its contract."""</span>
+    <span class="n">expect_columns_exist</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="p">[</span><span class="s2">"customer_id"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">,</span> <span class="s2">"signup_date"</span><span class="p">])</span>
+    <span class="n">expect_unique</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="p">[</span><span class="s2">"customer_id"</span><span class="p">])</span>
+    <span class="n">expect_no_nulls</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="p">[</span><span class="s2">"customer_id"</span><span class="p">,</span> <span class="s2">"signup_date"</span><span class="p">])</span>
+    <span class="n">expect_value_range</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">,</span> <span class="n">minimum</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">maximum</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+</code></pre></div>
 <p>Wire it into a test so CI enforces it:</p>
-<pre><code class="language-python">def test_customers_contract():
-    df = pd.read_parquet(&quot;data/customers.parquet&quot;)
-    validate_customers(df)  # raises ExpectationError on violation → test fails
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">test_customers_contract</span><span class="p">():</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s2">"data/customers.parquet"</span><span class="p">)</span>
+    <span class="n">validate_customers</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>  <span class="c1"># raises ExpectationError on violation → test fails</span>
+</code></pre></div>
 <h2 id="example-a-pipeline-guard">Example: a pipeline guard</h2>
-<pre><code class="language-python">from skyulf import expect_no_nulls
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">expect_no_nulls</span>
 
-def run(df):
-    # Fail fast with a clear message before an expensive fit.
-    expect_no_nulls(df, [&quot;target&quot;])
-    ...
-</code></pre>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="c1"># Fail fast with a clear message before an expensive fit.</span>
+    <span class="n">expect_no_nulls</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="p">[</span><span class="s2">"target"</span><span class="p">])</span>
+    <span class="o">...</span>
+</code></pre></div>
 <h2 id="api-reference">API reference</h2>
 
 

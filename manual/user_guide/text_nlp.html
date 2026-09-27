@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3436,25 +3716,25 @@ duplicate feature names, rerun from the original input and refit downstream mode
 <h2 id="count-vectorizer-bag-of-words">Count Vectorizer — bag of words</h2>
 <p>The simplest representation: build a vocabulary of every word seen in training, then count how
 many times each word appears in each document.</p>
-<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
-    CountVectorizerCalculator,
-    CountVectorizerApplier,
-)
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.vectorization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CountVectorizerCalculator</span><span class="p">,</span>
+    <span class="n">CountVectorizerApplier</span><span class="p">,</span>
+<span class="p">)</span>
 
-cfg = {
-    &quot;columns&quot;: [&quot;text&quot;],     # one or more text columns (joined with a space)
-    &quot;max_features&quot;: 5000,    # keep the 5000 most frequent words
-    &quot;min_df&quot;: 2,             # ignore words appearing in &lt; 2 documents
-    &quot;ngram_range&quot;: [1, 1],   # unigrams only
-}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">],</span>     <span class="c1"># one or more text columns (joined with a space)</span>
+    <span class="s2">"max_features"</span><span class="p">:</span> <span class="mi">5000</span><span class="p">,</span>    <span class="c1"># keep the 5000 most frequent words</span>
+    <span class="s2">"min_df"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>             <span class="c1"># ignore words appearing in &lt; 2 documents</span>
+    <span class="s2">"ngram_range"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>   <span class="c1"># unigrams only</span>
+<span class="p">}</span>
 
-art = CountVectorizerCalculator().fit(train_df, cfg)   # learn vocabulary on TRAIN
-train_X = CountVectorizerApplier().apply(train_df, art)
-test_X = CountVectorizerApplier().apply(test_df, art)  # same vocabulary
+<span class="n">art</span> <span class="o">=</span> <span class="n">CountVectorizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>   <span class="c1"># learn vocabulary on TRAIN</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">CountVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="n">test_X</span> <span class="o">=</span> <span class="n">CountVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>  <span class="c1"># same vocabulary</span>
 
-feature_cols = art[&quot;output_columns&quot;]   # e.g. ['text__count__game', ...]
-vocab = art[&quot;vocabulary&quot;]              # {word: column index}
-</code></pre>
+<span class="n">feature_cols</span> <span class="o">=</span> <span class="n">art</span><span class="p">[</span><span class="s2">"output_columns"</span><span class="p">]</span>   <span class="c1"># e.g. ['text__count__game', ...]</span>
+<span class="n">vocab</span> <span class="o">=</span> <span class="n">art</span><span class="p">[</span><span class="s2">"vocabulary"</span><span class="p">]</span>              <span class="c1"># {word: column index}</span>
+</code></pre></div>
 <p><strong>Reach for it when</strong> you want a dead-simple, interpretable baseline.</p>
 <hr />
 <h2 id="tf-idf-vectorizer-counts-but-smarter">TF-IDF Vectorizer — counts, but smarter</h2>
@@ -3462,24 +3742,24 @@ vocab = art[&quot;vocabulary&quot;]              # {word: column index}
 (Term Frequency × Inverse Document Frequency) multiplies each count by how <em>rare</em> the word is
 across the corpus, so distinctive words score higher. This is the <strong>best default</strong> for most
 text-classification tasks.</p>
-<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
-    TfidfVectorizerCalculator,
-    TfidfVectorizerApplier,
-)
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.vectorization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">TfidfVectorizerCalculator</span><span class="p">,</span>
+    <span class="n">TfidfVectorizerApplier</span><span class="p">,</span>
+<span class="p">)</span>
 
-cfg = {
-    &quot;columns&quot;: [&quot;text&quot;],
-    &quot;max_features&quot;: 20000,
-    &quot;min_df&quot;: 2,
-    &quot;ngram_range&quot;: [1, 2],   # unigrams + bigrams capture short phrases
-    &quot;sublinear_tf&quot;: True,    # dampen very frequent words (log scaling)
-}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">],</span>
+    <span class="s2">"max_features"</span><span class="p">:</span> <span class="mi">20000</span><span class="p">,</span>
+    <span class="s2">"min_df"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="s2">"ngram_range"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>   <span class="c1"># unigrams + bigrams capture short phrases</span>
+    <span class="s2">"sublinear_tf"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>    <span class="c1"># dampen very frequent words (log scaling)</span>
+<span class="p">}</span>
 
-art = TfidfVectorizerCalculator().fit(train_df, cfg)
-app = TfidfVectorizerApplier()
-train_X = app.apply(train_df, art)
-test_X = app.apply(test_df, art)
-</code></pre>
+<span class="n">art</span> <span class="o">=</span> <span class="n">TfidfVectorizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">TfidfVectorizerApplier</span><span class="p">()</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="n">test_X</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+</code></pre></div>
 <p>The artifact stores both the vocabulary and the learned IDF weights, so test data is
 transformed with exactly the weights learned on train.</p>
 <h3 id="when-there-are-no-usable-tokens">When there are no usable tokens</h3>
@@ -3499,16 +3779,16 @@ that remove every learned term (<code>min_df</code> / <code>max_df</code>) still
 front. The Hashing Vectorizer instead pushes every word through a hash function into a fixed
 number of columns (<code>n_features</code>). It is <strong>stateless</strong> — there is nothing to learn — so it is
 ideal for streaming data or vocabularies too big to keep in memory.</p>
-<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
-    HashingVectorizerCalculator,
-    HashingVectorizerApplier,
-)
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.vectorization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">HashingVectorizerCalculator</span><span class="p">,</span>
+    <span class="n">HashingVectorizerApplier</span><span class="p">,</span>
+<span class="p">)</span>
 
-cfg = {&quot;columns&quot;: [&quot;text&quot;], &quot;n_features&quot;: 4096, &quot;norm&quot;: &quot;l2&quot;}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="s2">"n_features"</span><span class="p">:</span> <span class="mi">4096</span><span class="p">,</span> <span class="s2">"norm"</span><span class="p">:</span> <span class="s2">"l2"</span><span class="p">}</span>
 
-art = HashingVectorizerCalculator().fit(train_df, cfg)   # no vocabulary learned
-train_X = HashingVectorizerApplier().apply(train_df, art)
-</code></pre>
+<span class="n">art</span> <span class="o">=</span> <span class="n">HashingVectorizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>   <span class="c1"># no vocabulary learned</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">HashingVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+</code></pre></div>
 <p>Normalization defaults to <code>"l2"</code>; <code>"l1"</code> is also available. Choose <strong>None</strong> in the
 Canvas, or set <code>"norm": "none"</code> (Python <code>None</code> also works), to keep unnormalized
 hashed token counts.</p>
@@ -3524,34 +3804,34 @@ word ↔ column mapping, and different words can occasionally collide into the s
 split on characters instead of words — and then feed the cleaned result into a vectorizer. The
 Tokenizer emits a space-joined token string column <code>{col}__tokens</code> (and optionally
 <code>{col}__token_count</code>) that any vectorizer can consume.</p>
-<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
-    TokenizerCalculator,
-    TokenizerApplier,
-)
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.vectorization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">TokenizerCalculator</span><span class="p">,</span>
+    <span class="n">TokenizerApplier</span><span class="p">,</span>
+<span class="p">)</span>
 
-cfg = {
-    &quot;columns&quot;: [&quot;text&quot;],
-    &quot;analyzer&quot;: &quot;word&quot;,        # 'word' | 'char' | 'char_wb'
-    &quot;stop_words&quot;: &quot;english&quot;,   # drop common filler words ('the', 'is', ...)
-    &quot;add_token_count&quot;: True,   # also emit text__token_count
-}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">],</span>
+    <span class="s2">"analyzer"</span><span class="p">:</span> <span class="s2">"word"</span><span class="p">,</span>        <span class="c1"># 'word' | 'char' | 'char_wb'</span>
+    <span class="s2">"stop_words"</span><span class="p">:</span> <span class="s2">"english"</span><span class="p">,</span>   <span class="c1"># drop common filler words ('the', 'is', ...)</span>
+    <span class="s2">"add_token_count"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>   <span class="c1"># also emit text__token_count</span>
+<span class="p">}</span>
 
-art = TokenizerCalculator().fit(train_df, cfg)
-train_tok = TokenizerApplier().apply(train_df, art)
-# -&gt; new columns: ['text__tokens', 'text__token_count']
-</code></pre>
+<span class="n">art</span> <span class="o">=</span> <span class="n">TokenizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>
+<span class="n">train_tok</span> <span class="o">=</span> <span class="n">TokenizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="c1"># -&gt; new columns: ['text__tokens', 'text__token_count']</span>
+</code></pre></div>
 <h3 id="chaining-tokenizer-tf-idf">Chaining: Tokenizer → TF-IDF</h3>
 <p>Because every node speaks the same DataFrame-in / DataFrame-out language, you can simply point
 the next vectorizer at the Tokenizer's output column:</p>
-<pre><code class="language-python">chain_cfg = {
-    &quot;columns&quot;: [&quot;text__tokens&quot;],   # the Tokenizer's output column
-    &quot;max_features&quot;: 20000,
-    &quot;ngram_range&quot;: [1, 2],
-    &quot;sublinear_tf&quot;: True,
-}
-chain_art = TfidfVectorizerCalculator().fit(train_tok, chain_cfg)
-train_X = TfidfVectorizerApplier().apply(train_tok, chain_art)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">chain_cfg</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text__tokens"</span><span class="p">],</span>   <span class="c1"># the Tokenizer's output column</span>
+    <span class="s2">"max_features"</span><span class="p">:</span> <span class="mi">20000</span><span class="p">,</span>
+    <span class="s2">"ngram_range"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+    <span class="s2">"sublinear_tf"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">chain_art</span> <span class="o">=</span> <span class="n">TfidfVectorizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_tok</span><span class="p">,</span> <span class="n">chain_cfg</span><span class="p">)</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">TfidfVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_tok</span><span class="p">,</span> <span class="n">chain_art</span><span class="p">)</span>
+</code></pre></div>
 <p>In practice this <code>text → Tokenizer → TF-IDF → model</code> chain often beats vectorizing raw text,
 because stop-word removal focuses the vocabulary on meaningful words.</p>
 <hr />
@@ -3560,19 +3840,19 @@ because stop-word removal focuses the vocabulary on meaningful words.</p>
 embeddings</strong> map text into a dense vector space where similar <em>meanings</em> land close together,
 which can help on short text. This node is powered by
 <a href="https://www.sbert.net/"><code>sentence-transformers</code></a> and is an <strong>optional</strong> dependency.</p>
-<pre><code class="language-bash">pip install skyulf-core[nlp]     # or: pip install -r requirements-nlp.txt
-</code></pre>
-<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
-    SentenceEmbedderCalculator,
-    SentenceEmbedderApplier,
-)
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>nlp<span class="o">]</span><span class="w">     </span><span class="c1"># or: pip install -r requirements-nlp.txt</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.vectorization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">SentenceEmbedderCalculator</span><span class="p">,</span>
+    <span class="n">SentenceEmbedderApplier</span><span class="p">,</span>
+<span class="p">)</span>
 
-cfg = {&quot;columns&quot;: [&quot;text&quot;], &quot;model_name&quot;: &quot;all-MiniLM-L6-v2&quot;, &quot;normalize&quot;: True}
+<span class="n">cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="s2">"model_name"</span><span class="p">:</span> <span class="s2">"all-MiniLM-L6-v2"</span><span class="p">,</span> <span class="s2">"normalize"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
 
-art = SentenceEmbedderCalculator().fit(train_df, cfg)
-train_X = SentenceEmbedderApplier().apply(train_df, art)
-# output columns: text__emb__0 … text__emb__{embedding_dim-1}
-</code></pre>
+<span class="n">art</span> <span class="o">=</span> <span class="n">SentenceEmbedderCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">cfg</span><span class="p">)</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">SentenceEmbedderApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="c1"># output columns: text__emb__0 … text__emb__{embedding_dim-1}</span>
+</code></pre></div>
 <p>The node imports <code>sentence-transformers</code> lazily and raises a clear install hint if the extra is
 missing, so pipelines that don't use it never pay the (large, PyTorch-based) dependency cost.</p>
 <p>!!! warning "Embeddings are dense and can be negative"
@@ -3618,36 +3898,36 @@ Skyulf classifier or regressor exactly like ordinary tabular data — <code>logi
 </table>
 <h3 id="multinomial-bernoulli-naive-bayes">Multinomial &amp; Bernoulli Naive Bayes</h3>
 <p>These two text-friendly classifiers live in <code>skyulf.modeling.naive_bayes</code>:</p>
-<pre><code class="language-python">from skyulf.modeling.naive_bayes import (
-    MultinomialNBCalculator, MultinomialNBApplier,
-    BernoulliNBCalculator, BernoulliNBApplier,
-)
-from sklearn.metrics import accuracy_score
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.naive_bayes</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">MultinomialNBCalculator</span><span class="p">,</span> <span class="n">MultinomialNBApplier</span><span class="p">,</span>
+    <span class="n">BernoulliNBCalculator</span><span class="p">,</span> <span class="n">BernoulliNBApplier</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">accuracy_score</span>
 
-# TF-IDF (or counts) -&gt; Multinomial NB: the classic strong baseline
-model = MultinomialNBCalculator().fit(
-    train_X[feature_cols], train_df[&quot;label&quot;], config={&quot;alpha&quot;: 0.1}
-)
-preds = MultinomialNBApplier().predict(test_X[feature_cols], model)
-print(accuracy_score(test_df[&quot;label&quot;], preds))
-</code></pre>
+<span class="c1"># TF-IDF (or counts) -&gt; Multinomial NB: the classic strong baseline</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MultinomialNBCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">train_X</span><span class="p">[</span><span class="n">feature_cols</span><span class="p">],</span> <span class="n">train_df</span><span class="p">[</span><span class="s2">"label"</span><span class="p">],</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"alpha"</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">MultinomialNBApplier</span><span class="p">()</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">test_X</span><span class="p">[</span><span class="n">feature_cols</span><span class="p">],</span> <span class="n">model</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">accuracy_score</span><span class="p">(</span><span class="n">test_df</span><span class="p">[</span><span class="s2">"label"</span><span class="p">],</span> <span class="n">preds</span><span class="p">))</span>
+</code></pre></div>
 <p>Bernoulli NB binarizes its inputs internally at the <code>binarize</code> threshold, so it pairs naturally
 with raw counts: <code>BernoulliNBCalculator().fit(X, y, config={"binarize": 0.0})</code>.</p>
 <hr />
 <h2 id="the-universal-recipe">The universal recipe</h2>
 <p>Every text pipeline follows the same shape:</p>
-<pre><code class="language-python"># 1. LEARN the transform on TRAIN only
-art = SomeVectorizerCalculator().fit(train_df, config)
+<div class="highlight"><pre><span></span><code><span class="c1"># 1. LEARN the transform on TRAIN only</span>
+<span class="n">art</span> <span class="o">=</span> <span class="n">SomeVectorizerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
-# 2. APPLY the same transform to train and test
-train_X = SomeVectorizerApplier().apply(train_df, art)
-test_X = SomeVectorizerApplier().apply(test_df, art)
-cols = art[&quot;output_columns&quot;]
+<span class="c1"># 2. APPLY the same transform to train and test</span>
+<span class="n">train_X</span> <span class="o">=</span> <span class="n">SomeVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="n">test_X</span> <span class="o">=</span> <span class="n">SomeVectorizerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="n">art</span><span class="p">)</span>
+<span class="n">cols</span> <span class="o">=</span> <span class="n">art</span><span class="p">[</span><span class="s2">"output_columns"</span><span class="p">]</span>
 
-# 3. Train a model on the new numeric columns
-model = SomeModelCalculator().fit(train_X[cols], train_df[&quot;label&quot;])
-preds = SomeModelApplier().predict(test_X[cols], model)
-</code></pre>
+<span class="c1"># 3. Train a model on the new numeric columns</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SomeModelCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">train_X</span><span class="p">[</span><span class="n">cols</span><span class="p">],</span> <span class="n">train_df</span><span class="p">[</span><span class="s2">"label"</span><span class="p">])</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">SomeModelApplier</span><span class="p">()</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">test_X</span><span class="p">[</span><span class="n">cols</span><span class="p">],</span> <span class="n">model</span><span class="p">)</span>
+</code></pre></div>
 <hr />
 <h2 id="in-the-visual-canvas">In the visual canvas</h2>
 <p>All of these nodes appear in the <strong>Preprocessing</strong> section of the node sidebar in the ML Canvas.

@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3436,57 +3716,57 @@ column deletion is fixed; selecting columns by missing-value percentage is not.<
 <h3 id="22-a-complete-core-example-with-yeo-johnson">2.2 A complete core example with Yeo-Johnson</h3>
 <p>This example uses the dedicated <code>PowerTransformer</code>, which is registered as a
 learner, and places it after the splitter. It requires only the core library.</p>
-<pre><code class="language-python">import pandas as pd
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-data = pd.DataFrame({
-    &quot;x&quot;: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 20.0, 30.0, 50.0, 80.0],
-    &quot;target&quot;: [3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0, 17.0, 41.0, 61.0, 101.0, 161.0],
-})
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {
-                &quot;test_size&quot;: 0.25,
-                &quot;random_state&quot;: 42,
-                &quot;target_column&quot;: &quot;target&quot;,
-            },
-        },
-        {
-            &quot;name&quot;: &quot;power&quot;,
-            &quot;transformer&quot;: &quot;PowerTransformer&quot;,
-            &quot;params&quot;: {
-                &quot;columns&quot;: [&quot;x&quot;],
-                &quot;method&quot;: &quot;yeo-johnson&quot;,
-                &quot;standardize&quot;: True,
-            },
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;linear_regression&quot;},
-}
+<span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">,</span> <span class="mf">80.0</span><span class="p">],</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">7.0</span><span class="p">,</span> <span class="mf">9.0</span><span class="p">,</span> <span class="mf">11.0</span><span class="p">,</span> <span class="mf">13.0</span><span class="p">,</span> <span class="mf">15.0</span><span class="p">,</span> <span class="mf">17.0</span><span class="p">,</span> <span class="mf">41.0</span><span class="p">,</span> <span class="mf">61.0</span><span class="p">,</span> <span class="mf">101.0</span><span class="p">,</span> <span class="mf">161.0</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span>
+                <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"power"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"PowerTransformer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"x"</span><span class="p">],</span>
+                <span class="s2">"method"</span><span class="p">:</span> <span class="s2">"yeo-johnson"</span><span class="p">,</span>
+                <span class="s2">"standardize"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(data, target_column=&quot;target&quot;)
-predictions = pipeline.predict(pd.DataFrame({&quot;x&quot;: [9.0, 10.0]}))
-</code></pre>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">9.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">]}))</span>
+</code></pre></div>
 <p><code>pipeline</code> is an ordinary variable containing a <code>SkyulfPipeline</code> instance.
 It is not a special mode. The example demonstrates preprocessing boundaries,
 not a claim that this transform/model combination is optimal for these data.</p>
 <p>To use the canvas-equivalent transform in a core config, replace the power step
 with the following <strong>in the same post-split position</strong>:</p>
-<pre><code class="language-python">{
-    &quot;name&quot;: &quot;power&quot;,
-    &quot;transformer&quot;: &quot;GeneralTransformation&quot;,
-    &quot;params&quot;: {
-        &quot;transformations&quot;: [
-            {&quot;column&quot;: &quot;x&quot;, &quot;method&quot;: &quot;yeo-johnson&quot;},
-        ],
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"power"</span><span class="p">,</span>
+    <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"GeneralTransformation"</span><span class="p">,</span>
+    <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"transformations"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="s2">"x"</span><span class="p">,</span> <span class="s2">"method"</span><span class="p">:</span> <span class="s2">"yeo-johnson"</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>Both implementations learn power parameters. Both now reject this operation
 before the splitter under the default policy. Pure mathematical operations in
 GeneralTransformation remain allowed.</p>
@@ -3517,10 +3797,10 @@ GeneralTransformation remain allowed.</p>
 </tr>
 </tbody>
 </table>
-<pre><code class="language-python">messages = pipeline.validate_leakage_safety(on_leakage=&quot;warn&quot;)
-# Only if deliberately accepting an unsafe fit:
-# pipeline.fit(data, target_column=&quot;target&quot;, on_leakage=&quot;warn&quot;)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">messages</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">validate_leakage_safety</span><span class="p">(</span><span class="n">on_leakage</span><span class="o">=</span><span class="s2">"warn"</span><span class="p">)</span>
+<span class="c1"># Only if deliberately accepting an unsafe fit:</span>
+<span class="c1"># pipeline.fit(data, target_column="target", on_leakage="warn")</span>
+</code></pre></div>
 <p>Only <code>raise</code>, <code>warn</code>, and <code>ignore</code> are accepted. The latter two do not repair
 leakage, create a splitter, enable CV, or make an unsupported backend graph
 refittable. They do not suppress unrelated errors.</p>
@@ -3535,32 +3815,32 @@ preprocessing already fitted on the combined data.</p>
 <p><img alt="Core CV: create a fresh pipeline for each raw-data fold" src="../assets/diagrams/leakage/core_cv.svg" /></p>
 <p><a href="../assets/diagrams/leakage/core_cv.mmd">Editable Mermaid source</a></p>
 <p>For core-only CV, split raw indices and create a new pipeline inside every fold:</p>
-<pre><code class="language-python">from copy import deepcopy
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
 
-from sklearn.model_selection import KFold
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">KFold</span>
 
-from skyulf.data.dataset import SplitDataset
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
 
-fold_config = deepcopy(config)
-fold_config[&quot;preprocessing&quot;] = [
-    step for step in fold_config[&quot;preprocessing&quot;]
-    if step[&quot;transformer&quot;] != &quot;TrainTestSplitter&quot;
-]
+<span class="n">fold_config</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">fold_config</span><span class="p">[</span><span class="s2">"preprocessing"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">step</span> <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">fold_config</span><span class="p">[</span><span class="s2">"preprocessing"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">step</span><span class="p">[</span><span class="s2">"transformer"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"TrainTestSplitter"</span>
+<span class="p">]</span>
 
-for train_indices, validation_indices in KFold(
-    n_splits=3, shuffle=True, random_state=42
-).split(data):
-    fold_data = SplitDataset(
-        train=data.iloc[train_indices].copy(),
-        test=data.iloc[validation_indices].copy(),
-    )
-    fold_pipeline = SkyulfPipeline(deepcopy(fold_config))
-    fold_pipeline.fit(fold_data, target_column=&quot;target&quot;)
-    fold_predictions = fold_pipeline.predict(
-        fold_data.test.drop(columns=[&quot;target&quot;])
-    )
-    # Score fold_predictions against fold_data.test[&quot;target&quot;].
-</code></pre>
+<span class="k">for</span> <span class="n">train_indices</span><span class="p">,</span> <span class="n">validation_indices</span> <span class="ow">in</span> <span class="n">KFold</span><span class="p">(</span>
+    <span class="n">n_splits</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">fold_data</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
+        <span class="n">train</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_indices</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+        <span class="n">test</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">validation_indices</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+    <span class="p">)</span>
+    <span class="n">fold_pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">fold_config</span><span class="p">))</span>
+    <span class="n">fold_pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">fold_data</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+    <span class="n">fold_predictions</span> <span class="o">=</span> <span class="n">fold_pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+        <span class="n">fold_data</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"target"</span><span class="p">])</span>
+    <span class="p">)</span>
+    <span class="c1"># Score fold_predictions against fold_data.test["target"].</span>
+</code></pre></div>
 <p>Do not transform the full dataset first and then hand its transformed rows to
 KFold. Do not reuse the same fitted pipeline across folds. If CV is used for
 model selection, retain an additional untouched final test set.</p>
@@ -3568,19 +3848,19 @@ model selection, retain an additional untouched final test set.</p>
 computed CV scores, prediction tables, and numerical train-only scaling checks.</p>
 <h3 id="25-native-core-tuning-also-refits-preprocessing-per-fold">2.5 Native core tuning also refits preprocessing per fold</h3>
 <p>For automatic tuning, keep the same safe preprocessing and replace modeling:</p>
-<pre><code class="language-python">tuning_config = deepcopy(config)
-tuning_config[&quot;modeling&quot;] = {
-    &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
-    &quot;base_model&quot;: {&quot;type&quot;: &quot;ridge_regression&quot;},
-    &quot;strategy&quot;: &quot;grid&quot;,
-    &quot;metric&quot;: &quot;r2&quot;,
-    &quot;search_space&quot;: {&quot;alpha&quot;: [0.1, 1.0]},
-    &quot;cv_folds&quot;: 3,
-    &quot;random_state&quot;: 42,
-}
-tuned_pipeline = SkyulfPipeline(tuning_config)
-tuning_metrics = tuned_pipeline.fit(data, target_column=&quot;target&quot;)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">tuning_config</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">tuning_config</span><span class="p">[</span><span class="s2">"modeling"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"hyperparameter_tuner"</span><span class="p">,</span>
+    <span class="s2">"base_model"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"ridge_regression"</span><span class="p">},</span>
+    <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"grid"</span><span class="p">,</span>
+    <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"r2"</span><span class="p">,</span>
+    <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"alpha"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]},</span>
+    <span class="s2">"cv_folds"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">tuned_pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">tuning_config</span><span class="p">)</span>
+<span class="n">tuning_metrics</span> <span class="o">=</span> <span class="n">tuned_pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+</code></pre></div>
 <p>These settings are flat modeling keys, not a nested tuning/params object.
 Without an explicit validation partition, each candidate fits a fresh
 preprocessor on each inner fold's raw training rows. Final refitting learns

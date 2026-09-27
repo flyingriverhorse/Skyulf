@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3400,31 +3680,31 @@
 </tbody>
 </table>
 <h2 id="quick-example">Quick example</h2>
-<pre><code class="language-python">config = {
-    &quot;preprocessing&quot;: [
-        {&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-         &quot;params&quot;: {&quot;test_size&quot;: 0.25, &quot;random_state&quot;: 42,
-                    &quot;stratify&quot;: True, &quot;target_column&quot;: &quot;target&quot;}},
-        {&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-         &quot;params&quot;: {&quot;columns&quot;: [&quot;age&quot;], &quot;strategy&quot;: &quot;mean&quot;}},
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
-        &quot;base_model&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;},
-        &quot;strategy&quot;: &quot;optuna&quot;,
-        &quot;search_space&quot;: {
-            &quot;n_estimators&quot;: [50, 100, 200],
-            &quot;max_depth&quot;: [5, 10, 20, &quot;none&quot;],
-        },
-        &quot;n_trials&quot;: 25,
-        &quot;metric&quot;: &quot;accuracy&quot;,
-        &quot;strategy_params&quot;: {
-            &quot;sampler&quot;: &quot;tpe&quot;,
-            &quot;pruner&quot;: &quot;none&quot;,  # Random Forest does not support incremental fitting.
-        },
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                    <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"hyperparameter_tuner"</span><span class="p">,</span>
+        <span class="s2">"base_model"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">},</span>
+        <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"optuna"</span><span class="p">,</span>
+        <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"n_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="mi">50</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">],</span>
+            <span class="s2">"max_depth"</span><span class="p">:</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="s2">"none"</span><span class="p">],</span>
+        <span class="p">},</span>
+        <span class="s2">"n_trials"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span>
+        <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"accuracy"</span><span class="p">,</span>
+        <span class="s2">"strategy_params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"sampler"</span><span class="p">:</span> <span class="s2">"tpe"</span><span class="p">,</span>
+            <span class="s2">"pruner"</span><span class="p">:</span> <span class="s2">"none"</span><span class="p">,</span>  <span class="c1"># Random Forest does not support incremental fitting.</span>
+        <span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <blockquote>
 <p><strong>Note:</strong> <code>"none"</code> (string) in the search space is automatically converted to Python <code>None</code>.</p>
 </blockquote>
@@ -3707,8 +3987,8 @@ unconfirmed because support cannot be established without executing that graph.<
 <p>In the ML Canvas UI, selecting Time Series Split reveals a date column picker.</p>
 <h2 id="install-requirements">Install requirements</h2>
 <p>Optuna strategies require the tuning extra:</p>
-<pre><code class="language-bash">pip install skyulf-core[tuning]
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>tuning<span class="o">]</span>
+</code></pre></div>
 <p>Grid, random, and halving strategies work out of the box (scikit-learn only).</p>
 <h2 id="what-happens-under-the-hood">What happens under the hood</h2>
 <ol>
@@ -3725,67 +4005,67 @@ unconfirmed because support cannot be established without executing that graph.<
 <li>Passes <code>log_callback=print</code> so the engine's own log lines (<code>Tuning Completed (optuna). Best Score: …</code>, <code>Best Params: {…}</code>, <code>Refitting best model…</code>) appear in the cell output too.</li>
 </ul>
 <p>Example output you'll see while the cell runs:</p>
-<pre><code>Trial 1/10 — score=0.9221
+<div class="highlight"><pre><span></span><code>Trial 1/10 — score=0.9221
 Trial 2/10 — score=0.9306
 ...
 Tuning Completed (optuna). Trials evaluated: 10. Best Score: 0.9497
 Best Params: {'n_estimators': 500, 'max_depth': 3, 'learning_rate': 0.05, ...}
 Refitting best model with params: {...}
-</code></pre>
+</code></pre></div>
 <p>After <code>fit_predict</code> completes, the cell calls <code>estimator.evaluate()</code> and renders a coloured <code>train vs test</code> metrics DataFrame (accuracy, F1, ROC-AUC, PR-AUC, and more) using pandas Styler <code>background_gradient</code>.</p>
 <h3 id="using-tuning-directly-without-the-canvas">Using tuning directly (without the canvas)</h3>
 <p>If you want to run tuning in a plain Python script or existing notebook:</p>
-<pre><code class="language-python">from skyulf import NodeRegistry
-from skyulf.data.dataset import SplitDataset
-from skyulf.modeling.base import StatefulEstimator
-from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling._tuning.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TuningApplier</span><span class="p">,</span> <span class="n">TuningCalculator</span>
 
-ALGORITHM = &quot;xgboost_classifier&quot;
-base_calc = NodeRegistry.get_calculator(ALGORITHM)()
-base_apply = NodeRegistry.get_applier(ALGORITHM)()
+<span class="n">ALGORITHM</span> <span class="o">=</span> <span class="s2">"xgboost_classifier"</span>
+<span class="n">base_calc</span> <span class="o">=</span> <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_calculator</span><span class="p">(</span><span class="n">ALGORITHM</span><span class="p">)()</span>
+<span class="n">base_apply</span> <span class="o">=</span> <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_applier</span><span class="p">(</span><span class="n">ALGORITHM</span><span class="p">)()</span>
 
-# Wrapping is required — without it, tuning_config is silently ignored.
-tuner_calc = TuningCalculator(base_calc)
-tuner_apply = TuningApplier(base_apply)
-estimator = StatefulEstimator(node_id=&quot;my_tuner&quot;, calculator=tuner_calc, applier=tuner_apply)
+<span class="c1"># Wrapping is required — without it, tuning_config is silently ignored.</span>
+<span class="n">tuner_calc</span> <span class="o">=</span> <span class="n">TuningCalculator</span><span class="p">(</span><span class="n">base_calc</span><span class="p">)</span>
+<span class="n">tuner_apply</span> <span class="o">=</span> <span class="n">TuningApplier</span><span class="p">(</span><span class="n">base_apply</span><span class="p">)</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span><span class="n">node_id</span><span class="o">=</span><span class="s2">"my_tuner"</span><span class="p">,</span> <span class="n">calculator</span><span class="o">=</span><span class="n">tuner_calc</span><span class="p">,</span> <span class="n">applier</span><span class="o">=</span><span class="n">tuner_apply</span><span class="p">)</span>
 
-dataset = SplitDataset(
-    train=X_train.assign(**{&quot;target&quot;: y_train}),
-    test=X_test.assign(**{&quot;target&quot;: y_test}),
-    validation=None,
-)
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
+    <span class="n">train</span><span class="o">=</span><span class="n">X_train</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="s2">"target"</span><span class="p">:</span> <span class="n">y_train</span><span class="p">}),</span>
+    <span class="n">test</span><span class="o">=</span><span class="n">X_test</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="s2">"target"</span><span class="p">:</span> <span class="n">y_test</span><span class="p">}),</span>
+    <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span>
 
-tuning_config = {
-    &quot;strategy&quot;: &quot;optuna&quot;,
-    &quot;metric&quot;: &quot;f1&quot;,
-    &quot;n_trials&quot;: 25,
-    &quot;search_space&quot;: {
-        &quot;n_estimators&quot;: [100, 200, 500],
-        &quot;max_depth&quot;: [3, 5, 7],
-        &quot;learning_rate&quot;: [0.01, 0.05, 0.1, 0.3],
-    },
-    &quot;cv_enabled&quot;: True,
-    &quot;cv_folds&quot;: 5,
-    &quot;cv_type&quot;: &quot;stratified_k_fold&quot;,
-    &quot;random_state&quot;: 42,
-}
+<span class="n">tuning_config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"optuna"</span><span class="p">,</span>
+    <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"f1"</span><span class="p">,</span>
+    <span class="s2">"n_trials"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span>
+    <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"n_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">500</span><span class="p">],</span>
+        <span class="s2">"max_depth"</span><span class="p">:</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">],</span>
+        <span class="s2">"learning_rate"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">],</span>
+    <span class="p">},</span>
+    <span class="s2">"cv_enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"cv_folds"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="s2">"cv_type"</span><span class="p">:</span> <span class="s2">"stratified_k_fold"</span><span class="p">,</span>
+    <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+<span class="p">}</span>
 
-def _on_trial(current, total, score=None, params=None):
-    msg = f&quot;Trial {current}/{total}&quot;
-    if score is not None:
-        msg += f&quot; — score={score:.4f}&quot;
-    print(msg)
+<span class="k">def</span><span class="w"> </span><span class="nf">_on_trial</span><span class="p">(</span><span class="n">current</span><span class="p">,</span> <span class="n">total</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Trial </span><span class="si">{</span><span class="n">current</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">if</span> <span class="n">score</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" — score=</span><span class="si">{</span><span class="n">score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 
-_ = estimator.fit_predict(
-    dataset=dataset,
-    target_column=&quot;target&quot;,
-    config=tuning_config,
-    progress_callback=_on_trial,
-    log_callback=print,
-)
+<span class="n">_</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span>
+    <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+    <span class="n">config</span><span class="o">=</span><span class="n">tuning_config</span><span class="p">,</span>
+    <span class="n">progress_callback</span><span class="o">=</span><span class="n">_on_trial</span><span class="p">,</span>
+    <span class="n">log_callback</span><span class="o">=</span><span class="nb">print</span><span class="p">,</span>
+<span class="p">)</span>
 
-metrics = estimator.evaluate(dataset=dataset, target_column=&quot;target&quot;)
-</code></pre>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+</code></pre></div>
 <blockquote>
 <p><strong>Important:</strong> Always pass <code>TuningCalculator(base_calc)</code> — not the raw base calculator. The <code>TuningConfig</code> keyword filter inside <code>TuningCalculator.fit</code> reads <code>strategy</code>, <code>n_trials</code>, <code>metric</code>, <code>search_space</code>, <code>cv_*</code>, etc. directly from the config dict. If you pass the unwrapped base calculator, <code>tuning_config</code> is ignored and a single default-param fit runs instead.</p>
 <p><strong>Seeds:</strong> <code>random_state</code> pins the whole tuning run — candidate sampling,
@@ -3803,25 +4083,25 @@ the <strong>Random State</strong> field (Tuning Strategy section) and <strong>Fo
 </blockquote>
 <h3 id="built-in-console-progress-no-callback-needed">Built-in console progress (no callback needed)</h3>
 <p>Instead of writing your own <code>progress_callback</code>, set <code>"progress": True</code> in the tuning config. Skyulf then attaches a tidy console reporter for core-only runs:</p>
-<pre><code class="language-python">tuning_config = {
-    &quot;strategy&quot;: &quot;optuna&quot;,
-    &quot;metric&quot;: &quot;f1&quot;,
-    &quot;n_trials&quot;: 25,
-    &quot;search_space&quot;: {...},
-    &quot;progress&quot;: True,   # built-in console progress
-}
+<div class="highlight"><pre><span></span><code><span class="n">tuning_config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"optuna"</span><span class="p">,</span>
+    <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"f1"</span><span class="p">,</span>
+    <span class="s2">"n_trials"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span>
+    <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">},</span>
+    <span class="s2">"progress"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>   <span class="c1"># built-in console progress</span>
+<span class="p">}</span>
 
-# No progress_callback needed:
-_ = estimator.fit_predict(dataset=dataset, target_column=&quot;target&quot;, config=tuning_config)
-</code></pre>
+<span class="c1"># No progress_callback needed:</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">tuning_config</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>On an interactive terminal (TTY)</strong> you get a single self-updating line — never a flood of per-trial output:</p>
-<pre><code>Tuning trial 12/25 | score 0.9306 | best 0.9497 (#8)
-</code></pre>
+<div class="highlight"><pre><span></span><code>Tuning trial 12/25 | score 0.9306 | best 0.9497 (#8)
+</code></pre></div>
 <p><strong>When the run finishes</strong>, a compact summary always prints (TTY or not):</p>
-<pre><code>Tuning complete | 25/25 scored trials | metric f1
+<div class="highlight"><pre><span></span><code>Tuning complete | 25/25 scored trials | metric f1
   best 0.9497 | {'n_estimators': 500, 'max_depth': 3}
   top: #8 0.9497 | #21 0.9410 | #3 0.9355
-</code></pre>
+</code></pre></div>
 <p><strong>When stdout is piped</strong> (CI, log files, notebooks that capture output), the live line is skipped and only the summary prints.</p>
 <blockquote>
 <p><strong>Note:</strong> <code>progress</code> is off by default and is ignored whenever you pass your own <code>progress_callback</code> — the reporter steps aside so your callback stays in full control. The backend/app never enables it (it streams trials over the jobs WebSocket instead), so this is purely for script/notebook/terminal use of <code>skyulf-core</code>.</p>

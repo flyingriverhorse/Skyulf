@@ -1531,6 +1531,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3241,19 +3521,19 @@
 <li><code>CHANGELOG.md</code> and the applicable <code>changelog/&lt;series&gt;.md</code> entry describe user-visible changes.</li>
 </ul>
 <h2 id="local-distribution-verification">Local distribution verification</h2>
-<pre><code class="language-bash">rm -rf skyulf-core/dist
-python -m pip install --upgrade build twine
-python -m build --outdir skyulf-core/dist skyulf-core
-twine check skyulf-core/dist/*
-python .github/scripts/verify_skyulf_core_distribution.py skyulf-core/dist/*.whl
-</code></pre>
+<div class="highlight"><pre><span></span><code>rm<span class="w"> </span>-rf<span class="w"> </span>skyulf-core/dist
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>build<span class="w"> </span>twine
+python<span class="w"> </span>-m<span class="w"> </span>build<span class="w"> </span>--outdir<span class="w"> </span>skyulf-core/dist<span class="w"> </span>skyulf-core
+twine<span class="w"> </span>check<span class="w"> </span>skyulf-core/dist/*
+python<span class="w"> </span>.github/scripts/verify_skyulf_core_distribution.py<span class="w"> </span>skyulf-core/dist/*.whl
+</code></pre></div>
 <h2 id="publishing">Publishing</h2>
 <p>Merge the version change to <code>master</code>. The <code>Release skyulf-core</code> workflow uses PyPI Trusted Publishing, publishes the already-validated distribution, and creates the <code>core-v&lt;version&gt;</code> tag. Do not add a PyPI API token to the repository.</p>
 <h2 id="post-release-checks">Post-release checks</h2>
-<pre><code class="language-bash">python -m venv /tmp/skyulf-core-release-check
-/tmp/skyulf-core-release-check/bin/python -m pip install --upgrade pip skyulf-core
-/tmp/skyulf-core-release-check/bin/python -c &quot;from skyulf import SkyulfPipeline; print(SkyulfPipeline)&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/tmp/skyulf-core-release-check
+/tmp/skyulf-core-release-check/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip<span class="w"> </span>skyulf-core
+/tmp/skyulf-core-release-check/bin/python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from skyulf import SkyulfPipeline; print(SkyulfPipeline)"</span>
+</code></pre></div>
 
 
 

@@ -1775,6 +1775,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3483,7 +3763,7 @@
 </blockquote>
 <hr />
 <h2 id="architecture-overview">Architecture overview</h2>
-<pre><code>Browser (React SPA)
+<div class="highlight"><pre><span></span><code>Browser (React SPA)
     |
     v
 FastAPI Backend (REST API)
@@ -3495,7 +3775,7 @@ FastAPI Backend (REST API)
     |
     v
 skyulf-core (ML engine)
-</code></pre>
+</code></pre></div>
 <hr />
 <h2 id="step-1-upload-data">Step 1: Upload data</h2>
 <p><strong>Page:</strong> <code>/data</code> (Data Sources)</p>
@@ -3506,12 +3786,12 @@ skyulf-core (ML engine)
 <li>Once ingested, the dataset appears in the list with row count, column count, and status.</li>
 </ol>
 <p><strong>API equivalent:</strong></p>
-<pre><code class="language-bash">curl -X POST http://127.0.0.1:8000/api/ingestion/upload \
-  -F &quot;file=@my_dataset.csv&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/ingestion/upload<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-F<span class="w"> </span><span class="s2">"file=@my_dataset.csv"</span>
+</code></pre></div>
 <p>You can preview sample rows via the <strong>sample</strong> button or API:</p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/data/api/sources/{source_id}/sample
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://127.0.0.1:8000/data/api/sources/<span class="o">{</span>source_id<span class="o">}</span>/sample
+</code></pre></div>
 <hr />
 <h2 id="step-2-explore-data-eda">Step 2: Explore data (EDA)</h2>
 <p><strong>Page:</strong> <code>/eda</code> (Exploratory Data Analysis)</p>
@@ -3631,8 +3911,8 @@ Both operations use fixed configuration and can precede the train/test split;
 choose bounds independently of held-out results. H3 indexing remains a Core
 capability and is not offered in Canvas.</p>
 <h3 id="recommended-pipeline-order">Recommended pipeline order:</h3>
-<pre><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
-</code></pre>
+<div class="highlight"><pre><span></span><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
+</code></pre></div>
 <blockquote>
 <p><strong>Tip:</strong> Always place <code>TrainTestSplitter</code> early to prevent data leakage. Skyulf's Calculator/Applier pattern ensures preprocessing statistics are learned only from the training split.</p>
 </blockquote>
@@ -3651,8 +3931,8 @@ capability and is not offered in Canvas.</p>
 <p><strong>From the canvas:</strong> Click the <strong>Run Preview</strong> button to preview the pipeline, or use <strong>Train</strong> on an individual training node.</p>
 <h3 id="single-training-node">Single training node</h3>
 <p>The frontend converts your visual graph into a pipeline config and sends it to the backend:</p>
-<pre><code>POST /api/pipeline/run
-</code></pre>
+<div class="highlight"><pre><span></span><code>POST /api/pipeline/run
+</code></pre></div>
 <p>The backend validates the config, queues the job (Celery if <code>USE_CELERY=true</code>, otherwise FastAPI BackgroundTasks), and returns a <code>job_id</code>.</p>
 <h3 id="multiple-training-nodes-v040">Multiple training nodes <em>(v0.4.0+)</em></h3>
 <p>When your canvas has 2+ training nodes on separate branches:</p>
@@ -3682,8 +3962,8 @@ capability and is not offered in Canvas.</p>
 <li><strong>Tuning results:</strong> Best parameters, trial history, convergence.</li>
 </ul>
 <p><strong>API equivalent:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://127.0.0.1:8000/api/pipeline/jobs/<span class="o">{</span>job_id<span class="o">}</span>/evaluation
+</code></pre></div>
 <hr />
 <h3 id="inspecting-a-historical-node">Inspecting a historical node</h3>
 <p>Node links in <strong>Error Log</strong> and <strong>Slow Nodes</strong> open <strong>Node Inspector</strong> for the
@@ -3721,12 +4001,13 @@ after a request fails.</p>
 <li><strong>Training cell</strong> — wired up to run the same algorithm the canvas node was configured for:</li>
 <li><strong>Training nodes in Basic mode</strong> (<code>run_mode: "basic"</code>) call <code>estimator.fit_predict()</code> with <code>log_callback=print</code>.</li>
 <li><strong>Training nodes in Advanced mode</strong> (<code>run_mode: "advanced"</code>) automatically use <code>TuningCalculator</code>/<code>TuningApplier</code> wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
-     <code>Trial 1/10 — score=0.9221
-     Trial 2/10 — score=0.9306
-     ...
-     Tuning Completed (optuna). Best Score: 0.9497
-     Best Params: {'n_estimators': 500, ...}
-     Refitting best model with params: {...}</code></li>
+     <div class="highlight"><pre><span></span><code>Trial 1/10 — score=0.9221
+Trial 2/10 — score=0.9306
+...
+Tuning Completed (optuna). Best Score: 0.9497
+Best Params: {'n_estimators': 500, ...}
+Refitting best model with params: {...}
+</code></pre></div></li>
 <li><strong>Metrics cell</strong> — renders a coloured <code>train vs test</code> table (green = high, red = low) via pandas Styler <code>background_gradient</code>.</li>
 <li><strong>Multi-branch comparison</strong> (if 2+ training nodes) — a <code>(branch × split)</code> metrics table after all branches have run, so you can compare experiments side-by-side.</li>
 <li><strong>Inference cell</strong> — shows how to reload the saved <code>.pkl</code> artifact and call <code>estimator.predict(new_df)</code>.</li>
@@ -3742,16 +4023,16 @@ after a request fails.</p>
 <li>Only one model can be active at a time. Deploying a new model deactivates the previous one.</li>
 </ol>
 <p><strong>Check active deployment:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/api/deployment/active
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://127.0.0.1:8000/api/deployment/active
+</code></pre></div>
 <hr />
 <h2 id="step-7-run-predictions-inference">Step 7: Run predictions (inference)</h2>
 <p><strong>Page:</strong> <code>/deployments</code> (Deployments) — Inference testing panel</p>
 <p>Send new data to the active model:</p>
-<pre><code class="language-bash">curl -X POST http://127.0.0.1:8000/api/deployment/predict \
-  -H &quot;Content-Type: application/json&quot; \
-  -d '{&quot;data&quot;: [{&quot;age&quot;: 25, &quot;income&quot;: 60000, &quot;city&quot;: &quot;London&quot;}]}'
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/api/deployment/predict<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"data": [{"age": 25, "income": 60000, "city": "London"}]}'</span>
+</code></pre></div>
 <p>The deployed model applies the full preprocessing pipeline (imputation, encoding, scaling) and returns predictions.</p>
 <hr />
 <h2 id="step-8-monitor-for-drift">Step 8: Monitor for drift</h2>

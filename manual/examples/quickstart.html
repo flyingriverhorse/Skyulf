@@ -1553,6 +1553,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3258,84 +3538,84 @@
 <p>This guide demonstrates how to create a simple end-to-end pipeline using Skyulf Core — from data creation to training, saving, and loading.</p>
 <h2 id="1-setup">1. Setup</h2>
 <p>First, import the necessary modules.</p>
-<pre><code class="language-python">import numpy as np
-import pandas as pd
-from skyulf import SkyulfPipeline
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+</code></pre></div>
 <h2 id="2-create-dummy-data">2. Create Dummy Data</h2>
 <p>We'll create a synthetic dataset with some missing values and categorical features.</p>
-<pre><code class="language-python">def create_dummy_data(n: int = 200) -&gt; pd.DataFrame:
-    np.random.seed(42)
-    df = pd.DataFrame({
-        'age': np.random.randint(18, 80, n),
-        'income': np.random.normal(50000, 15000, n),
-        'city': np.random.choice(['New York', 'London', 'Paris'], n),
-        'is_customer': np.random.choice([0, 1], n),
-    })
-    # Introduce missing values
-    df.loc[0:10, 'income'] = np.nan
-    return df
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_dummy_data</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s1">'age'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+        <span class="s1">'income'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">50000</span><span class="p">,</span> <span class="mi">15000</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+        <span class="s1">'city'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">'New York'</span><span class="p">,</span> <span class="s1">'London'</span><span class="p">,</span> <span class="s1">'Paris'</span><span class="p">],</span> <span class="n">n</span><span class="p">),</span>
+        <span class="s1">'is_customer'</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">n</span><span class="p">),</span>
+    <span class="p">})</span>
+    <span class="c1"># Introduce missing values</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">10</span><span class="p">,</span> <span class="s1">'income'</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="k">return</span> <span class="n">df</span>
 
-data = create_dummy_data()
-print(data.head())
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">   age        income      city  is_customer
+<span class="n">data</span> <span class="o">=</span> <span class="n">create_dummy_data</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>   age        income      city  is_customer
 0   56           NaN     Paris            0
 1   69           NaN  New York            1
 2   46           NaN     Paris            0
 3   32           NaN     Paris            0
 4   60           NaN  New York            0
-</code></pre>
+</code></pre></div></p>
 <h2 id="3-define-pipeline-configuration">3. Define Pipeline Configuration</h2>
 <p>Skyulf pipelines are defined using a JSON-compatible dictionary. This makes them easy to serialize and store.</p>
-<pre><code class="language-python">config = {
-    'preprocessing': [
-        # 1. Split Data into Train/Test
-        {
-            'name': 'split_data',
-            'transformer': 'TrainTestSplitter',
-            'params': {
-                'test_size': 0.2,
-                'target_column': 'is_customer',
-            },
-        },
-        # 2. Impute Missing Income
-        {
-            'name': 'impute_income',
-            'transformer': 'SimpleImputer',
-            'params': {
-                'columns': ['income'],
-                'strategy': 'mean',
-            },
-        },
-        # 3. Encode City (Categorical)
-        {
-            'name': 'encode_city',
-            'transformer': 'OneHotEncoder',
-            'params': {'columns': ['city']},
-        },
-        # 4. Scale Numeric Features
-        {
-            'name': 'scale_features',
-            'transformer': 'StandardScaler',
-            'params': {'columns': ['age', 'income']},
-        },
-    ],
-    'modeling': {
-        'type': 'random_forest_classifier',
-        'params': {'n_estimators': 50, 'max_depth': 5},
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">'preprocessing'</span><span class="p">:</span> <span class="p">[</span>
+        <span class="c1"># 1. Split Data into Train/Test</span>
+        <span class="p">{</span>
+            <span class="s1">'name'</span><span class="p">:</span> <span class="s1">'split_data'</span><span class="p">,</span>
+            <span class="s1">'transformer'</span><span class="p">:</span> <span class="s1">'TrainTestSplitter'</span><span class="p">,</span>
+            <span class="s1">'params'</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">'test_size'</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+                <span class="s1">'target_column'</span><span class="p">:</span> <span class="s1">'is_customer'</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="c1"># 2. Impute Missing Income</span>
+        <span class="p">{</span>
+            <span class="s1">'name'</span><span class="p">:</span> <span class="s1">'impute_income'</span><span class="p">,</span>
+            <span class="s1">'transformer'</span><span class="p">:</span> <span class="s1">'SimpleImputer'</span><span class="p">,</span>
+            <span class="s1">'params'</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">'columns'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'income'</span><span class="p">],</span>
+                <span class="s1">'strategy'</span><span class="p">:</span> <span class="s1">'mean'</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="c1"># 3. Encode City (Categorical)</span>
+        <span class="p">{</span>
+            <span class="s1">'name'</span><span class="p">:</span> <span class="s1">'encode_city'</span><span class="p">,</span>
+            <span class="s1">'transformer'</span><span class="p">:</span> <span class="s1">'OneHotEncoder'</span><span class="p">,</span>
+            <span class="s1">'params'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'columns'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'city'</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="c1"># 4. Scale Numeric Features</span>
+        <span class="p">{</span>
+            <span class="s1">'name'</span><span class="p">:</span> <span class="s1">'scale_features'</span><span class="p">,</span>
+            <span class="s1">'transformer'</span><span class="p">:</span> <span class="s1">'StandardScaler'</span><span class="p">,</span>
+            <span class="s1">'params'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'columns'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'age'</span><span class="p">,</span> <span class="s1">'income'</span><span class="p">]},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s1">'modeling'</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s1">'type'</span><span class="p">:</span> <span class="s1">'random_forest_classifier'</span><span class="p">,</span>
+        <span class="s1">'params'</span><span class="p">:</span> <span class="p">{</span><span class="s1">'n_estimators'</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s1">'max_depth'</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <h2 id="4-run-pipeline">4. Run Pipeline</h2>
 <p>Initialize and fit the pipeline.</p>
-<pre><code class="language-python">pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(data, target_column='is_customer')
-print(metrics)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">{
+<div class="highlight"><pre><span></span><code><span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s1">'is_customer'</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>{
     'preprocessing': {...},
     'modeling': {
         'accuracy': 0.85,
@@ -3343,36 +3623,36 @@ print(metrics)
         ...
     }
 }
-</code></pre>
+</code></pre></div></p>
 <h2 id="5-save-and-load">5. Save and Load</h2>
 <p>Pipelines can be saved to disk and reloaded for inference.</p>
-<pre><code class="language-python">import os
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 
-artifact_path = 'my_model.pkl'
-pipeline.save(artifact_path)
+<span class="n">artifact_path</span> <span class="o">=</span> <span class="s1">'my_model.pkl'</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
 
-# Load back
-loaded = SkyulfPipeline.load(artifact_path)
+<span class="c1"># Load back</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
 
-# Predict on new data
-new_data = pd.DataFrame({
-    'age': [25, 40],
-    'income': [60000, np.nan],
-    'city': ['London', 'Paris'],
-})
+<span class="c1"># Predict on new data</span>
+<span class="n">new_data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s1">'age'</span><span class="p">:</span> <span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="mi">40</span><span class="p">],</span>
+    <span class="s1">'income'</span><span class="p">:</span> <span class="p">[</span><span class="mi">60000</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">],</span>
+    <span class="s1">'city'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'London'</span><span class="p">,</span> <span class="s1">'Paris'</span><span class="p">],</span>
+<span class="p">})</span>
 
-predictions = loaded.predict(new_data)
-print(predictions)
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
 
-# Cleanup
-if os.path.exists(artifact_path):
-    os.remove(artifact_path)
-</code></pre>
-<p><strong>Output:</strong></p>
-<pre><code class="language-text">0    0
+<span class="c1"># Cleanup</span>
+<span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">):</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Output:</strong>
+<div class="highlight"><pre><span></span><code>0    0
 1    1
 dtype: int64
-</code></pre>
+</code></pre></div></p>
 <h2 id="6-whats-next">6. What's next?</h2>
 <table>
 <thead>

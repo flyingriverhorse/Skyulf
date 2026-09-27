@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -4697,7 +4977,9 @@ continue to work unchanged.</p>
 
         <p>Standardize the selected columns using the fitted mean and scale.</p>
 <p>Honors <code>with_mean</code>/<code>with_std</code>; <code>X</code> passes through unchanged when the
-enabled flags have no fitted statistics, and <code>y</code> is never modified.</p>
+enabled flags have no fitted statistics, and <code>y</code> is never modified.
+Spark validates portable state and applies native expressions without a
+data action. Its selected numeric columns become double when scaling is enabled.</p>
 
 
 
@@ -4708,9 +4990,7 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 49</span>
 <span class="normal"> 50</span>
 <span class="normal"> 51</span>
 <span class="normal"> 52</span>
@@ -4772,18 +5052,36 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StandardScalerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StandardScalerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Standardize the selected columns using the fitted mean and scale.</span>
 
 <span class="sd">    Honors ``with_mean``/``with_std``; ``X`` passes through unchanged when the</span>
 <span class="sd">    enabled flags have no fitted statistics, and ``y`` is never modified.</span>
+<span class="sd">    Spark validates portable state and applies native expressions without a</span>
+<span class="sd">    data action. Its selected numeric columns become double when scaling is enabled.</span>
 <span class="sd">    """</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">        </span><span class="sd">"""Center and scale ``X`` with the fitted statistics on the active engine."""</span>
         <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
-            <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+            <span class="n">X</span><span class="p">,</span>
+            <span class="n">params</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">,</span>
+                <span class="s2">"spark"</span><span class="p">:</span> <span class="n">apply_spark_standard</span><span class="p">,</span>
+            <span class="p">},</span>
         <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
@@ -4869,16 +5167,28 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Center and scale ``X`` with the fitted statistics on the active engine."""</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
-        <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+        <span class="n">X</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">,</span>
+            <span class="s2">"spark"</span><span class="p">:</span> <span class="n">apply_spark_standard</span><span class="p">,</span>
+        <span class="p">},</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -4911,7 +5221,11 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
 
 
-        <p>Fit per-column mean/scale statistics with sklearn's <code>StandardScaler</code>.</p>
+        <p>Fit per-column statistics using sklearn locally or native Spark aggregates.</p>
+<p>Spark uses population variance (<code>ddof=0</code>), ignores null/NaN observations,
+and returns at most two statistics rows to the driver. Both options default
+to True. Empty explicit training selections produce a no-op artifact;
+selected features with zero training rows cannot be fitted.</p>
 
 
 
@@ -4922,17 +5236,7 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
@@ -4964,7 +5268,65 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
-<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="n">StandardScalerApplier</span><span class="p">)</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+    <span class="s2">"StandardScaler"</span><span class="p">,</span>
+    <span class="n">StandardScalerApplier</span><span class="p">,</span>
+    <span class="n">execution_capabilities</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">ExecutionCapability</span><span class="p">(</span>
+            <span class="s2">"spark"</span><span class="p">,</span>
+            <span class="n">operation</span><span class="p">,</span>
+            <span class="s2">"native"</span><span class="p">,</span>
+            <span class="s2">"preserve"</span><span class="p">,</span>
+            <span class="s2">"global"</span> <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">"fit"</span> <span class="k">else</span> <span class="s2">"row"</span><span class="p">,</span>
+            <span class="n">codec_version</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">config_match</span><span class="o">=</span><span class="p">((</span><span class="s2">"with_mean"</span><span class="p">,</span> <span class="n">with_mean</span><span class="p">),</span> <span class="p">(</span><span class="s2">"with_std"</span><span class="p">,</span> <span class="n">with_std</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">operation</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"fit"</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">with_mean</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">with_std</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="p">),</span>
+<span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"StandardScaler"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Standard Scaler"</span><span class="p">,</span>
@@ -4974,7 +5336,13 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
     <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">StandardScalerCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Fit per-column mean/scale statistics with sklearn's ``StandardScaler``."""</span>
+<span class="w">    </span><span class="sd">"""Fit per-column statistics using sklearn locally or native Spark aggregates.</span>
+
+<span class="sd">    Spark uses population variance (``ddof=0``), ignores null/NaN observations,</span>
+<span class="sd">    and returns at most two statistics rows to the driver. Both options default</span>
+<span class="sd">    to True. Empty explicit training selections produce a no-op artifact;</span>
+<span class="sd">    selected features with zero training rows cannot be fitted.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
@@ -4991,7 +5359,15 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">StandardScalerArtifact</span><span class="p">,</span> <span class="p">{})</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">StandardScalerArtifact</span><span class="p">,</span>
-            <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">}),</span>
+            <span class="n">fit_dual_engine</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span>
+                    <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">,</span>
+                    <span class="s2">"spark"</span><span class="p">:</span> <span class="n">fit_spark_standard</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
         <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
@@ -5039,22 +5415,38 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">StandardScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Dispatch the fit to the active engine and return the scaler-statistics artifact."""</span>
     <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">StandardScalerArtifact</span><span class="p">,</span> <span class="p">{})</span>
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
         <span class="n">StandardScalerArtifact</span><span class="p">,</span>
-        <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">}),</span>
+        <span class="n">fit_dual_engine</span><span class="p">(</span>
+            <span class="n">X</span><span class="p">,</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">,</span>
+                <span class="s2">"spark"</span><span class="p">:</span> <span class="n">fit_spark_standard</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">),</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5078,13 +5470,13 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a schema with touched numeric columns promoted to ``float64``."""</span>

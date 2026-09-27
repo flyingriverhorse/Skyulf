@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -4017,12 +4297,12 @@
 <p>This page documents all preprocessing node types supported by Skyulf's <code>NodeRegistry</code> (resolved by <code>FeatureEngineer</code> at runtime).</p>
 <h2 id="step-schema">Step schema</h2>
 <p>Every preprocessing step in the pipeline config uses:</p>
-<pre><code class="language-python">{
-  &quot;name&quot;: &quot;...&quot;,
-  &quot;transformer&quot;: &quot;TransformerType&quot;,
-  &quot;params&quot;: { ... }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"..."</span><span class="p">,</span>
+  <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TransformerType"</span><span class="p">,</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>Where <code>params</code> is passed into the node's Calculator <code>fit()</code>.</p>
 <h3 id="decimal-numeric-columns">Decimal numeric columns</h3>
 <p>Numeric auto-selection includes Polars <code>Decimal(precision, scale)</code> columns and
@@ -4042,8 +4322,8 @@ engines. An explicit <code>columns=[]</code> still makes the scaler a no-op.</p>
 Existing fitted artifacts keep their original selection when replayed.</p>
 <h2 id="splitters">Splitters</h2>
 <p>Example step:</p>
-<pre><code class="language-python">{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">}}</span>
+</code></pre></div>
 <h3 id="traintestsplitter">TrainTestSplitter</h3>
 <p>Splits a DataFrame (or <code>(X, y)</code> tuple) into <code>SplitDataset(train, test, validation)</code>.</p>
 <p>Config (<code>params</code>):</p>
@@ -4084,19 +4364,19 @@ numbers, matching native Polars Decimal behavior. Amounts such as
 Refit saved text-cleaning steps that selected Decimal columns and rerun from
 the original data; old artifacts keep their stored column selections.</p>
 <p>Example step:</p>
-<pre><code class="language-python">{
-  &quot;name&quot;: &quot;clean_text&quot;,
-  &quot;transformer&quot;: &quot;TextCleaning&quot;,
-  &quot;params&quot;: {
-    &quot;columns&quot;: [&quot;free_text&quot;],
-    &quot;operations&quot;: [
-      {&quot;op&quot;: &quot;trim&quot;, &quot;mode&quot;: &quot;both&quot;},
-      {&quot;op&quot;: &quot;case&quot;, &quot;mode&quot;: &quot;lower&quot;},
-      {&quot;op&quot;: &quot;regex&quot;, &quot;mode&quot;: &quot;collapse_whitespace&quot;}
-    ]
-  }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"clean_text"</span><span class="p">,</span>
+  <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TextCleaning"</span><span class="p">,</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"free_text"</span><span class="p">],</span>
+    <span class="s2">"operations"</span><span class="p">:</span> <span class="p">[</span>
+      <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"trim"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"both"</span><span class="p">},</span>
+      <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"case"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"lower"</span><span class="p">},</span>
+      <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"regex"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"collapse_whitespace"</span><span class="p">}</span>
+    <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="textcleaning">TextCleaning</h3>
 <p>Applies a list of string operations.</p>
 <p>Config:</p>
@@ -4219,8 +4499,8 @@ data. Rename the conflicting input column or change the selected columns.</p>
 </ul>
 <h2 id="imputation">Imputation</h2>
 <p>Example step:</p>
-<pre><code class="language-python">{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;median&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"median"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]}}</span>
+</code></pre></div>
 <h3 id="simpleimputer">SimpleImputer</h3>
 <p>Mean and median require numeric columns. An explicit selection containing text,
 including numeric-looking strings, raises a <code>ValueError</code> naming the incompatible
@@ -4272,8 +4552,8 @@ Decimal numeric selections remain supported; automatic selection is unchanged.</
 Polars <code>Enum</code> columns as well as strings and categorical columns. Refit a
 pipeline that previously skipped Enum inputs to learn their encoding.</p>
 <p>Example step:</p>
-<pre><code class="language-python">{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">}}</span>
+</code></pre></div>
 <h3 id="onehotencoder">OneHotEncoder</h3>
 <p>Generated names must be unique and must not collide with retained input
 columns. Fitting and applying raise <code>ValueError</code> before returning ambiguous

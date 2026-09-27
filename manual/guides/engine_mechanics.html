@@ -1693,6 +1693,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3399,9 +3679,9 @@
 <h2 id="1-specifically-what-is-skyulfdataframe">1. Specifically, what is <code>SkyulfDataFrame</code>?</h2>
 <p>You might see <code>SkyulfDataFrame</code> in our type hints. It is <strong>not</strong> a new class. It is a <strong>Type Alias</strong> (Protocol) that means:
 <em>"This variable can be either a <code>polars.DataFrame</code> or a <code>pandas.DataFrame</code>."</em></p>
-<pre><code class="language-python"># Conceptually:
-SkyulfDataFrame = Union[pl.DataFrame, pd.DataFrame]
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># Conceptually:</span>
+<span class="n">SkyulfDataFrame</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span>
+</code></pre></div>
 <p>This ensures our code knows how to handle both formats without forcing you to convert everything manually.</p>
 <h2 id="2-engine-detection-how-do-we-know-which-one-it-is">2. Engine Detection: How do we know which one it is?</h2>
 <p>We don't ask you to specify the engine. We detect it automatically using the <code>get_engine(df)</code> utility.</p>
@@ -3412,16 +3692,16 @@ SkyulfDataFrame = Union[pl.DataFrame, pd.DataFrame]
 2.  If not, we check <code>isinstance(df, pandas.DataFrame)</code>.
     *   If <strong>True</strong>: We tag it as <code>Engine.PANDAS</code>.
 3.  Otherwise, we raise an error.</p>
-<pre><code class="language-python">from skyulf.engines import get_engine
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_engine</span>
 
-def fit(self, df: SkyulfDataFrame, ...):
-    engine = get_engine(df)
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
-    if engine.name == &quot;polars&quot;:
-        # Run optimized Polars logic
-    else:
-        # Run standard Pandas logic
-</code></pre>
+    <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"polars"</span><span class="p">:</span>
+        <span class="c1"># Run optimized Polars logic</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Run standard Pandas logic</span>
+</code></pre></div>
 <h2 id="3-choosing-the-engine-skyulf_engine">3. Choosing the engine: <code>SKYULF_ENGINE</code></h2>
 <p>Inside <code>skyulf-core</code>, recognized dataframe types determine their own engine
 (detection above). Without a recognized dataframe, the fallback is <strong>Polars</strong>.
@@ -3474,17 +3754,17 @@ frame-type invariant:</p>
 </li>
 <li><strong>Safe Output:</strong> Ensures the result is always a Numpy array ready for <code>.fit()</code>.</li>
 </ol>
-<pre><code class="language-python"># Inside your complex Calculator
-from skyulf.engines.sklearn_bridge import SklearnBridge
+<p><div class="highlight"><pre><span></span><code><span class="c1"># Inside your complex Calculator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines.sklearn_bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">SklearnBridge</span>
 
-def fit(self, df, ...):
-    # Doesn't matter if df is Pandas or Polars
-    X_matrix, y_vector = SklearnBridge.to_sklearn(df)
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="c1"># Doesn't matter if df is Pandas or Polars</span>
+    <span class="n">X_matrix</span><span class="p">,</span> <span class="n">y_vector</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
-    model = IsolationForest()
-    model.fit(X_matrix, y_vector)
-</code></pre>
-<p>This isolates the "compatibility boilerplate" away from your ML logic.</p>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">IsolationForest</span><span class="p">()</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_matrix</span><span class="p">,</span> <span class="n">y_vector</span><span class="p">)</span>
+</code></pre></div>
+This isolates the "compatibility boilerplate" away from your ML logic.</p>
 <p>This allows us to support <em>every</em> ML feature without rewriting Scikit-Learn from scratch in Polars.</p>
 <h2 id="5-calculator-vs-applier-in-the-hybrid-world">5. Calculator vs. Applier in the Hybrid World</h2>
 <h3 id="calculator-fit">Calculator (<code>fit</code>)</h3>

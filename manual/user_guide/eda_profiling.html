@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3595,27 +3875,27 @@
 <blockquote>
 <p><strong>Note:</strong> This requires the visualization extras: <code>pip install skyulf-core[viz]</code></p>
 </blockquote>
-<pre><code class="language-python">import polars as pl
-from skyulf import EDAAnalyzer, EDAVisualizer
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">EDAAnalyzer</span><span class="p">,</span> <span class="n">EDAVisualizer</span>
 
-# 1. Load Data
-df = pl.read_csv(&quot;your_dataset.csv&quot;)
+<span class="c1"># 1. Load Data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"your_dataset.csv"</span><span class="p">)</span>
 
-# 2. Analyze
-analyzer = EDAAnalyzer(df)
-profile = analyzer.analyze(
-    target_col=&quot;target&quot;,
-    task_type=&quot;Classification&quot;, # Optional: Force &quot;Classification&quot; or &quot;Regression&quot;
-    date_col=&quot;timestamp&quot;,       # Optional: Manually specify if auto-detection fails
-    lat_col=&quot;latitude&quot;,         # Optional
-    lon_col=&quot;longitude&quot;         # Optional
-)
+<span class="c1"># 2. Analyze</span>
+<span class="n">analyzer</span> <span class="o">=</span> <span class="n">EDAAnalyzer</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span>
+    <span class="n">target_col</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+    <span class="n">task_type</span><span class="o">=</span><span class="s2">"Classification"</span><span class="p">,</span> <span class="c1"># Optional: Force "Classification" or "Regression"</span>
+    <span class="n">date_col</span><span class="o">=</span><span class="s2">"timestamp"</span><span class="p">,</span>       <span class="c1"># Optional: Manually specify if auto-detection fails</span>
+    <span class="n">lat_col</span><span class="o">=</span><span class="s2">"latitude"</span><span class="p">,</span>         <span class="c1"># Optional</span>
+    <span class="n">lon_col</span><span class="o">=</span><span class="s2">"longitude"</span>         <span class="c1"># Optional</span>
+<span class="p">)</span>
 
-# 3. Visualize
-viz = EDAVisualizer(profile, df)
-viz.summary()  # Prints Data Quality, Stats, Outliers, Target Analysis, Alerts to terminal
-viz.plot()     # Opens Matplotlib plots (Distributions, Correlations, PCA, etc.)
-</code></pre>
+<span class="c1"># 3. Visualize</span>
+<span class="n">viz</span> <span class="o">=</span> <span class="n">EDAVisualizer</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>
+<span class="n">viz</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>  <span class="c1"># Prints Data Quality, Stats, Outliers, Target Analysis, Alerts to terminal</span>
+<span class="n">viz</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>     <span class="c1"># Opens Matplotlib plots (Distributions, Correlations, PCA, etc.)</span>
+</code></pre></div>
 <h3 id="the-manual-way-accessing-raw-stats">The Manual Way (Accessing Raw Stats)</h3>
 <p>For custom reports or application integrations, use <code>EDAProfile</code> for the raw
 result returned by <code>EDAAnalyzer.analyze()</code>. This is the recommended public name,
@@ -3625,31 +3905,31 @@ available from both <code>skyulf</code> and <code>skyulf.profiling</code>.</p>
 <code>DatasetProfile</code> title, and saved profiles retain their original pickle path.
 The pipeline transformer id <code>"DatasetProfile"</code> still identifies the separate
 inspection node; use that unchanged id in pipeline configurations.</p>
-<pre><code class="language-python">import polars as pl
-from skyulf import EDAAnalyzer, EDAProfile
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">EDAAnalyzer</span><span class="p">,</span> <span class="n">EDAProfile</span>
 
-# 1. Load your data into a Polars DataFrame
-df = pl.read_csv(&quot;your_dataset.csv&quot;)
+<span class="c1"># 1. Load your data into a Polars DataFrame</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"your_dataset.csv"</span><span class="p">)</span>
 
-# 2. Initialize the Analyzer
-analyzer = EDAAnalyzer(df)
+<span class="c1"># 2. Initialize the Analyzer</span>
+<span class="n">analyzer</span> <span class="o">=</span> <span class="n">EDAAnalyzer</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
 
-# 3. Run the analysis
-# You can optionally specify a target column for supervised analysis
-profile: EDAProfile = analyzer.analyze(target_col=&quot;target_variable&quot;)
+<span class="c1"># 3. Run the analysis</span>
+<span class="c1"># You can optionally specify a target column for supervised analysis</span>
+<span class="n">profile</span><span class="p">:</span> <span class="n">EDAProfile</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="n">target_col</span><span class="o">=</span><span class="s2">"target_variable"</span><span class="p">)</span>
 
-# 4. Access the results
-print(f&quot;Rows: {profile.row_count}&quot;)
-print(f&quot;Missing Cells: {profile.missing_cells_percentage}%&quot;)
+<span class="c1"># 4. Access the results</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Rows: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">row_count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Missing Cells: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">missing_cells_percentage</span><span class="si">}</span><span class="s2">%"</span><span class="p">)</span>
 
-# Access column-specific stats
-age_stats = profile.columns[&quot;age&quot;].stats
-print(f&quot;Mean Age: {age_stats.mean}&quot;)
+<span class="c1"># Access column-specific stats</span>
+<span class="n">age_stats</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="s2">"age"</span><span class="p">]</span><span class="o">.</span><span class="n">stats</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Mean Age: </span><span class="si">{</span><span class="n">age_stats</span><span class="o">.</span><span class="n">mean</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# Check for data quality alerts
-for alert in profile.alerts:
-    print(f&quot;[{alert.severity}] {alert.message}&quot;)
-</code></pre>
+<span class="c1"># Check for data quality alerts</span>
+<span class="k">for</span> <span class="n">alert</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">alerts</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="n">alert</span><span class="o">.</span><span class="n">severity</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">alert</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="features">Features</h2>
 <h3 id="1-comprehensive-profiling">1. Comprehensive Profiling</h3>
 <p>The analyzer automatically detects column types (Numeric, Categorical, Date, Text, Boolean) and computes relevant statistics:
@@ -3751,9 +4031,9 @@ and <code>group</code> are supported without dropping their statistics or recomm
 <li><strong>Force Classification:</strong> Useful for ID columns or numeric codes (e.g., Zip Code, Status Code) that should be treated as categories.</li>
 <li><strong>Force Regression:</strong> Useful for numeric ratings (e.g., 1–5) that you want to treat as measurements. String labels are not automatically converted into numeric ratings.</li>
 </ul>
-<pre><code class="language-python"># Force Classification on a numeric ID column
-profile = analyzer.analyze(target_col=&quot;zip_code&quot;, task_type=&quot;Classification&quot;)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># Force Classification on a numeric ID column</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="n">target_col</span><span class="o">=</span><span class="s2">"zip_code"</span><span class="p">,</span> <span class="n">task_type</span><span class="o">=</span><span class="s2">"Classification"</span><span class="p">)</span>
+</code></pre></div>
 <p>An explicit classification task also excludes a numerically stored target
 from target Pearson and Fisher-Z analysis, while retaining categorical
 associations. An explicit regression task permits an existing numeric target
@@ -3768,8 +4048,8 @@ when row order or the Python process changes. Recreate existing plots with
 PCA treats text labels such as <code>"nan"</code> and <code>"inf"</code> as categories so their
 points remain visible.</p>
 <p>The core library is designed to be lightweight. To use the <code>EDAVisualizer</code> and generate plots, you must install the optional visualization dependencies:</p>
-<pre><code class="language-bash">pip install skyulf-core[viz]
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>viz<span class="o">]</span>
+</code></pre></div>
 <p>This installs:
 *   <code>matplotlib</code>: For generating plots.
 *   <code>rich</code>: For beautiful terminal dashboards.</p>
@@ -3795,18 +4075,18 @@ category colors above twenty groups.</p>
 The chart data table and CSV export retain the original label values.</p>
 <h2 id="filtering-exclusion">Filtering &amp; Exclusion</h2>
 <p>You can refine your analysis by filtering rows or excluding columns without modifying your original dataframe.</p>
-<pre><code class="language-python"># Run analysis on a subset of data
-profile = analyzer.analyze(
-    target_col=&quot;price&quot;,
-    # Filter rows where 'region' is 'US' and 'age' &gt; 18
-    filters=[
-        {&quot;column&quot;: &quot;region&quot;, &quot;operator&quot;: &quot;==&quot;, &quot;value&quot;: &quot;US&quot;},
-        {&quot;column&quot;: &quot;age&quot;, &quot;operator&quot;: &quot;&gt;&quot;, &quot;value&quot;: 18}
-    ],
-    # Exclude 'id' and 'timestamp' columns from the report
-    exclude_cols=[&quot;id&quot;, &quot;timestamp&quot;]
-)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># Run analysis on a subset of data</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span>
+    <span class="n">target_col</span><span class="o">=</span><span class="s2">"price"</span><span class="p">,</span>
+    <span class="c1"># Filter rows where 'region' is 'US' and 'age' &gt; 18</span>
+    <span class="n">filters</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="s2">"region"</span><span class="p">,</span> <span class="s2">"operator"</span><span class="p">:</span> <span class="s2">"=="</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="s2">"US"</span><span class="p">},</span>
+        <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="s2">"age"</span><span class="p">,</span> <span class="s2">"operator"</span><span class="p">:</span> <span class="s2">"&gt;"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="mi">18</span><span class="p">}</span>
+    <span class="p">],</span>
+    <span class="c1"># Exclude 'id' and 'timestamp' columns from the report</span>
+    <span class="n">exclude_cols</span><span class="o">=</span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"timestamp"</span><span class="p">]</span>
+<span class="p">)</span>
+</code></pre></div>
 <p>Column exclusions also apply to explicit <code>lat_col</code> and <code>lon_col</code> selections.
 If either selected coordinate is excluded, <code>profile.geospatial</code> is <code>None</code>,
 so its points, bounds and centroid are omitted. Exclusions persist when you
@@ -3826,25 +4106,25 @@ after row filters, before sampling. Without filters, it is the position in
 the input dataframe. It is never the position within the randomized sample.
 The outlier count and percentage describe the analyzed sample when sampling
 is used.</p>
-<pre><code class="language-python">if profile.outliers:
-    print(f&quot;Total Outliers: {profile.outliers.total_outliers}&quot;)
-    print(f&quot;Outlier Percentage: {profile.outliers.outlier_percentage}%&quot;)
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="n">profile</span><span class="o">.</span><span class="n">outliers</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total Outliers: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">outliers</span><span class="o">.</span><span class="n">total_outliers</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Outlier Percentage: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">outliers</span><span class="o">.</span><span class="n">outlier_percentage</span><span class="si">}</span><span class="s2">%"</span><span class="p">)</span>
 
-    # Inspect the top most anomalous rows
-    for outlier in profile.outliers.top_outliers[:5]:
-        print(f&quot;Row Index: {outlier.index}, Score: {outlier.score}&quot;)
+    <span class="c1"># Inspect the top most anomalous rows</span>
+    <span class="k">for</span> <span class="n">outlier</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">outliers</span><span class="o">.</span><span class="n">top_outliers</span><span class="p">[:</span><span class="mi">5</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Row Index: </span><span class="si">{</span><span class="n">outlier</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s2">, Score: </span><span class="si">{</span><span class="n">outlier</span><span class="o">.</span><span class="n">score</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-        # See why it was flagged (feature contribution)
-        if outlier.explanation:
-            print(&quot;  Reason:&quot;, outlier.explanation)
-</code></pre>
+        <span class="c1"># See why it was flagged (feature contribution)</span>
+        <span class="k">if</span> <span class="n">outlier</span><span class="o">.</span><span class="n">explanation</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"  Reason:"</span><span class="p">,</span> <span class="n">outlier</span><span class="o">.</span><span class="n">explanation</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="2-multivariate-analysis-pca">2. Multivariate Analysis (PCA)</h3>
 <p>Principal Component Analysis (PCA) projects high-dimensional data into 2D or 3D space to visualize clusters and structure.</p>
-<pre><code class="language-python">if profile.pca_data:
-    # Access the projected points (x, y, z)
-    for point in profile.pca_data[:5]:
-        print(f&quot;x: {point.x}, y: {point.y}, Label: {point.label}&quot;)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="n">profile</span><span class="o">.</span><span class="n">pca_data</span><span class="p">:</span>
+    <span class="c1"># Access the projected points (x, y, z)</span>
+    <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">pca_data</span><span class="p">[:</span><span class="mi">5</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"x: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">x</span><span class="si">}</span><span class="s2">, y: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">y</span><span class="si">}</span><span class="s2">, Label: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">label</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="3-causal-discovery">3. Causal Discovery</h3>
 <p>Skyulf integrates <code>causal-learn</code> to run PC with Fisher-Z tests on eligible
 numeric measurements. PC can leave relationships unoriented, so the result
@@ -3865,13 +4145,13 @@ are selected. A feature named <code>target</code> or <code>label</code> does not
 numeric analysis, <code>profile.causal_target_exclusion_reason</code> is <code>"categorical"</code>,
 <code>"excluded"</code> or <code>"unsupported"</code>; this explanation is available even when the
 graph itself is <code>None</code>. Both fields are optional when reading older reports.</p>
-<pre><code class="language-python">if profile.causal_graph:
-    print(f&quot;Graph has {len(profile.causal_graph.nodes)} nodes and {len(profile.causal_graph.edges)} edges.&quot;)
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="n">profile</span><span class="o">.</span><span class="n">causal_graph</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Graph has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">profile</span><span class="o">.</span><span class="n">causal_graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span><span class="si">}</span><span class="s2"> nodes and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">profile</span><span class="o">.</span><span class="n">causal_graph</span><span class="o">.</span><span class="n">edges</span><span class="p">)</span><span class="si">}</span><span class="s2"> edges."</span><span class="p">)</span>
 
-    for edge in profile.causal_graph.edges:
-        # Types: &quot;directed&quot; (-&gt;), &quot;undirected&quot; (--), &quot;bidirected&quot; (&lt;-&gt;)
-        print(f&quot;{edge.source} {edge.type} {edge.target}&quot;)
-</code></pre>
+    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">causal_graph</span><span class="o">.</span><span class="n">edges</span><span class="p">:</span>
+        <span class="c1"># Types: "directed" (-&gt;), "undirected" (--), "bidirected" (&lt;-&gt;)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">edge</span><span class="o">.</span><span class="n">type</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <p>Directed edges preserve the orientation returned by PC. The web graph keeps
 distinct column names such as <code>petal width</code> and <code>petal_width</code> separate and
 shows both arrowheads for a bidirected edge. Loading a report with an empty
@@ -3881,19 +4161,19 @@ saved causal graphs, target statistics, rules and outlier row indices: existing
 stored reports retain the results produced by their original analysis.</p>
 <h3 id="4-geospatial-analysis">4. Geospatial Analysis</h3>
 <p>Automatically detects Latitude/Longitude columns and computes bounding boxes and centroids.</p>
-<pre><code class="language-python">if profile.geospatial:
-    print(f&quot;Bounds: {profile.geospatial.min_lat}, {profile.geospatial.min_lon} to {profile.geospatial.max_lat}, {profile.geospatial.max_lon}&quot;)
-    print(f&quot;Centroid: {profile.geospatial.centroid_lat}, {profile.geospatial.centroid_lon}&quot;)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Bounds: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">min_lat</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">min_lon</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">max_lat</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">max_lon</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Centroid: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">centroid_lat</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">geospatial</span><span class="o">.</span><span class="n">centroid_lon</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="5-time-series-analysis">5. Time Series Analysis</h3>
 <p>Detects datetime columns and analyzes trends and seasonality. It automatically adjusts the resampling interval (e.g., 1s, 1h, 1d) based on the data duration to provide meaningful trend lines.</p>
-<pre><code class="language-python">if profile.timeseries:
-    print(f&quot;Time Column: {profile.timeseries.date_col}&quot;)
+<div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="n">profile</span><span class="o">.</span><span class="n">timeseries</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Time Column: </span><span class="si">{</span><span class="n">profile</span><span class="o">.</span><span class="n">timeseries</span><span class="o">.</span><span class="n">date_col</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-    # Access trend data
-    for point in profile.timeseries.trend[:5]:
-        print(f&quot;Date: {point.date}, Value: {point.values}&quot;)
-</code></pre>
+    <span class="c1"># Access trend data</span>
+    <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">timeseries</span><span class="o">.</span><span class="n">trend</span><span class="p">[:</span><span class="mi">5</span><span class="p">]:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Date: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">date</span><span class="si">}</span><span class="s2">, Value: </span><span class="si">{</span><span class="n">point</span><span class="o">.</span><span class="n">values</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="6-smart-date-detection">6. Smart Date Detection</h3>
 <p>Skyulf uses a robust "Tournament Strategy" to correctly identify date formats in ambiguous columns (e.g., distinguishing between <code>MM/DD/YYYY</code> and <code>DD/MM/YYYY</code>).</p>
 <p><strong>How it works:</strong>
@@ -3907,9 +4187,9 @@ stored reports retain the results produced by their original analysis.</p>
 <h2 id="examples">Examples</h2>
 <p>We provide complete, runnable scripts in the <code>docs/examples/scripts/</code> directory. These examples demonstrate how to use Skyulf as a library with rich terminal output and visualizations.</p>
 <h3 id="prerequisites-for-examples">Prerequisites for Examples</h3>
-<p>To run these examples, you'll need a few extra libraries for visualization and pretty printing:</p>
-<pre><code class="language-bash">pip install matplotlib rich scikit-learn
-</code></pre>
+<p>To run these examples, you'll need a few extra libraries for visualization and pretty printing:
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>matplotlib<span class="w"> </span>rich<span class="w"> </span>scikit-learn
+</code></pre></div></p>
 <h3 id="1-time-series-analysis">1. Time Series Analysis</h3>
 <p><strong>Script:</strong> <a href="../examples/scripts/eda_timeseries.py"><code>docs/examples/scripts/eda_timeseries.py</code></a></p>
 <p>This example generates synthetic sales data with a trend and weekly seasonality. It demonstrates:
@@ -4000,42 +4280,42 @@ place it is reported.</p>
 <h3 id="using-the-library-python-api">Using the Library (Python API)</h3>
 <p><strong>Script:</strong> <a href="../examples/scripts/data_drift_check.py"><code>docs/examples/scripts/data_drift_check.py</code></a></p>
 <p>You can also use the drift detection engine programmatically within your own scripts or pipelines using <code>skyulf-core</code>.</p>
-<pre><code class="language-python">import polars as pl
-from skyulf import DriftCalculator
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">DriftCalculator</span>
 
-# 1. Load Data (Reference vs Current)
-# Reference: The data your model was trained on
-# Current: The new data from production
-ref_df = pl.read_csv(&quot;training_data.csv&quot;)
-curr_df = pl.read_csv(&quot;production_data.csv&quot;)
+<span class="c1"># 1. Load Data (Reference vs Current)</span>
+<span class="c1"># Reference: The data your model was trained on</span>
+<span class="c1"># Current: The new data from production</span>
+<span class="n">ref_df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"training_data.csv"</span><span class="p">)</span>
+<span class="n">curr_df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"production_data.csv"</span><span class="p">)</span>
 
-# 2. Initialize Calculator
-calculator = DriftCalculator(ref_df, curr_df)
+<span class="c1"># 2. Initialize Calculator</span>
+<span class="n">calculator</span> <span class="o">=</span> <span class="n">DriftCalculator</span><span class="p">(</span><span class="n">ref_df</span><span class="p">,</span> <span class="n">curr_df</span><span class="p">)</span>
 
-# 3. Calculate Drift
-# You can optionally override default thresholds
-report = calculator.calculate_drift(thresholds={&quot;psi&quot;: 0.2, &quot;wasserstein&quot;: 0.1})
+<span class="c1"># 3. Calculate Drift</span>
+<span class="c1"># You can optionally override default thresholds</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">calculator</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">thresholds</span><span class="o">=</span><span class="p">{</span><span class="s2">"psi"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">"wasserstein"</span><span class="p">:</span> <span class="mf">0.1</span><span class="p">})</span>
 
-# 4. Inspect Results
-print(f&quot;Drifted Columns: {report.drifted_columns_count}&quot;)
+<span class="c1"># 4. Inspect Results</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Drifted Columns: </span><span class="si">{</span><span class="n">report</span><span class="o">.</span><span class="n">drifted_columns_count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# Check for Schema Drift
-if report.missing_columns:
-    print(f&quot;⚠️ Missing Columns: {report.missing_columns}&quot;)
-if report.new_columns:
-    print(f&quot;ℹ️ New Columns: {report.new_columns}&quot;)
+<span class="c1"># Check for Schema Drift</span>
+<span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">missing_columns</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"⚠️ Missing Columns: </span><span class="si">{</span><span class="n">report</span><span class="o">.</span><span class="n">missing_columns</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">new_columns</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ℹ️ New Columns: </span><span class="si">{</span><span class="n">report</span><span class="o">.</span><span class="n">new_columns</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-# Check for Statistical Drift
-for col_name, drift_info in report.column_drifts.items():
-    if drift_info.drift_detected:
-        print(f&quot;\n🚨 Drift detected in '{col_name}':&quot;)
-        for metric in drift_info.metrics:
-            status = &quot;FAIL&quot; if metric.has_drift else &quot;PASS&quot;
-            print(f&quot;  - {metric.metric}: {metric.value:.4f} [{status}]&quot;)
+<span class="c1"># Check for Statistical Drift</span>
+<span class="k">for</span> <span class="n">col_name</span><span class="p">,</span> <span class="n">drift_info</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">column_drifts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">drift_info</span><span class="o">.</span><span class="n">drift_detected</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">🚨 Drift detected in '</span><span class="si">{</span><span class="n">col_name</span><span class="si">}</span><span class="s2">':"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">metric</span> <span class="ow">in</span> <span class="n">drift_info</span><span class="o">.</span><span class="n">metrics</span><span class="p">:</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="s2">"FAIL"</span> <span class="k">if</span> <span class="n">metric</span><span class="o">.</span><span class="n">has_drift</span> <span class="k">else</span> <span class="s2">"PASS"</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  - </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">metric</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">metric</span><span class="o">.</span><span class="n">value</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> [</span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
 
-        if drift_info.suggestions:
-            print(f&quot;  💡 Suggestion: {drift_info.suggestions[0]}&quot;)
-</code></pre>
+        <span class="k">if</span> <span class="n">drift_info</span><span class="o">.</span><span class="n">suggestions</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  💡 Suggestion: </span><span class="si">{</span><span class="n">drift_info</span><span class="o">.</span><span class="n">suggestions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 
 
 

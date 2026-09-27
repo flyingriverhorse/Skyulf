@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3318,20 +3598,20 @@
 </blockquote>
 <h2 id="pipeline-config">Pipeline config</h2>
 <p><code>SkyulfPipeline</code> expects:</p>
-<pre><code class="language-python">{
-  &quot;preprocessing&quot;: [ ... ],
-  &quot;modeling&quot;: { ... }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span> <span class="o">...</span> <span class="p">],</span>
+  <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="preprocessing-config">Preprocessing config</h3>
 <p>The preprocessing list is executed in order.</p>
 <p>Each step is:</p>
-<pre><code class="language-python">{
-  &quot;name&quot;: &quot;step_name&quot;,
-  &quot;transformer&quot;: &quot;TransformerType&quot;,
-  &quot;params&quot;: { ... }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"step_name"</span><span class="p">,</span>
+  <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TransformerType"</span><span class="p">,</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <p><code>TransformerType</code> is a string key resolved via the <code>NodeRegistry</code>.
 For the full list and per-node parameters, see:</p>
 <ul>
@@ -3339,18 +3619,18 @@ For the full list and per-node parameters, see:</p>
 <li>Reference → API → Preprocessing → pipeline</li>
 </ul>
 <h4 id="minimal-examples">Minimal examples</h4>
-<pre><code class="language-python"># Split to avoid leakage
-{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
-</code></pre>
-<pre><code class="language-python"># Impute missing numeric values
-{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
-</code></pre>
-<pre><code class="language-python"># Encode categoricals
-{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
-</code></pre>
-<pre><code class="language-python"># Scale numeric columns
-{&quot;name&quot;: &quot;scale&quot;, &quot;transformer&quot;: &quot;StandardScaler&quot;, &quot;params&quot;: {&quot;auto_detect&quot;: True}}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># Split to avoid leakage</span>
+<span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">}}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Impute missing numeric values</span>
+<span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]}}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Encode categoricals</span>
+<span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">}}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># Scale numeric columns</span>
+<span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"auto_detect"</span><span class="p">:</span> <span class="kc">True</span><span class="p">}}</span>
+</code></pre></div>
 <h3 id="modeling-config">Modeling config</h3>
 <p><code>SkyulfPipeline</code> supports the following model types via the <code>NodeRegistry</code>.</p>
 <h4 id="classification-9-models">Classification (9 models)</h4>
@@ -3471,25 +3751,25 @@ For the full list and per-node parameters, see:</p>
 </tbody>
 </table>
 <p>Example:</p>
-<pre><code class="language-python">{
-  &quot;type&quot;: &quot;random_forest_classifier&quot;,
-  &quot;node_id&quot;: &quot;model_node&quot;,
-  &quot;params&quot;: {
-    &quot;n_estimators&quot;: 200,
-    &quot;max_depth&quot;: 10
-  }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+  <span class="s2">"node_id"</span><span class="p">:</span> <span class="s2">"model_node"</span><span class="p">,</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
+    <span class="s2">"max_depth"</span><span class="p">:</span> <span class="mi">10</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>Tuner example:</p>
-<pre><code class="language-python">{
-  &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
-  &quot;base_model&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;},
-  &quot;strategy&quot;: &quot;optuna&quot;,
-  &quot;search_space&quot;: {&quot;C&quot;: [0.1, 1.0, 10.0]},
-  &quot;n_trials&quot;: 25,
-  &quot;metric&quot;: &quot;accuracy&quot;
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"hyperparameter_tuner"</span><span class="p">,</span>
+  <span class="s2">"base_model"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"logistic_regression"</span><span class="p">},</span>
+  <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"optuna"</span><span class="p">,</span>
+  <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"C"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">]},</span>
+  <span class="s2">"n_trials"</span><span class="p">:</span> <span class="mi">25</span><span class="p">,</span>
+  <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"accuracy"</span>
+<span class="p">}</span>
+</code></pre></div>
 <h4 id="reproducibility-and-seeds">Reproducibility and seeds</h4>
 <p>Seeding has exactly one owner: <code>skyulf.types.DEFAULT_RANDOM_STATE</code> (currently
 <code>42</code>). Every stochastic component (model fitting, CV folds, tuning search,
@@ -3514,16 +3794,16 @@ out of the box. Explicit configuration always wins, in this precedence order:</p
   encoding CV folds, profiling analyzers) carry fixed seeds that are not
   user-configurable — they are implementation details, not pipeline choices.</li>
 </ul>
-<pre><code class="language-python"># Pin one seed for the whole tuning run:
-{
-  &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
-  &quot;base_model&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;},
-  &quot;strategy&quot;: &quot;random&quot;,
-  &quot;search_space&quot;: {&quot;n_estimators&quot;: [100, 200]},
-  &quot;random_state&quot;: 123,
-  &quot;cv_random_state&quot;: 123
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="c1"># Pin one seed for the whole tuning run:</span>
+<span class="p">{</span>
+  <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"hyperparameter_tuner"</span><span class="p">,</span>
+  <span class="s2">"base_model"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">},</span>
+  <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"random"</span><span class="p">,</span>
+  <span class="s2">"search_space"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">]},</span>
+  <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">123</span><span class="p">,</span>
+  <span class="s2">"cv_random_state"</span><span class="p">:</span> <span class="mi">123</span>
+<span class="p">}</span>
+</code></pre></div>
 <h5 id="where-to-set-seeds-in-the-canvas-per-node">Where to set seeds in the canvas (per node)</h5>
 <table>
 <thead>

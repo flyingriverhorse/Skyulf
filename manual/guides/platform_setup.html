@@ -1647,6 +1647,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3383,14 +3663,14 @@
 </table>
 <hr />
 <h2 id="1-clone-the-repository">1. Clone the Repository</h2>
-<pre><code class="language-bash">git clone https://github.com/flyingriverhorse/Skyulf.git
-cd Skyulf
-</code></pre>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/flyingriverhorse/Skyulf.git
+<span class="nb">cd</span><span class="w"> </span>Skyulf
+</code></pre></div>
 <hr />
 <h2 id="2-configure-environment-variables">2. Configure Environment Variables</h2>
 <p>Copy the example environment file and review the settings:</p>
-<pre><code class="language-bash">cp .env.example .env
-</code></pre>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>.env.example<span class="w"> </span>.env
+</code></pre></div>
 <p>Key variables in <code>.env</code>:</p>
 <table>
 <thead>
@@ -3439,8 +3719,8 @@ cd Skyulf
 <hr />
 <h2 id="3a-docker-compose-recommended">3A. Docker Compose (Recommended)</h2>
 <p>From the repository root:</p>
-<pre><code class="language-bash">docker compose up --build
-</code></pre>
+<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build
+</code></pre></div>
 <p>This starts three containers:</p>
 <table>
 <thead>
@@ -3469,57 +3749,57 @@ cd Skyulf
 </tbody>
 </table>
 <p><strong>Verify it's running:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/health
-# Expected: {&quot;status&quot;: &quot;healthy&quot;, ...}
-</code></pre>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://127.0.0.1:8000/health
+<span class="c1"># Expected: {"status": "healthy", ...}</span>
+</code></pre></div>
 <p><strong>Useful commands:</strong></p>
-<pre><code class="language-bash"># Run in background
-docker compose up --build -d
+<div class="highlight"><pre><span></span><code><span class="c1"># Run in background</span>
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>--build<span class="w"> </span>-d
 
-# Follow API logs
-docker compose logs -f api
+<span class="c1"># Follow API logs</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>api
 
-# Stop everything
-docker compose down
-</code></pre>
+<span class="c1"># Stop everything</span>
+docker<span class="w"> </span>compose<span class="w"> </span>down
+</code></pre></div>
 <blockquote>
 <p><strong>Tip:</strong> Docker Compose mounts your working tree, so local code edits are picked up on reload.</p>
 </blockquote>
 <hr />
 <h2 id="3b-manual-setup-no-docker">3B. Manual Setup (No Docker)</h2>
 <h3 id="create-a-virtual-environment">Create a virtual environment</h3>
-<pre><code class="language-bash">python -m venv .venv
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
+<span class="c1"># Windows PowerShell</span>
+.<span class="se">\.</span>venv<span class="se">\S</span>cripts<span class="se">\A</span>ctivate.ps1
 
-# macOS / Linux
-source .venv/bin/activate
-</code></pre>
+<span class="c1"># macOS / Linux</span>
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</code></pre></div>
 <h3 id="install-dependencies">Install dependencies</h3>
-<pre><code class="language-bash">pip install --upgrade pip
-pip install -r requirements.txt
-</code></pre>
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
 <h3 id="start-redis-if-use_celerytrue">Start Redis (if <code>USE_CELERY=true</code>)</h3>
-<pre><code class="language-bash"># Option 1: Docker (simplest)
-docker run --name skyulf-redis -p 6379:6379 -d redis:7
+<div class="highlight"><pre><span></span><code><span class="c1"># Option 1: Docker (simplest)</span>
+docker<span class="w"> </span>run<span class="w"> </span>--name<span class="w"> </span>skyulf-redis<span class="w"> </span>-p<span class="w"> </span><span class="m">6379</span>:6379<span class="w"> </span>-d<span class="w"> </span>redis:7
 
-# Option 2: Native install (Linux)
-sudo apt install redis-server &amp;&amp; sudo systemctl start redis
+<span class="c1"># Option 2: Native install (Linux)</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>redis-server<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>systemctl<span class="w"> </span>start<span class="w"> </span>redis
 
-# Option 3: Skip Redis entirely
-# Set USE_CELERY=false in your .env file
-</code></pre>
+<span class="c1"># Option 3: Skip Redis entirely</span>
+<span class="c1"># Set USE_CELERY=false in your .env file</span>
+</code></pre></div>
 <h3 id="launch-the-api-server">Launch the API server</h3>
-<pre><code class="language-bash">python run_skyulf.py
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>run_skyulf.py
+</code></pre></div>
 <p>Or with uvicorn directly:</p>
-<pre><code class="language-bash">python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>uvicorn<span class="w"> </span>backend.main:app<span class="w"> </span>--reload<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
+</code></pre></div>
 <h3 id="start-the-celery-worker-optional">Start the Celery worker (optional)</h3>
 <p>In a second terminal with the virtualenv activated:</p>
-<pre><code class="language-bash">python -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
-</code></pre>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>celery<span class="w"> </span>-A<span class="w"> </span>celery_worker.celery_app<span class="w"> </span>worker<span class="w"> </span>--pool<span class="o">=</span>solo<span class="w"> </span>--loglevel<span class="o">=</span>info<span class="w"> </span>--queues<span class="w"> </span>mlops-training
+</code></pre></div>
 <hr />
 <h2 id="4-verify-the-stack">4. Verify the Stack</h2>
 <p>Once the server is running, check these URLs:</p>

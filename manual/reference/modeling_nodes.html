@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3619,13 +3899,13 @@ preserve registration order, and unknown category filters return an empty list.<
 </blockquote>
 <h2 id="common-config-shape">Common config shape</h2>
 <p><code>SkyulfPipeline</code> expects a modeling block like:</p>
-<pre><code class="language-python">{
-  &quot;type&quot;: &quot;logistic_regression&quot;,
-  &quot;node_id&quot;: &quot;model_node&quot;,       # optional
-  &quot;execution_mode&quot;: &quot;merge&quot;,     # optional; &quot;merge&quot; (default) or &quot;parallel&quot;
-  &quot;params&quot;: { ... }              # optional; estimator hyperparameters
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"logistic_regression"</span><span class="p">,</span>
+  <span class="s2">"node_id"</span><span class="p">:</span> <span class="s2">"model_node"</span><span class="p">,</span>       <span class="c1"># optional</span>
+  <span class="s2">"execution_mode"</span><span class="p">:</span> <span class="s2">"merge"</span><span class="p">,</span>     <span class="c1"># optional; "merge" (default) or "parallel"</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span> <span class="o">...</span> <span class="p">}</span>              <span class="c1"># optional; estimator hyperparameters</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="execution_mode-v040">execution_mode <em>(v0.4.0+)</em></h3>
 <p>When a training node has 2+ incoming connections:</p>
 <table>
@@ -3653,11 +3933,11 @@ preserve registration order, and unknown category filters return an empty list.<
 <li>Flat params (legacy): <code>{ "C": 1.0, "type": "..." }</code></li>
 </ul>
 <p>Example (RandomForestClassifier):</p>
-<pre><code class="language-python">{
-  &quot;type&quot;: &quot;random_forest_classifier&quot;,
-  &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+  <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+  <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
 <h3 id="seeding">Seeding</h3>
 <p>Every <code>random_state=42</code> default listed below comes from one place:
 <code>skyulf.types.DEFAULT_RANDOM_STATE</code>, injected at model construction. You can
@@ -3937,65 +4217,65 @@ Existing fitted models retain their predictions; retrain to apply the setting.</
 </blockquote>
 <h3 id="python-example-programmatic-usage-in-skyulf-core">Python Example — Programmatic Usage in <code>skyulf-core</code></h3>
 <p>Ensemble nodes are registered like any other modeling step, so they slot into the <code>modeling</code> block of a <code>SkyulfPipeline</code> config:</p>
-<pre><code class="language-python">import pandas as pd
-from skyulf import SkyulfPipeline
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;},
-        },
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;stacking_classifier&quot;,
-        &quot;params&quot;: {
-            &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;logistic_regression&quot;, &quot;gradient_boosting&quot;],
-            &quot;final_estimator&quot;: &quot;logistic_regression&quot;,
-            &quot;cv&quot;: 5,
-            # Fixed per-base-model hyperparameters (basic mode)
-            &quot;base_estimator_params&quot;: {
-                &quot;random_forest&quot;: {&quot;n_estimators&quot;: 100, &quot;max_depth&quot;: 12},
-                &quot;logistic_regression&quot;: {&quot;C&quot;: 0.5},
-            },
-        },
-    },
-}
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"stacking_classifier"</span><span class="p">,</span>
+        <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"base_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"random_forest"</span><span class="p">,</span> <span class="s2">"logistic_regression"</span><span class="p">,</span> <span class="s2">"gradient_boosting"</span><span class="p">],</span>
+            <span class="s2">"final_estimator"</span><span class="p">:</span> <span class="s2">"logistic_regression"</span><span class="p">,</span>
+            <span class="s2">"cv"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+            <span class="c1"># Fixed per-base-model hyperparameters (basic mode)</span>
+            <span class="s2">"base_estimator_params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"random_forest"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"max_depth"</span><span class="p">:</span> <span class="mi">12</span><span class="p">},</span>
+                <span class="s2">"logistic_regression"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"C"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(df, target_column=&quot;target&quot;)   # learns on the train split
-predictions = pipeline.predict(new_df)               # feature-only dataframe
-</code></pre>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>   <span class="c1"># learns on the train split</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new_df</span><span class="p">)</span>               <span class="c1"># feature-only dataframe</span>
+</code></pre></div>
 <p>A <strong>VotingClassifier</strong> is configured the same way — swap the <code>type</code> for <code>voting_classifier</code> and add <code>"voting": "soft"</code> (or <code>"hard"</code>):</p>
-<pre><code class="language-python">&quot;modeling&quot;: {
-    &quot;type&quot;: &quot;voting_classifier&quot;,
-    &quot;params&quot;: {
-        &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;svc&quot;, &quot;knn&quot;],
-        &quot;voting&quot;: &quot;soft&quot;,
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"voting_classifier"</span><span class="p">,</span>
+    <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"base_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"random_forest"</span><span class="p">,</span> <span class="s2">"svc"</span><span class="p">,</span> <span class="s2">"knn"</span><span class="p">],</span>
+        <span class="s2">"voting"</span><span class="p">:</span> <span class="s2">"soft"</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>You can also drive the underlying calculator/applier directly for low-level usage via the <code>NodeRegistry</code>:</p>
-<pre><code class="language-python">from skyulf import NodeRegistry
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeRegistry</span>
 
-calc = NodeRegistry.get_calculator(&quot;stacking_classifier&quot;)()
-applier = NodeRegistry.get_applier(&quot;stacking_classifier&quot;)()
+<span class="n">calc</span> <span class="o">=</span> <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_calculator</span><span class="p">(</span><span class="s2">"stacking_classifier"</span><span class="p">)()</span>
+<span class="n">applier</span> <span class="o">=</span> <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_applier</span><span class="p">(</span><span class="s2">"stacking_classifier"</span><span class="p">)()</span>
 
-# `fit(X, y, config)` returns the fitted sklearn meta-estimator
-model = calc.fit(
-    X_train,
-    y_train,
-    {
-        &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;decision_tree&quot;],
-        &quot;final_estimator&quot;: &quot;logistic_regression&quot;,
-        &quot;cv&quot;: 3,
-    },
-)
+<span class="c1"># `fit(X, y, config)` returns the fitted sklearn meta-estimator</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">calc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">X_train</span><span class="p">,</span>
+    <span class="n">y_train</span><span class="p">,</span>
+    <span class="p">{</span>
+        <span class="s2">"base_estimators"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"random_forest"</span><span class="p">,</span> <span class="s2">"decision_tree"</span><span class="p">],</span>
+        <span class="s2">"final_estimator"</span><span class="p">:</span> <span class="s2">"logistic_regression"</span><span class="p">,</span>
+        <span class="s2">"cv"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
 
-# `predict(X, model)` / `predict_proba(X, model)` generate predictions
-preds = applier.predict(X_test, model)
-</code></pre>
+<span class="c1"># `predict(X, model)` / `predict_proba(X, model)` generate predictions</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="advanced-hyperparameter-tuning-nested-parameters">Advanced Hyperparameter Tuning (Nested Parameters)</h3>
 <p>When an ensemble runs in <strong>Advanced/Tuning mode</strong> (<code>run_mode: "advanced"</code>), it is routed through the same hyperparameter search engine as a normal model. Set <code>tune_base_models: true</code> to auto-expand the search space into per-base-model dimensions using sklearn's double-underscore syntax (e.g. <code>random_forest__n_estimators</code>, <code>logistic_regression__C</code>). The search then optimizes the meta-estimator's own params (voting type, stacking <code>cv</code>) <em>and</em> each base learner simultaneously.</p>
 <ul>

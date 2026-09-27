@@ -1,0 +1,5128 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle.html">
+      
+      
+        <link rel="prev" href="databricks_local_sdk.html">
+      
+      
+        <link rel="next" href="databricks_bundle_walkthrough.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Databricks Local Bundle (Development) - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#local-engine-databricks-bundle" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Databricks Local Bundle (Development)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="databricks_bundle.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#guided-setup-and-offline-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guided setup and offline preview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-preprocessing-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom preprocessing recipes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-input-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local input limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#record-identity-and-result-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Record identity and result availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-evaluation-split-and-result-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose the evaluation split and result availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#search-and-cross-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Search and cross-validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ensemble-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ensemble recipes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-training-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit training sampling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-windows-are-independent-of-splitting-and-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source windows are independent of splitting and scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-date-formats-and-timezones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source date formats and timezones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-validation-and-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration validation and migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-workflow-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the workflow lives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Where the workflow lives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#independent-scoring-and-promotion-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Independent scoring and promotion policies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operator-actions-through-run-now" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operator actions through Run now
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#approve-an-existing-candidate-without-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approve an existing candidate without training
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reject-a-candidate-or-roll-back-a-promotion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reject a candidate or roll back a promotion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recent-challenger-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recent challenger history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-created" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is created
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What is created">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#additional-quality-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Additional quality gates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#explicit-retry-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit retry policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="local-engine-databricks-bundle">Local-engine Databricks Bundle</h1>
+<p>For job-screen instructions and lifecycle diagrams, use the
+<a href="databricks_bundle_walkthrough.html">operator walkthrough</a>.</p>
+<p>The custom Skyulf template generates one editable Bundle with <code>dev</code>, <code>test</code>,
+<code>syst</code> and <code>prod</code> targets. It fits and predicts with pandas or Polars. Spark
+reads bounded Unity Catalog Delta rows and publishes predictions; local
+feature engineering and model prediction are not distributed Spark work.</p>
+<p>Initialize a project from a Skyulf checkout:</p>
+<div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
+</code></pre></div>
+<p>Initialization follows five sections: <strong>data, model,
+evaluation CV, lifecycle, compute</strong>. It asks for existing record keys (including
+composite keys), source columns, split strategy, applicable date parsing,
+scoring/promotion policies and job settings. Serverless is the default. Reviewable
+noninteractive examples are in <code>skyulf-core/templates/databricks/examples/</code>. The generated
+project has its own <code>databricks.yml</code>; Skyulf's root has no Bundle config.</p>
+<p>Regression starts with Core <code>linear_regression</code> and <code>heldout_rmse</code>;
+classification starts with <code>logistic_regression</code> and <code>heldout_accuracy</code>.
+The pipeline remains editable: add registered Core preprocessing nodes and
+choose a task-compatible model. With a JSON init file, <code>max_rows</code> and
+<code>max_input_mb</code> are positive integer <strong>strings</strong>; the generated workflow stores
+them as numbers. Enter <code>record_key_columns</code> as <code>customer_id, observation_id</code>
+and <code>input_columns</code> as <code>income, age</code>, with no brackets or quotes. The generated
+workflow stores ordered JSON arrays automatically. Init examples now use these
+plain-text fields and task-specific <code>regression_model</code>/<code>classification_model</code>
+and <code>regression_metric</code>/<code>classification_metric</code>; regenerate old init inputs.</p>
+<p>Saved-artifact holdout evaluation uses sequential joblib prediction so parallel
+Random Forest tree summation does not introduce last-bit metric differences into
+exact approval evidence. This affects evaluation only: model hyperparameters and
+normal training/batch inference parallelism are retained. Arbitrary numerical
+runtimes may still be nondeterministic and must pass replay checks.</p>
+<h3 id="guided-setup-and-offline-preview">Guided setup and offline preview</h3>
+<p>Setup follows your answers; it does not inspect source tables or sample rows.
+Random full-snapshot training hides observation-date questions. Result-availability
+questions appear only when you enable that separate filter. Schedule and
+policy-cluster details likewise appear only when selected.</p>
+<p>Advanced settings use defaults without additional questions. Set them with
+<code>--config-file</code> using an existing example, or edit the generated
+<code>config/workflow.json</code> before running preview:</p>
+<table>
+<thead>
+<tr>
+<th>Advanced fields</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>training_version</code></td>
+<td><code>null</code>: pin latest snapshot at run start</td>
+</tr>
+<tr>
+<td><code>training_window_mode</code></td>
+<td><code>auto</code>: full snapshot for random, rolling calendar for temporal</td>
+</tr>
+<tr>
+<td><code>test_size</code>, <code>random_state</code>, <code>stratify</code></td>
+<td><code>0.2</code>, <code>42</code>, <code>false</code></td>
+</tr>
+<tr>
+<td><code>training_sample_rows</code>, <code>training_sample_seed</code></td>
+<td><code>null</code> (all eligible rows within limits), <code>42</code></td>
+</tr>
+<tr>
+<td><code>cv_folds</code>, <code>cv_type</code>, <code>cv_shuffle</code>, <code>cv_random_state</code></td>
+<td><code>5</code>, <code>k_fold</code>, <code>true</code>, <code>42</code>; prompted when CV is enabled</td>
+</tr>
+<tr>
+<td><code>min_improvement</code>, <code>risk_category</code></td>
+<td><code>0.0</code>, empty (generated as <code>null</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Existing init-file names, values and validation remain supported. Most init
+values are strings, including <code>"true"</code>, <code>"42"</code> and <code>"null"</code>; <code>min_improvement</code>
+is a JSON number. Generated workflow JSON uses native booleans/numbers/null.
+For fixed dates, start from
+<code>random-window-init.example.json</code> or <code>temporal-delayed-results-init.example.json</code>.
+For stratified CV and sampling, use <code>guided-classification-init.example.json</code>.
+From the Skyulf checkout, for example:</p>
+<div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-config</span><span class="o">-file</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span><span class="p">/</span><span class="n">examples</span><span class="p">/</span><span class="n">guided-classification-init</span><span class="p">.</span><span class="n">example</span><span class="p">.</span><span class="n">json</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
+</code></pre></div>
+<p>Review table and feature names in the example first. If editing generated JSON,
+use <code>full_snapshot</code>, <code>fixed_window</code> or <code>rolling_calendar</code> for the window mode;
+<code>auto</code> is resolved during initialization. Run <code>python src/preview.py --action train</code>
+from the generated project to validate the resulting combination.</p>
+<p>For each date column you actually use, declare how it is stored:</p>
+<table>
+<thead>
+<tr>
+<th>Your answer</th>
+<th>Follow-up questions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code>: database timestamp representing an instant</td>
+<td>No text format, source timezone or date-only question</td>
+</tr>
+<tr>
+<td><code>local_timestamp</code>: database clock time without a timezone</td>
+<td>Which timezone this clock belongs to</td>
+</tr>
+<tr>
+<td><code>date</code>: day with no clock time</td>
+<td>Source timezone, then whether to treat the day as midnight or reject it</td>
+</tr>
+<tr>
+<td><code>text</code>: dates stored as strings</td>
+<td>Whether the text contains a date only, local date/time, or date/time with an offset; then its format and only the applicable timezone/date-only questions</td>
+</tr>
+</tbody>
+</table>
+<p>For example, date-only text <code>2026-08-10</code> asks for its format, timezone and
+permission to use 00:00. Text <code>2026-08-10T14:30:00+02:00</code> asks for its format
+but not another timezone or midnight rule. Initialization fields
+<code>event_time_kind</code>/<code>result_time_kind</code> and <code>event_text_kind</code>/<code>result_text_kind</code>
+control these questions only; the generated workflow keeps the existing parsing
+contract. Runtime still validates actual values against your declared rules.</p>
+<p>The initializer asks for two <strong>input</strong> tables. <code>source_table_name</code> contains the
+training examples and known answers. <code>score_source_table_name</code> contains records
+to predict; leave it blank to reuse the training input. Neither is the output.
+Choose the result name in the <code>prediction_table_name</code> setup question, for example
+<code>customer_predictions</code>. It becomes <code>prediction_table</code> in the configured output
+schema, with any target resource suffix. Blank uses <code>&lt;project_name&gt;_predictions</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Meaning and example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Training version</td>
+<td>A saved Delta table snapshot from the table's History, such as version 12. This pins input data, not model v12. <code>null</code> or missing resolves latest once at run start; an explicit nonnegative integer pins that snapshot for manual and scheduled runs.</td>
+</tr>
+<tr>
+<td>Source selection</td>
+<td><code>full_snapshot</code>: use all eligible rows from that snapshot. <code>fixed_window</code>: use observation dates between your boundaries. <code>rolling_calendar</code>: derive recent complete months at every invocation. <code>auto</code>: full snapshot for random splitting, rolling calendar for temporal splitting.</td>
+</tr>
+<tr>
+<td>Result availability column</td>
+<td>A column such as <code>claim_confirmed_at</code>, recording when that row's answer became known. Only needed if availability filtering is enabled.</td>
+</tr>
+<tr>
+<td>Result cutoff</td>
+<td>Keep answers known <strong>by</strong> this instant, including equality. For a cutoff of September 15, an answer confirmed September 20 is excluded even if the observation occurred in August. An explicit cutoff is honored in every run; null derives invocation time minus <code>result_availability_lag_hours</code>.</td>
+</tr>
+<tr>
+<td>Date format</td>
+<td>For a text value <code>10/08/2026 14:30</code>, use <code>%d/%m/%Y %H:%M</code> (day/month/year hour:minute). For <code>2026-08-10</code>, use <code>%Y-%m-%d</code>. Database timestamp/date columns do not need a text format.</td>
+</tr>
+<tr>
+<td>Source timezone</td>
+<td>For values such as <code>2026-08-10 14:30</code> with no offset, specify where that clock time belongs, e.g. <code>Europe/Copenhagen</code>. Offset-bearing values such as <code>2026-08-10T14:30:00+02:00</code> identify their offset already.</td>
+</tr>
+<tr>
+<td>Date-only policy</td>
+<td><code>reject</code> stops on values without clock time. <code>midnight</code> interprets <code>2026-08-10</code> as 00:00 in the explicitly selected source timezone.</td>
+</tr>
+<tr>
+<td>Training sample</td>
+<td><code>10000</code> selects up to 10,000 eligible rows before splitting; with a 20% test split this usually means 8,000 train and 2,000 test. <code>null</code> uses all eligible rows within read limits. Prediction never samples.</td>
+</tr>
+<tr>
+<td>CV</td>
+<td>With five folds, score each search candidate using five training folds. Learned preprocessing is fitted within each fold. The final test set remains separate.</td>
+</tr>
+<tr>
+<td>Cron timezone</td>
+<td>The timezone of the job clock. A 03:00 schedule with <code>Europe/Copenhagen</code> uses Copenhagen time, including daylight saving. This does not interpret source dates or change the selected data window.</td>
+</tr>
+</tbody>
+</table>
+<p>For training every six months on January 1 and July 1 at 03:00, choose
+<code>scheduled</code> and enter <code>0 0 3 1 1,7 ?</code>. The cron is the schedule; nothing
+overrides it with a second monthly timer. Manual and scheduled runs use the same
+<code>train</code> action with identical snapshot/window selection rules.
+<code>monthly_lookback_months</code> separately controls how many complete
+months of data a rolling window reads. Independent score scheduling is SM-34.</p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>What you choose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Basics/data</td>
+<td>Engine/task, UC names, keys/features/target, split strategy, availability/date parsing and input limits; advanced snapshot/window/sampling settings use config</td>
+</tr>
+<tr>
+<td>Model</td>
+<td>A menu containing only models for the selected regression/classification task; defaults remain editable in the generated file</td>
+</tr>
+<tr>
+<td>Evaluation CV</td>
+<td>Enable evaluation with fold-local preprocessing; select folds, method, shuffle and seed</td>
+</tr>
+<tr>
+<td>Lifecycle</td>
+<td>Metric/gates, manual/automatic promotion, score selector/handoff and enabled retraining cron</td>
+</tr>
+<tr>
+<td>Compute</td>
+<td>Serverless or approved policy cluster and cost tags</td>
+</tr>
+</tbody>
+</table>
+<p>Preprocessing is edited in the generated <strong><code>src/preprocessing.py</code></strong> file, not in
+the initializer or JSON. <code>build_preprocessing()</code> returns normal Core steps in
+execution order. Keep the JSON <code>pipeline.preprocessing</code> list empty.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_preprocessing</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Fit numeric cleanup and scaling with the selected Core engine."""</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">]}},</span>
+    <span class="p">]</span>
+</code></pre></div>
+<h3 id="custom-preprocessing-recipes">Custom preprocessing recipes</h3>
+<p>Select per-step columns when mixing numeric and categorical features. For your
+own logic, define top-level Calculator/Applier classes in the same file and add
+<code>custom_step("my_step", MyCalculator, MyApplier, params={...})</code> to this list.
+The self-contained
+<a href="https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/preprocessing_custom.py">custom recipe example</a>
+in <code>skyulf-core/templates/databricks/examples/preprocessing_custom.py</code> provides
+mean-centering and fixed eligibility examples for pandas/Polars. Copy the needed
+imports, classes and helper functions into your generated <code>src/preprocessing.py</code>;
+keep your two recipe builders and add <code>example_custom_step("income")</code> to
+<code>build_preprocessing()</code> to enable centering. Do not import the example as a
+sibling module: training snapshots only <code>src/preprocessing.py</code>. Fit returns learned state;
+apply uses it without learning again. Preserve row count/order and implement
+the engines your project uses. CV refits the custom step within every fold.</p>
+<p>Training saves the exact Python source with the fitted artifact. Both local
+and MLflow loading restore this saved source, including custom classes. Changing
+the project file affects future training; score, approve and rollback continue
+using saved model code/state. Different source versions use distinct module
+identities. This supports a self-contained file up to 64 KiB, with imports from
+installed packages. Sibling files and new package dependencies are not packaged
+automatically. Only load trusted code/models, as with existing pickle artifacts.
+Broader project packaging, row filtering/output rules, Optuna and multiple model
+branches remain later tasks.</p>
+<p>From the generated project, with the matching Core wheel installed locally:</p>
+<div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-models</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-preprocessors</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">train</span>
+</code></pre></div>
+<p>Preview executes the trusted Python recipe to resolve its steps. Keep data access
+and training out of module-level code and <code>build_preprocessing()</code>. The preview
+shows the actual pipeline, input selection, final holdout, CV and
+score/promotion policies. The default shows the setup; <code>--action train</code> checks
+training readiness using job preflight, including automatic source/window
+selection when configured. The same rules apply to manual and scheduled runs.
+This is an offline configuration check, not a test of data values, parameter
+combinations, permissions or worker dependencies. Model/node metadata comes from
+Core rather than a duplicated Bundle algorithm catalog.</p>
+<p>Preview defaults to the generated dev bindings. To inspect another target, pass
+<code>--catalog</code>, <code>--input-schema</code>, <code>--output-schema</code>, <code>--metadata-schema</code> and
+<code>--resource-suffix</code> matching that target's resolved Bundle variables. Preview does
+not resolve target YAML or workspace <code>${...}</code> substitutions. Run the real Bundle's
+<code>validate --strict</code> as well before deployment.</p>
+<p>Editable model parameters, for example:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">"modeling"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"random_forest_regressor"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"n_estimators"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_depth"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="nt">"random_state"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Published initializer examples now include
+<code>guided-classification-init.example.json</code> (Polars, random forest,
+stratified CV and explicit sample) and <code>random-window-init.example.json</code>
+(random holdout inside an observation window, separate Copenhagen event and
+Vilnius result parsing). Replace example table/column names and snapshot pins
+with real values. A default model ID or empty parameter object uses Core defaults.</p>
+<h3 id="local-input-limits">Local input limits</h3>
+<p><code>max_rows</code> bounds the rows read into the local process before train/test splitting.
+Without sampling it applies after any observation-window selection, but before
+result-availability filtering. An overflow fails; the reader never silently
+truncates data. Explicit sampling is available as described below.</p>
+<p><code>max_input_mb</code> defaults to <code>64</code>. One unit is 1 MiB (1,048,576 bytes). It bounds
+measured decoded input/serialized row sizes and local frames; it does not cap
+Spark's scan, total process RAM, preprocessing expansion or model training RAM.
+The existing scoring services also check bounded prediction frames. Row count
+alone cannot predict size: wide numeric tables and long strings cost more.</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"max_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">100000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_input_mb"</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>These are illustrative limits, not a claim that every 100,000-row dataset fits
+256 MiB. Training, scoring and approval convert this value to bytes internally.
+Approval may tighten but never relax the saved training budget. The lower-level
+Python SDK still accepts <code>max_bytes</code>; Bundle workflow settings use only
+<code>max_input_mb</code>. Replace an old Bundle <code>"max_bytes": 67108864</code> with
+<code>"max_input_mb": 64</code>; no legacy alias is accepted. In an initializer file use
+<code>"max_input_mb": "64"</code>; generated workflow JSON stores the number <code>64</code>.</p>
+<h3 id="record-identity-and-result-availability">Record identity and result availability</h3>
+<p>New workflow JSON uses the following names:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"record_key_columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer_id"</span><span class="p">,</span><span class="w"> </span><span class="s2">"observation_id"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"event_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"observation_date"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"target_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"claim_amount"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"result_available_at_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"result_confirmed_at"</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The key columns identify a source record and are copied to prediction output.
+They do not create an ID, become features, or implicitly define CV groups.
+<code>event_column</code> names the source observation timestamp; <code>start</code>, <code>holdout_start</code>
+and <code>cutoff</code> are boundaries applied to that column. <code>result_available_at_column</code>
+names each row's actual result-availability timestamp. Different rows can have
+different availability dates. With <code>filter_unavailable_results: true</code>, exclude
+unknown results and results later than the independent <code>result_cutoff</code>. Skyulf does not invent
+those timestamps or fill them with the job's execution time.</p>
+<p>Use <code>record_key_columns</code> and <code>result_available_at_column</code> in initialization
+files. The default example identity column is <code>entity_id</code>; date mappings default
+to null. Initialization does not create columns or generate timestamps.</p>
+<p>The same names are used throughout the library and saved training settings.
+This is an intentional pre-production breaking rename: regenerate projects and
+retrain test models created with the previous column settings. There is no
+field-alias adapter or automatic conversion of earlier training evidence.</p>
+<h3 id="choose-the-evaluation-split-and-result-availability">Choose the evaluation split and result availability</h3>
+<p>The default <code>split_strategy: "random"</code> needs only existing keys, features and a
+nonnull target. <code>training_version</code> pins the source Delta snapshot; it is unrelated
+to dates. Leave it null to resolve latest once at run start, or set a nonnegative
+integer to pin that version. This example shows the training-related
+part of the generated <code>config/workflow.json</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"split_strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"random"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"training_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"record_key_columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer_id"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"input_columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"income"</span><span class="p">,</span><span class="w"> </span><span class="s2">"age"</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"target_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"claim_amount"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"test_size"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"random_state"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"stratify"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"event_column"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"holdout_start"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cutoff"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"monthly_lookback_months"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"filter_unavailable_results"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"result_available_at_column"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"result_cutoff"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Split</th>
+<th>Availability filter</th>
+<th>Required date settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Random</td>
+<td>Disabled</td>
+<td>None; all supplied targets must be known.</td>
+</tr>
+<tr>
+<td>Random</td>
+<td>Enabled</td>
+<td><code>result_available_at_column</code>; explicit <code>result_cutoff</code> or invocation time minus lag; source parsing rules when needed.</td>
+</tr>
+<tr>
+<td>Temporal</td>
+<td>Disabled</td>
+<td><code>event_column</code>; <code>start</code>, <code>holdout_start</code>, <code>cutoff</code> for <code>fixed_window</code>, or rolling calendar settings; source parsing rules when needed.</td>
+</tr>
+<tr>
+<td>Temporal</td>
+<td>Enabled</td>
+<td>Both sets above; observation and result cutoffs are independent.</td>
+</tr>
+</tbody>
+</table>
+<p>For random splitting with delayed outcomes, keep the event fields null and set
+<code>filter_unavailable_results: true</code>, <code>result_available_at_column: "confirmed_at"</code>
+and an aware <code>result_cutoff</code>, for example <code>2026-09-15T00:00:00+00:00</code>, or leave
+it null to derive invocation time minus <code>result_availability_lag_hours</code>. Each row
+is eligible only if its own result date is known and no later than that instant.
+A future snapshot/cutoff can admit results that became available later. Null
+availability is excluded; a known, eligible result with a null target fails.
+With filtering disabled, any null target fails: Skyulf does not manufacture labels.</p>
+<p>Core <code>DataSplitter</code> selects the random holdout after sorting by the complete
+record key. The same snapshot, keys, seed and split settings retain membership
+when input row order changes. <code>stratify: true</code> is for classification; insufficient
+class counts or an impossible partition fail instead of silently disabling it.
+A different snapshot may produce different membership even with the same seed.
+The final holdout never fits preprocessing or the model.</p>
+<p>Saved training settings include the split policy and a holdout-key digest.
+<code>holdout_membership.json</code> records the key-column names, count and digest without
+labels. Approval replays the saved snapshot and verifies that membership before
+comparison; changing today's workflow cannot silently replace the evaluation set.
+Old experimental training evidence must be recreated. Optional training CV and
+independent source-window controls are described below.</p>
+<p>Inactive fields must stay null/default: full-snapshot selection rejects event
+fields; random splitting rejects <code>holdout_start</code>. A random split can use an
+explicit event window without becoming a temporal split. A result column with
+availability filtering disabled is rejected. Missing temporal dates never switch
+training to random.
+Initialization hides irrelevant prompts but preserves explicitly supplied values
+so validation can identify conflicts. The examples folder contains
+<code>date-free-init.example.json</code>, <code>random-delayed-results-init.example.json</code> and
+<code>temporal-delayed-results-init.example.json</code>. Replace their table/feature names
+and snapshot before using them. Their date examples assume native timestamp
+instants; edit parsing rules for other source types. In initializer JSON,
+<code>test_size</code>, <code>random_state</code>, <code>stratify</code> and <code>filter_unavailable_results</code> are
+strings; generated workflow JSON stores numbers and booleans.</p>
+<p><a id="optional-basic-model-cross-validation"></a></p>
+<h3 id="search-and-cross-validation">Search and cross-validation</h3>
+<p>The initializer selects a task, its model (including voting/stacking ensembles),
+then a tuning strategy and default or custom strategy settings. There is no
+Basic/Advanced mode flag. The generated <code>config/workflow.json</code> uses Core's
+<code>hyperparameter_tuner</code> with the selected <code>base_model</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Budget and custom settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>grid</code></td>
+<td><code>max_candidates</code> bounds the full parameter combination count</td>
+</tr>
+<tr>
+<td><code>random</code></td>
+<td><code>n_trials</code> bounds sampled candidates; separate search seed</td>
+</tr>
+<tr>
+<td><code>halving_grid</code></td>
+<td>Candidate limit, factor, resource, minimum/maximum resource</td>
+</tr>
+<tr>
+<td><code>halving_random</code></td>
+<td>Sampled candidate limit and the same halving controls</td>
+</tr>
+<tr>
+<td><code>optuna</code></td>
+<td>Trial limit, sampler, pruner, pruning and optional soft timeout</td>
+</tr>
+</tbody>
+</table>
+<p>Search spaces come from Core's model/strategy catalog or ensemble builder.
+Override them in <code>src/tuning.py::build_search_space(model_type, strategy, params)</code>;
+return <code>None</code> to preserve an explicit JSON space or use Core defaults. A returned
+dictionary of finite candidate lists takes precedence over the JSON space.
+The resolved space and exact Python source are saved with the trained artifact.
+Changing the file affects future training; scoring uses the saved fitted model.
+Fixed scalar model parameters remain fixed during search. Ensemble structural
+settings stay on the base model. Estimator-specific value compatibility is checked
+when Core fits the model; offline preview validates structure and budgets.</p>
+<p>Training is sequential (<code>n_jobs=1</code>). Grid admission fails if the full space exceeds
+the configured limit; it does not truncate it. Optuna requires its optional sklearn
+integration. Its timeout is a soft search deadline and cannot interrupt an active
+model fit. Decision-threshold tuning is not enabled by this adapter.</p>
+<p>Edit shared CV settings in the generated configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"cv_enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cv_folds"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cv_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"stratified_k_fold"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cv_shuffle"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cv_random_state"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>For a tuner these settings control candidate evaluation. Preprocessing is fitted
+inside each fold, then the selected pipeline is fitted on the complete training
+partition. The final holdout never enters search or preprocessing fit. pandas
+and Polars both use this path. Existing ordinary model configurations remain
+supported; their CV evaluates independent fixed-parameter models.</p>
+<ul>
+<li>Default: CV disabled, five folds, K-fold, shuffle enabled, seed 42.</li>
+<li><code>cv_folds</code> supports 2 through 20; each fold needs at least two training and
+  validation rows. Stratified CV requires classification and at least as many
+  training rows per class as folds.</li>
+<li>Methods: <code>k_fold</code>, <code>stratified_k_fold</code>, <code>shuffle_split</code>, <code>time_series_split</code>, <code>nested_cv</code>.
+  Shuffle Split uses Core's 20% validation proportion and requires shuffle.</li>
+<li>Time-series CV requires an explicit selected window with <code>event_column</code> and
+  <code>cv_shuffle: false</code>. Its normalized timestamps order the folds and are removed
+  before preprocessing/model fit. Equal timestamps across a fold boundary fail;
+  choose appropriate folds or aggregate observations rather than leaking time.</li>
+<li>Splitter nodes inside preprocessing are rejected when Bundle CV owns the split.
+  Unsupported methods fail instead of falling back.</li>
+<li><code>nested_cv</code> repeats the chosen strategy inside every outer training fold and
+  scores that fold's selected model on untouched outer rows. <code>cv_folds</code> selects
+  outer folds; optional <code>cv_inner_folds</code> selects inner folds (2-20). When omitted,
+  inner folds are <code>min(3, cv_folds - 1)</code>, or 2 for two outer folds. A separate
+  search on all training rows selects the saved model. Trial budgets and Optuna
+  timeouts apply per search, so five outer folds require six searches in total.
+  <code>tuning.json</code> and <code>cross_validation.json</code> retain the outer scores, per-fold
+  selected parameters and aggregate mean/std separately from the final search
+  score. Ordinary fixed-model configurations retain Core's stability diagnostics;
+  historical artifacts without nested search evidence remain labeled diagnostic.
+  Nested tuning uses stratified folds for classification and K-fold for regression;
+  temporal/group nested splitters are not included. Combining it with
+  <code>tune_threshold: true</code> fails explicitly because threshold selection is not yet
+  evaluated independently within the outer folds.</li>
+</ul>
+<p>MLflow stores <code>cross_validation.json</code> with fold results, aggregate metrics,
+source/split dataset identity and engine. Ordinary CV includes fold-refit counts
+and metrics such as <code>cv_rmse_mean</code> and <code>cv_rmse_std</code>. Nested search reports its
+selection scorer, for example <code>cv_neg_mean_squared_error_mean</code>; negative loss
+scores remain negative, with larger scores better. The
+<code>heldout_*</code> metrics remain the separate candidate/champion promotion evidence.
+With CV disabled, search uses one training-only 80/20 validation split; an ordinary
+model adds no fold fits. Search runs save <code>tuning.json</code> with effective settings,
+trials, best parameters and the actual scorer. Negative loss scores remain negative
+and higher is better. <code>train_and_register</code> displays a compact search summary.</p>
+<p>Optional <code>pipeline.explainability</code> accepts <code>{"method": "shap", "max_samples": 100,
+"max_features": 30, "max_display_samples": 10}</code>. It uses bounded training rows and
+already fitted preprocessing, without fitting again. <code>explanations.json</code> records
+results or an explicit unavailable reason. Limits are 200 samples, 50 transformed
+features and 50 displayed samples; explanations are disabled when this field is absent.</p>
+<p>To enable SHAP in a generated project, add this entry inside the existing
+<code>pipeline</code> object in <code>config/workflow.json</code> (alongside <code>modeling</code> and
+<code>preprocessing</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">"explainability"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shap"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_samples"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_features"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_display_samples"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The training runtime also needs the optional <code>shap&gt;=0.46.0,&lt;1.0.0</code> dependency
+declared by Core's <code>explainability</code> extra. The generated wheel/MLflow dependency
+list does not install this extra automatically. For serverless training, add SHAP
+to the training environment's <code>dependencies</code> in <code>resources/workflow.jobs.yml</code>;
+for classic compute, include it in the training task's PyPI libraries.</p>
+<p>Run the normal training job; do not execute <code>local_explanations.py</code> directly.
+<code>train_and_register</code> reports the explanation status, sample count and artifact name.
+Open that training run in MLflow and read <strong>Artifacts &gt; explanations.json</strong> for
+global feature importance and the bounded per-row explanations. The Bundle
+currently publishes JSON evidence and a status summary, not SHAP charts.
+<code>max_features</code> is a guard on the transformed feature count, not a top-feature
+selector. Exceeding it, missing SHAP or an unsupported explanation returns an
+explicit <code>unavailable</code> reason.</p>
+<h3 id="ensemble-recipes">Ensemble recipes</h3>
+<p>Select <code>voting_classifier</code>, <code>stacking_classifier</code>, <code>voting_regressor</code> or
+<code>stacking_regressor</code> for your task. Edit the generated <strong><code>src/ensemble.py</code></strong> to
+choose the component models and their settings. Set <code>USE_EXAMPLES = True</code> to
+activate its four example recipes, then edit the recipe for your selected model.
+Returning <code>None</code> keeps the parameters already configured in JSON and Core defaults.
+Returned keys override matching <code>pipeline.modeling.base_model.params</code> keys before
+<code>src/tuning.py</code> resolves the search space. Both recipes are pinned for future replay.</p>
+<table>
+<thead>
+<tr>
+<th>Setting from Canvas</th>
+<th>Bundle ensemble recipe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Base Models</td>
+<td><code>base_estimators</code>: Core member keys such as <code>random_forest</code>, <code>ridge</code>, <code>sgd_classifier</code></td>
+</tr>
+<tr>
+<td>Voting Type</td>
+<td>Classifier <code>voting</code>: <code>soft</code> or <code>hard</code></td>
+</tr>
+<tr>
+<td>Model Weights</td>
+<td><code>weights</code>: a model-name map or an ordered list; missing map entries use 1</td>
+</tr>
+<tr>
+<td>Base Model Hyperparameters</td>
+<td><code>base_estimator_params</code>: model-name maps of fixed parameters</td>
+</tr>
+<tr>
+<td>Calibrate base models</td>
+<td>Classification <code>calibrate_base_models</code>, <code>calibration_method</code>, <code>calibration_cv</code></td>
+</tr>
+<tr>
+<td>Stacking meta-learner</td>
+<td><code>final_estimator</code>, <code>final_estimator_params</code>, <code>passthrough</code></td>
+</tr>
+<tr>
+<td>Stacking OOF folds</td>
+<td>Ensemble <code>cv</code>, independent of the shared search <code>cv_*</code> settings</td>
+</tr>
+<tr>
+<td>Tune component hyperparameters</td>
+<td>Defaults to <code>true</code> for all four ensembles in Bundle search; <code>false</code> opts out of automatic component spaces</td>
+</tr>
+<tr>
+<td>Search strategy / search CV</td>
+<td>Existing workflow settings and optional <code>src/tuning.py</code>; no second tuning engine</td>
+</tr>
+</tbody>
+</table>
+<p>Use task-compatible member keys from Core; optional XGBoost/LightGBM require the
+corresponding runtime dependency. Invalid members, duplicates, weights, parameter
+names and inapplicable family settings fail explicitly. Fixed component parameters
+remain fixed even with automatic component tuning. Conflicting manual search axes
+are rejected. Search and estimator workers remain sequential.</p>
+<p>With an empty <code>search_space</code>, the selected component models determine the automatic
+search axes, including when <code>USE_EXAMPLES = False</code>. That flag only controls the
+example overrides. Explicit nonempty search spaces remain user-owned. Grid searches
+still enforce the configured candidate limit when combining component spaces.</p>
+<p>Soft voting predicts probabilities. Hard voting predicts class labels only;
+use label-based metrics such as accuracy/F1. Probability metrics and probability
+thresholds are unavailable for hard voting. Artifact metadata, MLflow signatures
+and the local SDK output schema record that difference. Existing artifacts remain
+loadable. The GUI's auto task inference and connected-node selection are represented
+by explicit task/model/member selections in a generated project.</p>
+<h3 id="explicit-training-sampling">Explicit training sampling</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"training_sample_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"training_sample_seed"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_input_mb"</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>training_sample_rows: null</code> keeps the full selected input and fails on budget
+overflow. When enabled, Spark selects up to the requested number of eligible
+records using a seeded SHA-256 ordering of complete record keys. Selection occurs
+before local transfer, after window and result-availability filtering. Changing
+partition layout does not change the sample. A different seed or source snapshot
+may change it. The requested count must be 4 through <code>max_rows</code>.</p>
+<p>The count includes the final holdout: a 10,000-row sample with <code>test_size: 0.2</code>
+produces 8,000 training and 2,000 test rows. Sampling is without replacement and
+is not class-balanced; split/CV class-count guards still apply. For temporal
+splits it samples within the chosen window; both partitions must remain usable.
+It never samples inference rows. Record keys must be nonnull and unique across
+the selected source, and eligible targets must be nonnull before sampling.</p>
+<p><code>training_selection.json</code> records source/eligible/selected counts, seed, algorithm
+and membership digest. Saved training evidence pins both sample and holdout
+membership; approval replays those choices. Row/memory budgets remain enforced.
+Sampling bounds transfer, not Spark scans: validation, counts and hash ordering
+can scan the selected source several times.</p>
+<h3 id="source-windows-are-independent-of-splitting-and-scheduling">Source windows are independent of splitting and scheduling</h3>
+<table>
+<thead>
+<tr>
+<th><code>training_window_mode</code></th>
+<th>Source selection</th>
+<th>Settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>full_snapshot</code></td>
+<td>All eligible rows from the pinned snapshot</td>
+<td>Random split; event fields, lookback and window timezone null.</td>
+</tr>
+<tr>
+<td><code>fixed_window</code></td>
+<td>Explicit <code>[start, cutoff)</code> observations</td>
+<td>Event column and boundaries; random or temporal split; lookback and window timezone null.</td>
+</tr>
+<tr>
+<td><code>rolling_calendar</code></td>
+<td>Completed calendar months, derived at every <code>train</code> invocation</td>
+<td>Event column, explicit <code>window_timezone</code> and <code>monthly_lookback_months</code>; random or temporal split.</td>
+</tr>
+</tbody>
+</table>
+<p>New random projects default to <code>full_snapshot</code>; temporal projects start with an
+editable <code>rolling_calendar</code>, four months and <code>window_timezone: "UTC"</code>. Existing
+temporal project configs must explicitly select their window mode. Every <code>train</code>
+invocation resolves latest once when <code>training_version</code> is null or missing;
+an explicit version is honored regardless of trigger. Only <code>rolling_calendar</code>
+derives new observation boundaries, including for manual runs. Fixed
+windows stay fixed even if a job runs again a month later.</p>
+<p>This is a pre-production contract change: recreate candidates produced before
+SM-33D. Added sampling fields participate in the saved dataset identity even when
+sampling is disabled; earlier evidence is not silently upgraded for approval.</p>
+<p>For example, <code>window_timezone: "Europe/Vilnius"</code> uses Vilnius month boundaries,
+including the correct seasonal UTC offsets. Four months includes the temporal
+holdout month: three months for fit, the last completed month for final test.
+Random splitting instead divides the selected four-month data by <code>test_size</code>
+and leaves <code>holdout_start</code> null. Temporal lookback is 2Ã¢â‚¬â€œ120 months; random is
+1Ã¢â‚¬â€œ120. Source parsing timezone, window timezone and cron timezone serve different
+purposes. Neither the cron day nor the source timestamp format determines the
+calendar implicitly. When availability filtering is enabled, an explicit
+<code>result_cutoff</code> is honored; null derives invocation time minus
+<code>result_availability_lag_hours</code>, equally for manual and scheduled runs.</p>
+<pre class="mermaid"><code>flowchart LR
+    Source["Pinned Delta source"] --&gt; Window["Full, fixed or rolling selection"]
+    Window --&gt; Sample["Optional eligible-row sample on Spark"]
+    Sample --&gt; Split["Random or temporal outer split"]
+    Split --&gt; Train["Training rows"]
+    Split --&gt; Test["Protected final holdout"]
+    Train --&gt; CV["Optional Core CV with fold-local preprocessing"]
+    Train --&gt; Fit["Final pipeline fit with fixed parameters"]
+    CV --&gt; Report["MLflow CV report"]
+    Fit --&gt; Evaluation["Final evaluation and champion comparison"]
+    Test --&gt; Evaluation</code></pre>
+<h3 id="source-date-formats-and-timezones">Source date formats and timezones</h3>
+<p>Column names and time boundaries serve different purposes. <code>event_column</code>
+selects the source column; <code>event_time_parsing</code> explains its values. The
+<code>start</code>, <code>holdout_start</code> and <code>cutoff</code> boundaries are timezone-aware instants.
+They do not need to use the same UTC offset as source values.</p>
+<p>Edit these settings in the generated <code>config/workflow.json</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"split_strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"temporal"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"training_window_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fixed_window"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"monthly_lookback_months"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"holdout_months"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"window_timezone"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"filter_unavailable_results"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"event_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"observation_date"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"event_time_parsing"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"%d/%m/%Y %H:%M:%S"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"timezone"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Europe/Copenhagen"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"date_only"</span><span class="p">:</span><span class="w"> </span><span class="s2">"reject"</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"result_available_at_column"</span><span class="p">:</span><span class="w"> </span><span class="s2">"result_confirmed_at"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"result_time_parsing"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"%Y-%m-%dT%H:%M:%S%z"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"timezone"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"date_only"</span><span class="p">:</span><span class="w"> </span><span class="s2">"reject"</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-06-01T00:00:00+00:00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"holdout_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-01T00:00:00+00:00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"cutoff"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-01T00:00:00+00:00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"result_cutoff"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-15T00:00:00+00:00"</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>In this example <code>01/08/2026 02:00:00</code> in Copenhagen and
+<code>2026-08-01T03:00:00+03:00</code> represent the same instant: August 1 at 00:00 UTC.
+An event at that instant belongs to the holdout. The window includes <code>start</code>
+and excludes <code>cutoff</code>; the holdout includes <code>holdout_start</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Source values</th>
+<th>Parsing settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Native Spark <code>TIMESTAMP</code> instants</td>
+<td>Keep defaults: <code>format: null</code>, <code>timezone: null</code>, <code>date_only: "reject"</code>; the stored instant is retained.</td>
+</tr>
+<tr>
+<td>Native <code>TIMESTAMP_NTZ</code> or naive local datetimes</td>
+<td>Set the source IANA <code>timezone</code>; leave <code>format: null</code>.</td>
+</tr>
+<tr>
+<td>Strings containing UTC offsets</td>
+<td>Set an explicit <code>format</code> with <code>%z</code>; leave <code>timezone: null</code>.</td>
+</tr>
+<tr>
+<td>Strings containing local clock times</td>
+<td>Set an explicit <code>format</code> and source <code>timezone</code>.</td>
+</tr>
+<tr>
+<td>Native <code>DATE</code> or date-only strings</td>
+<td>Set <code>date_only: "midnight"</code> and source <code>timezone</code>; strings also need a date <code>format</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Formats use Python numeric directives: <code>%Y</code>, <code>%m</code>, <code>%d</code>, <code>%H</code>, <code>%M</code>, <code>%S</code>,
+<code>%f</code> and <code>%z</code>, with literal separators. A complete four-digit year, month and
+day are required. They are not Spark/Java patterns such as <code>yyyy-MM-dd</code>.
+The same parser handles formatted source values and local validation, so
+pandas and Polars training receive the same instants. Precision is limited to
+microseconds; submicrosecond pandas timestamps are rejected. Local month names,
+missing years and guessed day/month order are not supported. An explicit
+<code>%d/%m/%Y</code> resolves day/month order; a string without a format does not.</p>
+<p>Date-only values are not automatically interpreted as UTC. For example,
+<code>2026-08-01</code> with <code>date_only: "midnight"</code> and <code>Europe/Copenhagen</code> means
+July 31 at 22:00 UTC, before the holdout boundary above. Ambiguous or nonexistent
+local times at daylight-saving transitions fail; supply an offset-bearing
+source timestamp to make the intended instant explicit.</p>
+<p>Source dates are normalized in Spark before filtering. Invalid/null event
+values fail validation even if a window filter would otherwise hide them.
+A null result-availability value remains unavailable, while a malformed value
+fails. Normalized instants cross the Spark/Python boundary as integer
+microseconds; session and process timezone settings do not reinterpret them.
+The local row/byte limits still apply after filtering. Date validation may scan
+the pinned source snapshot in Spark; these limits bound driver materialization,
+not the amount of distributed source validation.</p>
+<p>Keep driver, worker and replay environments' timezone data aligned. Saved rules
+record zone identifiers, not a copy of the IANA timezone database.</p>
+<p>Parsing rules are saved with the candidate's training specification and dataset
+identity. Approval replays those saved rules. The job's cron timezone only
+controls when it runs; it does not define the source timestamps' timezone.
+For Python APIs, use <code>TrainingDateSpec</code> in the
+<a href="databricks_local_sdk.html#train-a-candidate-when-labels-are-ready">local training guide</a>.
+The supported format vocabulary is a subset of Python's
+<a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes">strptime directives</a>;
+source timezone rules use <a href="https://docs.python.org/3/library/zoneinfo.html">IANA zoneinfo</a>.</p>
+<p><code>training_version</code> defaults to <code>null</code>, resolving latest once at the start of
+each <code>train</code> invocation. Set an explicit version for a repeatable snapshot.
+Date boundaries default to null and are required only for <code>fixed_window</code>;
+<code>rolling_calendar</code> derives them at invocation. Scoring and saved-evidence actions
+do not require a new training window.</p>
+<h3 id="configuration-validation-and-migration">Configuration validation and migration</h3>
+<p>New projects declare <code>config_version: 1</code> and <code>task</code>. The notebook validates
+the resolved configuration before training, registry access or output writes:
+resource names, distinct columns, reserved metadata names, budgets, model/task
+compatibility, metric/threshold domains and action-specific snapshot inputs.
+Actual source schema, keys and artifact compatibility are checked by the
+existing data-read and scoring services against the real data.</p>
+<p>The same check can run locally, without Spark or registry access:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_target_config</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_workflow_config</span>
+
+<span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_target_config</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s2">"catalog"</span><span class="p">:</span> <span class="s2">"workspace"</span><span class="p">,</span>
+    <span class="s2">"input_schema"</span><span class="p">:</span> <span class="s2">"my_inputs"</span><span class="p">,</span>
+    <span class="s2">"output_schema"</span><span class="p">:</span> <span class="s2">"my_outputs"</span><span class="p">,</span>
+    <span class="s2">"metadata_schema"</span><span class="p">:</span> <span class="s2">"my_models"</span><span class="p">,</span>
+    <span class="s2">"resource_suffix"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
+<span class="p">})</span>
+<span class="n">validate_workflow_config</span><span class="p">(</span><span class="n">resolved</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"train"</span><span class="p">)</span>  <span class="c1"># Or score, approve, etc.</span>
+</code></pre></div>
+<p>For an older project's loaded JSON, migrate explicitly:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">migrate_workflow_config</span>
+
+<span class="n">updated</span> <span class="o">=</span> <span class="n">migrate_workflow_config</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"regression"</span><span class="p">,</span> <span class="n">score_handoff</span><span class="o">=</span><span class="s2">"after_alias_change"</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Review/save <code>updated</code>, regenerate both job definitions and entrypoints, then
+validate and redeploy together. Migration returns a copy; it does not upload
+files, invent training dates, or change aliases. Legacy <code>auto_champion</code> maps
+to champion/automatic; legacy <code>pinned_version</code> maps to pinned/manual approval.
+Mixed policies, unknown config versions and contradictory existing task or
+handoff settings are rejected. The notebook checks the deployed
+<code>workflow_contract</code> and <code>deployed_score_handoff</code> markers against the JSON.
+These detect stale generated definitions; they are not workspace permissions
+or a complete audit of manually edited Jobs settings.</p>
+<p><code>dev</code> uses the selected CLI profile's workspace host. <code>test</code>, <code>syst</code> and
+<code>prod</code> each have a different placeholder host and catalog in the generated
+file. Edit each target's host, catalog and input/output/metadata schema
+bindings, then validate with its designated profile. No Danske, Danica or
+personal-workspace value is built into those three targets. Policy-backed
+compute uses the policy name, runtime, node type and cost tag supplied at
+initialization. Serverless compute needs none of those fields.</p>
+<p>For a company policy requiring <code>PayingRegNo</code>, select that value as
+<code>cost_tag_key</code> and supply the approved registration number as <code>cost_tag_value</code>.
+The <code>paying-reg-no-init.example.json</code> example demonstrates both settings;
+the generic default remains <code>CostCenter</code>. This tag applies to policy-cluster
+compute. Selecting it does not assign a model risk category.</p>
+<p>Advanced configuration accepts an optional <code>risk_category</code>, such as <code>Low</code>,
+<code>Medium</code>, or <code>High</code>. Leave it blank to omit the tag. The value remains editable
+in <code>config/workflow.json</code> and is recorded on future training runs and model
+versions; it does not change promotion gates or relabel existing versions.</p>
+<h2 id="where-the-workflow-lives">Where the workflow lives</h2>
+<p>The generated notebooks are small entrypoints with fixed lifecycle steps or
+the score role. <code>src/workflow.py</code> prepares a request; <code>train_and_register</code>
+fits, evaluates and registers it, then <code>compare_and_decide</code> compares models
+and applies the promotion policy. The shared <code>finalize_and_report</code> task closes
+training even on failure and publishes only a verified successful result.
+Approve/reject/rollback use a separate branch without training. The installed
+<code>job_runtime</code> adapter reads configuration once and exchanges durable MLflow
+references between phases. Computation and lifecycle changes reuse existing
+Core services; no extra control tables or jobs are introduced. See the
+<a href="databricks_bundle_walkthrough.html#the-two-jobs-and-their-tasks">task graph and operator walkthrough</a>.
+<code>prediction_output</code> creates output tables and safely switches full-rebuild
+views. Imports do not create a Spark session or cloud resource.</p>
+<p>Regenerate and deploy the notebook files and job graph together with the
+matching wheel; graph contract 2 deliberately rejects older generated graphs.
+The workflow configuration schema remains version 1.</p>
+<p>Notebook entrypoints are explicit: generated <code>src/score.py</code> calls
+<code>job_runtime.run_score_notebook</code>; lifecycle notebooks call
+<code>job_runtime.run_lifecycle_notebook</code> with a fixed phase. Deploy new entrypoints
+with the matching wheel. Existing direct <code>run_notebook(task_role=...)</code> callers
+remain supported: score delegates to the score entrypoint, while lifecycle keeps
+its sequential behavior and does not acquire durable phase/retry semantics.
+<code>run_bundle_action</code>, <code>run_action</code> and <code>train_local_candidate</code> retain their APIs.</p>
+<p>Edit preprocessing in <code>src/preprocessing.py</code> and model/workflow settings in
+<code>config/workflow.json</code>. These remain project choices; common workflow fixes ship in the
+Skyulf wheel instead of requiring edits to every generated notebook.</p>
+<h3 id="independent-scoring-and-promotion-policies">Independent scoring and promotion policies</h3>
+<p>Generated Bundles and direct <code>run_action</code> callers separate these decisions:</p>
+<table>
+<thead>
+<tr>
+<th><code>score_model_selection</code></th>
+<th><code>promotion_policy</code></th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pinned_version</code></td>
+<td><code>manual_approval</code></td>
+<td>Register/evaluate the contender; score keeps the configured version</td>
+</tr>
+<tr>
+<td><code>pinned_version</code></td>
+<td><code>automatic</code></td>
+<td>Apply promotion gates; score still keeps the configured version</td>
+</tr>
+<tr>
+<td><code>champion</code></td>
+<td><code>manual_approval</code></td>
+<td>Register/evaluate the contender; score follows the existing champion</td>
+</tr>
+<tr>
+<td><code>champion</code></td>
+<td><code>automatic</code></td>
+<td>Apply promotion gates; the next score follows the resulting champion</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a library configuration containing <code>model_version: "2"</code>,
+<code>score_model_selection: "pinned_version"</code> and <code>promotion_policy: "automatic"</code>
+continues scoring with v2 after a successful promotion of v4. Selecting
+<code>champion</code> instead resolves the controlled alias once per score run. A missing
+champion fails before output preparation; there is no fallback to latest.</p>
+<p>Both new fields are required together. Remove <code>model_selection_mode</code> when
+using them; mixed or partial configurations fail before training or scoring.
+Legacy <code>auto_champion</code> retains champion/automatic behavior, and legacy
+<code>pinned_version</code> retains pinned/manual behavior, with a deprecation warning.
+Automatic promotion still requires <code>quality_threshold</code>, including when
+scoring is pinned. Scoring never updates the caller's configured version.</p>
+<p>New Bundles require both policy fields and <code>score_handoff</code>. Migrate an older
+project's configuration, all notebook entrypoints and job graph together;
+changing only JSON is insufficient. Core direct callers retain the legacy
+compatibility path described above. Generated projects use the new policies.</p>
+<h3 id="operator-actions-through-run-now">Operator actions through Run now</h3>
+<p>The existing <code>train</code> job is the serialized lifecycle writer. In <strong>Run now with
+different parameters</strong>, choose <code>lifecycle_action</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Required job parameters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train</code></td>
+<td>No operator evidence; leave other parameters empty</td>
+</tr>
+<tr>
+<td><code>approve</code></td>
+<td><code>candidate_version</code>, <code>expected_champion_version</code>; comparison proof resolves automatically</td>
+</tr>
+<tr>
+<td><code>reject</code></td>
+<td>Same as approve, plus <code>rejection_reason</code></td>
+</tr>
+<tr>
+<td><code>rollback</code></td>
+<td><code>promotion_receipt_json</code>, <code>expected_champion_version</code></td>
+</tr>
+</tbody>
+</table>
+<p>Manual training returns copyable <code>next_actions.approve</code> and <code>next_actions.reject</code>
+fields. Review the comparison and copy its exact values; add a reason for
+rejection. <code>expected_champion_version=none</code> explicitly selects first-champion
+initialization; an empty value fails. Configure the metric and absolute quality
+threshold <strong>before training</strong> so saved evidence matches the approval policy.
+A completed promotion returns <code>next_actions.rollback</code>, including its complete
+receipt JSON. Copy that receipt rather than reconstructing it from alias names.
+These operator actions reuse the existing candidate; they do not fit a model.</p>
+<p><code>score_handoff=after_alias_change</code> requests the existing score job after a
+successful initialization, promotion or rollback. <code>disabled</code> leaves scoring to
+an explicit score run or its schedule. Rejection and training without a champion
+transition never trigger score. Handoff preserves the score selector: a pinned
+scorer still uses its configured version even after champion changes.</p>
+<p>There are still two jobs. The lifecycle job contains three tasks: execute the
+action, check <code>score_requested</code>, and conditionally call the score job. Both jobs
+queue runs with <code>max_concurrent_runs: 1</code>. Score's fixed notebook role ignores inherited
+lifecycle parameters and cannot dispatch alias actions; this is input isolation, not a replacement for exclusive
+registry write permissions. A failed/uncertain alias action never publishes a
+successful score request. If the alias change succeeded but score failed, retry
+score directly; no retraining is needed.</p>
+<p>Local tests and strict generated-project validation cover this wiring. The
+personal serverless SM-32 rehearsal verified manual approval, rejection,
+rollback/retry, automatic promotion, score handoff and pinned selection.
+The score entrypoint filters inherited parent-job evidence before dispatching
+score. Company targets and production identities remain separate acceptance work.</p>
+<h3 id="approve-an-existing-candidate-without-training">Approve an existing candidate without training</h3>
+<p>Use an explicit manual policy and the comparison returned by the earlier
+training job. Review that saved result before passing its version and digest:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">asdict</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_action</span>
+
+<span class="c1"># candidate is the result of an earlier training job; no training runs here.</span>
+<span class="n">comparison</span> <span class="o">=</span> <span class="n">asdict</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">comparison</span><span class="p">)</span>
+<span class="n">comparison_sha256</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">comparison</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+<span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+<span class="n">receipt</span> <span class="o">=</span> <span class="n">run_action</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">,</span>  <span class="c1"># promotion_policy="manual_approval" and both independent fields</span>
+    <span class="s2">"approve"</span><span class="p">,</span>
+    <span class="n">candidate_version</span><span class="o">=</span><span class="n">candidate</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span>
+    <span class="n">comparison_sha256</span><span class="o">=</span><span class="n">comparison_sha256</span><span class="p">,</span>
+    <span class="n">expected_champion_version</span><span class="o">=</span><span class="n">candidate</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">champion_version</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Approval downloads <code>candidate_comparison.json</code> and <code>candidate_training_spec.json</code>
+from the run associated with that registered version. It verifies the digest,
+current metric policy, expected champion and controlled challenger receipt.
+It then reads the original Delta version and evaluation window and rechecks
+quality using the existing Core comparison/promotion services. The original
+engine is preserved; current read budgets may tighten the saved limits.</p>
+<p>The action does not train, register or upload a model, rewrite <code>model_version</code>,
+or publish predictions. A later score run follows the configured selector.
+Retrying an unchanged successful approval returns its original committed
+receipt; changed champion, pending writes or incompatible evidence fail.
+Training runs created before the saved specification was introduced cannot
+use this action without explicitly supplying that missing provenance through
+a separately reviewed migration; there is no fallback to current training dates.
+Use the same externally serialized lifecycle writer as training. The Bundle
+operator parameters above provide that path with optional score handoff.</p>
+<h3 id="reject-a-candidate-or-roll-back-a-promotion">Reject a candidate or roll back a promotion</h3>
+<p>To decline the candidate above, use the same version and evidence digest with
+an explicit manual policy. This is an alternative to approving that candidate:</p>
+<div class="highlight"><pre><span></span><code><span class="n">decision</span> <span class="o">=</span> <span class="n">run_action</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">,</span>
+    <span class="s2">"reject"</span><span class="p">,</span>
+    <span class="n">candidate_version</span><span class="o">=</span><span class="n">candidate</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span>
+    <span class="n">comparison_sha256</span><span class="o">=</span><span class="n">comparison_sha256</span><span class="p">,</span>
+    <span class="n">expected_champion_version</span><span class="o">=</span><span class="n">candidate</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">champion_version</span><span class="p">,</span>
+    <span class="n">rejection_reason</span><span class="o">=</span><span class="s2">"Business review requires another candidate"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Rejection retains both aliases and the evaluation metrics/status. It records
+<code>approval_status=rejected</code> and the human-readable <code>approval_reason</code> separately.
+The reason must be nonempty and at most 256 UTF-8 bytes. A rejected version
+cannot be implicitly approved, restaged, renominated or made the first champion.
+There is no reopen action in this slice; a later training run creates a new candidate.
+Neither rejection nor rollback reads training rows, fits or registers a model.</p>
+<p>To undo an earlier completed promotion, pass that promotion's receipt:</p>
+<div class="highlight"><pre><span></span><code><span class="n">reversal</span> <span class="o">=</span> <span class="n">run_action</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">,</span>
+    <span class="s2">"rollback"</span><span class="p">,</span>
+    <span class="n">promotion_receipt</span><span class="o">=</span><span class="n">receipt</span><span class="p">,</span>  <span class="c1"># kind="promotion", not first-champion initialization</span>
+    <span class="n">expected_champion_version</span><span class="o">=</span><span class="n">receipt</span><span class="o">.</span><span class="n">new_version</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Rollback is available under either promotion policy. It restores the previous
+champion only when the saved transition still matches controlled registry state.
+A separately verified challenger is retained. Repeating an unchanged rejection
+or rollback returns the same committed receipt; incompatible evidence,
+conflicting alias state and unresolved writes stop the action.</p>
+<p>All lifecycle actions must use the same externally serialized writer as training.
+No additional control table is created. Direct <code>run_action</code> calls do not launch
+score or rewrite its version pin; the Bundle adapter can request score afterward. A later <code>champion</code> score follows the restored alias;
+a <code>pinned_version</code> score continues using its configured version. Rollback does
+not undo predictions already written; scoring's model-change policy still applies.</p>
+<h3 id="recent-challenger-history">Recent challenger history</h3>
+<p>The Core lifecycle keeps the last displaced contender as <code>previous_challenger</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Champion</th>
+<th>Challenger</th>
+<th>Previous challenger</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Starting state</td>
+<td>v2</td>
+<td>v3</td>
+<td>unset</td>
+</tr>
+<tr>
+<td>Nominate v4</td>
+<td>v2</td>
+<td>v4</td>
+<td>v3</td>
+</tr>
+<tr>
+<td>Repeat nomination of v4</td>
+<td>v2</td>
+<td>v4</td>
+<td>v3</td>
+</tr>
+<tr>
+<td>Promote v4</td>
+<td>v4</td>
+<td>unset</td>
+<td>v3</td>
+</tr>
+</tbody>
+</table>
+<p>Only replacing an existing contender rotates this pointer. Evaluation and
+promotion retain it, and promotion still puts the old champion in
+<code>previous_champion</code>. If the historical version becomes champion through
+rollback, or becomes challenger again, its history alias is cleared. The
+version and its earlier event records remain available.</p>
+<p>This alias is neither a complete history nor a scoring fallback. It creates
+no table or job. History changes share the lifecycle's pending-event checks
+and writer ownership; manual alias/receipt disagreement stops further actions,
+including retries. Partial writes require reconciliation before proceeding.
+This history extension passed local and personal-serverless Bundle verification,
+including replacement, explicit rejection and rollback while retaining a contender.</p>
+<h2 id="what-is-created">What is created</h2>
+<p><code>bundle deploy</code> creates only two jobs and uploads their code:</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Purpose</th>
+<th>UC objects created when run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train</code></td>
+<td>Train/evaluate a candidate or execute approve/reject/rollback</td>
+<td>Model/version only for training</td>
+</tr>
+<tr>
+<td><code>score</code></td>
+<td>Score initial and later CDF rows</td>
+<td>Prediction output and rows</td>
+</tr>
+</tbody>
+</table>
+<p>The default project has no schedule. Choosing <code>scheduled</code> at initialization
+adds an enabled schedule to the existing <code>train</code> job, without adding a third
+job or running it at deployment. The Quartz cron and timezone are selected
+at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
+created by deployment alone.
+The generated <code>schedule.pause_status: UNPAUSED</code> also overrides development mode's
+default pause. Once deployed, the job runs at the next matching cron time.
+Initialization alone does not deploy or start any job.
+<code>promotion_policy=automatic</code> uses the same train job to compare candidate and
+champion on the same pinned holdout, independently of the score selector. The
+selected <code>metric</code>, <code>min_improvement</code>, and absolute <code>quality_threshold</code> stay
+editable in <code>config/workflow.json</code>. A first champion requires a numeric
+absolute threshold because no prior version exists for comparison. Later
+versions must pass that threshold and improve on champion by the chosen
+minimum. A passing candidate is staged and promoted through checked registry
+receipts; an ineligible candidate leaves champion unchanged. The train job
+calls the existing score job only after a champion transition when handoff is
+enabled. No third job or control table is added.</p>
+<h3 id="additional-quality-gates">Additional quality gates</h3>
+<p>Keep one selection <code>metric</code>. Optionally add <code>quality_gates</code> directly to
+<code>config/workflow.json</code>; no extra initializer question is needed. For example,
+merge these regression policy fields into your existing configuration:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"metric"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heldout_rmse"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quality_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mf">5.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"min_improvement"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quality_gates"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"heldout_mae"</span><span class="p">:</span><span class="w"> </span><span class="mf">3.0</span><span class="p">,</span><span class="w"> </span><span class="nt">"heldout_r2"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>These illustrative bounds require RMSE &lt;= 5, MAE &lt;= 3 and R2 &gt;= 0.7.
+Choose bounds appropriate to your target's units and business requirements;
+generated projects keep the quality threshold unset. Every bound must pass.
+For later champions, RMSE must additionally improve by at least <strong>0.2 absolute
+units</strong> on the same holdout. A tie never qualifies, even with minimum improvement 0.
+The first champion still needs an explicit selection-metric quality threshold.</p>
+<p>For classification, a policy might select <code>heldout_f1</code> with threshold 0.8 and
+add <code>{"heldout_recall": 0.9, "heldout_log_loss": 0.5}</code>. Classification score
+bounds are in [0, 1], except Matthews correlation [-1, 1]; error/loss bounds
+are nonnegative, while R2/explained variance may be negative but cannot exceed 1.
+The existing metric definition determines whether a lower or higher value wins.
+Use weighted metrics for multiclass models. An unavailable metric, such as
+binary ROC AUC on a one-class holdout, fails its gate; it is never silently ignored.
+These bounds do <strong>not</strong> set classification probability decision thresholds or tune them.</p>
+<p>The comparison/final notebook reports show each bound, observed value and
+failure reason. MLflow retains the policy in <code>candidate_comparison.json</code>, all
+gate outcomes in <code>quality_gates.json</code>, and per-gate version tags.
+Version tags identify their event; use
+<code>quality_gate_event</code> to distinguish current gates from retained older outcomes.
+Approval requires the saved policy unchanged and re-evaluates it before changing aliases.
+Omitting <code>quality_gates</code> preserves the single-gate policy and historical receipt
+digests. SDK callers should use the returned <code>comparison_sha256</code>; when explicitly
+serializing a report for evidence, use <code>comparison_payload</code>/<code>comparison_digest</code>
+from <code>skyulf.integrations.mlflow.validation</code> instead of hashing <code>dataclasses.asdict</code>.</p>
+<p>In both modes, registration nominates <code>@challenger</code> before comparison. A tied
+or worse candidate retains that alias with <code>validation_status=rejected</code> and
+a reason; comparison errors retain it with <code>validation_status=error</code>.
+New contenders replace the pointer without deleting earlier version evidence.
+Manual approval records these results without automatically promoting the candidate.
+Training resolves the current champion; a stale explicit <code>champion_version</code>
+fails before fit. Generic Core training remains alias-free unless a caller
+supplies the explicit <code>on_registered</code> lifecycle callback.</p>
+<p>Training runs and model versions share readable metadata: <code>train_data_version</code>,
+<code>test_data_version</code>, <code>train_data_destination</code>, <code>test_data_destination</code>,
+<code>model_type</code>, <code>candidate_date_tag</code>, and <code>engine</code>. Optional <code>risk_category</code> is
+editable in workflow.json. Since fit and evaluation split one Delta snapshot,
+their table names and versions match; <code>train_start</code>, <code>test_start</code>, and
+<code>data_end</code> explain the split. The exact dataset identity is saved in
+<code>training_data.json</code>. Run tags use <code>task=training</code>.</p>
+<p>Validation reasons use plain English. Technical event tags retain unique IDs
+and evidence hashes for rollback/recovery; their JSON fields are <code>action</code>,
+<code>from_version</code>, <code>proof</code>, <code>parent</code>, <code>state</code>, and <code>previous</code>. <code>from_version</code>
+identifies the version previously held by the affected alias, not necessarily
+the previous champion. These are audit records,
+not settings to edit. Earlier compact receipts remain supported.</p>
+<p>With <code>score_model_selection=champion</code>, score resolves the alias once to a
+concrete version per run, under either promotion policy. Only the serialized
+train job identity may write this
+model's aliases; other alias-write grants must be removed before training.
+Alias promotion and Delta scoring are separate transactions. If scoring fails
+after promotion, the last successful prediction output remains and the score
+job must be retried. Unknown alias outcomes need receipt reconciliation.
+Skyulf marks an alias transition as pending before writing it; automatic
+training and scoring stop until that pending event is reconciled. An existing
+champion alias set outside this controlled lifecycle also needs reconciliation
+before controlled champion scoring or promotion can use it.</p>
+<p>For example, a regression project can select its gate in the generated config:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"engine"</span><span class="p">:</span><span class="w"> </span><span class="s2">"polars"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"score_model_selection"</span><span class="p">:</span><span class="w"> </span><span class="s2">"champion"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"promotion_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"automatic"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"score_handoff"</span><span class="p">:</span><span class="w"> </span><span class="s2">"after_alias_change"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"metric"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heldout_rmse"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"min_improvement"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"quality_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mf">5.0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"model_change_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"incremental_append"</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>These example values mean RMSE must be at most <code>5.0</code>; a later candidate must
+reduce champion's RMSE by at least <code>0.1</code> on the same holdout. Improvement is
+an absolute metric difference, not a percentage. Skyulf derives the direction
+from the metric: RMSE/MAE/log loss are minimized, while RÃ‚Â²/accuracy/F1 are
+maximized. Use a metric supported by the configured model task. The first
+comparison reports <code>reason=no_champion</code> and <code>eligible=false</code> because no
+baseline exists; successful bootstrap is recorded separately as
+<code>result.alias_change.kind=initial</code> in the Bundle output after the absolute gate passes.</p>
+<p>If promotion succeeds but scoring fails, the train job reports a failed
+dependent score task. Correct the scoring problem and run <code>score</code> again;
+retraining is unnecessary. Full-rebuild output continues to expose the last
+successfully activated generation during this recovery.</p>
+<p>The four relevant Unity Catalog names have different roles:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>training_table</code></td>
+<td>Existing labeled input table, pinned to a Delta version for training</td>
+</tr>
+<tr>
+<td><code>score_source_table</code></td>
+<td>Existing CDF-enabled source of rows to predict</td>
+</tr>
+<tr>
+<td><code>prediction_table</code></td>
+<td>The output table in append mode, or the stable active view in full-rebuild mode</td>
+</tr>
+<tr>
+<td><code>model_name</code></td>
+<td>Registered Unity Catalog model, not a table</td>
+</tr>
+</tbody>
+</table>
+<p>The first two references point to <strong>the same existing table by default</strong>.
+Neither reference creates a table. Separate them only when labeled training
+data and new scoring data have different lifecycles. If they stay together,
+the first <code>score</code> run predicts all existing rows, including historical labeled
+rows; review whether that is intended for your use case.</p>
+<p>In <code>full_rebuild</code>, a version-specific physical table records the model name,
+version and artifact digest. Scoring rejects an existing table at that name
+when its model provenance differs. A new model with the same numeric version
+needs a different logical prediction name or a new model version.</p>
+<p>The initialization question <code>record_key_columns</code> accepts <code>customer_id</code>
+or <code>customer_id, observation_id</code>. It becomes an ordered JSON array in the generated
+configuration, and the same column appears in the prediction table. It must
+be non-null, <code>STRING</code> or <code>BIGINT</code>, and unique across the initial data and all
+later inserts. For multiple predictions per customer, edit the generated
+configuration to a composite key such as
+<code>"record_key_columns": ["customer_id", "observation_id"]</code> before deployment. The Bundle
+does not create an ID in the source. Keep keys out of <code>input_columns</code>. With
+<code>customer_id</code> in the output, a query
+can find a customer's predictions:</p>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="n">customer_id</span><span class="p">,</span><span class="w"> </span><span class="n">prediction</span><span class="p">,</span><span class="w"> </span><span class="n">model_version</span>
+<span class="k">FROM</span><span class="w"> </span><span class="k">catalog</span><span class="p">.</span><span class="k">schema</span><span class="p">.</span><span class="n">predictions</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'C123'</span><span class="p">;</span>
+</code></pre></div>
+<h2 id="first-run">First run</h2>
+<p>Build and place the matching Skyulf wheel in the generated project's <code>dist/</code>,
+then edit <code>config/workflow.json</code> for real source columns, model, split policy
+and size limits, and <code>src/preprocessing.py</code> for feature engineering.
+The JSON values are an example, not a dataset.
+Enable Change Data Feed on the scoring source before later inserts arrive.</p>
+<div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">train</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+</code></pre></div>
+<p>For pinned scoring, inspect the registered version, put that concrete value
+in <code>model_version</code>, redeploy the changed JSON, then run <code>score</code>. For champion
+scoring, approve manually or use automatic promotion gates, then run score or
+enable the optional handoff. Inspect both lifecycle and score task results. The first score
+rejects a missing source, disabled CDF, unsuitable row keys, a model output
+mismatch or an existing target schema mismatch before creating prediction
+output. It checks initial row count against <code>max_rows</code>; each score
+also checks decoded transfer size against the <code>max_input_mb</code> budget. Existing tables are
+never overwritten. The first score processes the current source
+snapshot; later runs process only new inserts since the committed Delta
+receipt. A repeat without new rows is a no-op. No monthly date or source
+version is entered for each run.</p>
+<p>With manual approval, the first candidate requires explicit approval to become
+champion. Pinned scoring can use a registered version without that approval. At initialization, choose
+<code>incremental_append</code> to keep
+v1 predictions and score only later source inserts with pinned v2. Choose
+<code>full_rebuild</code> to write a new physical <code>&lt;prediction_table&gt;_v2</code> generation,
+switch the stable <code>prediction_table</code> view after a successful complete score,
+and append future inserts to v2. The previous generation remains available;
+a failed rebuild leaves the active view unchanged. Full mode needs view
+creation/ownership privileges and cannot silently turn an existing append-mode
+physical table into a view. <code>max_concurrent_runs: 1</code> serializes the generated score job, but
+does not coordinate other jobs. Grant prediction-table writes only to this
+job's identity. For multiple publishers, use Skyulf Core's shared admission
+provider. Online endpoints and Spark-native FE/model execution remain
+separate work.</p>
+<p>The optional <code>scheduled</code> mode starts the train schedule enabled after deployment,
+including the dev target. Its default is 03:00 UTC on day three of each month;
+edit the cron and timezone to choose another cadence, including every six months.
+The default <code>manual</code> mode creates no schedule. Both modes invoke <code>train</code>.
+A null or missing <code>training_version</code> resolves latest once at run start;
+an explicit version pins that snapshot regardless of the trigger.
+The separate <code>training_window_mode</code> selects full data, a fixed window or completed
+calendar months. Rolling selection uses <code>window_timezone</code>; a temporal split holds
+out the last completed month, included in <code>monthly_lookback_months</code>. The schedule
+timezone controls execution only. Sampling and CV are independent optional settings.
+When availability filtering is enabled, an explicit <code>result_cutoff</code> is honored;
+null derives invocation time minus <code>result_availability_lag_hours</code>.
+The source must truthfully record per-row availability. <code>@champion</code> is resolved to a
+concrete version for comparison if present. Manual approval leaves champion
+unchanged; automatic promotion applies its metric gates. Score handoff follows
+only a successful champion transition when enabled. The source version is
+pinned at run start; it is not a historical snapshot as of the observation cutoff.</p>
+<p>The older SM-20a personal serverless rehearsal passed, but its jobs and test
+schemas were removed at the user's request. The subsequent clean generic
+<code>dev</code> rehearsal trained a Polars model from 600 real taxi rows, wrote 600
+initial and 50 later predictions to one table, and replayed without another
+commit. The later two-job design passed a separate personal serverless
+rehearsal: 650 existing source rows, one later insert, and a no-op replay
+left one prediction table with 651 rows. The <code>test</code>, <code>syst</code> and <code>prod</code>
+placeholders have not been deployed in a company workspace.</p>
+<h3 id="explicit-retry-policy">Explicit retry policy</h3>
+<p>Generated notebook tasks set <code>max_retries: 0</code>; serverless tasks additionally set
+<code>disable_auto_optimization: true</code> because serverless auto-optimization can add
+retries independently. A training retry can register another candidate version.
+Inspect failed run evidence and registry state before rerunning; retry score
+separately after an already-committed approval. This is not an exactly-once
+training guarantee. See the <a href="https://docs.databricks.com/aws/en/jobs/run-serverless-jobs">Databricks serverless retry behavior</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

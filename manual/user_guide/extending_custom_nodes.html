@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3280,51 +3560,51 @@
 <li>Decorate the Calculator with <code>@NodeRegistry.register()</code> and <code>@node_meta()</code>.</li>
 </ol>
 <h3 id="step-by-step-example">Step-by-step example</h3>
-<pre><code class="language-python">from typing import Any, Dict, Tuple, Union
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
-import pandas as pd
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import NodeRegistry
-from skyulf.preprocessing.base import BaseApplier, BaseCalculator
-from skyulf.core.meta.decorators import node_meta
-from skyulf.utils import pack_pipeline_output, unpack_pipeline_input
-
-
-class MyNodeApplier(BaseApplier):
-    &quot;&quot;&quot;Applies the learned transformation.&quot;&quot;&quot;
-
-    def apply(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        params: Dict[str, Any],
-    ) -&gt; Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]]:
-        X, y, is_tuple = unpack_pipeline_input(df)
-        columns = params.get(&quot;columns&quot;, [])
-        # Apply your transformation to X using the fitted params...
-        return pack_pipeline_output(X, y, is_tuple)
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeRegistry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseApplier</span><span class="p">,</span> <span class="n">BaseCalculator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.meta.decorators</span><span class="w"> </span><span class="kn">import</span> <span class="n">node_meta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">pack_pipeline_output</span><span class="p">,</span> <span class="n">unpack_pipeline_input</span>
 
 
-@NodeRegistry.register(&quot;MyNode&quot;, MyNodeApplier)
-@node_meta(
-    id=&quot;MyNode&quot;,
-    name=&quot;My Custom Node&quot;,
-    category=&quot;Preprocessing&quot;,
-    description=&quot;A short description of what this node does.&quot;,
-    params={&quot;columns&quot;: &quot;list[str] — columns to transform&quot;},
-)
-class MyNodeCalculator(BaseCalculator):
-    &quot;&quot;&quot;Learns parameters from training data.&quot;&quot;&quot;
+<span class="k">class</span><span class="w"> </span><span class="nc">MyNodeApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Applies the learned transformation."""</span>
 
-    def fit(
-        self,
-        df: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
-        config: Dict[str, Any],
-    ) -&gt; Dict[str, Any]:
-        X, _, _ = unpack_pipeline_input(df)
-        columns = config.get(&quot;columns&quot;, [])
-        # Learn something from X...
-        return {&quot;type&quot;: &quot;MyNode&quot;, &quot;columns&quot;: columns}
-</code></pre>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]],</span>
+        <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]]:</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">is_tuple</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="c1"># Apply your transformation to X using the fitted params...</span>
+        <span class="k">return</span> <span class="n">pack_pipeline_output</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">is_tuple</span><span class="p">)</span>
+
+
+<span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"MyNode"</span><span class="p">,</span> <span class="n">MyNodeApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">"MyNode"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"My Custom Node"</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">"Preprocessing"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"A short description of what this node does."</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="s2">"list[str] — columns to transform"</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyNodeCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Learns parameters from training data."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]],</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">unpack_pipeline_input</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="c1"># Learn something from X...</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"MyNode"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="n">columns</span><span class="p">}</span>
+</code></pre></div>
 <h3 id="what-happens-under-the-hood">What happens under the hood</h3>
 <ul>
 <li><code>@NodeRegistry.register("MyNode", MyNodeApplier)</code> registers the Calculator and Applier classes so that <code>FeatureEngineer</code> can resolve <code>"transformer": "MyNode"</code> in a pipeline config.</li>
@@ -3348,37 +3628,37 @@ the registry — e.g. scripting an ad-hoc pipeline step, or wrapping a
 third-party object), you don't need to subclass anything. <code>skyulf.core.protocols</code>
 defines <code>CalculatorProtocol</code>/<code>ApplierProtocol</code> as structural (<code>typing.Protocol</code>)
 types — any object with matching <code>fit</code>/<code>apply</code> methods satisfies them:</p>
-<pre><code class="language-python">from skyulf.preprocessing.base import StatefulTransformer
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulTransformer</span>
 
 
-class MeanCenterer:
-    &quot;&quot;&quot;Plain class — no BaseCalculator/BaseApplier inheritance.&quot;&quot;&quot;
+<span class="k">class</span><span class="w"> </span><span class="nc">MeanCenterer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Plain class — no BaseCalculator/BaseApplier inheritance."""</span>
 
-    def fit(self, df, config):
-        return {&quot;mean&quot;: df[&quot;x&quot;].mean()}
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="n">df</span><span class="p">[</span><span class="s2">"x"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()}</span>
 
-    def apply(self, df, params):
-        out = df.copy()
-        out[&quot;x&quot;] = out[&quot;x&quot;] - params[&quot;mean&quot;]
-        return out
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s2">"x"</span><span class="p">]</span> <span class="o">=</span> <span class="n">out</span><span class="p">[</span><span class="s2">"x"</span><span class="p">]</span> <span class="o">-</span> <span class="n">params</span><span class="p">[</span><span class="s2">"mean"</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">out</span>
 
 
-centerer = MeanCenterer()
-step = StatefulTransformer(calculator=centerer, applier=centerer, node_id=&quot;center_x&quot;)
-</code></pre>
+<span class="n">centerer</span> <span class="o">=</span> <span class="n">MeanCenterer</span><span class="p">()</span>
+<span class="n">step</span> <span class="o">=</span> <span class="n">StatefulTransformer</span><span class="p">(</span><span class="n">calculator</span><span class="o">=</span><span class="n">centerer</span><span class="p">,</span> <span class="n">applier</span><span class="o">=</span><span class="n">centerer</span><span class="p">,</span> <span class="n">node_id</span><span class="o">=</span><span class="s2">"center_x"</span><span class="p">)</span>
+</code></pre></div>
 <p>This is useful for quick experiments or wrapping existing objects (e.g. an
 sklearn-like class that already has compatible methods) without writing an
 ABC subclass just to satisfy a type check.</p>
 <h2 id="testing-guidance">Testing guidance</h2>
 <p>Write integration tests that run the full cycle:</p>
-<pre><code class="language-python">calc = MyNodeCalculator()
-artifact = calc.fit(sample_df, {&quot;columns&quot;: [&quot;col_a&quot;]})
+<div class="highlight"><pre><span></span><code><span class="n">calc</span> <span class="o">=</span> <span class="n">MyNodeCalculator</span><span class="p">()</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">calc</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">sample_df</span><span class="p">,</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"col_a"</span><span class="p">]})</span>
 
-applier = MyNodeApplier()
-result = applier.apply(sample_df, artifact)
+<span class="n">applier</span> <span class="o">=</span> <span class="n">MyNodeApplier</span><span class="p">()</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">sample_df</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
 
-assert &quot;col_a&quot; in result.columns  # or whatever your node guarantees
-</code></pre>
+<span class="k">assert</span> <span class="s2">"col_a"</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">columns</span>  <span class="c1"># or whatever your node guarantees</span>
+</code></pre></div>
 <p>Prefer real DataFrames over mocks — see <code>tests/</code> for examples.</p>
 
 

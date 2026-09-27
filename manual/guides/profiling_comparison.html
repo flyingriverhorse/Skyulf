@@ -1581,6 +1581,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3562,26 +3842,26 @@ can be embedded into an ML workflow.</p>
 </table>
 <hr />
 <h2 id="quick-start-with-skyulf">Quick Start with Skyulf</h2>
-<pre><code class="language-python">import polars as pl
-from skyulf import EDAAnalyzer, EDAVisualizer
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">EDAAnalyzer</span><span class="p">,</span> <span class="n">EDAVisualizer</span>
 
-# 1. Load Data
-df = pl.read_csv(&quot;your_dataset.csv&quot;)
+<span class="c1"># 1. Load Data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"your_dataset.csv"</span><span class="p">)</span>
 
-# 2. Run Analysis
-analyzer = EDAAnalyzer(df)
-profile = analyzer.analyze(target_col=&quot;target&quot;)
+<span class="c1"># 2. Run Analysis</span>
+<span class="n">analyzer</span> <span class="o">=</span> <span class="n">EDAAnalyzer</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">analyzer</span><span class="o">.</span><span class="n">analyze</span><span class="p">(</span><span class="n">target_col</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
 
-# 3. Visualize Results (The Easy Way)
-# This single class handles all the rich terminal output and matplotlib plots
-viz = EDAVisualizer(profile, df)
+<span class="c1"># 3. Visualize Results (The Easy Way)</span>
+<span class="c1"># This single class handles all the rich terminal output and matplotlib plots</span>
+<span class="n">viz</span> <span class="o">=</span> <span class="n">EDAVisualizer</span><span class="p">(</span><span class="n">profile</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>
 
-# Print the dashboard
-viz.summary()
+<span class="c1"># Print the dashboard</span>
+<span class="n">viz</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
 
-# Show the plots
-viz.plot()
-</code></pre>
+<span class="c1"># Show the plots</span>
+<span class="n">viz</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+</code></pre></div>
 <hr />
 <h2 id="conclusion">Conclusion</h2>
 <p>There's no universally "best" profiling tool. Choose based on your needs:</p>

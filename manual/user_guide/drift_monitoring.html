@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3328,30 +3608,30 @@ the upload with a transformed reference. Legacy jobs without graph metadata
 retain their original saved reference; ensure that reference and upload use the
 same preprocessing stage.</p>
 <h2 id="quick-example">Quick example</h2>
-<pre><code class="language-python">import polars as pl
-from skyulf.profiling import DriftCalculator
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.profiling</span><span class="w"> </span><span class="kn">import</span> <span class="n">DriftCalculator</span>
 
-# Reference = your training data
-reference = pl.DataFrame({
-    &quot;age&quot;: [25, 30, 35, 40, 45, 50],
-    &quot;income&quot;: [30000, 45000, 55000, 65000, 70000, 80000],
-})
+<span class="c1"># Reference = your training data</span>
+<span class="n">reference</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">35</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">45</span><span class="p">,</span> <span class="mi">50</span><span class="p">],</span>
+    <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="mi">30000</span><span class="p">,</span> <span class="mi">45000</span><span class="p">,</span> <span class="mi">55000</span><span class="p">,</span> <span class="mi">65000</span><span class="p">,</span> <span class="mi">70000</span><span class="p">,</span> <span class="mi">80000</span><span class="p">],</span>
+<span class="p">})</span>
 
-# Current = new production data
-current = pl.DataFrame({
-    &quot;age&quot;: [60, 65, 70, 75, 80, 85],
-    &quot;income&quot;: [90000, 95000, 100000, 110000, 120000, 130000],
-})
+<span class="c1"># Current = new production data</span>
+<span class="n">current</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">60</span><span class="p">,</span> <span class="mi">65</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">75</span><span class="p">,</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">85</span><span class="p">],</span>
+    <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="mi">90000</span><span class="p">,</span> <span class="mi">95000</span><span class="p">,</span> <span class="mi">100000</span><span class="p">,</span> <span class="mi">110000</span><span class="p">,</span> <span class="mi">120000</span><span class="p">,</span> <span class="mi">130000</span><span class="p">],</span>
+<span class="p">})</span>
 
-calc = DriftCalculator(reference, current)
-report = calc.calculate_drift()
+<span class="n">calc</span> <span class="o">=</span> <span class="n">DriftCalculator</span><span class="p">(</span><span class="n">reference</span><span class="p">,</span> <span class="n">current</span><span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">calc</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">()</span>
 
-print(f&quot;Drifted columns: {report.drifted_columns_count}&quot;)
-for col, drift in report.column_drifts.items():
-    print(f&quot;  {col}: drift={drift.drift_detected}&quot;)
-    for m in drift.metrics:
-        print(f&quot;    {m.metric}: {m.value:.4f} (threshold={m.threshold}, drifted={m.has_drift})&quot;)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Drifted columns: </span><span class="si">{</span><span class="n">report</span><span class="o">.</span><span class="n">drifted_columns_count</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">drift</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">column_drifts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">: drift=</span><span class="si">{</span><span class="n">drift</span><span class="o">.</span><span class="n">drift_detected</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">drift</span><span class="o">.</span><span class="n">metrics</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">metric</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">value</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> (threshold=</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">threshold</span><span class="si">}</span><span class="s2">, drifted=</span><span class="si">{</span><span class="n">m</span><span class="o">.</span><span class="n">has_drift</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="drift-metrics">Drift metrics</h2>
 <p>String, Categorical, Enum and Boolean columns receive categorical drift metrics,
 including <code>psi_categorical</code>. They do not need encoding first. Rerun saved drift
@@ -3408,13 +3688,13 @@ the cards show <code>—</code> and <strong>No PSI available</strong> rather tha
   statistic's threshold rather than one of its own.</li>
 </ul>
 <h2 id="custom-thresholds">Custom thresholds</h2>
-<pre><code class="language-python">report = calc.calculate_drift(thresholds={
-    &quot;psi&quot;: 0.15,
-    &quot;ks_statistic&quot;: 0.01,
-    &quot;wasserstein&quot;: 0.05,
-    &quot;kl_divergence&quot;: 0.2,
-})
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">report</span> <span class="o">=</span> <span class="n">calc</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">thresholds</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">"psi"</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">,</span>
+    <span class="s2">"ks_statistic"</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span>
+    <span class="s2">"wasserstein"</span><span class="p">:</span> <span class="mf">0.05</span><span class="p">,</span>
+    <span class="s2">"kl_divergence"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+<span class="p">})</span>
+</code></pre></div>
 <p>The keys are <code>psi</code>, <code>ks_statistic</code>, <code>wasserstein</code> and <code>kl_divergence</code>. Anything
 else is merged into the dict but never read, so a misspelled key silently leaves
 that threshold at its default.</p>
@@ -3446,29 +3726,29 @@ compare, so it never appears in <code>column_drifts</code> — the count is the 
 shows up, and it used to be omitted entirely, leaving a report that claimed zero
 drift while the structural change was classified as critical.</p>
 <h2 id="report-structure">Report structure</h2>
-<pre><code class="language-python">DriftReport(
-    reference_rows=1000,
-    current_rows=500,
-    drifted_columns_count=2,
-    column_drifts={
-        &quot;age&quot;: ColumnDrift(
-            column=&quot;age&quot;,
-            metrics=[...],
-            drift_detected=True,
-            suggestions=[&quot;Consider retraining...&quot;],
-        ),
-    },
-    missing_columns=[],
-    new_columns=[&quot;new_feature&quot;],
-)
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">DriftReport</span><span class="p">(</span>
+    <span class="n">reference_rows</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">current_rows</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">drifted_columns_count</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">column_drifts</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="n">ColumnDrift</span><span class="p">(</span>
+            <span class="n">column</span><span class="o">=</span><span class="s2">"age"</span><span class="p">,</span>
+            <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+            <span class="n">drift_detected</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">suggestions</span><span class="o">=</span><span class="p">[</span><span class="s2">"Consider retraining..."</span><span class="p">],</span>
+        <span class="p">),</span>
+    <span class="p">},</span>
+    <span class="n">missing_columns</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">new_columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"new_feature"</span><span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
 <h2 id="data-format">Data format</h2>
 <p><code>DriftCalculator</code> works with <strong>Polars DataFrames</strong>. If your data is in Pandas:</p>
-<pre><code class="language-python">import polars as pl
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
 
-reference_pl = pl.from_pandas(reference_pd)
-current_pl = pl.from_pandas(current_pd)
-</code></pre>
+<span class="n">reference_pl</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">reference_pd</span><span class="p">)</span>
+<span class="n">current_pl</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">from_pandas</span><span class="p">(</span><span class="n">current_pd</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="dependencies">Dependencies</h2>
 <p>Drift calculation requires <code>scipy</code> (installed with <code>skyulf-core</code> by default).</p>
 <h2 id="tips">Tips</h2>

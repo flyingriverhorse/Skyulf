@@ -1431,6 +1431,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3139,25 +3419,25 @@ regular, trainable model that plugs into the same Calculator/Applier
 pipeline as classification and regression, with four algorithms available:
 <code>kmeans</code>, <code>minibatch_kmeans</code>, <code>gaussian_mixture</code>, and <code>birch</code>.</p>
 <h2 id="quick-start">Quick start</h2>
-<pre><code class="language-python">from skyulf.modeling.clustering import KMeansCalculator, KMeansApplier
-from skyulf.modeling.base import StatefulEstimator
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.clustering</span><span class="w"> </span><span class="kn">import</span> <span class="n">KMeansCalculator</span><span class="p">,</span> <span class="n">KMeansApplier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
 
-estimator = StatefulEstimator(KMeansCalculator(), KMeansApplier(), node_id=&quot;segments&quot;)
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span><span class="n">KMeansCalculator</span><span class="p">(),</span> <span class="n">KMeansApplier</span><span class="p">(),</span> <span class="n">node_id</span><span class="o">=</span><span class="s2">"segments"</span><span class="p">)</span>
 
-# No target column needed — pass &quot;&quot; (or omit it).
-estimator.fit_predict(split_dataset, target_column=&quot;&quot;, config={&quot;params&quot;: {&quot;n_clusters&quot;: 4}})
+<span class="c1"># No target column needed — pass "" (or omit it).</span>
+<span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span><span class="n">split_dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_clusters"</span><span class="p">:</span> <span class="mi">4</span><span class="p">}})</span>
 
-# Evaluate cluster quality + get cluster sizes/centroids
-report = estimator.evaluate(split_dataset, target_column=&quot;&quot;, job_id=&quot;job1&quot;)
-train_eval = report[&quot;splits&quot;][&quot;train&quot;]
+<span class="c1"># Evaluate cluster quality + get cluster sizes/centroids</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">split_dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">job_id</span><span class="o">=</span><span class="s2">"job1"</span><span class="p">)</span>
+<span class="n">train_eval</span> <span class="o">=</span> <span class="n">report</span><span class="p">[</span><span class="s2">"splits"</span><span class="p">][</span><span class="s2">"train"</span><span class="p">]</span>
 
-print(train_eval.metrics)              # {&quot;silhouette_score&quot;: 0.61, &quot;n_clusters&quot;: 4, ...}
-print(train_eval.clustering.n_clusters)      # 4
-print(train_eval.clustering.cluster_sizes)   # {&quot;0&quot;: 120, &quot;1&quot;: 95, ...}
-for c in train_eval.clustering.centroids:
-    print(c.cluster_id, c.size, c.percentage, c.center, c.profile)
-    # c.profile is an auto-generated label, e.g. &quot;High income, Low age&quot;
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="n">train_eval</span><span class="o">.</span><span class="n">metrics</span><span class="p">)</span>              <span class="c1"># {"silhouette_score": 0.61, "n_clusters": 4, ...}</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">train_eval</span><span class="o">.</span><span class="n">clustering</span><span class="o">.</span><span class="n">n_clusters</span><span class="p">)</span>      <span class="c1"># 4</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">train_eval</span><span class="o">.</span><span class="n">clustering</span><span class="o">.</span><span class="n">cluster_sizes</span><span class="p">)</span>   <span class="c1"># {"0": 120, "1": 95, ...}</span>
+<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">train_eval</span><span class="o">.</span><span class="n">clustering</span><span class="o">.</span><span class="n">centroids</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">cluster_id</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">percentage</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">center</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">profile</span><span class="p">)</span>
+    <span class="c1"># c.profile is an auto-generated label, e.g. "High income, Low age"</span>
+</code></pre></div>
 <p>That's it — no separate clustering API to learn. <code>fit_predict</code>/<code>evaluate</code>
 work exactly like every other model; the only difference is the empty
 <code>target_column</code>.</p>
@@ -3200,11 +3480,11 @@ algorithms (DBSCAN, Agglomerative, OPTICS) only implement <code>fit_predict()</c
 the training data and can't be deployed for inference.</p>
 <p>Swap the calculator/applier class to switch algorithms — the rest of the
 code above is identical:</p>
-<pre><code class="language-python">from skyulf.modeling.clustering import GaussianMixtureCalculator, GaussianMixtureApplier
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.clustering</span><span class="w"> </span><span class="kn">import</span> <span class="n">GaussianMixtureCalculator</span><span class="p">,</span> <span class="n">GaussianMixtureApplier</span>
 
-estimator = StatefulEstimator(GaussianMixtureCalculator(), GaussianMixtureApplier(), node_id=&quot;segments&quot;)
-estimator.fit_predict(split_dataset, target_column=&quot;&quot;, config={&quot;params&quot;: {&quot;n_components&quot;: 4, &quot;covariance_type&quot;: &quot;full&quot;}})
-</code></pre>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span><span class="n">GaussianMixtureCalculator</span><span class="p">(),</span> <span class="n">GaussianMixtureApplier</span><span class="p">(),</span> <span class="n">node_id</span><span class="o">=</span><span class="s2">"segments"</span><span class="p">)</span>
+<span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span><span class="n">split_dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_components"</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">"covariance_type"</span><span class="p">:</span> <span class="s2">"full"</span><span class="p">}})</span>
+</code></pre></div>
 <h2 id="interpreting-clusters">Interpreting clusters</h2>
 <p>Cluster IDs (<code>0</code>, <code>1</code>, <code>2</code>, ...) are arbitrary — the model has no idea a
 cluster corresponds to, say, "high-value customers" or "setosa". Two ways
@@ -3218,13 +3498,13 @@ extra config needed; it's just part of <code>centroid.profile</code>.</p>
 dataset, or a customer segment you already know), pass it as
 <code>reference_column</code> — it's excluded from the model entirely, but a
 cluster → label breakdown is computed for you:</p>
-<pre><code class="language-python">estimator.fit_predict(
-    split_dataset, target_column=&quot;&quot;, config={&quot;params&quot;: {&quot;n_clusters&quot;: 3}, &quot;reference_column&quot;: &quot;species&quot;}
-)
-report = estimator.evaluate(split_dataset, target_column=&quot;&quot;, reference_column=&quot;species&quot;)
-print(report[&quot;splits&quot;][&quot;train&quot;].clustering.reference_crosstab)
-# {&quot;0&quot;: {&quot;setosa&quot;: 46, &quot;versicolor&quot;: 2}, &quot;1&quot;: {&quot;versicolor&quot;: 44}, &quot;2&quot;: {&quot;virginica&quot;: 50}}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span>
+    <span class="n">split_dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_clusters"</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span> <span class="s2">"reference_column"</span><span class="p">:</span> <span class="s2">"species"</span><span class="p">}</span>
+<span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">split_dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">reference_column</span><span class="o">=</span><span class="s2">"species"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="p">[</span><span class="s2">"splits"</span><span class="p">][</span><span class="s2">"train"</span><span class="p">]</span><span class="o">.</span><span class="n">clustering</span><span class="o">.</span><span class="n">reference_crosstab</span><span class="p">)</span>
+<span class="c1"># {"0": {"setosa": 46, "versicolor": 2}, "1": {"versicolor": 44}, "2": {"virginica": 50}}</span>
+</code></pre></div>
 <p>This tells you e.g. "Cluster 0 is 92% setosa" — without the model ever
 seeing the <code>species</code> column.</p>
 <h2 id="deployment-inference">Deployment &amp; inference</h2>
@@ -3263,19 +3543,19 @@ applies to unsupervised clustering). Results appear in a dedicated
 per-cluster centroid cards (with the auto-generated profile), and — if a
 reference column was set — a breakdown of that column's values per cluster.</p>
 <p>Same thing via a pipeline config:</p>
-<pre><code class="language-python">{
-    &quot;node_id&quot;: &quot;segment_customers&quot;,
-    &quot;step_type&quot;: &quot;training&quot;,
-    &quot;params&quot;: {
-        &quot;run_mode&quot;: &quot;fixed&quot;,          # clustering always runs in fixed mode
-        &quot;target_column&quot;: &quot;&quot;,          # sentinel for &quot;no target&quot;
-        &quot;model_type&quot;: &quot;gaussian_mixture&quot;,
-        &quot;hyperparameters&quot;: {&quot;n_components&quot;: 4, &quot;covariance_type&quot;: &quot;full&quot;},
-        &quot;reference_column&quot;: &quot;known_segment&quot;,  # optional
-        &quot;evaluate&quot;: True,
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s2">"node_id"</span><span class="p">:</span> <span class="s2">"segment_customers"</span><span class="p">,</span>
+    <span class="s2">"step_type"</span><span class="p">:</span> <span class="s2">"training"</span><span class="p">,</span>
+    <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"run_mode"</span><span class="p">:</span> <span class="s2">"fixed"</span><span class="p">,</span>          <span class="c1"># clustering always runs in fixed mode</span>
+        <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>          <span class="c1"># sentinel for "no target"</span>
+        <span class="s2">"model_type"</span><span class="p">:</span> <span class="s2">"gaussian_mixture"</span><span class="p">,</span>
+        <span class="s2">"hyperparameters"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_components"</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">"covariance_type"</span><span class="p">:</span> <span class="s2">"full"</span><span class="p">},</span>
+        <span class="s2">"reference_column"</span><span class="p">:</span> <span class="s2">"known_segment"</span><span class="p">,</span>  <span class="c1"># optional</span>
+        <span class="s2">"evaluate"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <h2 id="notes">Notes</h2>
 <ul>
 <li><strong>Only genuinely deployable algorithms are included.</strong> K-Means,

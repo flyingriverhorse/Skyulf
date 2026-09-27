@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3238,85 +3518,85 @@ Instead, it uses Skyulf's low-level building blocks directly:</p>
 </ol>
 <h2 id="runnable-example">Runnable example</h2>
 <p>This single snippet is fully self-contained and can be pasted into a Python session as-is.</p>
-<pre><code class="language-python">import pandas as pd
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf.data.dataset import SplitDataset
-from skyulf.modeling.base import StatefulEstimator
-from skyulf.modeling.classification import (
-    RandomForestClassifierApplier,
-    RandomForestClassifierCalculator,
-)
-from skyulf.preprocessing.encoding import OneHotEncoderApplier, OneHotEncoderCalculator
-from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
-from skyulf.preprocessing.split import (
-    FeatureTargetSplitApplier,
-    FeatureTargetSplitCalculator,
-    SplitApplier,
-    SplitCalculator,
-)
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.classification</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">RandomForestClassifierApplier</span><span class="p">,</span>
+    <span class="n">RandomForestClassifierCalculator</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.encoding</span><span class="w"> </span><span class="kn">import</span> <span class="n">OneHotEncoderApplier</span><span class="p">,</span> <span class="n">OneHotEncoderCalculator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleImputerApplier</span><span class="p">,</span> <span class="n">SimpleImputerCalculator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.split</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">FeatureTargetSplitApplier</span><span class="p">,</span>
+    <span class="n">FeatureTargetSplitCalculator</span><span class="p">,</span>
+    <span class="n">SplitApplier</span><span class="p">,</span>
+    <span class="n">SplitCalculator</span><span class="p">,</span>
+<span class="p">)</span>
 
-# 0) Setup data
-df = pd.DataFrame(
-    {
-        &quot;age&quot;: [10, 20, None, 40, 50, None, 70, 80],
-        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
+<span class="c1"># 0) Setup data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">70</span><span class="p">,</span> <span class="mi">80</span><span class="p">],</span>
+        <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">],</span>
+        <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-# 1) Split the dataset (no leakage)
-split_params = {
-    &quot;test_size&quot;: 0.25,
-    &quot;validation_size&quot;: 0.0,
-    &quot;random_state&quot;: 42,
-    &quot;shuffle&quot;: True,
-    &quot;stratify&quot;: True,
-    &quot;target_column&quot;: &quot;target&quot;,
-}
+<span class="c1"># 1) Split the dataset (no leakage)</span>
+<span class="n">split_params</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.25</span><span class="p">,</span>
+    <span class="s2">"validation_size"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+    <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+<span class="p">}</span>
 
-dataset = SplitApplier().apply(df, SplitCalculator().fit(df, split_params))
+<span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">SplitCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">split_params</span><span class="p">))</span>
 
-# 2) Convert DataFrames to (X, y) tuples
-fts_params = {&quot;target_column&quot;: &quot;target&quot;}
-dataset_xy = FeatureTargetSplitApplier().apply(
-    dataset, FeatureTargetSplitCalculator().fit(dataset, fts_params)
-)
+<span class="c1"># 2) Convert DataFrames to (X, y) tuples</span>
+<span class="n">fts_params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">}</span>
+<span class="n">dataset_xy</span> <span class="o">=</span> <span class="n">FeatureTargetSplitApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+    <span class="n">dataset</span><span class="p">,</span> <span class="n">FeatureTargetSplitCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">fts_params</span><span class="p">)</span>
+<span class="p">)</span>
 
-X_train, y_train = dataset_xy.train
-X_test, y_test = dataset_xy.test
+<span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">dataset_xy</span><span class="o">.</span><span class="n">train</span>
+<span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">dataset_xy</span><span class="o">.</span><span class="n">test</span>
 
-# 3) Fit preprocessing on train, apply to test
-imp_cfg = {&quot;columns&quot;: [&quot;age&quot;], &quot;strategy&quot;: &quot;mean&quot;}
-imp_params = SimpleImputerCalculator().fit((X_train, y_train), imp_cfg)
-X_train_imp, y_train = SimpleImputerApplier().apply((X_train, y_train), imp_params)
-X_test_imp, y_test = SimpleImputerApplier().apply((X_test, y_test), imp_params)
+<span class="c1"># 3) Fit preprocessing on train, apply to test</span>
+<span class="n">imp_cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}</span>
+<span class="n">imp_params</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">imp_cfg</span><span class="p">)</span>
+<span class="n">X_train_imp</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">((</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">imp_params</span><span class="p">)</span>
+<span class="n">X_test_imp</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">((</span><span class="n">X_test</span><span class="p">,</span> <span class="n">y_test</span><span class="p">),</span> <span class="n">imp_params</span><span class="p">)</span>
 
-ohe_cfg = {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}
-ohe_params = OneHotEncoderCalculator().fit((X_train_imp, y_train), ohe_cfg)
-X_train_fe, y_train = OneHotEncoderApplier().apply((X_train_imp, y_train), ohe_params)
-X_test_fe, y_test = OneHotEncoderApplier().apply((X_test_imp, y_test), ohe_params)
+<span class="n">ohe_cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">}</span>
+<span class="n">ohe_params</span> <span class="o">=</span> <span class="n">OneHotEncoderCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">((</span><span class="n">X_train_imp</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">ohe_cfg</span><span class="p">)</span>
+<span class="n">X_train_fe</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">OneHotEncoderApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">((</span><span class="n">X_train_imp</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span> <span class="n">ohe_params</span><span class="p">)</span>
+<span class="n">X_test_fe</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">OneHotEncoderApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">((</span><span class="n">X_test_imp</span><span class="p">,</span> <span class="n">y_test</span><span class="p">),</span> <span class="n">ohe_params</span><span class="p">)</span>
 
-# 4) Train a model and predict
-estimator = StatefulEstimator(
-    calculator=RandomForestClassifierCalculator(),
-    applier=RandomForestClassifierApplier(),
-    node_id=&quot;rf_model&quot;,
-)
+<span class="c1"># 4) Train a model and predict</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span>
+    <span class="n">calculator</span><span class="o">=</span><span class="n">RandomForestClassifierCalculator</span><span class="p">(),</span>
+    <span class="n">applier</span><span class="o">=</span><span class="n">RandomForestClassifierApplier</span><span class="p">(),</span>
+    <span class="n">node_id</span><span class="o">=</span><span class="s2">"rf_model"</span><span class="p">,</span>
+<span class="p">)</span>
 
-dataset_for_model = SplitDataset(
-    train=(X_train_fe, y_train),
-    test=(X_test_fe, y_test),
-    validation=None,
-)
+<span class="n">dataset_for_model</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
+    <span class="n">train</span><span class="o">=</span><span class="p">(</span><span class="n">X_train_fe</span><span class="p">,</span> <span class="n">y_train</span><span class="p">),</span>
+    <span class="n">test</span><span class="o">=</span><span class="p">(</span><span class="n">X_test_fe</span><span class="p">,</span> <span class="n">y_test</span><span class="p">),</span>
+    <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span>
 
-model_cfg = {&quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}}
-preds = estimator.fit_predict(dataset=dataset_for_model, target_column=&quot;target&quot;, config=model_cfg)
+<span class="n">model_cfg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">}}</span>
+<span class="n">preds</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">fit_predict</span><span class="p">(</span><span class="n">dataset</span><span class="o">=</span><span class="n">dataset_for_model</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">model_cfg</span><span class="p">)</span>
 
-print(&quot;Train preds:&quot;)
-print(preds[&quot;train&quot;].head())
-print(&quot;Test preds:&quot;)
-print(preds.get(&quot;test&quot;, pd.Series(dtype=float)).head())
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Train preds:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds</span><span class="p">[</span><span class="s2">"train"</span><span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Test preds:"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"test"</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span><span class="o">.</span><span class="n">head</span><span class="p">())</span>
+</code></pre></div>
 <h2 id="5-summary-what-to-remember">5) Summary: what to remember</h2>
 <ul>
 <li>Split first (or provide a <code>SplitDataset</code>) to prevent leakage.</li>

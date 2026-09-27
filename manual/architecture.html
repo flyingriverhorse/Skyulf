@@ -1614,6 +1614,286 @@
   
   
     <li class="md-nav__item">
+      <a href="user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3377,11 +3657,11 @@
 <li>Optionally evaluates on test/validation.</li>
 </ol>
 <p>High-level flow:</p>
-<pre><code>Raw DataFrame
+<div class="highlight"><pre><span></span><code>Raw DataFrame
   └─ FeatureEngineer.fit_transform(...)  -&gt; DataFrame or SplitDataset
         └─ (optionally) SplitDataset.train / test / validation
               └─ StatefulEstimator.fit_predict(...) -&gt; predictions
-</code></pre>
+</code></pre></div>
 <h2 id="avoiding-data-leakage">Avoiding Data Leakage</h2>
 <p>If you split first (or provide a <code>SplitDataset</code>), calculators should learn only on the train split.
 This prevents leakage of statistics from test/validation.</p>
@@ -3394,10 +3674,10 @@ This prevents leakage of statistics from test/validation.</p>
 <li><strong>Row-wise concat</strong> when column schemas match (data augmentation).</li>
 </ul>
 <p>Inputs are merged in topological order. Duplicate columns are deduplicated. Dead-end branches (nodes not on a path to any terminal) are pruned from execution.</p>
-<pre><code>Dataset → Scaling   ──┐
+<div class="highlight"><pre><span></span><code>Dataset → Scaling   ──┐
                       ├──→ Training Node (merge)
 Dataset → Encoding  ──┘
-</code></pre>
+</code></pre></div>
 <h2 id="parallel-experiment-execution">Parallel Experiment Execution</h2>
 <p><em>New in v0.4.0</em></p>
 <p>When a canvas has multiple training/tuning nodes, <code>partition_parallel_pipeline()</code> splits the graph into independent sub-pipelines:</p>
@@ -3406,10 +3686,10 @@ Dataset → Encoding  ──┘
 <li><strong>Single terminal, parallel mode</strong> — When <code>execution_mode=parallel</code>, each incoming branch becomes a separate job.</li>
 </ol>
 <p>The API returns <code>job_ids: List[str]</code> — one per branch. Shared prefix nodes (e.g., dataset) are included in each sub-pipeline. When <code>target_node_id</code> is set, only the branch containing that node executes.</p>
-<pre><code>Dataset → Scaling → RandomForest (Train)   → Job 1
+<div class="highlight"><pre><span></span><code>Dataset → Scaling → RandomForest (Train)   → Job 1
     │
     └──→ Encoding → XGBoost (Train)         → Job 2
-</code></pre>
+</code></pre></div>
 <h2 id="topological-execution-order-kahns-algorithm">Topological Execution Order (Kahn's Algorithm)</h2>
 <p><em>Hardened in v0.5.1</em></p>
 <p>Sub-pipelines produced by partitioning must be executed in <strong>topological order</strong> —
@@ -3435,10 +3715,10 @@ subgraph of the requested node:</p>
 <p><strong>BFS in one line:</strong> <em>Breadth-First Search</em> explores a graph level-by-level using a FIFO queue — visit a node, enqueue its neighbours,repeat. Contrast with DFS which uses a stack and goes deep first. We use BFS in step 1 because we only need the <em>set</em> of ancestors (level order is irrelevant); the actual execution order comes from step 3.</p>
 </blockquote>
 <h3 id="why-the-diamond-case-broke-reversed-bfs">Why the diamond case broke reversed-BFS</h3>
-<pre><code>Dataset ──► Split ──► Scaler ──► Train
+<div class="highlight"><pre><span></span><code>Dataset ──► Split ──► Scaler ──► Train
    │                    ▲
    └────────────────────┘   (shortcut edge)
-</code></pre>
+</code></pre></div>
 <p>Scaler has two parents (<code>Split</code> and <code>Dataset</code>). Reversed-BFS starting from
 Train enqueues parents in the order it visits children, so for some traversal
 orders Scaler ended up emitted <strong>before</strong> Split. The engine then ran Scaler →

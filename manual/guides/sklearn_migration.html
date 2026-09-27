@@ -1564,6 +1564,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3307,73 +3587,73 @@ row, or a REST payload can all produce the same <code>config</code> dict that
 <code>SkyulfPipeline(config)</code> consumes.</p>
 <h2 id="side-by-side-impute-encode-scale-train">Side-by-side: impute → encode → scale → train</h2>
 <p><strong>scikit-learn</strong></p>
-<pre><code class="language-python">from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.compose</span><span class="w"> </span><span class="kn">import</span> <span class="n">ColumnTransformer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomForestClassifier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.impute</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleImputer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">train_test_split</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">Pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">OneHotEncoder</span><span class="p">,</span> <span class="n">StandardScaler</span>
 
-numeric_features = [&quot;age&quot;, &quot;income&quot;]
-categorical_features = [&quot;city&quot;]
+<span class="n">numeric_features</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">,</span> <span class="s2">"income"</span><span class="p">]</span>
+<span class="n">categorical_features</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">]</span>
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        (&quot;num&quot;, Pipeline([
-            (&quot;impute&quot;, SimpleImputer(strategy=&quot;mean&quot;)),
-            (&quot;scale&quot;, StandardScaler()),
-        ]), numeric_features),
-        (&quot;cat&quot;, OneHotEncoder(), categorical_features),
-    ]
-)
+<span class="n">preprocessor</span> <span class="o">=</span> <span class="n">ColumnTransformer</span><span class="p">(</span>
+    <span class="n">transformers</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">(</span><span class="s2">"num"</span><span class="p">,</span> <span class="n">Pipeline</span><span class="p">([</span>
+            <span class="p">(</span><span class="s2">"impute"</span><span class="p">,</span> <span class="n">SimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="s2">"mean"</span><span class="p">)),</span>
+            <span class="p">(</span><span class="s2">"scale"</span><span class="p">,</span> <span class="n">StandardScaler</span><span class="p">()),</span>
+        <span class="p">]),</span> <span class="n">numeric_features</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"cat"</span><span class="p">,</span> <span class="n">OneHotEncoder</span><span class="p">(),</span> <span class="n">categorical_features</span><span class="p">),</span>
+    <span class="p">]</span>
+<span class="p">)</span>
 
-model = Pipeline([
-    (&quot;preprocess&quot;, preprocessor),
-    (&quot;clf&quot;, RandomForestClassifier(n_estimators=50, max_depth=5)),
-])
+<span class="n">model</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">([</span>
+    <span class="p">(</span><span class="s2">"preprocess"</span><span class="p">,</span> <span class="n">preprocessor</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"clf"</span><span class="p">,</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">max_depth</span><span class="o">=</span><span class="mi">5</span><span class="p">)),</span>
+<span class="p">])</span>
 
-X_train, X_test, y_train, y_test = train_test_split(
-    data.drop(columns=[&quot;is_customer&quot;]), data[&quot;is_customer&quot;], test_size=0.2
-)
-model.fit(X_train, y_train)
-predictions = model.predict(X_test)
-</code></pre>
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span>
+    <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"is_customer"</span><span class="p">]),</span> <span class="n">data</span><span class="p">[</span><span class="s2">"is_customer"</span><span class="p">],</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>Skyulf</strong></p>
-<pre><code class="language-python">from skyulf import SkyulfPipeline
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split_data&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;target_column&quot;: &quot;is_customer&quot;},
-        },
-        {
-            &quot;name&quot;: &quot;impute_income&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;income&quot;], &quot;strategy&quot;: &quot;mean&quot;},
-        },
-        {
-            &quot;name&quot;: &quot;encode_city&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;scale_features&quot;,
-            &quot;transformer&quot;: &quot;StandardScaler&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;age&quot;, &quot;income&quot;]},
-        },
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;random_forest_classifier&quot;,
-        &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;max_depth&quot;: 5},
-    },
-}
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split_data"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"is_customer"</span><span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute_income"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode_city"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale_features"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">,</span> <span class="s2">"income"</span><span class="p">]},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+        <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"max_depth"</span><span class="p">:</span> <span class="mi">5</span><span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(data, target_column=&quot;is_customer&quot;)   # split + fit + evaluate
-predictions = pipeline.predict(new_data)                    # transform + predict
-</code></pre>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"is_customer"</span><span class="p">)</span>   <span class="c1"># split + fit + evaluate</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new_data</span><span class="p">)</span>                    <span class="c1"># transform + predict</span>
+</code></pre></div>
 <p>Key differences to notice:</p>
 <ul>
 <li><strong>The split is a pipeline step, not a separate call.</strong> <code>TrainTestSplitter</code>
@@ -3390,11 +3670,11 @@ predictions = pipeline.predict(new_data)                    # transform + predic
 <h2 id="inspecting-a-fitted-pipeline">Inspecting a fitted pipeline</h2>
 <p>scikit-learn pipelines are inspected by walking <code>.named_steps</code> / <code>.steps</code> in
 Python. Skyulf gives you the same information without touching internals:</p>
-<pre><code class="language-python">print(pipeline.describe())      # human-readable step-by-step summary
-print(pipeline.to_mermaid())    # Mermaid flowchart string (paste into docs/PRs)
-print(pipeline.fingerprint())   # deterministic SHA-256 over topology + fitted artifacts
-print(pipeline.export_model_card())  # structured dict: lineage, params, metrics, fingerprint, mermaid diagram
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>      <span class="c1"># human-readable step-by-step summary</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">())</span>    <span class="c1"># Mermaid flowchart string (paste into docs/PRs)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">fingerprint</span><span class="p">())</span>   <span class="c1"># deterministic SHA-256 over topology + fitted artifacts</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">export_model_card</span><span class="p">())</span>  <span class="c1"># structured dict: lineage, params, metrics, fingerprint, mermaid diagram</span>
+</code></pre></div>
 <p><code>fingerprint()</code> in particular has no direct sklearn equivalent — it's a
 single hash that changes if <em>either</em> the config <em>or</em> any fitted artifact
 changes, so two pipelines with the same fingerprint are guaranteed to
@@ -3408,16 +3688,16 @@ there's no <code>remainder</code> argument because steps never touch unlisted co
 in the first place.</p>
 <h2 id="custom-transformers">Custom transformers</h2>
 <p><strong>scikit-learn</strong> — subclass <code>BaseEstimator</code>/<code>TransformerMixin</code>:</p>
-<pre><code class="language-python">from sklearn.base import BaseEstimator, TransformerMixin
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEstimator</span><span class="p">,</span> <span class="n">TransformerMixin</span>
 
-class MyTransformer(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None):
-        self.medians_ = X.median()
-        return self
+<span class="k">class</span><span class="w"> </span><span class="nc">MyTransformer</span><span class="p">(</span><span class="n">BaseEstimator</span><span class="p">,</span> <span class="n">TransformerMixin</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">medians_</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
 
-    def transform(self, X):
-        return X.fillna(self.medians_)
-</code></pre>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">X</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">medians_</span><span class="p">)</span>
+</code></pre></div>
 <p><strong>Skyulf</strong> — a <code>Calculator</code> (fit) / <code>Applier</code> (transform) pair registered
 under a name your config can reference. See
 <a href="../user_guide/extending_custom_nodes.html">Write your own node</a> for the full

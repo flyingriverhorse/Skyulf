@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3238,35 +3518,35 @@ numbers. This is a lightweight, advisory heuristic that helps you review a
 dataset before modeling; it is not a complete sensitive-data scanner or a
 compliance control.</p>
 <h2 id="basic-example">Basic example</h2>
-<pre><code class="language-python">import polars as pl
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
 
-from skyulf.profiling.analyzer import EDAAnalyzer
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.profiling.analyzer</span><span class="w"> </span><span class="kn">import</span> <span class="n">EDAAnalyzer</span>
 
-df = pl.DataFrame(
-    {
-        &quot;name&quot;: [&quot;Alice&quot;, &quot;Bob&quot;, &quot;Carol&quot;],
-        &quot;contact&quot;: [
-            &quot;alice@example.com&quot;,
-            &quot;+1 (555) 123-4567&quot;,
-            &quot;bob@example.com&quot;,
-        ],
-        &quot;customer_id&quot;: [&quot;10000001&quot;, &quot;10000002&quot;, &quot;10000003&quot;],
-    }
-)
+<span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"Alice"</span><span class="p">,</span> <span class="s2">"Bob"</span><span class="p">,</span> <span class="s2">"Carol"</span><span class="p">],</span>
+        <span class="s2">"contact"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"alice@example.com"</span><span class="p">,</span>
+            <span class="s2">"+1 (555) 123-4567"</span><span class="p">,</span>
+            <span class="s2">"bob@example.com"</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="s2">"customer_id"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"10000001"</span><span class="p">,</span> <span class="s2">"10000002"</span><span class="p">,</span> <span class="s2">"10000003"</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-profile = EDAAnalyzer(df).analyze()
+<span class="n">profile</span> <span class="o">=</span> <span class="n">EDAAnalyzer</span><span class="p">(</span><span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">analyze</span><span class="p">()</span>
 
-print(&quot;has_pii =&quot;, profile.has_pii)
-print(&quot;pii_columns =&quot;, profile.pii_columns)
+<span class="nb">print</span><span class="p">(</span><span class="s2">"has_pii ="</span><span class="p">,</span> <span class="n">profile</span><span class="o">.</span><span class="n">has_pii</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pii_columns ="</span><span class="p">,</span> <span class="n">profile</span><span class="o">.</span><span class="n">pii_columns</span><span class="p">)</span>
 
-for alert in profile.pii_alerts:
-    print(alert.message)
-</code></pre>
+<span class="k">for</span> <span class="n">alert</span> <span class="ow">in</span> <span class="n">profile</span><span class="o">.</span><span class="n">pii_alerts</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">alert</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+</code></pre></div>
 <p>The output is:</p>
-<pre><code class="language-text">has_pii = True
+<div class="highlight"><pre><span></span><code>has_pii = True
 pii_columns = ['contact', 'customer_id']
 Column 'contact' may contain PII (Email/Phone).
-</code></pre>
+</code></pre></div>
 <p>The <code>contact</code> result is expected. The <code>customer_id</code> values are deliberately
 included to show that ordinary numeric identifiers are not flagged as phone
 PII after the OC-148 fix.</p>

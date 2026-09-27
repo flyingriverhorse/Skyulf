@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3383,48 +3663,48 @@
 </tbody>
 </table>
 <h2 id="quick-example-standalone">Quick example (standalone)</h2>
-<pre><code class="language-python">from skyulf.modeling.base import StatefulEstimator
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
 
-estimator = StatefulEstimator(model_type=&quot;random_forest_classifier&quot;)
-estimator.fit(X_train, y_train)
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span><span class="n">model_type</span><span class="o">=</span><span class="s2">"random_forest_classifier"</span><span class="p">)</span>
+<span class="n">estimator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
 
-cv_results = estimator.cross_validate(
-    X_train, y_train,
-    n_folds=5,
-    cv_type=&quot;stratified_k_fold&quot;,
-)
+<span class="n">cv_results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">cross_validate</span><span class="p">(</span>
+    <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span>
+    <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+    <span class="n">cv_type</span><span class="o">=</span><span class="s2">"stratified_k_fold"</span><span class="p">,</span>
+<span class="p">)</span>
 
-print(cv_results[&quot;aggregated_metrics&quot;])
-# {'accuracy': {'mean': 0.92, 'std': 0.01, 'min': 0.90, 'max': 0.94}, ...}
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="n">cv_results</span><span class="p">[</span><span class="s2">"aggregated_metrics"</span><span class="p">])</span>
+<span class="c1"># {'accuracy': {'mean': 0.92, 'std': 0.01, 'min': 0.90, 'max': 0.94}, ...}</span>
+</code></pre></div>
 <h2 id="quick-example-pipeline-config">Quick example (pipeline config)</h2>
-<pre><code class="language-python">config = {
-    &quot;preprocessing&quot;: [...],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;random_forest_classifier&quot;,
-        &quot;cv_enabled&quot;: True,
-        &quot;cv_type&quot;: &quot;k_fold&quot;,
-        &quot;cv_folds&quot;: 5,
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span><span class="o">...</span><span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+        <span class="s2">"cv_enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"cv_type"</span><span class="p">:</span> <span class="s2">"k_fold"</span><span class="p">,</span>
+        <span class="s2">"cv_folds"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <h2 id="method-details">Method details</h2>
 <h3 id="k-fold">K-Fold</h3>
 <p>Splits data into <code>n_folds</code> equal parts. Each fold is used once as validation while the remaining folds form the training set. Data is shuffled by default.</p>
-<pre><code class="language-python">cv_type=&quot;k_fold&quot;, n_folds=5, shuffle=True
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"k_fold"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span>
+</code></pre></div>
 <h3 id="stratified-k-fold">Stratified K-Fold</h3>
 <p>Same as K-Fold but preserves the class distribution in each fold. Automatically falls back to K-Fold for regression problems.</p>
-<pre><code class="language-python">cv_type=&quot;stratified_k_fold&quot;, n_folds=5
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"stratified_k_fold"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span>
+</code></pre></div>
 <h3 id="shuffle-split">Shuffle Split</h3>
 <p>Generates <code>n_folds</code> random train/test splits. Unlike K-Fold, the same sample can appear in the test set of multiple iterations. Uses a fixed 80/20 train/test ratio per split.</p>
-<pre><code class="language-python">cv_type=&quot;shuffle_split&quot;, n_folds=10
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"shuffle_split"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">10</span>
+</code></pre></div>
 <h3 id="time-series-split">Time Series Split</h3>
 <p>Expands the training window forward in time. Fold 1 trains on the first chunk and validates on the second; fold 2 trains on the first two chunks and validates on the third; and so on.</p>
-<pre><code class="language-python">cv_type=&quot;time_series_split&quot;, n_folds=5, time_column=&quot;order_date&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"time_series_split"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">time_column</span><span class="o">=</span><span class="s2">"order_date"</span>
+</code></pre></div>
 <p><strong>Auto-sort behavior:</strong></p>
 <ol>
 <li>If <code>time_column</code> is provided, data is sorted by that column and the column is dropped from features (prevents date leakage).</li>
@@ -3445,29 +3725,29 @@ native pandas date inputs; previous scores may have used nonchronological folds.
 <li><strong>Inner loop</strong> (3-fold, capped at <code>n_folds - 1</code>): trains within each outer training set to check hyperparameter stability.</li>
 </ul>
 <p>This prevents the optimistic bias that occurs when the same data is used for both tuning and evaluation.</p>
-<pre><code class="language-python">cv_type=&quot;nested_cv&quot;, n_folds=5
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"nested_cv"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span>
+</code></pre></div>
 <p>Each fold result includes an <code>inner_cv_mean</code> score for diagnostics.</p>
 <h2 id="return-structure">Return structure</h2>
 <p>All CV methods return the same dictionary shape:</p>
-<pre><code class="language-python">{
-    &quot;aggregated_metrics&quot;: {
-        &quot;accuracy&quot;: {&quot;mean&quot;: 0.92, &quot;std&quot;: 0.01, &quot;min&quot;: 0.90, &quot;max&quot;: 0.94},
-        # ... other metrics
-    },
-    &quot;folds&quot;: [
-        {&quot;fold&quot;: 1, &quot;metrics&quot;: {...}},
-        {&quot;fold&quot;: 2, &quot;metrics&quot;: {...}},
-        # ...
-    ],
-    &quot;cv_config&quot;: {
-        &quot;n_folds&quot;: 5,
-        &quot;cv_type&quot;: &quot;k_fold&quot;,
-        &quot;shuffle&quot;: True,
-        &quot;random_state&quot;: 42,
-    },
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+    <span class="s2">"aggregated_metrics"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"accuracy"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="mf">0.92</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">"min"</span><span class="p">:</span> <span class="mf">0.90</span><span class="p">,</span> <span class="s2">"max"</span><span class="p">:</span> <span class="mf">0.94</span><span class="p">},</span>
+        <span class="c1"># ... other metrics</span>
+    <span class="p">},</span>
+    <span class="s2">"folds"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"fold"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"metrics"</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"fold"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"metrics"</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}},</span>
+        <span class="c1"># ...</span>
+    <span class="p">],</span>
+    <span class="s2">"cv_config"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"n_folds"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="s2">"cv_type"</span><span class="p">:</span> <span class="s2">"k_fold"</span><span class="p">,</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">}</span>
+</code></pre></div>
 <p>Nested CV adds <code>inner_cv_mean</code> to each fold entry and <code>inner_folds</code> to <code>cv_config</code>.</p>
 <h2 id="configuration-reference">Configuration reference</h2>
 <table>

@@ -1520,6 +1520,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3225,163 +3505,163 @@
 <p>This page contains practical patterns for common workflows.</p>
 <h2 id="recipe-split-preprocess-train">Recipe: split, preprocess, train</h2>
 <p>If you want evaluation metrics, use a split step (or pass a <code>SplitDataset</code>).</p>
-<pre><code class="language-python">import pandas as pd
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-# In real usage you'd likely load a file:
-# df = pd.read_csv(&quot;your_data.csv&quot;)
+<span class="c1"># In real usage you'd likely load a file:</span>
+<span class="c1"># df = pd.read_csv("your_data.csv")</span>
 
-df = pd.DataFrame(
-    {
-        &quot;free_text&quot;: [
-            &quot;  Hello   World  &quot;,
-            &quot;Skyulf is GREAT! &quot;,
-            &quot;  hello\tworld &quot;,
-            &quot;  ML pipelines   &quot;,
-            &quot;Encode + scale&quot;,
-            &quot; text cleaning  &quot;,
-        ],
-        &quot;country&quot;: [&quot;TR&quot;, &quot;TR&quot;, &quot;DE&quot;, &quot;DE&quot;, &quot;TR&quot;, &quot;DE&quot;],
-        &quot;age&quot;: [10, 20, 30, 40, 50, 60],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0],
-    }
-)
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"free_text"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"  Hello   World  "</span><span class="p">,</span>
+            <span class="s2">"Skyulf is GREAT! "</span><span class="p">,</span>
+            <span class="s2">"  hello</span><span class="se">\t</span><span class="s2">world "</span><span class="p">,</span>
+            <span class="s2">"  ML pipelines   "</span><span class="p">,</span>
+            <span class="s2">"Encode + scale"</span><span class="p">,</span>
+            <span class="s2">" text cleaning  "</span><span class="p">,</span>
+        <span class="p">],</span>
+        <span class="s2">"country"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"TR"</span><span class="p">,</span> <span class="s2">"TR"</span><span class="p">,</span> <span class="s2">"DE"</span><span class="p">,</span> <span class="s2">"DE"</span><span class="p">,</span> <span class="s2">"TR"</span><span class="p">,</span> <span class="s2">"DE"</span><span class="p">],</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">],</span>
+        <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {
-                &quot;test_size&quot;: 0.34,
-                &quot;validation_size&quot;: 0.0,
-                &quot;random_state&quot;: 42,
-                &quot;shuffle&quot;: True,
-                &quot;stratify&quot;: True,
-                &quot;target_column&quot;: &quot;target&quot;,
-            },
-        },
-        {
-            &quot;name&quot;: &quot;text_clean&quot;,
-            &quot;transformer&quot;: &quot;TextCleaning&quot;,
-            &quot;params&quot;: {
-                &quot;columns&quot;: [&quot;free_text&quot;],
-                &quot;operations&quot;: [
-                    {&quot;op&quot;: &quot;trim&quot;, &quot;mode&quot;: &quot;both&quot;},
-                    {&quot;op&quot;: &quot;case&quot;, &quot;mode&quot;: &quot;lower&quot;},
-                    {&quot;op&quot;: &quot;regex&quot;, &quot;mode&quot;: &quot;collapse_whitespace&quot;},
-                ],
-            },
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {
-                &quot;columns&quot;: [&quot;country&quot;, &quot;free_text&quot;],
-                &quot;drop_original&quot;: True,
-                &quot;handle_unknown&quot;: &quot;ignore&quot;,
-            },
-        },
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;scale&quot;,
-            &quot;transformer&quot;: &quot;StandardScaler&quot;,
-            &quot;params&quot;: {&quot;auto_detect&quot;: True},
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;, &quot;params&quot;: {&quot;n_estimators&quot;: 200}},
-}
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.34</span><span class="p">,</span>
+                <span class="s2">"validation_size"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"text_clean"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TextCleaning"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"free_text"</span><span class="p">],</span>
+                <span class="s2">"operations"</span><span class="p">:</span> <span class="p">[</span>
+                    <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"trim"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"both"</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"case"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"lower"</span><span class="p">},</span>
+                    <span class="p">{</span><span class="s2">"op"</span><span class="p">:</span> <span class="s2">"regex"</span><span class="p">,</span> <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"collapse_whitespace"</span><span class="p">},</span>
+                <span class="p">],</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"country"</span><span class="p">,</span> <span class="s2">"free_text"</span><span class="p">],</span>
+                <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"auto_detect"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">200</span><span class="p">}},</span>
+<span class="p">}</span>
 
-pipeline = SkyulfPipeline(config)
-report = pipeline.fit(df, target_column=&quot;target&quot;)
-print(report.get(&quot;modeling&quot;))
-</code></pre>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"modeling"</span><span class="p">))</span>
+</code></pre></div>
 <h2 id="recipe-safe-inference">Recipe: safe inference</h2>
 <p>At inference time you typically:</p>
 <ol>
 <li>load a persisted pipeline</li>
 <li>call <code>predict(df)</code> on a dataframe without the target column</li>
 </ol>
-<pre><code class="language-python">import tempfile
-from pathlib import Path
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-import pandas as pd
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-df = pd.DataFrame(
-    {
-        &quot;age&quot;: [10, 20, 30, 40, 50, 60],
-        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0],
-    }
-)
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">],</span>
+        <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">],</span>
+        <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
 
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;split&quot;,
-            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-            &quot;params&quot;: {
-                &quot;test_size&quot;: 0.2,
-                &quot;validation_size&quot;: 0.0,
-                &quot;random_state&quot;: 42,
-                &quot;shuffle&quot;: True,
-                &quot;stratify&quot;: True,
-                &quot;target_column&quot;: &quot;target&quot;,
-            },
-        },
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True},
-        },
-    ],
-    &quot;modeling&quot;: {
-        &quot;type&quot;: &quot;random_forest_classifier&quot;,
-        &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42},
-    },
-}
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+                <span class="s2">"validation_size"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+                <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]},</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+            <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+        <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">},</span>
+    <span class="p">},</span>
+<span class="p">}</span>
 
-with tempfile.TemporaryDirectory() as tmp:
-    model_path = Path(tmp) / &quot;model.pkl&quot;
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="n">model_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"model.pkl"</span>
 
-    pipeline = SkyulfPipeline(config)
-    _ = pipeline.fit(df, target_column=&quot;target&quot;)
-    pipeline.save(model_path)
+    <span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+    <span class="n">pipeline</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
 
-    loaded = SkyulfPipeline.load(model_path)
+    <span class="n">loaded</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
 
-    new_df = pd.DataFrame({&quot;age&quot;: [25, 55], &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;]})
-    preds = loaded.predict(new_df)
+    <span class="n">new_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="mi">55</span><span class="p">],</span> <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">]})</span>
+    <span class="n">preds</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new_df</span><span class="p">)</span>
 
-print(preds)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="recipe-use-a-single-component-debug">Recipe: use a single component (debug)</h2>
 <p>For debugging, you can run one node directly.</p>
-<pre><code class="language-python">import pandas as pd
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing.imputation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleImputerApplier</span><span class="p">,</span> <span class="n">SimpleImputerCalculator</span>
 
-df = pd.DataFrame({&quot;A&quot;: [1, 2, None, 4]})
-config = {&quot;columns&quot;: [&quot;A&quot;], &quot;strategy&quot;: &quot;mean&quot;}
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"A"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">4</span><span class="p">]})</span>
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}</span>
 
-params = SimpleImputerCalculator().fit(df, config)
-out = SimpleImputerApplier().apply(df, params)
+<span class="n">params</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">SimpleImputerApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 
-print(params)
-print(out)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</code></pre></div>
 
 
 

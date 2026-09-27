@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3296,65 +3576,65 @@ copied. This selection does not override
 the engine detected from a loaded dataframe or wrapper, and concurrent callers
 cannot change one another's fallback selection.</p>
 <h2 id="load-and-use">Load and use</h2>
-<pre><code class="language-python">import tempfile
-from pathlib import Path
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-import pandas as pd
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-from skyulf import SkyulfPipeline
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
 
-df = pd.DataFrame(
-  {
-    &quot;age&quot;: [10, 20, None, 40, 50, 60, None, 80],
-    &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
-    &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
-  }
-)
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+  <span class="p">{</span>
+    <span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="mi">80</span><span class="p">],</span>
+    <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">],</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+  <span class="p">}</span>
+<span class="p">)</span>
 
-config = {
-  &quot;preprocessing&quot;: [
-    {
-      &quot;name&quot;: &quot;split&quot;,
-      &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
-      &quot;params&quot;: {
-        &quot;test_size&quot;: 0.2,
-        &quot;validation_size&quot;: 0.0,
-        &quot;random_state&quot;: 42,
-        &quot;shuffle&quot;: True,
-        &quot;stratify&quot;: True,
-        &quot;target_column&quot;: &quot;target&quot;,
-      },
-    },
-    {
-      &quot;name&quot;: &quot;impute&quot;,
-      &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-      &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-    },
-    {
-      &quot;name&quot;: &quot;encode&quot;,
-      &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-      &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True},
-    },
-  ],
-  &quot;modeling&quot;: {
-    &quot;type&quot;: &quot;random_forest_classifier&quot;,
-    &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42},
-  },
-}
+<span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+  <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"split"</span><span class="p">,</span>
+      <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"TrainTestSplitter"</span><span class="p">,</span>
+      <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"test_size"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+        <span class="s2">"validation_size"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"stratify"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+      <span class="p">},</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span>
+      <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+      <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"age"</span><span class="p">]},</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode"</span><span class="p">,</span>
+      <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+      <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"city"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+    <span class="p">},</span>
+  <span class="p">],</span>
+  <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"random_forest_classifier"</span><span class="p">,</span>
+    <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">},</span>
+  <span class="p">},</span>
+<span class="p">}</span>
 
-with tempfile.TemporaryDirectory() as tmp:
-  model_path = Path(tmp) / &quot;model.pkl&quot;
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+  <span class="n">model_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"model.pkl"</span>
 
-  pipeline = SkyulfPipeline(config)
-  _ = pipeline.fit(df, target_column=&quot;target&quot;)
-  pipeline.save(model_path)
+  <span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+  <span class="n">_</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+  <span class="n">pipeline</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
 
-  loaded = SkyulfPipeline.load(model_path)
-  new_df = pd.DataFrame({&quot;age&quot;: [25, None], &quot;city&quot;: [&quot;A&quot;, &quot;C&quot;]})
-  preds = loaded.predict(new_df)
+  <span class="n">loaded</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+  <span class="n">new_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mi">25</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="s2">"city"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">]})</span>
+  <span class="n">preds</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new_df</span><span class="p">)</span>
 
-print(preds)
-</code></pre>
+<span class="nb">print</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="explicit-core-persistence-utilities">Explicit Core persistence utilities</h2>
 <p><code>skyulf.core.get_model_serializer()</code> returns a context-local serializer, backed
 by joblib by default. Call its <code>dump()</code> and <code>load()</code> methods explicitly to use
@@ -3367,36 +3647,36 @@ objects and metadata in the current process, with versions starting at 1 for
 each name. Training a pipeline does not register it here automatically, and
 these entries are not added to the backend's persisted model registry.</p>
 <p>For example, using the fitted <code>pipeline</code> from above:</p>
-<pre><code class="language-python">from skyulf.core import InMemoryModelRegistry, get_model_serializer
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">InMemoryModelRegistry</span><span class="p">,</span> <span class="n">get_model_serializer</span>
 
-registry = InMemoryModelRegistry()
-entry = registry.register(&quot;classifier&quot;, pipeline, metadata={&quot;purpose&quot;: &quot;example&quot;})
+<span class="n">registry</span> <span class="o">=</span> <span class="n">InMemoryModelRegistry</span><span class="p">()</span>
+<span class="n">entry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"classifier"</span><span class="p">,</span> <span class="n">pipeline</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">"purpose"</span><span class="p">:</span> <span class="s2">"example"</span><span class="p">})</span>
 
-with tempfile.TemporaryDirectory() as tmp:
-    artifact_path = Path(tmp) / &quot;classifier.joblib&quot;
-    serializer = get_model_serializer()
-    serializer.dump(entry.model, artifact_path)
-    restored_pipeline = serializer.load(artifact_path)
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="n">artifact_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"classifier.joblib"</span>
+    <span class="n">serializer</span> <span class="o">=</span> <span class="n">get_model_serializer</span><span class="p">()</span>
+    <span class="n">serializer</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">artifact_path</span><span class="p">)</span>
+    <span class="n">restored_pipeline</span> <span class="o">=</span> <span class="n">serializer</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
 
-assert registry.get(&quot;classifier&quot;).version == 1
-</code></pre>
+<span class="k">assert</span> <span class="n">registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"classifier"</span><span class="p">)</span><span class="o">.</span><span class="n">version</span> <span class="o">==</span> <span class="mi">1</span>
+</code></pre></div>
 <p>The two <code>ModelVersion</code> types describe different data. For code that works with
 both Core and the full backend installation, qualify the modules explicitly:</p>
-<pre><code class="language-python">from skyulf.core import model_registry as core_registry
-from backend.ml_pipeline.model_registry import schemas as backend_registry
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">model_registry</span> <span class="k">as</span> <span class="n">core_registry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">backend.ml_pipeline.model_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">schemas</span> <span class="k">as</span> <span class="n">backend_registry</span>
 
-# A dataclass containing name, version, model and metadata.
-core_version_type = core_registry.ModelVersion
-# A Pydantic API schema containing job, pipeline and artifact information.
-backend_version_type = backend_registry.ModelVersion
-</code></pre>
+<span class="c1"># A dataclass containing name, version, model and metadata.</span>
+<span class="n">core_version_type</span> <span class="o">=</span> <span class="n">core_registry</span><span class="o">.</span><span class="n">ModelVersion</span>
+<span class="c1"># A Pydantic API schema containing job, pipeline and artifact information.</span>
+<span class="n">backend_version_type</span> <span class="o">=</span> <span class="n">backend_registry</span><span class="o">.</span><span class="n">ModelVersion</span>
+</code></pre></div>
 <p>Neither type converts into the other automatically. The backend import is part
 of the platform application and is not provided by the standalone Core package.</p>
 <h2 id="reproducibility-fingerprint">Reproducibility fingerprint</h2>
 <p><code>pipeline.fingerprint()</code> returns a deterministic SHA-256 over the pipeline's
 topology, fitted artifacts and stored decision thresholds:</p>
-<pre><code class="language-python">print(pipeline.fingerprint())  # 64-char hex, e.g. &quot;9f2c4e...&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">fingerprint</span><span class="p">())</span>  <span class="c1"># 64-char hex, e.g. "9f2c4e..."</span>
+</code></pre></div>
 <ul>
 <li>Two pipelines with the same fingerprint produce the same predictions for
   the same prediction options —
@@ -3432,15 +3712,15 @@ literal strings such as <code>"nan"</code>, <code>"NaT"</code>, <code>"&lt;NA&gt
 category labels, matching the async helper's treatment of text. Actual missing
 scalars (<code>None</code>, <code>pd.NA</code>, <code>pd.NaT</code>) and non-finite Python floats become JSON
 <code>null</code> through the synchronous helper:</p>
-<pre><code class="language-python">import json
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
-from backend.data_ingestion.serialization import JSONSafeSerializer
+<span class="kn">from</span><span class="w"> </span><span class="nn">backend.data_ingestion.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">JSONSafeSerializer</span>
 
-payload = {&quot;label&quot;: &quot;nan&quot;, &quot;measurement&quot;: float(&quot;nan&quot;)}
-cleaned = JSONSafeSerializer.clean_for_json(payload)
-print(json.dumps(cleaned, allow_nan=False))
-# {&quot;label&quot;: &quot;nan&quot;, &quot;measurement&quot;: null}
-</code></pre>
+<span class="n">payload</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"label"</span><span class="p">:</span> <span class="s2">"nan"</span><span class="p">,</span> <span class="s2">"measurement"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)}</span>
+<span class="n">cleaned</span> <span class="o">=</span> <span class="n">JSONSafeSerializer</span><span class="o">.</span><span class="n">clean_for_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">cleaned</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<span class="c1"># {"label": "nan", "measurement": null}</span>
+</code></pre></div>
 <p>This backend utility is retained for compatibility; current HTTP routes do
 not call it. Pipeline persistence uses the separate pickle format above.</p>
 

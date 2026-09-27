@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3240,39 +3520,39 @@ features matter most overall) and for individual rows.</p>
 model/data shape isn't supported, the platform just omits the explanation
 instead of failing the training job.</p>
 <h2 id="quick-start">Quick start</h2>
-<pre><code class="language-bash">pip install skyulf-core[explainability]
-</code></pre>
-<pre><code class="language-python">from sklearn.ensemble import RandomForestClassifier
-from skyulf.modeling import compute_shap_explanation
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>explainability<span class="o">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.ensemble</span><span class="w"> </span><span class="kn">import</span> <span class="n">RandomForestClassifier</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_shap_explanation</span>
 
-model = RandomForestClassifier(random_state=42).fit(X_train, y_train)
-explanation = compute_shap_explanation(model, X_train)
+<span class="n">model</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+<span class="n">explanation</span> <span class="o">=</span> <span class="n">compute_shap_explanation</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_train</span><span class="p">)</span>
 
-if explanation is None:
-    print(&quot;SHAP unavailable (not installed, or unsupported model/data)&quot;)
-else:
-    # Global importance, sorted
-    for feature, importance in sorted(
-        explanation[&quot;mean_abs_importance&quot;].items(), key=lambda kv: -kv[1]
-    ):
-        print(f&quot;{feature}: {importance:.4f}&quot;)
+<span class="k">if</span> <span class="n">explanation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"SHAP unavailable (not installed, or unsupported model/data)"</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># Global importance, sorted</span>
+    <span class="k">for</span> <span class="n">feature</span><span class="p">,</span> <span class="n">importance</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span>
+        <span class="n">explanation</span><span class="p">[</span><span class="s2">"mean_abs_importance"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="o">-</span><span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">importance</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-    # Explain a single row (e.g. the first sampled row)
-    row = explanation[&quot;samples&quot;][0]
-    predicted_output = row[&quot;base_value&quot;] + sum(row[&quot;shap_values&quot;].values())
-    print(f&quot;base={row['base_value']:.3f} -&gt; predicted={predicted_output:.3f}&quot;)
-    for feature, contribution in row[&quot;shap_values&quot;].items():
-        print(f&quot;  {feature}: {contribution:+.4f}&quot;)
+    <span class="c1"># Explain a single row (e.g. the first sampled row)</span>
+    <span class="n">row</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">predicted_output</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">"base_value"</span><span class="p">]</span> <span class="o">+</span> <span class="nb">sum</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"base=</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">'base_value'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> -&gt; predicted=</span><span class="si">{</span><span class="n">predicted_output</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">feature</span><span class="p">,</span> <span class="n">contribution</span> <span class="ow">in</span> <span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">feature</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">contribution</span><span class="si">:</span><span class="s2">+.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-    # Feature interactions (tree models only — None otherwise)
-    if explanation[&quot;interactions&quot;] is not None:
-        names = explanation[&quot;interactions&quot;][&quot;feature_names&quot;]
-        matrix = explanation[&quot;interactions&quot;][&quot;matrix&quot;]
-        for i, a in enumerate(names):
-            for j, b in enumerate(names):
-                if j &gt; i:
-                    print(f&quot;{a} x {b}: {matrix[i][j]:.4f}&quot;)
-</code></pre>
+    <span class="c1"># Feature interactions (tree models only — None otherwise)</span>
+    <span class="k">if</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"interactions"</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"interactions"</span><span class="p">][</span><span class="s2">"feature_names"</span><span class="p">]</span>
+        <span class="n">matrix</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"interactions"</span><span class="p">][</span><span class="s2">"matrix"</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">names</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">names</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">j</span> <span class="o">&gt;</span> <span class="n">i</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">a</span><span class="si">}</span><span class="s2"> x </span><span class="si">{</span><span class="n">b</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">matrix</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
 <p>That's it — <code>explanation</code> is <code>None</code> if SHAP couldn't run (not installed,
 empty data, unsupported model), otherwise a plain <code>dict</code> you can plug
 straight into a chart or print.</p>
@@ -3333,88 +3613,88 @@ Experiments page:</p>
 <code>skyulf-core</code> standalone and want the same charts, <code>explanation</code> has
 everything you need — no extra SHAP computation required. Quick
 <code>matplotlib</code> recipes for each:</p>
-<pre><code class="language-python">import matplotlib.pyplot as plt
-import numpy as np
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-# Summary — mean(|SHAP|) bar chart
-items = sorted(explanation[&quot;mean_abs_importance&quot;].items(), key=lambda kv: kv[1])
-plt.barh([f for f, _ in items], [v for _, v in items])
-plt.xlabel(&quot;mean(|SHAP value|)&quot;); plt.show()
+<span class="c1"># Summary — mean(|SHAP|) bar chart</span>
+<span class="n">items</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">explanation</span><span class="p">[</span><span class="s2">"mean_abs_importance"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">kv</span><span class="p">:</span> <span class="n">kv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">barh</span><span class="p">([</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">items</span><span class="p">],</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">items</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">"mean(|SHAP value|)"</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
-# Waterfall — one row, feature-by-feature staircase
-row = explanation[&quot;samples&quot;][0]
-features = sorted(row[&quot;shap_values&quot;], key=lambda f: -abs(row[&quot;shap_values&quot;][f]))
-running = row[&quot;base_value&quot;]
-for f in features:
-    delta = row[&quot;shap_values&quot;][f]
-    plt.barh(f, delta, left=running if delta &gt; 0 else running + delta,
-             color=&quot;#ef4444&quot; if delta &gt;= 0 else &quot;#3b82f6&quot;)
-    running += delta
-plt.axvline(row[&quot;base_value&quot;], ls=&quot;--&quot;, color=&quot;gray&quot;, label=&quot;base&quot;)
-plt.axvline(running, ls=&quot;--&quot;, color=&quot;indigo&quot;, label=&quot;prediction&quot;)
-plt.legend(); plt.show()
+<span class="c1"># Waterfall — one row, feature-by-feature staircase</span>
+<span class="n">row</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">features</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">],</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="o">-</span><span class="nb">abs</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">][</span><span class="n">f</span><span class="p">]))</span>
+<span class="n">running</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">"base_value"</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>
+    <span class="n">delta</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">][</span><span class="n">f</span><span class="p">]</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">barh</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">delta</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="n">running</span> <span class="k">if</span> <span class="n">delta</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">running</span> <span class="o">+</span> <span class="n">delta</span><span class="p">,</span>
+             <span class="n">color</span><span class="o">=</span><span class="s2">"#ef4444"</span> <span class="k">if</span> <span class="n">delta</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">"#3b82f6"</span><span class="p">)</span>
+    <span class="n">running</span> <span class="o">+=</span> <span class="n">delta</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"base_value"</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"gray"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"base"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">running</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"indigo"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"prediction"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">();</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
-# Force Plot — same row, compressed into one stacked bar
-fig, ax = plt.subplots(figsize=(8, 1.5))
-running = row[&quot;base_value&quot;]
-for f in features:  # order doesn't matter, all bars anchor at base_value
-    delta = row[&quot;shap_values&quot;][f]
-    ax.barh(0, delta, left=running if delta &gt;= 0 else running + delta,
-            color=&quot;#ef4444&quot; if delta &gt;= 0 else &quot;#3b82f6&quot;)
-    running += delta
-ax.axvline(row[&quot;base_value&quot;], ls=&quot;--&quot;, color=&quot;gray&quot;)
-ax.set_yticks([]); plt.show()
+<span class="c1"># Force Plot — same row, compressed into one stacked bar</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">))</span>
+<span class="n">running</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">"base_value"</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">features</span><span class="p">:</span>  <span class="c1"># order doesn't matter, all bars anchor at base_value</span>
+    <span class="n">delta</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">][</span><span class="n">f</span><span class="p">]</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">barh</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">delta</span><span class="p">,</span> <span class="n">left</span><span class="o">=</span><span class="n">running</span> <span class="k">if</span> <span class="n">delta</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">running</span> <span class="o">+</span> <span class="n">delta</span><span class="p">,</span>
+            <span class="n">color</span><span class="o">=</span><span class="s2">"#ef4444"</span> <span class="k">if</span> <span class="n">delta</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">"#3b82f6"</span><span class="p">)</span>
+    <span class="n">running</span> <span class="o">+=</span> <span class="n">delta</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">"base_value"</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s2">"--"</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"gray"</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
-# Dependence — one feature's value vs. its SHAP contribution
-feature = explanation[&quot;feature_names&quot;][0]
-xs = [s[&quot;feature_values&quot;][feature] for s in explanation[&quot;samples&quot;]]
-ys = [s[&quot;shap_values&quot;][feature] for s in explanation[&quot;samples&quot;]]
-plt.scatter(xs, ys); plt.xlabel(feature); plt.ylabel(&quot;SHAP value&quot;); plt.show()
+<span class="c1"># Dependence — one feature's value vs. its SHAP contribution</span>
+<span class="n">feature</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"feature_names"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">xs</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="s2">"feature_values"</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">]]</span>
+<span class="n">ys</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">]]</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="n">feature</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">"SHAP value"</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
-# Beeswarm — every feature's SHAP values, colored by that row's feature value
-fig, ax = plt.subplots()
-for i, feature in enumerate(explanation[&quot;feature_names&quot;]):
-    shap_vals = [s[&quot;shap_values&quot;][feature] for s in explanation[&quot;samples&quot;]]
-    feat_vals = np.array([s[&quot;feature_values&quot;][feature] for s in explanation[&quot;samples&quot;]])
-    span = feat_vals.max() - feat_vals.min() or 1
-    color = (feat_vals - feat_vals.min()) / span
-    jitter = i + (np.random.rand(len(shap_vals)) - 0.5) * 0.3
-    ax.scatter(shap_vals, jitter, c=color, cmap=&quot;coolwarm&quot;, s=10)
-ax.set_yticks(range(len(explanation[&quot;feature_names&quot;])))
-ax.set_yticklabels(explanation[&quot;feature_names&quot;]); plt.show()
+<span class="c1"># Beeswarm — every feature's SHAP values, colored by that row's feature value</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">feature</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">explanation</span><span class="p">[</span><span class="s2">"feature_names"</span><span class="p">]):</span>
+    <span class="n">shap_vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="p">[</span><span class="s2">"shap_values"</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">]]</span>
+    <span class="n">feat_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">s</span><span class="p">[</span><span class="s2">"feature_values"</span><span class="p">][</span><span class="n">feature</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"samples"</span><span class="p">]])</span>
+    <span class="n">span</span> <span class="o">=</span> <span class="n">feat_vals</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">feat_vals</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>
+    <span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="n">feat_vals</span> <span class="o">-</span> <span class="n">feat_vals</span><span class="o">.</span><span class="n">min</span><span class="p">())</span> <span class="o">/</span> <span class="n">span</span>
+    <span class="n">jitter</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shap_vals</span><span class="p">))</span> <span class="o">-</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.3</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">shap_vals</span><span class="p">,</span> <span class="n">jitter</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"coolwarm"</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">explanation</span><span class="p">[</span><span class="s2">"feature_names"</span><span class="p">])))</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_yticklabels</span><span class="p">(</span><span class="n">explanation</span><span class="p">[</span><span class="s2">"feature_names"</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 
-# Interaction — feature-pair heatmap (tree models only; None otherwise)
-interactions = explanation[&quot;interactions&quot;]
-if interactions is not None:
-    names, matrix = interactions[&quot;feature_names&quot;], np.array(interactions[&quot;matrix&quot;])
-    plt.imshow(matrix, cmap=&quot;Purples&quot;)
-    plt.xticks(range(len(names)), names, rotation=45, ha=&quot;right&quot;)
-    plt.yticks(range(len(names)), names)
-    plt.colorbar(label=&quot;mean(|interaction value|)&quot;); plt.show()
-</code></pre>
+<span class="c1"># Interaction — feature-pair heatmap (tree models only; None otherwise)</span>
+<span class="n">interactions</span> <span class="o">=</span> <span class="n">explanation</span><span class="p">[</span><span class="s2">"interactions"</span><span class="p">]</span>
+<span class="k">if</span> <span class="n">interactions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">names</span><span class="p">,</span> <span class="n">matrix</span> <span class="o">=</span> <span class="n">interactions</span><span class="p">[</span><span class="s2">"feature_names"</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">interactions</span><span class="p">[</span><span class="s2">"matrix"</span><span class="p">])</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">matrix</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"Purples"</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">)),</span> <span class="n">names</span><span class="p">,</span> <span class="n">rotation</span><span class="o">=</span><span class="mi">45</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s2">"right"</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">yticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">names</span><span class="p">)),</span> <span class="n">names</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">label</span><span class="o">=</span><span class="s2">"mean(|interaction value|)"</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
 <p>Want SHAP's own native plots (<code>shap.plots.waterfall</code>, <code>shap.plots.beeswarm</code>,
 <code>shap.plots.force</code>, <code>shap.plots.heatmap</code>, ...) instead? Those need a live
 <code>shap.Explanation</code> object, which <code>compute_shap_explanation</code> doesn't return
 (it only returns a plain, JSON-serializable <code>dict</code>). Call <code>shap.Explainer</code>
 yourself and keep the result if you want that:</p>
-<pre><code class="language-python">import shap
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">shap</span>
 
-explainer = shap.Explainer(model, X_train)
-shap_values = explainer(X_train)      # shap.Explanation — full native API
-shap.plots.waterfall(shap_values[0])
-shap.plots.beeswarm(shap_values)
+<span class="n">explainer</span> <span class="o">=</span> <span class="n">shap</span><span class="o">.</span><span class="n">Explainer</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_train</span><span class="p">)</span>
+<span class="n">shap_values</span> <span class="o">=</span> <span class="n">explainer</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>      <span class="c1"># shap.Explanation — full native API</span>
+<span class="n">shap</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">waterfall</span><span class="p">(</span><span class="n">shap_values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">shap</span><span class="o">.</span><span class="n">plots</span><span class="o">.</span><span class="n">beeswarm</span><span class="p">(</span><span class="n">shap_values</span><span class="p">)</span>
 
-# Interaction values (tree models only) for shap.plots.heatmap-style use
-interaction_values = shap.TreeExplainer(model).shap_interaction_values(X_train)
-</code></pre>
+<span class="c1"># Interaction values (tree models only) for shap.plots.heatmap-style use</span>
+<span class="n">interaction_values</span> <span class="o">=</span> <span class="n">shap</span><span class="o">.</span><span class="n">TreeExplainer</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="n">shap_interaction_values</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="reference">Reference</h2>
-<pre><code class="language-python">def compute_shap_explanation(
-    model: Any,             # any fitted scikit-learn-compatible estimator
-    X: pd.DataFrame,        # features to compute SHAP values for
-    max_samples: int = 200,        # rows used for mean_abs_importance
-    max_display_samples: int = 50, # rows kept in `samples` for per-row plots
-) -&gt; dict[str, Any] | None: ...
-</code></pre>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_shap_explanation</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>             <span class="c1"># any fitted scikit-learn-compatible estimator</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>        <span class="c1"># features to compute SHAP values for</span>
+    <span class="n">max_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">200</span><span class="p">,</span>        <span class="c1"># rows used for mean_abs_importance</span>
+    <span class="n">max_display_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">50</span><span class="p">,</span> <span class="c1"># rows kept in `samples` for per-row plots</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
 <ul>
 <li>Multi-class: each row uses <strong>its own predicted class</strong>, so waterfall/dependence explain "why did the model predict what it predicted for this row." Binary classification uses the positive class.</li>
 <li>The full platform (<code>pyproject.toml</code> at the repo root) already pins <code>shap</code>, so no extra install is needed when running Skyulf via <code>run_skyulf.py</code> — the <code>pip install</code> above is only for using <code>skyulf-core</code> standalone.</li>

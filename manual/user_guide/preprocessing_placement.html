@@ -1440,6 +1440,286 @@
   
   
     <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -3348,8 +3628,8 @@ in another. These rules describe supported implementations and parameter modes;
 they do not guarantee that an arbitrary dataset or experiment is leakage-free.</p>
 <h2 id="start-with-the-training-boundary">Start with the training boundary</h2>
 <p>A practical linear pipeline is:</p>
-<pre><code class="language-text">Loader -&gt; Fixed rules -&gt; Train-Test Split -&gt; Learned preprocessing -&gt; Train / Tune
-</code></pre>
+<div class="highlight"><pre><span></span><code>Loader -&gt; Fixed rules -&gt; Train-Test Split -&gt; Learned preprocessing -&gt; Train / Tune
+</code></pre></div>
 <p>Learned preprocessing must fit using <strong>training rows only</strong>. Apply the resulting
 state to validation, test and inference rows without fitting it again. Examples
 include scaling statistics, imputation values, category vocabularies, feature
@@ -3593,6 +3873,32 @@ history protocol. A rolling aggregate includes the current row: a current-target
 input can expose the answer directly. A lagged target is useful only when that
 target observation is actually available at the intended prediction time. Merely
 moving a temporal node after a random split does not establish a valid protocol.</p>
+<p>Core rejects <code>RollingAggregate(columns=[target_column])</code> when the target is known
+from the pipeline, splitter or explicit calculator context. This applies before
+or after splitting, including external <code>SplitDataset</code> inputs. Backend admission
+uses the same check for the selected execution branch. This invalid feature
+definition is rejected even with <code>on_leakage="warn"</code> or <code>"ignore"</code>. Without target
+context, a standalone calculator cannot identify which column contains the answer.</p>
+<p>For both nodes, a configured <code>sort_by</code> column must exist: a typo raises rather than
+silently using input row order. Omitting <code>sort_by</code> still means input row order.
+The lag applier rejects nonpositive or noninteger lags in directly supplied artifacts;
+the calculator retains its existing positive-lag normalization. Sorting remains a
+stable ascending sort of the stored values, not automatic date parsing. Parse date
+strings first and establish a meaningful order for missing or tied timestamps.</p>
+<p>Artifacts store configuration, <strong>not a history buffer</strong>. If fitting sees values
+<code>[10, 20]</code> and the next apply call sees <code>[30, 40]</code>, lag 1 produces <code>[missing, 30]</code>
+and rolling mean with window 2 produces <code>[30, 35]</code>. The new batch does not inherit
+<code>20</code> from training. Supplying <code>[20, 30, 40]</code> explicitly supplies that context, but
+the caller must then identify the requested output rows and exclude context rows.
+Ordinary saved-model inference does not automatically fetch or trim this history.</p>
+<p>Positive lags and ascending sorting are not a point-in-time availability guarantee.
+For example, yesterday's target might only become available next week. Held-out
+target history is also invalid for a forecast made before those outcomes occur.
+Use entity grouping and a temporal evaluation protocol consistent with the actual
+forecast horizon and result availability. Single-row live requests, separate batch
+boundaries and partitioned execution require an explicit history contract; these
+nodes do not provide that service. Automatic temporal history remains outside the
+initial Bundle pre-split cleanup scope.</p>
 <p>Newly fitted <code>DateFeatures</code> steps extract calendar parts in UTC. For example,
 <code>2024-01-01 00:30+02:00</code> produces year 2023, day 31 and hour 22. Naive dates
 are interpreted as UTC without moving their clock time; mixed offsets and DST

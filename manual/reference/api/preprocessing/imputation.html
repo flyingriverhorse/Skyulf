@@ -1437,6 +1437,286 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_local_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local SDK (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Local Bundle (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
@@ -4282,7 +4562,9 @@ continue to work unchanged.</p>
         <p>Apply fitted Simple Imputer fill values to missing values in selected columns.</p>
 <p>The calculator artifact records per-column values for <code>mean</code>, <code>median</code>,
 <code>most_frequent</code> (also accepted as <code>mode</code>), or <code>constant</code> strategies.
-Missing columns seen during fitting are restored with their stored value.</p>
+Missing columns seen during fitting are restored with their stored value.
+Spark supports only <code>mean</code> and <code>constant</code> artifacts and applies them
+with native expressions. All-missing means leave existing columns untouched.</p>
 
 
 
@@ -4293,9 +4575,7 @@ Missing columns seen during fitting are restored with their stored value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 28</span>
-<span class="normal"> 29</span>
-<span class="normal"> 30</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
 <span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
@@ -4369,19 +4649,37 @@ Missing columns seen during fitting are restored with their stored value.</p>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
-<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Apply fitted Simple Imputer fill values to missing values in selected columns.</span>
 
 <span class="sd">    The calculator artifact records per-column values for ``mean``, ``median``,</span>
 <span class="sd">    ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.</span>
 <span class="sd">    Missing columns seen during fitting are restored with their stored value.</span>
+<span class="sd">    Spark supports only ``mean`` and ``constant`` artifacts and applies them</span>
+<span class="sd">    with native expressions. All-missing means leave existing columns untouched.</span>
 <span class="sd">    """</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">        </span><span class="sd">"""Fill nulls and NaNs with the fitted per-column values; ``y`` passes through."""</span>
         <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
-            <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+            <span class="n">X</span><span class="p">,</span>
+            <span class="n">params</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">,</span>
+                <span class="s2">"spark"</span><span class="p">:</span> <span class="n">apply_spark_imputer</span><span class="p">,</span>
+            <span class="p">},</span>
         <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
@@ -4478,16 +4776,28 @@ Missing columns seen during fitting are restored with their stored value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Fill nulls and NaNs with the fitted per-column values; ``y`` passes through."""</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
-        <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+        <span class="n">X</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">,</span>
+            <span class="s2">"spark"</span><span class="p">:</span> <span class="n">apply_spark_imputer</span><span class="p">,</span>
+        <span class="p">},</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -4525,7 +4835,9 @@ Missing columns seen during fitting are restored with their stored value.</p>
 and <code>constant</code>; <code>mode</code> is normalized to <code>most_frequent</code>. Use
 <code>columns</code> to select columns and <code>fill_value</code> with <code>constant</code>.
 Mean and median auto-select numeric columns and reject explicitly selected
-non-numeric columns. The other strategies can operate on all selected columns.</p>
+non-numeric columns. The other strategies can operate on all selected columns.
+Spark supports only <code>mean</code> and <code>constant</code> through a native aggregate;
+string and boolean constants require explicit compatible fill values.</p>
 
 
 
@@ -4536,17 +4848,7 @@ non-numeric columns. The other strategies can operate on all selected columns.</
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
@@ -4665,7 +4967,76 @@ non-numeric columns. The other strategies can operate on all selected columns.</
 <span class="normal">233</span>
 <span class="normal">234</span>
 <span class="normal">235</span>
-<span class="normal">236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+    <span class="s2">"SimpleImputer"</span><span class="p">,</span>
+    <span class="n">SimpleImputerApplier</span><span class="p">,</span>
+    <span class="n">execution_capabilities</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">ExecutionCapability</span><span class="p">(</span>
+            <span class="s2">"spark"</span><span class="p">,</span>
+            <span class="n">operation</span><span class="p">,</span>
+            <span class="s2">"native"</span><span class="p">,</span>
+            <span class="s2">"preserve"</span><span class="p">,</span>
+            <span class="s2">"global"</span> <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">"fit"</span> <span class="k">else</span> <span class="s2">"row"</span><span class="p">,</span>
+            <span class="n">codec_version</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+            <span class="n">config_match</span><span class="o">=</span><span class="p">((</span><span class="s2">"strategy"</span><span class="p">,</span> <span class="n">strategy</span><span class="p">),),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">operation</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"fit"</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"constant"</span><span class="p">)</span>
+    <span class="p">),</span>
+<span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"SimpleImputer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Simple Imputer"</span><span class="p">,</span>
@@ -4682,6 +5053,8 @@ non-numeric columns. The other strategies can operate on all selected columns.</
 <span class="sd">    ``columns`` to select columns and ``fill_value`` with ``constant``.</span>
 <span class="sd">    Mean and median auto-select numeric columns and reject explicitly selected</span>
 <span class="sd">    non-numeric columns. The other strategies can operate on all selected columns.</span>
+<span class="sd">    Spark supports only ``mean`` and ``constant`` through a native aggregate;</span>
+<span class="sd">    string and boolean constants require explicit compatible fill values.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
@@ -4702,8 +5075,24 @@ non-numeric columns. The other strategies can operate on all selected columns.</
 <span class="sd">        ``mode`` is accepted as an alias of ``most_frequent``; mean/median are</span>
 <span class="sd">        restricted to numeric columns.</span>
 <span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+            <span class="n">SimpleImputerArtifact</span><span class="p">,</span>
+            <span class="n">fit_dual_engine</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">,</span>
+                <span class="n">config</span><span class="p">,</span>
+                <span class="p">{</span>
+                    <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars_input</span><span class="p">,</span>
+                    <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas_input</span><span class="p">,</span>
+                    <span class="s2">"spark"</span><span class="p">:</span> <span class="n">fit_spark_imputer</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_local</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Keep existing local column/strategy resolution separate from Spark preparation."""</span>
         <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
-            <span class="k">return</span> <span class="p">{}</span>
+            <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">strategy</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">"mode"</span><span class="p">:</span>
@@ -4712,7 +5101,7 @@ non-numeric columns. The other strategies can operate on all selected columns.</
 
         <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_simple_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">{}</span>
+            <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">}:</span>
             <span class="n">numeric</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">auto_detect_numeric_columns</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
@@ -4729,10 +5118,19 @@ non-numeric columns. The other strategies can operate on all selected columns.</
         <span class="n">merged</span><span class="p">[</span><span class="s2">"_resolved_cols"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
         <span class="n">merged</span><span class="p">[</span><span class="s2">"_resolved_fill_value"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fill_value</span>
 
-        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
-            <span class="n">SimpleImputerArtifact</span><span class="p">,</span>
-            <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">merged</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">}),</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">merged</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fit_polars_input</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Prepare the existing Polars contract before its fit implementation."""</span>
+        <span class="n">prepared</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="o">.</span><span class="n">_prepare_local</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">prepared</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">SimpleImputerCalculator</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">prepared</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fit_pandas_input</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Prepare the existing pandas contract before its fit implementation."""</span>
+        <span class="n">prepared</span> <span class="o">=</span> <span class="n">SimpleImputerCalculator</span><span class="o">.</span><span class="n">_prepare_local</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">prepared</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">SimpleImputerCalculator</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">prepared</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_fit_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -4829,35 +5227,7 @@ restricted to numeric columns.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
 <span class="normal">168</span>
@@ -4866,43 +5236,33 @@ restricted to numeric columns.</p>
 <span class="normal">171</span>
 <span class="normal">172</span>
 <span class="normal">173</span>
-<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SimpleImputerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Resolve strategy and columns, then fit fill values on the active engine.</span>
 
 <span class="sd">    ``mode`` is accepted as an alias of ``most_frequent``; mean/median are</span>
 <span class="sd">    restricted to numeric columns.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{}</span>
-
-    <span class="n">strategy</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">"mode"</span><span class="p">:</span>
-        <span class="n">strategy</span> <span class="o">=</span> <span class="s2">"most_frequent"</span>
-    <span class="n">fill_value</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fill_value"</span><span class="p">)</span>
-
-    <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_simple_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">{}</span>
-
-    <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">}:</span>
-        <span class="n">numeric</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">auto_detect_numeric_columns</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
-        <span class="n">invalid</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">numeric</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">invalid</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"SimpleImputer strategy '</span><span class="si">{</span><span class="n">strategy</span><span class="si">}</span><span class="s2">' requires numeric columns; "</span>
-                <span class="sa">f</span><span class="s2">"non-numeric columns selected: </span><span class="si">{</span><span class="n">invalid</span><span class="si">}</span><span class="s2">."</span>
-            <span class="p">)</span>
-
-    <span class="c1"># Stash resolved-once values into params so dispatched fits don't redo work.</span>
-    <span class="n">merged</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-    <span class="n">merged</span><span class="p">[</span><span class="s2">"_resolved_strategy"</span><span class="p">]</span> <span class="o">=</span> <span class="n">strategy</span>
-    <span class="n">merged</span><span class="p">[</span><span class="s2">"_resolved_cols"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
-    <span class="n">merged</span><span class="p">[</span><span class="s2">"_resolved_fill_value"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fill_value</span>
-
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
         <span class="n">SimpleImputerArtifact</span><span class="p">,</span>
-        <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">merged</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">}),</span>
+        <span class="n">fit_dual_engine</span><span class="p">(</span>
+            <span class="n">X</span><span class="p">,</span>
+            <span class="n">config</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars_input</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas_input</span><span class="p">,</span>
+                <span class="s2">"spark"</span><span class="p">:</span> <span class="n">fit_spark_imputer</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">),</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -4926,16 +5286,16 @@ restricted to numeric columns.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return ``input_schema`` and promote float-only imputation targets to ``float64``."""</span>

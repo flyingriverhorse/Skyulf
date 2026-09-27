@@ -1,0 +1,23 @@
+flowchart TD
+    accTitle: Python FE and model inference inside Spark workers
+    accDescr: SM-10 distributes raw batches and applies fitted Python FE and the model inside each worker.
+    status["SM-10: AVAILABLE<br/>python_pipeline supports raw regression"]:::available
+    raw["Distributed Spark input<br/>Raw features + record_key_columns"]:::plain
+    subgraph wa["Python worker A"]
+        fea["Batch-independent Python FE<br/>Apply saved transformation rules"]:::available
+        ma["Predict with the same fitted model"]:::available
+        fea --> ma
+    end
+    subgraph wb["Python worker B"]
+        feb["Batch-independent Python FE<br/>Apply saved transformation rules"]:::available
+        mb["Predict with the same fitted model"]:::available
+        feb --> mb
+    end
+    result["Spark DataFrame<br/>record_key_columns + prediction"]:::plain
+    status -.-> raw
+    raw -->|"Raw batch + keys"| wa
+    raw -->|"Raw batch + keys"| wb
+    ma --> result
+    mb --> result
+    classDef plain fill:#ffffff,stroke:#64748b,color:#172b3a
+    classDef available fill:#e9f8ef,stroke:#267a45,color:#172b3a
