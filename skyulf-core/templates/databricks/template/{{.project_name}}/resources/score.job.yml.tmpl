@@ -2,6 +2,11 @@ resources:
   jobs:
     score:
       name: ${bundle.name}_score
+      timeout_seconds: ${var.score_timeout_seconds}
+      health:
+        rules: ${var.score_health_rules}
+      email_notifications: ${var.score_email_notifications}
+      webhook_notifications: ${var.score_webhook_notifications}
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -16,7 +21,10 @@ resources:
 {{end}}
       tasks:
         - task_key: score
-          max_retries: 0
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
           notebook_task:
 {{if eq .training_layout "multi_target"}}
             notebook_path: ../src/jobs/score_models.py

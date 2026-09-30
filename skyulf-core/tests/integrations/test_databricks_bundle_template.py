@@ -449,12 +449,9 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
         for name in ("train", "score")
     )
     assert re.findall(r"^    ([a-z_]+):$", template, flags=re.MULTILINE) == ["train", "score"]
-    assert re.search(
-        r"^    score:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
-    )
-    assert re.search(
-        r"^    train:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
-    )
+    for name in ("train", "score"):
+        job = (resources / f"{name}.job.yml.tmpl").read_text(encoding="utf-8")
+        assert re.search(r"^      max_concurrent_runs: 1$", job, re.MULTILINE)
     assert 'if eq .retraining_mode "scheduled"' in template
     assert "pause_status: ${var.retraining_pause_status}" in template
     assert "          default: train\n" in template

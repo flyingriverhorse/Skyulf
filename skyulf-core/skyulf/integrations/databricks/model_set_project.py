@@ -25,6 +25,7 @@ from ..mlflow.registry import (
 from ._contracts import input_budget_bytes
 from ._project_files import project_source, read_source
 from .admission import SingleWriterAdmission
+from .job_output import render_scoring_summary
 from .job_runtime import (
     OPERATOR_FIELDS,
     notebook_output,
@@ -415,10 +416,22 @@ def run_model_set_operator(
 
 def render_model_set_result(payload: dict[str, Any]) -> str:
     """Show concrete set identity and explicit operator actions with escaped evidence."""
+    raw = html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
+    if "noop" not in payload:
+        return "<h2>Model set result</h2><pre>" + raw + "</pre>"
+    summary = render_scoring_summary(
+        {
+            **payload,
+            "selected_model_name": payload["model_set_name"],
+            "selected_model_version": payload["model_set_version"],
+        }
+    )
     return (
-        "<h2>Model set result</h2><pre>"
-        + html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
-        + "</pre>"
+        "<h2>Model set result</h2>"
+        + summary
+        + "<details><summary>Technical details (JSON)</summary><pre>"
+        + raw
+        + "</pre></details>"
     )
 
 
@@ -473,6 +486,7 @@ def run_model_set_score_notebook(
             "model_set_name": resolved.name,
             "model_set_version": resolved.version,
             "model_set_digest": resolved.digest,
+            "source_table": config["score_source_table"],
             "prediction_table": settings["prediction_table"],
             "publication": settings.get("publication", {"mode": "all"}),
             "source_change_policy": settings.get("source_change_policy", "reject"),

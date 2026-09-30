@@ -755,6 +755,10 @@ An unchanged replay is a no-op. [Prediction behavior and model changes][predicti
 If scoring fails after promotion, retry score independently. Inspect saved
 MLflow evidence and registry state before a fresh lifecycle run; lifecycle repair
 and retry are rejected because effects may already have committed.
+Configure job/task time limits, optional score retries and email/webhook events in
+`deployment/variables.yml`, or override them for a target. See
+[operational settings and score-only recovery](deployment/README.md#time-limits-retries-and-notifications).
+Limits default to unlimited, retries to zero and notification recipients to empty.
 See [failure evidence and pinned replay][replay] and [recovery][schedules].
 
 Keep `workflow_contract: "3"` fixed in the generated notebook parameters.

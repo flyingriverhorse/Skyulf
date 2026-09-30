@@ -246,3 +246,53 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
     result = _resolve(project, "test_development", offline_workspace)
     for job in result["resources"]["jobs"].values():
         assert job["job_clusters"][0]["new_cluster"]["policy_id"] == "local-policy-id"
+
+
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+def test_operational_settings_resolve_without_retrying_lifecycle(
+    tmp_path, offline_workspace, layout, compute
+):
+    """Timeouts and alerts must reach every graph while only scoring can opt into retries."""
+    project = _generate_project(
+        tmp_path, training_layout=layout, compute_mode=compute, cluster_policy_name="local-policy"
+    )
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    variables = contents["variables"]
+    for role in ("train", "score"):
+        assert variables[f"{role}_timeout_seconds"]["default"] == 0
+        assert variables[f"{role}_task_timeout_seconds"]["default"] == 0
+        assert variables[f"{role}_email_notifications"]["default"] == {}
+        assert variables[f"{role}_webhook_notifications"]["default"] == {}
+        assert variables[f"{role}_health_rules"]["default"] == []
+        variables[f"{role}_timeout_seconds"]["default"] = 7200
+        variables[f"{role}_task_timeout_seconds"]["default"] = 1800
+        variables[f"{role}_health_rules"]["default"] = [
+            {"metric": "RUN_DURATION_SECONDS", "op": "GREATER_THAN", "value": 3600}
+        ]
+        variables[f"{role}_email_notifications"]["default"] = {
+            "on_failure": ["operator@example.invalid"],
+            "on_duration_warning_threshold_exceeded": ["operator@example.invalid"],
+        }
+        variables[f"{role}_webhook_notifications"]["default"] = {
+            "on_failure": [{"id": "00000000-0000-0000-0000-000000000001"}]
+        }
+    assert variables["score_max_retries"]["default"] == 0
+    variables["score_max_retries"]["default"] = 2
+    variables["score_min_retry_interval_millis"]["default"] = 60000
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    bundle = _resolve(project, "test", offline_workspace)
+    for role, job in bundle["resources"]["jobs"].items():
+        assert job["timeout_seconds"] == 7200
+        assert job["health"]["rules"][0]["value"] == 3600
+        assert job["email_notifications"]["on_failure"] == ["operator@example.invalid"]
+        assert job["webhook_notifications"]["on_failure"][0]["id"].endswith("000001")
+        for task in job["tasks"]:
+            assert task.get("max_retries", 0) == (2 if role == "score" else 0)
+            assert not task.get("retry_on_timeout", False)
+            if "notebook_task" in task:
+                assert task["timeout_seconds"] == 1800
+                if compute == "serverless":
+                    assert task["disable_auto_optimization"] is True
+    assert bundle["resources"]["jobs"]["score"]["tasks"][0]["min_retry_interval_millis"] == 60000

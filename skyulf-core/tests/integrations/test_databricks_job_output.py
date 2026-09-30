@@ -7,6 +7,50 @@ import pytest
 from skyulf.integrations.databricks import job_runtime
 
 
+@pytest.mark.parametrize("noop", [False, True])
+@pytest.mark.parametrize("model_set", [False, True])
+def test_scoring_summary_shows_current_source_without_reusing_old_write(noop, model_set):
+    """A no-op must show the current source watermark and keep old provenance clearly labeled."""
+    from skyulf.integrations.databricks.job_output import render_bundle_output
+    from skyulf.integrations.databricks.model_set_project import render_model_set_result
+
+    result = {
+        "source_end_version": 12,
+        "input_count": 0 if noop else 4,
+        "output_count": 0 if noop else 4,
+        "commit_version": 8,
+        "noop": noop,
+        "manifest": {"model_name": "old_model", "model_version": "1", "source_end_version": 9},
+    }
+    context = {
+        "source_table": "catalog.input.<source>",
+        "prediction_table": "catalog.output.predictions",
+    }
+    if model_set:
+        html = render_model_set_result(
+            {**context, **result, "model_set_name": "catalog.models.set", "model_set_version": "3"}
+        )
+    else:
+        html = render_bundle_output(
+            {
+                **context,
+                "action": "score",
+                "result": {
+                    **result,
+                    "selected_model_name": "catalog.models.one",
+                    "selected_model_version": "3",
+                },
+            }
+        )
+    visible = html.split("<details>", 1)[0]
+    assert "Source table" in visible and "catalog.input.&lt;source&gt;" in visible
+    assert "Prediction table" in visible and "catalog.output.predictions" in visible
+    assert "Source end version</td><td>12" in visible
+    assert "Input rows" in visible and "Output rows" in visible
+    assert "v3" in visible
+    assert ("No new predictions written" if noop else "Prediction write completed") in visible
+
+
 def test_comparison_output_explains_each_quality_gate():
     """Operators must see every failed bound even when the selected metric passes."""
     from skyulf.integrations.databricks.job_output import render_lifecycle_output
@@ -168,6 +212,10 @@ def test_notebook_renders_summary_and_preserves_machine_result(
     else:
         warning.assert_not_called()
     assert json.loads(notebook.exit.call_args.args[0])["result"] == {"noop": True}
+    if entrypoint == "run_score_notebook":
+        payload = json.loads(notebook.exit.call_args.args[0])
+        assert payload["source_table"] == workflow_config["score_source_table"]
+        assert payload["prediction_table"] == workflow_config["prediction_table"]
 
 
 @pytest.mark.parametrize("entrypoint", ["training_report.py", "score.py"])
@@ -187,6 +235,20 @@ def test_generated_notebook_keeps_report_and_exit_in_separate_cells(entrypoint):
     )
     assert "exit_notebook=False" in cells[0] and expected_call in cells[0]
     assert ".notebook.exit(output)" in cells[1]
+
+
+@pytest.mark.parametrize("entrypoint", ["score.py", "score_models.py"])
+def test_generated_score_notebook_enables_visible_summary(entrypoint):
+    """The notebook must pass Databricks' renderer to show HTML instead of only JSON."""
+    from pathlib import Path
+
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "templates/databricks/template/{{.project_name}}/src/jobs"
+        / entrypoint
+    )
+    source = path.read_text()
+    assert 'display_html=globals().get("displayHTML")' in source
 
 
 def test_legacy_notebook_converts_result_before_publishing_score_request(monkeypatch):

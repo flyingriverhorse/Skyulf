@@ -1,6 +1,50 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
 # Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
 variables:
+  # Operations are configured here or per target; no extra initializer questions.
+  # Zero timeout preserves unlimited execution until a project chooses its limits.
+  train_timeout_seconds:
+    description: Whole train job timeout in seconds; 0 disables the limit
+    default: 0
+  train_task_timeout_seconds:
+    description: Per-notebook train timeout in seconds; 0 disables the limit
+    default: 0
+  score_timeout_seconds:
+    description: Whole score job timeout in seconds; 0 disables the limit
+    default: 0
+  score_task_timeout_seconds:
+    description: Score notebook timeout in seconds; 0 disables the limit
+    default: 0
+  score_max_retries:
+    description: Opt-in score retries after failure; 0 disables retries; never use -1
+    default: 0
+  score_min_retry_interval_millis:
+    description: Minimum delay between score attempts when retries are enabled
+    default: 60000
+  train_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for train
+    type: complex
+    default: []
+  score_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for score
+    type: complex
+    default: []
+  train_email_notifications:
+    description: Optional train email events and recipient lists
+    type: complex
+    default: {}
+  score_email_notifications:
+    description: Optional score email events and recipient lists
+    type: complex
+    default: {}
+  train_webhook_notifications:
+    description: Optional train events with existing notification destination IDs
+    type: complex
+    default: {}
+  score_webhook_notifications:
+    description: Optional score events with existing notification destination IDs
+    type: complex
+    default: {}
   catalog:
     description: Unity Catalog catalog selected by the active target
     default: {{.catalog}}

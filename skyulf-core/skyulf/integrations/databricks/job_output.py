@@ -236,7 +236,7 @@ def render_bundle_output(payload: dict[str, Any]) -> str:
         )
         sections.extend(_comparison_summary(candidate))
     if action == "score":
-        _append_scoring_output(sections, result)
+        sections.append(render_scoring_summary({**payload, **result}))
     elif payload["score_requested"]:
         sections.append("<p>Scoring requested. Check the child score run for its result.</p>")
     else:
@@ -309,8 +309,9 @@ def _append_lifecycle_actions(sections: list[str], phase: str, payload: dict[str
         )
 
 
-def _append_scoring_output(sections: list[str], result: dict[str, Any]) -> None:
-    """Distinguish this run's scoring result from a previous no-op manifest."""
+def render_scoring_summary(result: dict[str, Any]) -> str:
+    """Render current scoring evidence separately from any previous committed manifest."""
+    sections: list[str] = []
     if result.get("selected_model_version"):
         sections.append(
             "<p><strong>Selected model for this run:</strong> "
@@ -329,6 +330,9 @@ def _append_scoring_output(sections: list[str], result: dict[str, Any]) -> None:
             [
                 (label, result[key])
                 for key, label in (
+                    ("source_table", "Source table"),
+                    ("prediction_table", "Prediction table"),
+                    ("source_end_version", "Source end version"),
                     ("input_count", "Input rows"),
                     ("output_count", "Output rows"),
                     ("commit_version", "Prediction table Delta version"),
@@ -342,10 +346,12 @@ def _append_scoring_output(sections: list[str], result: dict[str, Any]) -> None:
         _append_scoring_coverage(sections, manifest)
     if manifest:
         label = "Model recorded by the previous write" if noop else "Prediction model"
+        model_name = manifest.get("model_name", manifest.get("model_set_name"))
+        model_version = manifest.get("model_version", manifest.get("model_set_version"))
         sections.append(
-            f"<p><strong>{label}:</strong> {_text(manifest.get('model_name'))} "
-            f"v{_text(manifest.get('model_version'))}</p>"
+            f"<p><strong>{label}:</strong> {_text(model_name)} v{_text(model_version)}</p>"
         )
+    return "".join(sections)
 
 
 def _append_operator_options(

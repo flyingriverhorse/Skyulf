@@ -204,6 +204,86 @@ account can run the project, but it cannot prove that scoring is forbidden from
 changing aliases. Keep the existing one-run train/score queues and ensure another
 job or operator is not independently writing the same aliases/output namespace.
 
+## Time limits, retries and notifications
+
+Operational settings live in `variables.yml`; initialization asks no extra
+questions. Override them under a target's `variables` when environments differ.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `train_timeout_seconds`, `score_timeout_seconds` | `0` | Whole-job limit; zero means unlimited |
+| `train_task_timeout_seconds`, `score_task_timeout_seconds` | `0` | Notebook-task limit; zero means unlimited |
+| `score_max_retries` | `0` | Optional finite score retries after failure |
+| `score_min_retry_interval_millis` | `60000` | Minimum interval between score attempts |
+| `train_health_rules`, `score_health_rules` | `[]` | Optional duration-warning rules |
+| `train_email_notifications`, `score_email_notifications` | `{}` | Optional event-to-email mappings |
+| `train_webhook_notifications`, `score_webhook_notifications` | `{}` | Optional event-to-notification-destination mappings |
+
+Choose limits from measured project runs. A duration warning does not stop the
+job; a timeout does. The task limit also applies to generated model/SHAP tasks
+after `refresh_training_graph.py`. The train job includes its automatic score
+handoff, so leave time for that child run when configuring its whole-job limit.
+
+For example, add these values under `targets.test.variables` in `targets.yml`:
+
+```yaml
+train_timeout_seconds: 14400
+train_task_timeout_seconds: 7200
+score_timeout_seconds: 3600
+score_task_timeout_seconds: 3000
+score_max_retries: 2
+score_min_retry_interval_millis: 60000
+train_health_rules:
+  - metric: RUN_DURATION_SECONDS
+    op: GREATER_THAN
+    value: 10800
+train_email_notifications:
+  on_failure: ["YOUR_ONCALL_EMAIL"]
+  on_duration_warning_threshold_exceeded: ["YOUR_ONCALL_EMAIL"]
+score_email_notifications:
+  on_failure: ["YOUR_ONCALL_EMAIL"]
+score_webhook_notifications:
+  on_failure:
+    - id: "YOUR_EXISTING_NOTIFICATION_DESTINATION_ID"
+```
+
+Webhook values are existing workspace destination IDs, not URLs or secrets.
+No destination is created and no recipient is added by default. Configure
+duration events alongside a health rule. Job-level failure notifications report
+the final failed job, rather than every failed retry attempt. See the official
+[notification settings](https://docs.databricks.com/aws/en/jobs/notifications).
+Global defaults apply to personal targets too; use target overrides to keep
+personal trials separate from shared on-call recipients.
+
+Lifecycle tasks and the automatic handoff always have zero retries. Existing
+runtime guards also reject lifecycle repair/retry before mutations. Scoring
+retries are opt-in, finite (never `-1`), and do not retry timeouts. Serverless
+automatic optimization remains disabled so it cannot add hidden attempts. See
+[Databricks task retry settings](https://docs.databricks.com/aws/en/jobs/configure-task).
+
+Enable score retries only while the job remains the sole output writer and the
+configured model/source policies suit another attempt. An attempt re-evaluates
+the configured model selector and current source watermark; it is not an exact
+replay of the failed snapshot. Use a concrete `score_model_version` when recovery
+must keep the same model. An uncertain write, foreign commit, source replacement,
+expired CDF or incompatible schema requires inspecting the receipt/history and
+fixing the cause; retries do not bypass those guards. A timeout cannot undo an
+already committed write or alias change.
+
+If training/promotion succeeded and only scoring failed, inspect the child run
+and run **only the score job** after fixing the error. Use Run with different
+settings on score to enter the concrete version recorded by the failed attempt,
+or leave it blank to deliberately use the configured selector. Do not rerun train
+or approve just to recover predictions. Single/competition versions identify the
+selected model; multi-target versions identify the complete model set. An
+unchanged successful replay produces no new prediction writes.
+
+The score output shows the source table and end version, output table, selected
+model/version, row counts, commit version and no-op status. Previous-write
+provenance stays labeled separately on a no-op. Raw JSON remains available for
+automation. These settings and summaries are covered locally; actual timeout,
+retry scheduling and notification delivery require workspace verification.
+
 ## Existing deployments and verification limits
 
 This layout replaces the standalone `dev` target with optional environment pairs

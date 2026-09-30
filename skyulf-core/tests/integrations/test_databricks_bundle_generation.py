@@ -566,7 +566,9 @@ def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train
                 "workflow_contract"
             ] == documented_contract.group(1)
     assert tasks["run_batch_scoring"]["run_job_task"]["job_id"] == "${resources.jobs.score.id}"
-    assert tasks["train_and_tune"]["max_retries"] == jobs["score"]["tasks"][0]["max_retries"] == 0
+    assert tasks["train_and_tune"]["max_retries"] == 0
+    assert jobs["score"]["tasks"][0]["max_retries"] == "${var.score_max_retries}"
+    assert _read_bundle(project)["variables"]["score_max_retries"]["default"] == 0
 
 
 @pytest.mark.parametrize("strategy,holdout", [("random", None), ("temporal", 2)])
@@ -695,10 +697,12 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     )
     config = _read_validated_config(project)
     jobs = _read_jobs(project)
-    for job in jobs.values():
+    for role, job in jobs.items():
         for entry in job["tasks"]:
             if "notebook_task" in entry:
-                assert entry["max_retries"] == 0
+                assert entry["max_retries"] == (
+                    "${var.score_max_retries}" if role == "score" else 0
+                )
                 assert entry["disable_auto_optimization"] is True
     modeling = _read_modeling(project)
     assert modeling["type"] == "hyperparameter_tuner"

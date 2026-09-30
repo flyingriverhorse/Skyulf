@@ -458,7 +458,11 @@ def run_score_notebook(
     config = read_notebook_config(values)
     outcome = run_bundle_action(spark, config, parameters, task_role="score")
     return notebook_output(
-        asdict(outcome),
+        {
+            **asdict(outcome),
+            "source_table": config["score_source_table"],
+            "prediction_table": config["prediction_table"],
+        },
         dbutils,
         render=render_bundle_output,
         display_html=display_html,

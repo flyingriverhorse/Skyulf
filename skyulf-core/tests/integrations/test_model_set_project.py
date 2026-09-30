@@ -1,5 +1,6 @@
 """Project model-set activation preserves deployment ownership and frozen scoring."""
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -328,3 +329,4 @@ def test_score_entrypoint_pins_set_and_uses_saved_artifact(
     assert batch.call_args.args == ("spark", resolved, saved)
     assert batch.call_args.kwargs["prediction_table"] == "workspace.outputs.example_set_scores_dev"
     assert '"output_count": 2' in result
+    assert json.loads(result)["source_table"] == batch.call_args.kwargs["source_table"]

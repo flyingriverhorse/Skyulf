@@ -2,6 +2,11 @@ resources:
   jobs:
     train:
       name: ${bundle.name}_train
+      timeout_seconds: ${var.train_timeout_seconds}
+      health:
+        rules: ${var.train_health_rules}
+      email_notifications: ${var.train_email_notifications}
+      webhook_notifications: ${var.train_webhook_notifications}
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -27,6 +32,8 @@ resources:
         - &branch_task
           task_key: initialize_run
           max_retries: 0
+          retry_on_timeout: false
+          timeout_seconds: ${var.train_task_timeout_seconds}
           notebook_task:
             notebook_path: ../src/jobs/initialize_models.py
             base_parameters: &branch_parameters
@@ -153,6 +160,8 @@ resources:
         - &lifecycle_task
           task_key: initialize_run
           max_retries: 0
+          retry_on_timeout: false
+          timeout_seconds: ${var.train_task_timeout_seconds}
           notebook_task:
             notebook_path: ../src/jobs/initialize_run.py
             base_parameters: &lifecycle_parameters
