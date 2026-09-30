@@ -224,7 +224,8 @@ def render_bundle_output(payload: dict[str, Any]) -> str:
     result = payload["result"]
     candidate = result.get("candidate", result)
     receipt = result.get("alias_change") or result
-    sections = [f"<h2>{_text(action.replace('_', ' ').title())} completed</h2>"]
+    status = "recovery requested" if payload.get("recovery_required") else "completed"
+    sections = [f"<h2>{_text(action.replace('_', ' ').title())} {status}</h2>"]
     _append_competition_output(sections, payload)
     sections.extend(_receipt_summary(receipt))
     name = candidate.get("model_name") or receipt.get("model_name")
@@ -311,6 +312,12 @@ def _append_lifecycle_actions(sections: list[str], phase: str, payload: dict[str
 
 def render_scoring_summary(result: dict[str, Any]) -> str:
     """Render current scoring evidence separately from any previous committed manifest."""
+    if result.get("recovery_required"):
+        return (
+            "<p>CDF history is unavailable. Predictions have not been replaced. "
+            "Open <strong>recover_predictions</strong> for the full snapshot recovery "
+            "and <strong>scoring_report</strong> for the final result.</p>"
+        )
     sections: list[str] = []
     if result.get("selected_model_version"):
         sections.append(
@@ -342,6 +349,21 @@ def render_scoring_summary(result: dict[str, Any]) -> str:
         )
     )
     manifest = result.get("manifest", {})
+    _append_scoring_provenance(sections, manifest, noop)
+    return "".join(sections)
+
+
+def _append_scoring_provenance(
+    sections: list[str],
+    manifest: dict[str, Any] | None,
+    noop: bool,
+) -> None:
+    """Distinguish this write's recovery and coverage from historical no-op provenance."""
+    if manifest and manifest.get("cdf_recovered") and not noop:
+        sections.append(
+            "<p><strong>CDF recovery completed.</strong> Predictions were replaced from "
+            "the pinned full source snapshot. Later runs resume incremental scoring.</p>"
+        )
     if manifest and not noop:
         _append_scoring_coverage(sections, manifest)
     if manifest:
@@ -351,7 +373,6 @@ def render_scoring_summary(result: dict[str, Any]) -> str:
         sections.append(
             f"<p><strong>{label}:</strong> {_text(model_name)} v{_text(model_version)}</p>"
         )
-    return "".join(sections)
 
 
 def _append_operator_options(

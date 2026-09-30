@@ -110,6 +110,7 @@ def run_bundle_action(
     task_role: str,
     experiment_name: str | None = None,
     artifact_path: str | Path | None = None,
+    recovery_request: dict[str, Any] | None = None,
 ) -> BundleActionResult:
     """Run one role-bound action; score handoff follows only a successful champion transition.
 
@@ -137,15 +138,34 @@ def run_bundle_action(
         }
     if "config_version" in config:
         config = validate_workflow_config(config, action=action)
+    options = _bundle_action_options(
+        action, parameters, config, experiment_name, artifact_path, recovery_request
+    )
+    result = run_action(spark, config, action, **options)
+    return build_bundle_result(config, action, result)
+
+
+def _bundle_action_options(
+    action: str,
+    parameters: dict[str, str],
+    config: dict[str, Any],
+    experiment_name: str | None,
+    artifact_path: str | Path | None,
+    recovery_request: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Validate recovery scope before resolving lifecycle evidence or training settings."""
+    if recovery_request is not None and action != "score":
+        raise ValueError("CDF recovery is only available for scoring.")
     options = operator_options(action, parameters)
+    if recovery_request is not None:
+        options["recovery_request"] = recovery_request
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
             config, options["candidate_version"], action=action
         )
     if action == "train":
         options.update(experiment_name=experiment_name, artifact_path=artifact_path)
-    result = run_action(spark, config, action, **options)
-    return build_bundle_result(config, action, result)
+    return options
 
 
 def validate_job_parameters(parameters: dict[str, str]) -> None:
@@ -446,6 +466,8 @@ def run_score_notebook(
     replaces the readable report with the exit value in the same cell.
     Scoring uses saved model code and creates no training artifact directory.
     """
+    from .scoring_recovery import run_scoring_step  # noqa: PLC0415 - shared notebook routing
+
     values = dbutils.widgets.getAll()
     # Databricks pushes parent job parameters into Run Job children. The score
     # entrypoint ignores inherited lifecycle evidence and always dispatches score.
@@ -456,13 +478,18 @@ def run_score_notebook(
         if key not in OPERATOR_FIELDS | {"lifecycle_action"}
     }
     config = read_notebook_config(values)
-    outcome = run_bundle_action(spark, config, parameters, task_role="score")
-    return notebook_output(
-        {
+
+    def score() -> dict[str, Any]:
+        """Keep the original outcome intact while allowing typed recovery routing."""
+        outcome = run_bundle_action(spark, config, parameters, task_role="score")
+        return {
             **asdict(outcome),
             "source_table": config["score_source_table"],
             "prediction_table": config["prediction_table"],
-        },
+        }
+
+    return notebook_output(
+        run_scoring_step(config, dbutils, score),
         dbutils,
         render=render_bundle_output,
         display_html=display_html,

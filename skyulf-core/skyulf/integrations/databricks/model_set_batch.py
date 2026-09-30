@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +12,15 @@ from skyulf.integrations.databricks._local_frames import frame_bytes, output_sca
 from ..mlflow.registry import ResolvedModel
 from ._contracts import column_name, table_name
 from .admission import BatchConflictError, PublishAdmission, validate_admission
+from .cdf_recovery import (
+    CdfHistoryExpired,
+    CdfRecoveryRequired,
+    check_recovery_state,
+    make_recovery_request,
+    normalize_cdf_error,
+    recovery_receipt_fields,
+    validate_recovery_binding,
+)
 from .delta import DeltaPublishError, table_identity
 from .local_incremental import (
     SourceChangeRequiresRebuild,
@@ -238,6 +248,7 @@ def _publication_receipt(
     source_change_policy: str = "reject",
     source_rebuilt: bool = False,
     write_mode: str = "append",
+    recovery_request: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bind provenance, progress and component continuation to one atomic write."""
     receipt = {
@@ -258,6 +269,8 @@ def _publication_receipt(
         "source_rebuilt": source_rebuilt,
         "write_mode": write_mode,
     }
+    if recovery_request is not None:
+        receipt.update(recovery_receipt_fields(recovery_request))
     encoded = json.dumps(receipt, sort_keys=True, allow_nan=False).encode()
     if len(encoded) > 60 * 1024:
         raise ValueError("Model-set publication receipt exceeds its 60 KiB budget.")
@@ -317,6 +330,8 @@ def _commit_set(
         raise BatchConflictError("Target changed while scoring the set.")
     try:
         output.write.format("delta").mode(mode).option("mergeSchema", "false").option(
+            "partitionOverwriteMode", "static"
+        ).option("overwriteSchema", "false").option(
             "txnAppId", f"skyulf-model-set:{target_id}"
         ).option("txnVersion", expected + 1).option(
             "userMetadata", json.dumps(receipt, sort_keys=True, allow_nan=False)
@@ -345,6 +360,7 @@ def run_model_set_batch(
     max_bytes: int = 64 * 1024 * 1024,
     publication: dict[str, Any] | None = None,
     source_change_policy: str = "reject",
+    recovery_request: dict[str, Any] | None = None,
 ) -> ModelSetBatchResult:
     """Publish all keyed component and rule outcomes together, or publish nothing.
 
@@ -385,6 +401,7 @@ def run_model_set_batch(
             max_bytes,
             publication,
             source_change_policy,
+            recovery_request,
         )
 
 
@@ -401,6 +418,7 @@ def _run_admitted_set(
     max_bytes: int,
     publication: dict[str, Any] | None = None,
     source_change_policy: str = "reject",
+    recovery_request: dict[str, Any] | None = None,
 ) -> ModelSetBatchResult:
     """Hold the common target claim through snapshot selection and complete publication."""
     if table_identity(spark, source) != source_id or table_identity(spark, target) != target_id:
@@ -409,28 +427,38 @@ def _run_admitted_set(
     latest = latest_source_version(spark, target)
     previous = _previous_set_receipt(latest, source_id, target_id)
     check_incremental_bootstrap(spark, target, previous, functions)
-    upper = int(latest_source_version(spark, source)["version"])
-    prior, write_mode, noop = _plan_publication(
+    upper, prior, write_mode, noop = _set_read_plan(
+        spark,
+        model,
+        source,
+        target,
+        source_id,
+        target_id,
+        mode,
         previous,
-        set_digest=artifact.manifest.set_sha256,
-        mode=mode,
-        source_version=upper,
-        release_changed=_release_changed(previous, model),
+        int(latest["version"]),
+        recovery_request,
     )
     if noop:
         return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
-    selected, source_rebuilt = _select_set_source(
-        spark, source, prior, upper, functions, source_change_policy
-    )
-    if source_rebuilt:
-        prior, write_mode = None, "overwrite"
-    frame = bounded_frame(
-        selected,
-        tuple(column.name for column in artifact.manifest.input_schema),
-        artifact.manifest.record_key_columns,
+    frame, source_rebuilt = _read_set_frame(
+        spark,
+        model,
+        artifact,
+        source,
+        target,
+        source_id,
+        target_id,
+        prior,
+        upper,
+        int(latest["version"]),
+        functions,
+        source_change_policy,
         max_rows,
         max_bytes,
     )
+    if source_rebuilt:
+        prior, write_mode = None, "overwrite"
     if frame.empty and write_mode != "overwrite":
         return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
     scored = _score_increment(artifact, frame, previous, write_mode, max_rows, max_bytes)
@@ -446,6 +474,7 @@ def _run_admitted_set(
         source_change_policy=source_change_policy,
         source_rebuilt=source_rebuilt,
         write_mode=write_mode,
+        recovery_request=recovery_request,
     )
     selected_columns = [
         name for name in publication_columns(artifact, publication) if name not in _METADATA
@@ -462,6 +491,100 @@ def _run_admitted_set(
     )
     committed = _commit_set(spark, output, source, target, receipt, write_mode)
     return ModelSetBatchResult(upper, len(frame), len(scored.frame), committed, receipt, False)
+
+
+def _set_read_plan(
+    spark: Any,
+    model: ResolvedModel,
+    source: str,
+    target: str,
+    source_id: str,
+    target_id: str,
+    mode: str,
+    previous: dict | None,
+    target_version: int,
+    request: dict[str, Any] | None,
+) -> tuple[int, int | None, str, bool]:
+    """Freeze the recovery snapshot and reject stale requests before prediction work."""
+    digest = _model_digest(model)
+    if request is not None:
+        request = validate_recovery_binding(
+            request,
+            layout="model_set",
+            source_table=source,
+            target_table=target,
+            model_name=model.name,
+            model_version=model.version,
+            model_digest=digest,
+        )
+        if source_id != request["source_table_id"] or target_id != request["target_table_id"]:
+            raise BatchConflictError("CDF recovery source or target table ID changed.")
+        noop = check_recovery_state(request, previous, target_version)
+        return request["source_end_version"], None, "overwrite", noop
+    upper = int(latest_source_version(spark, source)["version"])
+    prior, write_mode, noop = _plan_publication(
+        previous,
+        set_digest=digest,
+        mode=mode,
+        source_version=upper,
+        release_changed=_release_changed(previous, model),
+    )
+    return upper, prior, write_mode, noop
+
+
+def _read_set_frame(
+    spark: Any,
+    model: ResolvedModel,
+    artifact: "ModelSetArtifact",
+    source: str,
+    target: str,
+    source_id: str,
+    target_id: str,
+    prior: int | None,
+    upper: int,
+    target_version: int,
+    functions: Any,
+    policy: str,
+    max_rows: int,
+    max_bytes: int,
+) -> tuple[Any, bool]:
+    """Classify history loss only while reading an incremental window, never while writing."""
+    try:
+        selected, rebuilt = _select_set_source(spark, source, prior, upper, functions, policy)
+        context = normalize_cdf_error() if prior is not None and not rebuilt else nullcontext()
+        with context:
+            frame = bounded_frame(
+                selected,
+                tuple(column.name for column in artifact.manifest.input_schema),
+                artifact.manifest.record_key_columns,
+                max_rows,
+                max_bytes,
+            )
+        return frame, rebuilt
+    except CdfHistoryExpired as error:
+        if prior is None:
+            raise
+        request = make_recovery_request(
+            layout="model_set",
+            source_table=source,
+            source_table_id=source_id,
+            target_table=target,
+            target_table_id=target_id,
+            target_version=target_version,
+            source_start_version=prior,
+            source_end_version=upper,
+            model_name=model.name,
+            model_version=model.version,
+            model_digest=_model_digest(model),
+        )
+        raise CdfRecoveryRequired(request) from error
+
+
+def _model_digest(model: ResolvedModel) -> str:
+    """Require the artifact digest used to bind recovery across separate tasks."""
+    if not isinstance(model.digest, str):
+        raise ValueError("Model-set scoring requires a concrete artifact digest.")
+    return model.digest
 
 
 def _select_set_source(

@@ -36,7 +36,7 @@ placeholders, matching the other environments.
 | `tuning.json` | Search strategy, space, metric, resources and threshold tuning |
 | `cross_validation.json` | Ordinary/nested folds, group/time splits and seed |
 | `scheduling.json` | Training and scoring schedules |
-| `scoring.json` | Single-model prediction source/output, promotion and quality |
+| `scoring.json` | Prediction source/output, promotion, quality and optional CDF expiry recovery |
 | `model_set.json` | Set name, promotion, outputs/views and source-change policy |
 | `deployment.json` | Compute, cluster policy and cost tags |
 | `identities.json` | Optional personal targets, shared run identities and job ACL ownership |

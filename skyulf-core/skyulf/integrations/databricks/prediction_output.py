@@ -57,21 +57,29 @@ def activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
     ):
         raise ValueError("Prediction view and generation names must match one UC target.")
     physical = spark.table(generation)
+    exists = managed_prediction_view_exists(spark, logical)
+    if exists:
+        _validate_generation_schema(spark, logical, physical)
+        if _view_reads_generation(spark, logical, generation):
+            return
     if not physical.limit(1).count():
         raise ValueError("A full-rebuild generation must contain predictions before activation.")
-    if not managed_prediction_view_exists(spark, logical):
+    if not exists:
         spark.sql(
             f"CREATE VIEW {logical} TBLPROPERTIES ('skyulf.mode' = 'full_rebuild') "
             f"AS SELECT * FROM {generation}"
         ).collect()
         return
-    _validate_generation_schema(spark, logical, physical)
-    definition = spark.sql(f"SHOW CREATE TABLE {logical}").first()
-    if definition is not None:
-        sql = definition["createtab_stmt"].casefold().replace("`", "")
-        if re.search(r"\bfrom\s+" + re.escape(generation.casefold()) + r"\b", sql):
-            return
     spark.sql(f"ALTER VIEW {logical} AS SELECT * FROM {generation}").collect()
+
+
+def _view_reads_generation(spark: Any, logical: str, generation: str) -> bool:
+    """Keep a recovered empty generation active without treating it as a new release."""
+    definition = spark.sql(f"SHOW CREATE TABLE {logical}").first()
+    if definition is None:
+        return False
+    sql = definition["createtab_stmt"].casefold().replace("`", "")
+    return re.search(r"\bfrom\s+" + re.escape(generation.casefold()) + r"\b", sql) is not None
 
 
 def _prediction_columns(

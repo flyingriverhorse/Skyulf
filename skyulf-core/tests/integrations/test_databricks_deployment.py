@@ -250,12 +250,17 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+@pytest.mark.parametrize("recovery", ["false", "true"])
 def test_operational_settings_resolve_without_retrying_lifecycle(
-    tmp_path, offline_workspace, layout, compute
+    tmp_path, offline_workspace, layout, compute, recovery
 ):
     """Timeouts and alerts must reach every graph while only scoring can opt into retries."""
     project = _generate_project(
-        tmp_path, training_layout=layout, compute_mode=compute, cluster_policy_name="local-policy"
+        tmp_path,
+        training_layout=layout,
+        compute_mode=compute,
+        cluster_policy_name="local-policy",
+        auto_rebuild_on_cdf_expiry=recovery,
     )
     path = project / "deployment/variables.yml"
     contents = yaml.safe_load(path.read_text())
@@ -289,10 +294,15 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
         assert job["email_notifications"]["on_failure"] == ["operator@example.invalid"]
         assert job["webhook_notifications"]["on_failure"][0]["id"].endswith("000001")
         for task in job["tasks"]:
-            assert task.get("max_retries", 0) == (2 if role == "score" else 0)
+            expected_retries = 2 if role == "score" and "notebook_task" in task else 0
+            assert task.get("max_retries", 0) == expected_retries
             assert not task.get("retry_on_timeout", False)
             if "notebook_task" in task:
                 assert task["timeout_seconds"] == 1800
                 if compute == "serverless":
                     assert task["disable_auto_optimization"] is True
     assert bundle["resources"]["jobs"]["score"]["tasks"][0]["min_retry_interval_millis"] == 60000
+    score_tasks = {task["task_key"]: task for task in bundle["resources"]["jobs"]["score"]["tasks"]}
+    assert ("recover_predictions" in score_tasks) is (recovery == "true")
+    if recovery == "true":
+        assert score_tasks["scoring_report"]["run_if"] == "NONE_FAILED"

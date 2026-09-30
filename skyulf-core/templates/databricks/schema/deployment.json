@@ -1,6 +1,6 @@
 {
   "compute_mode": {
-    "order": 732,
+    "order": 733,
     "type": "string",
     "default": "serverless",
     "description": "5. Compute | Job compute mode for this project",
@@ -10,7 +10,7 @@
     ]
   },
   "cluster_policy_name": {
-    "order": 733,
+    "order": 734,
     "type": "string",
     "default": "REPLACE_WITH_APPROVED_POLICY",
     "description": "5. Compute | Approved job-cluster policy name",
@@ -23,7 +23,7 @@
     }
   },
   "spark_version": {
-    "order": 734,
+    "order": 735,
     "type": "string",
     "default": "17.3.x-cpu-ml-scala2.13",
     "description": "5. Compute | Approved Databricks ML Runtime for the job cluster",
@@ -36,7 +36,7 @@
     }
   },
   "node_type_id": {
-    "order": 735,
+    "order": 736,
     "type": "string",
     "default": "REPLACE_WITH_NODE_TYPE",
     "description": "5. Compute | Approved job-cluster node type",
@@ -49,7 +49,7 @@
     }
   },
   "cost_tag_key": {
-    "order": 736,
+    "order": 737,
     "type": "string",
     "default": "CostCenter",
     "description": "5. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
@@ -63,7 +63,7 @@
     }
   },
   "cost_tag_value": {
-    "order": 737,
+    "order": 738,
     "type": "string",
     "default": "REPLACE_WITH_COST_TAG",
     "description": "5. Compute | Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",

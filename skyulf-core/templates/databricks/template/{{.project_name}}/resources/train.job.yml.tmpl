@@ -44,6 +44,7 @@ resources:
               repair_count: '{{"{{job.repair_count}}"}}'
               execution_count: '{{"{{task.execution_count}}"}}'
               deployed_score_handoff: "{{.score_handoff}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
               candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
@@ -174,6 +175,7 @@ resources:
               repair_count: '{{"{{job.repair_count}}"}}'
               execution_count: '{{"{{task.execution_count}}"}}'
               deployed_score_handoff: "{{.score_handoff}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
               candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'

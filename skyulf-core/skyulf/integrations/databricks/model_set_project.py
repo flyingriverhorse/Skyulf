@@ -25,7 +25,7 @@ from ..mlflow.registry import (
 from ._contracts import input_budget_bytes
 from ._project_files import project_source, read_source
 from .admission import SingleWriterAdmission
-from .job_output import render_scoring_summary
+from .job_output import render_bundle_output, render_scoring_summary
 from .job_runtime import (
     OPERATOR_FIELDS,
     notebook_output,
@@ -416,6 +416,8 @@ def run_model_set_operator(
 
 def render_model_set_result(payload: dict[str, Any]) -> str:
     """Show concrete set identity and explicit operator actions with escaped evidence."""
+    if payload.get("recovery_required"):
+        return render_bundle_output(payload)
     raw = html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
     if "noop" not in payload:
         return "<h2>Model set result</h2><pre>" + raw + "</pre>"
@@ -443,22 +445,49 @@ def run_model_set_score_notebook(
     exit_notebook: bool = True,
 ) -> str:
     """Score one frozen set with a fixed role and one controlled champion lookup."""
+    from .scoring_recovery import run_scoring_step  # noqa: PLC0415
+
+    values = dbutils.widgets.getAll()
+    config = validate_workflow_config(read_notebook_config(values), action="score")
+    payload = run_scoring_step(
+        config, dbutils, lambda: score_model_set_payload(spark, config, values)
+    )
+    return notebook_output(
+        payload,
+        dbutils,
+        render=render_model_set_result,
+        display_html=display_html,
+        exit_notebook=exit_notebook,
+    )
+
+
+def score_model_set_payload(
+    spark: Any,
+    config: dict[str, Any],
+    values: dict[str, str],
+    *,
+    recovery_request: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Score a saved set, reusing the predecessor's concrete pin for CDF recovery."""
     from ..mlflow.model_set import load_registered_model_set  # noqa: PLC0415
     from .model_set_batch import run_model_set_batch  # noqa: PLC0415 - optional Spark boundary
 
-    values = dbutils.widgets.getAll()
     parameters = {
         key: value
         for key, value in values.items()
         if key not in OPERATOR_FIELDS | {"lifecycle_action"}
     }
     validate_job_parameters(parameters)
-    config = validate_workflow_config(read_notebook_config(values), action="score")
+    config = validate_workflow_config(config, action="score")
     settings = load_project_model_set(values, config)
     if settings is None:
         raise ValueError("Multi-target score requires an enabled model set.")
     endpoints = project_endpoints(config)
-    override = parameters.get("score_model_version", "")
+    override = (
+        recovery_request["model_version"]
+        if recovery_request is not None
+        else parameters.get("score_model_version", "")
+    )
     version = (
         parse_model_version(override)
         if override
@@ -480,26 +509,21 @@ def run_model_set_score_notebook(
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         publication=settings.get("publication"),
         source_change_policy=settings.get("source_change_policy", "reject"),
+        **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
-    return notebook_output(
-        {
-            "model_set_name": resolved.name,
-            "model_set_version": resolved.version,
-            "model_set_digest": resolved.digest,
-            "source_table": config["score_source_table"],
-            "prediction_table": settings["prediction_table"],
-            "publication": settings.get("publication", {"mode": "all"}),
-            "source_change_policy": settings.get("source_change_policy", "reject"),
-            "prediction_views": [
-                view.name
-                for view in publication_views(
-                    artifact, settings["prediction_table"], settings.get("publication")
-                )
-            ],
-            **asdict(result),
-        },
-        dbutils,
-        render=render_model_set_result,
-        display_html=display_html,
-        exit_notebook=exit_notebook,
-    )
+    return {
+        "model_set_name": resolved.name,
+        "model_set_version": resolved.version,
+        "model_set_digest": resolved.digest,
+        "source_table": config["score_source_table"],
+        "prediction_table": settings["prediction_table"],
+        "publication": settings.get("publication", {"mode": "all"}),
+        "source_change_policy": settings.get("source_change_policy", "reject"),
+        "prediction_views": [
+            view.name
+            for view in publication_views(
+                artifact, settings["prediction_table"], settings.get("publication")
+            )
+        ],
+        **asdict(result),
+    }

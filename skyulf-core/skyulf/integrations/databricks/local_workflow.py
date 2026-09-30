@@ -603,6 +603,7 @@ def _run_scoring_action(
     selection: str,
     tracking_uri: str,
     registry_uri: str,
+    recovery_request: dict[str, Any] | None = None,
 ) -> Any:
     """Resolve the scoring pin and activate rebuilt output only after a successful batch."""
     if selection == "champion":
@@ -617,12 +618,14 @@ def _run_scoring_action(
         managed_prediction_view_exists(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
     prepared = prepare_local_workflow(_scoring_config(score_config))
-    provision_prediction_table(spark, score_config, prepared)
+    if recovery_request is None:
+        provision_prediction_table(spark, score_config, prepared)
     result = run_incremental_local_batch(
         spark,
         prepared,
         record_key_columns=tuple(config["record_key_columns"]),
         admission=SingleWriterAdmission(),
+        **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
         activate_prediction_view(spark, config["prediction_table"], target)
@@ -671,9 +674,12 @@ def run_action(
     expected_champion_version: str | None = None,
     rejection_reason: str = "",
     promotion_receipt: AliasChangeReceipt | None = None,
+    recovery_request: dict[str, Any] | None = None,
 ) -> Any:
     """Delegate training, scoring and explicit lifecycle actions to existing Core services."""
     _validate_action_layout(config, action)
+    if recovery_request is not None and action != "score":
+        raise ValueError("CDF recovery is only available for scoring.")
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
     selection, policy = workflow_policies(config)
@@ -717,5 +723,6 @@ def run_action(
             selection=selection,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
+            recovery_request=recovery_request,
         )
     raise ValueError(f"Unknown workflow action: {action}.")

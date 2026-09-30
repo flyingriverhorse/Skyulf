@@ -5,6 +5,59 @@ from copy import deepcopy
 import pytest
 
 
+@pytest.mark.parametrize("action", ["train", "score", "approve"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_cdf_expiry_recovery_requires_explicit_boolean(workflow_config, action, enabled):
+    """Optional recovery must remain independent of model-change and lifecycle policy."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    settings = {**workflow_config, "auto_rebuild_on_cdf_expiry": enabled}
+    assert validate_workflow_config(settings, action=action) == settings
+
+
+@pytest.mark.parametrize("value", [None, "true", "false", 0, 1, [], {}])
+def test_cdf_expiry_recovery_rejects_coerced_values(workflow_config, value):
+    """Truthy strings and numbers must never authorize an automatic full rescore."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    with pytest.raises(ValueError, match="auto_rebuild_on_cdf_expiry must be a boolean"):
+        validate_workflow_config(
+            {**workflow_config, "auto_rebuild_on_cdf_expiry": value}, action="score"
+        )
+
+
+@pytest.mark.parametrize("enabled,deployed", [(True, None), (True, "false"), (False, "true")])
+def test_cdf_recovery_rejects_json_only_graph_changes(workflow_config, enabled, deployed):
+    """An enabled runtime must have matching recovery tasks in the deployed score job."""
+    from skyulf.integrations.databricks.workflow_config import validate_deployed_contract
+
+    parameters = {"workflow_contract": "3", "deployed_score_handoff": "after_alias_change"}
+    if deployed is not None:
+        parameters["deployed_auto_rebuild_on_cdf_expiry"] = deployed
+    with pytest.raises(ValueError, match="regenerate/redeploy"):
+        validate_deployed_contract(
+            {**workflow_config, "auto_rebuild_on_cdf_expiry": enabled}, parameters
+        )
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_cdf_recovery_accepts_matching_deployed_graph(workflow_config, enabled):
+    """Regenerated notebook parameters explicitly match the JSON recovery policy."""
+    from skyulf.integrations.databricks.workflow_config import validate_deployed_contract
+
+    assert (
+        validate_deployed_contract(
+            {**workflow_config, "auto_rebuild_on_cdf_expiry": enabled},
+            {
+                "workflow_contract": "3",
+                "deployed_score_handoff": "after_alias_change",
+                "deployed_auto_rebuild_on_cdf_expiry": str(enabled).lower(),
+            },
+        )
+        is None
+    )
+
+
 def test_workflow_accepts_optional_quality_gates(workflow_config):
     """Additional absolute bounds must survive offline validation without new defaults."""
     from skyulf.integrations.databricks.workflow_config import validate_workflow_config

@@ -41,6 +41,7 @@ WORKFLOW_FIELDS = {
     "model_name",
     "model_version",
     "model_change_mode",
+    "auto_rebuild_on_cdf_expiry",
     "score_model_selection",
     "promotion_policy",
     "score_handoff",
@@ -167,6 +168,8 @@ def _validate_workflow_fields(config: dict[str, Any], action: str) -> None:
         raise ValueError(f"Unknown workflow settings: {', '.join(sorted(unknown))}.")
     if action not in _ACTIONS:
         raise ValueError("Unknown workflow action.")
+    if type(config.get("auto_rebuild_on_cdf_expiry", False)) is not bool:
+        raise ValueError("auto_rebuild_on_cdf_expiry must be a boolean.")
 
 
 def _validate_workflow_sources(config: dict[str, Any]) -> None:
@@ -598,12 +601,17 @@ def _migrate_selection_policy(migrated: dict[str, Any]) -> None:
 
 
 def validate_deployed_contract(config: dict[str, Any], parameters: dict[str, str]) -> None:
-    """Require notebook/job generation to agree with the project's handoff contract."""
+    """Require notebook/job generation to agree with handoff and recovery policy."""
     if parameters.get("workflow_contract") not in {"2", "3"} or parameters.get(
         "deployed_score_handoff"
     ) != config.get("score_handoff"):
         raise ValueError(
             "Project and job definitions disagree; regenerate/redeploy the Bundle together."
+        )
+    recovery = str(config.get("auto_rebuild_on_cdf_expiry", False)).lower()
+    if parameters.get("deployed_auto_rebuild_on_cdf_expiry", "false") != recovery:
+        raise ValueError(
+            "Project and recovery tasks disagree; regenerate/redeploy the Bundle together."
         )
 
 

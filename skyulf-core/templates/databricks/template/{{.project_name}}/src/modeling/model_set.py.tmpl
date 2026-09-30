@@ -51,7 +51,9 @@ source_change_policy below handles source corrections independently:
   history is rebuilt. This replaces all earlier results, including predictions
   from older model versions. No training occurs. Inserts alone still append.
   The full snapshot must fit max_rows/max_input_mb; exceeding limits fails.
-  Missing CDF history or permission errors still fail; they are not corrections.
+  Permission errors still fail; they are not corrections. Expired CDF history
+  fails unless auto_rebuild_on_cdf_expiry=true enables recovery of recognized
+  history loss as a separate scoring policy.
 
 Rule exceptions fail the job before publishing new results. Previous successful
 results remain. Changing all/combined_only storage schemas needs a new table.

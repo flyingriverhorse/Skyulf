@@ -15,6 +15,20 @@ WORKFLOW = (
 )
 
 
+def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
+    """Full-rescore authorization requires an explicit guided choice in every layout."""
+    from jsonschema import Draft7Validator
+
+    schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
+    setting = schema["properties"]["auto_rebuild_on_cdf_expiry"]
+    assert setting["default"] == "false"
+    assert setting["enum"] == ["false", "true"]
+    assert "skip_prompt_if" not in setting
+    assert Draft7Validator(setting).is_valid("true")
+    assert not Draft7Validator(setting).is_valid(True)
+    assert not Draft7Validator(setting).is_valid("yes")
+
+
 @pytest.mark.parametrize("task", ["regression", "classification"])
 def test_initializer_only_shows_task_specific_models_and_metrics(task):
     """Changing task must change visible menus while keeping them aligned with Core."""

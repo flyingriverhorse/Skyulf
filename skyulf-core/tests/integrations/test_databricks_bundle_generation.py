@@ -66,6 +66,76 @@ def _read_bundle(project):
     return bundle
 
 
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+@pytest.mark.parametrize("enabled", ["false", "true"])
+def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, compute, enabled):
+    """Opt-in recovery stays in the score job and both successful branches reach its report."""
+    project = _generate_project(
+        tmp_path,
+        training_layout=layout,
+        compute_mode=compute,
+        auto_rebuild_on_cdf_expiry=enabled,
+    )
+    config = _read_validated_config(project)
+    assert config["auto_rebuild_on_cdf_expiry"] is (enabled == "true")
+    jobs = _read_jobs(project)
+    assert set(jobs) == {"train", "score"}
+    tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
+    if enabled == "false":
+        assert set(tasks) == {"score"}
+        return
+    assert set(tasks) == {"score", "recovery_needed", "recover_predictions", "scoring_report"}
+    assert tasks["recovery_needed"]["depends_on"] == [{"task_key": "score"}]
+    assert tasks["recovery_needed"]["condition_task"] == {
+        "op": "EQUAL_TO",
+        "left": "{{tasks.score.values.recovery_required}}",
+        "right": "true",
+    }
+    assert tasks["recover_predictions"]["depends_on"] == [
+        {"task_key": "recovery_needed", "outcome": "true"}
+    ]
+    report = tasks["scoring_report"]
+    assert report["run_if"] == "NONE_FAILED"
+    assert report["depends_on"] == [
+        {"task_key": "recovery_needed", "outcome": "false"},
+        {"task_key": "recover_predictions"},
+    ]
+    for key in ("score", "recover_predictions", "scoring_report"):
+        task = tasks[key]
+        parameters = task["notebook_task"]["base_parameters"]
+        assert parameters["workflow_contract"] == "3"
+        assert parameters["deployed_auto_rebuild_on_cdf_expiry"] == enabled
+        for name in (
+            "config_path",
+            "catalog",
+            "input_schema",
+            "output_schema",
+            "metadata_schema",
+            "resource_suffix",
+        ):
+            assert parameters[name] == tasks["score"]["notebook_task"]["base_parameters"][name]
+        assert task["timeout_seconds"] == "${var.score_task_timeout_seconds}"
+        assert task["max_retries"] == "${var.score_max_retries}"
+        assert task["min_retry_interval_millis"] == "${var.score_min_retry_interval_millis}"
+        assert task["retry_on_timeout"] is False
+        if compute == "serverless":
+            assert task["disable_auto_optimization"] is True
+            assert task["environment_key"] == "skyulf"
+        else:
+            assert task["job_cluster_key"] == "skyulf"
+            assert task["libraries"] == tasks["score"]["libraries"]
+    for key, entrypoint in (
+        ("recover_predictions", "run_cdf_recovery_notebook"),
+        ("scoring_report", "run_scoring_report_notebook"),
+    ):
+        notebook = (project / "src/jobs" / f"{key}.py").read_text()
+        assert entrypoint in notebook
+        assert "exit_notebook=False" in notebook
+        assert 'display_html=globals().get("displayHTML")' in notebook
+        assert notebook.index("# COMMAND ----------") < notebook.index(".notebook.exit(output)")
+
+
 def test_deployment_defaults_are_ci_independent(tmp_path):
     """Shared environments require explicit selection without company automation."""
     project = _generate_project(tmp_path)

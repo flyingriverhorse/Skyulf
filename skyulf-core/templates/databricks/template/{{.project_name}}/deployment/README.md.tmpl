@@ -261,13 +261,24 @@ retries are opt-in, finite (never `-1`), and do not retry timeouts. Serverless
 automatic optimization remains disabled so it cannot add hidden attempts. See
 [Databricks task retry settings](https://docs.databricks.com/aws/en/jobs/configure-task).
 
+When `auto_rebuild_on_cdf_expiry=true` was selected during initialization, the
+same notebook timeout and retry settings also apply to `recover_predictions`
+and `scoring_report`. These tasks use the existing score job's identity,
+single-run queue, compute and notifications. The `recovery_needed` condition
+does not run a notebook or retry scoring. Recovery consumes the score task's
+pinned request; an exact already committed recovery is a no-op. The final report
+joins the ordinary and recovery branches with `NONE_FAILED`, so failed recovery
+does not publish a success report.
+
 Enable score retries only while the job remains the sole output writer and the
 configured model/source policies suit another attempt. An attempt re-evaluates
 the configured model selector and current source watermark; it is not an exact
 replay of the failed snapshot. Use a concrete `score_model_version` when recovery
-must keep the same model. An uncertain write, foreign commit, source replacement,
-expired CDF or incompatible schema requires inspecting the receipt/history and
-fixing the cause; retries do not bypass those guards. A timeout cannot undo an
+must keep the same model. An uncertain write, foreign commit, source replacement
+or incompatible schema requires inspecting the receipt/history and fixing the
+cause; retries do not bypass those guards. Expired CDF also requires operator
+action unless optional CDF recovery is enabled and the expiry is recognized.
+A timeout cannot undo an
 already committed write or alias change.
 
 If training/promotion succeeded and only scoring failed, inspect the child run

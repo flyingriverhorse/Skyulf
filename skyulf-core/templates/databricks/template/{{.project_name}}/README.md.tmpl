@@ -226,7 +226,9 @@ complete current snapshot with the selected set when UPDATE/DELETE is observed.
 Deleted rows disappear, corrected rows and business results are recomputed,
 and lag/rolling history starts from the corrected snapshot. Ordinary inserts
 still append. The full snapshot must fit `max_rows` and `max_input_mb`; otherwise
-the job fails and keeps previous results. CDF/permission failures still fail.
+the job fails and keeps previous results. Permission failures still fail.
+Expired CDF history fails unless `auto_rebuild_on_cdf_expiry=true` enables
+recovery of recognized history loss; this is a separate scoring policy.
 
 The two questions have independent purposes: `model_change_mode` controls a
 new model-set selection; `source_change_policy` controls changed/deleted source
@@ -698,7 +700,9 @@ The `train` job has one active run, with queued training and operator actions:
 | `scoring_requested` | Check whether scoring was requested |
 | `run_batch_scoring` | Invoke the existing score job |
 
-The separate score job has the `score` task. Open **`training_report`** for
+The separate score job has the `score` task. With CDF expiry recovery enabled,
+`recovery_needed` routes recognized expiry to `recover_predictions`, and
+`scoring_report` shows the actual scoring or recovery result. Open **`training_report`** for
 metrics, the decision and ready-to-copy `next_actions`. Search details are in
 `train_and_tune`; champion comparison is in `evaluate_model`. Score results are
 in the child or independent score run. Manual actions skip data and training
@@ -724,6 +728,8 @@ This project's policies are:
 - `score_model_selection={{.score_model_selection}}`: pinned version or champion.
 - `promotion_policy={{.promotion_policy}}`: manual approval or automatic gates.
 - `score_handoff={{.score_handoff}}`: disabled or score after an alias change.
+- `auto_rebuild_on_cdf_expiry={{.auto_rebuild_on_cdf_expiry}}`: optional full rescore
+  after recognized expiry of retained Delta change history.
 
 Set a numeric `quality_threshold` before the first champion approval/promotion.
 Later promotions also need positive improvement meeting `min_improvement`.
@@ -752,6 +758,24 @@ selector. `incremental_append` keeps old predictions and scores new inserts;
 `full_rebuild` builds a versioned generation and switches the view after success.
 An unchanged replay is a no-op. [Prediction behavior and model changes][predictions].
 
+`auto_rebuild_on_cdf_expiry` defaults to `false`. When enabled, a recognized CDF
+history expiry requests a full rescore of the pinned source snapshot and model
+selection through the separate `recover_predictions` task inside this score job.
+This option is independent of `model_change_mode` and supports single models,
+competitions and model sets. It does not train models or change registry aliases.
+The task can read and score the complete source, so the existing input limits
+still apply. It replaces the compatible prediction output atomically after
+checking source/output identities and the expected output version. Table IDs,
+grants and named views remain intact. An exact committed recovery retry is a
+no-op; ordinary incremental scoring then resumes from its saved watermark.
+
+Permission/connectivity failures, disabled CDF, source replacement, schema errors
+and readable source UPDATE/DELETE changes retain their existing failure behavior.
+Recovery is not a general retry or authorization to accept those changes. Older
+model-version generations remain available; rollback within the rebuilt generation
+depends on Delta history retention. Open `scoring_report` for the completed result
+on either the ordinary scoring or recovery branch.
+
 If scoring fails after promotion, retry score independently. Inspect saved
 MLflow evidence and registry state before a fresh lifecycle run; lifecycle repair
 and retry are rejected because effects may already have committed.
@@ -766,6 +790,12 @@ Keep `workflow_contract: "3"` fixed in the generated notebook parameters.
 `score_handoff` requires updating `deployed_score_handoff` wherever present in
 `resources/train.job.yml` and `resources/score.job.yml`, then redeploying the
 matching graph/notebooks/wheel.
+
+Changing `auto_rebuild_on_cdf_expiry` also requires regenerating and redeploying
+the matching score graph, notebooks and wheel. Its generated
+`deployed_auto_rebuild_on_cdf_expiry` parameter must match the JSON boolean in
+both job definitions. Editing only `config/workflow.json` is rejected. Leave
+the flag disabled for existing projects until the recovery tasks are deployed.
 
 [setup]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#guided-setup-and-offline-preview
 [recipes]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#custom-preprocessing-recipes

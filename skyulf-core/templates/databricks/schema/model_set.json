@@ -1,6 +1,6 @@
 {
   "model_set_name": {
-    "order": 738,
+    "order": 739,
     "type": "string",
     "default": "",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
@@ -14,7 +14,7 @@
     }
   },
   "model_set_promotion_policy": {
-    "order": 744,
+    "order": 745,
     "type": "string",
     "default": "manual_approval",
     "enum": [
@@ -31,7 +31,7 @@
     }
   },
   "model_set_output_mode": {
-    "order": 739,
+    "order": 740,
     "type": "string",
     "default": "all",
     "enum": [
@@ -49,7 +49,7 @@
     }
   },
   "model_set_table_name": {
-    "order": 740,
+    "order": 741,
     "type": "string",
     "default": "",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
@@ -63,7 +63,7 @@
     }
   },
   "model_view_prefix": {
-    "order": 741,
+    "order": 742,
     "type": "string",
     "default": "",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
@@ -91,7 +91,7 @@
     }
   },
   "combined_view_name": {
-    "order": 742,
+    "order": 743,
     "type": "string",
     "default": "",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
@@ -119,7 +119,7 @@
     }
   },
   "source_change_policy": {
-    "order": 743,
+    "order": 744,
     "type": "string",
     "default": "reject",
     "enum": [

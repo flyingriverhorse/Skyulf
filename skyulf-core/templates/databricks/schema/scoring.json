@@ -38,7 +38,7 @@
     ]
   },
   "score_model_selection": {
-    "order": 724,
+    "order": 725,
     "type": "string",
     "default": "pinned_version",
     "description": "4. Lifecycle | Score with one pinned version or resolve the controlled champion on each run",
@@ -55,7 +55,7 @@
     }
   },
   "promotion_policy": {
-    "order": 725,
+    "order": 726,
     "type": "string",
     "default": "manual_approval",
     "description": "4. Lifecycle | Require operator approval or promote automatically after quality gates pass",
@@ -72,7 +72,7 @@
     }
   },
   "score_handoff": {
-    "order": 726,
+    "order": 727,
     "type": "string",
     "default": "disabled",
     "description": "4. Lifecycle | Optionally start the score job after successful champion initialization, promotion or rollback (single, competition or model set). Pending approval, failed quality and rejection do not start scoring",
@@ -82,7 +82,7 @@
     ]
   },
   "regression_metric": {
-    "order": 727,
+    "order": 728,
     "type": "string",
     "default": "heldout_rmse",
     "description": "4. Lifecycle | Metric for comparing regression models on separate test data (heldout). Lower error is better; higher R2 or explained variance is better",
@@ -114,7 +114,7 @@
     }
   },
   "classification_metric": {
-    "order": 728,
+    "order": 729,
     "type": "string",
     "default": "heldout_accuracy",
     "description": "4. Lifecycle | Metric for comparing classification models on separate test data (heldout). Some metrics need probabilities or specific class counts",
@@ -159,7 +159,7 @@
     }
   },
   "min_improvement": {
-    "order": 729,
+    "order": 730,
     "type": "number",
     "default": 0.0,
     "minimum": 0,
@@ -167,7 +167,7 @@
     "skip_prompt_if": {}
   },
   "quality_threshold": {
-    "order": 730,
+    "order": 731,
     "type": "string",
     "default": "null",
     "description": "4. Lifecycle | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
@@ -180,8 +180,18 @@
       }
     }
   },
+  "auto_rebuild_on_cdf_expiry": {
+    "order": 724,
+    "type": "string",
+    "default": "false",
+    "description": "4. Lifecycle | Automatically rebuild predictions when retained Delta change history has expired? Adds a visible recovery task to the score job. May rescore the full source; independent of model-change policy",
+    "enum": [
+      "false",
+      "true"
+    ]
+  },
   "risk_category": {
-    "order": 731,
+    "order": 732,
     "type": "string",
     "default": "",
     "description": "4. Lifecycle | Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
