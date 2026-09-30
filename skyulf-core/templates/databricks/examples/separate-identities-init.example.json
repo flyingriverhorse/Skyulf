@@ -1,0 +1,6 @@
+{
+  "project_name": "skyulf_managed",
+  "personal_development_targets": "true",
+  "deployment_identity": "separate_service_principals",
+  "manage_job_permissions": "true"
+}

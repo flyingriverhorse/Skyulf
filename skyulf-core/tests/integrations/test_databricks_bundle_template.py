@@ -482,7 +482,7 @@ def test_init_exposes_both_model_change_modes_and_editable_training_cadence():
     assert properties["model_change_mode"]["enum"] == ["incremental_append", "full_rebuild"]
     assert properties["retraining_cron_expression"]["default"] == "0 0 3 3 * ?"
     assert properties["retraining_timezone_id"]["default"] == "UTC"
-    bundle = (WORKFLOW.parents[2] / "databricks.yml.tmpl").read_text(encoding="utf-8")
+    bundle = (WORKFLOW.parents[2] / "deployment/variables.yml.tmpl").read_text(encoding="utf-8")
     assert 'default: "{{.retraining_cron_expression}}"' in bundle
     assert 'default: "{{.retraining_timezone_id}}"' in bundle
 

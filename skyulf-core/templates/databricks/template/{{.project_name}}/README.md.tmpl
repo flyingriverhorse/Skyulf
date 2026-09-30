@@ -310,7 +310,9 @@ The remaining lifecycle instructions below apply to `training_layout=single_mode
 | `src/modeling/model_set.py` | Whole-set release/promotion policy and scoring table/view destinations |
 | `src/jobs/` | Notebook entrypoints referenced by the two jobs |
 | `src/tools/preview.py` | Offline configuration preview and installed-node discovery |
-| `databricks.yml` | Workspace/UC bindings for `dev`, `test`, `syst`, `prod`; schedule and compute variables |
+| `databricks.yml` | Bundle identity, source sync and included deployment/resource files |
+| `deployment/targets.yml` | Shared environments and optional personal development targets |
+| `deployment/variables.yml` | UC bindings, run identities, optional job ACLs, schedule and compute variables |
 | `resources/train.job.yml` | Training, comparison, approval/rollback and optional scoring handoff |
 | `resources/score.job.yml` | Batch scoring job and its independent schedule/compute |
 
@@ -531,8 +533,8 @@ removing or renaming entries in `src/modeling/model_competition.py` or
 
 ```bash
 python src/tools/refresh_training_graph.py
-databricks bundle validate --strict --target dev
-databricks bundle deploy --target dev
+databricks bundle validate --strict --target {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}}
+databricks bundle deploy --target {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}}
 ```
 
 The refresh script preserves schedules, compute and operator settings. A changed
@@ -640,12 +642,17 @@ uv build --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core
 From this generated project, with your authenticated CLI profile:
 
 ```powershell
-databricks bundle validate --strict -t dev --profile <profile>
-databricks bundle deploy -t dev --profile <profile>
+databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
+databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
 ```
 
-`dev` uses your profile's workspace and initialized UC bindings. Replace the
-placeholder hosts/catalogs for other targets before using them. The source tables
+Targets are paired by environment: `test/test_development`,
+`syst/syst_development` and `prod/prod_development`. Personal targets are optional,
+use user-scoped names and start with paused schedules. Configure the workspace
+and separate shared/development schemas in
+`deployment/targets.yml` and `deployment/variables.yml`; see
+[deployment setup](deployment/README.md) for external CI/CD, identity choices and
+optional personal targets inside each environment. The source tables
 must already exist; enable Delta Change Data Feed on the scoring source before
 new rows arrive. The first score processes all existing rows in that source.
 Record keys must be unique, nonnull STRING/BIGINT columns.
@@ -659,15 +666,15 @@ initialization choice.
 {{end}}
 
 Deployment creates two jobs and uploads code/configuration; input tables are
-not created. Selected schedules start `UNPAUSED` unless you set their Bundle
-pause variables to `PAUSED`. Training and scoring clocks are independent.
+not created. Shared targets use the configured schedule status; personal targets
+start paused. Training and scoring clocks are independent.
 See [deployment and schedules][schedules] and [existing-project migration][migration].
 
 ## 3. Train, inspect and approve
 
 ```powershell
-databricks bundle run -t dev --profile <profile> train
-databricks bundle run -t dev --profile <profile> score
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile> train
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile> score
 ```
 
 Run `score` after a model is selected. When handoff is enabled, first inspect its

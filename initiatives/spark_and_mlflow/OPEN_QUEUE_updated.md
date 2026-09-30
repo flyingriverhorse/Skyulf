@@ -16,7 +16,22 @@
 > and this removal; its earlier full-suite totals predate the removal.
 > Removal checks: 105 affected tests and 93 CLI generation tests passed;
 > all 2,370 remaining integration cases collect; Ruff, full Ty and CCN 10 passed.
-> Next: SM-37 (READY). [Plan128](128-reference-followups-plan.md).
+> SM-37 PARTIAL (2026-09-30): CI-independent deployment files, optional personal
+> targets in test/syst/prod, shared/separate run identities and opt-in job ACLs
+> delivered locally. 99 CLI generation cases, 20 strict loopback resolution cases
+> and 89 local checks passed; 2,396 integration cases collect. Targets now use only
+> test/test_development, syst/syst_development and prod/prod_development pairs;
+> personal targets remain optional and every target includes permissions: [].
+> Catalog/schema setup
+> now generates editable bindings without interactive questions; personal jobs use
+> dev_<user>_train/score, shared jobs retain <project>_train/score. The user subsequently
+> authorized live testing: the earlier seven-target layout validated in the workspace;
+> a fresh personal deployment passed 12 train tasks, automatic child score with
+> 120 verified predictions, and repeat no-op with unchanged data/Delta version.
+> The current paired layout has local CLI verification but was not redeployed.
+> Separate-identity alias denial and concurrent lifecycle evidence remain open.
+> [Plan130](130-sm37-deployment-plan.md), [Delivery131](131-sm37-local-deployment-delivery.md),
+> [Live132](132-sm37-live-deployment-verification.md). Test jobs remain PAUSED.
 > [Review126](126-sm52-reference-review.md) maps the supplied dbml template to
 > current tasks and records additional acceptance proposals; quality gates stay parked.
 > Approved SM-36e follow-up (2026-09-30): separate real training tasks and leaf
@@ -253,7 +268,7 @@ on an existing candidate without retraining or reuploading the model.
 | SM-36h | Nested group cross-validation | SM-36f | DONE | Group/stratified-group policies preserve metadata and isolate inner/outer/final holdouts; split identifiers excluded from features. Final local 291 tests; frontend134; cloud16/16 +384 replay rows; independent persisted audit passed. Included in the nested-policy delivery commit. [Evidence and limits](101-sm36ghi-nested-policy-acceptance.md) |
 | SM-36i | Nested decision-threshold tuning | SM-36f | DONE | Binary training-only inner OOF thresholds, threshold-aware outer scoring, separate final threshold and persisted provenance/artifact parity. Final local 291 tests; frontend134; cloud16/16 +384 replay rows; independent persisted audit passed. Included in the nested-policy delivery commit. [Evidence and limits](101-sm36ghi-nested-policy-acceptance.md) |
 | SM-54 | Single-job candidate competition and one champion | SM-35, SM-36f | DONE | Single target only; shared snapshot/folds, candidate tuning/recipes/runs, deterministic CV winner, winner-only registration and existing lifecycle. Guided model-owned Python settings verified on both engines: 419 local + 511 final-wheel cloud tests and real single/competition/multi-model lifecycle/scoring acceptance. Signed delivery includes reports115-119. [Final evidence119](119-model-layout-live-delivery.md), [Delivery116](116-sm54-model-competition-delivery.md), [Plan115](115-sm54-model-competition-plan.md). |
-| SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | READY | Per-target run_as/permissions/hosts/roots; one lifecycle writer; scoring cannot move aliases; actual denial and lifecycle queue evidence; report93 additions: optional UC `registered_models`/`schemas` grants, experiment permissions, operator `CAN_MANAGE_RUN`, optional per-target host/catalog prompts; shared non-home `root_path` for syst/prod (today `~/<project>/<target>`, so the experiment lands in the deployer's home) ([report93](93-dbml-reference-recomparison.md)) |
+| SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | PARTIAL | Modular deployment files, optional environment development pairs, same/separate run identities and opt-in job ACLs delivered; every target has an editable permissions list. Current paired layout passed 119 CLI cases locally. Earlier live personal deployment passed train, automatic child score (120 predictions) and unchanged no-op; its seven-target layout validated in one workspace. Current layout was not redeployed. Separate-identity grants/alias-denial and concurrent lifecycle queue evidence remain open. UC/experiment grants remain external prerequisites, not provisioned resources. [Delivery131](131-sm37-local-deployment-delivery.md), [Live132](132-sm37-live-deployment-verification.md); original scope [report93](93-dbml-reference-recomparison.md). |
 | SM-38 | Operational limits, retry/recovery and run summaries | SM-34, SM-37 | WAIT | Configurable timeouts/retries/notifications; source/model/count/no-op summaries; score-only recovery and no blind alias retry; report93 additions: email/webhook notifications, `health.rules` duration limits, task `timeout_seconds` ([report93](93-dbml-reference-recomparison.md)) |
 | SM-39 | Reproducible packaging and per-target compute | SM-33 | WAIT | Central compatible wheel/runtime pins, clean install/load, configurable policy/worker/cost settings and strict target validation; report93 additions: DAB `artifacts:` wheel build, one Skyulf/MLflow version variable, automatic Optuna dependencies, serverless `budget_policy_id` and job tags ([report93](93-dbml-reference-recomparison.md)) |
 | SM-40 | Generated-project tests and generic CI/CD | SM-37, SM-38, SM-39 | PARTIAL | Standalone project tests/build/validate and optional company adapter; explicit deployment approvals; no default chargeable PR runs; report93 additions: `ci` target, generated recipe/preflight tests and lint config, credential-free render of every init example checked against the Bundle schema in repository CI; per-project working directory for several generated projects in one repository ([report93](93-dbml-reference-recomparison.md)); static smoke delivered locally; isolated CI runner removed/deferred by user, remaining CI/CD scope open ([report129](129-reference-followups-delivery.md)) |

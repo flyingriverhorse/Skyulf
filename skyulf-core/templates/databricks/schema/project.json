@@ -47,15 +47,17 @@
   "catalog": {
     "order": 4,
     "type": "string",
-    "default": "workspace",
-    "description": "1. Basics and data | Existing dev Unity Catalog catalog",
+    "default": "REPLACE_TEST_CATALOG",
+    "description": "Optional init-file test catalog; otherwise configure deployment/variables.yml",
+    "skip_prompt_if": {},
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
   },
   "schema": {
     "order": 5,
     "type": "string",
-    "default": "default",
-    "description": "1. Basics and data | Existing dev Unity Catalog schema",
+    "default": "REPLACE_TEST_SCHEMA",
+    "description": "Optional init-file test schema; otherwise configure deployment/variables.yml",
+    "skip_prompt_if": {},
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
   },
   "source_table_name": {

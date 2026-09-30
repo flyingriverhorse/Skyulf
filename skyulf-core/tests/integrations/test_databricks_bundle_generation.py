@@ -56,6 +56,117 @@ def _generate_project(tmp_path, **overrides):
     return project
 
 
+def _read_bundle(project):
+    """Read the root and deployment includes without emulating CLI variable resolution."""
+    bundle = yaml.safe_load((project / "databricks.yml").read_text())
+    for name in ("variables", "targets"):
+        path = project / "deployment" / f"{name}.yml"
+        if path.is_file():
+            bundle.update(yaml.safe_load(path.read_text()))
+    return bundle
+
+
+def test_deployment_defaults_are_ci_independent(tmp_path):
+    """Shared environments require explicit selection without company automation."""
+    project = _generate_project(tmp_path)
+    root = yaml.safe_load((project / "databricks.yml").read_text())
+    assert "deployment/targets.yml" in root["include"]
+    assert "deployment/variables.yml" in root["include"]
+    bundle = _read_bundle(project)
+    assert set(bundle["targets"]) == {"test", "syst", "prod"}
+    assert not any(v.get("default") for v in bundle["targets"].values())
+    assert not (project / ".github/workflows").exists()
+    for env in ("test", "syst", "prod"):
+        target = bundle["targets"][env]
+        assert target["mode"] == "production"
+        assert target["permissions"] == []
+        assert target["variables"]["resource_suffix"] == ""
+        assert target["workspace"]["root_path"] == f"${{var.{env}_root_path}}"
+        path = bundle["variables"][f"{env}_root_path"]["default"]
+        assert path.startswith("/Workspace/Projects/")
+        assert "current_user" not in path
+        assert "resources" not in target  # Identity/ACL ownership remains external by default.
+
+
+@pytest.mark.parametrize("prefill", [False, True])
+def test_catalog_and_schema_generate_without_questions(tmp_path, prefill):
+    """CI initialization must generate editable environment bindings without prompting."""
+    root = Path(__file__).resolve().parents[2] / "templates/databricks"
+    properties = json.loads((root / "databricks_template_schema.json").read_text())["properties"]
+    for key in ("catalog", "schema"):
+        assert properties[key]["skip_prompt_if"] == {}
+    if prefill:
+        project = _generate_project(tmp_path, catalog="existing_catalog", schema="existing_schema")
+    else:
+        project = _generate_project(tmp_path, omit_fields=("catalog", "schema"))
+    bundle = _read_bundle(project)
+    expected_catalog = "existing_catalog" if prefill else "REPLACE_TEST_CATALOG"
+    expected_schema = "existing_schema" if prefill else "REPLACE_TEST_SCHEMA"
+    assert bundle["variables"]["test_catalog"]["default"] == expected_catalog
+    for key in ("input_schema", "output_schema", "metadata_schema"):
+        assert bundle["variables"][f"test_{key}"]["default"] == expected_schema
+        assert bundle["targets"]["test"]["variables"][key] == f"${{var.test_{key}}}"
+    assert bundle["targets"]["test"]["variables"]["catalog"] == "${var.test_catalog}"
+
+
+@pytest.mark.parametrize(
+    "identity", ["deployer", "shared_service_principal", "separate_service_principals"]
+)
+def test_personal_targets_keep_outputs_and_identity_separate(tmp_path, identity):
+    """Personal trials must not inherit shared writers, output names or enabled schedules."""
+    project = _generate_project(
+        tmp_path,
+        personal_development_targets="true",
+        deployment_identity=identity,
+        manage_job_permissions="true",
+        retraining_mode="scheduled",
+        scoring_mode="scheduled",
+        retraining_pause_status="UNPAUSED",
+        scoring_pause_status="UNPAUSED",
+    )
+    bundle = _read_bundle(project)
+    assert list(bundle["targets"]) == [
+        "test",
+        "test_development",
+        "syst",
+        "syst_development",
+        "prod",
+        "prod_development",
+    ]
+    assert [key for key, value in bundle["targets"].items() if value.get("default")] == [
+        "test_development"
+    ]
+    for env in ("test", "syst", "prod"):
+        shared = bundle["targets"][env]
+        personal = bundle["targets"][f"{env}_development"]
+        assert personal["workspace"]["host"] == shared["workspace"]["host"]
+        assert personal["mode"] == "development"
+        assert shared["permissions"] == personal["permissions"] == []
+        for key in ("input_schema", "output_schema", "metadata_schema"):
+            variable = f"{env}_development_{key}"
+            assert personal["variables"][key] == f"${{var.{variable}}}"
+            assert variable in bundle["variables"]
+            assert personal["variables"][key] != shared["variables"][key]
+        assert "${workspace.current_user.userName}" in personal["workspace"]["root_path"]
+        assert (
+            personal["variables"]["resource_suffix"] == f"_{env}_dev_${{workspace.current_user.id}}"
+        )
+        assert personal["variables"]["retraining_pause_status"] == "PAUSED"
+        assert personal["variables"]["scoring_pause_status"] == "PAUSED"
+        assert personal["resources"]["jobs"] == {job: {"name": job} for job in ("train", "score")}
+        assert "run_as" not in personal
+        for job in ("train", "score"):
+            resource = shared["resources"]["jobs"][job]
+            assert resource["permissions"] == f"${{var.{job}_permissions}}"
+            if identity == "deployer":
+                assert "run_as" not in resource
+            else:
+                role = "shared" if identity == "shared_service_principal" else job
+                assert resource["run_as"] == {
+                    "service_principal_name": f"${{var.{role}_service_principal}}"
+                }
+
+
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 def test_smoke_renders_without_cloud_operations(tmp_path, layout):
     """Every layout must retain runnable offline checks without cloud operations."""
@@ -413,7 +524,7 @@ def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train
         retraining_pause_status="PAUSED",
         scoring_pause_status="UNPAUSED",
     )
-    variables = yaml.safe_load((project / "databricks.yml").read_text())["variables"]
+    variables = _read_bundle(project)["variables"]
     jobs = _read_jobs(project)
     config = _read_validated_config(project)
     assert set(jobs) == {"train", "score"}
@@ -546,7 +657,7 @@ def test_cli_six_month_schedule_keeps_data_window_independent(tmp_path):
         retraining_timezone_id="Europe/Copenhagen",
         training_window_mode="full_snapshot",
     )
-    bundle = yaml.safe_load((project / "databricks.yml").read_text())
+    bundle = _read_bundle(project)
     jobs = _read_jobs(project)
     assert bundle["variables"]["retraining_cron_expression"]["default"] == "0 0 3 1 1,7 ?"
     assert bundle["variables"]["retraining_timezone_id"]["default"] == "Europe/Copenhagen"

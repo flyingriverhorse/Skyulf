@@ -14,6 +14,11 @@ Bundle users continue to run `databricks bundle init` normally; no build step is
 required for them. These maintenance files sit outside `template/`, so they are
 not copied into generated projects.
 
+`catalog` and `schema` are optional initialization-file inputs, not interactive
+questions. Their empty `skip_prompt_if` schema matches every answer set. Without
+explicit values, deployment settings are generated with editable `REPLACE_TEST_*`
+placeholders, matching the other environments.
+
 ## Where to edit
 
 | File | Questions/settings |
@@ -34,6 +39,7 @@ not copied into generated projects.
 | `scoring.json` | Single-model prediction source/output, promotion and quality |
 | `model_set.json` | Set name, promotion, outputs/views and source-change policy |
 | `deployment.json` | Compute, cluster policy and cost tags |
+| `identities.json` | Optional personal targets, shared run identities and job ACL ownership |
 
 Each topic file is a JSON object whose keys are the existing wizard field names:
 
