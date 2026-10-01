@@ -429,6 +429,65 @@ compatible estimator and numeric resource limits. The resource cannot also be a
 searched parameter; generated spaces exclude it. Optuna requires optuna and
 optuna-integration; its timeout stops between fits, not during a running fit.
 
+### Optional evaluation charts
+
+Bundle initialization asks `evaluation_charts_enabled` (default: `false`). Choosing
+`true` adds a separate `generate_charts` task after model evaluation, plus
+`matplotlib==3.10.0` in the training environment. Charts do not retrain models.
+
+| Layout | Images and destination |
+| --- | --- |
+| Single | Saved model diagnostics in its training run |
+| Competition | CV leaderboard and selected model diagnostics in the parent run; final holdout is never used to rank candidates |
+| Model set | Independent diagnostics in each child run; parent overview lists each component's own metric and units without a common ranking |
+
+Regression includes actual versus predicted, residuals and error distribution.
+Classification includes raw/normalized confusion matrices and per-class metrics;
+ROC/PR and calibration require model probabilities. Tree models expose native
+feature importance; linear models expose signed coefficients when available.
+Saved CV folds, tuning trials and training loss are plotted only when present.
+Full-holdout metric summaries use existing scalar values and separate metric scales.
+
+Open **Charts** in the MLflow run. MLflow can automatically create image cards
+from the logged image keys. If a chart is missing from your saved layout, choose
+**Add chart → Image grid** and select a key such as `single_actual_vs_predicted`
+or `competition_leaderboard`. Images use MLflow's key-based image API.
+The card header can show the run name and all run parameters above the image.
+To hide this parameter list, edit the chart and turn off
+**Run details → Show run parameters**, if your workspace UI offers the setting.
+This changes only the display; the training parameters remain recorded.
+The task output is plain text: created image keys grouped under their MLflow
+Charts links. Sample counts and skipped diagnostics remain available in
+`evaluation_charts/report.json` on the parent run.
+
+`config/workflow.json` controls the saved sample and display budgets:
+
+```json
+"evaluation_charts": {
+  "enabled": true,
+  "max_rows": 2000,
+  "max_features": 20,
+  "max_classes": 20
+}
+```
+
+Enabling charts saves a deterministic bounded sample of actual heldout predictions,
+probabilities and labels in the evaluated model's MLflow artifacts, subject to
+the experiment's access and retention policies. Raw features and record keys are
+excluded. Sampling happens after full-holdout evaluation, preserving temporal
+feature context. Maximums are
+10,000 rows, 50 displayed features and 50 classes; each sample has a 16 MiB budget.
+Pairwise coefficient outputs are capped at 20 boundaries. Sample diagnostics are
+labelled with their row count; full-holdout scalar metrics are never overwritten.
+Missing classes or unavailable model capabilities are reported explicitly.
+
+The task is an independent leaf with no retries. A chart failure can mark the
+overall job failed but does not undo model decisions or repeat training. Inspect
+the chart task and `skyulf.charts.status`; do not repair an old lifecycle invocation.
+Setting `enabled` to `false` disables an already deployed chart task. Adding charts
+to a project generated without them also requires adding the generated task and
+Matplotlib dependency, then redeploying; the flag alone cannot change a job graph.
+
 ### Optional SHAP explanations
 
 Bundle setup asks whether to enable SHAP (default: off). Enabling it adds pinned

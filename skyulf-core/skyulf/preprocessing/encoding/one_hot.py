@@ -57,6 +57,13 @@ def _to_dense(encoded_array: Any) -> Any:
     return encoded_array
 
 
+def _transform_partition(encoder: Any, values: Any, feature_names: list[str]) -> Any:
+    """Preserve fitted output schema for an empty fit-only test partition."""
+    if len(values) == 0:
+        return np.empty((0, len(feature_names)), dtype=encoder.dtype)
+    return _to_dense(encoder.transform(values))
+
+
 def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
     if not valid_cols:
@@ -70,7 +77,7 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         X_subset = X_subset.fill_null(_MISSING_TOKEN)
 
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
-    encoded = _to_dense(encoder.transform(X_np))
+    encoded = _transform_partition(encoder, X_np, feature_names)
 
     encoded_df = pl.DataFrame(encoded, schema=feature_names)
     retained = X.drop(valid_cols) if drop_original else X
@@ -91,7 +98,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
 
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    encoded = _to_dense(encoder.transform(X_input))
+    encoded = _transform_partition(encoder, X_input, feature_names)
     encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
     if drop_original:
         X_out = X_out.drop(columns=valid_cols)

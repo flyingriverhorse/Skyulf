@@ -1,5 +1,6 @@
 """Held-out metrics for a saved pandas/Polars local pipeline."""
 
+from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -19,12 +20,15 @@ def evaluate_local_holdout(
     heldout: pd.DataFrame | pl.DataFrame,
     *,
     target_column: str,
+    on_predictions: Callable[[Any, pd.DataFrame], None] | None = None,
 ) -> dict[str, float]:
     """Measure a saved local pipeline on labeled rows excluded from fitting.
 
     The caller owns the split. This function never fits preprocessing or a model;
     it predicts with the loaded artifact and records only held-out metrics.
     Binary F1 uses the artifact's second class as the positive label.
+    An optional observer receives actual labels and predictions after scoring,
+    allowing integrations to sample the exact outputs without repeating inference.
     Evaluation uses sequential joblib prediction to keep parallel forest sums
     reproducible for exact registry evidence checks. Saved model parameters and
     normal training/batch prediction parallelism remain unchanged. This does not
@@ -39,6 +43,8 @@ def evaluate_local_holdout(
     with parallel_config(backend="sequential"):
         predictions = predict_local_pipeline(features, artifact)
     raw_metrics = _holdout_metrics(artifact, features, heldout, target_column, actual, predictions)
+    if on_predictions is not None:
+        on_predictions(actual, predictions)
     return {f"heldout_{name}": value for name, value in sanitize_metrics(raw_metrics).items()}
 
 

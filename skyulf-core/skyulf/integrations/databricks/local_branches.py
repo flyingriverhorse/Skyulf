@@ -400,6 +400,7 @@ def train_branch(
     tracking_uri: str,
     registry_uri: str,
     experiment_name: str,
+    evaluation_charts: dict[str, Any] | None = None,
 ) -> LocalCandidateResult:
     """Delegate fitting, registration and comparison to the existing candidate service."""
     return train_local_candidate(
@@ -420,6 +421,7 @@ def train_branch(
         quality_gates=branch.quality_gates,
         risk_category=branch.risk_category,
         cv=branch.cv,
+        evaluation_charts=evaluation_charts,
         run_tags={
             "mlflow.parentRunId": str(run.run_id),
             "skyulf.training.branch": branch.name,

@@ -1,4 +1,11 @@
 {
+  "evaluation_charts_enabled": {
+    "order": 899,
+    "type": "string",
+    "default": "false",
+    "enum": ["false", "true"],
+    "description": "Evaluation charts | Add a separate generate_charts task and MLflow Image grid diagnostics? Saves up to 2000 heldout prediction/label rows per evaluated model in MLflow. Includes regression/classification diagnostics, supported model importance, competition comparison or independent model-set reports. Adds Matplotlib; no extra training."
+  },
   "shap_enabled": {
     "order": 900,
     "type": "string",

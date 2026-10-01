@@ -19,6 +19,52 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+@pytest.mark.parametrize("enabled,shap", [("false", "false"), ("true", "false"), ("true", "true")])
+def test_evaluation_charts_are_an_optional_independent_leaf(
+    tmp_path, layout, compute, enabled, shap
+):
+    """The opt-in adds one plotting task without changing promotion dependencies or duplicating packages."""
+    project = _generate_project(
+        tmp_path,
+        training_layout=layout,
+        compute_mode=compute,
+        evaluation_charts_enabled=enabled,
+        shap_enabled=shap,
+    )
+    config = _read_validated_config(project)
+    assert config["evaluation_charts"]["enabled"] is (enabled == "true")
+    jobs = _read_jobs(project)
+    tasks = {task["task_key"]: task for task in jobs["train"]["tasks"]}
+    assert ("generate_charts" in tasks) is (enabled == "true")
+    assert not any(
+        dependency["task_key"] == "generate_charts"
+        for task in tasks.values()
+        for dependency in task.get("depends_on", [])
+    )
+    dependencies = (
+        jobs["train"].get("environments", [{}])[0].get("spec", {}).get("dependencies", [])
+        if compute == "serverless"
+        else [item.get("pypi", {}).get("package") for item in tasks["initialize_run"]["libraries"]]
+    )
+    assert dependencies.count("matplotlib==3.10.0") == int(enabled == "true" or shap == "true")
+    if enabled == "true":
+        predecessor = "evaluate_model_set" if layout == "multi_target" else "evaluate_model"
+        task = tasks["generate_charts"]
+        assert task["depends_on"] == [{"task_key": predecessor}]
+        assert task["max_retries"] == 0
+        assert task["notebook_task"]["base_parameters"]["workspace_host"] == "${workspace.host}"
+        notebook = (project / "src/jobs/generate_charts.py").read_text()
+        assert 'run_evaluation_charts_notebook(globals()["dbutils"])' in notebook
+        assert "displayHTML" not in notebook
+        assert (
+            task["notebook_task"]["base_parameters"]["reference_json"]
+            == "{{tasks." + predecessor + ".values.reference_json}}"
+        )
+    assert "generate_charts" not in {task["task_key"] for task in jobs["score"]["tasks"]}
+
+
 def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
     """Render the actual template through the installed CLI without cloud writes."""
     root = Path(__file__).resolve().parents[2] / "templates/databricks"

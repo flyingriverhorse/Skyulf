@@ -68,7 +68,8 @@ resources:
                 package: mlflow==3.16.1
 {{if eq .shap_enabled "true"}}            - pypi:
                 package: shap==0.49.1
-            - pypi:
+{{end}}
+{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}            - pypi:
                 package: matplotlib==3.10.0
 {{end}}
 {{end}}
@@ -132,6 +133,19 @@ resources:
               <<: *branch_parameters
               reference_json: '{{"{{tasks.register_model_set.values.reference_json}}"}}'
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+{{if eq .evaluation_charts_enabled "true"}}
+        - <<: *branch_task
+          task_key: generate_charts
+          depends_on:
+            - task_key: evaluate_model_set
+          notebook_task:
+            notebook_path: ../src/jobs/generate_charts.py
+            base_parameters:
+              <<: *branch_parameters
+              reference_json: '{{"{{tasks.evaluate_model_set.values.reference_json}}"}}'
+              tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+              workspace_host: ${workspace.host}
+{{end}}
         - <<: *branch_task
           task_key: model_decision
           run_if: NONE_FAILED
@@ -199,7 +213,8 @@ resources:
                 package: mlflow==3.16.1
 {{if eq .shap_enabled "true"}}            - pypi:
                 package: shap==0.49.1
-            - pypi:
+{{end}}
+{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}            - pypi:
                 package: matplotlib==3.10.0
 {{end}}
 {{end}}
@@ -328,6 +343,19 @@ resources:
               <<: *lifecycle_parameters
               reference_json: '{{"{{tasks.register_model.values.reference_json}}"}}'
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+{{if eq .evaluation_charts_enabled "true"}}
+        - <<: *lifecycle_task
+          task_key: generate_charts
+          depends_on:
+            - task_key: evaluate_model
+          notebook_task:
+            notebook_path: ../src/jobs/generate_charts.py
+            base_parameters:
+              <<: *lifecycle_parameters
+              reference_json: '{{"{{tasks.evaluate_model.values.reference_json}}"}}'
+              tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+              workspace_host: ${workspace.host}
+{{end}}
         - <<: *lifecycle_task
           task_key: model_decision
           run_if: NONE_FAILED
@@ -380,7 +408,8 @@ resources:
               - ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
               - mlflow==3.16.1
 {{if eq .shap_enabled "true"}}              - shap==0.49.1
-              - matplotlib==3.10.0
+{{end}}
+{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}              - matplotlib==3.10.0
 {{end}}
 {{else}}
       job_clusters:

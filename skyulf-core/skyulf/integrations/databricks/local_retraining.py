@@ -42,6 +42,7 @@ from ..mlflow.validation import (
     validate_quality_policy,
 )
 from ._contracts import column_name, table_name
+from .evaluation_chart_data import chart_recorder, chart_settings
 from .local_batch import fit_local_workflow
 from .local_cv import CV_FIELDS, LocalCVSpec, evaluate_training_cv
 from .local_explanations import log_training_explanations, validate_explanation_config
@@ -1028,10 +1029,21 @@ def log_fitted_candidate(
 
 
 def evaluate_candidate(
-    artifact: Any, native_holdout: Any, *, spec: LocalTrainingSpec, metric: str
+    artifact: Any,
+    native_holdout: Any,
+    *,
+    spec: LocalTrainingSpec,
+    metric: str,
+    chart_run: Any = None,
+    evaluation_charts: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """Require a finite initial holdout metric before any registration."""
-    metrics = evaluate_local_holdout(artifact, native_holdout, target_column=spec.target_column)
+    metrics = evaluate_local_holdout(
+        artifact,
+        native_holdout,
+        target_column=spec.target_column,
+        on_predictions=chart_recorder(chart_run, artifact, spec, evaluation_charts),
+    )
     if metric not in metrics or not math.isfinite(metrics[metric]):
         raise ValueError("Selected metric is unavailable or non-finite on the holdout.")
     return metrics
@@ -1133,6 +1145,7 @@ def train_local_candidate(
     risk_category: str | None = None,
     cv: LocalCVSpec | None = None,
     run_tags: dict[str, str] | None = None,
+    evaluation_charts: dict[str, Any] | None = None,
 ) -> LocalCandidateResult:
     """Fit, register and compare; optionally notify an explicit lifecycle owner.
 
@@ -1140,6 +1153,7 @@ def train_local_candidate(
     registration and before comparison, allowing the caller to nominate a
     contender without making the generic training service an alias writer.
     """
+    chart_settings(evaluation_charts)
     cv = LocalCVSpec() if cv is None else cv
     pipeline_config = candidate_config(
         spec,
@@ -1189,8 +1203,16 @@ def train_local_candidate(
             fitted.holdout,
             spec=fitted.spec,
             metric=metric,
+            chart_run=run,
+            evaluation_charts=evaluation_charts,
         )
-        log_fitted_candidate(run, fitted, config, engine=engine, risk_category=risk_category)
+        log_fitted_candidate(
+            run,
+            fitted,
+            config,
+            engine=engine,
+            risk_category=risk_category,
+        )
         run.log_metrics(metrics)
         model_uri = log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
     registered = register_candidate(

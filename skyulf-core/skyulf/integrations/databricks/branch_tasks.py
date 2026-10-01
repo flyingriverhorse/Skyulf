@@ -153,6 +153,7 @@ def run_branch_training(
                 digest=store.request["plan_sha256"],
                 path=Path(directory) / "model",
                 experiment_name=store.request["experiment_name"],
+                evaluation_charts=store.request["config"].get("evaluation_charts"),
                 **project_endpoints(store.request["config"]),
             )
         return store.complete(phase, {"name": name, **asdict(result)}, reference)

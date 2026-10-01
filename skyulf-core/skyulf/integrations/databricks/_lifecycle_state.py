@@ -19,6 +19,7 @@ PHASE_PREDECESSORS = {
     "train": "prepare",
     "evaluate_register": "train",
     "compare": "evaluate_register",
+    "generate_charts": "compare",
     "decide": "compare",
     "operator": "prepare",
     "finalize": "prepare",
@@ -169,10 +170,11 @@ class PhaseStore:
             }
             if phase in branches | {"register_model_set"}:
                 return "prepare"
-            if phase in {"evaluate_model_set", "model_decision"}:
+            if phase in {"evaluate_model_set", "model_decision", "generate_charts"}:
                 return {
                     "evaluate_model_set": "register_model_set",
                     "model_decision": "evaluate_model_set",
+                    "generate_charts": "evaluate_model_set",
                 }[phase]
         if phase.startswith("candidate_") and phase.removeprefix("candidate_") in self.request.get(
             "competition", {}

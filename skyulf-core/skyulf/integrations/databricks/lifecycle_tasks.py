@@ -417,7 +417,12 @@ def _evaluate_register(spark: Any, store: PhaseStore) -> dict[str, Any]:
     spec = verified.spec
     config = store.request["config"]
     metrics = training.evaluate_candidate(
-        verified.artifact, holdout, spec=spec, metric=config["metric"]
+        verified.artifact,
+        holdout,
+        spec=spec,
+        metric=config["metric"],
+        chart_run=store.run,
+        evaluation_charts=config.get("evaluation_charts"),
     )
     store.run.log_metrics(metrics)
     store.log(

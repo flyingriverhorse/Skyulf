@@ -574,6 +574,7 @@ def _run_training_action(
             on_registered=lifecycle.registered,
             risk_category=config.get("risk_category"),
             cv=cv,
+            evaluation_charts=config.get("evaluation_charts"),
         )
         alias_change = automatic_promotion(
             spark,

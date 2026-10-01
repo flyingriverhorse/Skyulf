@@ -12,6 +12,7 @@ from ...modeling.base import BaseModelCalculator
 from ...registry import NodeRegistry
 from ..mlflow.validation import validate_quality_policy
 from ._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
+from .evaluation_chart_data import chart_settings
 from .local_cv import CV_FIELDS, LocalCVSpec
 from .local_explanations import validate_explanation_config
 from .local_sdk import ModelSelection
@@ -22,6 +23,7 @@ from .training_dates import training_date_spec
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    "evaluation_charts",
     "training_layout",
     "competition",
     "competition_max_trials",
@@ -273,6 +275,7 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     actions use their own pinned data.
     """
     _validate_workflow_fields(config, action)
+    chart_settings(config.get("evaluation_charts"))
     _validate_layout(config, action)
     task = _choice(config, "task", {"regression", "classification"})
     _choice(config, "engine", {"pandas", "polars"})

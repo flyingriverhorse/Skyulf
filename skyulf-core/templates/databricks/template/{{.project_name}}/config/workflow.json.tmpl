@@ -10,6 +10,7 @@
 {
   "config_version": 1,
   "training_layout": "{{.training_layout}}",
+  "evaluation_charts": {"enabled": {{.evaluation_charts_enabled}}, "max_rows": 2000, "max_features": 20, "max_classes": 20},
 {{if $competition}}  "competition_max_trials": {{.competition_max_trials}},
   "competition_max_candidates": 8,
 {{end}}
