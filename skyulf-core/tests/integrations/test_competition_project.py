@@ -157,7 +157,7 @@ def test_custom_recipe_registers_only_selected_candidate_and_replays(tmp_path):
     root.joinpath("__init__.py").write_text("raise RuntimeError('edited')\n", encoding="utf-8")
     replay = load_project_module(source)
     assert replay.build_preprocessing() == pipeline["preprocessing"]
-    assert pipeline["preprocessing"][0]["params"]["columns"] == ["x"]
+    assert pipeline["preprocessing"][0]["params"]["params"]["columns"] == ["x"]
 
 
 def test_competition_binds_metric_and_runs_ensemble_before_tuning(tmp_path):
@@ -286,7 +286,8 @@ def test_named_candidates_share_custom_presplit_identity_and_fresh_replay(tmp_pa
         pipeline = candidate["pipeline"]
         saved = load_project_module(pipeline["project_python_source"])
         assert saved.build_pre_split_steps() == result["pre_split_steps"]
-        custom_ids.append(pipeline["preprocessing"][0]["transformer"])
+        # Each candidate's learn function resolves from its own saved source snapshot.
+        custom_ids.append(pipeline["preprocessing"][0]["params"]["learn"])
         if reuse_scoring:
             assert pipeline["project_scoring"]["pre_split"]["steps"] == result["pre_split_steps"]
     assert custom_ids[0] != custom_ids[1]

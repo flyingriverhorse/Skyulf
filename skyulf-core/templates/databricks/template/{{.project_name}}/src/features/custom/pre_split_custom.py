@@ -1,66 +1,110 @@
-"""Reusable fixed row-completeness filter, configured in features/pre_split.py.
+"""YOUR OWN ROW FILTERS. Use them in features/pre_split.py.
 
-Only null/NaN count as missing; blank strings and infinity remain values.
-No statistics are learned. The surviving values, columns and order are preserved.
-This filter selects training rows and can also be reused during scoring via
-SCORING_MODE="pre_split" or "combined" in features/scoring.py.
+A filter decides, row by row, which rows may be used for training.
+Write one function that returns True for rows to KEEP, then wrap it:
+
+  filter_step(name, fn, columns=[...])
+      fn(df) -> True/False for every row
+      columns = the columns fn reads (Skyulf checks they exist)
+
+Rules:
+  - Look only at the row itself (no df.mean(), df.duplicated() etc.).
+    Something learned from data belongs in preprocessing, not here.
+  - Return exactly one True/False per row. Missing values give no answer,
+    so decide them yourself: (df["x"] > 0).fillna(False)
+  - Never change values; filters only remove rows.
+  - Write normal top-level `def` functions (no lambda).
+  - params={...} is passed to your function as its last argument.
+
+scoring.py can reuse these filters for scoring rows (SCORING_MODE="pre_split")
+or "combined" in features/scoring.py
 """
 
-import numpy as np
-import pandas as pd
-import polars as pl
+from skyulf.preprocessing import filter_step
 
-from skyulf.inference.project_code import custom_step
-from skyulf.preprocessing.base import BaseApplier, BaseCalculator, apply_method, fit_method
+# ---------------------------------------------------------------------------
+# Example 1 - keep rows with enough filled-in fields.
+#   minimum_completeness(["a", "b", "c"], min_present=2)
+#   a=1, b=null, c=3  -> kept (2 values)      a=null, b=null, c=3 -> removed
+#   null/NaN count as missing; empty text and infinity count as values.
+# ---------------------------------------------------------------------------
 
 
-def _validate(columns, min_present):
-    """Reject ambiguous column selections and impossible completeness requirements."""
-    if not isinstance(columns, (list, tuple)):
-        raise ValueError("Completeness columns must be a list of column names.")
-    if not columns or any(not isinstance(column, str) or not column for column in columns):
+def has_enough_values(df, params):
+    """True when at least min_present of the selected columns are not null."""
+    return df[params["columns"]].notna().sum(axis=1) >= params["min_present"]
+
+
+def minimum_completeness(columns, min_present=1):
+    """Keep rows where at least min_present of the given columns have a value."""
+    if not isinstance(columns, (list, tuple)) or not columns:
+        raise ValueError("Completeness columns must be a nonempty list of column names.")
+    if any(not isinstance(column, str) or not column for column in columns):
         raise ValueError("Completeness columns must be nonempty column names.")
     if len(set(columns)) != len(columns):
         raise ValueError("Completeness columns must be unique.")
     if type(min_present) is not int or not 1 <= min_present <= len(columns):
         raise ValueError("min_present must be an integer between 1 and the number of columns.")
-
-
-class CompletenessCalculator(BaseCalculator):
-    """Save the fixed completeness rule without inspecting training values."""
-
-    @fit_method
-    def fit(self, X, y, config):
-        """Validate and freeze the explicit column selection and minimum count."""
-        _validate(config["columns"], config["min_present"])
-        return {"columns": list(config["columns"]), "min_present": config["min_present"]}
-
-
-class CompletenessApplier(BaseApplier):
-    """Retain rows meeting the configured minimum number of observed fields."""
-
-    @apply_method
-    def apply(self, X, y, params):
-        """Filter on selected fields without modifying any survivor or its position."""
-        frame = X.to_native() if hasattr(X, "to_native") else X
-        counts = np.zeros(len(frame), dtype=int)
-        for column in params["columns"]:
-            counts += pd.notna(frame[column].to_list())
-        keep = counts >= params["min_present"]
-        return frame.filter(pl.Series(keep)) if isinstance(frame, pl.DataFrame) else frame.loc[keep]
-
-
-def minimum_completeness(columns, min_present=1):
-    """Declare a fixed training filter over explicitly selected source columns."""
-    _validate(columns, min_present)
-    return custom_step(
-        "minimum_completeness",
-        CompletenessCalculator,
-        CompletenessApplier,
-        params={"columns": list(columns), "min_present": min_present},
-        pre_split={
-            "effect": "filter",
-            "required_columns": list(columns),
-            "learns_from_data": False,
-        },
+    params = {"columns": list(columns), "min_present": min_present}
+    return filter_step(
+        "minimum_completeness", has_enough_values, columns=list(columns), params=params
     )
+
+
+# ---------------------------------------------------------------------------
+# Example 2 - keep values inside a known valid range (missing values are kept).
+#   value_range("age", 0, 120)   age = 35 kept, -1 removed, 130 removed, null kept
+# ---------------------------------------------------------------------------
+
+
+def in_range(df, params):
+    """True when the value is within [minimum, maximum] or missing."""
+    values = df[params["column"]]
+    return values.between(params["minimum"], params["maximum"]) | values.isna()
+
+
+def value_range(column, minimum, maximum):
+    """Remove rows whose column is outside [minimum, maximum]."""
+    params = {"column": column, "minimum": minimum, "maximum": maximum}
+    return filter_step(f"{column}_range", in_range, columns=[column], params=params)
+
+
+# ---------------------------------------------------------------------------
+# Example 3 - keep only listed categories (null is removed).
+#   allowed_values("country", ["NL", "DE"])   NL kept, FR removed, null removed
+# ---------------------------------------------------------------------------
+
+
+def is_allowed(df, params):
+    """True when the value is one of the allowed values."""
+    return df[params["column"]].isin(params["values"])
+
+
+def allowed_values(column, values):
+    """Keep rows whose column is one of the given values."""
+    params = {"column": column, "values": list(values)}
+    return filter_step(f"{column}_allowed", is_allowed, columns=[column], params=params)
+
+
+# ---------------------------------------------------------------------------
+# Example 4 - the allowed list read from a data file (asset). Inactive.
+#   1. Create src/features/assets/countries.json   ["NL", "DE", "BE"]
+#   2. In src/features/assets.json set   "files": ["assets/countries.json"]
+#   3. Uncomment the code below, then add allowed_countries() to a pre-split recipe.
+#   The file is saved with the model; editing it later needs a new training run.
+# ---------------------------------------------------------------------------
+
+# import json
+#
+# from skyulf.inference.project_package import read_project_asset
+#
+#
+# def is_known_country(df):
+#     """True when the country is listed in the saved countries file."""
+#     countries = json.loads(read_project_asset(__package__, "assets/countries.json"))
+#     return df["country"].isin(countries)
+#
+#
+# def allowed_countries():
+#     """Keep rows whose country is in assets/countries.json."""
+#     return filter_step("allowed_countries", is_known_country, columns=["country"])

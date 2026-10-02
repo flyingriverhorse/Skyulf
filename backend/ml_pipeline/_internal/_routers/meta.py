@@ -24,6 +24,7 @@ from backend.database.models import (
 )
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._internal._advisor import AnalysisProfile, DataProfiler
+from backend.ml_pipeline._internal._code_only_nodes import code_only_step_types
 from backend.ml_pipeline._internal._schemas import RegistryItem
 from backend.ml_pipeline.constants import StepType
 from backend.utils.file_utils import extract_file_path_from_source
@@ -64,7 +65,10 @@ def _build_node_registry() -> list[RegistryItem]:
         logical_id = meta.get("id", registration_name)
         if registration_name != logical_id:
             aliases_by_id.setdefault(logical_id, []).append(registration_name)
+    code_only = code_only_step_types()
     for node_id, meta in all_metadata.items():
+        if node_id in code_only:
+            continue
         item_data = dict(meta)
         if "id" not in item_data:
             item_data["id"] = node_id

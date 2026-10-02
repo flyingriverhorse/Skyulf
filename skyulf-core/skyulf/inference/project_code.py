@@ -12,6 +12,7 @@ from threading import RLock
 from types import ModuleType
 from typing import Any
 
+from ..preprocessing.function_steps import FILTER_STEP
 from ..registry import NodeRegistry
 from .project_package import discard_project_package
 
@@ -147,3 +148,21 @@ def is_registered_project_step(identity: str) -> bool:
         and sys.modules.get(module) is not None
         and identity == f"{module}.{calculator.__qualname__}.{applier.__qualname__}"
     )
+
+
+def is_project_filter_step(step: Any) -> bool:
+    """Recognize a project filter class pair or a function filter from loaded project source."""
+    if type(step) is not dict:
+        return False
+    if step.get("transformer") != FILTER_STEP:
+        return is_registered_project_step(step.get("transformer"))
+    module = project_step_source(step)
+    return module.startswith(_PREFIX) and sys.modules.get(module) is not None
+
+
+def project_step_source(step: dict[str, Any]) -> str:
+    """Return the project identity owning a custom filter: class identity or function module."""
+    if step.get("transformer") == FILTER_STEP:
+        ref = step.get("params", {}).get("function")
+        return ref.partition(":")[0] if isinstance(ref, str) else ""
+    return step.get("transformer", "")

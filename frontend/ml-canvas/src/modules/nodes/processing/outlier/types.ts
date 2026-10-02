@@ -4,10 +4,10 @@ export interface ManualColumnBounds {
 }
 
 export interface OutlierConfig {
-  method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope' | 'manual_bounds';
+  method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope' | 'manual_bounds' | 'clip';
   columns: string[];
 
-  // Manual Bounds
+  // Manual Bounds and Clip (same fixed bounds; one drops rows, one caps values)
   bounds?: Record<string, ManualColumnBounds>;
 
   // IQR

@@ -73,12 +73,12 @@ preprocessing recipe (normally `default`). For example, customize a regression
 forest candidate's recipe while retaining its tuning settings:
 
 ```python
-MODELS["random_forest_regressor_2"]["preprocessing_recipe"] = "imputer_only"
+MODELS["random_forest_regressor_2"]["preprocessing_recipe"] = "example_imputer"
 ```
 
-`imputer_only` is a named recipe in `src/features/preprocessing.py`; adapt its
+`example_imputer` is a named recipe in `src/features/preprocessing.py`; adapt its
 `feature_value` column first. Add other named builders there for custom steps or
-use `combined` after adapting its numeric and category inputs. Each candidate
+use `example_imputer_frequency` after adapting its numeric and category inputs. Each candidate
 and CV fold fits its selected recipe only on that fold's training rows. Keep
 eligibility in the shared `src/features/pre_split.py`. Candidate declarations
 cannot override target, task, source, pre-split rules, holdout or CV.
@@ -129,17 +129,17 @@ package and select different ordered step lists:
 
 | Branch | preprocessing_recipe | pre_split_recipe |
 | --- | --- | --- |
-| revenue | frequency_only | complete_inputs |
-| cost | imputer_only | none |
-| churn | combined | complete_inputs |
+| revenue | example_frequency | example_complete_inputs |
+| cost | example_imputer | none |
+| churn | example_imputer_frequency | example_complete_inputs |
 
 `preprocessing.py` defines `build_preprocessing(recipe="default")` and
 `pre_split.py` defines `build_pre_split_steps(recipe="default")`. Add a named
 function to either file's mapping to create a recipe. Each function returns a
 normal list of Core/custom steps. The starters use `feature_value` and `category`;
-adapt those columns to the selected branch's inputs. `frequency_only` performs
-no imputation; `combined` runs the imputer then custom frequency encoding.
-`complete_inputs` requires at least one of the two inputs to be present.
+adapt those columns to the selected branch's inputs. `example_frequency` performs
+no imputation; `example_imputer_frequency` runs the imputer then custom frequency encoding.
+`example_complete_inputs` requires at least one of the two inputs to be present.
 
 Shared recipes share code, not fitted values: each branch and CV fold learns its
 own statistics from its own training rows. Selected recipe names are bound into
@@ -309,7 +309,7 @@ The remaining lifecycle instructions below apply to `training_layout=single_mode
 | `src/features/scoring.py` | `build_model_rules()` for each model; `build_combined_rules()` for calculations across models |
 | `src/features/assets.json` | Relative paths of bounded data files to save with the model |
 | `src/features/requirements.txt` | Exact project dependency pins verified at fit/load and recorded by MLflow |
-| `src/features/custom/` | Optional Calculator/Applier pairs and helper modules; use relative imports |
+| `src/features/custom/` | Your own steps as plain pandas functions (examples inside); use relative imports |
 | `src/modeling/single_model.py` | Single model's parameters and tuning/search space in `MODELING` |
 | `src/modeling/model_competition.py` | Each competition candidate owns its model, tuning/search space and preprocessing recipe in `MODELS` |
 | `src/modeling/multi_model.py` | Each target owns its model, tuning/search space, recipes and validation/quality policy |
@@ -347,8 +347,13 @@ verifies versions and never installs packages during prediction. MLflow exports
 the pins in its environment requirements. Changing code/assets/pins requires
 a new model version. Large external model downloads are outside this contract.
 
-Custom implementations live in two modules. Their step calls appear directly
-inside the parent builders' returned lists, alongside the Core steps:
+Custom steps are plain pandas functions in `src/features/custom/`, wrapped with
+`column_step` (new column), `fitted_step` (learn a dict on training rows, apply it
+later) or `filter_step` (pre-split row filter). Each file starts with its rules
+and has small examples; `advanced_class_step.py` shows the Calculator/Applier
+form for rare cases. Try them with the `example_all` recipe in both recipe files.
+Their step calls appear directly inside the parent builders' returned lists,
+alongside the Core steps:
 
 | Parent recipe | Inline custom step |
 | --- | --- |

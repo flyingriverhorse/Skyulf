@@ -472,6 +472,7 @@ def _synced_sources(project, bundle):
 def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
     """Generated relative imports, preview, hooks and all job paths must agree."""
     from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.preprocessing.function_steps import FITTED_STEP
 
     project = _generate_project(tmp_path)
     assert {path.name for path in (project / "src").iterdir()} == {
@@ -516,7 +517,10 @@ def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
     (project / "config/workflow.json").write_text(json.dumps(config), encoding="utf-8")
     enabled = load_project_workflow(config, features)
     assert enabled["pre_split_steps"][0]["pre_split"]["effect"] == "filter"
-    assert enabled["pipeline"]["preprocessing"][0]["params"]["columns"] == ["category"]
+    frequency_step = enabled["pipeline"]["preprocessing"][0]
+    assert frequency_step["transformer"] == FITTED_STEP
+    assert frequency_step["params"]["output"] == ["category"]
+    assert frequency_step["params"]["params"]["columns"] == ["category"]
     result = subprocess.run(
         [sys.executable, str(project / "src/tools/preview.py"), "--action", "train"],
         cwd=project,

@@ -344,7 +344,7 @@ leakage check. Selecting warn/ignore does not make that shape refittable.
 ## 4. Operation-level behavior and limits
 
 The complete [per-node audit](preprocessing_leakage_audit.md) lists all
-62 registered preprocessing IDs, including the two row-splitter registrations.
+64 registered preprocessing IDs, including the two row-splitter registrations.
 
 | Node/configuration | Actual behavior | Placement |
 |---|---|---|

@@ -48,7 +48,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
             </div>
           )}
 
-          <ImputationMethodOptions config={config} onChange={onChange} />
+          <ImputationMethodOptions config={config} onChange={onChange} availableColumns={availableColumns} />
 
           {/* Feedback Section - Only show here if wide */}
           {isWide && <ImputationFeedback {...data} />}
@@ -64,6 +64,18 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
     </div>
   );
 };
+
+/** The group column must exist, stay unfilled, and use a learned statistic. */
+function validateGroup(config: ImputationConfig) {
+  if (!config.group_by) return { isValid: false, field: 'group_by', message: 'Select the column that defines the groups' };
+  if (config.columns.includes(config.group_by)) {
+    return { isValid: false, field: 'group_by', message: 'The group column cannot also be filled' };
+  }
+  if (config.strategy === 'constant') {
+    return { isValid: false, field: 'strategy', message: 'Group imputation supports mean, median or most frequent' };
+  }
+  return { isValid: true };
+}
 
 export const ImputationNode: NodeDefinition<ImputationConfig> = {
   type: 'imputation_node',
@@ -82,6 +94,7 @@ export const ImputationNode: NodeDefinition<ImputationConfig> = {
   },
   validate: (config) => {
     if (config.columns.length === 0) return { isValid: false, field: 'columns', message: 'Select at least one column' };
+    if (config.method === 'group') return validateGroup(config);
     if (config.method === 'simple' && config.strategy === 'constant' && (config.fill_value === undefined || config.fill_value === '')) {
       return { isValid: false, field: 'fill_value', message: 'Fill value is required for Constant strategy' };
     }

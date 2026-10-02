@@ -74,7 +74,7 @@ def test_independent_selections_are_bound_into_saved_source(tmp_path):
         module = load_project_module(pipeline["project_python_source"])
         assert module.build_preprocessing() == pipeline["preprocessing"]
         assert module.build_pre_split_steps() == config["pre_split_steps"]
-        assert pipeline["preprocessing"][0]["params"]["columns"] == [column]
+        assert pipeline["preprocessing"][0]["params"]["params"]["columns"] == [column]
         assert pipeline["project_scoring"]["pre_split"]["steps"] == config["pre_split_steps"]
     default = load_project_workflow(_config(), root)["pipeline"]
     assert default["preprocessing"] == []
@@ -186,7 +186,7 @@ def test_branch_entry_selects_each_recipe(tmp_path, workflow_config):
         values,
         modeling,
     )
-    assert config["pipeline"]["preprocessing"][0]["params"]["columns"] == ["category"]
+    assert config["pipeline"]["preprocessing"][0]["params"]["params"]["columns"] == ["category"]
     assert config["pre_split_steps"][0]["params"]["columns"] == ["category"]
     with pytest.raises(ValueError, match="pre_split_recipe"):
         _branch_config(base, {"workflow": {}, "pre_split_recipe": "missing"}, values, modeling)
@@ -262,7 +262,7 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
         max_bytes=100000,
     )
     state = artifact.pipeline.feature_engineer.fitted_steps[0]["artifact"]
-    assert state["frequencies"]["category"] == train.category.value_counts(normalize=True).to_dict()
+    assert state["state"]["category"] == train.category.value_counts(normalize=True).to_dict()
     saved_path = str(tmp_path / "artifact")
     if transport == "mlflow":
         saved_path = _log_model(tmp_path)

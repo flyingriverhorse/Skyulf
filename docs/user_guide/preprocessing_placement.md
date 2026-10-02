@@ -1,8 +1,8 @@
 # Preprocessing placement and leakage
 
 Use this guide to decide where a preprocessing node belongs relative to the
-**Train-Test Split** node. It covers **62 registered preprocessing IDs**:
-60 transformations and two row-split registrations. Aliases have separate entries
+**Train-Test Split** node. It covers **64 registered preprocessing IDs**:
+62 transformations and two row-split registrations. Aliases have separate entries
 because older saved pipelines can contain either spelling.
 
 Placement depends on the configured operation, not just the node's display name.
@@ -219,6 +219,7 @@ explicit-empty and target-only exceptions above still apply. Aliases remain sepa
 | --- | --- | --- |
 | `AliasReplacement` | Before split (fixed) | Apply configured/domain aliases to each value; no fitted vocabulary. |
 | `Casting` | Depends on operation | Fixed casts may precede split; categorical vocabularies fit on train. Resolve per-column overrides. |
+| `ClipValues` | Before split (fixed) | Cap values at supplied bounds and keep every row; do not choose bounds by inspecting test outcomes. |
 | `CorrelationThreshold` | After split | Learn retained columns from training correlations; empty selection still invokes discovery. |
 | `CustomBinning` | Depends on operation | Explicit columns and configured edges are fixed; omitted/null columns learn value-based selection. |
 | `DataSnapshot` | Before split (fixed) | Report a snapshot without changing modeling data; do not tune from held-out reports. |
@@ -236,6 +237,7 @@ explicit-empty and target-only exceptions above still apply. Aliases remain sepa
 | `GeneralBinning` | After split | Learn bin edges or discretization state on training values and replay them. |
 | `GeneralTransformation` | Depends on operation | Fixed math may precede split; Yeo-Johnson/Box-Cox fit parameters. Inspect all rules. |
 | `GeoDistance` | Before split (fixed) | Compute configured distances from each row's coordinates. |
+| `GroupImputer` | After split | Learn per-group fill values on training rows; unseen groups use the overall training value. |
 | `H3Index` | Before split (fixed) | Map coordinates to cells at a configured resolution. |
 | `HashEncoder` | Depends on operation | Explicit columns use fixed hashing; automatic selection is conservatively gated. |
 | `IQR` | After split | Learn training quartiles and bounds; held-out outliers cannot move them. |

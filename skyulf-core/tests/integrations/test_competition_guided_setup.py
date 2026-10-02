@@ -141,7 +141,7 @@ def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy)
         training_layout="model_competition",
         task=task,
         competition_candidate_count="2",
-        competition_preprocessing_recipe="imputer_only",
+        competition_preprocessing_recipe="example_imputer",
         competition_max_trials="2000",
         search_strategy=strategy,
         search_n_trials="3",

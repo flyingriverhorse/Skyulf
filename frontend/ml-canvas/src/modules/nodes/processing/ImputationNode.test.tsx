@@ -209,3 +209,15 @@ it('filters recommendations and applies only a stable deduplicated column union'
   fireEvent.click(screen.getByTitle('Apply Recommendation'));
   expect(onChange).toHaveBeenLastCalledWith({ ...ImputationNode.getDefaultConfig(), columns: ['city', 'amount'] });
 });
+
+it('offers upstream columns as groups and keeps the chosen group and strategy', () => {
+  /** The group picker must list live schema columns, not dropped ones, and write group_by. */
+  const { onChange } = renderSettings();
+  selectMethod('group');
+  const groupBy = screen.getByRole('combobox', { name: 'Group By' });
+  const options = within(groupBy).getAllByRole('option').map(option => option.textContent);
+  expect(options).toEqual(['Select a column...', 'amount', 'city']);
+  fireEvent.change(groupBy, { target: { value: 'city' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Group Strategy' }), { target: { value: 'median' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'group', group_by: 'city', strategy: 'median' }));
+});

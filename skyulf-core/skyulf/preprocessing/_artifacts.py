@@ -9,6 +9,7 @@ a deliberate re-export so unused-import checkers don't flag it.
 from skyulf.core.artifacts import (
     AliasReplacementArtifact,
     CastingArtifact,
+    ClipValuesArtifact,
     CorrelationThresholdArtifact,
     CountVectorizerArtifact,
     DatasetProfileArtifact,
@@ -25,6 +26,7 @@ from skyulf.core.artifacts import (
     GeneralBinningArtifact,
     GeneralTransformationArtifact,
     GeoDistanceArtifact,
+    GroupImputerArtifact,
     H3IndexArtifact,
     HashEncoderArtifact,
     HashingVectorizerArtifact,
@@ -66,6 +68,7 @@ from skyulf.core.artifacts import (
 __all__ = [
     "AliasReplacementArtifact",
     "CastingArtifact",
+    "ClipValuesArtifact",
     "CorrelationThresholdArtifact",
     "CountVectorizerArtifact",
     "DataSnapshotArtifact",
@@ -87,6 +90,7 @@ __all__ = [
     "HashingVectorizerArtifact",
     "IQRArtifact",
     "InvalidValueReplacementArtifact",
+    "GroupImputerArtifact",
     "IterativeImputerArtifact",
     "KNNImputerArtifact",
     "LabelEncoderArtifact",

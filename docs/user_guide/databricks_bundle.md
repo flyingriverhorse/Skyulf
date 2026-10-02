@@ -174,15 +174,20 @@ def build_preprocessing():
 ### Custom preprocessing recipes
 
 Select per-step columns when mixing numeric and categorical features. Generated
-projects contain two reusable, domain-independent custom operations:
+projects contain small, domain-independent custom examples written as plain
+pandas functions:
 
-| Custom module | Operation | Configuration location |
+| Custom module | Examples | Configuration location |
 | --- | --- | --- |
-| `src/features/custom/pre_split_custom.py` | Keep rows with at least `min_present` nonmissing values among selected columns | `src/features/pre_split.py` |
-| `src/features/custom/preprocessing_custom.py` | Replace selected string categories with their training frequencies | `src/features/preprocessing.py` |
+| `src/features/custom/pre_split_custom.py` | `minimum_completeness`, `value_range`, `allowed_values` row filters | `src/features/pre_split.py` |
+| `src/features/custom/preprocessing_custom.py` | `log_feature` (new column), `frequency_encoding` and `rare_categories` (learned per fold) | `src/features/preprocessing.py` |
+| `src/features/custom/advanced_class_step.py` | The same `rare_categories` written as a Calculator/Applier pair, to compare | — |
 
-The custom modules contain Calculator/Applier implementations and step factories.
-Each factory returns a normal Core step dictionary. The parent recipe files show
+Each example is a pair of functions plus a factory that wraps them with one
+helper from `skyulf.preprocessing`. Each factory returns a normal Core step
+dictionary. Both recipe files also have an `example_all` recipe that runs them
+together. Each custom file ends with an inactive Example 4 that reads a small
+data file (asset); `src/features/assets.json` explains the three steps to enable it. The parent recipe files show
 these calls directly beside the built-in steps in the returned list. Uncomment
 the matching import and step, then adapt the columns:
 
@@ -235,10 +240,68 @@ The tests configure these actual parent builders, then run filtering, training,
 CV and fresh-process model reload on pandas and Polars. No separate demonstration
 files need to be copied into a project.
 
+#### Writing your own step
+
+Write top-level pandas functions and wrap them with one of three helpers:
+
+| Helper | Your functions | Use for |
+| --- | --- | --- |
+| `column_step(name, fn, output=...)` | `fn(df)` returns the new column(s) | Row-by-row calculations; nothing is learned |
+| `fitted_step(name, learn, apply, output=...)` | `learn(df, y)` returns a small dict; `apply(df, state)` returns column(s) | Anything learned from training rows (means, bounds, mappings) |
+| `filter_step(name, fn, columns=[...])` | `fn(df)` returns True for rows to keep | Pre-split row filters |
+
+```python
+# src/features/custom/preprocessing_custom.py
+from skyulf.preprocessing import fitted_step
+
+
+def learn_bounds(df, y, params):
+    """Learn clip limits from the training fold only."""
+    values = df[params["column"]]
+    return {"low": float(values.quantile(0.01)), "high": float(values.quantile(0.99))}
+
+
+def clip_values(df, state, params):
+    """Clip every later batch with the saved training limits."""
+    return df[params["column"]].clip(state["low"], state["high"])
+
+
+def clip_outliers(column):
+    """Replace column with its value clipped to training 1%-99% quantiles."""
+    params = {"column": column}
+    return fitted_step(f"clip_{column}", learn_bounds, clip_values,
+                       output=column, replace=True, params=params)
+```
+
+`learn` runs on the training rows of every CV fold and of the final fit; its
+dict is saved with the model and `apply` reuses it for validation and scoring
+rows, so there is no leakage. `y` is the training target; the target column is
+removed from `df` in both functions, so `apply` can never depend on it. Rules:
+
+- Use top-level `def` functions, not lambdas or nested functions.
+- `df` is a pandas copy, also for Polars models; changing it has no effect.
+- Return one value per row in the same order. Filters return True/False per
+  row; decide missing values explicitly, e.g. `(df["x"] > 0).fillna(False)`.
+- Learned dicts must be JSON-like: string keys and no NaN. NumPy numbers are
+  converted automatically.
+- `params={...}` is passed to every function as its last argument.
+- Use `replace=True` to overwrite existing columns; otherwise outputs must be new.
+
+Errors name the failing function, e.g. `Project function ...:learn_bounds failed:
+KeyError: 'income'`.
+
+Most former Calculator/Applier pairs fit in these helpers. Keep a class pair
+(see `advanced_class_step.py`) only when the learned state is not a small dict
+(for example a fitted scikit-learn object), the step changes the number of rows
+during preprocessing, or it needs native Polars/Spark code for performance.
+These helper steps are project code only: the web canvas and backend API reject
+them, because a graph must never name an arbitrary server function.
+
 Custom pre-split steps remain declared fixed filters: they must preserve survivor
 values/order and cannot learn statistics. They do not run on unlabeled score
-input. Custom value transformations belong in preprocessing; its Calculator fits
-inside each CV training fold and its Applier reuses that state during inference.
+input. Custom value transformations belong in preprocessing; its learn function
+runs inside each CV training fold and its apply function reuses that state during
+inference.
 
 Training saves the exact Python source with the fitted artifact. Both local
 and MLflow loading restore this saved source, including custom classes. Changing

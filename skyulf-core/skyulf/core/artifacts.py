@@ -74,6 +74,17 @@ class SimpleImputerArtifact(TypedDict, total=False):
     total_missing: int
 
 
+class GroupImputerArtifact(TypedDict, total=False):
+    """Group-imputation parameters ([group, value] pairs per column and global fallbacks)."""
+
+    type: str
+    group_by: str
+    strategy: str
+    columns: list[str]
+    group_values: dict[str, list[list[Any]]]
+    fill_values: dict[str, Any]
+
+
 class KNNImputerArtifact(TypedDict, total=False):
     """KNN-imputation parameters (fitted sklearn imputer object and neighbour settings)."""
 
@@ -123,6 +134,13 @@ class WinsorizeArtifact(TypedDict, total=False):
     lower_percentile: float
     upper_percentile: float
     warnings: list[str]
+
+
+class ClipValuesArtifact(TypedDict, total=False):
+    """Fixed clip bounds per column (optional ``lower``/``upper``); rows are never removed."""
+
+    type: str
+    bounds: dict[str, dict[str, float]]
 
 
 class ManualBoundsArtifact(TypedDict, total=False):

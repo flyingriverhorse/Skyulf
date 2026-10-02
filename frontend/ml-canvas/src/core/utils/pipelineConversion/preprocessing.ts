@@ -34,6 +34,13 @@ const convertImputationNode: NodeConverter = (node) => {
       n_neighbors: node.data.n_neighbors,
       weights: node.data.weights
     };
+  } else if (method === 'group') {
+    stepType = 'GroupImputer';
+    params = {
+      columns: node.data.columns,
+      group_by: node.data.group_by,
+      strategy: node.data.strategy,
+    };
   } else if (method === 'iterative') {
     stepType = 'IterativeImputer';
     params = {
@@ -194,6 +201,9 @@ const convertOutlier: NodeConverter = (node) => {
   const method = node.data.method || 'iqr';
   if (method === 'manual_bounds') {
     return { stepType: 'ManualBounds', params: { bounds: selectedManualBounds(node.data) } };
+  }
+  if (method === 'clip') {
+    return { stepType: 'ClipValues', params: { bounds: selectedManualBounds(node.data) } };
   }
   if (method === 'iqr') stepType = 'IQR';
   else if (method === 'zscore') stepType = 'ZScore';

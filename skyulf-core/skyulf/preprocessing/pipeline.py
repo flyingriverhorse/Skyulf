@@ -79,7 +79,11 @@ class FeatureEngineer:
     # responses carry no row keys, so callers could never tell which inputs
     # lost their prediction. Skipping them means a null row surfaces as a
     # visible model error instead of a silent misalignment.
-    _ROW_DROPPING_TYPES: ClassVar[set[str]] = {"Deduplicate", "DropMissingRows"}
+    _ROW_DROPPING_TYPES: ClassVar[set[str]] = {
+        "Deduplicate",
+        "DropMissingRows",
+        "RowFilterFunction",
+    }
 
     def __init__(
         self,

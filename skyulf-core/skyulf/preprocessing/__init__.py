@@ -66,6 +66,7 @@ from .fold_adapter import (
     MergedBranchFoldAdapter,
     frame_rows,
 )
+from .function_steps import column_step, filter_step, fitted_step
 from .geo import (
     GeoDistanceApplier,
     GeoDistanceCalculator,
@@ -73,6 +74,8 @@ from .geo import (
     H3IndexCalculator,
 )
 from .imputation import (
+    GroupImputerApplier,
+    GroupImputerCalculator,
     IterativeImputerApplier,
     IterativeImputerCalculator,
     KNNImputerApplier,
@@ -87,6 +90,8 @@ from .inspection import (
     DataSnapshotCalculator,
 )
 from .outliers import (
+    ClipValuesApplier,
+    ClipValuesCalculator,
     EllipticEnvelopeApplier,
     EllipticEnvelopeCalculator,
     IQRApplier,
@@ -147,6 +152,8 @@ __all__ = [
     "BaseCalculator",
     "CastingApplier",
     "CastingCalculator",
+    "ClipValuesApplier",
+    "ClipValuesCalculator",
     "CorrelationThresholdApplier",
     "CorrelationThresholdCalculator",
     "CountVectorizerApplier",
@@ -178,6 +185,8 @@ __all__ = [
     "GeneralTransformationApplier",
     "GeneralTransformationCalculator",
     "GeoDistanceApplier",
+    "GroupImputerApplier",
+    "GroupImputerCalculator",
     "GeoDistanceCalculator",
     "H3IndexApplier",
     "H3IndexCalculator",
@@ -249,6 +258,9 @@ __all__ = [
     "WinsorizeCalculator",
     "ZScoreApplier",
     "ZScoreCalculator",
+    "column_step",
+    "filter_step",
+    "fitted_step",
     "frame_rows",
     "validate_schema",
 ]

@@ -19,9 +19,10 @@ FEATURES = (
     [
         ("default", []),
         ("none", []),
-        ("frequency_only", ["FrequencyCalculator.FrequencyApplier"]),
-        ("imputer_only", ["SimpleImputer"]),
-        ("combined", ["SimpleImputer", "FrequencyCalculator.FrequencyApplier"]),
+        ("example_frequency", ["FittedFunction"]),
+        ("example_imputer", ["SimpleImputer"]),
+        ("example_imputer_frequency", ["SimpleImputer", "FittedFunction"]),
+        ("example_all", ["SimpleImputer", "ColumnFunction", "FittedFunction", "FittedFunction"]),
     ],
 )
 def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
@@ -34,7 +35,10 @@ def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
     )
 
 
-@pytest.mark.parametrize("recipe, count", [("default", 0), ("none", 0), ("complete_inputs", 1)])
+@pytest.mark.parametrize(
+    "recipe, count",
+    [("default", 0), ("none", 0), ("example_complete_inputs", 1), ("example_all", 2)],
+)
 def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count):
     """Filtering may be shared or omitted independently of the learned transformations."""
     module = load_project_module(project_source(FEATURES))

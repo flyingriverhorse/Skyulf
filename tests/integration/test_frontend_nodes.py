@@ -104,6 +104,8 @@ async def test_all_transformers(sample_data, tmp_path):
                 "lat_col": "target",
                 "lon_col": "C",
             }
+        elif node_id == "GroupImputer":
+            pipeline_config["nodes"][1]["params"] = {"columns": ["A"], "group_by": "B"}
         elif node_id == "ValueReplacement":
             pipeline_config["nodes"][1]["params"]["to_replace"] = {"a": "x"}
         elif node_id == "Casting":

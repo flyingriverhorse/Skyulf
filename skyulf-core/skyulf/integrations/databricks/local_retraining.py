@@ -27,7 +27,7 @@ from skyulf.integrations.databricks._local_frames import frame_bytes
 
 from ...data.dataset import SplitDataset
 from ...inference.local_evaluation import evaluate_local_holdout
-from ...inference.project_code import is_registered_project_step
+from ...inference.project_code import is_project_filter_step
 from ...leakage import step_learns_from_data
 from ...preprocessing.split import DataSplitter
 from ...registry import NodeRegistry
@@ -383,7 +383,7 @@ def validate_pre_split_step(
 ) -> tuple[str, ...] | list[str]:
     """Reject learned or malformed steps before accepting their source dependencies."""
     step_type, params = _pre_split_step_identity(step, index)
-    custom_filter = is_registered_project_step(step_type)
+    custom_filter = is_project_filter_step(step)
     if (
         step_type != "Deduplicate"
         and not custom_filter
@@ -622,7 +622,9 @@ def apply_pre_split_step(
     before_columns = {column: native[column].to_list() for column in native.columns}
     artifact = NodeRegistry.get_calculator(step["transformer"])().fit(native, step["params"])
     filtered = NodeRegistry.get_applier(step["transformer"])().apply(native, artifact)
-    _validate_filter_frame(filtered, native, step_type, original_columns, original_dtypes)
+    _validate_filter_frame(
+        filtered, native, is_project_filter_step(step), original_columns, original_dtypes
+    )
     _validate_pre_split_survivors(
         filtered,
         keys,
@@ -1433,7 +1435,7 @@ def _validate_survivor_values(
 def _validate_filter_frame(
     filtered: Any,
     native: pd.DataFrame | pl.DataFrame,
-    step_type: str,
+    custom_filter: bool,
     original_columns: list[str],
     original_dtypes: list[Any],
 ) -> None:
@@ -1442,7 +1444,7 @@ def _validate_filter_frame(
         raise ValueError("pre_split_steps filter did not return a frame.")
     if list(filtered.columns) != original_columns:
         raise ValueError("pre_split_steps must preserve all source columns.")
-    if is_registered_project_step(step_type) and list(filtered.dtypes) != original_dtypes:
+    if custom_filter and list(filtered.dtypes) != original_dtypes:
         raise ValueError("pre_split_steps custom filter must preserve source dtypes.")
 
 

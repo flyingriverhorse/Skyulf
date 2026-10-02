@@ -27,6 +27,7 @@ import pandas as pd
 import polars as pl
 
 from backend.config import get_settings
+from backend.ml_pipeline._internal._code_only_nodes import reject_code_only_steps
 from backend.realtime.events import JobEvent, publish_job_event
 from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
@@ -1218,6 +1219,7 @@ class NodeRunnersMixin:
             self.artifact_store.save(f"exec_{node.node_id}_input", data)
 
         # Wrap the single node as a 1-step feature engineering pipeline
+        reject_code_only_steps(node.step_type, node.params)
         step_config = {
             "name": "step",  # Generic name, the artifact will be saved by engine anyway
             "transformer": node.step_type,

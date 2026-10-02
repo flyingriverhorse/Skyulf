@@ -6,7 +6,12 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
-from ...inference.project_code import is_registered_project_step, load_project_module
+from ...inference.project_code import (
+    is_registered_project_step,
+    load_project_module,
+    project_step_source,
+)
+from ...preprocessing.function_steps import FILTER_STEP
 from .local_pre_split import FIXED_TYPES, projected_fixed_steps
 
 
@@ -106,13 +111,26 @@ def _register_saved_filters(steps: list[dict[str, Any]], module: Any) -> None:
     """Restore project class registrations while keeping saved parameters authoritative."""
     custom = [step for step in steps if "pre_split" in step]
     owner = _saved_filter_owner(module, custom)
-    if custom and not all(is_registered_project_step(step["transformer"]) for step in custom):
-        factory = getattr(module, "build_pre_split_steps", None)
-        if not callable(factory):
-            raise ValueError("Saved project must define build_pre_split_steps for custom filters.")
-        factory()
-    if any(not step["transformer"].startswith(owner.__name__ + ".") for step in custom):
+    _register_filter_classes(
+        [step for step in custom if step["transformer"] != FILTER_STEP], module
+    )
+    if any(not _owned_by(project_step_source(step), owner.__name__) for step in custom):
         raise ValueError("Scoring filters must belong to the saved project package.")
+
+
+def _register_filter_classes(classes: list[dict[str, Any]], module: Any) -> None:
+    """Rebuild class-based filters so their saved project registrations exist again."""
+    if not classes or all(is_registered_project_step(step["transformer"]) for step in classes):
+        return
+    factory = getattr(module, "build_pre_split_steps", None)
+    if not callable(factory):
+        raise ValueError("Saved project must define build_pre_split_steps for custom filters.")
+    factory()
+
+
+def _owned_by(source: str, owner: str) -> bool:
+    """Accept a filter defined in the saved project module or one of its submodules."""
+    return source == owner or source.startswith(owner + ".")
 
 
 def _saved_filter_owner(module: Any, custom: list[dict[str, Any]]) -> Any:

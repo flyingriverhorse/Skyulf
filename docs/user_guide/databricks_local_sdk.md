@@ -971,16 +971,16 @@ Keep custom implementations in `src/features/custom/`. In `preprocessing.py`,
 Select the two names at branch level (beside its `workflow` overlay):
 
 ```python
-"preprocessing_recipe": "frequency_only",
-"pre_split_recipe": "complete_inputs",
+"preprocessing_recipe": "example_frequency",
+"pre_split_recipe": "example_complete_inputs",
 ```
 
-Another branch can select `imputer_only` with `none`, while a third selects
-`combined` with the same `complete_inputs`. No feature-package copy is needed.
+Another branch can select `example_imputer` with `none`, while a third selects
+`example_imputer_frequency` with the same `example_complete_inputs`. No feature-package copy is needed.
 The shipped starters use `feature_value` and `category`; adapt their columns or
-add your own recipe function to the relevant builder's mapping. `frequency_only`
-uses only the custom encoder, `imputer_only` uses only the Core mean imputer, and
-`combined` runs imputation before encoding. `complete_inputs` requires at least
+add your own recipe function to the relevant builder's mapping. `example_frequency`
+uses only the custom encoder, `example_imputer` uses only the Core mean imputer, and
+`example_imputer_frequency` runs imputation before encoding. `example_complete_inputs` requires at least
 one of those inputs; `none` produces an empty list. Both default recipes remain
 empty until explicitly configured.
 

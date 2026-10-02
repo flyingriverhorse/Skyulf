@@ -81,7 +81,7 @@
   "branch_SLOT_preprocessing_recipe": {
     "type": "string",
     "default": "default",
-    "description": "Branch SLOT | Named recipe from features/preprocessing.py: default, none, imputer_only, frequency_only or combined; adapt recipe columns to this branch",
+    "description": "Branch SLOT | Named recipe from features/preprocessing.py: default, none, example_imputer, example_frequency, example_imputer_frequency or example_all; adapt recipe columns to this branch",
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
     "order": 4,
     "skip_prompt_if": {
@@ -100,7 +100,7 @@
   "branch_SLOT_pre_split_recipe": {
     "type": "string",
     "default": "default",
-    "description": "Branch SLOT | Named recipe from features/pre_split.py: default, none or complete_inputs; adapt recipe columns to this branch",
+    "description": "Branch SLOT | Named recipe from features/pre_split.py: default, none, example_complete_inputs or example_all; adapt recipe columns to this branch",
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
     "order": 5,
     "skip_prompt_if": {

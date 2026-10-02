@@ -8,6 +8,7 @@ function getMetricPrefix(method: OutlierConfig['method']): string {
     case 'zscore': return 'ZScore';
     case 'winsorize': return 'Winsorize';
     case 'manual_bounds': return 'ManualBounds';
+    case 'clip': return 'ClipValues';
     default: return 'IQR';
   }
 }

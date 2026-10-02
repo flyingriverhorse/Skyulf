@@ -3,7 +3,7 @@ import { parseIntSafe } from '../../../../core/utils/numberInput';
 import type { ImputationConfig, ImputationSettingsProps } from './types';
 
 /** Keep the shared method selector mounted while conditional options change. */
-export function ImputationMethodOptions({ config, onChange }: ImputationSettingsProps) {
+export function ImputationMethodOptions({ config, onChange, availableColumns = [] }: ImputationSettingsProps & { availableColumns?: string[] }) {
   return <>
     <div>
       <span className="block text-sm font-medium mb-1">Imputation Method</span>
@@ -16,12 +16,14 @@ export function ImputationMethodOptions({ config, onChange }: ImputationSettings
         <option value="simple">Simple Imputer (Univariate)</option>
         <option value="knn">KNN Imputer (Multivariate)</option>
         <option value="iterative">Iterative Imputer (MICE)</option>
+        <option value="group">Group Imputer (Per Group)</option>
       </select>
     </div>
 
     {(config.method === 'simple' || !config.method) && <SimpleOptions config={config} onChange={onChange} />}
     {config.method === 'knn' && <KnnOptions config={config} onChange={onChange} />}
     {config.method === 'iterative' && <IterativeOptions config={config} onChange={onChange} />}
+    {config.method === 'group' && <GroupOptions config={config} onChange={onChange} availableColumns={availableColumns} />}
   </>;
 }
 
@@ -67,6 +69,50 @@ function SimpleOptions({ config, onChange }: ImputationSettingsProps) {
       )}
     </>
 
+  );
+}
+
+/** Group imputation fills a row from its group's training statistic. */
+function GroupOptions({ config, onChange, availableColumns }: ImputationSettingsProps & { availableColumns: string[] }) {
+  const strategy = config.strategy === 'constant' ? 'mean' : config.strategy;
+  return (
+    <>
+      <div>
+        <span className="block text-sm font-medium mb-1">Group By</span>
+        <ValidationField field="group_by">
+          <select
+            aria-label="Group By"
+            className="w-full p-2 border rounded bg-background text-sm"
+            value={config.group_by ?? ''}
+            onChange={(e) => onChange({ ...config, group_by: e.target.value })}
+          >
+            <option value="">Select a column...</option>
+            {availableColumns.map(column => <option key={column} value={column}>{column}</option>)}
+          </select>
+        </ValidationField>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Example: fill missing employee counts with the median of the same industry.
+        </p>
+      </div>
+      <div>
+        <span className="block text-sm font-medium mb-1">Strategy</span>
+        <ValidationField field="strategy">
+          <select
+            aria-label="Group Strategy"
+            className="w-full p-2 border rounded bg-background text-sm"
+            value={strategy}
+            onChange={(e) => onChange({ ...config, strategy: e.target.value as ImputationConfig['strategy'] })}
+          >
+            <option value="mean">Mean (Average)</option>
+            <option value="median">Median (Middle Value)</option>
+            <option value="most_frequent">Most Frequent (Mode)</option>
+          </select>
+        </ValidationField>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Learned on training rows only. Groups never seen in training use the overall value.
+        </p>
+      </div>
+    </>
   );
 }
 

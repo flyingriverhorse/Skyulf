@@ -27,7 +27,7 @@ export const validateOutlier = (config: OutlierConfig) => {
   if (config.columns.length === 0) {
     return { isValid: false, field: 'columns', message: 'Select at least one column.' };
   }
-  if (config.method === 'manual_bounds') {
+  if (config.method === 'manual_bounds' || config.method === 'clip') {
     for (const column of config.columns) {
       const result = validateManualBound(column, config.bounds?.[column]);
       if (!result.isValid) return result;

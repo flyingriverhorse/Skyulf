@@ -24,6 +24,7 @@ from skyulf.preprocessing.fold_adapter import (
 )
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
+from ..._internal._code_only_nodes import reject_code_only_steps
 from ...constants import StepType
 from ..schemas import NodeConfig
 
@@ -730,6 +731,7 @@ class FeatureEngMixin:
             self.artifact_store.save(f"exec_{node.node_id}_input", df)
 
         # params: {"steps": [...]}
+        reject_code_only_steps(node.step_type, node.params)
         steps = node.params.get("steps", [])
         engineer = FeatureEngineer(steps)
 

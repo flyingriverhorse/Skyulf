@@ -753,7 +753,7 @@
     "order": 71,
     "type": "string",
     "default": "default",
-    "description": "2. Competition | Common preprocessing recipe from features/preprocessing.py: default, none, imputer_only, frequency_only or combined. Adapt recipe columns to your inputs; per-candidate overrides remain editable in model_competition.py.",
+    "description": "2. Competition | Common preprocessing recipe from features/preprocessing.py: default, none, example_imputer, example_frequency, example_imputer_frequency or example_all. Adapt recipe columns to your inputs; per-candidate overrides remain editable in model_competition.py.",
     "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
     "skip_prompt_if": {
       "not": {

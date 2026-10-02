@@ -80,10 +80,12 @@ _COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
     "SimpleImputer": {"columns": ["with_missing"], "strategy": "mean"},
     "KNNImputer": {"columns": ["with_missing", "num_a"], "n_neighbors": 3},
     "IterativeImputer": {"columns": ["with_missing", "num_a"]},
+    "GroupImputer": {"columns": ["with_missing"], "group_by": "cat_low", "strategy": "mean"},
     # Outlier nodes — pure numeric.
     "IQR": {"columns": ["with_outliers"]},
     "ZScore": {"columns": ["with_outliers"]},
     "Winsorize": {"columns": ["with_outliers"]},
+    "ClipValues": {"bounds": {"with_outliers": {"lower": -3.0, "upper": 3.0}}},
     "ManualBounds": {
         "columns": ["with_outliers"],
         "lower_bound": -10,
