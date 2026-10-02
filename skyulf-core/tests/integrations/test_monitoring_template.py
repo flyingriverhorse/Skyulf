@@ -20,6 +20,13 @@ def test_generated_projects_bind_independent_monitoring_destination(
         tmp_path, training_layout=layout, auto_rebuild_on_cdf_expiry=recovery, compute_mode=compute
     )
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
+    targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
+    for target in targets.values():
+        if target["mode"] == "development":
+            assert target["variables"]["monitoring_enabled"] == "false"
+            assert target["variables"]["on_drift"] == "disabled"
+        else:
+            assert target["variables"].get("monitoring_enabled", "true") == "true"
     assert variables["monitoring_enabled"]["default"] == "true"
     assert variables["monitoring_catalog"]["default"] == ""
     assert variables["monitoring_schema"]["default"] == ""
@@ -40,6 +47,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
         assert params["monitoring_catalog"] == "${var.monitoring_catalog}"
         assert params["monitoring_schema"] == "${var.monitoring_schema}"
         assert params["monitoring_environment"] == "${bundle.target}"
+        assert params["monitoring_deployment_mode"] == "${bundle.mode}"
         assert params["monitoring_project"] == "${bundle.name}"
         assert params["monitoring_drift_thresholds"] == "${var.monitoring_drift_thresholds}"
     assert len(tasks) == (8 if recovery == "true" else 6)
@@ -63,9 +71,16 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert params["score_job_name"] == "{{job.name}}"
     assert params["on_drift"] == "${var.on_drift}"
     monitor = next(task for task in tasks if task["task_key"] == "monitor_model")
-    assert monitor["depends_on"] == [
+    assert monitor["depends_on"] == [{"task_key": "monitoring_allowed", "outcome": "true"}]
+    allowed = next(task for task in job["tasks"] if task["task_key"] == "monitoring_allowed")
+    assert allowed["depends_on"] == [
         {"task_key": "scoring_report" if recovery == "true" else "score"}
     ]
+    assert allowed["condition_task"] == {
+        "op": "EQUAL_TO",
+        "left": "${bundle.mode}",
+        "right": "production",
+    }
     assert monitor["notebook_task"]["notebook_path"] == "../src/jobs/monitor_model.py"
     assert (
         monitor["notebook_task"]["base_parameters"]["monitoring_dashboard_url"]
@@ -85,8 +100,16 @@ def test_generated_projects_bind_independent_monitoring_destination(
         "jobs"
     ]["train"]
     training_tasks = {task["task_key"]: task for task in training["tasks"]}
-    assert training_tasks["register_monitor"]["depends_on"] == [{"task_key": "training_report"}]
-    assert training_tasks["scoring_requested"]["depends_on"] == [{"task_key": "register_monitor"}]
+    assert training_tasks["monitoring_allowed"]["depends_on"] == [{"task_key": "training_report"}]
+    assert training_tasks["monitoring_allowed"]["condition_task"] == allowed["condition_task"]
+    assert training_tasks["register_monitor"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "true"}
+    ]
+    assert training_tasks["scoring_requested"]["run_if"] == "NONE_FAILED"
+    assert training_tasks["scoring_requested"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "false"},
+        {"task_key": "register_monitor"},
+    ]
     reference_task = "initialize_run" if layout == "multi_target" else "training_report"
     registration = training_tasks["register_monitor"]["notebook_task"]
     assert registration["base_parameters"]["reference_json"] == (

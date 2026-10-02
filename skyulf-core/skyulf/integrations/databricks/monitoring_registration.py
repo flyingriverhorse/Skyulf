@@ -10,6 +10,8 @@ from .prediction_output import scoring_target
 
 def monitoring_destination(values: dict[str, str]) -> str | None:
     """Require an independent monitoring destination whenever registration is configured."""
+    if values.get("monitoring_deployment_mode") == "development":
+        return None
     enabled = values.get("monitoring_enabled", "false")
     if enabled not in {"true", "false"}:
         raise ValueError("monitoring_enabled must be true or false.")

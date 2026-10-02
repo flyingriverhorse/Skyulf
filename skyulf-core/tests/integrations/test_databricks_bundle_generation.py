@@ -131,6 +131,7 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
     if enabled == "false":
         assert set(tasks) == {
             "score",
+            "monitoring_allowed",
             "monitor_model",
             "drift_report",
             "check_retraining",
@@ -144,6 +145,7 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         "recovery_needed",
         "recover_predictions",
         "scoring_report",
+        "monitoring_allowed",
         "monitor_model",
         "drift_report",
         "retrain_on_drift",
@@ -1055,6 +1057,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         *chain,
         "model_decision",
         "training_report",
+        "monitoring_allowed",
         "register_monitor",
         "scoring_requested",
         "run_batch_scoring",
@@ -1077,8 +1080,15 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     assert tasks["training_report"]["run_if"] == "ALL_DONE"
     completion = tasks["training_report"]["notebook_task"]["base_parameters"]
     assert completion["decision_result_state"] == "{{tasks.model_decision.result_state}}"
-    assert tasks["register_monitor"]["depends_on"] == [{"task_key": "training_report"}]
-    assert tasks["scoring_requested"]["depends_on"] == [{"task_key": "register_monitor"}]
+    assert tasks["monitoring_allowed"]["depends_on"] == [{"task_key": "training_report"}]
+    assert tasks["register_monitor"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "true"}
+    ]
+    assert tasks["scoring_requested"]["run_if"] == "NONE_FAILED"
+    assert tasks["scoring_requested"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "false"},
+        {"task_key": "register_monitor"},
+    ]
     assert tasks["scoring_requested"]["condition_task"] == {
         "op": "EQUAL_TO",
         "left": "{{tasks.training_report.values.score_requested}}",

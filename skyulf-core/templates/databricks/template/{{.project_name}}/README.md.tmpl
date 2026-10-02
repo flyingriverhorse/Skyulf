@@ -953,6 +953,16 @@ clock or filesystem state. Use the saved asset helper for lookup data.
 
 ## Shared model monitoring
 
+Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
+`prod`). Personal development targets do not enroll temporary models or create
+monitoring tables. The `monitoring_allowed` condition excludes enrollment and the
+post-scoring monitoring/drift/retraining branch in `mode: development`; training
+and scoring still run normally, including automatic scoring after activation.
+Development targets also set `monitoring_enabled: "false"` and `on_drift: disabled`.
+The deployment-mode guard remains effective even if shared monitoring destinations
+or an enabled flag are inherited from common settings. Deploy both updated jobs
+with the updated Skyulf wheel for this behavior to apply to an existing project.
+
 Each repository registers its activated model before scoring, and its scored
 version after successful inference, directly in a shared
 Delta inventory. No central model-list file or export/copy step is needed.

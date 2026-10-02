@@ -65,6 +65,7 @@ resources:
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
               monitoring_environment: ${bundle.target}
+              monitoring_deployment_mode: ${bundle.mode}
               monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
@@ -219,6 +220,7 @@ resources:
               monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
               monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
               monitoring_environment: ${bundle.target}
+              monitoring_deployment_mode: ${bundle.mode}
               monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
@@ -400,11 +402,21 @@ resources:
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
               decision_result_state: '{{"{{tasks.model_decision.result_state}}"}}'
 {{end}}
+        - task_key: monitoring_allowed
+          description: Register shared deployments only; skip ephemeral development models
+          max_retries: 0
+          depends_on:
+            - task_key: training_report
+          condition_task:
+            op: EQUAL_TO
+            left: ${bundle.mode}
+            right: production
 {{if eq .training_layout "multi_target"}}
         - <<: *branch_task
           task_key: register_monitor
           depends_on:
-            - task_key: training_report
+            - task_key: monitoring_allowed
+              outcome: "true"
           notebook_task:
             notebook_path: ../src/jobs/register_set_monitor.py
             base_parameters:
@@ -415,7 +427,8 @@ resources:
         - <<: *lifecycle_task
           task_key: register_monitor
           depends_on:
-            - task_key: training_report
+            - task_key: monitoring_allowed
+              outcome: "true"
           notebook_task:
             notebook_path: ../src/jobs/register_monitor.py
             base_parameters:
@@ -424,7 +437,10 @@ resources:
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
 {{end}}
         - task_key: scoring_requested
+          run_if: NONE_FAILED
           depends_on:
+            - task_key: monitoring_allowed
+              outcome: "false"
             - task_key: register_monitor
           max_retries: 0
           condition_task:

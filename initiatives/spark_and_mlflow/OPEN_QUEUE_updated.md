@@ -2,6 +2,16 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> Development monitoring isolation (2026-10-02): personal development
+> targets bypass enrollment and the full monitoring/drift/retraining branch.
+> Real temporal model-set train/scoring passed in both modes: dev automatic scoring
+> wrote 20 predictions with zero central inventory/observation rows; normal scoring
+> wrote 20 predictions and two drift observations. No-new-data retraining was skipped.
+> Requested normal rerun `243687288401872` also passed: no new input meant no new
+> predictions, the existing observation was reused, and retraining was skipped.
+> All 251 affected tests passed, including 141 real CLI generation cases.
+> The previously linked dashboard is currently TRASHED; dashboard access is a
+> separate follow-up. [Delivery156](156-development-monitoring-isolation.md).
 > Model-set policy follow-up (2026-10-01, uncommitted): one meaningful improvement
 > now permits equal peers when no selected metric regresses and all absolute gates
 > pass. Temporal set v3 automatically replaced v1 with improved revenue RMSE and

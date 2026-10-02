@@ -19,6 +19,8 @@ from .monitoring_store import load_enrolled_models
 def retraining_policy(values: dict[str, str]) -> dict:
     """Require an explicit opt-in and bounded finite submission controls."""
     mode = values.get("on_drift", "disabled")
+    if values.get("monitoring_deployment_mode") == "development":
+        mode = "disabled"
     if mode not in {"disabled", "retrain"}:
         raise ValueError("on_drift must be disabled or retrain.")
     cooldown = float(values.get("on_drift_cooldown_hours", "24"))

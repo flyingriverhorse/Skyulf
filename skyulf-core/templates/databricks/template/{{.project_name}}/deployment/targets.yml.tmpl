@@ -66,6 +66,9 @@ targets:
       output_schema: ${var.test_development_output_schema}
       metadata_schema: ${var.test_development_metadata_schema}
       resource_suffix: _test_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
@@ -138,6 +141,9 @@ targets:
       output_schema: ${var.syst_development_output_schema}
       metadata_schema: ${var.syst_development_metadata_schema}
       resource_suffix: _syst_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}
@@ -210,6 +216,9 @@ targets:
       output_schema: ${var.prod_development_output_schema}
       metadata_schema: ${var.prod_development_metadata_schema}
       resource_suffix: _prod_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
 {{end}}

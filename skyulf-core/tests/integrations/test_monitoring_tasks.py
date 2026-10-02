@@ -8,6 +8,33 @@ import pytest
 from test_monitoring_registration import settings, workflow
 
 
+def test_development_monitoring_tasks_exit_before_reading_models_or_tables(monkeypatch):
+    """Direct notebook retries in dev must not access the central monitoring store."""
+    from skyulf.integrations.databricks import monitoring_model_set as sets
+    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.retraining_task import (
+        run_retraining_check_notebook,
+        run_retraining_notebook,
+    )
+
+    dbutils = Mock()
+    dbutils.widgets.getAll.return_value = settings(
+        monitoring_deployment_mode="development", on_drift="retrain"
+    )
+    run = Mock(side_effect=AssertionError("Development must not run monitoring"))
+    monkeypatch.setattr(tasks, "run_monitoring", run)
+    spark = Mock()
+    assert tasks.run_monitor_enrollment_notebook(spark, dbutils) == {"status": "disabled"}
+    assert tasks.run_scoring_monitor_notebook(spark, dbutils) == {"status": "disabled"}
+    assert sets.run_set_monitor_enrollment_notebook(spark, dbutils) == {"status": "disabled"}
+    assert sets.register_set_monitors(spark, {}, dbutils.widgets.getAll(), {}, None, None) is None
+    result = run_retraining_check_notebook(spark, dbutils)
+    assert result["status"] == "disabled"
+    assert run_retraining_notebook(spark, dbutils)["status"] == "disabled"
+    assert spark.mock_calls == []
+    run.assert_not_called()
+
+
 @pytest.fixture(autouse=True)
 def no_previous_observation(monkeypatch):
     """Keep task unit tests independent of a real Delta results table."""
