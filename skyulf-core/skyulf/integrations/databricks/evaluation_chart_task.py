@@ -5,6 +5,7 @@ from typing import Any
 
 from ._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
 from .evaluation_chart_data import chart_settings
+from .evaluation_chart_runs import chart_run
 from .job_runtime import lifecycle_widget_context, saved_notebook_request
 
 
@@ -42,7 +43,14 @@ def generate_evaluation_charts(
 
 def _generate(store: PhaseStore, tracking_uri: str) -> dict:
     """Select the report strategy from the immutable invocation, not editable project files."""
-    from .evaluation_chart_report import (  # noqa: PLC0415 - keep plotting fully optional
+    with chart_run(store.client, store.run_id) as destination:
+        output = _generate_in_run(store, tracking_uri, destination)
+    return {**output, "charts_run_id": destination}
+
+
+def _generate_in_run(store: PhaseStore, tracking_uri: str, destination: str) -> dict:
+    """Keep chart destinations separate from source model and metric identities."""
+    from .evaluation_chart_report import (  # noqa: PLC0415 - plotting remains optional
         competition_charts,
         model_set_charts,
         publish_figures,
@@ -56,16 +64,17 @@ def _generate(store: PhaseStore, tracking_uri: str) -> dict:
             verified = store.receipt(f"branch_{name}")["output"]
             if {key: value for key, value in verified.items() if key != "name"} != identity:
                 raise ValueError("Chart component differs from its completed training receipt.")
-            reports[name] = report_model(
-                store.client,
-                tracking_uri,
-                identity,
-                destination=identity["run_id"],
-                prefix=f"model_set_{name}",
-            )
+            with chart_run(store.client, identity["run_id"]) as component_destination:
+                reports[name] = report_model(
+                    store.client,
+                    tracking_uri,
+                    identity,
+                    destination=component_destination,
+                    prefix=f"model_set_{name}",
+                )
         keys = publish_figures(
             store.client,
-            store.run_id,
+            destination,
             model_set_charts(components),
             prefix="model_set",
             caption="Each component has its own target, units and heldout population.",
@@ -74,13 +83,13 @@ def _generate(store: PhaseStore, tracking_uri: str) -> dict:
     identity, selection = _single_identity(store)
     prefix = "competition_winner" if selection else "single"
     report = report_model(
-        store.client, tracking_uri, identity, destination=store.run_id, prefix=prefix
+        store.client, tracking_uri, identity, destination=destination, prefix=prefix
     )
     keys = list(report["image_keys"])
     if selection:
         keys += publish_figures(
             store.client,
-            store.run_id,
+            destination,
             competition_charts(selection),
             prefix="competition",
             caption="Winner selected using training CV; only its final holdout is plotted.",
@@ -120,7 +129,7 @@ def render_chart_report(payload: dict, *, workspace_host: str = "") -> str:
     """List only created image keys and their MLflow Charts locations as plain text."""
     if payload["status"] == "disabled":
         return "Evaluation charts are disabled."
-    destinations = {payload["run_id"]: list(payload["image_keys"])}
+    destinations = {payload.get("charts_run_id", payload["run_id"]): list(payload["image_keys"])}
     for report in payload["reports"].values():
         keys = destinations.setdefault(report["destination_run_id"], [])
         keys.extend(key for key in report["image_keys"] if key not in keys)

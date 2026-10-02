@@ -11,11 +11,14 @@ here; define the profit calculation (revenue - cost) in features/scoring.py.
 
 promotion_policy applies to the COMPLETE set. automatic checks each branch's
 saved quality_threshold, quality_gates and min_improvement from multi_model.py.
-All branches must pass; otherwise the candidate remains available for inspection
-and the previous champion stays active. The first set needs absolute thresholds.
+All branches must pass absolute gates and none may regress on its selected metric.
+At least one branch must improve by its min_improvement (a positive gain is required
+even when min_improvement=0); equal peers may join that release. Otherwise the
+candidate remains available and the previous champion stays active. The first set
+needs absolute thresholds.
 manual_approval uses the same quality checks when approve is requested.
 Each replacement is compared with the corresponding model in the champion set,
-not independently moved component aliases. Ties do not pass. Scoring is a
+not independently moved component aliases. An all-tied set does not pass. Scoring is a
 separate job. Set score_handoff="after_alias_change" in config/workflow.json
 and redeploy matching job definitions to start it after a successful automatic
 promotion, manual approval or rollback. With disabled, run/schedule score

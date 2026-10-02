@@ -57,6 +57,8 @@ MODELS = _unique_object([
             "task": "{{$task}}",
             "split_strategy": "{{$split}}",
             "training_window_mode": "{{$window}}",
+            "lookback_days": {{if eq $window "rolling_days"}}{{template "python_value" (index $ (print $prefix "lookback_days"))}}{{else}}None{{end}},
+            "holdout_days": {{if and (eq $window "rolling_days") (eq $split "temporal")}}{{template "python_value" (index $ (print $prefix "holdout_days"))}}{{else}}None{{end}},
             "window_timezone": {{if eq $window "rolling_calendar"}}"{{(index $ (print $prefix "window_timezone"))}}"{{else}}None{{end}},
             "holdout_months": {{if and (eq $window "rolling_calendar") (eq $split "temporal")}}{{(index $ (print $prefix "holdout_months"))}}{{else}}None{{end}},
             "result_availability_lag_hours": {{if eq (index $ (print $prefix "filter_unavailable_results")) "true"}}{{template "python_value" (index $ (print $prefix "result_availability_lag_hours"))}}{{else}}None{{end}},

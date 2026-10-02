@@ -57,6 +57,15 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
           disable_auto_optimization: true
@@ -202,6 +211,15 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
           disable_auto_optimization: true
@@ -382,9 +400,32 @@ resources:
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
               decision_result_state: '{{"{{tasks.model_decision.result_state}}"}}'
 {{end}}
-        - task_key: scoring_requested
+{{if eq .training_layout "multi_target"}}
+        - <<: *branch_task
+          task_key: register_monitor
           depends_on:
             - task_key: training_report
+          notebook_task:
+            notebook_path: ../src/jobs/register_set_monitor.py
+            base_parameters:
+              <<: *branch_parameters
+              reference_json: '{{"{{tasks.initialize_run.values.reference_json}}"}}'
+              tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+{{else}}
+        - <<: *lifecycle_task
+          task_key: register_monitor
+          depends_on:
+            - task_key: training_report
+          notebook_task:
+            notebook_path: ../src/jobs/register_monitor.py
+            base_parameters:
+              <<: *lifecycle_parameters
+              reference_json: '{{"{{tasks.training_report.values.reference_json}}"}}'
+              tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
+{{end}}
+        - task_key: scoring_requested
+          depends_on:
+            - task_key: register_monitor
           max_retries: 0
           condition_task:
             op: EQUAL_TO

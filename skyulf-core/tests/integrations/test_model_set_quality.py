@@ -46,19 +46,31 @@ def test_initial_set_requires_absolute_quality(score, threshold, passed):
     assert result["passed"] is passed
 
 
-@pytest.mark.parametrize("eligible", [False, True])
-def test_replacement_requires_improvement_and_additional_gates(eligible):
-    """A previous champion requires strict improvement plus every absolute gate."""
+@pytest.mark.parametrize(
+    "improvement,eligible,passed",
+    [
+        (0.5, True, True),
+        (0.01, False, True),
+        (0.0, False, True),
+        (-0.01, False, False),
+        (None, False, False),
+        (float("nan"), False, False),
+        (float("inf"), False, False),
+    ],
+)
+def test_replacement_requires_no_regression_and_additional_gates(improvement, eligible, passed):
+    """Tied peers may join an improving set, but regression or invalid evidence cannot."""
     from skyulf.integrations.databricks.model_set_quality import component_quality
 
     report = _report(
         champion_version="1",
         champion_digest="b" * 64,
         eligible=eligible,
-        improvement=0.5,
+        improvement=improvement,
         reason="candidate_improved",
     )
-    assert component_quality(report)["passed"] is eligible
+    assert component_quality(report)["passed"] is passed
+    assert component_quality(report)["improved"] is (passed and eligible)
     failing = replace(
         report,
         quality_gates={"heldout_r2": 0.9},
@@ -82,7 +94,9 @@ def test_quality_uses_set_components_and_all_failures(monkeypatch):
         )
     )
     champion = SimpleNamespace(manifest=SimpleNamespace(components=components))
-    evaluate = Mock(side_effect=[{"passed": True}, {"passed": False}])
+    evaluate = Mock(
+        side_effect=[{"passed": True, "improved": True}, {"passed": False, "improved": False}]
+    )
     monkeypatch.setattr(module, "_evaluate_component", evaluate)
     result = module.evaluate_model_set_quality(
         None,
@@ -98,6 +112,80 @@ def test_quality_uses_set_components_and_all_failures(monkeypatch):
     assert result["failed_components"] == ["risk"]
     assert evaluate.call_count == 2
     assert evaluate.call_args.args[3] is components[1]
+
+
+@pytest.mark.parametrize(
+    "revenue_gain,risk_gain,minimum,passed,reason",
+    [
+        (0.4, 0.0, 0.0, True, "set_improved"),
+        (0.0, 0.1, 0.0, True, "set_improved"),
+        (0.4, -0.01, 0.0, False, "component_quality_failed"),
+        (-0.01, 0.1, 0.0, False, "component_quality_failed"),
+        (0.0, 0.0, 0.0, False, "no_component_improved"),
+        (0.1, 0.0, 0.2, False, "no_component_improved"),
+        (0.25, 0.0, 0.25, True, "set_improved"),
+    ],
+)
+def test_set_requires_one_meaningful_improvement_without_regression(
+    monkeypatch, revenue_gain, risk_gain, minimum, passed, reason
+):
+    """Whole-set activation needs one eligible improvement and no worsening peer."""
+    from skyulf.integrations.databricks import model_set_quality as module
+    from skyulf.integrations.mlflow.validation import _comparison_decision, _metric_improvement
+
+    results = []
+    for metric, candidate, baseline, direction in (
+        ("heldout_rmse", 1.0 - revenue_gain, 1.0, "minimize"),
+        ("heldout_accuracy", 0.8 + risk_gain, 0.8, "maximize"),
+    ):
+        candidate_metrics = {metric: candidate}
+        champion_metrics = {metric: baseline}
+        gain = _metric_improvement(candidate_metrics, champion_metrics, metric)
+        eligible, comparison_reason = _comparison_decision(gain, True, minimum)
+        results.append(
+            module.component_quality(
+                _report(
+                    champion_version="1",
+                    champion_digest="b" * 64,
+                    metric=metric,
+                    metric_direction=direction,
+                    quality_threshold=2.0 if direction == "minimize" else 0.5,
+                    candidate_metrics=candidate_metrics,
+                    champion_metrics=champion_metrics,
+                    improvement=gain,
+                    min_improvement=minimum,
+                    eligible=eligible,
+                    reason=comparison_reason,
+                )
+            )
+        )
+    components = [SimpleNamespace(branch=name) for name in ("revenue", "risk")]
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            components=components,
+            quality_evidence={
+                "expected_champion_version": "1",
+                "comparisons": {"revenue": "a", "risk": "b"},
+            },
+        )
+    )
+    champion = SimpleNamespace(manifest=SimpleNamespace(components=components))
+    monkeypatch.setattr(module, "_evaluate_component", Mock(side_effect=results))
+    decision = module.evaluate_model_set_quality(
+        None,
+        cast(Any, artifact),
+        cast(Any, champion),
+        expected_champion_version="1",
+        max_rows=100,
+        max_bytes=10000,
+    )
+    assert decision["passed"] is passed
+    assert decision["reason"] == reason
+    assert decision["improved_components"] == [
+        name
+        for name, result in zip(("revenue", "risk"), results, strict=True)
+        if result["improved"]
+    ]
 
 
 def test_quality_rejects_stale_baseline_before_loading_models():

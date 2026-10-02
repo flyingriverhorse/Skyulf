@@ -18,6 +18,8 @@
   "engine": "{{.engine}}",
   "split_strategy": "{{$split}}",
   "training_window_mode": "{{$window}}",
+  "lookback_days": {{if eq $window "rolling_days"}}{{.lookback_days}}{{else}}null{{end}},
+  "holdout_days": {{if and (eq $window "rolling_days") (eq $split "temporal")}}{{.holdout_days}}{{else}}null{{end}},
   "window_timezone": {{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}},
   "holdout_months": {{if and (eq $window "rolling_calendar") (eq $split "temporal")}}{{.holdout_months}}{{else}}null{{end}},
   "result_availability_lag_hours": {{if eq .filter_unavailable_results "true"}}{{.result_availability_lag_hours}}{{else}}null{{end}},

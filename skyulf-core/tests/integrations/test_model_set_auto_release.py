@@ -18,6 +18,8 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
     from skyulf.integrations.databricks import local_branches, local_retraining
     from skyulf.integrations.databricks import model_set_project as project
     from skyulf.integrations.databricks import model_set_release as release
+    from skyulf.integrations.databricks.model_set_quality import evaluate_model_set_quality
+    from skyulf.integrations.mlflow.model_set import load_registered_model_set
     from skyulf.integrations.mlflow.model_set_challenger import reject_model_set
     from skyulf.integrations.mlflow.model_set_lifecycle import rollback_model_set
     from skyulf.integrations.mlflow.promotion import (
@@ -57,7 +59,7 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
     }
     base = {**configs["amount"], "max_rows": 100, "max_input_mb": 4}
 
-    def train(number, weak=False):
+    def train(number, weak=False, weak_category=False):
         """Register a fresh complete set using the baseline captured before its training."""
         recipes = deepcopy(configs)
         recipes["amount"]["pipeline"]["modeling"] = {
@@ -66,7 +68,7 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
         }
         recipes["category"]["pipeline"]["modeling"] = {
             "type": "logistic_regression",
-            "params": {"C": 1e-6 if weak else 1.0},
+            "params": {"C": 1e-6 if weak or weak_category else 1.0},
         }
         recipes["ensemble"]["pipeline"]["modeling"]["params"]["base_estimator_params"] = {
             "ridge": {"alpha": 1e6 if weak else 0.1}
@@ -93,14 +95,27 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
     for component in outcome.components.values():
         assert client.get_registered_model(component.model_name).aliases == {}
         client.set_registered_model_alias(component.model_name, "champion", component.model_version)
-    second, pinned, _ = train(2)
+    second, pinned, _ = train(2, weak_category=True)
+    quality = evaluate_model_set_quality(
+        spark,
+        load_registered_model_set(second, **endpoints),
+        load_registered_model_set(first, **endpoints),
+        expected_champion_version="1",
+        max_rows=100,
+        max_bytes=4 * 1024 * 1024,
+        **endpoints,
+    )
+    assert quality["passed"]
+    assert quality["components"]["category"]["comparison"]["improvement"] == 0.0
+    assert set(quality["improved_components"]) == {"amount", "ensemble"}
     promoted = release.automatic_model_set_release(spark, second, pinned, base)
     assert promoted["alias_change"]["kind"] == "promotion"
     assert str(client.get_model_version_by_alias(first.name, "champion").version) == "2"
-    third, pinned, _ = train(3)
+    third, pinned, _ = train(3, weak_category=True)
     failed = release.automatic_model_set_release(spark, third, pinned, base)
     assert failed["alias_change"] is None
-    assert set(failed["quality"]["failed_components"]) == set(configs)
+    assert failed["quality"]["failed_components"] == []
+    assert failed["quality"]["reason"] == "no_component_improved"
     assert all(
         c["comparison"]["champion_version"] == "2" for c in failed["quality"]["components"].values()
     )

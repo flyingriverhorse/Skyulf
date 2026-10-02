@@ -249,9 +249,13 @@ For example, RMSE with threshold 10 means RMSE <= 10; F1 with threshold 0.8
 means F1 >= 0.8. Use limits suitable for your task, including ensemble branches.
 
 The first set needs passing absolute thresholds for every branch. Replacements
-also require every model to strictly improve over the corresponding component
-in the pinned champion set; ties fail even with min_improvement=0. The quality
-policy and baseline are saved with the set and evaluated on saved holdout rows.
+require no branch to regress on its selected metric against the corresponding
+component in the pinned champion set. At least one branch must improve by its
+`min_improvement` (with a positive gain even when the minimum is zero). Equal
+peers are allowed; an all-tied set stays challenger. For example, lower revenue
+RMSE with unchanged risk accuracy can promote the complete set. All absolute
+gates still apply, including additional metrics configured in `quality_gates`.
+The quality policy and baseline are saved with the set and evaluated on saved holdout rows.
 Editing multi_model.py cannot change a previously registered set's policy.
 Branch names and registered component names must match the existing set layout.
 
@@ -437,9 +441,9 @@ Bundle initialization asks `evaluation_charts_enabled` (default: `false`). Choos
 
 | Layout | Images and destination |
 | --- | --- |
-| Single | Saved model diagnostics in its training run |
-| Competition | CV leaderboard and selected model diagnostics in the parent run; final holdout is never used to rank candidates |
-| Model set | Independent diagnostics in each child run; parent overview lists each component's own metric and units without a common ranking |
+| Single | Saved model diagnostics in a `Charts` child of its training run |
+| Competition | CV leaderboard and selected model diagnostics share a `Charts` child of the parent training run; final holdout is never used to rank candidates |
+| Model set | Each component has its own `Charts` child; a separate `Charts` child of the set parent contains the overview |
 
 Regression includes actual versus predicted, residuals and error distribution.
 Classification includes raw/normalized confusion matrices and per-class metrics;
@@ -448,17 +452,19 @@ feature importance; linear models expose signed coefficients when available.
 Saved CV folds, tuning trials and training loss are plotted only when present.
 Full-holdout metric summaries use existing scalar values and separate metric scales.
 
-Open **Charts** in the MLflow run. MLflow can automatically create image cards
-from the logged image keys. If a chart is missing from your saved layout, choose
-**Add chart → Image grid** and select a key such as `single_actual_vs_predicted`
-or `competition_leaderboard`. Images use MLflow's key-based image API.
-The card header can show the run name and all run parameters above the image.
-To hide this parameter list, edit the chart and turn off
-**Run details → Show run parameters**, if your workspace UI offers the setting.
-This changes only the display; the training parameters remain recorded.
+Open the **Charts** tab using the links printed by `generate_charts`. Images
+are indexed in dedicated `Charts` child runs with no training parameters, so
+MLflow's image-grid header does not repeat the long parameter list. The original
+training run retains all parameters, metrics and model artifacts. Its
+`skyulf.charts.run_id` tag links to the latest successful chart run.
+
+MLflow can automatically create image cards from logged image keys. If a card
+is missing from your saved layout, choose **Add chart -> Image grid** and select
+a key such as `single_actual_vs_predicted` or `competition_leaderboard`.
 The task output is plain text: created image keys grouped under their MLflow
-Charts links. Sample counts and skipped diagnostics remain available in
-`evaluation_charts/report.json` on the parent run.
+Charts links. Sample counts, skipped diagnostics and `charts_run_id` remain in
+`evaluation_charts/report.json` on the parent training run. Component reports
+keep the source `run_id` and the separate chart `destination_run_id`.
 
 `config/workflow.json` controls the saved sample and display budgets:
 
@@ -756,6 +762,9 @@ The `train` job has one active run, with queued training and operator actions:
 | `evaluate_model` | Compare the registered candidate with the pinned champion on the same holdout |
 | `model_decision` | Apply promotion policy or execute an explicit approve/reject/rollback action |
 | `training_report` | Finalize the run and publish verified results and next actions |
+| `register_monitor` | Enroll the activated model, competition winner or model-set components before scoring |
+| `monitor_model` | Measure the successful scoring commit and save shared monitoring results |
+| `drift_report` | Display the saved batch's feature drift values/limits and shared dashboard link |
 | `scoring_requested` | Check whether scoring was requested |
 | `run_batch_scoring` | Invoke the existing score job |
 
@@ -942,6 +951,151 @@ Input schema validation still applies to every request. Business callbacks are
 trusted saved project code: keep them deterministic and free of mutable network,
 clock or filesystem state. Use the saved asset helper for lookup data.
 
+## Shared model monitoring
+
+Each repository registers its activated model before scoring, and its scored
+version after successful inference, directly in a shared
+Delta inventory. No central model-list file or export/copy step is needed.
+First deploy and initialize Skyulf's `examples/databricks_monitoring/` once.
+Then set these independent variables in this project's deployment target:
+
+```yaml
+monitoring_catalog: operations
+monitoring_schema: model_monitoring
+monitoring_expected_interval_hours: "24"
+monitoring_drift_thresholds: '{"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}'
+monitoring_experiment_name: /Shared/skyulf/monitoring # Optional MLflow evidence
+monitoring_dashboard_url: "https://<workspace-host>/dashboardsv3/<dashboard-id>/published"
+# Optional actual outcomes, possibly in another catalog:
+monitoring_label_table: labels.production.outcomes
+monitoring_result_available_at_column: available_at
+```
+
+Monitoring defaults to enabled; set both locations before running a new project.
+Use `monitoring_enabled: "false"` to opt out. Existing projects with no monitoring
+settings remain unconfigured; providing the destination without the flag enables
+monitoring. True target values are optional: without a configured label table,
+drift/quality still run but model performance cannot be measured.
+
+These locations are for monitoring storage, separate from this project's
+`catalog`, `input_schema`, `output_schema` and `metadata_schema`. The scoring
+principal needs SELECT/MODIFY on the central inventory and access to its
+catalog/schema. The `monitor_model` task also needs SELECT/MODIFY on
+`monitoring_results`, read access to saved training data/models and optional
+labels, and access to its optional MLflow experiment. The central initializer
+creates the inventory, results and dashboard views. A successful score or CDF recovery pins the exact
+scored version and physical output generation. A no-op scoring retry can repair
+registration without creating duplicate predictions. Registration failure is a
+visible job failure; committed predictions remain intact.
+
+For all three layouts, `training_report -> register_monitor`
+enrolls the activated version from its verified lifecycle receipt, before
+`scoring_requested`. Pending or rejected candidates leave enrollment unchanged.
+The `score -> monitor_model -> drift_report` task chain automatically measures each new scoring
+commit; with CDF recovery, `monitor_model` follows `scoring_report`. No-op scoring skips completed observations and repairs missing/failed ones
+from the original saved commit. A measurement failure leaves committed predictions intact and
+fails its own task after saving the error. The central inventory-wide job remains
+available for periodic checks and delayed outcomes; configure its schedule and
+window separately. External alias edits do not trigger enrollment.
+`monitor_model` computes drift, data quality and eligible labeled performance;
+`drift_report` only reads the saved observation for that scoring batch and config.
+Both notebook outputs include an **Open monitoring dashboard** link when the
+shared HTTPS `monitoring_dashboard_url` is configured. The report task needs
+SELECT on the shared results table. A monitoring failure blocks the report task.
+Existing deployed projects must adopt the updated score job/notebooks/variables
+and install the updated wheel, then validate and redeploy; changing Skyulf's
+template files does not alter a previously deployed workspace job automatically.
+For a pause, retain the destination and set `monitoring_enabled: "false"`, then
+run scoring to publish the disabled registration. Removing only the destination
+while monitoring is enabled is invalid; it does not erase existing records.
+
+Automatic enrollment supports single models, competition winners and each
+model-set component. Components retain their concrete version and parent set
+name/version/branch; monitoring reads their individual outputs from the shared
+physical prediction table. Model-set output mode must be `all` or `separate_views`
+when monitoring storage is configured. `combined_only` is rejected before scoring
+because combined business outputs cannot measure each component's performance.
+
+## Optional training after drift
+
+Set these deployment variables to request this repository's existing train job:
+
+```yaml
+on_drift: "retrain" # Default: disabled
+on_drift_cooldown_hours: "24"
+on_drift_min_new_training_rows: "20"
+```
+
+The visible chain is `score -> monitor_model -> drift_report -> check_retraining`
+followed by the `retraining_needed` If/else task. Its true branch runs
+`retrain_on_drift`; its false branch runs `retraining_skipped` with the saved reason.
+The check reads the saved observation, checks the current enrolled version,
+and compares actual eligible training rows with the saved model's training data.
+Feature quality/schema problems, incomplete drift checks, stale observations,
+unchanged training data, active training and cooldown prevent a new request.
+The check does not claim a request or start training. The true branch repeats
+the checks before claiming and submitting, so a concurrent run or data change
+cannot bypass the guards between the two tasks.
+One request starts the complete single, competition or model-set train job.
+It does not wait inside the scoring job or alter quality/approval policy.
+The trigger resolves the unique deployed `${bundle.name}_train` job name at run
+time, preserving the actual scoring job's development prefix and avoiding a
+Bundle dependency cycle with training's scoring handoff.
+
+Set `training_version: null`. Maintain the configured training table upstream:
+new feature rows must contain actual target values when they become available.
+Monitoring's optional label table does not automatically update training data.
+Freshness means eligible training values changed relative to the active model;
+it does not require their arrival time to be after the drift report. The request
+records the assessed Delta version and content digest. The train run independently
+pins its input snapshot at initialization; inspect its saved training specification
+and membership evidence to establish what was actually used if data changed again.
+Predictions are never substituted for real targets. Random splitting includes
+some new eligible rows in training; merely reshuffling old rows does not qualify.
+Temporal rows qualify once they enter the training side of the time boundary.
+Changing the table, column roles, split strategy or engine needs an explicit
+training run before automatic retraining can assess the new contract.
+
+For a daily rolling window, configure `config/workflow.json` (or each branch's
+workflow in `src/modeling/multi_model.py`):
+
+```json
+{
+  "training_window_mode": "rolling_days",
+  "split_strategy": "temporal",
+  "event_column": "transaction_time",
+  "lookback_days": 90,
+  "holdout_days": 14,
+  "window_timezone": null,
+  "monthly_lookback_months": null,
+  "holdout_months": null,
+  "start": null,
+  "holdout_start": null,
+  "cutoff": null
+}
+```
+
+`transaction_time` must be a real selected source column, using the existing date
+parsing settings. Each run selects the preceding 90 elapsed UTC days; temporal
+holds out the latest 14 days. For random use `holdout_days: null` and `test_size`.
+Random with `full_snapshot` needs no event column. Advancing a window does not
+guarantee new training data or better performance.
+
+`monitoring_drift_thresholds` is authoritative for this project's enrollment;
+`{}` uses Core defaults and partial objects override named metrics. Defaults are
+PSI 0.2, KS statistic 0.1, normalized Wasserstein 0.1 and KL divergence 0.1.
+A value must strictly exceed its own threshold. KS p-value is diagnostic only.
+
+The optional trigger creates the owned `retraining_requests` Delta table in the
+selected monitoring namespace, storing job claims, request evidence and run IDs.
+Its principal needs CREATE TABLE there, SELECT/MODIFY on that table and CAN MANAGE
+RUN on the train job, in addition to monitoring's read permissions. Keep train
+`max_concurrent_runs: 1`. Ambiguous API failures retain the pending claim; repair
+the same scoring task to retry the same idempotency token. An unresolved request
+blocks other automatic requests instead of guessing that submission failed.
+The central periodic monitoring job measures delayed labels but does not submit
+training; this trigger runs in the model repository's scoring job.
+
 ## Offline checks
 
 Run `python src/tools/smoke.py` without credentials. This reads workflow settings
@@ -950,3 +1104,11 @@ data, or write resources. It validates the shared configuration, not resolved
 candidate/branch recipes. Use the existing preview tool for trusted recipe
 inspection and separate runtime tests for training/scoring behavior. A training
 row sample does not prevent writes and is not a smoke mode.
+
+Activation enrollment is ordered by the original serialized lifecycle run start.
+A delayed score cannot replace an activated different version, and repairing an
+older activation cannot replace a newer activation. Enrollment-only repairs read
+the verified original receipt without repeating training or alias changes.
+The private activation-order metadata lives in inventory config_json; table
+schemas and model configuration digests are unchanged. Deploy the updated central
+monitoring runner together with model jobs so inventory readers understand it.

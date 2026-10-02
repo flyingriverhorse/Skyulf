@@ -19,6 +19,11 @@ from .local_workflow import (
     run_action,
     workflow_policies,
 )
+from .monitoring_registration import (
+    publish_monitoring_request,
+    register_scoring_monitor,
+    validate_monitoring_settings,
+)
 from .workflow_config import validate_deployed_contract, validate_workflow_config
 
 OPERATOR_FIELDS = {
@@ -308,6 +313,7 @@ def _prepared_notebook_request(
             config, Path(values["config_path"]).parent / preprocessing_path
         )
     config = validate_workflow_config(config, action=action)
+    validate_monitoring_settings(values, config)
     if action == "train" and "competition" in config:
         from .training_node_notebook import validate_model_task_names  # noqa: PLC0415
 
@@ -481,12 +487,18 @@ def run_score_notebook(
 
     def score() -> dict[str, Any]:
         """Keep the original outcome intact while allowing typed recovery routing."""
+        validate_monitoring_settings(values, config)
         outcome = run_bundle_action(spark, config, parameters, task_role="score")
-        return {
+        payload = {
             **asdict(outcome),
             "source_table": config["score_source_table"],
             "prediction_table": config["prediction_table"],
         }
+        registration = register_scoring_monitor(spark, config, values, payload)
+        if registration is not None:
+            payload["monitoring"] = registration
+            publish_monitoring_request(dbutils, payload)
+        return payload
 
     return notebook_output(
         run_scoring_step(config, dbutils, score),

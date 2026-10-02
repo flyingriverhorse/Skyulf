@@ -861,30 +861,26 @@
   "branch_SLOT_training_window_mode": {
     "type": "string",
     "default": "auto",
-    "description": "Branch SLOT | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; auto = all for random, recent months for temporal",
+    "description": "Branch SLOT | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; rolling_days = last N elapsed UTC days; auto = all for random, recent months for temporal",
     "enum": [
       "auto",
       "full_snapshot",
       "fixed_window",
-      "rolling_calendar"
+      "rolling_calendar",
+      "rolling_days"
     ],
     "order": 21,
     "skip_prompt_if": {
-      "anyOf": [
-        {
-          "not": {
-            "properties": {
-              "training_layout": {
-                "const": "multi_target"
-              },
-              "branch_count": {
-                "pattern": "^[SLOT-8]$"
-              }
-            }
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "multi_target"
+          },
+          "branch_count": {
+            "pattern": "^[SLOT-8]$"
           }
-        },
-        {}
-      ]
+        }
+      }
     }
   },
   "branch_SLOT_window_timezone": {
@@ -892,7 +888,7 @@
     "default": "UTC",
     "description": "Branch SLOT | Timezone defining calendar month boundaries, e.g. Europe/Copenhagen. This controls selected data, not when the job runs",
     "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
-    "order": 22,
+    "order": 24,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -980,6 +976,13 @@
               ]
             }
           ]
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
@@ -989,7 +992,7 @@
     "default": "4",
     "description": "Branch SLOT | Total complete past months to read, including the final holdout. Example: 4 months with a 2-month holdout leaves 2 months for training",
     "pattern": "^[1-9][0-9]*$",
-    "order": 23,
+    "order": 25,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -1077,6 +1080,13 @@
               ]
             }
           ]
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
@@ -1086,7 +1096,7 @@
     "default": "1",
     "description": "Branch SLOT | How many final complete months to hold out for testing? Enter 1 to total lookback minus 1; example: 2",
     "pattern": "^[1-9][0-9]*$",
-    "order": 24,
+    "order": 26,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -1159,12 +1169,19 @@
               }
             }
           ]
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
   },
   "branch_SLOT_event_column": {
-    "order": 25,
+    "order": 27,
     "type": "string",
     "default": "",
     "description": "Branch SLOT | Column containing when each record was observed, e.g. observation_date; used to select older/newer data",
@@ -1254,7 +1271,7 @@
     }
   },
   "branch_SLOT_event_time_kind": {
-    "order": 26,
+    "order": 28,
     "type": "string",
     "default": "timestamp",
     "description": "Branch SLOT | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
@@ -1349,7 +1366,7 @@
     }
   },
   "branch_SLOT_event_text_kind": {
-    "order": 27,
+    "order": 29,
     "type": "string",
     "default": "local_datetime",
     "description": "Branch SLOT | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
@@ -1462,7 +1479,7 @@
     "default": "",
     "description": "Branch SLOT | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
     "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
-    "order": 28,
+    "order": 30,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -1567,7 +1584,7 @@
     "default": "",
     "description": "Branch SLOT | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
     "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
-    "order": 29,
+    "order": 31,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -1703,7 +1720,7 @@
       "reject",
       "midnight"
     ],
-    "order": 30,
+    "order": 32,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -1830,7 +1847,7 @@
     }
   },
   "branch_SLOT_start": {
-    "order": 31,
+    "order": 33,
     "type": "string",
     "default": "",
     "description": "Branch SLOT | Earliest observation to include, e.g. 2026-06-01T00:00:00+02:00. Required for fixed_window; rolling_calendar calculates it for every run",
@@ -1859,12 +1876,19 @@
               ]
             }
           }
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
   },
   "branch_SLOT_holdout_start": {
-    "order": 32,
+    "order": 34,
     "type": "string",
     "default": "",
     "description": "Branch SLOT | Observations from this time onward are test rows, e.g. 2026-08-01T00:00:00+02:00. Older selected rows train the model; rolling runs calculate it",
@@ -1942,12 +1966,19 @@
               ]
             }
           ]
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
   },
   "branch_SLOT_cutoff": {
-    "order": 33,
+    "order": 35,
     "type": "string",
     "default": "",
     "description": "Branch SLOT | Stop before this observation time, e.g. 2026-09-01T00:00:00+02:00. This is a data boundary, not the job date; rolling runs calculate it",
@@ -1976,6 +2007,13 @@
               ]
             }
           }
+        },
+        {
+          "properties": {
+            "branch_SLOT_training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
@@ -1988,7 +2026,7 @@
       "false",
       "true"
     ],
-    "order": 34,
+    "order": 36,
     "skip_prompt_if": {
       "not": {
         "properties": {
@@ -2007,7 +2045,7 @@
     "default": "0",
     "description": "Branch SLOT | When result_cutoff is blank, subtract this many hours from run start. Enter 0 to 87600; example: 48 excludes results available in the last two days. An explicit result_cutoff overrides this lag for every run",
     "pattern": "^(0|[1-9][0-9]*)$",
-    "order": 35,
+    "order": 37,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2033,7 +2071,7 @@
     }
   },
   "branch_SLOT_result_available_at_column": {
-    "order": 36,
+    "order": 38,
     "type": "string",
     "default": "",
     "description": "Branch SLOT | Column recording when each answer became known, e.g. claim_confirmed_at. This is a column name, not a date you enter",
@@ -2063,7 +2101,7 @@
     }
   },
   "branch_SLOT_result_time_kind": {
-    "order": 37,
+    "order": 39,
     "type": "string",
     "default": "timestamp",
     "description": "Branch SLOT | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
@@ -2098,7 +2136,7 @@
     }
   },
   "branch_SLOT_result_text_kind": {
-    "order": 38,
+    "order": 40,
     "type": "string",
     "default": "local_datetime",
     "description": "Branch SLOT | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
@@ -2151,7 +2189,7 @@
     "default": "",
     "description": "Branch SLOT | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
     "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
-    "order": 39,
+    "order": 41,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2196,7 +2234,7 @@
     "default": "",
     "description": "Branch SLOT | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
     "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
-    "order": 40,
+    "order": 42,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2272,7 +2310,7 @@
       "reject",
       "midnight"
     ],
-    "order": 41,
+    "order": 43,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2343,7 +2381,7 @@
     "default": "",
     "description": "Branch SLOT | Use answers known by this time, INCLUDING this instant, e.g. 2026-09-15T00:00:00+02:00. An explicit cutoff applies to every run; blank derives run start minus result_availability_lag_hours",
     "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
-    "order": 42,
+    "order": 44,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2369,7 +2407,7 @@
     }
   },
   "branch_SLOT_max_rows": {
-    "order": 43,
+    "order": 45,
     "type": "string",
     "default": "10000",
     "description": "Branch SLOT | Maximum rows transferred into Python memory per read; exceeding this stops the run. This does not randomly sample rows",
@@ -2388,7 +2426,7 @@
     }
   },
   "branch_SLOT_max_input_mb": {
-    "order": 44,
+    "order": 46,
     "type": "string",
     "default": "64",
     "description": "Branch SLOT | Maximum input data size transferred into Python memory, in MiB (64 = 64 MiB). Model training can use more RAM",
@@ -2411,7 +2449,7 @@
     "default": "null",
     "description": "Branch SLOT | Optional sample: enter 10000 to select up to 10000 eligible rows BEFORE train/test splitting. null = no sampling. Prediction rows are never sampled",
     "pattern": "^(?:null|[1-9][0-9]*)$",
-    "order": 45,
+    "order": 47,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2435,7 +2473,7 @@
     "default": "42",
     "description": "Branch SLOT | Seed for choosing the same sample from the same table snapshot. Keep 42 unless you want another sample",
     "pattern": "^(?:0|[1-9][0-9]*)$",
-    "order": 46,
+    "order": 48,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -2455,7 +2493,7 @@
     }
   },
   "branch_SLOT_regression_model": {
-    "order": 47,
+    "order": 49,
     "type": "string",
     "default": "linear_regression",
     "description": "Branch SLOT | Choose a regression model. It starts with its default settings; README explains how to change them",
@@ -2502,7 +2540,7 @@
     }
   },
   "branch_SLOT_classification_model": {
-    "order": 48,
+    "order": 50,
     "type": "string",
     "default": "logistic_regression",
     "description": "Branch SLOT | Choose a classification model. It starts with its default settings; README explains how to change them",
@@ -2551,7 +2589,7 @@
     }
   },
   "branch_SLOT_model_params": {
-    "order": 49,
+    "order": 51,
     "type": "string",
     "default": "{}",
     "description": "Branch SLOT | Optional JSON object of fixed model parameters. For voting/stacking, include base_estimators and any base_estimator_params or final_estimator to define the ensemble. Other models can set this in an init file or generated config",
@@ -2575,7 +2613,7 @@
     }
   },
   "branch_SLOT_search_strategy": {
-    "order": 50,
+    "order": 52,
     "type": "string",
     "default": "random",
     "description": "Branch SLOT | Choose grid, random, halving_grid, halving_random, or optional Optuna. Core supplies a model-appropriate default search space; grid strategies evaluate its full Cartesian product",
@@ -2600,7 +2638,7 @@
     }
   },
   "branch_SLOT_search_settings": {
-    "order": 51,
+    "order": 53,
     "type": "string",
     "default": "default",
     "description": "Branch SLOT | Use Core defaults for this strategy, or customize its controls below",
@@ -2622,7 +2660,7 @@
     }
   },
   "branch_SLOT_search_max_candidates": {
-    "order": 52,
+    "order": 54,
     "type": "string",
     "default": "1000",
     "description": "Branch SLOT | Maximum full-grid combinations to admit (1-10000). Grid and halving_grid run every combination, so preflight rejects a larger space",
@@ -2657,7 +2695,7 @@
     }
   },
   "branch_SLOT_search_space": {
-    "order": 53,
+    "order": 55,
     "type": "string",
     "default": "{}",
     "description": "Optional init-file search override; otherwise Bundle writes Core-derived editable lists into this branch. Edit its generated search_space or clear it to {} for automatic resolution.",
@@ -2665,7 +2703,7 @@
     "skip_prompt_if": {}
   },
   "branch_SLOT_regression_search_metric": {
-    "order": 54,
+    "order": 56,
     "type": "string",
     "default": "rmse",
     "description": "Branch SLOT | Objective for choosing regression parameters on training folds; separate from the heldout lifecycle metric",
@@ -2700,7 +2738,7 @@
     }
   },
   "branch_SLOT_classification_search_metric": {
-    "order": 55,
+    "order": 57,
     "type": "string",
     "default": "accuracy",
     "description": "Branch SLOT | Objective for choosing classification parameters on training folds; separate from the heldout lifecycle metric",
@@ -2738,7 +2776,7 @@
     }
   },
   "branch_SLOT_search_n_trials": {
-    "order": 56,
+    "order": 58,
     "type": "string",
     "default": "3",
     "description": "Branch SLOT | Trials or initial sampled candidates for random, halving_random and Optuna (1-1000)",
@@ -2771,7 +2809,7 @@
     }
   },
   "branch_SLOT_search_timeout": {
-    "order": 57,
+    "order": 59,
     "type": "string",
     "default": "null",
     "description": "Branch SLOT | Optional Optuna soft stop in positive seconds; null disables it. A running estimator fit is not interrupted",
@@ -2814,7 +2852,7 @@
     }
   },
   "branch_SLOT_search_random_state": {
-    "order": 58,
+    "order": 60,
     "type": "string",
     "default": "42",
     "description": "Branch SLOT | Seed for sampled parameter choices, separate from the heldout split seed and CV fold seed",
@@ -2833,7 +2871,7 @@
     }
   },
   "branch_SLOT_search_factor": {
-    "order": 59,
+    "order": 61,
     "type": "string",
     "default": "3",
     "description": "Branch SLOT | Successive halving keeps roughly one in this many candidates per round (integer 2 or more)",
@@ -2879,7 +2917,7 @@
     }
   },
   "branch_SLOT_search_resource": {
-    "order": 60,
+    "order": 62,
     "type": "string",
     "default": "n_samples",
     "description": "Branch SLOT | Halving budget resource: training rows or estimator n_estimators. n_estimators requires explicit max_resources and a compatible model",
@@ -2928,7 +2966,7 @@
     }
   },
   "branch_SLOT_search_min_resources": {
-    "order": 61,
+    "order": 63,
     "type": "string",
     "default": "exhaust",
     "description": "Branch SLOT | Halving starting budget: exhaust, smallest, or a positive integer",
@@ -2981,7 +3019,7 @@
     }
   },
   "branch_SLOT_search_estimator_min_resources": {
-    "order": 62,
+    "order": 64,
     "type": "string",
     "default": "10",
     "description": "Branch SLOT | Starting estimator budget for n_estimators halving (integer 2 or more; must not exceed max_resources)",
@@ -3036,7 +3074,7 @@
     }
   },
   "branch_SLOT_search_max_resources": {
-    "order": 63,
+    "order": 65,
     "type": "string",
     "default": "null",
     "description": "Branch SLOT | Maximum estimator resource count for n_estimators halving; enter a positive integer compatible with the selected model",
@@ -3091,7 +3129,7 @@
     }
   },
   "branch_SLOT_search_sampler": {
-    "order": 64,
+    "order": 66,
     "type": "string",
     "default": "tpe",
     "description": "Branch SLOT | Optuna sampler: TPE, random or CMA-ES; CMA-ES samples categorical axes randomly",
@@ -3138,7 +3176,7 @@
     }
   },
   "branch_SLOT_search_pruner": {
-    "order": 65,
+    "order": 67,
     "type": "string",
     "default": "median",
     "description": "Branch SLOT | Optuna trial pruner; Core checks whether the selected model and validation method support early stopping. none disables pruning",
@@ -3185,7 +3223,7 @@
     }
   },
   "branch_SLOT_search_pruning": {
-    "order": 66,
+    "order": 68,
     "type": "string",
     "default": "true",
     "description": "Branch SLOT | Allow Optuna pruning when model and validation settings support it",
@@ -3234,7 +3272,7 @@
     "type": "string",
     "default": "false",
     "description": "Branch SLOT | Select a binary decision threshold from inner out-of-fold predictions. Requires probability output; final holdout stays untouched.",
-    "order": 67,
+    "order": 69,
     "enum": [
       "false",
       "true"
@@ -3280,7 +3318,7 @@
     }
   },
   "branch_SLOT_regression_metric": {
-    "order": 68,
+    "order": 70,
     "type": "string",
     "default": "heldout_rmse",
     "description": "Branch SLOT | Metric for comparing regression models on separate test data (heldout). Lower error is better; higher R2 or explained variance is better",
@@ -3317,7 +3355,7 @@
     }
   },
   "branch_SLOT_classification_metric": {
-    "order": 69,
+    "order": 71,
     "type": "string",
     "default": "heldout_accuracy",
     "description": "Branch SLOT | Metric for comparing classification models on separate test data (heldout). Some metrics need probabilities or specific class counts",
@@ -3367,7 +3405,7 @@
     }
   },
   "branch_SLOT_min_improvement": {
-    "order": 70,
+    "order": 72,
     "type": "number",
     "default": 0.0,
     "minimum": 0,
@@ -3391,7 +3429,7 @@
     }
   },
   "branch_SLOT_quality_threshold": {
-    "order": 71,
+    "order": 73,
     "type": "string",
     "default": "null",
     "description": "Branch SLOT | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
@@ -3414,7 +3452,7 @@
     "default": "null",
     "description": "Branch SLOT | Optional init-file JSON object of additional heldout metric thresholds, or null",
     "pattern": "^(?:null|\\{.*\\})$",
-    "order": 72,
+    "order": 74,
     "skip_prompt_if": {
       "anyOf": [
         {
@@ -3430,6 +3468,115 @@
           }
         },
         {}
+      ]
+    }
+  },
+  "branch_SLOT_lookback_days": {
+    "type": "string",
+    "default": "90",
+    "description": "Branch SLOT | Total elapsed 24-hour days before each run to read, including holdout; enter 1 to 36500",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 22,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "not": {
+            "properties": {
+              "training_layout": {
+                "const": "multi_target"
+              },
+              "branch_count": {
+                "pattern": "^[SLOT-8]$"
+              }
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "branch_SLOT_training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "branch_SLOT_holdout_days": {
+    "type": "string",
+    "default": "14",
+    "description": "Branch SLOT | Final elapsed days reserved for temporal testing; enter 1 to lookback_days minus 1",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 23,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "not": {
+            "properties": {
+              "training_layout": {
+                "const": "multi_target"
+              },
+              "branch_count": {
+                "pattern": "^[SLOT-8]$"
+              }
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "branch_SLOT_training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "properties": {
+                "branch_SLOT_split_strategy": {
+                  "const": "random"
+                }
+              }
+            },
+            {
+              "not": {
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "branch_SLOT_cv_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "branch_SLOT_cv_type": {
+                            "const": "nested_cv"
+                          },
+                          "branch_SLOT_cv_nested_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "branch_SLOT_cv_enabled": {
+                        "const": "true"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
       ]
     }
   }

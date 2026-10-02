@@ -1,0 +1,9 @@
+resources:
+  dashboards:
+    monitoring_dashboard:
+      display_name: Skyulf shared monitoring (${bundle.target})
+      file_path: ../src/monitoring.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.monitoring_catalog}
+      dataset_schema: ${var.monitoring_schema}
+      embed_credentials: false

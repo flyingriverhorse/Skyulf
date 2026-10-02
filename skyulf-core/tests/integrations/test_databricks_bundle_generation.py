@@ -129,9 +129,28 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
     assert set(jobs) == {"train", "score"}
     tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
     if enabled == "false":
-        assert set(tasks) == {"score"}
+        assert set(tasks) == {
+            "score",
+            "monitor_model",
+            "drift_report",
+            "check_retraining",
+            "retraining_needed",
+            "retrain_on_drift",
+            "retraining_skipped",
+        }
         return
-    assert set(tasks) == {"score", "recovery_needed", "recover_predictions", "scoring_report"}
+    assert set(tasks) == {
+        "score",
+        "recovery_needed",
+        "recover_predictions",
+        "scoring_report",
+        "monitor_model",
+        "drift_report",
+        "retrain_on_drift",
+        "check_retraining",
+        "retraining_needed",
+        "retraining_skipped",
+    }
     assert tasks["recovery_needed"]["depends_on"] == [{"task_key": "score"}]
     assert tasks["recovery_needed"]["condition_task"] == {
         "op": "EQUAL_TO",
@@ -1036,6 +1055,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         *chain,
         "model_decision",
         "training_report",
+        "register_monitor",
         "scoring_requested",
         "run_batch_scoring",
     }
@@ -1057,7 +1077,8 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     assert tasks["training_report"]["run_if"] == "ALL_DONE"
     completion = tasks["training_report"]["notebook_task"]["base_parameters"]
     assert completion["decision_result_state"] == "{{tasks.model_decision.result_state}}"
-    assert tasks["scoring_requested"]["depends_on"] == [{"task_key": "training_report"}]
+    assert tasks["register_monitor"]["depends_on"] == [{"task_key": "training_report"}]
+    assert tasks["scoring_requested"]["depends_on"] == [{"task_key": "register_monitor"}]
     assert tasks["scoring_requested"]["condition_task"] == {
         "op": "EQUAL_TO",
         "left": "{{tasks.training_report.values.score_requested}}",

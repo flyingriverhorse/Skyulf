@@ -8,6 +8,11 @@ from typing import Any
 from .cdf_recovery import CdfRecoveryRequired, validate_recovery_request
 from .job_output import render_bundle_output
 from .job_runtime import notebook_output, read_notebook_config, run_bundle_action
+from .monitoring_registration import (
+    publish_monitoring_request,
+    register_scoring_monitor,
+    validate_monitoring_settings,
+)
 
 _LARGE_RECEIPT_FIELDS = {
     "temporal_history",
@@ -137,12 +142,17 @@ def run_cdf_recovery_notebook(
 ) -> str:
     """Recompute a pinned full snapshot in the visible, explicitly enabled recovery node."""
     values, config = _enabled_config(dbutils)
+    validate_monitoring_settings(values, config)
     if not _recovery_needed(dbutils):
         raise ValueError("Score task did not request CDF recovery.")
     request = validate_recovery_request(
         dbutils.jobs.taskValues.get(taskKey="score", key="cdf_recovery_request")
     )
     payload = _recover(spark, config, values, request)
+    registration = register_scoring_monitor(spark, config, values, payload)
+    if registration is not None:
+        payload["monitoring"] = registration
+        publish_monitoring_request(dbutils, payload)
     dbutils.jobs.taskValues.set(key="scoring_result", value=_compact_result(payload))
     return notebook_output(
         payload,

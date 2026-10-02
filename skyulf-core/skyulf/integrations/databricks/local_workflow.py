@@ -323,14 +323,8 @@ def _validate_window_event(config: dict[str, Any], mode: str) -> None:
         raise ValueError("Window selection requires an explicit event_column.")
 
 
-def training_window_mode(config: dict[str, Any]) -> str:
-    """Validate source selection independently of the random/temporal evaluation split."""
-    mode = config.get("training_window_mode", "full_snapshot")
-    if mode not in ("full_snapshot", "fixed_window", "rolling_calendar"):
-        raise ValueError(
-            "training_window_mode must be full_snapshot, fixed_window or rolling_calendar."
-        )
-    _validate_window_event(config, mode)
+def _validate_calendar_controls(config: dict[str, Any], mode: str) -> None:
+    """Keep existing calendar validation separate from elapsed-day settings."""
     if mode == "rolling_calendar":
         _validate_rolling_window(config)
     elif (
@@ -344,6 +338,37 @@ def training_window_mode(config: dict[str, Any]) -> str:
         "holdout_months"
     ) is not None:
         raise ValueError("holdout_months must be null outside rolling temporal selection.")
+
+
+def _validate_daily_controls(config: dict[str, Any], mode: str) -> None:
+    """Require bounded integer day counts only for their active selection policy."""
+    if mode != "rolling_days":
+        for field in ("lookback_days", "holdout_days"):
+            if config.get(field) is not None:
+                raise ValueError(f"{field} must be null outside rolling_days selection.")
+        return
+    days = config.get("lookback_days")
+    if type(days) is not int or not 1 <= days <= 36500:
+        raise ValueError("lookback_days must be an integer from 1 to 36500.")
+    holdout = config.get("holdout_days")
+    if config.get("split_strategy") == "temporal":
+        if type(holdout) is not int or not 1 <= holdout < days:
+            raise ValueError("holdout_days must be an integer from 1 to lookback_days - 1.")
+    elif holdout is not None:
+        raise ValueError("holdout_days must be null outside rolling_days temporal selection.")
+
+
+def training_window_mode(config: dict[str, Any]) -> str:
+    """Validate source selection independently of the random/temporal evaluation split."""
+    mode = config.get("training_window_mode", "full_snapshot")
+    if mode not in ("full_snapshot", "fixed_window", "rolling_calendar", "rolling_days"):
+        raise ValueError(
+            "training_window_mode must be full_snapshot, fixed_window, "
+            "rolling_calendar or rolling_days."
+        )
+    _validate_window_event(config, mode)
+    _validate_calendar_controls(config, mode)
+    _validate_daily_controls(config, mode)
     _validate_result_lag(config)
     return mode
 
@@ -370,6 +395,17 @@ def training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
             start=months_before(lookback).isoformat(),
             holdout_start=(
                 months_before(config.get("holdout_months", 1)).isoformat()
+                if config.get("split_strategy") == "temporal"
+                else None
+            ),
+            cutoff=cutoff.isoformat(),
+        )
+    elif mode == "rolling_days":
+        cutoff = now.astimezone(UTC)
+        settings.update(
+            start=(cutoff - timedelta(days=config["lookback_days"])).isoformat(),
+            holdout_start=(
+                (cutoff - timedelta(days=config["holdout_days"])).isoformat()
                 if config.get("split_strategy") == "temporal"
                 else None
             ),

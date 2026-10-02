@@ -68,6 +68,8 @@ WORKFLOW_FIELDS = {
     "cutoff",
     "monthly_lookback_months",
     "holdout_months",
+    "lookback_days",
+    "holdout_days",
     "result_availability_lag_hours",
     "max_rows",
     "max_input_mb",
@@ -362,6 +364,12 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
                 if months == 1
                 else f"last {months} completed calendar months"
             )
+    elif window == "rolling_days":
+        observation_window = (
+            f"last {checked['lookback_days']} elapsed UTC days before invocation (exclusive)"
+        )
+        if checked.get("split_strategy") == "temporal":
+            holdout_start = f"invocation time UTC minus {checked['holdout_days']} elapsed days"
     if checked.get("filter_unavailable_results") and result_cutoff is None:
         result_cutoff = (
             f"invocation time UTC minus {checked.get('result_availability_lag_hours', 0)} "

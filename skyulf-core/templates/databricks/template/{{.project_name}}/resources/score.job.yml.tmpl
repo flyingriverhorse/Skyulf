@@ -42,6 +42,15 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
           disable_auto_optimization: true
@@ -80,6 +89,15 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
           disable_auto_optimization: true
@@ -112,6 +130,15 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
 {{if eq .compute_mode "serverless"}}
           environment_key: skyulf
           disable_auto_optimization: true
@@ -123,6 +150,212 @@ resources:
                 package: mlflow==3.16.1
 {{end}}
 {{end}}
+        - task_key: monitor_model
+          description: Calculate drift, data quality and available labeled performance for the saved scoring batch
+          depends_on:
+            - task_key: {{if eq .auto_rebuild_on_cdf_expiry "true"}}scoring_report{{else}}score{{end}}
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../src/jobs/monitor_model.py
+            base_parameters:
+              workflow_contract: "3"
+              deployed_score_handoff: "{{.score_handoff}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+              monitoring_experiment_name: ${var.monitoring_experiment_name}
+              monitoring_dashboard_url: ${var.monitoring_dashboard_url}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+            - pypi:
+                package: imbalanced-learn>=0.14.1,<1.0.0
+            - pypi:
+                package: sklearn-compat==0.1.5
+{{end}}
+        - task_key: drift_report
+          description: Show saved per-feature drift values and limits without recalculating monitoring
+          depends_on:
+            - task_key: monitor_model
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../src/jobs/drift_report.py
+            base_parameters:
+              workflow_contract: "3"
+              monitoring_dashboard_url: ${var.monitoring_dashboard_url}
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+        - task_key: check_retraining
+          description: Optionally request the existing train job after drift and fresh labeled training data
+          depends_on:
+            - task_key: drift_report
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../src/jobs/check_retraining.py
+            base_parameters:
+              on_drift: ${var.on_drift}
+              on_drift_cooldown_hours: ${var.on_drift_cooldown_hours}
+              on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}
+              train_job_name: ${bundle.name}_train
+              score_job_name: '{{"{{job.name}}"}}'
+              workflow_contract: "3"
+              deployed_score_handoff: "{{.score_handoff}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+              monitoring_experiment_name: ${var.monitoring_experiment_name}
+              monitoring_dashboard_url: ${var.monitoring_dashboard_url}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+            - pypi:
+                package: imbalanced-learn>=0.14.1,<1.0.0
+            - pypi:
+                package: sklearn-compat==0.1.5
+{{end}}
+        - task_key: retraining_needed
+          depends_on:
+            - task_key: check_retraining
+          condition_task:
+            op: EQUAL_TO
+            left: '{{"{{tasks.check_retraining.values.retraining_needed}}"}}'
+            right: "true"
+        - task_key: retrain_on_drift
+          description: Optionally request the existing train job after drift and fresh labeled training data
+          depends_on:
+            - task_key: retraining_needed
+              outcome: "true"
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../src/jobs/retrain_on_drift.py
+            base_parameters:
+              on_drift: ${var.on_drift}
+              on_drift_cooldown_hours: ${var.on_drift_cooldown_hours}
+              on_drift_min_new_training_rows: ${var.on_drift_min_new_training_rows}
+              train_job_name: ${bundle.name}_train
+              score_job_name: '{{"{{job.name}}"}}'
+              workflow_contract: "3"
+              deployed_score_handoff: "{{.score_handoff}}"
+              deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
+              score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+              monitoring_experiment_name: ${var.monitoring_experiment_name}
+              monitoring_dashboard_url: ${var.monitoring_dashboard_url}
+              monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_catalog: ${var.monitoring_catalog}
+              monitoring_schema: ${var.monitoring_schema}
+              monitoring_label_table: ${var.monitoring_label_table}
+              monitoring_result_available_at_column: ${var.monitoring_result_available_at_column}
+              monitoring_expected_interval_hours: ${var.monitoring_expected_interval_hours}
+              monitoring_environment: ${bundle.target}
+              monitoring_project: ${bundle.name}
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+            - pypi:
+                package: imbalanced-learn>=0.14.1,<1.0.0
+            - pypi:
+                package: sklearn-compat==0.1.5
+{{end}}
+        - task_key: retraining_skipped
+          description: Show why automatic training was not requested
+          depends_on:
+            - task_key: retraining_needed
+              outcome: "false"
+          timeout_seconds: ${var.score_task_timeout_seconds}
+          max_retries: ${var.score_max_retries}
+          min_retry_interval_millis: ${var.score_min_retry_interval_millis}
+          retry_on_timeout: false
+          notebook_task:
+            notebook_path: ../src/jobs/retraining_skipped.py
+            base_parameters:
+              workflow_contract: "3"
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+          disable_auto_optimization: true
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+            - pypi:
+                package: imbalanced-learn>=0.14.1,<1.0.0
+            - pypi:
+                package: sklearn-compat==0.1.5
+{{end}}
 {{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
@@ -131,6 +364,8 @@ resources:
             dependencies:
               - ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
               - mlflow==3.16.1
+              - imbalanced-learn>=0.14.1,<1.0.0
+              - sklearn-compat==0.1.5
 {{else}}
       job_clusters:
         - job_cluster_key: skyulf

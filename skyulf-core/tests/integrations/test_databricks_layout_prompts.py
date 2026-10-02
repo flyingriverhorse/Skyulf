@@ -21,6 +21,11 @@ SHARED_FIELDS = {
     "max_rows",
     "max_input_mb",
     "compute_mode",
+    "deployment_identity",
+    "manage_job_permissions",
+    "personal_development_targets",
+    "auto_rebuild_on_cdf_expiry",
+    "evaluation_charts_enabled",
     "cluster_policy_name",
     "spark_version",
     "node_type_id",
@@ -82,14 +87,14 @@ def test_multi_target_prompts_for_shared_setup_and_independent_branches(settings
     assert {
         "project_name",
         "engine",
-        "catalog",
-        "schema",
         "source_table_name",
         "record_key_columns",
         "training_version",
         "compute_mode",
         "retraining_mode",
     } <= visible
+    # Deployment namespaces are editable target bindings, not interactive model prompts.
+    assert {"catalog", "schema"}.isdisjoint(visible)
 
 
 def test_multi_target_keeps_scheduled_training_and_policy_compute_questions():

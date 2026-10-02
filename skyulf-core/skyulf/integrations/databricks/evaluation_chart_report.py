@@ -77,7 +77,7 @@ def report_model(
     report["image_keys"] += publish_figures(
         client,
         destination,
-        evidence_charts(client, identity["run_id"], manifest.task, metrics_run_id=destination),
+        evidence_charts(client, identity["run_id"], manifest.task),
         prefix=prefix,
         caption="Recorded training/CV evidence; final holdout was not used for selection.",
     )

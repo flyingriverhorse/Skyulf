@@ -445,13 +445,19 @@ def run_model_set_score_notebook(
     exit_notebook: bool = True,
 ) -> str:
     """Score one frozen set with a fixed role and one controlled champion lookup."""
+    from .monitoring_registration import (  # noqa: PLC0415
+        publish_monitoring_request,
+        validate_monitoring_settings,
+    )
     from .scoring_recovery import run_scoring_step  # noqa: PLC0415
 
     values = dbutils.widgets.getAll()
     config = validate_workflow_config(read_notebook_config(values), action="score")
+    validate_monitoring_settings(values, config)
     payload = run_scoring_step(
         config, dbutils, lambda: score_model_set_payload(spark, config, values)
     )
+    publish_monitoring_request(dbutils, payload)
     return notebook_output(
         payload,
         dbutils,
@@ -471,6 +477,10 @@ def score_model_set_payload(
     """Score a saved set, reusing the predecessor's concrete pin for CDF recovery."""
     from ..mlflow.model_set import load_registered_model_set  # noqa: PLC0415
     from .model_set_batch import run_model_set_batch  # noqa: PLC0415 - optional Spark boundary
+    from .monitoring_model_set import (  # noqa: PLC0415
+        register_set_monitors,
+        validate_set_monitoring,
+    )
 
     parameters = {
         key: value
@@ -482,6 +492,7 @@ def score_model_set_payload(
     settings = load_project_model_set(values, config)
     if settings is None:
         raise ValueError("Multi-target score requires an enabled model set.")
+    validate_set_monitoring(values, settings)
     endpoints = project_endpoints(config)
     override = (
         recovery_request["model_version"]
@@ -511,7 +522,7 @@ def score_model_set_payload(
         source_change_policy=settings.get("source_change_policy", "reject"),
         **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
-    return {
+    payload = {
         "model_set_name": resolved.name,
         "model_set_version": resolved.version,
         "model_set_digest": resolved.digest,
@@ -527,3 +538,7 @@ def score_model_set_payload(
         ],
         **asdict(result),
     }
+    registration = register_set_monitors(spark, config, values, settings, resolved, artifact)
+    if registration is not None:
+        payload["monitoring"] = registration
+    return payload

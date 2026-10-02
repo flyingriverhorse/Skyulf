@@ -91,15 +91,22 @@
   "training_window_mode": {
     "type": "string",
     "default": "auto",
-    "description": "1. Data | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; auto = all for random, recent months for temporal",
+    "description": "1. Data | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; rolling_days = last N elapsed UTC days; auto = all for random, recent months for temporal",
     "enum": [
       "auto",
       "full_snapshot",
       "fixed_window",
-      "rolling_calendar"
+      "rolling_calendar",
+      "rolling_days"
     ],
     "order": 28,
-    "skip_prompt_if": {}
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
   },
   "window_timezone": {
     "type": "string",
@@ -187,6 +194,13 @@
               }
             }
           ]
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     },
@@ -278,6 +292,13 @@
               }
             }
           ]
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     },
@@ -354,6 +375,13 @@
               ]
             }
           }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     },
@@ -382,6 +410,13 @@
                 "full_snapshot",
                 "rolling_calendar"
               ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
             }
           }
         }
@@ -461,6 +496,13 @@
               }
             ]
           }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
         }
       ]
     }
@@ -488,6 +530,13 @@
                 "full_snapshot",
                 "rolling_calendar"
               ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
             }
           }
         }
@@ -523,5 +572,107 @@
     "pattern": "^(?:0|[1-9][0-9]*)$",
     "skip_prompt_if": {},
     "order": 53
+  },
+  "lookback_days": {
+    "type": "string",
+    "default": "90",
+    "description": "1. Data | Total elapsed 24-hour days before each run to read, including holdout; enter 1 to 36500",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 990,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "holdout_days": {
+    "type": "string",
+    "default": "14",
+    "description": "1. Data | Final elapsed days reserved for temporal testing; enter 1 to lookback_days minus 1",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 991,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "split_strategy": {
+              "const": "random"
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "nested_cv"
+                  },
+                  "cv_nested_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_enabled": {
+                        "const": "true"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "training_layout": {
+                        "const": "model_competition"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
   }
 }

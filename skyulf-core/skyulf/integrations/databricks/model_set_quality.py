@@ -1,6 +1,7 @@
 """Re-evaluate every set component on its saved holdout before coherent activation."""
 
 from dataclasses import replace
+from math import isfinite
 from typing import Any
 
 import polars as pl
@@ -20,10 +21,17 @@ from . import local_retraining
 from .local_training_evidence import load_candidate_evidence, validate_training_evidence
 
 
+def _non_regressing(report: ModelComparisonReport) -> bool:
+    """Reject unavailable comparisons and any loss on the direction-aware metric."""
+    gain = report.improvement
+    return gain is not None and isfinite(gain) and gain >= 0
+
+
 def component_quality(report: ModelComparisonReport) -> dict[str, Any]:
-    """Use the same absolute gates and strict improvement contract as single models."""
+    """Require absolute gates and no regression; track meaningful gains separately."""
     absolute = report.quality_threshold is not None and quality_gates_pass(report)
-    passed = absolute and (report.champion_version is None or report.eligible)
+    non_regressing = _non_regressing(report)
+    passed = absolute and (report.champion_version is None or non_regressing)
     reason = report.reason
     if report.quality_threshold is None:
         reason = "missing_quality_threshold"
@@ -31,8 +39,11 @@ def component_quality(report: ModelComparisonReport) -> dict[str, Any]:
         reason = "quality_gate_failed"
     elif report.champion_version is None:
         reason = "initial_quality_passed"
+    elif non_regressing and not report.eligible:
+        reason = "non_regressing"
     return {
         "passed": passed,
+        "improved": passed and report.eligible,
         "reason": reason,
         "gates": quality_gate_results(report),
         "comparison": comparison_payload(report),
@@ -144,10 +155,24 @@ def evaluate_model_set_quality(
         )
         for c in components
     }
+    return _set_decision(results, expected_champion_version)
+
+
+def _set_decision(results: dict, expected_champion_version: str | None) -> dict:
+    """Allow tied peers only when another branch earns replacement of the whole set."""
+    initial = expected_champion_version is None
     failed = [name for name, result in results.items() if not result["passed"]]
+    improved = [name for name, result in results.items() if result["improved"]]
+    reason = "initial_quality_passed" if initial else "set_improved"
+    if failed:
+        reason = "component_quality_failed"
+    elif not initial and not improved:
+        reason = "no_component_improved"
     return {
-        "passed": not failed,
+        "passed": reason in {"initial_quality_passed", "set_improved"},
+        "reason": reason,
         "failed_components": failed,
+        "improved_components": improved,
         "components": results,
         "expected_champion_version": expected_champion_version,
     }

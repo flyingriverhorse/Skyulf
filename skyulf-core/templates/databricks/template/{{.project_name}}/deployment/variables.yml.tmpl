@@ -1,6 +1,42 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
 # Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
 variables:
+  on_drift:
+    description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
+    default: "disabled"
+  on_drift_cooldown_hours:
+    description: Minimum hours between automatic training requests for this train job
+    default: "24"
+  on_drift_min_new_training_rows:
+    description: Minimum new or changed labeled rows in the actual training partition
+    default: "1"
+  monitoring_drift_thresholds:
+    description: 'JSON overrides for psi, ks_statistic, wasserstein, kl_divergence; {} uses Core defaults'
+    default: '{}'
+  monitoring_enabled:
+    description: Enroll activated models and measure drift after scoring; false pauses monitoring
+    default: "true"
+  monitoring_dashboard_url:
+    description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
+    default: ""
+  monitoring_experiment_name:
+    description: Optional MLflow experiment for post-scoring monitoring reports
+    default: ""
+  monitoring_catalog:
+    description: Central monitoring catalog, independent of model and input catalogs
+    default: ""
+  monitoring_schema:
+    description: Existing central monitoring schema shared by model repositories
+    default: ""
+  monitoring_label_table:
+    description: Optional fully qualified table of actual outcomes for monitoring
+    default: ""
+  monitoring_result_available_at_column:
+    description: UTC outcome availability column in the monitoring label table
+    default: ""
+  monitoring_expected_interval_hours:
+    description: Maximum scoring age before the dashboard reports stale
+    default: "24"
   # Operations are configured here or per target; no extra initializer questions.
   # Zero timeout preserves unlimited execution until a project chooses its limits.
   train_timeout_seconds:

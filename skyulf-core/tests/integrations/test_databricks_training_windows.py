@@ -323,3 +323,106 @@ def test_lagged_result_cutoff_is_inclusive_and_event_window_half_open(engine):
     frame.loc[4, "event"] = spec.cutoff
     with pytest.raises(ValueError, match="outside the pinned window"):
         split_labeled_snapshot(frame, spec, engine=engine)
+
+
+@pytest.mark.parametrize("strategy", ["random", "temporal"])
+@pytest.mark.parametrize("instant", ["2026-03-29T04:00:00+03:00", "2026-10-25T04:00:00+02:00"])
+def test_rolling_days_uses_elapsed_utc_days_and_selected_event(strategy, instant):
+    """Daily windows advance with each run without calendar or DST rounding."""
+    now = datetime.fromisoformat(instant)
+    config = _config(
+        training_window_mode="rolling_days",
+        split_strategy=strategy,
+        event_column="observed_on",
+        lookback_days=90,
+        holdout_days=14 if strategy == "temporal" else None,
+    )
+    spec = resolve_training_spec(_spark(), config, now)
+    later = resolve_training_spec(_spark(), config, now + timedelta(days=1))
+    assert spec.event_column == "observed_on"
+    assert spec.start is not None
+    assert spec.start == now.astimezone(UTC) - timedelta(days=90)
+    assert spec.cutoff == now.astimezone(UTC)
+    assert spec.holdout_start == (
+        now.astimezone(UTC) - timedelta(days=14) if strategy == "temporal" else None
+    )
+    assert later.start == spec.start + timedelta(days=1)
+    assert "start" not in config
+
+
+@pytest.mark.parametrize(
+    "changes,field",
+    [
+        ({"lookback_days": None}, "lookback_days"),
+        ({"lookback_days": True}, "lookback_days"),
+        ({"lookback_days": 0}, "lookback_days"),
+        ({"lookback_days": 1.5}, "lookback_days"),
+        ({"lookback_days": "90"}, "lookback_days"),
+        ({"lookback_days": 36501}, "lookback_days"),
+        ({"holdout_days": None}, "holdout_days"),
+        ({"holdout_days": True}, "holdout_days"),
+        ({"holdout_days": 0}, "holdout_days"),
+        ({"holdout_days": 90}, "holdout_days"),
+        ({"holdout_days": 1.5}, "holdout_days"),
+        ({"holdout_days": "14"}, "holdout_days"),
+        ({"event_column": None}, "event_column"),
+        ({"window_timezone": "UTC"}, "window_timezone"),
+        ({"monthly_lookback_months": 4}, "monthly_lookback_months"),
+        ({"holdout_months": 1}, "holdout_months"),
+        ({"split_strategy": "random"}, "holdout_days"),
+    ],
+)
+def test_invalid_daily_windows_fail_before_history(changes, field):
+    """Invalid daily bounds and inactive calendar fields cannot reach source reads."""
+    config = _config(
+        training_window_mode="rolling_days",
+        split_strategy="temporal",
+        event_column="observed_on",
+        lookback_days=90,
+        holdout_days=14,
+    )
+    spark = _spark()
+    with pytest.raises(ValueError, match=field):
+        resolve_training_spec(spark, config | changes, datetime(2026, 10, 1, tzinfo=UTC))
+    spark.sql.assert_not_called()
+
+
+@pytest.mark.parametrize("field", ["lookback_days", "holdout_days"])
+def test_inactive_daily_controls_require_null(field):
+    """Date-free defaults must reject daily settings that would otherwise be ignored."""
+    with pytest.raises(ValueError, match=field):
+        training_spec(_config(**{field: 7}))
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("strategy", ["random", "temporal"])
+def test_daily_window_splits_selected_event_text_with_existing_parsing(engine, strategy):
+    """Both engines must honor the chosen date column and existing explicit text parser."""
+    spec = resolve_training_spec(
+        _spark(),
+        _config(
+            training_window_mode="rolling_days",
+            split_strategy=strategy,
+            event_column="observed_on",
+            event_time_parsing={"format": "%d/%m/%Y", "timezone": "UTC", "date_only": "midnight"},
+            lookback_days=10,
+            holdout_days=2 if strategy == "temporal" else None,
+        ),
+        datetime(2026, 10, 11, tzinfo=UTC),
+    )
+    frame = pd.DataFrame(
+        {
+            "id": range(10),
+            "x": range(10),
+            "target": range(10),
+            "observed_on": [f"{day:02d}/10/2026" for day in range(1, 11)],
+        }
+    )
+    train, holdout, excluded = split_labeled_snapshot(frame, spec, engine=engine)
+    assert len(train) == 8 and len(holdout) == 2 and excluded == 0
+    assert set(train.x) | set(holdout.x) == set(range(10))
+    if strategy == "temporal":
+        assert holdout.x.tolist() == [8, 9]
+    frame.loc[9, "observed_on"] = "11/10/2026"
+    with pytest.raises(ValueError, match="outside the pinned window"):
+        split_labeled_snapshot(frame, spec, engine=engine)

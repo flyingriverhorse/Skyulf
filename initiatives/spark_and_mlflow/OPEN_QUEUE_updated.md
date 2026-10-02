@@ -2,11 +2,94 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> Model-set policy follow-up (2026-10-01, uncommitted): one meaningful improvement
+> now permits equal peers when no selected metric regresses and all absolute gates
+> pass. Temporal set v3 automatically replaced v1 with improved revenue RMSE and
+> tied risk accuracy; its scoring child wrote 20 verified v3 predictions and skipped
+> redundant retraining. Pre-change audit matched all 320 Core files to the previous
+> live wheel, 42 project files to saved source, and dashboard JSON to the index.
+> [Delivery155](155-model-set-non-regressing-promotion.md).
+> Temporal acceptance follow-up (2026-10-01, uncommitted evidence): full competition
+> and model-set jobs passed with 90-day selection, 14-day temporal holdout and
+> time-series CV. Recent labels correctly stayed in holdout; 120 late-arriving
+> eligible rows triggered one automatic train per layout. Independent artifact
+> replay proved actual 600 train / 240 holdout membership and post-drift ingestion.
+> Repeated scoring preserved the original request; champion v1/challenger v2 remained
+> under existing quality gates. 191 scoped tests passed; runtime code unchanged.
+> [Delivery154](154-temporal-retraining-live-acceptance.md).
+> SM-23c branch/coverage follow-up (2026-10-01, uncommitted): all generated score
+> jobs now show an explicit retraining If/else. Competition and model-set positive
+> drift-triggered training, no-new-data false branches, duplicate-request repairs
+> and subsequent false branches passed live. Independent Delta/MLflow replay proved
+> post-drift appended data entered the actual fits: 101 new train / 19 new holdout
+> rows per model. Existing promotion gates correctly retained champions on ties.
+> [Delivery153](153-retraining-branches-live-acceptance.md).
+> SM-23c drift-trigger follow-up (2026-10-01, uncommitted): daily rolling windows,
+> Bundle thresholds and optional `retrain_on_drift` implemented. Real unchanged
+> data/healthy skips, positive train completion and duplicate-request repair
+> verified. Final-wheel v2 scoring produced 120/120 predictions, detected drift
+> and correctly skipped retraining on unchanged input. Larger
+> performance-trigger scope remains partial. [Delivery152](152-drift-retraining-delivery.md).
+> Evaluation-chart parameter headers fixed (2026-10-01, uncommitted): native
+> images now live in parameter-free `Charts` children. Single, competition and
+> model-set cloud publication passed: five children, 28 images, zero parameters;
+> source training metadata/status preserved. All three demo Bundles now use the
+> tested wheel. [Delivery150](150-evaluation-charts-child-runs.md).
+> Latest SM-23a acceptance (2026-10-01, uncommitted): previous monitoring demo
+> resources were deleted at the user's request. Fresh generated single-model,
+> competition and multi-target train/score Bundles passed in three separate schemas.
+> Multi-target components now enroll automatically before scoring. One shared
+> dashboard shows 4 monitors and 5 observations (current: 3 healthy / 1 drift).
+> The shifted single-model batch triggered monitoring automatically and retained
+> its earlier healthy result. Current resource/run links and validation limits:
+> [Delivery148](148-sm23a-full-generated-jobs.md). Subsequent `on_drift` work and
+> newer observation counts are tracked in Delivery152 above.
 > SM-36e is DONE (2026-09-30): optional SHAP prompts/dependencies and readable
 > notebook/MLflow charts passed 193 local tests, five lifecycle tests, 12 CLI
 > cases, three strict Bundle validations and 41 cloud contracts with zero skips.
 > Real training and saved notebook charts passed; final-wheel report replay also
 > passed. [Delivery121](121-sm36e-shap-delivery.md). SM-36d stays PARKED.
+> Optional evaluation-chart follow-up delivered (2026-10-01, commit `158161ed`):
+> default-off Bundle prompt and separate `generate_charts` task; regression,
+> classification and model-specific diagnostics with distinct single/competition/
+> model-set reporting. 219 affected tests, 129 real CLI generation cases, full
+> analysis gates and six generated serverless jobs passed on pandas/Polars.
+> All 68 native MLflow Image grid images were downloaded and verified. Two initial
+> lifecycle task timeouts passed on fresh runs with unchanged code/limits; their
+> cause remains unproven. All 12 test jobs are idle/manual-only. Policy-cluster
+> generation is tested locally; live execution is serverless only.
+> [Delivery137 and run links](137-optional-evaluation-charts.md).
+> SM-23a batch monitoring and central AI/BI dashboard delivered and live-tested
+> (2026-10-01, uncommitted). Two model schemas share one Delta inventory/history;
+> delayed labels, drift, stale/no-data/failure states and retry dedup verified.
+> Final Bundle job passed; dashboard redeploy retained both resource IDs.
+> Independent producer repos now register directly in central Delta; no models.json.
+> Explicit monitoring_catalog/schema select monitoring storage independently.
+> 227 scoped tests, six real CLI generation cases and six strict Bundle validations
+> passed. Two independent cloud scoring jobs, concurrent/repeated enrollment,
+> file-free central observation and table-ID/data preservation passed on final code.
+> Full analysis gates passed. Native InferenceLog, cost reports and serving
+> monitoring remain outside this slice. [Delivery144](144-sm23a-central-inventory-delivery.md).
+> SM-23a automatic-task follow-up delivered (2026-10-01, uncommitted): active
+> models enroll before scoring through register_monitor; score jobs run a separate
+> monitor_model task. Two cloud schemas passed never_observed enrollment and
+> automatic post-score observation. Final-wheel pandas/Polars checks passed missing
+> measurement recovery, repeat deduplication and atomic activation-order guards;
+> pandas enrollment-only job repair also passed. 225 final runtime tests, 141 real
+> CLI generation cases, six strict serverless validations and full analysis gates
+> passed. Central periodic scheduling and automatic multi-target enrollment remain
+> outside this follow-up. [Delivery145](145-sm23a-automatic-monitoring-tasks.md).
+> SM-23a dashboard layout updated (2026-10-01, uncommitted): environment/project
+> controls removed, metrics moved to columns, drift/quality/performance charts
+> added. Seven live dataset queries and 52 metric-value preservation checks passed;
+> shared inventory shows 4 drift rows instead of 28 and 4 performance rows instead
+> of 24. Same dashboard ID republished. [Delivery146](146-sm23a-dashboard-layout.md).
+> SM-23a approved simplification delivered (2026-10-01, uncommitted): drift and
+> quality are tables, per-statistic limits are explicit, KS p-value is excluded
+> from threshold comparison, and performance has dynamic metric columns, true
+> outcome counts and one model/version trend. New Bundles default monitoring to
+> enabled. 133 monitoring tests, 12 CLI cases, seven live queries and a final-wheel
+> default-enabled score/monitor/repeat cloud run passed. [Delivery147](147-sm23a-approved-dashboard.md).
 > SM-52 is DONE (2026-09-30): shared helpers use directly named definitions;
 > compatibility aliases removed and active MLflow monkeypatch targets verified.
 > User scope correction (2026-09-30): acceptance, monitoring and cost tools are
@@ -377,7 +460,7 @@ Acceptance additions (details in report93):
 | SM-45 | WAIT | SM-37, SM-40; suffix-scoped dev/CI cleanup job, dry-run default, production targets refused; separate from SM-41 retention |
 | SM-46 | WAIT | SM-34, SM-38; optional `scoring_mode: on_table_update` via Jobs table-update trigger, reusing CDF/queue/no-op |
 | SM-47 | WAIT | SM-38; MLflow dataset input for UC lineage, model-version card, optional experiment resource; MLflow 3 deployment jobs investigated without a second alias writer |
-| SM-23c | LATER | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; never approves |
+| SM-23c | PARTIAL | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; never approves |
 | SM-48 | PARTIAL | Local split complete; live redeploy ID/history check pending. None; split `resources/workflow.jobs.yml` into `train.job.yml`/`score.job.yml` and optionally clearer job display names; keep job keys `train`/`score` (renaming recreates jobs and loses IDs/history) |
 | SM-49 | WAIT | SM-39, SM-48; upgrade path for generated projects: regenerate from saved answers into a temporary directory, review the diff, run config migration and deployed-contract checks |
 | SM-50 | WAIT | SM-41; optional explicit period backfill operator action reusing `publish_replace_period`, separate from incremental and full rebuild |
@@ -399,113 +482,7 @@ Rules for every task touching integrations: 88 functions sit at CCN 9–10, so
 budget helper extraction inside the feature task instead of raising the gate;
 fix >100-character strings/docstrings in edited lines (no gate reports them).
 
-## SM-34B local and live closure - 2026-09-26/27
-
-Baseline: `3e92d14a` on `090`; the requested commit includes the pre-existing
-single-training-action/version-selection follow-up. Core lifecycle/runtime/report helpers,
-Bundle YAML/sync/notebooks and their tests/guides now produce eight tasks and
-eight edges. Two jobs, pinned evidence and manual actions are preserved.
-
-Final checks: `python -m pytest` on `test_databricks_lifecycle_tasks.py` passed
-83 tests; the lifecycle-notebook/job-runtime/job-output files passed 81 tests.
-`$env:SKYULF_BUNDLE_CLI_TEST_PROFILE='skyulf'` followed by
-`python -m pytest skyulf-core/tests/integrations/test_databricks_bundle_generation.py -q --tb=short -p no:cacheprovider`
-passed 63. The earlier broad Databricks suite passed 717 with 16 optional
-Spark/Delta skips. Counts overlap. Scoped Ruff/format, full
-`ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py`,
-wheel build and `databricks bundle validate --strict -t dev --profile skyulf`
-passed. Python 3.12.10 / MLflow 3.16.1 / pandas 2.3.2 / Polars 1.44.1 /
-Databricks CLI 1.17.0. Exact commands and evidence: [report67](67-sm34b-simplified-lifecycle-graph.md).
-
-Independent review reproduced and verified the fix for a notebook failing
-after its promotion receipt: cleanup preserves the committed promotion, while
-task-state checks prevent result publication and scoring. Both engines,
-manual actions, phase failures and stale/foreign/repeated references are
-covered locally. Fresh final verification passed 735 tests with 16 optional
-skips plus the separate 63-case CLI suite, strict docs and applicable hooks.
-
-The user subsequently authorized live testing followed by a commit. Both engines,
-Polars approval, child-score handoff, incremental/no-op scoring, failed fit and
-post-promotion notebook failure passed their acceptance assertions. Audit
-`683054016979330` and the local evidence verifier confirmed complete phase
-receipts, 240+3 predictions, unchanged historical rows, preserved promotion
-and blocked score handoff on failure. [Live record](rehearsals/sm34b_live/README.md).
-The existing two jobs are idle, schedules PAUSED and normal pandas config is
-restored. The later user-requested SM-34C1-C6 sequence now precedes SM-35;
-scheduled clocks and company acceptance remain separate.
-
 ## Custom feature engineering and multi-model follow-up
-
-### SM-36a/b/c complete; SM-36d parked
-
-User follow-up: generated scoring.py offers pre_split/custom/combined modes
-and an independent target-filter-skip switch. Pre-split reuse passed 285 local
-tests; the latest combined-mode selection passed 200 tests. Final Databricks
-run `530905329987142` passed all 156 tests with zero failures/skips, including
-seven real Delta cases. The final scoring modes are verified on both engines.
-Exact wheel/run evidence and earlier acceptance boundaries are in report106.
-
-[Report106](106-sm36a-project-delivery.md) closes keyed scoring outcomes,
-coverage, all-excluded incremental progress, versioned business outputs and
-bounded asset/dependency delivery. Databricks verified real Delta writes/retry
-and fresh-process MLflow replay after deleting the original project files.
-Temporal carry history is delivered in report105. This does not enable arbitrary
-row-dropping recipes or target-history forecasting.
-
-SM-36b is DONE ([evidence107](107-sm36b-training-branches.md)): named branches
-share one pinned source while keeping independent labels/features/tuning, linked
-runs and bounded sequential execution. Affected tests: 398 passed, 2 local Delta
-skips; template regression: 162 passed, plus 16 focused checks after wheel-path
-correction. Live run `612123557010767` verified six models across both engines
-and the failed-parent boundary. SM-36c is DONE with final-wheel cloud acceptance
-([report109](109-sm36c-model-set-delivery.md)); winner selection remains separate.
-
-The [named-recipe follow-up](108-sm36b-named-recipes.md) is also DONE: branches
-select preprocessing and pre-split independently from one shared feature package;
-saved source preserves selections. Assets have inline JSON help and compatible
-manifest loading. Multi-target setup hides branch-owned questions. Local checks:
-188 passed/1 Windows symlink skip, plus 105 template/layout tests. Live run
-`535676495601679` passed eight models on pandas/Polars through the notebook adapter,
-registration, independent Delta scoring, no-op retries and fresh-process reloads.
-All aliases remain unchanged. The branch starter includes a weighted voting
-regression ensemble with its own independent recipe selections.
-
-The user requested optional project-owned Python feature engineering and multiple
-models trained from one source and used together. Existing Core preprocessing,
-model fitting and registry extensions are reused; SM-36a/b/c add the missing
-Bundle packaging/orchestration contracts. See
-[the reference inspection and task acceptance criteria](58-custom-fe-and-multi-model-bundle-plan.md).
-Setup will be progressive: basics/data, preprocessing, model, optional CV/search,
-then lifecycle/output. Advanced and multi-model scenario questions appear only
-when selected; existing Core contracts remain authoritative. SM-33E delivers the
-first sections, SM-36/36a/b/c extend them, and SM-42 completes the combined setup.
-The initial guided sections and fixed-model CV are delivered through SM-33D/E.
-Single-file custom feature code is delivered in SM-33F. Advanced search, broader
-packaging and multiple-model scenarios remain planned. The user's pre-split
-cleanup request adds SM-33H1/H2/H3 before SM-34; the first slice reuses existing
-DropMissingRows/ManualBounds and Core leakage checks, not a new cleaning engine.
-The latest user decision prioritizes using ALL existing nodes in their correct
-phases through the same Python recipe. H3 covers mode-aware placement and
-train/holdout/CV/artifact/inference behavior on pandas and Polars. It does not
-permit learned nodes before split or enable a second split inside the workflow.
-New generic business-rule filters, group-disjoint splitting and configurable
-data-quality rejection thresholds are outside this active sequence.
-The user's follow-up adds opt-in custom pre-split code to H3 using the same
-preprocessing.py and existing saved-source mechanism. Explicit row/column
-contracts and replay tests are required; arbitrary Python is not automatically
-leakage-certified. This is extensibility, not a new built-in filter node.
-
-The requested pre-task temporal review is complete (2026-09-26): Core now rejects
-missing declared sort columns, invalid direct lag shifts and known current-target
-rolling; backend admission shares the target guard. Verified with 1,981 Core and
-1,731 backend tests, Ruff, ty and strict MkDocs. This does not deliver automatic
-history/availability handling: forecast horizon, cross-batch context retrieval,
-missing/tied time policy and context-row removal were later delivered in SM-36a
-(report105); this paragraph records the earlier review baseline.
-SM-33H1 completed after committing the review as `522c6e82`; its implementation
-and the H3 plan are included in the requested delivery commit. Final affected tests: 71 passed; CLI generation: 56
-passed; real local WSL Delta: 1 passed. Ruff, full ty, strict docs and generated
-dev Bundle validation passed. No deployment or live Databricks job in this slice.
 
 | Task | Status | Dependency / scope |
 | --- | --- | --- |
@@ -525,9 +502,9 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 | SM-19d | LATER | SM-19a; A/B/canary routing, endpoint update/rollback; batch rollout separately explicit |
 | SM-21a | LATER | SM-43a; UC feature lookup, keys and point-in-time correctness |
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
-| SM-23a | LATER | SM-43a; batch quality/drift/delayed-label reporting and optional dashboards; SM-38 covers basic operations first; report93 additions: reuse Core `DriftCalculator`, delayed-label performance join on record keys, optional `quality_monitors` InferenceLog and dashboard ([report93](93-dbml-reference-recomparison.md)); drift/freshness and job cost tools removed/deferred by user; monitoring, reporting and performance joins remain future work ([report129](129-reference-followups-delivery.md)) |
+| SM-23a | PARTIAL | Batch quality/drift/delayed-label reporting and central AI/BI dashboard delivered after user resumed scope (2026-10-01). Reuses Core `DriftCalculator`, explicit cross-namespace enrollment, original scoring snapshots and keyed available labels. Two-schema pandas/Polars live acceptance, final Bundle job, dashboard SQL/publish/readback and stable-ID redeploy passed ([delivery142](142-sm23a-monitoring-delivery.md)). Optional native `quality_monitors` InferenceLog, slices and infrastructure cost reports remain deferred; prior removal history remains in [report129](129-reference-followups-delivery.md). |
 | SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
-| SM-23c | LATER | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; gates unchanged, never approves ([report93](93-dbml-reference-recomparison.md)) |
+| SM-23c | PARTIAL | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; gates unchanged, never approves ([report93](93-dbml-reference-recomparison.md)) |
 | SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
@@ -576,7 +553,7 @@ SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
 | SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
-| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | LATER | Optional `on_drift` mode runs the existing train job; gates unchanged, never approves, no stacked runs; [report93](93-dbml-reference-recomparison.md) |
+| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Optional `on_drift` mode runs the existing train job; gates unchanged, never approves, no stacked runs; [report93](93-dbml-reference-recomparison.md) |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 | SM-45 | Suffix-scoped dev/CI resource cleanup | SM-37, SM-40 | WAIT | Dry-run default, confirmation, production targets refused; deleted set equals preview; other suffixes untouched; [report93](93-dbml-reference-recomparison.md) |
