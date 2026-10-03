@@ -12,6 +12,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ..modeling._cv_weights import fit_preprocessor, prepare_weights
 from ..registry import NodeRegistry
 from .pipeline import FeatureEngineer
 
@@ -141,7 +142,7 @@ class MergedBranchFoldAdapter:
         # the positional merge keeps every observation in its original order.
         self.changes_row_count = False
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Fit fresh branch engineers on this fold's payload and merge the results.
 
         Every branch engineer is rebuilt from the stored step lists on each call
@@ -151,6 +152,7 @@ class MergedBranchFoldAdapter:
         Raises:
             ValueError: If ``X`` still embeds the configured target column.
         """
+        self.train_sample_weight_ = prepare_weights(sample_weight, frame_rows(X), self)
         self._validate_payload(X)
         engineers = [FeatureEngineer(list(steps)) for steps in self._branch_step_lists]
         frames, ys = self._run_branches(engineers, (X, y), fit=True)
@@ -266,7 +268,7 @@ class FeatureEngineerFoldAdapter:
             NodeRegistry.get_calculator(step["transformer"])
         self._engineer: FeatureEngineer | None = None
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Fit a fresh engineer on this fold's ``(X, y)`` payload and return it.
 
         A new :class:`FeatureEngineer` is built on every call, so nothing fitted
@@ -277,8 +279,9 @@ class FeatureEngineerFoldAdapter:
         """
         self._validate_payload(X)
         engineer = FeatureEngineer(self._steps_config)
-        transformed, _metrics = engineer.fit_transform((X, y))
+        transformed, _metrics = engineer.fit_transform((X, y), sample_weight=sample_weight)
         self._engineer = engineer
+        self.train_sample_weight_ = engineer.train_sample_weight_
         return transformed
 
     @property
@@ -370,10 +373,12 @@ class AuditedFoldPreprocessor:
         """Return the wrapped preprocessor."""
         return self._inner
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Log the fit-time input row count, then delegate to ``inner``."""
         self.fit_rows.append(frame_rows(X))
-        return self._inner.fit_transform(X, y)
+
+        X, y, self.train_sample_weight_ = fit_preprocessor(self._inner, X, y, sample_weight)
+        return X, y
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Log the transform-time input row count, then delegate to ``inner``."""

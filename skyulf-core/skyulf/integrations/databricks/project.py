@@ -16,6 +16,7 @@ from ._project_files import modeling_hook, project_source, read_source
 from ._project_recipes import bind_recipe_source, recipe_label, recipe_steps
 from .local_ensemble import ENSEMBLE_MODELS
 from .local_search import bounded_space
+from .weight_config import capture_model_weights, validate_weight_roles
 
 
 def strict_json_value(value: Any, filename: str = "ensemble.py") -> Any:
@@ -47,7 +48,9 @@ def _load_single_model(config: dict[str, Any], path: Path) -> dict[str, Any]:
         return config
     if config["pipeline"].get("modeling") != {}:
         raise ValueError("Configure modeling in single_model.py; leave pipeline.modeling empty.")
-    factory = getattr(load_project_module(read_source(hook)), "build_modeling", None)
+    source = read_source(hook)
+    module = load_project_module(source)
+    factory = getattr(module, "build_modeling", None)
     if not callable(factory):
         raise ValueError("single_model.py must define build_modeling().")
     modeling = strict_json_value(factory(), hook.name)
@@ -57,6 +60,8 @@ def _load_single_model(config: dict[str, Any], path: Path) -> dict[str, Any]:
         raise ValueError("single_model.py returned more than 64 KiB of parameters.")
     result = deepcopy(config)
     result["pipeline"]["modeling"] = modeling
+    if hasattr(module, "WEIGHT_COLUMN"):
+        result.update(capture_model_weights(source, {"weight_column": module.WEIGHT_COLUMN}))
     return result
 
 
@@ -136,6 +141,7 @@ def load_project_workflow(
     *,
     preprocessing_recipe: str | None = None,
     pre_split_recipe: str | None = None,
+    weight_settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Use Python-defined steps for training/preview and capture their exact source.
 
@@ -157,7 +163,9 @@ def load_project_workflow(
             )
         return load_competition_project(config, path)
     validate_project_steps(config)
+    config = {**deepcopy(config), **deepcopy(weight_settings or {})}
     config = _load_single_model(config, Path(path))
+    validate_weight_roles(config)
     return resolve_project_workflow(
         config,
         path,

@@ -4,7 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from .monitoring_config import parse_drift_thresholds
-from .monitoring_registration import _enrollment_config, monitoring_destination
+from .monitoring_registration import build_monitor_enrollment_config, monitoring_destination
 from .monitoring_store import enroll_monitor
 
 
@@ -37,7 +37,7 @@ def register_set_monitors(
     configs = []
     for component in artifact.manifest.components:
         reference = component.reference
-        base = _enrollment_config(
+        base = build_monitor_enrollment_config(
             {**workflow, "model_name": reference.name}, values, reference.version
         )
         configs.append(

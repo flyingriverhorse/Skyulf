@@ -1,0 +1,92 @@
+{
+  "status": "passed",
+  "source": "workspace.skyulf_sampling_ab_20261003_fd9d6ead.source",
+  "model": "workspace.skyulf_sampling_ab_20261003_fd9d6ead.single_model",
+  "prediction_table": "workspace.skyulf_sampling_ab_20261003_fd9d6ead.predictions",
+  "prediction_rows": 96,
+  "same_source_split_and_smote_rows": true,
+  "max_weighted_vs_unweighted_probability_difference": 0.07559925807394258,
+  "cases": [
+    {
+      "case": "smote_weighted",
+      "run_id": "1d50b15930a4451fac7613c6d3cb061f",
+      "model_version": "1",
+      "source_version": 0,
+      "source_train_rows": 192,
+      "fit_rows": 284,
+      "synthetic_rows": 92,
+      "holdout_rows": 48,
+      "sample_weight_present": true,
+      "synthetic_weight": "class_mean",
+      "class_weight": null,
+      "feature_columns": [
+        "x",
+        "z"
+      ],
+      "sampled_features_sha256": "9f9960325339bd2d15753c52df147f622c6c8434d416ad504027b5299bcbb07e",
+      "sampled_labels_sha256": "72ed2af0ed237c9b2c4a913c77ca77c5dbac95b2734f2f5f43fb68def35047f9",
+      "sample_weight_sha256": "6bc172241530e95f951cce54374cbde82ef85a0497e4065b007fcd412dbd9b41",
+      "sample_weight_sum": 25491.280000000002,
+      "class_mean_weights": {
+        "0": 90.67605633802818,
+        "1": 88.84
+      },
+      "max_reference_probability_error": 0.0,
+      "coefficients": [
+        [
+          -0.19454813347193242,
+          -0.09531292822703843
+        ]
+      ],
+      "intercept": [
+        0.27771585805906746
+      ],
+      "train_key_sha256": "00d0702afb6018e1dabddde7e60e0b633a172c19268525e0f2adc1c2ac4e01a5",
+      "holdout_key_sha256": "0158d0dc9bec824c4869874c944011174425ace8dc13127a6247734528840a76",
+      "actual_fit_matches_independent_smote": true,
+      "actual_weights_match_reference": true,
+      "registered_reload_matches_reference": true,
+      "weight_free_scoring": true,
+      "aliases_unchanged": true
+    },
+    {
+      "case": "smote_unweighted",
+      "run_id": "0a8f777371c84da99f383af13c213d84",
+      "model_version": "2",
+      "source_version": 0,
+      "source_train_rows": 192,
+      "fit_rows": 284,
+      "synthetic_rows": 92,
+      "holdout_rows": 48,
+      "sample_weight_present": false,
+      "synthetic_weight": null,
+      "class_weight": null,
+      "feature_columns": [
+        "x",
+        "z"
+      ],
+      "sampled_features_sha256": "9f9960325339bd2d15753c52df147f622c6c8434d416ad504027b5299bcbb07e",
+      "sampled_labels_sha256": "72ed2af0ed237c9b2c4a913c77ca77c5dbac95b2734f2f5f43fb68def35047f9",
+      "sample_weight_sha256": null,
+      "sample_weight_sum": null,
+      "class_mean_weights": {},
+      "max_reference_probability_error": 0.0,
+      "coefficients": [
+        [
+          -0.019046907363684897,
+          -0.2383558366449935
+        ]
+      ],
+      "intercept": [
+        0.25194159953437806
+      ],
+      "train_key_sha256": "00d0702afb6018e1dabddde7e60e0b633a172c19268525e0f2adc1c2ac4e01a5",
+      "holdout_key_sha256": "0158d0dc9bec824c4869874c944011174425ace8dc13127a6247734528840a76",
+      "actual_fit_matches_independent_smote": true,
+      "actual_weights_match_reference": true,
+      "registered_reload_matches_reference": true,
+      "weight_free_scoring": true,
+      "aliases_unchanged": true
+    }
+  ]
+}

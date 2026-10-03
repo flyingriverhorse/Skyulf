@@ -166,6 +166,7 @@ def post_selection_cv(
     *,
     target_column: str,
     event_column: str | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any] | None:
     """Return stored nested search scores, retaining diagnostics for legacy artifacts."""
     modeling = artifact.pipeline.config.get("modeling", {})
@@ -194,7 +195,11 @@ def post_selection_cv(
         else frame.loc[:, input_columns]
     )
     report = evaluate_training_cv(
-        training_features, fixed_pipeline, fixed_cv, target_column=target_column
+        training_features,
+        fixed_pipeline,
+        fixed_cv,
+        target_column=target_column,
+        sample_weight=sample_weight,
     )
     assert report is not None
     return {

@@ -88,7 +88,9 @@ def prepare_policy_data(
     config: TuningConfig,
     problem_type: str,
     preprocessing: Any = None,
-) -> tuple[Any, Any, dict[str, np.ndarray]]:
+    *,
+    return_positions: bool = False,
+) -> tuple:
     """Separate split metadata, stably align chronological rows, and retain raw labels."""
     method = effective_cv_type(config, problem_type)
     validate_policy(config, problem_type)
@@ -99,11 +101,13 @@ def prepare_policy_data(
         times = _times(X, config.cv_time_column)
         order = np.argsort(times, kind="stable")
         features = X if retain_time else _drop_column(X, config.cv_time_column)
-        return take_rows(features, order), take_rows(y, order), {"times": times[order]}
+        result = (take_rows(features, order), take_rows(y, order), {"times": times[order]})
+        return (*result, order) if return_positions else result
     if method in GROUP_METHODS:
         groups = _column(X, config.cv_group_column, "group")
-        return _drop_column(X, config.cv_group_column), y, {"groups": groups}
-    return X, y, {}
+        result = (_drop_column(X, config.cv_group_column), y, {"groups": groups})
+        return (*result, np.arange(len(X))) if return_positions else result
+    return (X, y, {}, np.arange(len(X))) if return_positions else (X, y, {})
 
 
 def prediction_features(X: Any, result: Any) -> Any:

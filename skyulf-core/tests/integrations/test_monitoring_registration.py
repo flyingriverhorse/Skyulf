@@ -317,15 +317,15 @@ def test_inventory_conflict_retry_is_bounded_and_does_not_swallow_permission_err
     monkeypatch.setattr(store.time, "sleep", lambda _: None)
     spark = Mock()
     spark.sql.side_effect = [RuntimeError("[DELTA_CONCURRENT_APPEND]"), Mock()]
-    store._merge_with_retry(spark, "MERGE")
+    store.merge_with_retry(spark, "MERGE")
     assert spark.sql.call_count == 2
     spark.sql.reset_mock()
     spark.sql.side_effect = PermissionError("Denied")
     with pytest.raises(PermissionError):
-        store._merge_with_retry(spark, "MERGE")
+        store.merge_with_retry(spark, "MERGE")
     assert spark.sql.call_count == 1
     spark.sql.reset_mock()
     spark.sql.side_effect = RuntimeError("[DELTA_CONCURRENT_APPEND]")
     with pytest.raises(RuntimeError):
-        store._merge_with_retry(spark, "MERGE")
+        store.merge_with_retry(spark, "MERGE")
     assert spark.sql.call_count == 3

@@ -20,9 +20,11 @@ from .local_search import base_model_config, prepare_search_pipeline
 from .local_workflow import training_settings, training_spec, training_window_mode
 from .prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
 from .training_dates import training_date_spec
+from .weight_config import WEIGHT_FIELDS, validate_weight_roles
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    *WEIGHT_FIELDS,
     "evaluation_charts",
     "training_layout",
     "competition",
@@ -113,6 +115,7 @@ def _columns(config: dict[str, Any]) -> None:
         if config.get(key) is not None
     )
     _validate_column_roles(names, config["record_key_columns"])
+    validate_weight_roles(config)
 
 
 def _validate_column_roles(names: list[Any], record_key_columns: list[str]) -> None:

@@ -14,6 +14,7 @@ import polars as pl
 from skyulf.integrations.databricks._local_frames import frame_bytes
 
 from ...inference.local_pipeline import LocalPipelineArtifact
+from ...modeling._sample_weights import validate_sample_weight
 from ...modeling._tuning.cv_policy import (
     FrozenSplit,
     fold_evidence,
@@ -166,6 +167,7 @@ def _ordinary_scores(
     plan: FrozenSplit,
     scorer: str,
     adapter: FeatureEngineerFoldAdapter,
+    sample_weight: Any = None,
 ) -> list[float]:
     """Refit every fold independently and fail the candidate if even one score is missing."""
     scores = []
@@ -188,6 +190,7 @@ def _ordinary_scores(
             preprocessing=deepcopy(adapter),
             fold_errors=errors,
             model_calculator=calculator,
+            sample_weight=sample_weight,
         )
         if not math.isfinite(score):
             detail = errors[0] if errors else "nonfinite score"
@@ -252,6 +255,7 @@ def _nested_report(
     policy: TuningConfig,
     adapter: FeatureEngineerFoldAdapter,
     evidence: dict | None,
+    sample_weight: Any = None,
 ) -> dict:
     """Reuse nested search evidence or evaluate a fixed recipe as a singleton search."""
     if evidence is not None:
@@ -261,7 +265,12 @@ def _nested_report(
         return report
     singleton = replace(policy, strategy="grid", search_space={k: [v] for k, v in params.items()})
     result = TuningCalculator(calculator).tune(
-        X, y, singleton, preprocessing=adapter, preprocessing_frames=(X, y)
+        X,
+        y,
+        singleton,
+        preprocessing=adapter,
+        preprocessing_frames=(X, y),
+        sample_weight=sample_weight,
     )
     if result.nested_cv is None:
         raise ValueError("Fixed competition candidate produced no nested outer report.")
@@ -295,6 +304,7 @@ def evaluate_competition_candidate(
     max_bytes: int,
     event_column: str | None = None,
     cv_results: dict[str, Any] | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Evaluate one fitted recipe on bounded shared training rows, never a final holdout.
 
@@ -320,15 +330,21 @@ def evaluate_competition_candidate(
         else frame.drop(columns=[target_column])
     )
     adapter = FeatureEngineerFoldAdapter(pipeline.get("preprocessing", []), target_column)
-    prepared_X, prepared_y, metadata = prepare_policy_data(X, y, policy, task, adapter)
+    sample_weight = validate_sample_weight(sample_weight, len(frame))
+    prepared_X, prepared_y, metadata, positions = prepare_policy_data(
+        X, y, policy, task, adapter, return_positions=True
+    )
+    ordered_weight = None if sample_weight is None else sample_weight[positions]
     plan = _split_plan(policy, task, prepared_y, metadata)
     calculator, params, evidence = _candidate_recipe(artifact)
     if cv.method == "nested_cv":
-        report = _nested_report(X, y, calculator, params, policy, adapter, evidence)
+        report = _nested_report(X, y, calculator, params, policy, adapter, evidence, sample_weight)
         scores = _nested_scores(report, policy, task, scorer, plan)
         mode = "nested_cv"
     else:
-        scores = _ordinary_scores(prepared_X, prepared_y, calculator, params, plan, scorer, adapter)
+        scores = _ordinary_scores(
+            prepared_X, prepared_y, calculator, params, plan, scorer, adapter, ordered_weight
+        )
         mode = "post_selection_cv" if evidence is not None else "fixed_cv"
     minimize = native_metric in _MINIMIZE
     values = [-score if minimize else score for score in scores]

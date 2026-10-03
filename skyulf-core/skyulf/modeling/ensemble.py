@@ -221,7 +221,10 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
+        """Resolve the selected estimators and delegate fitting with optional weights."""
         config = self._inject_tuning_base_config(config)
         config = self._resolve_estimators(config)
         return super().fit(
@@ -232,6 +235,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             log_callback,
             validation_data,
             iteration_callback=iteration_callback,
+            sample_weight=sample_weight,
         )
 
     # --- tuning hooks -------------------------------------------------------

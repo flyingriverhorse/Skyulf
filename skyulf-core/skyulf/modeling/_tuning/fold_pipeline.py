@@ -16,6 +16,8 @@ The tuning engine wraps the step as::
 and routes the search space through ``model__estimator__<param>``.
 """
 
+from __future__ import annotations
+
 import copy
 from collections.abc import Callable
 from typing import Any
@@ -27,6 +29,16 @@ from sklearn.utils.metaestimators import available_if
 
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit
+from .._cv_weights import fit_preprocessor, prepare_weights
+from .._sample_weights import SampleWeightError
+
+
+class FatalSampleWeightError(BaseException):
+    """Carry weight failures through sklearn's candidate-level Exception handler.
+
+    This private search boundary signal is restored to SampleWeightError by the
+    runner, including after joblib transports it from a parallel worker.
+    """
 
 
 def _fitted_model_has(attr: str) -> Callable[[Any], bool]:
@@ -71,6 +83,7 @@ class FoldAwareModelStep(BaseEstimator):
         preprocessor: Any = None,
         feature_names: tuple[str, ...] | None = None,
         class_weight: Any = None,
+        propagate_weight_errors: bool = False,
     ) -> None:
         """Store the wrap targets verbatim; nothing is copied or fitted here.
 
@@ -85,6 +98,7 @@ class FoldAwareModelStep(BaseEstimator):
         self.preprocessor = preprocessor
         self.feature_names = feature_names
         self.class_weight = class_weight
+        self.propagate_weight_errors = propagate_weight_errors
 
     def _ensure_frames(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Rebuild named pandas frames when slicing hands non-pandas input.
@@ -157,7 +171,7 @@ class FoldAwareModelStep(BaseEstimator):
             tags.target_tags = model_tags.target_tags
         return tags
 
-    def fit(self, X: Any, y: Any = None) -> "FoldAwareModelStep":
+    def fit(self, X: Any, y: Any = None, *, sample_weight: Any = None) -> FoldAwareModelStep:
         """Fit preprocessing and model on this fold's training rows only.
 
         Preprocessor and estimator are deep-copied first, so clones made by
@@ -166,13 +180,23 @@ class FoldAwareModelStep(BaseEstimator):
         chains leakage-free inside the searcher's own CV. A label map is
         built when the chain re-encoded ``y``, for ``predict`` to invert.
         """
+        try:
+            return self._fit(X, y, sample_weight=sample_weight)
+        except SampleWeightError as exc:
+            if self.propagate_weight_errors:
+                raise FatalSampleWeightError(str(exc)) from exc
+            raise
+
+    def _fit(self, X: Any, y: Any, *, sample_weight: Any) -> FoldAwareModelStep:
+        """Apply the fold's preprocessing and effective weights before fitting."""
+        sample_weight = prepare_weights(sample_weight, len(X), self.preprocessor)
         if self.preprocessor is not None:
             X, y = self._ensure_frames(X, y)
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
-        X_t, y_t = worker.fit_transform(X, y) if worker is not None else (X, y)
+        X_t, y_t, sample_weight = fit_preprocessor(worker, X, y, sample_weight)
         SklearnBridge.validate_features(X_t)
-        sample_weight = sample_weight_for_fit(model, self.class_weight, y_t)
+        sample_weight = sample_weight_for_fit(model, self.class_weight, y_t, sample_weight)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_t, y_t, **fit_kwargs)
         self.preprocessor_ = worker

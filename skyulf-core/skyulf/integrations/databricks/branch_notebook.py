@@ -26,6 +26,7 @@ from .model_set_project import (
     render_model_set_result,
 )
 from .project import load_project_workflow
+from .weight_config import capture_branch_weights
 
 
 def _training_only(config: dict[str, Any], *, allow_set_handoff: bool = False) -> None:
@@ -37,20 +38,25 @@ def _training_only(config: dict[str, Any], *, allow_set_handoff: bool = False) -
         raise ValueError("Multi-target training requires score_handoff=disabled.")
 
 
-def _branch_entries(path: Path) -> dict[str, Any]:
+def _branch_entries(path: Path) -> tuple[dict[str, Any], str]:
     """Load the trusted branch factory separately from each saved feature package."""
-    module = load_project_module(read_source(path))
+    source = read_source(path)
+    module = load_project_module(source)
     factory = getattr(module, "build_training_branches", None)
     if not callable(factory):
         raise ValueError(f"{path.name} must define build_training_branches().")
     entries = factory()
     if not isinstance(entries, dict) or not entries:
         raise ValueError(f"Configure a nonempty branch mapping in src/modeling/{path.name}.")
-    return entries
+    return entries, source
 
 
 def _branch_config(
-    base: dict[str, Any], entry: Any, values: dict[str, str], modeling: Path
+    base: dict[str, Any],
+    entry: Any,
+    values: dict[str, str],
+    modeling: Path,
+    weight_settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Replace explicit top-level settings and capture one branch's feature recipe."""
     allowed = {"workflow", "features_path", "preprocessing_recipe", "pre_split_recipe"}
@@ -87,6 +93,7 @@ def _branch_config(
         path,
         preprocessing_recipe=entry.get("preprocessing_recipe"),
         pre_split_recipe=entry.get("pre_split_recipe"),
+        weight_settings=weight_settings,
     )
 
 
@@ -100,11 +107,13 @@ def load_training_branch_configs(values: dict[str, str]) -> dict[str, dict[str, 
     base = read_notebook_config(values)
     _training_only(base, allow_set_handoff=True)
     modeling = Path(values["config_path"]).parent.parent / "src/modeling"
+    entries, source = _branch_entries(
+        renamed_modeling_hook(modeling / "multi_model.py", "branches.py")
+    )
+    weights = capture_branch_weights(source, entries)
     return {
-        name: _branch_config(base, entry, values, modeling)
-        for name, entry in _branch_entries(
-            renamed_modeling_hook(modeling / "multi_model.py", "branches.py")
-        ).items()
+        name: _branch_config(base, entry, values, modeling, weights[name])
+        for name, entry in entries.items()
     }
 
 

@@ -1,9 +1,13 @@
 {{- define "ensemble_params" -}}
 {{- $indent := or (index . "indent") "" -}}
 {{- $v := .values -}}{{- $p := .ensemble_prefix -}}{{- $task := .task -}}
+{{- $weight_prefix := "" -}}
+{{- if (regexp "^branch_[1-8]_").MatchString $p -}}{{- $weight_prefix = (regexp "^branch_[1-8]_").FindString $p -}}{{- end -}}
+{{- $weighted := eq (index $v (print $weight_prefix "sample_weight_enabled")) "true" -}}
+{{- $suffix := "" -}}{{- if $weighted -}}{{- $suffix = "_weighted" -}}{{- end -}}
 {{- $count := index $v (printf "%s%s_base_count" $p $task) -}}
 {
-{{$indent}}    "base_estimators": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{printf "%q" (index $v (printf "%s%s_base_%s" $p $task $base))}}{{end}}{{end}}],
+{{$indent}}    "base_estimators": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{printf "%q" (index $v (printf "%s%s_base_%s%s" $p $task $base $suffix))}}{{end}}{{end}}],
 {{$indent}}    "tune_base_models": True,
 {{$indent}}    "n_jobs": 1{{if eq $task "classification"}},
 {{$indent}}    "calibrate_base_models": {{template "python_value" (index $v (printf "%scalibrate" $p))}},
@@ -11,7 +15,7 @@
 {{$indent}}    "weights": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{index $v (printf "%s%s_weight_%s" $p $task $base)}}{{end}}{{end}}]{{if eq $task "classification"}},
 {{$indent}}    "voting": "{{index $v (printf "%svoting" $p)}}"{{end}}{{else}},
 {{$indent}}    "cv": {{index $v (printf "%scv" $p)}},
-{{$indent}}    "final_estimator": "{{index $v (printf "%s%s_final" $p $task)}}",
+{{$indent}}    "final_estimator": "{{index $v (printf "%s%s_final%s" $p $task $suffix)}}",
 {{$indent}}    "passthrough": {{template "python_value" (index $v (printf "%spassthrough" $p))}}{{end}}
 {{$indent}}}
 {{- end -}}

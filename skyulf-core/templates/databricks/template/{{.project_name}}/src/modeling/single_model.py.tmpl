@@ -15,8 +15,23 @@ Those layouts do not use this file. Scoring replays the saved fitted artifact.
 
 from copy import deepcopy
 
+# To fix class weights for a supported classifier, edit MODELING below:
+#   "base_model": {"type": "logistic_regression", "params": {"class_weight": "balanced"}}
+# Add the key to the existing params; preserve your model type and other settings.
+# Use Python None to disable it. Remove "class_weight" from this model's
+# search_space to keep the value fixed. To tune it instead, keep the search axis
+# and omit the fixed class_weight key from base_model.params.
+# Sample weights are optional and independent of class_weight.
+# Set WEIGHT_COLUMN below to a training column, e.g. "training_weight".
+# None disables sample weights; scoring never needs this column.
+# Both settings can be enabled together. Class weights apply only to classifiers.
 
-MODELING = {{if eq .training_layout "single_model"}}{{template "modeling" (map (pair "values" .) (pair "prefix" "") (pair "model" (index . (printf "%s_model" .task))) (pair "task" .task) (pair "ensemble_prefix" "single_ensemble_"))}}{{else}}{}{{end}}
+
+WEIGHT_COLUMN = {{if eq .sample_weight_enabled "true"}}"{{.weight_column}}"{{else}}None{{end}}
+
+{{ $model := index . (printf "%s_model" .task) }}
+{{ if eq .sample_weight_enabled "true" }}{{ $model = index . (printf "%s_model_weighted" .task) }}{{ end }}
+MODELING = {{if eq .training_layout "single_model"}}{{template "modeling" (map (pair "values" .) (pair "prefix" "") (pair "model" $model) (pair "task" .task) (pair "ensemble_prefix" "single_ensemble_"))}}{{else}}{}{{end}}
 
 
 def build_modeling():

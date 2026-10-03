@@ -296,6 +296,7 @@ class OversamplingCalculator(BaseCalculator):
         """
         return {
             "type": "oversampling",
+            "synthetic_weight": config.get("synthetic_weight"),
             "method": config.get("method", "smote"),
             "target_column": config.get("target_column"),
             "sampling_strategy": config.get("sampling_strategy", "auto"),

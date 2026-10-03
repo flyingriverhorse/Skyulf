@@ -7,6 +7,8 @@ try/except and degrade to a ``-inf`` fold score instead of aborting the
 search.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,6 +17,8 @@ from sklearn.model_selection import ParameterGrid, ParameterSampler
 
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit, split_class_weight_params
+from .._cv_weights import fit_preprocessor, prepare_weights, take_weights
+from .._sample_weights import SampleWeightError
 from ..base import BaseModelCalculator
 from .metrics import resolve_scorer
 from .params import clean_search_space, instantiate_model, seed_params
@@ -48,11 +52,12 @@ def evaluate_candidate_cv(
     y_for_search: Any,
     metric: str,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> float:
     """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -89,6 +94,7 @@ def evaluate_candidate_cv(
             fold_errors=fold_errors,
             seed_params_overlay=seed_params_overlay,
             model_calculator=model_calculator,
+            sample_weight=sample_weight,
         )
         fold_scores.append(score)
 
@@ -122,11 +128,12 @@ def fit_and_score_candidate_fold(
     val_idx: Any,
     metric: str,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> float:
     """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
@@ -140,6 +147,10 @@ def fit_and_score_candidate_fold(
     X_val_fold = _slice_fold_rows(X_any, val_idx)
     y_val_fold = _slice_fold_rows(y_any, val_idx)
 
+    fold_weight = prepare_weights(
+        take_weights(sample_weight, train_idx), len(train_idx), preprocessing
+    )
+
     # Instantiate and Fit
     # Note: We must handle potential errors (e.g. incompatible params)
     try:
@@ -147,7 +158,9 @@ def fit_and_score_candidate_fold(
         # never see this fold's held-out rows (inside the try so a
         # preprocessing failure is contained like a model-fit failure).
         if preprocessing is not None:
-            X_train_fold, y_train_fold = preprocessing.fit_transform(X_train_fold, y_train_fold)
+            X_train_fold, y_train_fold, fold_weight = fit_preprocessor(
+                preprocessing, X_train_fold, y_train_fold, fold_weight
+            )
             X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
 
         SklearnBridge.validate_features(X_train_fold)
@@ -157,7 +170,7 @@ def fit_and_score_candidate_fold(
             {**model_calculator.default_params, **(seed_params_overlay or {}), **params},
         )
         model = instantiate_model(model_class, constructor_params)
-        sample_weight = sample_weight_for_fit(model, class_weight, y_train_fold)
+        sample_weight = sample_weight_for_fit(model, class_weight, y_train_fold, fold_weight)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_train_fold, y_train_fold, **fit_kwargs)
 
@@ -174,6 +187,8 @@ def fit_and_score_candidate_fold(
                 f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
             )
         return score
+    except SampleWeightError:
+        raise
     except Exception as e:  # noqa: BLE001 - per-fold failures are collected for reporting, must not abort tuning
         if fold_errors is not None:
             fold_errors.append(str(e))
@@ -194,11 +209,12 @@ def evaluate_search_candidates(
     metric: str,
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
     """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -229,6 +245,7 @@ def evaluate_search_candidates(
             fold_errors,
             seed_params_overlay,
             model_calculator=model_calculator,
+            sample_weight=sample_weight,
         )
 
         if log_callback:
@@ -255,9 +272,10 @@ def run_grid_or_random_search(
     metric: str,
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> TuningResult:
     """Runs a custom grid/random search loop instead of sklearn's searchers.
 
@@ -288,6 +306,7 @@ def run_grid_or_random_search(
         fold_errors,
         seed_params(config),
         model_calculator=model_calculator,
+        sample_weight=sample_weight,
     )
 
     if log_callback:

@@ -7,7 +7,9 @@ python skyulf-core/templates/databricks/build_schema.py
 python skyulf-core/templates/databricks/build_schema.py --check
 ```
 
-The script uses only Python's standard library and also works from another working
+The build needs the local Skyulf SDK and its model dependencies (including XGBoost
+and LightGBM, installed by requirements-ci.txt) to derive supported weighted model
+menus from Core's capability contract. It also works from another working
 directory when invoked by its path. Commit the topic files and the generated
 `databricks_template_schema.json` together. Pre-commit and CI reject stale output.
 Bundle users continue to run `databricks bundle init` normally; no build step is
@@ -81,3 +83,13 @@ The root JSON is generated with one compact line per prompt, including its neste
 conditions, to keep the expanded artifact manageable. Values and question order
 are unchanged by this formatting. Make future edits in the readable topic files
 here, then regenerate the root schema.
+
+Sample-weight questions and the parallel `*_weighted` model menus are derived by
+`build_schema.py`. It inserts an opt-in before model selection (and independently
+for each branch), preserves unweighted choices, and filters weighted choices with
+`skyulf.modeling.capabilities.model_supports_sample_weight`. Ensemble member and
+final-model choices use the same configured-model check. Prompt conditions inspect
+the active menu, and generated model/search templates use the same selection.
+The generated `order` values leave slots for these derived questions; maintain
+relative source orders in the topic files. Never hand-maintain a separate list of
+weight-supported models.

@@ -24,7 +24,7 @@ def monitoring_destination(values: dict[str, str]) -> str | None:
     return store_namespace(catalog, schema)
 
 
-def _enrollment_config(
+def build_monitor_enrollment_config(
     workflow: dict[str, Any], values: dict[str, str], version: str
 ) -> MonitorConfig:
     """Use resolved producer names and the physical generation of the selected version."""
@@ -49,7 +49,7 @@ def validate_monitoring_settings(values: dict[str, str], workflow: dict[str, Any
     """Validate configured registration before any scoring write or recovery request."""
     if monitoring_destination(values) is None:
         return
-    _enrollment_config(workflow, values, "1")
+    build_monitor_enrollment_config(workflow, values, "1")
 
 
 def register_scoring_monitor(
@@ -66,7 +66,7 @@ def register_scoring_monitor(
     if result.get("selected_model_name") != workflow["model_name"]:
         raise ValueError("Monitoring requires the scored model from this project.")
     version = result.get("selected_model_version")
-    config = _enrollment_config(workflow, values, version)
+    config = build_monitor_enrollment_config(workflow, values, version)
     enroll_monitor(spark, namespace, config, preserve_activation=True)
     return {
         "monitor_id": config.monitor_id,
@@ -94,7 +94,7 @@ def register_deployed_monitor(
     validate_monitoring_settings(values, workflow)
     if receipt["model_name"] != workflow["model_name"]:
         raise ValueError("Activated model differs from the frozen workflow.")
-    config = _enrollment_config(workflow, values, receipt["new_version"])
+    config = build_monitor_enrollment_config(workflow, values, receipt["new_version"])
     enroll_monitor(spark, namespace, config, activation_started_ms=activation_started_ms)
     return {"monitor_id": config.monitor_id, "inventory_table": f"{namespace}.model_inventory"}
 

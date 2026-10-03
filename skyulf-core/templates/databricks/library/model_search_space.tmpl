@@ -12,14 +12,17 @@
 {
 {{- if (regexp "^(voting|stacking)_").MatchString .model -}}
   {{$mapping := index $mappings .task -}}
-  {{$prefix := .ensemble_prefix -}}
   {{$values := .values -}}
+  {{$prefix := .ensemble_prefix -}}
+  {{$weightPrefix := "" -}}
+  {{if (regexp "^branch_[1-8]_").MatchString $prefix -}}{{$weightPrefix = (regexp "^branch_[1-8]_").FindString $prefix -}}{{end -}}
+  {{$suffix := "" -}}{{if eq (index $values (print $weightPrefix "sample_weight_enabled")) "true" -}}{{$suffix = "_weighted" -}}{{end -}}
   {{$count := index $values (printf "%s%s_base_count" $prefix .task) -}}
   {{$infix := "" -}}
   {{if and (eq .task "classification") (eq (index $values (printf "%scalibrate" $prefix)) "true")}}{{$infix = "estimator__"}}{{end -}}
   {{range $slot := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1 -}}
     {{if or (lt (len $slot) (len $count)) (and (eq (len $slot) (len $count)) (le $slot $count)) -}}
-      {{$base := index $values (printf "%s%s_base_%s" $prefix $.task $slot) -}}
+      {{$base := index $values (printf "%s%s_base_%s%s" $prefix $.task $slot $suffix) -}}
       {{range $param, $choices := index $spaces (index $mapping $base) -}}
         {{$key := printf "%s__%s%s" $base $infix $param -}}
         {{if ne $key $resource}}{{if not $first}},{{if not (index $ "python")}} {{end}}{{end}}{{if (index $ "python")}}{{printf "\n%s    " $indent}}{{end}}{{printf "%q" $key}}: {{if (index $ "python")}}{{template "python_value" $choices}}{{else}}{{$choices}}{{end}}{{$first = false}}{{end -}}
@@ -27,7 +30,7 @@
     {{end -}}
   {{end -}}
   {{if (regexp "^stacking_").MatchString .model -}}
-    {{$final := index $values (printf "%s%s_final" $prefix .task) -}}
+    {{$final := index $values (printf "%s%s_final%s" $prefix .task $suffix) -}}
     {{range $param, $choices := index $spaces (index $mapping $final) -}}
       {{$key := printf "final_estimator__%s" $param -}}
       {{if ne $key $resource}}{{if not $first}},{{if not (index $ "python")}} {{end}}{{end}}{{if (index $ "python")}}{{printf "\n%s    " $indent}}{{end}}{{printf "%q" $key}}: {{if (index $ "python")}}{{template "python_value" $choices}}{{else}}{{$choices}}{{end}}{{$first = false}}{{end -}}

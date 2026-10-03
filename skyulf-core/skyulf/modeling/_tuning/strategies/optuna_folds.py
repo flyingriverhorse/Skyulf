@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 
 from ....engines.sklearn_bridge import SklearnBridge
 from ..._class_weights import sample_weight_for_fit
+from ..._cv_weights import fit_preprocessor, prepare_weights
 from ..fold_pipeline import FoldAwareModelStep
 
 IterationReport = Callable[[float, int], None]
@@ -53,21 +54,34 @@ def _fold_step(estimator: Any) -> FoldAwareModelStep | None:
 
 
 def _prepare_fold(
-    estimator: Any, X_train: Any, y_train: Any, X_valid: Any, y_valid: Any
+    estimator: Any,
+    X_train: Any,
+    y_train: Any,
+    X_valid: Any,
+    y_valid: Any,
+    sample_weight: Any = None,
 ) -> _PreparedFold:
     """Fit preprocessing on training rows and transform validation X and y together."""
     estimator = clone(estimator)
     step = _fold_step(estimator)
     if step is None:
-        return _PreparedFold(estimator, X_train, y_train, X_valid, y_valid)
+        return _PreparedFold(
+            estimator,
+            X_train,
+            y_train,
+            X_valid,
+            y_valid,
+            sample_weight=sample_weight_for_fit(estimator, None, y_train, sample_weight),
+        )
     model = step.estimator
     worker = step.preprocessor
+    sample_weight = prepare_weights(sample_weight, len(X_train), worker)
     if worker is not None:
         X_train, y_train = step._ensure_frames(X_train, y_train)
         X_valid, y_valid = step._ensure_frames(X_valid, y_valid)
     original_y = y_train
     if worker is not None:
-        X_train, y_train = worker.fit_transform(X_train, y_train)
+        X_train, y_train, sample_weight = fit_preprocessor(worker, X_train, y_train, sample_weight)
         X_valid, y_valid = worker.transform(X_valid, y_valid)
     SklearnBridge.validate_features(X_train)
     SklearnBridge.validate_features(X_valid)
@@ -75,7 +89,7 @@ def _prepare_fold(
     step.preprocessor_ = None  # Scorers receive data already transformed as a pair.
     if step.label_map_ is not None:
         y_valid = pd.Series(np.asarray(y_valid)).map(step.label_map_).to_numpy()
-    sample_weight = sample_weight_for_fit(model, step.class_weight, y_train)
+    sample_weight = sample_weight_for_fit(model, step.class_weight, y_train, sample_weight)
     return _PreparedFold(model, X_train, y_train, X_valid, y_valid, step, sample_weight)
 
 
@@ -167,6 +181,7 @@ def fit_and_score_fold(
     y_valid: Any,
     scorer: Callable,
     report: IterationReport | None = None,
+    sample_weight: Any = None,
 ) -> float:
     """Fit an independent fold and return its finite signed validation score.
 
@@ -176,7 +191,7 @@ def fit_and_score_fold(
     when requested. Arbitrary estimators and sklearn pipelines retain their
     ordinary full fitting behavior. Fit, scorer, and pruning errors propagate.
     """
-    fold = _prepare_fold(estimator, X_train, y_train, X_valid, y_valid)
+    fold = _prepare_fold(estimator, X_train, y_train, X_valid, y_valid, sample_weight)
     fit_kwargs = {}
     library = _native_library(fold.model)
     if library is not None:

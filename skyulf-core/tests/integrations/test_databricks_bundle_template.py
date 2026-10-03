@@ -137,7 +137,7 @@ def test_optional_setup_sections_hide_their_details_until_selected(enabled):
 
 @pytest.mark.parametrize("task", ["regression", "classification"])
 def test_data_settings_use_defaults_without_extra_prompts(task):
-    """Enabling CV should expose folds while keeping unrelated data details quiet."""
+    """CV keeps advanced defaults hidden while source-window selection remains explicit."""
     from jsonschema import Draft7Validator
 
     properties = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())[
@@ -150,7 +150,6 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
         "test_size",
         "random_state",
         "stratify",
-        "training_window_mode",
         "training_sample_rows",
         "training_sample_seed",
         "min_improvement",
@@ -158,6 +157,12 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
     ):
         assert "default" in properties[name]
         assert Draft7Validator(properties[name].get("skip_prompt_if", False)).is_valid(values)
+    assert properties["training_window_mode"]["default"] == "auto"
+    assert not Draft7Validator(properties["training_window_mode"]["skip_prompt_if"]).is_valid(
+        values
+    )
+    values["training_layout"] = "multi_target"
+    assert Draft7Validator(properties["training_window_mode"]["skip_prompt_if"]).is_valid(values)
 
 
 @pytest.mark.parametrize("train_mode", ["manual", "scheduled"])
@@ -267,6 +272,14 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         '    "modeling": {"type": "linear_regression", "params": {}}',
         content,
         flags=re.DOTALL,
+    )
+    content = content.replace(
+        '{{if eq $window "rolling_days"}}{{.lookback_days}}{{else}}null{{end}}',
+        "null",
+    ).replace(
+        '{{if and (eq $window "rolling_days") (eq $split "temporal")}}'
+        "{{.holdout_days}}{{else}}null{{end}}",
+        "null",
     )
     content = content.replace(
         '{{if and (eq $window "rolling_calendar") (eq $split "temporal")}}'

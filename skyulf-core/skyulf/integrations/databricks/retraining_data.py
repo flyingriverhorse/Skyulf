@@ -1,8 +1,11 @@
 """Assess bounded eligible training changes before requesting an on-drift fit."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 from collections import Counter
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -12,10 +15,13 @@ from typing import Any
 import pandas as pd
 
 from .lifecycle_tasks import phase_training_spec
+from .local_pre_split import FIXED_TYPES
 from .local_retraining import (
     LocalTrainingSpec,
+    eligible_training_snapshot,
     read_training_partitions,
     training_spec_payload,
+    validate_pre_split_step,
 )
 from .local_workflow import resolve_training_spec
 from .monitoring_config import MonitorConfig
@@ -89,20 +95,96 @@ def _bounded(spec: LocalTrainingSpec, monitor: MonitorConfig) -> LocalTrainingSp
     )
 
 
-def _baseline_population(
+def _baseline_counts(
     spark: Any,
     monitor: MonitorConfig,
     spec: LocalTrainingSpec,
     train: pd.DataFrame,
     engine: str,
-) -> pd.DataFrame:
-    """Exclude all previously eligible random rows, while allowing temporal holdout to age in."""
-    if spec.split_strategy == "temporal":
-        return train
-    _, old_train, old_holdout, _ = read_training_partitions(
-        spark, _bounded(spec, monitor), temporal_cv=False, engine=engine
+    current: LocalTrainingSpec,
+    current_frame: pd.DataFrame,
+) -> Counter[str]:
+    """Count prior eligible values under both original and current source weights."""
+    columns = [*spec.input_columns, spec.target_column]
+    weights = _filter_weight_columns(spec, current)
+    if spec.split_strategy == "temporal" and not weights:
+        return _row_counts(train, columns)
+    bounded = _bounded(spec, monitor)
+    source, old_train, old_holdout, _ = read_training_partitions(
+        spark, bounded, temporal_cv=False, engine=engine
     )
-    return pd.concat([old_train, old_holdout], ignore_index=True)
+    baseline = _population_counts(spec, old_train, old_holdout)
+    if not weights:
+        return baseline
+    source = _replace_source_weights(source, current_frame, spec.record_key_columns, weights)
+    population = eligible_training_snapshot(source, _comparison_spec(bounded), engine=engine)
+    if spec.split_strategy == "temporal":
+        population = population.loc[population[spec.event_column] < spec.holdout_start]
+    return baseline | _row_counts(population, columns)
+
+
+def _comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
+    """Keep historical label alternatives without requiring a viable model-fit population."""
+    steps = deepcopy(list(spec.pre_split_steps))
+    for step in steps:
+        if step["transformer"] == "Deduplicate":
+            subset = step["params"]["subset"]
+            step["params"]["subset"] = list(dict.fromkeys([*subset, spec.target_column]))
+    steps.append(
+        {
+            "name": "freshness_available_target",
+            "transformer": "DropMissingRows",
+            "params": {"subset": [spec.target_column]},
+        }
+    )
+    return replace(
+        spec,
+        pre_split_steps=tuple(steps),
+        weight_column=None,
+        holdout_key_sha256=None,
+        survivor_key_sha256=None,
+        training_evidence_sha256=None,
+    )
+
+
+def _filter_weight_columns(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> set[str]:
+    """Find declared source weights read by the original eligibility recipe."""
+    weights = {
+        column.casefold()
+        for spec in (saved, current)
+        for column in (*spec.reserved_weight_columns, spec.weight_column)
+        if column is not None
+    }
+    return {
+        column
+        for index, step in enumerate(saved.pre_split_steps, 1)
+        if step["transformer"] not in FIXED_TYPES
+        for column in validate_pre_split_step(step, index, saved.target_column, ())
+        if column.casefold() in weights
+    }
+
+
+def _population_counts(
+    spec: LocalTrainingSpec, train: pd.DataFrame, holdout: pd.DataFrame
+) -> Counter[str]:
+    """Treat random holdout as seen, but retain the original temporal training boundary."""
+    population = train if spec.split_strategy == "temporal" else pd.concat([train, holdout])
+    return _row_counts(population, [*spec.input_columns, spec.target_column])
+
+
+def _replace_source_weights(
+    saved: pd.DataFrame,
+    current: pd.DataFrame,
+    keys: tuple[str, ...],
+    weights: set[str],
+) -> pd.DataFrame:
+    """Replace only matching records' weight metadata, preserving historical X, y and order."""
+    historical = saved.set_index(list(keys))
+    latest = current.set_index(list(keys))
+    common = historical.index.intersection(latest.index, sort=False)
+    for column in weights.intersection(current.columns):
+        historical.loc[common, column] = latest.loc[common, column]
+    return historical.reset_index().loc[:, saved.columns]
 
 
 def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now: datetime) -> dict:
@@ -129,18 +211,29 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
         raise ValueError("On-drift training engine differs from the active model.")
     current = resolve_training_spec(spark, workflow, now)
     _compatible_specs(saved, current)
-    baseline = _baseline_population(spark, monitor, saved, old_train, engine)
     # Reference replay may install older custom builders; restore this job's source.
     current = phase_training_spec(
         training_spec_payload(current, engine),
         workflow.get("pipeline", {}).get("project_python_source"),
     )
-    _, train, _, _ = read_training_partitions(
+    current_frame, train, _, _ = read_training_partitions(
         spark, _bounded(current, monitor), temporal_cv=False, engine=engine
     )
+    saved = phase_training_spec(
+        training_spec_payload(saved, engine), artifact.pipeline.config.get("project_python_source")
+    )
+    try:
+        baseline = _baseline_counts(
+            spark, monitor, saved, old_train, engine, current, current_frame
+        )
+    finally:
+        phase_training_spec(
+            training_spec_payload(current, engine),
+            workflow.get("pipeline", {}).get("project_python_source"),
+        )
     columns = [*current.input_columns, current.target_column]
     counts = _row_counts(train, columns)
-    changed = sum((counts - _row_counts(baseline, columns)).values())
+    changed = sum((counts - baseline).values())
     payload = json.dumps(
         {"columns": columns, "rows": sorted(counts.items())}, separators=(",", ":")
     )

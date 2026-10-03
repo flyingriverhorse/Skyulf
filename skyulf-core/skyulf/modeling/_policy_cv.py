@@ -3,6 +3,7 @@
 from copy import deepcopy
 from typing import Any, cast
 
+from ._cv_weights import preflight_weights, weight_kwargs
 from ._tuning.cv_policy import policy_description, policy_splitter, prepare_policy_data
 from ._tuning.engine import TuningCalculator
 from ._tuning.schemas import TuningConfig
@@ -42,12 +43,20 @@ def perform_policy_cv(
     preprocessing: Any,
     log_callback: Any,
     progress_callback: Any,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Evaluate fixed parameters under the same verified boundaries as tuning."""
     if policy.cv_type == "nested_cv":
-        return _fixed_nested(calculator, X, y, model_config, policy, preprocessing, log_callback)
-    X, y, metadata = prepare_policy_data(X, y, policy, calculator.problem_type, preprocessing)
+        return _fixed_nested(
+            calculator, X, y, model_config, policy, preprocessing, log_callback, sample_weight
+        )
+    X, y, metadata, positions = prepare_policy_data(
+        X, y, policy, calculator.problem_type, preprocessing, return_positions=True
+    )
+    if sample_weight is not None:
+        sample_weight = sample_weight[positions]
     cv = policy_splitter(policy, calculator.problem_type, y, metadata)
+    preflight_weights(sample_weight, cv, X, y)
     folds = []
     for index, (train, test) in enumerate(cv.split(X, y)):
         result = _run_cv_fold(
@@ -63,6 +72,7 @@ def perform_policy_cv(
             progress_callback,
             log_callback,
             deepcopy(preprocessing),
+            sample_weight,
         )
         folds.append(result | {"split": cv.evidence[index]})
     return {
@@ -86,6 +96,7 @@ def _fixed_nested(
     policy: TuningConfig,
     preprocessing: Any,
     log_callback: Any,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Evaluate a singleton recipe at both levels without introducing parameter choices."""
     policy.strategy = "grid"
@@ -98,6 +109,7 @@ def _fixed_nested(
         preprocessing=preprocessing,
         preprocessing_frames=(X, y) if preprocessing is not None else None,
         log_callback=log_callback,
+        **weight_kwargs(sample_weight),
     )
     if result.nested_cv is None:
         raise ValueError("Nested fixed-model evaluation did not produce complete evidence.")

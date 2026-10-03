@@ -480,11 +480,13 @@ class _FlakyInnerCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
         """Raise for small (inner-fold) splits; delegate to the real calculator otherwise."""
         if len(X) <= self._threshold:
             raise RuntimeError("Simulated inner-fold failure")
-        return self._real.fit(X, y, config)
+        return self._real.fit(X, y, config, sample_weight=sample_weight)
 
 
 def test_perform_nested_cv_inner_fold_failure_is_caught():
@@ -526,6 +528,8 @@ class _FlakyOnceCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
         """Raise on every 3rd call (the first inner-fold call per outer fold, since
         each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2).
@@ -533,7 +537,7 @@ class _FlakyOnceCalculator(BaseModelCalculator):
         self._call_count += 1
         if self._call_count % 3 == 1:
             raise RuntimeError("Simulated single inner-fold failure")
-        return self._real.fit(X, y, config)
+        return self._real.fit(X, y, config, sample_weight=sample_weight)
 
 
 def test_perform_nested_cv_partial_inner_failure_excludes_nan_from_mean():

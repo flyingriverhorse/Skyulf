@@ -96,6 +96,8 @@ nav:
     - Text & NLP: user_guide/text_nlp.md
     - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
     - skyulf-core Configuration: user_guide/configuration.md
+    - Weighted Training & Support: user_guide/weighted_training.md
+    - Sampling Weight Acceptance: user_guide/sampling_weight_acceptance.md
     - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
     - SHAP Explainability: user_guide/shap_explainability.md
     - Cross-Validation: user_guide/cross_validation.md

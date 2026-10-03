@@ -299,7 +299,7 @@ def _inventory_isolation(spark: Any, quoted_table: str) -> str | None:
     return row["value"] if row is not None else None
 
 
-def _merge_with_retry(spark: Any, statement: str) -> None:
+def merge_with_retry(spark: Any, statement: str) -> None:
     """Retry only optimistic Delta write conflicts; preserve permissions and data errors."""
     for attempt in range(3):
         try:
@@ -334,7 +334,7 @@ def _merge_row(
     spark.createDataFrame([row], schema=schema).createOrReplaceTempView(view)
     matched = _inventory_update(row, activation_started_ms, preserve_activation) if update else ""
     try:
-        _merge_with_retry(
+        merge_with_retry(
             spark,
             f"MERGE INTO {table_name(name)} t USING {view} s ON t.{key} = s.{key} "
             f"{matched} WHEN NOT MATCHED THEN INSERT *",

@@ -1,10 +1,107 @@
 """Independent training tasks retain the existing lifecycle integrity contracts."""
 
+from __future__ import annotations
+
+from copy import deepcopy
 from typing import Any
 
 import pytest
 from test_competition_lifecycle import _competition
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared fixture
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("separate_tasks", [False, True])
+def test_weighted_competition_preserves_recipe_and_registers(
+    staged, monkeypatch, engine, separate_tasks
+):
+    """Weight evidence must not change recipe identity across training task boundaries."""
+    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.mlflow.registry import load_run_local_pipeline
+
+    _, client, config, context, frame = staged
+    _competition(config, engine)
+    config.update(weight_column="w", reserved_weight_columns=["w"])
+    frame["w"] = frame.x + 1.0
+    original_fit = local_retraining.fit_candidate
+    recipes = []
+
+    def fit_without_mutating_recipe(*args, **kwargs):
+        """Retain the real fit and observe the caller-owned frozen configuration."""
+        before = deepcopy(kwargs["pipeline_config"])
+        fitted = original_fit(*args, **kwargs)
+        recipes.append((before, deepcopy(kwargs["pipeline_config"])))
+        return fitted
+
+    monkeypatch.setattr(local_retraining, "fit_candidate", fit_without_mutating_recipe)
+    prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
+    loaded = _call(staged, "load_data", prepared.reference)
+    split = _call(staged, "prepare_dataset", loaded.reference)
+    reference = split.reference
+    if separate_tasks:
+        for name in ("strong", "weak"):
+            run_competition_training(
+                None,
+                name=name,
+                context=context,
+                tracking_uri=config["tracking_uri"],
+                reference=reference,
+            )
+    else:
+        reference = _call(staged, "train", reference).reference
+    assert len(recipes) == 2
+    assert all(before == after for before, after in recipes)
+    selected = _call(staged, "select_best_model", reference)
+    assert selected.output["winner"] == "strong"
+    registered = _call(staged, "evaluate_register", selected.reference)
+    _call(staged, "compare", registered.reference)
+    _call(staged, "model_decision", prepared.reference)
+    versions = client.search_model_versions(f"name='{config['model_name']}'")
+    assert len(versions) == 1
+    artifact = load_run_local_pipeline(
+        f"runs:/{prepared.reference['run_id']}/model",
+        digest=selected.output["model_digest"],
+        tracking_uri=config["tracking_uri"],
+    )
+    weight_evidence = dict(artifact.pipeline.config)["training_weights"]
+    assert isinstance(weight_evidence, dict)
+    assert weight_evidence["weight_column"] == "w"
+    assert "w" not in artifact.manifest.input_columns
+
+
+@pytest.mark.parametrize("changed_section", ["training_weights", "modeling"])
+def test_weighted_competition_rejects_changed_winner_config(staged, monkeypatch, changed_section):
+    """Adoption must check weight evidence and model settings against the pinned request."""
+    from skyulf.integrations.databricks import training_nodes
+
+    _, client, config, context, frame = staged
+    _competition(config)
+    config.update(weight_column="w", reserved_weight_columns=["w"])
+    frame["w"] = frame.x + 1.0
+    prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
+    loaded = _call(staged, "load_data", prepared.reference)
+    split = _call(staged, "prepare_dataset", loaded.reference)
+    for name in ("strong", "weak"):
+        training_nodes.run_competition_training(
+            None,
+            name=name,
+            context=context,
+            tracking_uri=config["tracking_uri"],
+            reference=split.reference,
+        )
+    load = training_nodes.load_run_local_pipeline
+
+    def changed_artifact(*args, **kwargs):
+        """Alter loaded config to exercise the independent adoption integrity check."""
+        artifact = load(*args, **kwargs)
+        artifact.pipeline.config[changed_section] = {}
+        return artifact
+
+    monkeypatch.setattr(training_nodes, "load_run_local_pipeline", changed_artifact)
+    with pytest.raises(ValueError, match="Winning model configuration"):
+        _call(staged, "select_best_model", split.reference)
+    assert not client.search_registered_models()
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

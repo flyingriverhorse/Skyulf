@@ -1,5 +1,7 @@
 """Drift retraining requires changed eligible training values, not another split."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -48,7 +50,10 @@ def freshness(monkeypatch):
         train, _, _ = local_retraining.split_labeled_snapshot(
             snapshot(None, spec), spec, engine=saved["engine"]
         )
-        artifact = SimpleNamespace(manifest=SimpleNamespace(fitted_engine=saved["engine"]))
+        artifact = SimpleNamespace(
+            manifest=SimpleNamespace(fitted_engine=saved["engine"]),
+            pipeline=SimpleNamespace(config={}),
+        )
         return artifact, spec, train, {"model_version": "1"}
 
     monkeypatch.setattr(local_retraining, "read_training_snapshot", snapshot)
@@ -200,3 +205,177 @@ def test_pre_split_filters_define_freshness_population(freshness, engine):
     result = _assess(freshness)
     assert result["status"] == "no_new_training_data"
     assert result["training_rows"] == 16
+
+
+def _weight_filtered_source(state, engine="pandas"):
+    """Keep source values fixed while admitting previously excluded weight rows."""
+    state["config"].update(
+        engine=engine,
+        weight_column="w",
+        reserved_weight_columns=["w"],
+        pre_split_steps=[
+            {
+                "name": "keep",
+                "transformer": "ManualBounds",
+                "params": {"bounds": {"w": {"lower": 5}}},
+            }
+        ],
+    )
+    state["old"]["w"] = [1.0] * 10 + [10.0] * 10
+    state["current"]["w"] = 10.0
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_weight_filter_changes_do_not_make_training_data_fresh(freshness, engine):
+    """Changing only filter eligibility through weights must not request an automatic fit."""
+    _weight_filtered_source(freshness, engine)
+    result = _assess(freshness)
+    assert result["training_rows"] == 16
+    assert result["status"] == "no_new_training_data"
+    assert result["changed_rows"] == 0
+
+
+@pytest.mark.parametrize("column", ["x", "y"])
+def test_weight_filtered_source_still_detects_real_changes(freshness, column):
+    """An expanded historical population cannot hide real feature or label corrections."""
+    _weight_filtered_source(freshness)
+    freshness["current"][column] += 100
+    result = _assess(freshness)
+    assert result["status"] == "ready"
+    assert result["changed_rows"] == result["training_rows"] == 16
+
+
+def test_weight_filter_does_not_hide_new_training_rows(freshness):
+    """New observations remain fresh only when they enter the actual current fit partition."""
+    _weight_filtered_source(freshness)
+    freshness["current"] = pd.DataFrame(
+        {"id": range(40), "x": range(40), "y": range(40), "w": [10.0] * 40}
+    )
+    result = _assess(freshness)
+    assert result["status"] == "ready"
+    assert 0 < result["changed_rows"] < 20
+    assert result["training_rows"] == 32
+
+
+@pytest.mark.parametrize("eligibility", ["missing", "late"])
+def test_weight_filter_preserves_newly_available_labels(freshness, eligibility):
+    """Historical rows without usable labels must not suppress genuinely new training data."""
+    _weight_filtered_source(freshness)
+    if eligibility == "missing":
+        freshness["config"]["drop_missing_labels"] = True
+        freshness["old"].loc[:9, "y"] = None
+    else:
+        freshness["config"].update(
+            filter_unavailable_results=True, result_available_at_column="available_at"
+        )
+        freshness["old"]["available_at"] = freshness["now"] - timedelta(days=1)
+        freshness["old"].loc[:9, "available_at"] = freshness["now"] + timedelta(days=1)
+        freshness["current"]["available_at"] = freshness["now"] - timedelta(days=1)
+    result = _assess(freshness)
+    assert result["status"] == "ready"
+    assert result["changed_rows"] == 8
+
+
+def test_weight_filter_temporal_baseline_allows_holdout_to_age_in(freshness):
+    """Weight-only admissions are old data while genuinely aged-in holdout remains new."""
+    _weight_filtered_source(freshness)
+    now = freshness["now"]
+    freshness["config"].update(
+        training_window_mode="rolling_days",
+        split_strategy="temporal",
+        lookback_days=90,
+        holdout_days=10,
+        event_column="event_time",
+        test_size=None,
+        random_state=None,
+        stratify=None,
+    )
+    freshness["old"]["event_time"] = [now - timedelta(days=30 - i) for i in range(20)]
+    freshness["old"].loc[18:, "event_time"] = [now - timedelta(days=10), now - timedelta(days=9)]
+    freshness["current"]["event_time"] = freshness["old"]["event_time"]
+    extra = pd.DataFrame(
+        {
+            "id": [20, 21],
+            "x": [20, 21],
+            "y": [20, 21],
+            "w": [10.0, 10.0],
+            "event_time": [now - timedelta(days=2), now - timedelta(days=1)],
+        }
+    )
+    freshness["current"] = pd.concat([freshness["current"], extra], ignore_index=True)
+    unchanged = _assess(freshness)
+    freshness["now"] += timedelta(days=5)
+    changed = _assess(freshness)
+    assert unchanged["status"] == "no_new_training_data"
+    assert changed["status"] == "ready"
+    assert changed["changed_rows"] == 2
+
+
+def test_weight_filter_baseline_does_not_validate_excluded_fit_weights(freshness):
+    """Historically filtered invalid weights must not be validated as new training inputs."""
+    _weight_filtered_source(freshness)
+    freshness["old"].loc[:9, "w"] = -1.0
+    result = _assess(freshness)
+    assert result["status"] == "no_new_training_data"
+    assert result["changed_rows"] == 0
+
+
+@pytest.mark.parametrize("changed_labels", [False, True])
+def test_weight_filter_baseline_does_not_run_dedup_on_excluded_conflicts(freshness, changed_labels):
+    """Changing a weight-selected duplicate must not invent new labels or break baseline replay."""
+    _weight_filtered_source(freshness)
+    freshness["config"]["pre_split_steps"].append(
+        {"name": "dedup", "transformer": "Deduplicate", "params": {"subset": ["x"]}}
+    )
+    for frame in (freshness["old"], freshness["current"]):
+        frame["x"] = list(range(10)) * 2
+        frame["y"] = list(range(100, 110)) + list(range(10))
+    freshness["current"]["w"] = [10.0] * 10 + [1.0] * 10
+    if changed_labels:
+        freshness["current"].loc[:9, "y"] += 100
+    result = _assess(freshness)
+    assert result["training_rows"] == 8
+    assert result["changed_rows"] == (8 if changed_labels else 0)
+    assert result["status"] == ("ready" if changed_labels else "no_new_training_data")
+
+
+def test_new_weight_declaration_protects_previously_unweighted_filter(freshness):
+    """Enabling weights must protect a formerly ordinary filter source column too."""
+    _weight_filtered_source(freshness)
+    freshness["saved_config"] = {
+        **freshness["config"],
+        "weight_column": None,
+        "reserved_weight_columns": [],
+    }
+    result = _assess(freshness)
+    assert result["status"] == "no_new_training_data"
+    assert result["changed_rows"] == 0
+
+
+def test_weight_filter_counterfactual_keeps_historical_label_alternatives(freshness):
+    """Corrected labels stay fresh when old counterfactual duplicate groups disagree."""
+    _weight_filtered_source(freshness)
+    freshness["config"]["pre_split_steps"].append(
+        {"name": "dedup", "transformer": "Deduplicate", "params": {"subset": ["x"]}}
+    )
+    for frame in (freshness["old"], freshness["current"]):
+        frame["x"] = list(range(10)) * 2
+        frame["y"] = list(range(100, 110)) + list(range(10))
+    freshness["current"]["y"] = list(range(200, 210)) * 2
+    result = _assess(freshness)
+    assert result["status"] == "ready"
+    assert result["changed_rows"] == result["training_rows"] == 8
+
+
+@pytest.mark.parametrize("survivors", [0, 1, 2, 3])
+def test_weight_filter_allows_tiny_counterfactual_when_new_data_is_valid(freshness, survivors):
+    """Historical comparison needs no minimum fit size when current new rows train normally."""
+    _weight_filtered_source(freshness)
+    freshness["current"]["w"] = 0.0
+    freshness["current"].loc[: survivors - 1, "w"] = 10.0
+    extra = pd.DataFrame({"id": range(20, 40), "x": range(20, 40), "y": range(20, 40), "w": 10.0})
+    freshness["current"] = pd.concat([freshness["current"], extra], ignore_index=True)
+    result = _assess(freshness)
+    assert result["status"] == "ready"
+    assert 0 < result["changed_rows"] <= 20
+    assert result["changed_rows"] <= result["training_rows"]

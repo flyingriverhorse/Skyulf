@@ -64,6 +64,8 @@ def load_monitoring_reference(
         project_source_sha256=artifact.manifest.project_source_sha256,
         heldout=holdout,
     )
+    if spec.weight_column is not None:
+        train = train.drop(columns=[spec.weight_column])
     evidence = {
         "model_name": resolved.name,
         "model_version": resolved.version,

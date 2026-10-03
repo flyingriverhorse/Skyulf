@@ -1,5 +1,7 @@
 """Independent competition fits joined through the existing durable lifecycle."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -117,7 +119,14 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
         digest=row["model_digest"],
         tracking_uri=config["tracking_uri"],
     )
-    if artifact.pipeline.config != recipe["effective_config"]:
+    expected_config = recipe["effective_config"]
+    if store.request["spec"].get("weight_column") is not None:
+        prepared = store.receipt("prepare_dataset")["output"]
+        expected_config = {
+            **expected_config,
+            "training_weights": prepared["holdout"]["attrs"]["training_weights"],
+        }
+    if artifact.pipeline.config != expected_config:
         raise ValueError("Winning model configuration differs from its frozen recipe.")
     with TemporaryDirectory(prefix="skyulf-winner-adoption-") as directory:
         package = Path(store.client.download_artifacts(winner["run_id"], "model", directory))

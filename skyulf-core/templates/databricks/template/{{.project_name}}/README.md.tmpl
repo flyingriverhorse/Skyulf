@@ -414,6 +414,71 @@ projects may still define a single model inline in `workflow.json`, or use
 file, or both a single-model file and a nonempty inline model: conflicting
 definitions fail validation.
 
+### Class and row weights
+
+`class_weight` is configured in each model's parameters. Generated
+models are tuners. Find the model's settings in your layout:
+
+| File in `src/modeling/` | Model settings dictionary |
+| --- | --- |
+| `single_model.py` | `MODELING` |
+| `model_competition.py` | `MODELS["candidate_name"]["modeling"]` |
+| `multi_model.py` | `MODELS["branch_name"]["workflow"]["pipeline"]["modeling"]` |
+
+Use an actual candidate or branch key from your file. For a supported classifier,
+edit that dictionary's existing `base_model.params`, adding the class-weight key:
+
+```python
+"base_model": {
+    "type": "logistic_regression",  # Keep your selected model type.
+    "params": {"class_weight": "balanced"},  # Preserve other params too.
+},
+```
+
+Use Python `None` to disable class weighting. To keep your chosen value fixed,
+remove the `class_weight` entry from the same dictionary's `search_space`.
+To tune class weights instead, keep the search axis and omit the fixed
+`class_weight` key from `base_model.params`. Conflicting fixed and searched
+values fail validation. If you replace the tuner with a direct model, its
+settings live in `params` without `base_model`.
+Do not add class weights to regression models. Class and row weights can be
+enabled separately or together for a supported classifier.
+
+Bundle initialization asks whether to use sample weights before model selection
+(default: No). Selecting Yes asks for the source column and filters the model
+choices to supported models. The generated model file remains editable:
+
+- `single_model.py`: `WEIGHT_COLUMN = None` (or `"training_weight"`).
+- `model_competition.py`: one shared `WEIGHT_COLUMN` for all candidates.
+- `multi_model.py`: each branch's `workflow["weight_column"]` independently.
+
+Use finite nonnegative numeric source values. Each training fold must have
+positive total weight; values are not normalized. None disables that model or
+branch. All declared branch weight columns remain reserved across every branch,
+including disabled branches. They cannot be features, targets, record keys,
+group columns or timestamps, and pre-split steps cannot overwrite them.
+
+Weights affect model fitting, including CV fits. Selection and holdout metrics
+remain unweighted. Weighted training accepts supported models and row-preserving
+built-in preprocessing. Row filtering, deduplication and temporal sorting carry
+weights through explicit row positions. Random sampling carries selected source
+weights; synthetic samplers require `synthetic_weight="class_mean"` to assign
+new rows their training class's mean weight (`"uniform"` assigns one instead).
+Unsupported final models and custom steps without a row-mapping contract fail
+explicitly. Scalers and imputers remain unweighted.
+Edits apply on the next training load after syncing project files. Weight-only
+source edits do not count as new labels for automatic retraining; use manual
+training when that is the only change. Existing model files without weight
+declarations retain their unweighted behavior.
+
+Saved models record the resolved column, source-code digest, pinned table/version,
+aggregate statistics and an ordered record/weight digest. Console, parameter and
+metric summaries contain no raw weight vectors. Existing protected source and
+training Parquet snapshots retain the column for exact lifecycle replay under
+the same permissions as other training data. Scoring uses the saved model,
+does not execute the editable model files, and needs no weight column. Weight columns are
+excluded from model input schemas, explanations and drift inputs.
+
 Use `"search_space": {}` to ask the installed Core version for its current automatic
 space. If you change ensemble members, calibration or the search strategy, update
 the explicit space too, or clear it to `{}`. Calibration changes nested keys from

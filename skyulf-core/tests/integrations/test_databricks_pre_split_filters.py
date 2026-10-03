@@ -225,6 +225,10 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "training_evidence_sha256",
         "group_column",
         "drop_missing_labels",
+        "weight_column",
+        "reserved_weight_columns",
+        "weights_python_source",
+        "weights_python_sha256",
     ):
         old.pop(key)
     for key in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -234,6 +238,13 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
     saved.pop("pre_split_steps")
     saved.pop("group_column")
     saved.pop("drop_missing_labels")
+    for key in (
+        "weight_column",
+        "reserved_weight_columns",
+        "weights_python_source",
+        "weights_python_sha256",
+    ):
+        saved.pop(key)
     saved["event_time_parsing"] = spec.event_time_parsing
     saved["result_time_parsing"] = spec.result_time_parsing
     restored = training.LocalTrainingSpec(**saved)

@@ -124,7 +124,9 @@ def instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
     ``set_params`` because sklearn estimators only accept them that way.
     """
     flat, nested = split_flat_and_nested_params(params)
-    flat = filter_params_to_signature(model_class, flat)
+    constructor = filter_params_to_signature(model_class, flat)
+    replacements = {key: value for key, value in flat.items() if key not in constructor}
+    flat = constructor
 
     # LogisticRegression-only: sklearn >=1.8 deprecates the ``penalty``
     # constructor arg. The tuning engine builds estimators directly
@@ -138,6 +140,12 @@ def instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
         flat = normalize_logistic_regression_params(flat)
 
     model = model_class(**flat)
+    # Named ensemble children are set_params keys, not constructor arguments.
+    get_params = getattr(model, "get_params", None)
+    supported = get_params(deep=True) if replacements and callable(get_params) else {}
+    replacements = {key: value for key, value in replacements.items() if key in supported}
+    if replacements:
+        model.set_params(**replacements)
     if nested:
         model.set_params(**nested)
     return model

@@ -517,7 +517,10 @@ def test_fit_without_model_class_raises():
             log_callback=None,
             validation_data=None,
             iteration_callback=None,
+            *,
+            sample_weight=None,
         ):
+            """Return no artifact for the missing-estimator contract test."""
             return None
 
     X, y = _clf_xy()
@@ -1115,7 +1118,10 @@ class _FlipModelClassCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
+        """Return no artifact for the estimator-disappearance contract test."""
         return None
 
 

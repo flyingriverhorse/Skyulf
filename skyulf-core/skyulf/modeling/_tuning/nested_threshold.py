@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.utils.metaestimators import available_if
 
 from .._class_weights import split_class_weight_params
+from .._cv_weights import preflight_weights, take_weights, weight_kwargs
 from .._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .fold_pipeline import FoldAwareModelStep, _fitted_model_has
 from .grid_random import _slice_fold_rows
@@ -53,6 +54,7 @@ def _fit_step(
     config: TuningConfig,
     best_params: dict[str, Any],
     preprocessing: Any,
+    sample_weight: Any = None,
 ) -> _ThresholdModelStep:
     """Refit the selected recipe, including preprocessing and fold-local class weights."""
     calculator = tuner.model_calculator
@@ -64,7 +66,7 @@ def _fit_step(
     step = _ThresholdModelStep(
         estimator=estimator, preprocessor=preprocessing, class_weight=class_weight
     )
-    step.fit(X, y)
+    step.fit(X, y, **weight_kwargs(sample_weight))
     return step
 
 
@@ -108,12 +110,14 @@ def select_nested_threshold(
     best_params: dict[str, Any],
     cv: Any,
     preprocessing: Any = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Select a threshold from fresh inner-fold predictions of the winning parameters.
 
     Temporal warmup rows may be uncovered. They are excluded from optimization;
     evidence records the actual coverage without storing row-level predictions.
     """
+    preflight_weights(sample_weight, cv, X, y)
     classes = _binary_classes(tuner, y)
     partitions = list(cv.split(X, y) if hasattr(cv, "split") else cv)
     covered = np.zeros(len(y), dtype=bool)
@@ -127,6 +131,7 @@ def select_nested_threshold(
             config,
             best_params,
             preprocessing,
+            **weight_kwargs(take_weights(sample_weight, train)),
         )
         probabilities[test] = _probabilities(step, _slice_fold_rows(X, test), classes)
         covered[test] = True
@@ -165,12 +170,13 @@ def score_nested_threshold(
     best_params: dict[str, Any],
     selection: dict[str, Any],
     preprocessing: Any = None,
+    sample_weight: Any = None,
 ) -> float:
     """Refit on outer training rows and evaluate the selected threshold on untouched rows."""
     classes = _binary_classes(tuner, y_train)
     if not set(np.unique(np.asarray(y_test))).issubset(set(classes)):
         raise ValueError("Nested threshold outer labels do not match training classes.")
-    step = _fit_step(tuner, X_train, y_train, config, best_params, preprocessing)
+    step = _fit_step(tuner, X_train, y_train, config, best_params, preprocessing, sample_weight)
     _probabilities(step, X_test, classes)
     step.decision_thresholds = selection["decision_thresholds"]
     metric = resolve_metric(config, y_train, tuner.problem_type)

@@ -199,6 +199,7 @@ class OversamplingArtifact(TypedDict, total=False):
 
     type: str
     method: str
+    synthetic_weight: str | None
     target_column: str | None
     sampling_strategy: Any
     random_state: int

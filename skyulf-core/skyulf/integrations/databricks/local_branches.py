@@ -28,9 +28,11 @@ from .local_retraining import (
     train_local_candidate,
     training_spec_payload,
     validate_cv_holdout_policy,
+    validate_pre_split_step,
 )
 from .local_workflow import resolve_training_spec, training_settings, training_spec
 from .prediction_output import TABLE_NAME_PATTERN
+from .weight_config import validate_weight_roles
 from .workflow_config import validate_workflow_config
 
 
@@ -87,11 +89,26 @@ def _unique(values: list[str], label: str) -> None:
         raise ValueError(f"Training branches require distinct {label}.")
 
 
+def _validate_weight_roles(branches: tuple[TrainingBranch, ...]) -> None:
+    """Protect every declared weight against every branch role during frozen replay."""
+    reserved = {
+        column
+        for branch in branches
+        for column in (*branch.spec.reserved_weight_columns, branch.spec.weight_column)
+        if column is not None
+    }
+    for branch in branches:
+        validate_weight_roles({**asdict(branch.spec), "reserved_weight_columns": tuple(reserved)})
+        for index, step in enumerate(branch.spec.pre_split_steps):
+            validate_pre_split_step(step, index, branch.spec.target_column, tuple(reserved))
+
+
 def _validate_shared(branches: tuple[TrainingBranch, ...]) -> None:
     """Require distinct targets and models over exactly one source and key contract."""
     _unique([branch.name for branch in branches], "names")
     _unique([branch.model_name for branch in branches], "registered model names")
     _unique([branch.spec.target_column for branch in branches], "targets")
+    _validate_weight_roles(branches)
     first = branches[0].spec
     targets = {branch.spec.target_column.casefold() for branch in branches}
     for branch in branches:

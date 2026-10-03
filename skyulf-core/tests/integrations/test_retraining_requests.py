@@ -321,7 +321,7 @@ def test_store_claim_sql_cannot_replace_an_unresolved_intent(monkeypatch):
     row = {"row_id": "request:17:" + "a" * 64, "job_id": 17, "request_id": "a" * 64}
     monkeypatch.setattr(store, "read", lambda key: row | {"row_id": key})
     statements = []
-    monkeypatch.setattr(module, "_merge_with_retry", lambda spark, sql: statements.append(sql))
+    monkeypatch.setattr(module, "merge_with_retry", lambda spark, sql: statements.append(sql))
     result = store.claim(row, 123)
     assert result["row_id"] == "job:17"
     assert "ON t.row_id = s.row_id" in statements[0]

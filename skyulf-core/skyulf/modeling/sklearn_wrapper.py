@@ -16,6 +16,7 @@ from ._class_weights import (
     sample_weight_for_fit,
     split_class_weight_params,
 )
+from ._sample_weights import SampleWeightError
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
@@ -59,8 +60,14 @@ class SklearnCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Fit the Scikit-Learn model."""
+        if sample_weight is not None and self.problem_type not in ("classification", "regression"):
+            raise SampleWeightError(
+                "sample_weight is supported only for classification and regression in V1."
+            )
         # 1. Merge Config with Defaults
         params = self._resolve_fit_params(config)
 
@@ -81,9 +88,7 @@ class SklearnCalculator(BaseModelCalculator):
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
         X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=True)
 
-        sample_weight = None
-        if class_weight_to_apply is not None:
-            sample_weight = self._compute_sample_weight_for_fit(model, class_weight_to_apply, y_np)
+        sample_weight = sample_weight_for_fit(model, class_weight_to_apply, y_np, sample_weight)
 
         # sklearn's ConvergenceWarning (raised via `warnings.warn`, not the
         # `logging` module) would otherwise only reach the server's stderr

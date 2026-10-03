@@ -91,11 +91,13 @@ def test_pending_or_rejected_candidates_do_not_replace_active_monitor(monkeypatc
 
 def request(**changes):
     """Represent the immutable handoff saved by the successful score task."""
-    from skyulf.integrations.databricks.monitoring_registration import _enrollment_config
+    from skyulf.integrations.databricks.monitoring_registration import (
+        build_monitor_enrollment_config,
+    )
 
     return {
         "namespace": "ops.monitoring",
-        "config": _enrollment_config(workflow(), settings(), "7").payload(),
+        "config": build_monitor_enrollment_config(workflow(), settings(), "7").payload(),
         "commit_version": 3,
         "noop": False,
         **changes,
@@ -347,7 +349,7 @@ def test_scoring_merge_protects_active_selection_and_preserves_activation_order(
     monkeypatch.setattr(store, "ensure_owned_object", lambda *args: True)
     monkeypatch.setattr(store, "_inventory_isolation", lambda *args: "Serializable")
     merge = Mock()
-    monkeypatch.setattr(store, "_merge_with_retry", merge)
+    monkeypatch.setattr(store, "merge_with_retry", merge)
     store.enroll_monitor(
         Mock(),
         "ops.monitoring",
@@ -367,7 +369,7 @@ def test_old_activation_repair_cannot_replace_a_later_activation(monkeypatch):
     monkeypatch.setattr(store, "ensure_owned_object", lambda *args: True)
     monkeypatch.setattr(store, "_inventory_isolation", lambda *args: "Serializable")
     merge = Mock()
-    monkeypatch.setattr(store, "_merge_with_retry", merge)
+    monkeypatch.setattr(store, "merge_with_retry", merge)
     store.enroll_monitor(
         Mock(),
         "ops.monitoring",

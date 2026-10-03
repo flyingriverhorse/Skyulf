@@ -1,5 +1,7 @@
 """Optional training-only CV using Core estimators and fold-local feature engineering."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -78,7 +80,7 @@ class LocalCVSpec:
         _validate_policy_settings(self)
 
     @classmethod
-    def from_workflow(cls, config: dict[str, Any]) -> "LocalCVSpec":
+    def from_workflow(cls, config: dict[str, Any]) -> LocalCVSpec:
         """Read the same flat CV field names used by Canvas without leaking other config."""
         return cls(**{field: config[key] for key, field in CV_FIELDS.items() if key in config})
 
@@ -162,6 +164,7 @@ def evaluate_training_cv(
     *,
     target_column: str,
     event_column: str | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any] | None:
     """Evaluate a bounded raw training partition; never fit or inspect a final holdout.
 
@@ -181,7 +184,7 @@ def evaluate_training_cv(
     )
     estimator = StatefulEstimator(calculator, applier, "bundle_cv")
     result = estimator.cross_validate(
-        SplitDataset(train=frame, test=frame.head(0)),
+        SplitDataset(train=frame, test=frame.head(0), train_sample_weight=sample_weight),
         target_column,
         model,
         n_folds=spec.folds,

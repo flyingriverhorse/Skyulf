@@ -13,6 +13,8 @@ This removes the inline ``if engine.name == EngineName.POLARS`` branches from
 both :class:`DataSplitter` methods and :class:`FeatureTargetSplitApplier`.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any, cast
 
@@ -20,10 +22,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.model_selection import train_test_split
+from sklearn.utils.validation import check_consistent_length
 
 from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
+from ..modeling._sample_weights import validate_sample_weight
 from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ._artifacts import FeatureTargetSplitArtifact, SplitArtifact
@@ -64,6 +68,17 @@ def _back_to_engine(data: Any, was_polars: bool) -> Any:
     if isinstance(data, (pd.DataFrame, pd.Series)):
         return pl.from_pandas(data)
     return data
+
+
+def _take_weighted_rows(data: Any, indices: Any) -> Any:
+    """Gather positions on the input engine, preserving duplicate pandas labels."""
+    if data is None:
+        return None
+    if hasattr(data, "iloc"):
+        return data.iloc[indices]
+    if is_polars(data):
+        return data.gather(indices)
+    return np.asarray(data)[indices]
 
 
 def _safe_stratify(y: Any, label: str) -> Any:
@@ -109,7 +124,7 @@ def _safe_stratify_polars(y: Any, label: str) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def _build_splitter(params: dict[str, Any]) -> "DataSplitter":
+def _build_splitter(params: dict[str, Any]) -> DataSplitter:
     """Construct a :class:`DataSplitter` from the node's params dict."""
     stratify = params.get("stratify", False)
     target_col = params.get("target_column")
@@ -134,6 +149,8 @@ class SplitApplier(BaseApplier):
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         params: dict[str, Any],
+        *,
+        sample_weight: Any = None,
     ) -> SplitDataset:
         """Split ``df`` into train/test and optional validation.
 
@@ -146,7 +163,7 @@ class SplitApplier(BaseApplier):
 
         if isinstance(df, tuple) and len(df) == 2:
             X, y = df
-            return splitter.split_xy(cast(Any, X), y)
+            return splitter.split_xy(cast(Any, X), y, sample_weight=sample_weight)
 
         # If a target column is configured and present, split features from target
         # so downstream nodes see real (X, y) tuples — not the placeholder
@@ -157,9 +174,9 @@ class SplitApplier(BaseApplier):
             # takes column names positionally and has no `columns=` kwarg.
             X = frame.drop(target_col) if is_polars(frame) else frame.drop(columns=[target_col])
             y = frame[target_col]
-            return splitter.split_xy(X, y)
+            return splitter.split_xy(X, y, sample_weight=sample_weight)
 
-        return splitter.split(cast(Any, df))
+        return splitter.split(cast(Any, df), sample_weight=sample_weight)
 
 
 @NodeRegistry.register("Split", SplitApplier)
@@ -271,7 +288,13 @@ class DataSplitter:
 
     # ---- public API ---------------------------------------------------------
 
-    def split_xy(self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any) -> SplitDataset:
+    def split_xy(
+        self,
+        X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
+        y: pd.Series | Any,
+        *,
+        sample_weight: Any = None,
+    ) -> SplitDataset:
         """Split an ``(X, y)`` pair into train/test and optional validation.
 
         Polars input is partitioned by index gather and never converted; other
@@ -280,6 +303,8 @@ class DataSplitter:
         unstratified split, with a warning, when the rarest class has fewer than
         two members.
         """
+        if sample_weight is not None:
+            return self._split_weighted(X, y, sample_weight, paired=True)
         if is_polars(X):
             return self._split_xy_polars(cast(Any, X), y)
 
@@ -308,7 +333,9 @@ class DataSplitter:
             )
         return SplitDataset(train=train, test=test, validation=validation)
 
-    def split(self, df: pd.DataFrame | SkyulfDataFrame) -> SplitDataset:
+    def split(
+        self, df: pd.DataFrame | pl.DataFrame | SkyulfDataFrame, *, sample_weight: Any = None
+    ) -> SplitDataset:
         """Split a whole frame row-wise, leaving any target column in place.
 
         Shares :meth:`split_xy`'s engine handling. Stratification here reads
@@ -316,6 +343,8 @@ class DataSplitter:
         absent from ``df`` disables stratification with a warning instead of
         raising.
         """
+        if sample_weight is not None:
+            return self._split_weighted(df, None, sample_weight, paired=False)
         if is_polars(df):
             return self._split_polars(cast(Any, df))
 
@@ -338,6 +367,47 @@ class DataSplitter:
         )
 
     # ---- polars-native paths (index split + gather, no frame conversion) ----
+
+    def _split_weighted(self, X: Any, y: Any, weights: Any, *, paired: bool) -> SplitDataset:
+        """Partition features, targets and weights with the same actual row positions."""
+        check_consistent_length(X, y)
+        weights = validate_sample_weight(weights, len(X))
+        assert weights is not None
+        labels = y if paired else X[self.stratify_col] if self.stratify_col in X.columns else None
+        stratify = self._weighted_stratify(labels, "Stratified split")
+        train_idx, test_idx = self._split_indices(len(X), stratify)
+        val_idx = None
+        if self.validation_size > 0:
+            val_labels = _take_weighted_rows(labels, train_idx)
+            train_idx, val_idx = train_test_split(
+                train_idx,
+                test_size=self.validation_size / (1 - self.test_size),
+                random_state=self.random_state,
+                shuffle=self.shuffle,
+                stratify=self._weighted_stratify(val_labels, "Stratified validation split"),
+            )
+
+        def payload(indices: Any) -> Any:
+            """Gather one partition without relying on pandas index labels."""
+            if indices is None:
+                return None
+            features = _take_weighted_rows(X, indices)
+            return (features, _take_weighted_rows(y, indices)) if paired else features
+
+        return SplitDataset(
+            train=payload(train_idx),
+            test=payload(test_idx),
+            validation=payload(val_idx),
+            train_sample_weight=validate_sample_weight(weights[train_idx], len(train_idx)),
+        )
+
+    def _weighted_stratify(self, labels: Any, label: str) -> Any:
+        """Retain the existing rare-class fallback for weighted partitions."""
+        if self.stratify_col is None or labels is None:
+            return None
+        if is_polars(labels):
+            return _safe_stratify_polars(labels, label)
+        return _safe_stratify(labels, label)
 
     def _split_indices(self, n: int, stratify: Any) -> tuple[Any, Any]:
         """Split row positions ``0..n-1``; same partitioning as splitting rows."""
@@ -542,7 +612,12 @@ class FeatureTargetSplitApplier(BaseApplier):
                 if df.validation is not None
                 else None
             )
-            return SplitDataset(train=train, test=test, validation=validation)
+            return SplitDataset(
+                train=train,
+                test=test,
+                validation=validation,
+                train_sample_weight=df.train_sample_weight,
+            )
 
         if isinstance(df, tuple):
             return cast(tuple[pd.DataFrame, pd.Series], df)

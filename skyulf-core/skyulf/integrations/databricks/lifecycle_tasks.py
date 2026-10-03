@@ -313,8 +313,14 @@ def _validate_pinned_spec(fitted_spec: dict[str, Any], pinned_spec: dict[str, An
         "survivor_key_sha256",
         "training_evidence_sha256",
     }
-    if {key: value for key, value in fitted_spec.items() if key not in enriched} != {
-        key: value for key, value in pinned_spec.items() if key not in enriched
+    defaults = {
+        "weight_column": None,
+        "reserved_weight_columns": [],
+        "weights_python_source": None,
+        "weights_python_sha256": None,
+    }
+    if {key: value for key, value in (defaults | fitted_spec).items() if key not in enriched} != {
+        key: value for key, value in (defaults | pinned_spec).items() if key not in enriched
     }:
         raise ValueError("Saved training source differs from pinned invocation.")
 
@@ -330,6 +336,17 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
     )
     source = config["pipeline"].get("project_python_source")
     source_sha = None if source is None else project_source_digest(source)
+    if store.read("candidate_training_spec.json") != fitted["spec"]:
+        raise ValueError("Saved candidate training spec differs from phase receipt.")
+    spec = phase_training_spec(fitted["spec"], source)
+    _validate_pinned_spec(fitted["spec"], store.request["spec"])
+    evidence = store.read("training_filter_evidence.json")
+    validate_training_evidence(evidence, spec, project_source_sha256=source_sha)
+    if spec.weight_column is not None:
+        effective_config = {
+            **effective_config,
+            "training_weights": evidence.get("training_weights"),
+        }
     if (
         artifact.manifest.fitted_engine != config["engine"]
         or artifact.manifest.project_source_sha256 != source_sha
@@ -339,12 +356,6 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
         raise ValueError(
             "Fitted model engine, configuration or project source differs from invocation."
         )
-    if store.read("candidate_training_spec.json") != fitted["spec"]:
-        raise ValueError("Saved candidate training spec differs from phase receipt.")
-    spec = phase_training_spec(fitted["spec"], source)
-    _validate_pinned_spec(fitted["spec"], store.request["spec"])
-    evidence = store.read("training_filter_evidence.json")
-    validate_training_evidence(evidence, spec, project_source_sha256=source_sha)
     return _ReplayEvidence(artifact, spec, fitted, evidence)
 
 

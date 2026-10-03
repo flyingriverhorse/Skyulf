@@ -1,5 +1,7 @@
 """Main Skyulf Pipeline."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -24,6 +26,7 @@ from ..modeling._tuning.engine import TuningApplier, TuningCalculator
 from ..modeling._tuning.refit import tune_decision_thresholds
 from ..modeling._tuning.schemas import TuningConfig
 from ..modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
+from ..preprocessing._weight_policy import prepare_pipeline_weights
 from ..preprocessing.base import BaseApplier, apply_method
 from ..preprocessing.fold_adapter import FeatureEngineerFoldAdapter
 from ..preprocessing.pipeline import FeatureEngineer
@@ -58,12 +61,15 @@ class _PipelineTuningPreprocessor(FeatureEngineerFoldAdapter):
         self.metrics: dict[str, Any] = {}
         self.input_columns: list[str] = []
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Fit a fresh chain and retain its exact OOF or row-changing training output."""
         self._validate_payload(X)
         engineer = FeatureEngineer(self._steps_config)
-        transformed, metrics = engineer.fit_transform((X, y), target_column=self._target_column)
+        transformed, metrics = engineer.fit_transform(
+            (X, y), target_column=self._target_column, sample_weight=sample_weight
+        )
         self._engineer = engineer
+        self.train_sample_weight_ = engineer.train_sample_weight_
         self.training_payload = transformed
         self.metrics = metrics
         self.input_columns = list(X.columns)
@@ -250,7 +256,7 @@ class SkyulfPipeline:
         )
 
     def _fit_tuning_prefix(
-        self, data: Any, target_column: str
+        self, data: Any, target_column: str, sample_weight: Any = None
     ) -> tuple[FeatureEngineer, SplitDataset, dict[str, Any], int]:
         """Fit only the outer-split prefix and normalize its raw partition payload."""
         prefix_length = 0
@@ -264,22 +270,27 @@ class SkyulfPipeline:
                 0,
             )
         prefix = FeatureEngineer(self.preprocessing_steps[:prefix_length], _validated=True)
-        raw_data, prefix_metrics = prefix.fit_transform(data, target_column=target_column)
+        raw_data, prefix_metrics = prefix.fit_transform(
+            data, target_column=target_column, sample_weight=sample_weight
+        )
         if isinstance(raw_data, SplitDataset):
             raw_dataset = raw_data
         else:
             raw_frame = raw_data[0] if isinstance(raw_data, tuple) else raw_data
             raw_dataset = SplitDataset(
-                train=raw_data, test=get_engine(raw_frame).create_dataframe({}), validation=None
+                train=raw_data,
+                test=get_engine(raw_frame).create_dataframe({}),
+                validation=None,
+                train_sample_weight=prefix.train_sample_weight_,
             )
         return prefix, raw_dataset, prefix_metrics, prefix_length
 
     def _fit_tuning_pipeline(
-        self, data: Any, target_column: str
+        self, data: Any, target_column: str, sample_weight: Any = None
     ) -> tuple[SplitDataset, dict[str, Any]]:
         """Tune from raw outer partitions and adopt the final training preprocessor."""
         prefix, raw_dataset, prefix_metrics, prefix_length = self._fit_tuning_prefix(
-            data, target_column
+            data, target_column, sample_weight
         )
         raw_train = extract_xy(raw_dataset.train, target_column)
         raw_validation = (
@@ -306,6 +317,11 @@ class SkyulfPipeline:
             preprocessing=adapter,
             validation_data=raw_validation,
             validation_frames=raw_validation,
+            **(
+                {"sample_weight": raw_dataset.train_sample_weight}
+                if raw_dataset.train_sample_weight is not None
+                else {}
+            ),
         )
         if nested:
             self._tuned_thresholds = estimator.model[1].decision_thresholds
@@ -319,6 +335,8 @@ class SkyulfPipeline:
         _record_tuning_column_drops(adapter._engineer, raw_train[0], adapter.input_columns)
         self.feature_engineer.fitted_steps = prefix.fitted_steps + adapter._engineer.fitted_steps
         self.feature_engineer._portable_fitted = True
+        # This post-fit dataset is used only for unweighted evaluation.
+        # The tuner already consumed aligned weights in each actual model fit.
         transformed = SplitDataset(
             train=adapter.training_payload,
             test=self._transform_tuning_split(adapter, raw_dataset.test, target_column),
@@ -347,6 +365,7 @@ class SkyulfPipeline:
         target_column: str,
         *,
         on_leakage: OnLeakage = "raise",
+        sample_weight: Any = None,
     ) -> dict[str, Any]:
         """Fit the pipeline.
 
@@ -356,6 +375,8 @@ class SkyulfPipeline:
         Args:
             data: Input data (DataFrame or SplitDataset).
             target_column: Name of the target column.
+            sample_weight: Optional training weights in raw input order; use the
+                train_sample_weight slot for a SplitDataset.
             on_leakage: Reject definite leakage by default. Use "warn" or
                 "ignore" only to explicitly allow unsafe preprocessing.
 
@@ -383,7 +404,9 @@ class SkyulfPipeline:
         if self.model_estimator is not None:
             self.model_estimator.model = None
         try:
-            return self._fit(data, target_column)
+            weights = prepare_pipeline_weights(data, sample_weight, self.preprocessing_steps)
+            raw_weights = None if isinstance(data, SplitDataset) else weights
+            return self._fit(data, target_column, raw_weights)
         except BaseException:
             # A failure can occur after model fitting, while transforming or
             # predicting held-out data. Never expose that partial replacement.
@@ -397,6 +420,7 @@ class SkyulfPipeline:
         self,
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
+        sample_weight: Any = None,
     ) -> dict[str, Any]:
         """Fit validated data, publishing metadata only after all stages complete."""
         metrics = {}
@@ -411,7 +435,9 @@ class SkyulfPipeline:
             self.model_estimator.calculator, TuningCalculator
         )
         if is_tuning:
-            transformed_data, fe_metrics = self._fit_tuning_pipeline(data, target_column)
+            transformed_data, fe_metrics = self._fit_tuning_pipeline(
+                data, target_column, sample_weight
+            )
             if input_schema is not None:
                 ordering_columns = (
                     column
@@ -422,14 +448,20 @@ class SkyulfPipeline:
                 input_schema = input_schema.drop(ordering_columns)
         else:
             transformed_data, fe_metrics = self.feature_engineer.fit_transform(
-                data, target_column=target_column
+                data, target_column=target_column, sample_weight=sample_weight
             )
         metrics["preprocessing"] = fe_metrics
 
         # 2. Modeling
         if self.model_estimator:
             self._fit_model(
-                transformed_data, target_column, is_tuning, metrics, input_schema, fitted_engine
+                transformed_data,
+                target_column,
+                is_tuning,
+                metrics,
+                input_schema,
+                fitted_engine,
+                getattr(self.feature_engineer, "train_sample_weight_", sample_weight),
             )
 
         self._fit_metrics = metrics
@@ -452,6 +484,7 @@ class SkyulfPipeline:
         metrics: dict[str, Any],
         input_schema: SkyulfSchema | None,
         fitted_engine: str | None,
+        sample_weight: Any = None,
     ) -> None:
         """Fit and evaluate the model before publishing successful inference metadata."""
         assert self.model_estimator is not None
@@ -465,9 +498,16 @@ class SkyulfPipeline:
             # But we can fit on it.
             # Ideally, the user should provide a SplitDataset or use a Splitter node in preprocessing.
             # If preprocessing didn't split, we wrap it.
-            engine = get_engine(transformed_data)
+            engine = get_engine(
+                transformed_data[0] if isinstance(transformed_data, tuple) else transformed_data
+            )
             empty_df = engine.create_dataframe({})
-            dataset = SplitDataset(train=transformed_data, test=empty_df, validation=None)
+            dataset = SplitDataset(
+                train=transformed_data,
+                test=empty_df,
+                validation=None,
+                train_sample_weight=sample_weight,
+            )
 
         # Observe the actual training representation before sklearn loses
         # its column names. Schemas contain metadata only, never samples.
@@ -875,7 +915,7 @@ class SkyulfPipeline:
             pickle.dump(self, f)  # nosec B301 nosemgrep: avoid-pickle -- trusted local artifact save, not attacker-controlled
 
     @classmethod
-    def load(cls, path: str) -> "SkyulfPipeline":
+    def load(cls, path: str) -> SkyulfPipeline:
         """Load the pipeline from a file."""
         with open(path, "rb") as f:
             return pickle.load(f)  # nosec B301 nosemgrep: avoid-pickle -- loads only artifacts previously saved by this same trusted process, not attacker-controlled input

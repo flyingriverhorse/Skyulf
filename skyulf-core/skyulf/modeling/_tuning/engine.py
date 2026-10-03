@@ -11,6 +11,8 @@ kept on ``TuningCalculator`` are one-line delegates preserved for the
 existing test surface.
 """
 
+from __future__ import annotations
+
 import inspect
 import logging
 import warnings
@@ -23,6 +25,8 @@ import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.pipeline import Pipeline
 
+from .._cv_weights import fit_preprocessor
+
 try:
     from sklearn.utils import get_tags
 except ImportError:  # sklearn 1.4/1.5 remain supported by the standalone package.
@@ -32,7 +36,9 @@ from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import constructor_accepts_class_weight, split_class_weight_params
+from .._cv_weights import preflight_weights, prepare_weights, search_weights, weight_kwargs
 from .._evaluation.thresholds import apply_thresholds
+from .._sample_weights import SampleWeightError
 from ..base import BaseModelApplier, BaseModelCalculator
 from ..cross_validation import _sort_by_time
 from ..pruning import resolve_pruning_plan, unsupported_pruning_reason
@@ -144,15 +150,20 @@ def _prepare_time_series_data(
     tuning_config: TuningConfig,
     validation_data: tuple[Any, Any] | None,
     validation_frames: tuple[Any, Any] | None,
-    preprocessing: "FoldPreprocessor | None",
+    preprocessing: FoldPreprocessor | None,
     log_callback: Callable[[str], None] | None,
-) -> tuple[Any, Any, tuple[Any, Any] | None, tuple[Any, Any] | None]:
+    sample_weight: Any = None,
+) -> tuple:
     """Sort named time-series features and align validation columns without row sorting."""
     if not tuning_config.cv_enabled and has_temporal_history(preprocessing):
-        return X, y, validation_data, validation_frames
+        return X, y, validation_data, validation_frames, sample_weight
     if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
         original_columns = list(X.columns)
-        X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+        X, y, positions = _sort_by_time(
+            X, y, tuning_config.cv_time_column, log_callback, logger, True
+        )
+        if sample_weight is not None:
+            sample_weight = sample_weight[positions]
         feature_columns = list(X.columns)
         validation_data = _align_time_series_validation(
             validation_data,
@@ -165,7 +176,7 @@ def _prepare_time_series_data(
         validation_frames = _align_time_series_validation(
             validation_frames, original_columns, feature_columns
         )
-    return X, y, validation_data, validation_frames
+    return X, y, validation_data, validation_frames, sample_weight
 
 
 def _prepare_policy_inputs(
@@ -176,15 +187,20 @@ def _prepare_policy_inputs(
     validation_data: Any,
     validation_frames: Any,
     preprocessing: Any,
-) -> tuple[Any, Any, Any, Any, Any]:
+    sample_weight: Any = None,
+) -> tuple:
     """Extract metadata before conversion and keep validation feature order aligned."""
     if not uses_explicit_policy(config) and not uses_history_policy(config, preprocessing):
-        return X, y, validation_data, validation_frames, None
+        return X, y, validation_data, validation_frames, None, sample_weight
     raw_validation = validation_frames if validation_frames is not None else validation_data
     if raw_validation is not None:
         validate_holdout_metadata(X, raw_validation[0], config, problem_type)
     columns = list(X.columns)
-    X, y, metadata = prepare_policy_data(X, y, config, problem_type, preprocessing)
+    X, y, metadata, positions = prepare_policy_data(
+        X, y, config, problem_type, preprocessing, return_positions=True
+    )
+    if sample_weight is not None:
+        sample_weight = sample_weight[positions]
     validation_data = _align_time_series_validation(
         validation_data,
         columns,
@@ -192,7 +208,7 @@ def _prepare_policy_inputs(
         array_is_preprocessed=preprocessing is not None and validation_frames is not None,
     )
     validation_frames = _align_time_series_validation(validation_frames, columns, list(X.columns))
-    return X, y, validation_data, validation_frames, metadata
+    return X, y, validation_data, validation_frames, metadata, sample_weight
 
 
 def _finish_threshold_selection(
@@ -236,7 +252,7 @@ def _report_search_warnings(
 
 
 def _can_wrap_preprocessing(
-    preprocessing: "FoldPreprocessor | None",
+    preprocessing: FoldPreprocessor | None,
     searcher_strategy: bool,
     preprocessing_frames: tuple[Any, Any] | None,
     validation_data: tuple[Any, Any] | None,
@@ -275,7 +291,7 @@ def _can_wrap_preprocessing(
 def _wrap_search_estimator(
     base_estimator: Any,
     config: TuningConfig,
-    preprocessing: "FoldPreprocessor | None",
+    preprocessing: FoldPreprocessor | None,
     preprocessing_frames: tuple[Any, Any] | None,
     class_weight: Any,
     wrapped: bool,
@@ -438,6 +454,7 @@ class TuningCalculator(BaseModelCalculator):
         y_np: Any,
         log_callback: Callable[[str], None] | None,
         iteration_callback: Callable[..., None] | None = None,
+        sample_weight: Any = None,
     ) -> Any:
         return refit_best_model(
             self.model_calculator,
@@ -447,6 +464,7 @@ class TuningCalculator(BaseModelCalculator):
             y_np,
             log_callback,
             iteration_callback,
+            **weight_kwargs(sample_weight),
         )
 
     def _resolve_threshold_metric(
@@ -489,9 +507,10 @@ class TuningCalculator(BaseModelCalculator):
         val_idx: Any,
         metric: str,
         log_callback: Callable[[str], None] | None,
-        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing: FoldPreprocessor | None = None,
         fold_errors: list[str] | None = None,
         seed_params_overlay: dict[str, Any] | None = None,
+        sample_weight: Any = None,
     ) -> float:
         return fit_and_score_candidate_fold(
             candidate_idx,
@@ -511,6 +530,7 @@ class TuningCalculator(BaseModelCalculator):
             fold_errors,
             seed_params_overlay,
             model_calculator=self.model_calculator,
+            **weight_kwargs(sample_weight),
         )
 
     def _run_grid_or_random_search(
@@ -523,7 +543,8 @@ class TuningCalculator(BaseModelCalculator):
         metric: str,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
-        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing: FoldPreprocessor | None = None,
+        sample_weight: Any = None,
     ) -> TuningResult:
         return run_grid_or_random_search(
             X_for_search,
@@ -536,6 +557,7 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             preprocessing,
             model_calculator=self.model_calculator,
+            **weight_kwargs(sample_weight),
         )
 
     @staticmethod
@@ -627,8 +649,10 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
-        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing: FoldPreprocessor | None = None,
         validation_frames: tuple[Any, Any] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Fits the tuner (runs tuning).
 
@@ -651,6 +675,9 @@ class TuningCalculator(BaseModelCalculator):
         the fold-aware wrap convert them via ``to_pandas()`` with dtypes
         intact.
         """
+        sample_weight = _prepare_tuning_weights(
+            sample_weight, len(X), preprocessing, self.problem_type
+        )
         tuning_config = self._build_tuning_config(config)
         original_columns = tuple(getattr(X, "columns", ()))
 
@@ -668,18 +695,28 @@ class TuningCalculator(BaseModelCalculator):
         # Mirrors the same fix already applied to perform_cross_validation();
         # without it, tuning with cv_type="time_series_split" silently leaks
         # the time column and evaluates folds out of chronological order.
-        X, y, validation_data, validation_frames, split_metadata = _prepare_policy_inputs(
-            X,
-            y,
-            tuning_config,
-            self.problem_type,
-            validation_data,
-            validation_frames,
-            preprocessing,
+        X, y, validation_data, validation_frames, split_metadata, sample_weight = (
+            _prepare_policy_inputs(
+                X,
+                y,
+                tuning_config,
+                self.problem_type,
+                validation_data,
+                validation_frames,
+                preprocessing,
+                sample_weight,
+            )
         )
         if split_metadata is None:
-            X, y, validation_data, validation_frames = _prepare_time_series_data(
-                X, y, tuning_config, validation_data, validation_frames, preprocessing, log_callback
+            X, y, validation_data, validation_frames, sample_weight = _prepare_time_series_data(
+                X,
+                y,
+                tuning_config,
+                validation_data,
+                validation_frames,
+                preprocessing,
+                log_callback,
+                sample_weight,
             )
 
         # Convert data to Numpy for tuning
@@ -737,6 +774,7 @@ class TuningCalculator(BaseModelCalculator):
                 preprocessing_frames=(X, y) if preprocessing is not None else None,
                 validation_frames=validation_frames,
                 split_metadata=split_metadata,
+                **weight_kwargs(sample_weight),
             )
         _report_search_warnings(caught, log_callback)
         _record_feature_exclusions(tuning_result, original_columns, X)
@@ -746,7 +784,9 @@ class TuningCalculator(BaseModelCalculator):
         # the preprocessor — the same artifact the folds were scored against
         # and what serving will use for predictions.
         if preprocessing is not None:
-            X_refit_frame, y_refit_frame = preprocessing.fit_transform(X, y)
+            X_refit_frame, y_refit_frame, sample_weight = fit_preprocessor(
+                preprocessing, X, y, sample_weight
+            )
             X_refit, y_refit = SklearnBridge.to_sklearn(
                 (X_refit_frame, y_refit_frame), validate_features=True
             )
@@ -760,6 +800,7 @@ class TuningCalculator(BaseModelCalculator):
             y_refit,
             log_callback,
             iteration_callback=iteration_callback,
+            **weight_kwargs(sample_weight),
         )
 
         # F-13: optionally search a decision threshold for a binary
@@ -790,11 +831,12 @@ class TuningCalculator(BaseModelCalculator):
         self,
         model_class: Any,
         config: TuningConfig,
-        preprocessing: "FoldPreprocessor | None",
+        preprocessing: FoldPreprocessor | None,
         preprocessing_frames: tuple[Any, Any] | None,
         validation_data: tuple[Any, Any] | None,
         validation_frames: tuple[Any, Any] | None,
         log_callback: Callable[[str], None] | None,
+        sample_weight: Any = None,
     ) -> tuple[Any, TuningConfig, bool, bool]:
         """Prepare the estimator and parameter routing for the requested search strategy."""
         # ``default_params`` may carry structural args (e.g. an ensemble's
@@ -831,7 +873,7 @@ class TuningCalculator(BaseModelCalculator):
         )
         estimator: Any = base_estimator
         search_config = config
-        if wrapped or weighted:
+        if wrapped or weighted or (searcher_strategy and sample_weight is not None):
             estimator, search_config = _wrap_search_estimator(
                 base_estimator,
                 config,
@@ -842,14 +884,14 @@ class TuningCalculator(BaseModelCalculator):
                 weighted,
                 log_callback,
             )
-        return estimator, search_config, wrapped, weighted
+        return estimator, search_config, wrapped, weighted or sample_weight is not None
 
     def _prepare_search_splitter(
         self,
         X: Any,
         y: Any,
         config: TuningConfig,
-        preprocessing: "FoldPreprocessor | None",
+        preprocessing: FoldPreprocessor | None,
         preprocessing_frames: tuple[Any, Any] | None,
         validation_data: tuple[Any, Any] | None,
         validation_frames: tuple[Any, Any] | None,
@@ -886,6 +928,7 @@ class TuningCalculator(BaseModelCalculator):
         validation_data: tuple[Any, Any] | None,
         preprocessing_frames: tuple[Any, Any] | None,
         log_callback: Callable[[str], None] | None,
+        sample_weight: Any = None,
     ) -> TuningResult:
         """Execute the searcher and restore public parameter names in its results."""
         X_for_search, y_for_search = search_data
@@ -901,7 +944,9 @@ class TuningCalculator(BaseModelCalculator):
         else:
             X_arr = self._to_numpy(X_for_search)
             y_arr = self._to_numpy(y_for_search)
-        trial_errors = _runner.execute_search(searcher, X_arr, y_arr, config, log_callback)
+        trial_errors = _runner.execute_search(
+            searcher, X_arr, y_arr, config, log_callback, **weight_kwargs(sample_weight)
+        )
 
         # 5. Extract Results
         first_trial_error = trial_errors[0] if trial_errors else None
@@ -936,15 +981,41 @@ class TuningCalculator(BaseModelCalculator):
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[Any, Any] | None = None,
-        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing: FoldPreprocessor | None = None,
         preprocessing_frames: tuple[Any, Any] | None = None,
         validation_frames: tuple[Any, Any] | None = None,
         split_metadata: dict[str, np.ndarray] | None = None,
         cv_override: Any = None,
+        *,
+        sample_weight: Any = None,
     ) -> TuningResult:
         """Runs hyperparameter tuning."""
-        X, y, preprocessing_frames, split_metadata = _policy_search_data(
-            X, y, config, self.problem_type, preprocessing, preprocessing_frames, split_metadata
+        sample_weight = _prepare_tuning_weights(
+            sample_weight, len(X), preprocessing, self.problem_type
+        )
+        X, y, validation_data, validation_frames, preprocessing_frames, sample_weight = (
+            _direct_weighted_time_data(
+                X,
+                y,
+                config,
+                validation_data,
+                validation_frames,
+                preprocessing_frames,
+                preprocessing,
+                log_callback,
+                split_metadata,
+                sample_weight,
+            )
+        )
+        X, y, preprocessing_frames, split_metadata, sample_weight = _policy_search_data(
+            X,
+            y,
+            config,
+            self.problem_type,
+            preprocessing,
+            preprocessing_frames,
+            split_metadata,
+            sample_weight,
         )
         if config.cv_enabled and config.cv_type == "nested_cv":
             raw_x, raw_y = preprocessing_frames if preprocessing_frames is not None else (X, y)
@@ -957,6 +1028,7 @@ class TuningCalculator(BaseModelCalculator):
                 progress_callback=progress_callback,
                 log_callback=log_callback,
                 split_metadata=split_metadata,
+                **weight_kwargs(sample_weight),
             )
         # 1. Prepare Estimator
         # We need a base estimator. Since our Calculator wraps the class,
@@ -980,6 +1052,7 @@ class TuningCalculator(BaseModelCalculator):
             validation_data,
             validation_frames,
             log_callback,
+            sample_weight,
         )
 
         # 2. Prepare Splitter
@@ -989,6 +1062,9 @@ class TuningCalculator(BaseModelCalculator):
             X, y, config, preprocessing, preprocessing_frames, validation_data, validation_frames
         )
         cv = _effective_search_cv(cv, cv_override, config, self.problem_type, y, split_metadata)
+
+        sample_weight = search_weights(sample_weight, len(X_for_search))
+        preflight_weights(sample_weight, cv, X_for_search, y_for_search)
 
         # 3. Select Search Strategy
         # Handle multiclass metrics and map user-friendly names
@@ -1014,6 +1090,7 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback,
                 preprocessing,
                 model_calculator=self.model_calculator,
+                **weight_kwargs(sample_weight),
             )
         elif config.strategy in ["halving_grid", "halving_random", "optuna"]:
             # Searchers score the payload handed to them below: the raw
@@ -1036,7 +1113,13 @@ class TuningCalculator(BaseModelCalculator):
                 )
             else:
                 searcher = _optuna_strategy.build_optuna_searcher(
-                    search_config, estimator, cv, scoring, progress_callback, log_callback
+                    search_config,
+                    estimator,
+                    cv,
+                    scoring,
+                    progress_callback,
+                    log_callback,
+                    weighted=sample_weight is not None,
                 )
         else:
             raise_invalid_choice(
@@ -1055,12 +1138,13 @@ class TuningCalculator(BaseModelCalculator):
             validation_data,
             preprocessing_frames,
             log_callback,
+            **weight_kwargs(sample_weight),
         )
 
     @staticmethod
     def _grid_search_frames(
         search_frames: tuple[Any, Any],
-        preprocessing: "FoldPreprocessor | None",
+        preprocessing: FoldPreprocessor | None,
         preprocessing_frames: tuple[Any, Any] | None,
         validation_data: tuple[Any, Any] | None,
     ) -> tuple[Any, Any]:
@@ -1158,15 +1242,20 @@ def _policy_search_data(
     preprocessing: Any,
     frames: Any,
     metadata: Any,
-) -> tuple[Any, Any, Any, Any]:
+    sample_weight: Any = None,
+) -> tuple:
     """Prepare metadata once for direct tune calls or retain the fit-owned alignment."""
     if metadata is None and (
         uses_explicit_policy(config) or uses_history_policy(config, preprocessing)
     ):
         raw_x, raw_y = frames if frames is not None else (X, y)
-        X, y, metadata = prepare_policy_data(raw_x, raw_y, config, problem_type, preprocessing)
+        X, y, metadata, positions = prepare_policy_data(
+            raw_x, raw_y, config, problem_type, preprocessing, return_positions=True
+        )
+        if sample_weight is not None:
+            sample_weight = sample_weight[positions]
         frames = (X, y) if preprocessing is not None else None
-    return X, y, frames, metadata
+    return X, y, frames, metadata, sample_weight
 
 
 def _effective_search_cv(
@@ -1184,3 +1273,38 @@ def _record_feature_exclusions(result: TuningResult, original: tuple[str, ...], 
     """Persist only columns removed by the split policy, not learned feature changes."""
     remaining = getattr(X, "columns", original)
     result.excluded_feature_columns = [name for name in original if name not in remaining]
+
+
+def _prepare_tuning_weights(values: Any, rows: int, preprocessing: Any, problem_type: str) -> Any:
+    """Limit weighted tuning to supported supervised tasks before preprocessing learns."""
+    if values is not None and problem_type not in {"classification", "regression"}:
+        raise SampleWeightError("sample_weight supports classification and regression only.")
+    return prepare_weights(values, rows, preprocessing)
+
+
+def _direct_weighted_time_data(
+    X: Any,
+    y: Any,
+    config: TuningConfig,
+    validation: Any,
+    validation_frames: Any,
+    frames: Any,
+    preprocessing: Any,
+    log_callback: Any,
+    metadata: Any,
+    weights: Any,
+) -> tuple:
+    """Apply legacy temporal ordering once for direct weighted tune calls on named frames."""
+    if (
+        weights is None
+        or metadata is not None
+        or uses_explicit_policy(config)
+        or not hasattr(X, "columns")
+    ):
+        return X, y, validation, validation_frames, frames, weights
+    raw_x, raw_y = frames if frames is not None else (X, y)
+    X, y, validation, validation_frames, weights = _prepare_time_series_data(
+        raw_x, raw_y, config, validation, validation_frames, preprocessing, log_callback, weights
+    )
+    frames = (X, y) if frames is not None else None
+    return X, y, validation, validation_frames, frames, weights

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -51,6 +52,11 @@ def build_training_evidence(
         "holdout_rows": len(heldout),
         "filter_counts": attrs["pre_split_filter_counts"],
         **({"group_split": attrs["group_split"]} if "group_split" in attrs else {}),
+        **(
+            {"training_weights": deepcopy(attrs["training_weights"])}
+            if "training_weights" in attrs
+            else {}
+        ),
     }
 
 

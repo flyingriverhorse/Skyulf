@@ -5,6 +5,8 @@ pandas frame, a raw polars frame, or an ``(X, y)`` tuple, so consumers must
 dispatch on what they are given rather than assume one frame library.
 """
 
+from __future__ import annotations
+
 import copy as _copy
 from dataclasses import dataclass
 from typing import Any
@@ -27,13 +29,18 @@ SplitPayload = (
 
 @dataclass
 class SplitDataset:
-    """The train/test (and optional validation) slots a splitter node produces."""
+    """Hold train/test slots and optional positional training-only sample weights.
+
+    ``train_sample_weight`` follows the row order of ``train``. Test and
+    validation metrics remain unweighted.
+    """
 
     train: SplitPayload
     test: SplitPayload
     validation: SplitPayload | None = None
+    train_sample_weight: Any = None
 
-    def copy(self) -> "SplitDataset":
+    def copy(self) -> SplitDataset:
         """Return a ``SplitDataset`` whose slots are copies, not shared references.
 
         Each leaf is copied through its own ``copy()``/``clone()`` so pandas and
@@ -69,6 +76,7 @@ class SplitDataset:
 
         return SplitDataset(
             train=copy_data(self.train),
+            train_sample_weight=copy_leaf(self.train_sample_weight),
             test=copy_data(self.test),
             validation=(copy_data(self.validation) if self.validation is not None else None),
         )

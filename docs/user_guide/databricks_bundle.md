@@ -3,6 +3,9 @@
 For job-screen instructions and lifecycle diagrams, use the
 [operator walkthrough](databricks_bundle_walkthrough.md).
 
+For optional weight columns, class weights, SMOTE settings and supported models,
+see [Weighted Training & Support](weighted_training.md).
+
 The custom Skyulf template generates one editable Bundle with `dev`, `test`,
 `syst` and `prod` targets. It fits and predicts with pandas or Polars. Spark
 reads bounded Unity Catalog Delta rows and publishes predictions; local

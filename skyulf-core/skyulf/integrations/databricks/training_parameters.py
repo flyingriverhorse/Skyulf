@@ -89,11 +89,13 @@ def log_training_parameters(
     estimator = artifact.pipeline.model_estimator
     assert estimator is not None
     model = estimator._unwrap_tuned_model()
-    groups = {
+    groups: dict[str, Any] = {
         "model_params": _parameter_value(model.get_params(deep=True)),
         "ensemble": _ensemble_parameters(model, selected),
         "split": _split_parameters(spec),
     }
+    if "training_weights" in artifact.pipeline.config:
+        groups["training_weights"] = dict(artifact.pipeline.config)["training_weights"]
     recipes = config.get("feature_recipes", {})
     summary = {
         "model_type": selected["type"],
@@ -103,6 +105,8 @@ def log_training_parameters(
         "pre_split_steps": [step["name"] for step in spec.pre_split_steps],
         **groups,
     }
+    if "class_weight" in selected.get("params", {}):
+        summary["configured_class_weight"] = _parameter_value(selected["params"]["class_weight"])
     run.client.log_dict(run.run_id, summary, "training_parameters.json")
     params = {name: _preview(value, name) for name, value in summary.items()}
     for group, values in groups.items():

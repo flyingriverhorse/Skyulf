@@ -5,6 +5,8 @@ the best result and per-trial records, and translates known sklearn/optuna
 failure messages into actionable errors.
 """
 
+from __future__ import annotations
+
 import contextlib
 import logging
 import math
@@ -14,6 +16,8 @@ from typing import Any, cast
 
 from joblib import parallel_backend
 
+from ..._sample_weights import SampleWeightError
+from ..fold_pipeline import FatalSampleWeightError
 from ..schemas import TuningConfig
 from .optuna import _ensure_optuna_loaded
 
@@ -46,6 +50,7 @@ def execute_search(
     y_arr: Any,
     config: TuningConfig,
     log_callback: Callable[[str], None] | None = None,
+    sample_weight: Any = None,
 ) -> list[str]:
     """Fits the searcher, mapping known sklearn/optuna failures to ``ValueError``s.
 
@@ -55,6 +60,7 @@ def execute_search(
     on its own logger — without capturing them the only visible symptom is the
     generic "no trials completed" error, with the real cause stuck in stderr.
     """
+    fit_kwargs = _weight_fit_kwargs(searcher, sample_weight)
     captured: list[str] = []
     optuna_logger: logging.Logger | None = None
     handler: logging.Handler | None = None
@@ -88,9 +94,11 @@ def execute_search(
             )
             if config.parallel_backend:
                 with parallel_backend(config.parallel_backend):
-                    searcher.fit(X_arr, y_arr)
+                    searcher.fit(X_arr, y_arr, **fit_kwargs)
             else:
-                searcher.fit(X_arr, y_arr)
+                searcher.fit(X_arr, y_arr, **fit_kwargs)
+    except FatalSampleWeightError as exc:
+        raise SampleWeightError(str(exc)) from exc
     except Exception as e:
         logger.exception("Hyperparameter tuning failed")
         _raise_search_failure(e)
@@ -205,3 +213,13 @@ def log_final_completion(
             f"Trials evaluated: {len(trials)}. Best Score: {best_score:.4f}"
         )
         log_callback(f"Best Params: {best_params}")
+
+
+def _weight_fit_kwargs(searcher: Any, sample_weight: Any) -> dict[str, Any]:
+    """Route complete vectors so each searcher slices its actual resource subsets."""
+    if sample_weight is None:
+        return {}
+    if hasattr(searcher, "error_score"):
+        searcher.estimator.set_params(model__propagate_weight_errors=True)
+    key = "sample_weight" if hasattr(searcher, "mode") else "model__sample_weight"
+    return {key: sample_weight}

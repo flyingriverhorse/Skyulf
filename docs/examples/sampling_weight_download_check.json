@@ -1,0 +1,20 @@
+[
+  {
+    "case": "smote_weighted",
+    "experiment_id": "1521897804897496",
+    "mlflow_status": "FINISHED",
+    "fit_rows": 284,
+    "synthetic_rows": 92,
+    "downloaded_reference_probability_error": 3.3306690738754696e-16,
+    "fit_csv_sha256": "bb3a39f999297693e22e7aca167f9a7142ee1be2bc6088a45a1b42fb78efffd0"
+  },
+  {
+    "case": "smote_unweighted",
+    "experiment_id": "1521897804897496",
+    "mlflow_status": "FINISHED",
+    "fit_rows": 284,
+    "synthetic_rows": 92,
+    "downloaded_reference_probability_error": 2.7755575615628914e-16,
+    "fit_csv_sha256": "a50552a1a4eccb62611d4d745a805de37fec60a0195ad89ea1c45e5b460db27d"
+  }
+]

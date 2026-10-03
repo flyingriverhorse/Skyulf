@@ -15,6 +15,7 @@ from .local_competition import choose_winner
 from .local_cv import LocalCVSpec
 from .local_search import base_model_config
 from .local_training_evidence import evidence_digest
+from .local_weights import extract_training_weights
 
 
 def fit_competition(
@@ -111,6 +112,7 @@ def fit_training_pipeline(
             path, run_id=created.info.run_id, tracking_uri=config["tracking_uri"]
         )
         frame = pl.from_pandas(partitions[1]) if config["engine"] == "polars" else partitions[1]
+        frame, sample_weight = extract_training_weights(frame, spec.weight_column)
         row = evaluate_competition_candidate(
             frame,
             fitted.artifact,
@@ -121,6 +123,7 @@ def fit_training_pipeline(
             max_rows=spec.max_rows,
             max_bytes=spec.max_bytes,
             cv_results=fitted.cv_results,
+            sample_weight=sample_weight,
         )
         row.update(
             candidate=name,

@@ -12,3 +12,9 @@ it.each([buildBaseTuningConfig, buildFixedTrainingParams])('forwards nested spli
   const policy = { cv_nested_type: 'time_series_split', cv_group_column: 'customer', cv_gap: 2, cv_test_size: 8, cv_max_train_size: 30 };
   expect(build({ cv_type: 'nested_cv', ...policy })).toMatchObject(policy);
 });
+
+/** Fixed training must send a JSON null class weight to the API after choosing None. */
+it('preserves a null class weight in the fixed training payload', () => {
+  const payload = buildFixedTrainingParams({ hyperparameters: { class_weight: null } });
+  expect(JSON.parse(JSON.stringify(payload))).toMatchObject({ hyperparameters: { class_weight: null } });
+});

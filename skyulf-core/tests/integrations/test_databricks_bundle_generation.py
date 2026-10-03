@@ -1353,3 +1353,69 @@ def test_generated_nested_policies_preserve_controls_and_two_jobs(tmp_path, poli
     else:
         assert recipe["modeling"]["cv_group_column"] == "customer"
         assert recipe["modeling"]["tune_threshold"] is True
+
+
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("enabled", ["false", "true"])
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_generated_model_weight_declarations(tmp_path, layout, enabled, task):
+    """Real CLI output must run all layouts without a separate weight hook."""
+    import runpy
+
+    from skyulf.integrations.databricks.project import load_project_workflow
+
+    overrides = {
+        "training_layout": layout,
+        "task": task,
+        "sample_weight_enabled": enabled,
+        "weight_column": "importance",
+        "branch_1_sample_weight_enabled": enabled,
+        "branch_1_weight_column": "importance",
+        "branch_1_task": task,
+    }
+    project = _generate_project(tmp_path, **overrides)
+    modeling = project / "src/modeling"
+    assert not (modeling / "weights.py").exists()
+    expected = "importance" if enabled == "true" else None
+    if layout == "multi_target":
+        entries = runpy.run_path(str(modeling / "multi_model.py"))["build_training_branches"]()
+        assert entries["branch_1"]["workflow"]["weight_column"] == expected
+        assert entries["branch_2"]["workflow"]["weight_column"] is None
+    else:
+        config = json.loads((project / "config/workflow.json").read_text())
+        loaded = load_project_workflow(config, project / "src/features")
+        assert loaded["weight_column"] == expected
+        assert loaded["reserved_weight_columns"] == ([] if expected is None else [expected])
+        filename = "single_model.py" if layout == "single_model" else "model_competition.py"
+        assert loaded["weights_python_source"] == (modeling / filename).read_bytes().decode()
+
+
+@pytest.mark.parametrize(
+    "model", ["voting_classifier", "stacking_classifier", "voting_regressor", "stacking_regressor"]
+)
+def test_weighted_ensemble_uses_selected_members_and_search_space(tmp_path, model):
+    """Weighted menus must control both resolved members and their generated tuning axes."""
+    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.modeling.capabilities import ensure_model_sample_weight_support
+
+    task = "classification" if model.endswith("classifier") else "regression"
+    project = _generate_project(
+        tmp_path,
+        task=task,
+        sample_weight_enabled="true",
+        **{
+            f"{task}_model_weighted": model,
+            f"single_ensemble_{task}_base_count": "2",
+            f"single_ensemble_{task}_base_1_weighted": "random_forest",
+            f"single_ensemble_{task}_base_2_weighted": "decision_tree",
+        },
+    )
+    config = json.loads((project / "config/workflow.json").read_text())
+    loaded = load_project_workflow(config, project / "src/features")
+    modeling = loaded["pipeline"]["modeling"]
+    params = modeling["base_model"]["params"]
+    assert modeling["base_model"]["type"] == model
+    assert params["base_estimators"] == ["random_forest", "decision_tree"]
+    ensure_model_sample_weight_support(model, params)
+    assert any(key.startswith("decision_tree__") for key in modeling["search_space"])
+    assert not any(key.startswith("logistic_regression__") for key in modeling["search_space"])

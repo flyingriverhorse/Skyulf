@@ -1,5 +1,7 @@
 """Feature Engineering Pipeline Orchestrator."""
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
@@ -18,6 +20,7 @@ from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._feature_state import export_feature_state, restore_feature_state
 from ._spark import fit_spark, transform_spark, use_spark
+from ._weight_policy import prepare_pipeline_weights
 from .base import StatefulTransformer
 from .dispatcher import _check_xy_engine_parity
 from .time_series.lag import LagFeaturesApplier
@@ -56,6 +59,15 @@ def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
             f"Sort input by {artifact.get('sort_by')!r} before requesting predictions."
         )
     return pack_pipeline_output(transformed, target, was_tuple)
+
+
+def _step_weights(data: Any, transformer: Any, previous: Any) -> Any:
+    """Read the weight vector produced by the same step as the current payload."""
+    if isinstance(data, SplitDataset):
+        return data.train_sample_weight
+    if transformer is not None:
+        return transformer.train_sample_weight_
+    return previous
 
 
 class FeatureEngineer:
@@ -135,7 +147,7 @@ class FeatureEngineer:
         *,
         frame_spec: FrameSpec | None = None,
         execution_options: ExecutionOptions | None = None,
-    ) -> "FeatureEngineer":
+    ) -> FeatureEngineer:
         """Restore supported fitted steps without fitting, I/O or creating a Spark session.
 
         Spark requires explicit frame_spec and execution_options. Local callers
@@ -210,6 +222,7 @@ class FeatureEngineer:
         *,
         target_column: str | None = None,
         on_split: Callable[[SplitDataset], None] | None = None,
+        sample_weight: Any = None,
     ) -> Any:
         """Runs the pipeline on data.
 
@@ -217,6 +230,8 @@ class FeatureEngineer:
             data: Input frame, feature-target pair, or existing split dataset.
             node_id_prefix (str): Prefix for the per-step transformer identifiers.
             target_column: Execution target excluded from automatic feature selection.
+            sample_weight: Optional raw positional weights, sliced by the actual
+                splitter and stored in the resulting training split.
             on_split: Optional synchronous callback receiving the first actual row
                 split before later transformations run. Skipped splitters and
                 feature-target separation do not invoke it. The callback is not
@@ -230,6 +245,7 @@ class FeatureEngineer:
         uniqueness and per-step identity checks run distributed queries with
         bounded results; local row counts and memory metrics remain unknown.
         """
+        raw_weights = prepare_pipeline_weights(data, sample_weight, self.steps_config)
         spec = getattr(self, "frame_spec", None)
         if use_spark(data, getattr(self, "execution_options", None), spec):
             return self._fit_transform_spark(data, spec, target_column, on_split)
@@ -277,7 +293,10 @@ class FeatureEngineer:
                 step_node_id=step_node_id,
                 current_data=current_data,
                 params=params,
+                sample_weight=raw_weights,
             )
+
+            raw_weights = _step_weights(current_data, transformer_inst, raw_weights)
 
             if (
                 on_split is not None
@@ -326,6 +345,7 @@ class FeatureEngineer:
         metrics["rows_out"] = metrics["summary"]["rows_out"]
 
         self._portable_fitted = True
+        self.train_sample_weight_ = raw_weights
         return current_data, metrics
 
     def _fit_transform_spark(
@@ -401,6 +421,7 @@ class FeatureEngineer:
         step_node_id: str,
         current_data: Any,
         params: dict[str, Any],
+        sample_weight: Any = None,
     ) -> tuple:  # Returns (data, params, transformer)
         """Execute one pipeline step. Returns (new_data, fitted_params).
 
@@ -430,7 +451,8 @@ class FeatureEngineer:
             # dataset with no held-out test set.
             if isinstance(current_data, pd.DataFrame | SkyulfDataFrame | tuple | pl.DataFrame):
                 params = calculator.fit(current_data, params)
-                current_data = applier.apply(current_data, params)
+                weight_kwargs = {} if sample_weight is None else {"sample_weight": sample_weight}
+                current_data = applier.apply(current_data, params, **weight_kwargs)
             else:
                 logger.debug(f"Skipping TrainTestSplitter. current_data is {type(current_data)}")
                 logger.warning(
@@ -445,7 +467,13 @@ class FeatureEngineer:
             return current_data, fitted_params, None
 
         logger.debug("Handling standard transformer via StatefulTransformer")
-        current_data = transformer.fit_transform(current_data, params)
+        if sample_weight is not None and not isinstance(current_data, SplitDataset):
+            current_data, sample_weight = transformer.fit_transform_weighted(
+                current_data, params, sample_weight
+            )
+        else:
+            current_data = transformer.fit_transform(current_data, params)
+        transformer.train_sample_weight_ = sample_weight
         fitted_params = transformer.params
         self.fitted_steps.append(
             {

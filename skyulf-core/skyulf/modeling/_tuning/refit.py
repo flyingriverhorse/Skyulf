@@ -58,6 +58,7 @@ def refit_best_model(
     y_np: Any,
     log_callback: Callable[[str], None] | None,
     iteration_callback: Callable[..., None] | None = None,
+    sample_weight: Any = None,
 ) -> Any:
     """Build and fit the final model on the full dataset using the tuned best params."""
     best_params = tuning_result.best_params
@@ -83,7 +84,7 @@ def refit_best_model(
     # ``set_params`` so they are not silently dropped.
     constructor_params, class_weight = split_class_weight_params(model_cls, final_params)
     model = instantiate_model(model_cls, constructor_params)
-    sample_weight = sample_weight_for_fit(model, class_weight, y_np)
+    sample_weight = sample_weight_for_fit(model, class_weight, y_np, sample_weight)
     weight_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
     # Boosting base calculators (XGBoost/LightGBM) attach an eval set +
     # iteration callback here so the final refit streams per-round

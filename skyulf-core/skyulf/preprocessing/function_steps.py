@@ -19,6 +19,7 @@ import polars as pl
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ._helpers import select_rows_by_position
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 
 __all__ = ["column_step", "filter_step", "fitted_step"]
@@ -329,8 +330,7 @@ def _mask(mask: Any, frame: pd.DataFrame) -> list[bool]:
 
 def _filter_target(y: Any, keep: list[bool]) -> Any:
     """Keep the target aligned with retained rows."""
-    native = y.to_native() if hasattr(y, "to_native") else y
-    return native.filter(pl.Series(keep)) if isinstance(native, pl.Series) else native.loc[keep]
+    return select_rows_by_position(y, np.flatnonzero(keep))
 
 
 NodeRegistry.register(COLUMN_STEP, ColumnFunctionApplier)(ColumnFunctionCalculator)

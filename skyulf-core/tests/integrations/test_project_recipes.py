@@ -208,7 +208,12 @@ def test_legacy_zero_argument_factories_require_no_selection(tmp_path, option):
     source.write_text(text, encoding="utf-8", newline="\n")
     assert load_project_workflow(_config(), source)["pipeline"]["project_python_source"] == text
     with pytest.raises(ValueError, match=option):
-        load_project_workflow(_config(), source, **{option: "default"})
+        load_project_workflow(
+            _config(),
+            source,
+            preprocessing_recipe="default" if option == "preprocessing_recipe" else None,
+            pre_split_recipe="default" if option == "pre_split_recipe" else None,
+        )
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

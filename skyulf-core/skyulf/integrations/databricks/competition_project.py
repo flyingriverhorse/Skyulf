@@ -16,6 +16,7 @@ from .competition_evaluation import competition_metric, validate_competition_pre
 from .local_cv import LocalCVSpec
 from .local_search import base_model_config
 from .project import resolve_project_workflow, strict_json_value, validate_project_steps
+from .weight_config import capture_model_weights, validate_weight_roles
 from .workflow_config import WORKFLOW_FIELDS, validate_workflow_pipeline
 
 _CANDIDATE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
@@ -107,24 +108,30 @@ def validate_competition_config(config: dict[str, Any]) -> None:
         _validate_candidate_pipeline(candidate["pipeline"], config, cv, metric)
 
 
-def _load_candidates(path: Path, task: str, limit: int) -> tuple[dict[str, Any], str]:
+def _load_candidates(
+    path: Path, task: str, limit: int
+) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Capture and execute one bounded candidates hook with strict JSON output."""
     hook = renamed_modeling_hook(modeling_hook(path, "model_competition.py"), "candidates.py")
     source = read_source(hook)
-    factory = getattr(load_project_module(source), "build_candidates", None)
+    module = load_project_module(source)
+    factory = getattr(module, "build_candidates", None)
     if not callable(factory):
         raise ValueError(f"{hook.name} must define build_candidates(task).")
     candidates = strict_json_value(factory(task=task), hook.name)
     if len(json.dumps(candidates, allow_nan=False).encode("utf-8")) > MAX_PROJECT_SOURCE_BYTES:
         raise ValueError(f"{hook.name} returned more than 64 KiB of configuration.")
-    return _candidate_mapping(candidates, limit), source
+    settings = {"weight_column": module.WEIGHT_COLUMN} if hasattr(module, "WEIGHT_COLUMN") else {}
+    return _candidate_mapping(candidates, limit), source, capture_model_weights(source, settings)
 
 
 def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[str, Any]:
     """Resolve each model through the existing project hooks and freeze common eligibility."""
     cv, metric, limit = _competition_settings(config)
     validate_project_steps(config)
-    candidates, source = _load_candidates(Path(path), config["task"], limit)
+    candidates, source, weights = _load_candidates(Path(path), config["task"], limit)
+    config = {**deepcopy(config), **weights}
+    validate_weight_roles(config)
     shared_source = _competition_source(project_source(Path(path)))
     result = deepcopy(config)
     resolved = {}

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from ._contracts import table_name
 from .monitoring_config import qualified_name
-from .monitoring_store import OWNER, PROPERTY, _merge_with_retry, ensure_owned_object
+from .monitoring_store import OWNER, PROPERTY, ensure_owned_object, merge_with_retry
 
 REQUEST_SCHEMA = (
     "row_id STRING, job_id BIGINT, request_id STRING, status STRING, evidence_json STRING, "
@@ -52,7 +52,7 @@ class _RequestStore:
         self.spark.createDataFrame([row], schema=REQUEST_SCHEMA).createOrReplaceTempView(view)
         missing = "WHEN NOT MATCHED THEN INSERT *" if insert else ""
         try:
-            _merge_with_retry(
+            merge_with_retry(
                 self.spark,
                 f"MERGE INTO {table_name(self.name)} t USING {view} s "
                 f"ON t.row_id = s.row_id {matched} {missing}",

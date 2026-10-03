@@ -120,3 +120,56 @@ def test_check_is_read_only_and_build_works_outside_template_directory(tmp_path)
     assert json.loads(output.read_text()) == json.loads(
         (ROOT / "databricks_template_schema.json").read_text()
     )
+
+
+def test_weight_prompt_precedes_models_and_filters_supported_choices():
+    """Weighted menus must use the same configured-model capability as training."""
+    from skyulf.modeling.capabilities import model_supports_sample_weight
+
+    schema = json.loads((ROOT / "databricks_template_schema.json").read_text())
+    properties = schema["properties"]
+    assert properties["sample_weight_enabled"]["default"] == "false"
+    assert (
+        properties["sample_weight_enabled"]["order"]
+        < properties["competition_regression_model_1"]["order"]
+    )
+    for task in ("regression", "classification"):
+        original = properties[f"{task}_model"]["enum"]
+        weighted = properties[f"{task}_model_weighted"]["enum"]
+        assert weighted == [name for name in original if model_supports_sample_weight(name)]
+        assert properties[f"{task}_model_weighted"]["default"] in weighted
+
+
+@pytest.mark.parametrize("prefix", ["", "branch_1_"])
+def test_weighted_prompt_conditions_use_only_active_model_menu(prefix):
+    """Inactive unweighted defaults must not reveal unrelated ensemble questions."""
+    from jsonschema import Draft7Validator
+
+    properties = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
+    values = {key: field["default"] for key, field in properties.items()}
+    values.update(training_layout="multi_target" if prefix else "single_model")
+    values[prefix + "task"] = "classification"
+    values[prefix + "sample_weight_enabled"] = "true"
+    values[prefix + "classification_model"] = "logistic_regression"
+    values[prefix + "classification_model_weighted"] = "voting_classifier"
+    ensemble = prefix + "ensemble_" if prefix else "single_ensemble_"
+    assert not Draft7Validator(
+        properties[ensemble + "classification_base_1_weighted"]["skip_prompt_if"]
+    ).is_valid(values)
+    assert Draft7Validator(
+        properties[ensemble + "classification_base_1"]["skip_prompt_if"]
+    ).is_valid(values)
+    values[prefix + "classification_model_weighted"] = "logistic_regression"
+    assert Draft7Validator(
+        properties[ensemble + "classification_base_1_weighted"]["skip_prompt_if"]
+    ).is_valid(values)
+
+
+def test_schema_rejects_unavailable_ensemble_dependency(monkeypatch):
+    """A missing optional member must not silently fall back while building supported menus."""
+    from skyulf.modeling.ensemble import BASE_ESTIMATORS_CLF
+
+    select = runpy.run_path(str(ROOT / "build_schema.py"))["_supported_choices"]
+    monkeypatch.delitem(BASE_ESTIMATORS_CLF, "random_forest")
+    with pytest.raises(ValueError, match="model dependencies"):
+        select("single_ensemble_classification_base_1", ["random_forest"])

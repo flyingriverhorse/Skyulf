@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .._cv_weights import preflight_weights, take_weights, weight_kwargs
 from .cv_policy import effective_cv_type, policy_description, policy_splitter
 from .grid_random import _slice_fold_rows, fit_and_score_candidate_fold
 from .metrics import resolve_metric
@@ -53,6 +54,7 @@ def _outer_score(
     result: TuningResult,
     fold: int,
     preprocessing: Any,
+    sample_weight: Any = None,
 ) -> float:
     """Refit the selected recipe on outer training rows and reject incomplete evaluations."""
     errors: list[str] = []
@@ -74,6 +76,7 @@ def _outer_score(
         fold_errors=errors,
         seed_params_overlay=seed_params(config),
         model_calculator=tuner.model_calculator,
+        **weight_kwargs(sample_weight),
     )
     if not np.isfinite(score):
         detail = errors[0] if errors else "nonfinite outer score"
@@ -113,15 +116,23 @@ def _evaluate_selected(
     result: TuningResult,
     index: int,
     preprocessing: Any,
+    sample_weight: Any = None,
 ) -> tuple[float, dict[str, Any]]:
     """Evaluate selected parameters, with a training-only threshold when requested."""
     if not config.tune_threshold:
         return _outer_score(
-            tuner, X, y, train, test, outer, config, result, index, preprocessing
+            tuner, X, y, train, test, outer, config, result, index, preprocessing, sample_weight
         ), {}
     train_x, train_y = _slice_fold_rows(X, train), _slice_fold_rows(y, train)
     selection = select_nested_threshold(
-        tuner, train_x, train_y, config, result.best_params, inner, preprocessing
+        tuner,
+        train_x,
+        train_y,
+        config,
+        result.best_params,
+        inner,
+        preprocessing,
+        **weight_kwargs(take_weights(sample_weight, train)),
     )
     score = score_nested_threshold(
         tuner,
@@ -133,6 +144,7 @@ def _evaluate_selected(
         result.best_params,
         selection,
         preprocessing,
+        **weight_kwargs(take_weights(sample_weight, train)),
     )
     return score, {"threshold_selection": selection}
 
@@ -145,11 +157,14 @@ def _final_threshold(
     final: TuningResult,
     cv: Any,
     preprocessing: Any,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Select the deployable cutoff independently of every outer-fold winner."""
     if not config.tune_threshold:
         return {}
-    selection = select_nested_threshold(tuner, X, y, config, final.best_params, cv, preprocessing)
+    selection = select_nested_threshold(
+        tuner, X, y, config, final.best_params, cv, preprocessing, **weight_kwargs(sample_weight)
+    )
     final.decision_thresholds = selection["decision_thresholds"]
     final.decision_threshold_metric = selection["decision_threshold_metric"]
     return {"threshold_selection": selection}
@@ -165,6 +180,7 @@ def run_nested_search(
     progress_callback: Callable[..., Any] | None = None,
     log_callback: Callable[[str], None] | None = None,
     split_metadata: dict[str, np.ndarray] | None = None,
+    sample_weight: Any = None,
 ) -> TuningResult:
     """Search separately within outer folds, then run a distinct final training search.
 
@@ -180,6 +196,9 @@ def run_nested_search(
     )
     partitions = list(outer.split(np.asarray(X), np.asarray(y)))
 
+    _preflight_nested_weights(sample_weight, outer, inner_splitters, X, y)
+    final_cv = policy_splitter(inner_config, tuner.problem_type, y, metadata)
+    preflight_weights(sample_weight, final_cv, X, y)
     folds = []
     for index, (train, test) in enumerate(partitions):
         if log_callback:
@@ -196,6 +215,7 @@ def run_nested_search(
             preprocessing_frames=(train_x, train_y) if preprocessing is not None else None,
             split_metadata={key: values[train] for key, values in metadata.items()},
             cv_override=inner_splitters[index],
+            **weight_kwargs(take_weights(sample_weight, train)),
         )
         score, threshold = _evaluate_selected(
             tuner,
@@ -209,6 +229,7 @@ def run_nested_search(
             result,
             index,
             preprocessing,
+            sample_weight,
         )
         folds.append(
             {
@@ -240,10 +261,11 @@ def run_nested_search(
         preprocessing_frames=(X, y) if preprocessing is not None else None,
         split_metadata=metadata,
         cv_override=final_cv,
+        **weight_kwargs(sample_weight),
     )
     final.nested_cv = _nested_report(
         folds, config, inner_config, final, final_cv, tuner.problem_type
-    ) | _final_threshold(tuner, X, y, config, final, final_cv, preprocessing)
+    ) | _final_threshold(tuner, X, y, config, final, final_cv, preprocessing, sample_weight)
     return final
 
 
@@ -280,3 +302,17 @@ def _nested_report(
             "inner_folds": inner_config.cv_folds,
         },
     }
+
+
+def _preflight_nested_weights(weights: Any, outer: Any, inner: list[Any], X: Any, y: Any) -> None:
+    """Check outer and inner training weights before the first nested candidate fits."""
+    if weights is None:
+        return
+    preflight_weights(weights, outer, X, y)
+    for index, (train, _) in enumerate(outer.split(X, y)):
+        preflight_weights(
+            take_weights(weights, train),
+            inner[index],
+            _slice_fold_rows(X, train),
+            _slice_fold_rows(y, train),
+        )

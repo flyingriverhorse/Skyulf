@@ -15,6 +15,18 @@ set receives the champion alias.
 
 from copy import deepcopy
 
+# To fix class weights for one supported classifier, edit its branch below:
+#   modeling = MODELS["branch_name"]["workflow"]["pipeline"]["modeling"]
+#   modeling["base_model"]["params"]["class_weight"] = "balanced"
+# Replace branch_name with an actual MODELS key. Use Python None to disable it.
+# Remove "class_weight" from that branch's modeling.search_space to keep it fixed;
+# to tune it instead, keep the search axis and omit the fixed key from
+# base_model.params. Other branches keep their own settings.
+# Sample weights are optional and independent of class_weight.
+# Set each branch workflow["weight_column"] below, e.g. "training_weight".
+# None disables sample weights for that branch.
+# Both settings can be enabled together. Class weights apply only to classifiers.
+
 
 def _unique_object(pairs):
     """Reject duplicate branch names before a declaration can disappear."""
@@ -34,6 +46,7 @@ MODELS = _unique_object([
 {{- $prefix := printf "branch_%s_" $slot -}}
 {{- $task := index $ (print $prefix "task") -}}
 {{- $model := index $ (print $prefix $task "_model") -}}
+{{- if eq (index $ (print $prefix "sample_weight_enabled")) "true" -}}{{- $model = index $ (print $prefix $task "_model_weighted") -}}{{- end -}}
 {{- $cv_enabled := eq (index $ (print $prefix "cv_enabled")) "true" -}}
 {{- $cv_type := index $ (print $prefix "cv_type") -}}
 {{- $nested := index $ (print $prefix "cv_nested_type") -}}
@@ -50,6 +63,7 @@ MODELS = _unique_object([
         "preprocessing_recipe": "{{index $ (print $prefix "preprocessing_recipe")}}",
         "pre_split_recipe": "{{index $ (print $prefix "pre_split_recipe")}}",
         "workflow": {
+            "weight_column": {{if eq (index $ (print $prefix "sample_weight_enabled")) "true"}}"{{index $ (print $prefix "weight_column")}}"{{else}}None{{end}},
             "model_name": "{catalog}.{metadata_schema}.{{$.project_name}}_{{index $ (print $prefix "name")}}{resource_suffix}",
             "promotion_policy": "manual_approval",
             "score_handoff": "disabled",

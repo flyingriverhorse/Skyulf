@@ -244,6 +244,7 @@ def build_optuna_searcher(
     scoring: Any,
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
+    weighted: bool = False,
 ) -> Any:
     """Build a search using native iterations, direct partial_fit, or CV fold pruning."""
     if not _ensure_optuna_loaded():
@@ -275,12 +276,14 @@ def build_optuna_searcher(
     pruner_name = strategy_params.get("pruner", "median")
     pruner = build_optuna_pruner(pruner_name)
     plan = _pruning_plan(base_estimator, config, cv, pruner_name, log_callback)
+    if weighted and plan.mode == "none":
+        pruner = build_optuna_pruner("none")
 
     study = _optuna_state.optuna_module.create_study(
         sampler=sampler, pruner=pruner, direction="maximize"
     )
 
-    if plan.mode == "folds" or plan.kind in {"xgboost", "lightgbm"}:
+    if weighted or plan.mode == "folds" or plan.kind in {"xgboost", "lightgbm"}:
         from .optuna_search import OptunaPruningSearchCV  # noqa: PLC0415 - optional dependency
 
         return OptunaPruningSearchCV(
@@ -293,7 +296,7 @@ def build_optuna_searcher(
             n_jobs=config.n_jobs,
             callbacks=callbacks,
             study=study,
-            mode=plan.mode,
+            mode="folds" if weighted and plan.kind not in {"xgboost", "lightgbm"} else plan.mode,
             iteration_budget=plan.iteration_budget,
         )
 

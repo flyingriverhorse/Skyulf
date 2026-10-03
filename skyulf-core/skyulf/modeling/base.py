@@ -162,8 +162,16 @@ class BaseModelCalculator(ABC):
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Trains the model and returns the fitted model artifact.
+
+        ``class_weight`` is a model setting in ``config["params"]`` for
+        supported classifiers. ``sample_weight`` is a separate vector aligned
+        with the rows of ``X`` and ``y``; it can also weight regression fits.
+        A tuner keeps class weights in ``base_model.params`` (or searches them
+        in ``search_space``) and slices row weights for each training fold.
 
         The return type is intentionally `Any` rather than a narrower
         TypeVar/Protocol: most calculators (see `sklearn_wrapper.py`) return a
@@ -323,6 +331,11 @@ class StatefulEstimator:
             test_size=test_size,
             max_train_size=max_train_size,
             inner_folds=inner_folds,
+            **(
+                {"sample_weight": dataset.train_sample_weight}
+                if dataset.train_sample_weight is not None
+                else {}
+            ),
         )
 
     @staticmethod
@@ -459,6 +472,11 @@ class StatefulEstimator:
                 preprocessing=preprocessing,
                 validation_frames=preprocessing_validation,
                 iteration_callback=iteration_callback,
+                **(
+                    {"sample_weight": dataset.train_sample_weight}
+                    if dataset.train_sample_weight is not None
+                    else {}
+                ),
             )
         else:
             self.model = self.calculator.fit(
@@ -469,6 +487,11 @@ class StatefulEstimator:
                 log_callback=log_callback,
                 validation_data=validation_data,
                 iteration_callback=iteration_callback,
+                **(
+                    {"sample_weight": dataset.train_sample_weight}
+                    if dataset.train_sample_weight is not None
+                    else {}
+                ),
             )
 
         # 3. Predict on all splits

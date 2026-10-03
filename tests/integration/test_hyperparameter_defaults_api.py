@@ -48,3 +48,26 @@ def test_voting_regressor_empty_defaults_have_no_top_level_tuning_controls(clien
     fields = definitions.json()
     assert {field["name"] for field in fields} == {"base_estimators", "n_jobs"}
     assert all(field["tunable"] is False for field in fields)
+
+
+@pytest.mark.parametrize(
+    ("classifier", "regressor"),
+    [
+        ("random_forest_classifier", "random_forest_regressor"),
+        ("xgboost_classifier", "xgboost_regressor"),
+        ("lgbm_classifier", "lgbm_regressor"),
+    ],
+)
+def test_class_weight_metadata_is_classifier_only(client, classifier, regressor):
+    """The UI must receive a typed None choice only for supported classifiers."""
+    classifier_response = client.get(f"/pipeline/hyperparameters/{classifier}")
+    regressor_response = client.get(f"/pipeline/hyperparameters/{regressor}")
+    assert classifier_response.status_code == regressor_response.status_code == 200
+    fields = {field["name"]: field for field in classifier_response.json()}
+    assert fields["class_weight"]["type"] == "select"
+    assert fields["class_weight"]["default"] is None
+    assert fields["class_weight"]["options"] == [
+        {"label": "None (equal weight)", "value": None},
+        {"label": "Balanced", "value": "balanced"},
+    ]
+    assert "class_weight" not in {field["name"] for field in regressor_response.json()}
