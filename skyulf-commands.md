@@ -117,16 +117,27 @@ mypy backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
 ## 3. Tests (pytest)
 
+Local development uses explicit test files or node IDs. Start with the failing
+regression, then run the affected files and direct integration consumers once
+per completed batch. Reuse passing results while their code is unchanged;
+reviewers add independent checks for uncovered cases. See `AGENTS.md` for the
+batch and review rules. Do not run pytest without a selector locally.
+
 ```powershell
-# Full suite (stop on first failure, short traceback)
-.\.venv\Scripts\python.exe -m pytest tests/ -x --tb=short -q
+# Focused Core regression file
+.\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration/core/test_function_step_mutation.py -q --tb=short
 
-# Core package with coverage floor (CI parity)
-.\.venv\Scripts\python.exe -m pytest skyulf-core/tests -q --cov=skyulf --cov-branch --cov-fail-under=45 --disable-warnings
+# Affected saved-model behavior and its integration consumer
+.\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration/platforms/test_local_pipeline_policy_identity.py skyulf-core/tests/integration/platforms/test_local_pipeline_artifact.py -q --tb=short
 
-# Core coverage report (term)
-.\.venv\Scripts\python.exe -m pytest skyulf-core/tests -q --cov=skyulf --cov-branch --cov-report=term
+# Check moved imports and fixtures without executing tests
+.\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration --collect-only -q
 ```
+
+GitHub CI retains the full Core/backend/frontend suites and coverage gates.
+The Core branch-coverage floor is **90%**. Reproducing that full run locally is
+reserved for an explicit user request; it is not the default repair command.
+Pre-commit runs static checks, not pytest, and remains enabled.
 
 ---
 
@@ -134,11 +145,12 @@ mypy backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 ```powershell
 Set-Location frontend\ml-canvas
 npm run lint
-npm run test -- --run
+# Pass the affected test file or an unambiguous filename filter.
+npm run test -- useBranchColors
 npm run build
 
-# Single Vitest file
-npx vitest run useBranchColors
+# Run the affected browser flow only.
+npm run test:e2e -- e2e/threshold-tuning.spec.ts
 ```
 
 ---

@@ -68,7 +68,8 @@ the user should not need to relay messages between agents.
 ## CI analysis gates
 
 - Before editing, inspect the relevant `.github/workflows/` checks. Use the same
-  commands and analysis scope for local verification.
+  static-analysis commands and scope locally. Select local tests by affected
+  behavior as described below; full test suites and coverage remain in CI.
 - Keep Lizard CCN at most 10 in `backend/` and `skyulf-core/skyulf/`, and ESLint
   complexity at most 10 in the frontend. Extract meaningful helpers while
   preserving validation order, defaults, error messages and behavior.
@@ -89,6 +90,31 @@ the user should not need to relay messages between agents.
   including the Lizard and frontend complexity hooks. Keep caches, generated
   model artifacts and temporary verification output out of commits. Report
   checks that were not run or did not pass explicitly.
+
+## Local test scope and repair batches
+
+- Run local pytest, Vitest and Playwright with explicit test files, specs or node
+  IDs. Do not start bare `pytest`, whole-repository/layer suites, or full coverage
+  after a small change. Full local test runs require an explicit user request; GitHub CI keeps
+  its complete suites, coverage thresholds and existing checks.
+- Reproduce each defect with a focused failing test, then verify its fix. At
+  batch completion, run the deduplicated union of affected test files and direct
+  integration consumers once. Explain any expansion using the changed behavior.
+  Do not repeat passing groups unless code changed or a new concern warrants it.
+- Coordinate test ownership across Codex, subagents and Claude Code. Record the
+  tested revision/file state, command and result in the task document. Reviewers
+  independently inspect changes and probe missing cases instead of repeating
+  the same large suite. Never reuse evidence after its relevant code changes.
+- For test relocation, compare collected node IDs before and after normalizing
+  paths, then execute tests that depend on moved imports, fixtures or file paths.
+  Collection checks do not execute the suite and must not be reported as passes.
+- Keep Ruff, full CI Ty scope, applicable complexity checks and pre-commit hooks.
+  For Databricks behavior changes, retain focused validation on Databricks itself.
+  Do not reduce CI coverage or skip relevant tests to shorten local feedback.
+- Plan repair batches around at least ten open review IDs, split independent
+  domains across up to three subagents. Count a finding as closed only after
+  reproduction, correction, affected tests and Codex/Claude review. Report
+  unresolved decisions or blockers rather than inflating the closure count.
 
 ## Lint scope & test hygiene
 
