@@ -44,7 +44,19 @@
           }
         ],
         "drift_detected": false,
-        "suggestions": []
+        "suggestions": [
+          "No statistical support for a distribution change; equivalence is not established."
+        ],
+        "evidence": {
+          "status": "not_detected",
+          "test": "ks_2samp",
+          "p_value": 1.0,
+          "adjusted_p_value": 1.0,
+          "significance_level": 0.05,
+          "reference_count": 100,
+          "current_count": 100,
+          "reason": "No statistical support for a distribution change; equivalence is not established."
+        }
       },
       "category": {
         "column": "category",
@@ -60,7 +72,17 @@
         "drift_detected": true,
         "suggestions": [
           "Critical category-distribution shift detected (PSI > 0.25). Immediate model retraining is recommended."
-        ]
+        ],
+        "evidence": {
+          "status": "supported",
+          "test": "fisher_exact",
+          "p_value": 1.3889170690330084e-05,
+          "adjusted_p_value": 2.7778341380660168e-05,
+          "significance_level": 0.05,
+          "reference_count": 100,
+          "current_count": 100,
+          "reason": null
+        }
       }
     },
     "missing_columns": [],

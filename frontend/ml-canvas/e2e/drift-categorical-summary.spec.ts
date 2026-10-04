@@ -38,9 +38,9 @@ for (const width of [1440, 390]) {
     await page.getByRole('button', { name: 'Run Analysis', exact: true }).click();
 
     const average = page.getByText('Avg PSI', { exact: true }).locator('..');
-    const mostDrifted = page.getByText('Most Drifted', { exact: true }).locator('..');
+    const mostDrifted = page.getByText('Highest PSI', { exact: true }).locator('..');
     await expect(average.getByText('2.5050', { exact: true })).toBeVisible();
-    await expect(average.getByText('Significant drift', { exact: true })).toBeVisible();
+    await expect(average.getByText('Large distribution difference', { exact: true })).toBeVisible();
     await expect(mostDrifted.getByText('category', { exact: true })).toBeVisible();
     await expect(mostDrifted.getByText('PSI: 5.0000', { exact: true })).toBeVisible();
     await expect(page.getByText('50% of features', { exact: true })).toBeVisible();

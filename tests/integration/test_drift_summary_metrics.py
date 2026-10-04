@@ -43,6 +43,22 @@ def test_summary_preserves_numeric_and_categorical_psi(metric_name, value):
     assert _build_drift_column_summary(report)["feature"]["psi"] == value
 
 
+def _assert_matches_fixture(actual, expected, path="report"):
+    """Compare structure exactly but floats within rounding, since NumPy kernels vary by CPU."""
+    if isinstance(expected, dict):
+        assert isinstance(actual, dict) and actual.keys() == expected.keys(), path
+        for key, value in expected.items():
+            _assert_matches_fixture(actual[key], value, f"{path}.{key}")
+    elif isinstance(expected, list):
+        assert isinstance(actual, list) and len(actual) == len(expected), path
+        for index, value in enumerate(expected):
+            _assert_matches_fixture(actual[index], value, f"{path}[{index}]")
+    elif isinstance(expected, float):
+        assert actual == pytest.approx(expected, rel=1e-9, abs=1e-12), path
+    else:
+        assert actual == expected, path
+
+
 @pytest.mark.asyncio
 async def test_calculated_psi_survives_persisted_history_and_alert_detail(tmp_path, monkeypatch):
     """A real categorical drift signal must not disappear between the report and stored history."""
@@ -108,5 +124,7 @@ async def test_calculated_psi_survives_persisted_history_and_alert_detail(tmp_pa
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
     for drift in report["column_drifts"].values():
         drift.pop("distribution", None)
-    assert fixture["report"]["column_drifts"] == report["column_drifts"]
-    assert fixture["history"][0]["summary"] == history[0]["summary"]
+    _assert_matches_fixture(report["column_drifts"], fixture["report"]["column_drifts"])
+    _assert_matches_fixture(
+        history[0]["summary"], fixture["history"][0]["summary"], "history[0].summary"
+    )
