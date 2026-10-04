@@ -250,7 +250,7 @@ the same provenance guarantees as `run_batch`.
 
 ## Local verification
 
-The repository's `skyulf-core/examples/databricks_delta_smoke.py` accepts an
+The test fixture `skyulf-core/tests/fixtures/databricks_delta_smoke.py` accepts an
 existing Spark session, a pinned raw `y=2*x` regression bundle and an existing
 test namespace. Its `run_smoke(...)` creates and prints three unique Delta table
 names, verifies monthly publication/replay and explicit empty replacement, and
@@ -268,9 +268,9 @@ Keep this test environment separate from Databricks Runtime's bundled packages.
 uv venv .venv-delta
 uv pip install --python .venv-delta/bin/python -r requirements-delta.txt
 SKYULF_REQUIRE_DELTA=1 .venv-delta/bin/python -m pytest \
-  skyulf-core/tests/integrations/test_batch_contract.py \
-  skyulf-core/tests/integrations/test_batch_admission.py \
-  skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=
+  skyulf-core/tests/integration/platforms/test_batch_contract.py \
+  skyulf-core/tests/integration/platforms/test_batch_admission.py \
+  skyulf-core/tests/integration/platforms/test_delta_publish.py -q -o addopts=
 ```
 
 The fixture configures the Delta extension/catalog and creates only temporary

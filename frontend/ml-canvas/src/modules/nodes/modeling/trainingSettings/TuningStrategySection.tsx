@@ -136,7 +136,7 @@ export function TuningStrategySection({
                         <label htmlFor={`${fieldId}-tune_threshold`} className="text-xs text-gray-600 dark:text-gray-400">
                             Tune decision threshold
                         </label>
-                        <HelpTooltip text="After tuning, picks the probability cutoff that maximises your metric on the validation split (binary targets). Predictions then use that cutoff instead of the default 0.5. Needs a validation split; probability-only metrics like ROC AUC fall back to balanced accuracy for the cutoff search." />
+                        <HelpTooltip text="For binary targets with probabilities, picks a decision cutoff. Nested CV uses inner out-of-fold predictions from training rows only, independently for each outer fold and the final model. Ordinary tuning needs a validation split. Probability metrics retain probabilities; the cutoff search uses balanced accuracy for these metrics." />
                     </div>
                 )}
             </div>

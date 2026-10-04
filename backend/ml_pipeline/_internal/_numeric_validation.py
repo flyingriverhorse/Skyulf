@@ -136,6 +136,7 @@ def _training(params: dict[str, Any], *, tuned: bool = False) -> None:
         _finite_candidates(params.get("search_space"))
     if params.get("cv_enabled", tuned):
         _number(params, "cv_folds", 2, integer=True)
+        _cv_policy(params)
         if params.get("cv_type") == "nested_cv" and params.get("cv_inner_folds") is not None:
             _number(params, "cv_inner_folds", 2, integer=True)
     for seed in ("random_state", "cv_random_state"):
@@ -193,3 +194,37 @@ def _training_node(step_type: str, params: dict[str, Any]) -> None:
             },
             tuned=tuned,
         )
+
+
+def _cv_policy(params: dict[str, Any]) -> None:
+    """Validate row-count windows and required policy identifiers before queueing."""
+    policy = params.get("cv_type", "k_fold")
+    if policy == "nested_cv":
+        policy = params.get("cv_nested_type", "auto")
+        allowed = {
+            "auto",
+            "k_fold",
+            "stratified_k_fold",
+            "time_series_split",
+            "group_k_fold",
+            "stratified_group_k_fold",
+        }
+        if policy not in allowed:
+            raise ValueError("cv_nested_type is not a supported nested split policy.")
+    if policy in {"group_k_fold", "stratified_group_k_fold"} and not params.get("cv_group_column"):
+        raise ValueError("cv_group_column is required for group CV.")
+    if policy != "time_series_split":
+        return
+    _temporal_metadata(params)
+    if params.get("cv_shuffle", True):
+        raise ValueError("cv_shuffle must be false for temporal CV.")
+    _number(params, "cv_gap", 0, integer=True)
+    for field in ("cv_test_size", "cv_max_train_size"):
+        if params.get(field) is not None:
+            _number(params, field, 1, integer=True)
+
+
+def _temporal_metadata(params: dict[str, Any]) -> None:
+    """Nested chronology requires an explicit split column in the raw frames."""
+    if params.get("cv_type") == "nested_cv" and not params.get("cv_time_column"):
+        raise ValueError("cv_time_column is required for nested temporal CV.")

@@ -1,0 +1,678 @@
+{
+  "split_strategy": {
+    "type": "string",
+    "default": "random",
+    "description": "1. Data | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training. Default source: full snapshot for random, rolling calendar for temporal. Override training_window_mode in an init file.",
+    "enum": [
+      "random",
+      "temporal"
+    ],
+    "order": 24,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "cv_type": {
+                  "const": "time_series_split"
+                }
+              }
+            },
+            {
+              "properties": {
+                "cv_type": {
+                  "const": "nested_cv"
+                },
+                "cv_nested_type": {
+                  "const": "time_series_split"
+                }
+              }
+            }
+          ],
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "properties": {
+                    "cv_enabled": {
+                      "const": "true"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "training_layout": {
+                      "const": "model_competition"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "test_size": {
+    "type": "string",
+    "default": "0.2",
+    "description": "1. Data | Share of rows reserved for final testing: 0.2 means 20% test and 80% training",
+    "pattern": "^0\\.[0-9]*[1-9][0-9]*$",
+    "skip_prompt_if": {},
+    "order": 25
+  },
+  "random_state": {
+    "type": "string",
+    "default": "42",
+    "description": "1. Data | Seed for repeatable random splitting. Keep 42 unless you want a different split",
+    "pattern": "^(?:0|[1-9][0-9]*)$",
+    "skip_prompt_if": {},
+    "order": 26
+  },
+  "stratify": {
+    "type": "string",
+    "default": "false",
+    "description": "1. Data | Keep similar proportions of each target class in training and test rows?",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "skip_prompt_if": {},
+    "order": 27
+  },
+  "training_window_mode": {
+    "type": "string",
+    "default": "auto",
+    "description": "1. Data | Which source rows to use? full_snapshot = all; fixed_window = dates you enter; rolling_calendar = recent complete months; rolling_days = last N elapsed UTC days; auto = all for random, recent months for temporal",
+    "enum": [
+      "auto",
+      "full_snapshot",
+      "fixed_window",
+      "rolling_calendar",
+      "rolling_days"
+    ],
+    "order": 28,
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "window_timezone": {
+    "type": "string",
+    "default": "UTC",
+    "description": "1. Data | Timezone defining calendar month boundaries, e.g. Europe/Copenhagen. This controls selected data, not when the job runs",
+    "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "full_snapshot"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "fixed_window"
+            }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "auto"
+                }
+              }
+            },
+            {
+              "properties": {
+                "split_strategy": {
+                  "const": "random"
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "nested_cv"
+                      },
+                      "cv_nested_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_enabled": {
+                            "const": "true"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "training_layout": {
+                            "const": "model_competition"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    },
+    "order": 29
+  },
+  "monthly_lookback_months": {
+    "type": "string",
+    "default": "4",
+    "description": "1. Data | Total complete past months to read, including the final holdout. Example: 4 months with a 2-month holdout leaves 2 months for training",
+    "pattern": "^[1-9][0-9]*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "full_snapshot"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "fixed_window"
+            }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "auto"
+                }
+              }
+            },
+            {
+              "properties": {
+                "split_strategy": {
+                  "const": "random"
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "nested_cv"
+                      },
+                      "cv_nested_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_enabled": {
+                            "const": "true"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "training_layout": {
+                            "const": "model_competition"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    },
+    "order": 30
+  },
+  "holdout_months": {
+    "type": "string",
+    "default": "1",
+    "description": "1. Data | How many final complete months to hold out for testing? Enter 1 to total lookback minus 1; example: 2",
+    "pattern": "^[1-9][0-9]*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "split_strategy": {
+              "const": "random"
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "nested_cv"
+                  },
+                  "cv_nested_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_enabled": {
+                        "const": "true"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "training_layout": {
+                        "const": "model_competition"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "enum": [
+                "full_snapshot",
+                "fixed_window"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    },
+    "order": 31
+  },
+  "start": {
+    "order": 38,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Earliest observation to include, e.g. 2026-06-01T00:00:00+02:00. Required for fixed_window; rolling_calendar calculates it for every run",
+    "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "enum": [
+                "auto",
+                "full_snapshot",
+                "rolling_calendar"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "holdout_start": {
+    "order": 39,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Observations from this time onward are test rows, e.g. 2026-08-01T00:00:00+02:00. Older selected rows train the model; rolling runs calculate it",
+    "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "enum": [
+                "auto",
+                "full_snapshot",
+                "rolling_calendar"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "split_strategy": {
+              "const": "random"
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "nested_cv"
+                  },
+                  "cv_nested_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_enabled": {
+                        "const": "true"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "training_layout": {
+                        "const": "model_competition"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "cutoff": {
+    "order": 40,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Stop before this observation time, e.g. 2026-09-01T00:00:00+02:00. This is a data boundary, not the job date; rolling runs calculate it",
+    "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "enum": [
+                "auto",
+                "full_snapshot",
+                "rolling_calendar"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "rolling_days"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "max_rows": {
+    "order": 50,
+    "type": "string",
+    "default": "10000",
+    "description": "1. Data | Maximum rows transferred into Python memory per read; exceeding this stops the run. This does not randomly sample rows",
+    "pattern": "^[1-9][0-9]*$"
+  },
+  "max_input_mb": {
+    "order": 51,
+    "type": "string",
+    "default": "64",
+    "description": "1. Data | Maximum input data size transferred into Python memory, in MiB (64 = 64 MiB). Model training can use more RAM",
+    "pattern": "^[1-9][0-9]*$"
+  },
+  "training_sample_rows": {
+    "type": "string",
+    "default": "null",
+    "description": "1. Data | Optional sample: enter 10000 to select up to 10000 eligible rows BEFORE train/test splitting. null = no sampling. Prediction rows are never sampled",
+    "pattern": "^(?:null|[1-9][0-9]*)$",
+    "order": 52,
+    "skip_prompt_if": {}
+  },
+  "training_sample_seed": {
+    "type": "string",
+    "default": "42",
+    "description": "1. Data | Seed for choosing the same sample from the same table snapshot. Keep 42 unless you want another sample",
+    "pattern": "^(?:0|[1-9][0-9]*)$",
+    "skip_prompt_if": {},
+    "order": 53
+  },
+  "lookback_days": {
+    "type": "string",
+    "default": "90",
+    "description": "1. Data | Total elapsed 24-hour days before each run to read, including holdout; enter 1 to 36500",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 990,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "holdout_days": {
+    "type": "string",
+    "default": "14",
+    "description": "1. Data | Final elapsed days reserved for temporal testing; enter 1 to lookback_days minus 1",
+    "pattern": "^[1-9][0-9]*$",
+    "order": 991,
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "training_window_mode": {
+                "const": "rolling_days"
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "split_strategy": {
+              "const": "random"
+            }
+          },
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "cv_type": {
+                    "const": "nested_cv"
+                  },
+                  "cv_nested_type": {
+                    "const": "time_series_split"
+                  }
+                }
+              }
+            ],
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_enabled": {
+                        "const": "true"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "training_layout": {
+                        "const": "model_competition"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

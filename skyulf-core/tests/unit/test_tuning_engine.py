@@ -517,7 +517,10 @@ def test_fit_without_model_class_raises():
             log_callback=None,
             validation_data=None,
             iteration_callback=None,
+            *,
+            sample_weight=None,
         ):
+            """Return no artifact for the missing-estimator contract test."""
             return None
 
     X, y = _clf_xy()
@@ -905,10 +908,7 @@ def test_optuna_target_mutating_chain_matches_grid_scores():
 
 
 def test_optuna_failed_trials_surface_error_in_log_and_message():
-    """A trial that fails (here: string target XGBoost can't fit) must push the
-    underlying error into the log callback and into the raised ValueError, so
-    the frontend job detail shows the real cause instead of a generic message.
-    """
+    """Invalid XGBoost candidates must expose their cause in the error and job log."""
     pytest.importorskip("optuna")
     pytest.importorskip("xgboost")
     from skyulf.modeling.classification import XGBClassifierCalculator
@@ -920,7 +920,7 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
         metric="f1",
         n_trials=2,
         cv_folds=3,
-        search_space={"n_estimators": [10]},
+        search_space={"n_estimators": [10], "max_depth": [-1]},
     )
     logs: list[str] = []
     with pytest.raises(ValueError) as excinfo:
@@ -929,6 +929,7 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
         )
     assert "All trials failed" in str(excinfo.value)
     assert "First trial error:" in str(excinfo.value)
+    assert "max_depth" in str(excinfo.value)
     assert any("failed" in message for message in logs)
 
 
@@ -1115,7 +1116,10 @@ class _FlipModelClassCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
+        """Return no artifact for the estimator-disappearance contract test."""
         return None
 
 

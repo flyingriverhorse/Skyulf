@@ -1,0 +1,51 @@
+{{- define "model_packages" -}}
+{{- if (regexp "xgboost").MatchString . }}
+xgboost==3.0.5
+{{ end -}}
+{{- if (regexp "lgbm|lightgbm").MatchString . }}
+lightgbm==4.6.0
+{{ end -}}
+{{- end -}}
+
+{{- define "selected_packages" -}}
+{{- $v := .values -}}{{- $p := .prefix -}}
+{{- if eq (index $v (print $p "search_strategy")) "optuna" }}
+optuna==4.5.0
+optuna-integration==4.5.0
+cmaes==0.13.0
+{{ end -}}
+{{- template "model_packages" .model -}}
+{{- $params := index $v (print $p "model_params") -}}
+{{- if eq $v.training_layout "model_competition" -}}{{- $params = "{}" -}}{{- end -}}
+{{- if and $params (ne $params "{}") -}}
+{{- template "model_packages" $params -}}
+{{- else if (regexp "^(voting|stacking)_").MatchString .model -}}
+{{- $e := .ensemble_prefix -}}{{- $task := .task -}}
+{{- $suffix := "" -}}{{- if eq (index $v (print $p "sample_weight_enabled")) "true" -}}{{- $suffix = "_weighted" -}}{{- end -}}
+{{- $count := index $v (printf "%s%s_base_count" $e $task) -}}
+{{- range $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1 -}}
+{{- if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count)) -}}
+{{- template "model_packages" (index $v (printf "%s%s_base_%s%s" $e $task $base $suffix)) -}}
+{{- end -}}{{- end -}}
+{{- if (regexp "^stacking_").MatchString .model -}}
+{{- template "model_packages" (index $v (printf "%s%s_final%s" $e $task $suffix)) -}}
+{{- end -}}{{- end -}}
+{{- end -}}
+
+{{- define "runtime_packages" -}}
+{{- if eq .training_layout "multi_target" -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.branch_count -}}
+{{- $p := printf "branch_%s_" $slot -}}{{- $task := index $ (print $p "task") -}}
+{{- $suffix := "" -}}{{- if eq (index $ (print $p "sample_weight_enabled")) "true" -}}{{- $suffix = "_weighted" -}}{{- end -}}
+{{- template "selected_packages" (map (pair "values" $) (pair "prefix" $p) (pair "task" $task) (pair "model" (index $ (print $p $task "_model" $suffix))) (pair "ensemble_prefix" (print $p "ensemble_"))) -}}
+{{- end -}}{{- end -}}
+{{- else if eq .training_layout "model_competition" -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.competition_candidate_count -}}
+{{- $suffix := "" -}}{{- if eq $.sample_weight_enabled "true" -}}{{- $suffix = "_weighted" -}}{{- end -}}
+{{- template "selected_packages" (map (pair "values" $) (pair "prefix" "") (pair "task" $.task) (pair "model" (index $ (printf "competition_%s_model_%s%s" $.task $slot $suffix))) (pair "ensemble_prefix" (printf "competition_ensemble_%s_" $slot))) -}}
+{{- end -}}{{- end -}}
+{{- else -}}
+{{- $suffix := "" -}}{{- if eq .sample_weight_enabled "true" -}}{{- $suffix = "_weighted" -}}{{- end -}}
+{{- template "selected_packages" (map (pair "values" .) (pair "prefix" "") (pair "task" .task) (pair "model" (index . (print .task "_model" $suffix))) (pair "ensemble_prefix" "single_ensemble_")) -}}
+{{- end -}}
+{{- end -}}

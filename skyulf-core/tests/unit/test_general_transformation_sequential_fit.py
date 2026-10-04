@@ -31,6 +31,18 @@ def _frame(values: dict[str, list[float]], engine: str) -> Any:
     return pl.from_pandas(frame) if engine == "polars" else frame
 
 
+def test_exp_clip_threshold_survives_artifact_roundtrip(engine):
+    """Configured exponent clipping must govern replay, including held-out large values."""
+    train = _frame({"x": [0.0, 1.0, 2.0]}, engine)
+    params = GeneralTransformationCalculator().fit(
+        train, {"transformations": [{"column": "x", "method": "exp", "clip_threshold": 1.0}]}
+    )
+    restored = json.loads(json.dumps(params))
+    result = GeneralTransformationApplier().apply(_frame({"x": [800.0]}, engine), restored)
+
+    np.testing.assert_allclose(result["x"].to_numpy(), [np.e])
+
+
 @pytest.mark.parametrize("method", ["box-cox", "yeo-johnson"])
 @pytest.mark.parametrize("standardize", [False, True])
 def test_log_then_power_fits_transformed_training_values(engine, method, standardize):

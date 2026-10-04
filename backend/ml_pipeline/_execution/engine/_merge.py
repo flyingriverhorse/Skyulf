@@ -10,12 +10,14 @@ Relies on ``self._node_configs``, ``self._resolve_all_inputs``,
 
 import logging
 from collections.abc import Callable, Iterable
+from copy import deepcopy
 from typing import Any, cast
 
 import pandas as pd
 import polars as pl
 
 from backend.config import get_settings
+from skyulf.data.coverage import record_coverage
 from skyulf.data.dataset import SplitDataset
 
 from ..graph_utils import _extract_columns
@@ -31,6 +33,57 @@ def _column_name_counts(column_groups: Iterable[Iterable[str]]) -> dict[str, int
         for col in columns:
             counts[col] = counts.get(col, 0) + 1
     return counts
+
+
+def _payload_rows(payload: Any) -> int:
+    """Count one split's feature rows regardless of its paired or frame representation."""
+    if payload is None:
+        return 0
+    return len(payload[0] if isinstance(payload, tuple) else payload)
+
+
+def _has_filtered_population(coverage: dict[str, Any] | None) -> bool:
+    """Identify exclusions or an unknown population without treating equal counts as lineage."""
+    return bool(coverage) and (
+        coverage.get("input_rows") is None or coverage.get("excluded_rows") != 0
+    )
+
+
+def _validate_heldout_merge(artifacts: list[SplitDataset], node_id: str) -> None:
+    """Refuse positional alignment of nonempty filtered held-out branches without row lineage."""
+    if len(artifacts) < 2:
+        return
+    for name in ("test", "validation"):
+        has_rows = any(_payload_rows(getattr(artifact, name)) for artifact in artifacts)
+        filtered = any(
+            _has_filtered_population(artifact.evaluation_coverage.get(name))
+            for artifact in artifacts
+        )
+        if has_rows and filtered:
+            raise ValueError(
+                f"Node {node_id}: cannot merge filtered {name} branches without shared row lineage. "
+                "Merge branches before applying row filters."
+            )
+
+
+def _merged_population(
+    records: list[Any], row_counts: list[int], merged_rows: int, branch_names: list[str]
+) -> dict[str, Any] | None:
+    """Preserve proven common coverage or explicitly retain an unknown merged denominator."""
+    if not any(records) and all(rows == merged_rows for rows in row_counts):
+        return None
+    first = records[0]
+    if first and all(record == first for record in records) and first["scored_rows"] == merged_rows:
+        return deepcopy(first)
+    return record_coverage(
+        None,
+        merged_rows,
+        [
+            {"branch": branch, "coverage": deepcopy(record)}
+            for branch, record in zip(branch_names, records, strict=True)
+        ],
+        reason="Original evaluation population unavailable after merging preprocessing branches",
+    )
 
 
 class MergeMixin:
@@ -636,6 +689,9 @@ class MergeMixin:
         non_empty = [p for p in parts if p is not None]
         if not non_empty:
             return None
+        if all(_payload_rows(part) == 0 for part in non_empty):
+            # A present empty evaluation split still carries exclusion evidence.
+            return non_empty[0]
         if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
             return self._merge_split_dataset_xy_part(node, part_label, non_empty)
         # Mixed or pure DataFrame parts → flatten and merge as frames.
@@ -650,10 +706,11 @@ class MergeMixin:
         merged_train = self._merge_split_dataset_part(
             node, "train", [sd.train for sd in split_artifacts], target_col
         )
-        if merged_train is None:
+        if _payload_rows(merged_train) == 0:
             raise ValueError(
                 f"Node {node.node_id}: all upstream SplitDataset inputs have empty train splits."
             )
+        _validate_heldout_merge(split_artifacts, node.node_id)
         merged_test = self._merge_split_dataset_part(
             node, "test", [sd.test for sd in split_artifacts], target_col
         )
@@ -672,7 +729,34 @@ class MergeMixin:
             train=cast(Any, merged_train),
             test=cast(Any, merged_test),
             validation=merged_val,
+            evaluation_coverage=self._merged_evaluation_coverage(
+                node, split_artifacts, {"test": merged_test, "validation": merged_val}
+            ),
         )
+
+    def _merged_evaluation_coverage(
+        self, node: NodeConfig, artifacts: list[SplitDataset], merged: dict[str, Any]
+    ) -> dict[str, dict[str, Any]]:
+        """Keep held-out population evidence through column unions and row-wise stacking."""
+        order = getattr(self, "_merge_input_order", None)
+        names = order(node) if callable(order) else list(getattr(node, "inputs", []))
+        branches = [
+            names[index] if index < len(names) else f"branch_{index + 1}"
+            for index in range(len(artifacts))
+        ]
+        coverage = {}
+        for name, payload in merged.items():
+            if payload is None:
+                continue
+            observed = _merged_population(
+                [artifact.evaluation_coverage.get(name) for artifact in artifacts],
+                [_payload_rows(getattr(artifact, name)) for artifact in artifacts],
+                _payload_rows(payload),
+                branches,
+            )
+            if observed is not None:
+                coverage[name] = observed
+        return coverage
 
     def _merge_fallback_frames(
         self, node: NodeConfig, artifacts: list[Any], target_col: str
@@ -733,6 +817,8 @@ class MergeMixin:
                 train=self._strip_columns(payload.train, columns),
                 test=self._strip_columns(payload.test, columns),
                 validation=self._strip_columns(payload.validation, columns),
+                train_sample_weight=payload.train_sample_weight,
+                evaluation_coverage=deepcopy(payload.evaluation_coverage),
             )
         if (
             isinstance(payload, tuple)

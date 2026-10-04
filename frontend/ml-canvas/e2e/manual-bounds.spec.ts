@@ -35,8 +35,7 @@ test('manual bounds preview only selected columns and retain edits across layout
   // A removed column and inactive statistical parameters must not leak into the request.
   await openOutlier(page);
   const method = page.getByRole('combobox', { name: 'Method', exact: true });
-  await method.press('End');
-  await method.press('Enter');
+  await method.selectOption('manual_bounds');
   await expect(method).toHaveValue('manual_bounds');
   const lower = page.getByRole('spinbutton', { name: 'Lower bound for age', exact: true });
   const upper = page.getByRole('spinbutton', { name: 'Upper bound for age', exact: true });

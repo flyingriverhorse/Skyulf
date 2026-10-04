@@ -10,7 +10,8 @@ from skyulf.core.schema import SkyulfSchema
 
 @pytest.mark.parametrize("split_type", ["feature_target_split", "TrainTestSplitter", "Split"])
 @pytest.mark.parametrize(
-    "step_type, field", [("ManualBounds", "bounds"), ("GeoDistance", "lat1_col")]
+    "step_type, field",
+    [("ManualBounds", "bounds"), ("ClipValues", "bounds"), ("GeoDistance", "lat1_col")],
 )
 def test_feature_operations_reject_a_separated_target(split_type, step_type, field):
     """A target retained in schema metadata is unavailable to operations that act only on X."""
@@ -52,3 +53,24 @@ def test_bounds_can_filter_a_column_before_it_becomes_a_target():
     )
     predicted = predict_schemas(pipeline, {"load": SkyulfSchema.from_columns(["target"])})
     assert find_broken_references(pipeline, predicted) == []
+
+
+def test_group_imputer_flags_a_missing_group_column():
+    """A misspelled group column must show on the canvas before the run fails in core."""
+    pipeline = PipelineConfig(
+        pipeline_id="group-ref",
+        nodes=[
+            NodeConfig("load", "data_loader"),
+            NodeConfig(
+                "fill",
+                "GroupImputer",
+                params={"columns": ["age"], "group_by": "industri", "strategy": "mean"},
+                inputs=["load"],
+            ),
+        ],
+    )
+    schema = SkyulfSchema.from_columns(["age", "industry"], {"age": "float64", "industry": "str"})
+    predicted = predict_schemas(pipeline, {"load": schema})
+    assert find_broken_references(pipeline, predicted) == [
+        {"node_id": "fill", "field": "group_by", "column": "industri", "upstream_node_id": "load"}
+    ]

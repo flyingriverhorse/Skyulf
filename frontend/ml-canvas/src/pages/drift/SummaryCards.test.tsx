@@ -23,6 +23,16 @@ function makeReport(drifted: boolean, schemaChanges = true): DriftReport {
 }
 
 describe('SummaryCards feature drift percentage', () => {
+    it('shows evidence gaps without assigning a healthy background', () => {
+        // Zero confirmed alarms cannot establish health when a feature cannot be tested.
+        const report = makeReport(false);
+        report.column_drifts.sepalLength!.evidence = {
+            status: 'insufficient_data', reference_count: 3, current_count: 3,
+        };
+        render(<SummaryCards report={report} />);
+        expect(screen.getByText('1 without sufficient evidence').parentElement).toHaveClass('bg-amber-50');
+    });
+
     it('does not include schema changes in the percentage of measured features', () => {
         // Historic 6/4 reports must display the four feature verdicts as 100%.
         render(<SummaryCards report={makeReport(true)} />);
@@ -96,23 +106,23 @@ describe('SummaryCards PSI evidence', () => {
         ])} />);
 
         expect(summaryCard('Avg PSI').getByText('2.5050')).toBeInTheDocument();
-        expect(summaryCard('Avg PSI').getByText('Significant drift')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('category')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('PSI: 5.0000')).toBeInTheDocument();
+        expect(summaryCard('Avg PSI').getByText('Large distribution difference')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('category')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('PSI: 5.0000')).toBeInTheDocument();
         expect(screen.getByText('50% of features')).toBeInTheDocument();
     });
 
     it.each([
-        [0, '0.0000', 'Stable'],
-        [0.15, '0.1500', 'Minor drift'],
-        [0.3, '0.3000', 'Significant drift'],
+        [0, '0.0000', 'Small distribution difference'],
+        [0.15, '0.1500', 'Moderate distribution difference'],
+        [0.3, '0.3000', 'Large distribution difference'],
     ])('summarizes a categorical-only PSI of %s', (value, formatted, interpretation) => {
         /** Categorical-only reports need the same numeric summary and bands as numeric reports. */
         render(<SummaryCards report={psiReport([psiColumn('category', 'psi_categorical', value)])} />);
 
         expect(summaryCard('Avg PSI').getByText(formatted)).toBeInTheDocument();
         expect(summaryCard('Avg PSI').getByText(interpretation)).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText(`PSI: ${formatted}`)).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText(`PSI: ${formatted}`)).toBeInTheDocument();
     });
 
     it('excludes unavailable metrics while retaining measured zero in the average', () => {
@@ -127,8 +137,8 @@ describe('SummaryCards PSI evidence', () => {
         ])} />);
 
         expect(summaryCard('Avg PSI').getByText('0.2000')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('numeric')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('PSI: 0.4000')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('numeric')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('PSI: 0.4000')).toBeInTheDocument();
     });
 
     it('ranks a measured zero above columns without PSI', () => {
@@ -138,8 +148,8 @@ describe('SummaryCards PSI evidence', () => {
         ])} />);
 
         expect(summaryCard('Avg PSI').getByText('0.0000')).toBeInTheDocument();
-        expect(summaryCard('Avg PSI').getByText('Stable')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('zero')).toBeInTheDocument();
+        expect(summaryCard('Avg PSI').getByText('Small distribution difference')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('zero')).toBeInTheDocument();
     });
 
     it.each(['empty', 'missing', 'non-finite', 'json-null'])('shows unavailable PSI for %s evidence', kind => {
@@ -153,8 +163,8 @@ describe('SummaryCards PSI evidence', () => {
 
         expect(summaryCard('Avg PSI').getByText('—')).toBeInTheDocument();
         expect(summaryCard('Avg PSI').getByText('No PSI available')).toBeInTheDocument();
-        expect(summaryCard('Avg PSI').queryByText('Stable')).not.toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('—')).toBeInTheDocument();
-        expect(summaryCard('Most Drifted').getByText('PSI: —')).toBeInTheDocument();
+        expect(summaryCard('Avg PSI').queryByText('Small distribution difference')).not.toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('—')).toBeInTheDocument();
+        expect(summaryCard('Highest PSI').getByText('PSI: —')).toBeInTheDocument();
     });
 });

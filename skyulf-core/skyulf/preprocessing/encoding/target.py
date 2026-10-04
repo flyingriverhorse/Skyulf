@@ -96,7 +96,7 @@ def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
     X_subset = X.select(valid_cols)
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
-    encoded = encoder.transform(X_np)
+    encoded = encoder.transform(X_np) if len(X) else np.empty((0, len(encoder.encodings_)))
     return _replace_target_encoded_polars(X, y, valid_cols, encoded)
 
 
@@ -107,7 +107,7 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
     X_subset = X[valid_cols]
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    encoded = encoder.transform(X_input)
+    encoded = encoder.transform(X_input) if len(X) else np.empty((0, len(encoder.encodings_)))
     return _replace_target_encoded_pandas(X, y, valid_cols, encoded)
 
 

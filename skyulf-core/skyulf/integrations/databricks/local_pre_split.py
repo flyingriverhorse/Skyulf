@@ -7,7 +7,7 @@ from copy import deepcopy
 from decimal import Decimal, InvalidOperation
 from typing import Any, TypeGuard
 
-from ...inference.project_code import is_registered_project_step
+from ...inference.project_code import is_project_filter_step
 from ...preprocessing.casting import TYPE_ALIASES
 from ._contracts import column_name
 
@@ -43,7 +43,7 @@ def deduplicate_columns(step: dict[str, Any]) -> tuple[str, ...]:
 
 def custom_filter_columns(step: dict[str, Any]) -> tuple[str, ...]:
     """Validate a saved filter assertion against its isolated class registration."""
-    if not is_registered_project_step(step["transformer"]):
+    if not is_project_filter_step(step):
         raise ValueError("pre_split_steps custom filter requires registered project code.")
     declaration = step.get("pre_split")
     columns = declaration.get("required_columns") if type(declaration) is dict else None

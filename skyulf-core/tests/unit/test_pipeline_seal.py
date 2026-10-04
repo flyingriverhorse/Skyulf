@@ -17,6 +17,19 @@ from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
 
 
+def test_tree_missing_value_routing_changes_digest():
+    """Distinct NaN predictions must never share a fitted-tree artifact identity."""
+    from sklearn.tree import DecisionTreeClassifier
+
+    model = DecisionTreeClassifier(max_depth=1).fit([[0.0], [1.0]], [0, 1])
+    before_digest = artifact_digest(model)
+    before_prediction = model.predict([[np.nan]])
+    model.tree_.missing_go_to_left[0] = 1 - model.tree_.missing_go_to_left[0]
+
+    assert model.predict([[np.nan]])[0] != before_prediction[0]
+    assert artifact_digest(model) != before_digest
+
+
 @dataclasses.dataclass
 class ArtifactState:
     """Hold fitted state that can contain a nested reference."""

@@ -62,10 +62,10 @@ except ImportError:
     XGBOOST_AVAILABLE = False
 
 try:
-    from lightgbm import (  # ty: ignore[unresolved-import]
-        LGBMClassifier,  # ty: ignore[unresolved-import]
-        LGBMRegressor,  # ty: ignore[unresolved-import]
-    )
+    import lightgbm  # noqa: F401 - availability probe must run even when wrappers are cached
+
+    from .classification import _SamplingLGBMClassifier
+    from .regression import _SamplingLGBMRegressor
 
     LIGHTGBM_AVAILABLE = True
 except ImportError:
@@ -131,12 +131,19 @@ if XGBOOST_AVAILABLE:
     BASE_ESTIMATORS_REG["xgboost"] = lambda: XGBRegressor(random_state=DEFAULT_RANDOM_STATE)
 
 if LIGHTGBM_AVAILABLE:
-    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: LGBMClassifier(
+    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: _SamplingLGBMClassifier(
         random_state=DEFAULT_RANDOM_STATE, verbose=-1
-    )
-    BASE_ESTIMATORS_REG["lightgbm"] = lambda: LGBMRegressor(
+    ).set_params(subsample_freq=None)
+    BASE_ESTIMATORS_REG["lightgbm"] = lambda: _SamplingLGBMRegressor(
         random_state=DEFAULT_RANDOM_STATE, verbose=-1
-    )
+    ).set_params(subsample_freq=None)
+
+
+def _boolean_option(value: Any, name: str) -> bool:
+    """Require explicit booleans, matching the public ensemble configuration contract."""
+    if type(value) is not bool:
+        raise ValueError(f"{name} must be boolean.")
+    return value
 
 
 class _BaseEnsembleCalculator(SklearnCalculator):
@@ -189,7 +196,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     @property
     def default_params(self) -> dict[str, Any]:
-        """Base defaults, plus resolved ``estimators`` while tuning.
+        """Base defaults, plus the selected or default resolved ``estimators``.
 
         The tuner builds the meta-estimator from ``default_params``; without the
         resolved ``estimators`` a bare ``VotingClassifier()`` would raise. When
@@ -197,19 +204,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         is merged in here.
         """
         params = dict(self._default_params)
-        if self._tuning_base_config:
-            resolved = self._resolve_estimators(dict(self._tuning_base_config))
-            for key in (
-                "estimators",
-                "final_estimator",
-                "voting",
-                "cv",
-                "passthrough",
-                "weights",
-                "n_jobs",
-            ):
-                if key in resolved:
-                    params[key] = resolved[key]
+        resolved = self._resolve_estimators(dict(self._tuning_base_config))
+        for key in (
+            "estimators",
+            "final_estimator",
+            "voting",
+            "cv",
+            "passthrough",
+            "weights",
+            "n_jobs",
+        ):
+            if key in resolved:
+                params[key] = resolved[key]
         return params
 
     def fit(
@@ -221,7 +227,10 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
+        """Resolve the selected estimators and delegate fitting with optional weights."""
         config = self._inject_tuning_base_config(config)
         config = self._resolve_estimators(config)
         return super().fit(
@@ -232,6 +241,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             log_callback,
             validation_data,
             iteration_callback=iteration_callback,
+            sample_weight=sample_weight,
         )
 
     # --- tuning hooks -------------------------------------------------------
@@ -260,7 +270,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             final_estimator=final_est if self.IS_STACKING else "",
             strategy=strategy,
             problem_type=self.problem_type,
-            calibrate_base_models=bool(src.get("calibrate_base_models")),
+            calibrate_base_models=_boolean_option(
+                src.get("calibrate_base_models", False), "calibrate_base_models"
+            ),
         )
 
     def _inject_tuning_base_config(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -423,9 +435,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         bucket.pop("voting", None)
         bucket.pop("weights", None)
         # ``passthrough`` (let the meta-learner also see the raw features) is
-        # a valid Stacking-only param; coerce to bool and keep it.
+        # a valid Stacking-only param; require a boolean and keep it.
         if "passthrough" in bucket:
-            bucket["passthrough"] = bool(bucket["passthrough"])
+            bucket["passthrough"] = _boolean_option(bucket["passthrough"], "passthrough")
 
     def _clean_voting_meta_keys(self, bucket: dict[str, Any]) -> None:
         """Keeps/normalizes the meta-keys valid for Voting (voting, weights)."""
@@ -514,11 +526,13 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     def _extract_calibration(bucket: dict[str, Any]) -> dict[str, Any] | None:
         """Pop and normalise calibration settings from *bucket*.
 
-        Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is truthy,
+        Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is True,
         else ``None``. The transport keys are always removed so they cannot leak
         into the sklearn meta-estimator constructor.
         """
-        enabled = bool(bucket.pop("calibrate_base_models", False))
+        enabled = _boolean_option(
+            bucket.pop("calibrate_base_models", False), "calibrate_base_models"
+        )
         method = bucket.pop("calibration_method", "sigmoid")
         cv = bucket.pop("calibration_cv", 3)
         if not enabled:

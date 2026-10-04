@@ -31,6 +31,9 @@ _COMPILED_LOSS_IDENTITIES = {
     if isinstance(cls, type)
     and (issubclass(cls, _loss.CyLossFunction) or cls is _loss.CyHalfMultinomialLoss)
 }
+# Per-call diagnostics recorded on a fitted object while it scores rows. They describe the last
+# batch, not what was learned, so scoring must not change the artifact's identity.
+_TRANSIENT_ATTRIBUTES = frozenset({"last_transform_coverage_"})
 _BIT_GENERATOR_TYPES = frozenset(
     (np.random.PCG64, np.random.PCG64DXSM, np.random.MT19937, np.random.Philox, np.random.SFC64)
 )
@@ -190,6 +193,7 @@ def _tree_children(h: Any, obj: Any) -> Iterator[Any]:
         "impurity",
         "n_node_samples",
         "weighted_n_node_samples",
+        "missing_go_to_left",
         "value",
     ):
         yield np.asarray(getattr(obj, attr))
@@ -242,9 +246,11 @@ def _compiled_loss_state(obj: Any) -> Any:
 
 
 def _object_state(obj: Any) -> dict[str, Any]:
-    """Exclude routines and imported modules from an object's meaningful fitted state."""
+    """Exclude routines, imported modules and scoring diagnostics from fitted state."""
     return {
         name: value
         for name, value in vars(obj).items()
-        if not inspect.isroutine(value) and not isinstance(value, ModuleType)
+        if name not in _TRANSIENT_ATTRIBUTES
+        and not inspect.isroutine(value)
+        and not isinstance(value, ModuleType)
     }

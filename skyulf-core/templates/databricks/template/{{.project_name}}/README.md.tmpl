@@ -1,19 +1,386 @@
 # {{.project_name}}
 
-Skyulf 0.9.0 Bundle: **{{.task}}** with **{{.engine}}**, using **{{.compute_mode}}**
+Skyulf 0.9.1 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}**, using **{{.compute_mode}}**
 compute. Spark reads bounded Delta inputs and writes predictions; preprocessing
 and model fitting run locally on the selected compute.
+
+## Model competition for one target
+
+Choose `training_layout=model_competition` to compare named candidates for one
+target and select one winner. It uses the existing `train` and `score` jobs and
+single-model promotion controls. Each candidate has its own training task. Setup asks for the
+shared target/task, source, inputs, CV policy, final metric, quality threshold and
+lifecycle settings. Choose 2-8 candidates from task-specific model lists, then
+choose their common preprocessing recipe and search strategy/settings. Selecting
+voting or stacking opens questions for that candidate only: base-model count and
+individual model menus, voting weights/type, or stacking meta-model/folds and
+passthrough. Classifiers also offer calibration. Each ensemble keeps its own
+answers, including when two candidates use the same ensemble type. Select distinct
+base models; their automatic search spaces are supplied by Core. Accept defaults
+unless you need different settings. Hidden model slots do not enable questions.
+
+The initializer generates `src/modeling/model_competition.py` from those answers; no
+Python edits are required to activate the selected models. Default selections:
+
+| Task | Candidate 1 | Candidates 2 and 3 |
+| --- | --- | --- |
+| regression | Ridge | Random forest and voting (linear regression + Ridge) |
+| classification | Logistic regression | Random forest and soft voting (logistic + forest) |
+
+All selected candidates use the shared search controls (default: random,
+10 trials), each with its own Core automatic space. Selected ensemble base models
+are also tuned automatically. Search CV and the selection metric remain common;
+the lifecycle metric chosen during setup also supplies the tuning objective.
+Exhaustive grid strategies may exceed the budget with large automatic spaces;
+reduce the candidate-specific space or explicitly increase the limits.
+
+Each candidate has its own editable `modeling` object: model params, strategy,
+trial controls and a populated `search_space`. Edit one candidate without
+changing the others, even when they use the same model type. Recipe functions
+stay in `features/preprocessing.py`; select one with `preprocessing_recipe` and
+adapt its columns to your input data. Replace the modeling object with a plain
+model type and params if you want fixed training without tuning.
+
+New projects have no shared `ensemble.py` or `tuning.py` override files. Older
+projects using those hooks still work. Adjust
+`competition_max_trials` (setup default 1000) and `competition_max_candidates` (default 8)
+in `config/workflow.json` to bound the whole competition. The trial cap covers
+the sum of candidate trial upper bounds, including nested searches; a fixed
+candidate counts as one per outer/final search. Larger grids must fit those
+explicit bounds. This cap counts candidate configurations, not individual model
+fits: every configuration uses CV folds, and final fits and CV diagnostics add
+work. Input-size limits and the maximum fold count apply separately.
+
+Candidate preprocessing must preserve rows and their order. Put eligibility
+filters in the shared pre-split recipe; candidate-specific resampling and sorting
+are not supported.
+Custom Python is trusted project code and must also preserve row membership and
+order; the preflight checks recognize built-in row-changing steps, not arbitrary
+Python behavior.
+
+Ordinary tuned CV scores are post-selection diagnostics;
+choose Nested CV for independent outer-fold evaluation. The winner alone gets
+the reserved holdout quality check. A failed quality check does not fall back
+to a runner-up. A failed candidate stops the competition. Start a fresh run
+after inspecting failure evidence; lifecycle repairs do not re-register models.
+Use the phased Bundle train job for competition; the single-call `run_action`
+training adapter does not execute competitions.
+
+For a regression example, choose `task=regression`, your amount target and
+`metric=heldout_rmse`. For classification, choose `task=classification`, your class
+target and `metric=heldout_f1`. All generated candidates initially use the shared
+preprocessing recipe (normally `default`). For example, customize a regression
+forest candidate's recipe while retaining its tuning settings:
+
+```python
+MODELS["random_forest_regressor_2"]["preprocessing_recipe"] = "example_imputer"
+```
+
+`example_imputer` is a named recipe in `src/features/preprocessing.py`; adapt its
+`feature_value` column first. Add other named builders there for custom steps or
+use `example_imputer_frequency` after adapting its numeric and category inputs. Each candidate
+and CV fold fits its selected recipe only on that fold's training rows. Keep
+eligibility in the shared `src/features/pre_split.py`. Candidate declarations
+cannot override target, task, source, pre-split rules, holdout or CV.
+
+CV is mandatory for competition. The initializer exposes the same fold, group,
+time and nested policy controls as single-model training. All candidates share
+the same evaluation rows and metric: `heldout_rmse` selects using training-side
+RMSE, for example. Candidate ranking never consumes the final holdout. Only the
+winner is tested against the holdout and champion gates; a failed gate preserves
+the champion without trying a runner-up. Every candidate must complete before
+selection. The loader supplies `pipeline.modeling` from each declared candidate
+during training.
+
+## Optional multi-target training
+
+The initializer's `training_layout` defaults to `single_model`. Choose
+`multi_target` to use the same `train` job with one `train_<name>` task per model; the
+project still has exactly two jobs (`train` and `score`). Setup asks shared data,
+output selection, compute and training schedule questions, then 2-8 branches.
+For each branch choose its name, target, features, task, model, recipes, split,
+CV, tuning and quality settings. Ensemble choices open that branch's base-model
+menus and controls. The initializer writes executable `src/modeling/multi_model.py`.
+Multi-target keeps branch `promotion_policy=manual_approval` and
+`score_handoff=disabled`; whole-set manual/automatic policy is in model_set.py.
+The shared `score_handoff` prompt controls the complete set separately. Choose
+`after_alias_change` to start the existing score job after successful automatic
+promotion, manual approval or rollback. `training_report -> scoring_requested
+-> run_batch_scoring` provides this handoff. A pending/rejected candidate or
+failed quality check does not trigger scoring. `disabled` keeps scoring manual
+or scheduled. Promotion alone does not enable this option.
+
+Edit the generated declarations in `src/modeling/multi_model.py` when needed.
+Classification, regression and ensemble branches can be mixed. Each branch has a
+`workflow` overlay on
+`config/workflow.json` and optional `features_path` relative to `src/modeling`
+(default `../features`). Overlay values replace complete top-level fields:
+setting `pipeline` replaces the whole pipeline, with no nested model merging.
+Keep its preprocessing list empty; the selected Python recipe fills it.
+A branch selects `preprocessing_recipe` and `pre_split_recipe` independently.
+Omitting a selector calls that phase's default builder. Unknown names fail early.
+Use names such as `{catalog}.{metadata_schema}.revenue{resource_suffix}` to
+retain deployment bindings and namespace isolation. Feature packages must stay
+inside `src`; keep them under `src/features/`, or add their paths to sync includes.
+All modeling Python and feature Python files are explicitly included in sync.
+
+For example, keep all custom implementations in the shared `src/features/custom/`
+package and select different ordered step lists:
+
+| Branch | preprocessing_recipe | pre_split_recipe |
+| --- | --- | --- |
+| revenue | example_frequency | example_complete_inputs |
+| cost | example_imputer | none |
+| churn | example_imputer_frequency | example_complete_inputs |
+
+`preprocessing.py` defines `build_preprocessing(recipe="default")` and
+`pre_split.py` defines `build_pre_split_steps(recipe="default")`. Add a named
+function to either file's mapping to create a recipe. Each function returns a
+normal list of Core/custom steps. The starters use `feature_value` and `category`;
+adapt those columns to the selected branch's inputs. `example_frequency` performs
+no imputation; `example_imputer_frequency` runs the imputer then custom frequency encoding.
+`example_complete_inputs` requires at least one of the two inputs to be present.
+
+Shared recipes share code, not fitted values: each branch and CV fold learns its
+own statistics from its own training rows. Selected recipe names are bound into
+the saved source, so model reload and saved-plan replay never use another branch's
+current/default recipe. Pre-split scoring reuse uses the selected pre-split list.
+Legacy zero-argument builders remain valid when selectors are omitted.
+
+All branches share one pinned input Delta version and one captured training
+clock. Each has independent labels, preprocessing, optional search/CV, registered
+candidate, and comparison against its counterpart in the pinned champion set.
+Train-only projects use each model's own champion. Keep every known target
+column out of all input feature lists. Missing labels are excluded separately
+per branch. The report exposes the parent run and every component result.
+
+`src/modeling/multi_model.py` defines what to train: each target, model, training
+and CV settings, preprocessing recipe and quality limits. `src/modeling/model_set.py`
+defines how those models are released together: the registered set name, promotion
+policy and scoring tables/views. For example, define revenue and cost models in
+`multi_model.py`, then use `model_set.py` to approve them as one version and publish
+their predictions together. The profit calculation (`revenue - cost`) belongs in
+`src/features/scoring.py`.
+
+Multi-target projects enable `src/modeling/model_set.py`. Training packages every
+completed component candidate under one model-set name/version/digest. It copies
+the frozen component artifacts and shared `src/features/` source into the set.
+Component aliases stay unchanged. The set's `promotion_policy` controls its
+activation; legacy projects without that factory remain train only.
+`src/features/scoring.py` contains both stages: `build_model_rules()` selects each
+model's eligibility and output rules; `build_combined_rules()` selects calculations
+that use several model results. The latter returns an empty list by default.
+To enable one, declare its callback, version, parameters, typed columns and
+`required_components` there. The commented profit example depends
+only on revenue and cost; an unrelated component's exclusion does not suppress it.
+The feature package exports `build_scoring` as the compatible model-rule hook.
+
+### Select published results
+
+The initializer asks `model_set_name`, `model_set_output_mode` and `model_set_table_name` for this
+layout. Blank names use project defaults; explicit names use exactly that object
+name with the target's catalog/schema and deployment suffix added automatically.
+`model_set_name` names the registered model set, not a table (default:
+`<project_name>_set`). `model_set_table_name` names its physical result table
+(default: `<project_name>_set_scores`). View defaults are
+`<project_name>_predictions_<branch>` and `<project_name>_business_results`.
+Edit `publication` in `src/modeling/model_set.py` to change the selection:
+
+| Mode | Physical table | Consumer views |
+| --- | --- | --- |
+| `all` (default) | Model predictions, model outputs and combined business results | None |
+| `combined_only` | Combined business results, keys, rule status and set provenance | None |
+| `separate_views` | All results saved once | One per selected model, plus combined results when rules exist |
+
+All modes still run each model's saved scoring rules before combined rules.
+`combined_only` requires active combined rules in the saved set; configure,
+train and approve them first. It omits intermediate predictions from storage.
+Switching between this mode and the full schema requires a new table name.
+
+For `separate_views`, setup also asks `model_view_prefix` and
+`combined_view_name`. `model_views=None` creates a view for every saved branch;
+a mapping selects only its listed branches and gives each a custom name:
+
+```python
+"model_views": {
+    "revenue": "{catalog}.{output_schema}.revenue_predictions{resource_suffix}",
+    "cost": "{catalog}.{output_schema}.cost_predictions{resource_suffix}",
+},
+"combined_view": "{catalog}.{output_schema}.profit_results{resource_suffix}",
+```
+
+`model_views={}` exposes no individual model views. Views contain record keys,
+the relevant output/status columns and set provenance; model columns retain their
+branch prefix. Views are projections, not additional prediction tables. All read
+one committed backing table. A rule error fails the job before any new data is
+written; earlier successful results remain. View setup happens before the data
+write and can leave empty/old-result views if setup fails. Existing unrelated
+objects are never replaced. Changed view sources/projections require new names;
+removing a view from configuration does not delete an existing catalog object.
+
+For example, after scoring `id=101`, inserting `id=102` lets the next batch append
+its prediction. Updating a feature on `id=101` or deleting that row is different:
+the default `source_change_policy="reject"` fails the batch. Choose
+`rebuild_on_change` in Bundle setup (or `modeling/model_set.py`) to rebuild the
+complete current snapshot with the selected set when UPDATE/DELETE is observed.
+Deleted rows disappear, corrected rows and business results are recomputed,
+and lag/rolling history starts from the corrected snapshot. Ordinary inserts
+still append. The full snapshot must fit `max_rows` and `max_input_mb`; otherwise
+the job fails and keeps previous results. Permission failures still fail.
+Expired CDF history fails unless `auto_rebuild_on_cdf_expiry=true` enables
+recovery of recognized history loss; this is a separate scoring policy.
+
+The two questions have independent purposes: `model_change_mode` controls a
+new model-set selection; `source_change_policy` controls changed/deleted source
+rows. A source-triggered rebuild uses the selected set for ALL rows, even if
+earlier rows were scored with older versions in append mode. There is no
+retraining. Old projects without the new setting retain `reject`. This option
+currently belongs to model-set scoring; the standalone single-model insert
+scorer keeps its existing source-change rejection contract.
+
+### Set quality and activation
+
+Bundle setup asks `model_set_promotion_policy` (default `manual_approval`). Edit
+`promotion_policy` in `src/modeling/model_set.py` to choose `automatic` later.
+The set policy is separate from individual branch policies, which stay manual.
+Set each branch's `metric`, `quality_threshold`, optional `quality_gates` and
+`min_improvement` in its `workflow` dictionary in `src/modeling/multi_model.py`.
+For example, RMSE with threshold 10 means RMSE <= 10; F1 with threshold 0.8
+means F1 >= 0.8. Use limits suitable for your task, including ensemble branches.
+
+The first set needs passing absolute thresholds for every branch. Replacements
+require no branch to regress on its selected metric against the corresponding
+component in the pinned champion set. At least one branch must improve by its
+`min_improvement` (with a positive gain even when the minimum is zero). Equal
+peers are allowed; an all-tied set stays challenger. For example, lower revenue
+RMSE with unchanged risk accuracy can promote the complete set. All absolute
+gates still apply, including additional metrics configured in `quality_gates`.
+The quality policy and baseline are saved with the set and evaluated on saved holdout rows.
+Editing multi_model.py cannot change a previously registered set's policy.
+Branch names and registered component names must match the existing set layout.
+
+Automatic mode checks all gates after packaging. A failed gate leaves the current
+champion unchanged and reports the failed components. A complete passing set
+becomes champion. Missing evidence, changed baselines and execution errors fail
+the job. Scoring stays a separate job. Manual approval checks the same gates.
+
+For manual approval, use the `train` job's `lifecycle_action=approve`, the concrete set
+`candidate_version`, and `expected_champion_version` (`none` for first activation).
+Approval executes the saved complete set on a bounded scoring-source snapshot and
+requires each component and rule to produce at least one result, then verifies
+every saved component quality policy before changing the set alias.
+Old sets without quality pins remain scoreable but need retraining/packaging for
+approval through this Bundle flow.
+Save the returned promotion receipt. To restore its prior complete set, use
+`lifecycle_action=rollback`, `promotion_receipt_json`, and the expected current
+champion version.
+
+Every completed training candidate is nominated as the set's `challenger`. A new
+candidate moves the displaced contender to `previous_challenger`. Approval removes
+the promoted version's challenger alias and preserves the old champion as
+`previous_champion`. The individual component aliases remain unchanged.
+
+Use `lifecycle_action=reject` with the current set `candidate_version`,
+`expected_champion_version` and `rejection_reason` to record a manual rejection.
+The rejected set stays visible as challenger until a new candidate replaces it;
+its `approval_status=rejected` prevents later approval. Rejection does not run
+training or scoring, or require passing quality gates. An identical repeat reuses
+the original receipt. A changed reason, candidate or champion fails explicitly.
+Rollback restores the complete prior set and preserves unrelated challenger history.
+
+The same `score` job calls `score_models.py` for this layout. It pins the set
+champion once (or uses `score_model_version`) and publishes the full keyed result
+with set identity. Scoring loads saved code, so changing editable rules requires
+training/packaging and approving a new set. Both jobs remain serialized with
+`max_concurrent_runs=1`; they must exclusively own set aliases and output writes.
+Append retains earlier rows with their original set version; full rebuild
+atomically replaces compatible output on a set change. Temporal carry changes
+require full rebuild. Declare rule dependencies as exact pins in
+`src/features/requirements.txt`; conflicting component pins are rejected.
+The remaining lifecycle instructions below apply to `training_layout=single_model`.
 
 ## 1. Configure and preview
 
 | File | Edit here |
 | --- | --- |
-| `config/workflow.json` | Existing input tables, record keys, features/target, model parameters, validation/search, data selection, limits and promotion/scoring policies |
-| `src/preprocessing.py` | `build_pre_split_steps()` for fixed cleanup/eligibility; `build_preprocessing()` for learned transformations |
-| `src/tuning.py` | Optional `build_search_space()` override; returning `None` uses Core defaults |
-| `src/ensemble.py` | Optional voting/stacking composition; returning `None` keeps JSON parameters and Core defaults |
-| `databricks.yml` | Workspace/UC bindings for `dev`, `test`, `syst`, `prod`; schedule and compute variables |
-| `resources/workflow.jobs.yml` | Generated task definitions; keep them aligned with the installed wheel |
+| `config/workflow.json` | Existing input tables, record keys, features/target, validation/CV, data selection, limits and promotion/scoring policies |
+| `src/features/pre_split.py` | `build_pre_split_steps()` for fixed cleanup and training eligibility |
+| `src/features/preprocessing.py` | `build_preprocessing()` for transformations fitted inside each CV fold |
+| `src/features/scoring.py` | `build_model_rules()` for each model; `build_combined_rules()` for calculations across models |
+| `src/features/assets.json` | Relative paths of bounded data files to save with the model |
+| `src/features/requirements.txt` | Exact project dependency pins verified at fit/load and recorded by MLflow |
+| `src/features/custom/` | Your own steps as plain pandas functions (examples inside); use relative imports |
+| `src/modeling/single_model.py` | Single model's parameters and tuning/search space in `MODELING` |
+| `src/modeling/model_competition.py` | Each competition candidate owns its model, tuning/search space and preprocessing recipe in `MODELS` |
+| `src/modeling/multi_model.py` | Each target owns its model, tuning/search space, recipes and validation/quality policy |
+| `src/modeling/model_set.py` | Whole-set release/promotion policy and scoring table/view destinations |
+| `src/jobs/` | Notebook entrypoints referenced by the two jobs |
+| `src/tools/preview.py` | Offline configuration preview and installed-node discovery |
+| `databricks.yml` | Bundle identity, source sync and included deployment/resource files |
+| `deployment/targets.yml` | Shared environments and optional personal development targets |
+| `deployment/variables.yml` | UC bindings, run identities, optional job ACLs, schedule and compute variables |
+| `resources/train.job.yml` | Training, comparison, approval/rollback and optional scoring handoff |
+| `resources/score.job.yml` | Batch scoring job and its independent schedule/compute |
+
+`databricks.yml` includes both job files through `resources/*.yml`. Keep the
+resource keys `train` and `score` stable; the training handoff references
+`${resources.jobs.score.id}` across files. When updating an older generated
+project, replace `resources/workflow.jobs.yml` with these two files; do not
+leave all three present. The job definitions and resource keys stay the same.
+
+Training captures every Python file under `src/features/` in one versioned
+64 KiB snapshot. Relative imports keep custom modules available after MLflow
+reload, even if editable project files change. Add `__init__.py` to subpackages.
+The `src/features/assets.json` file contains detailed `_help` instructions and an
+initially empty `files` list. Create the data file yourself, then declare it as
+`"files": ["assets/bands.json"]`. The legacy `["assets/bands.json"]` format also
+works. Assets can be used by pre-split, preprocessing and scoring; listing one
+does not enable a step. Read it from saved custom code with
+`read_project_asset(__package__, "assets/bands.json")` from
+`skyulf.inference.project_package`. Code, encoded assets and dependency pins
+share the 64 KiB snapshot budget. Paths must remain inside the feature package;
+asset symlinks are rejected. Files outside the manifest are not embedded.
+
+Use exact `distribution==version` pins in `src/features/requirements.txt`.
+Install these in the training/scoring job environments as well: the loader
+verifies versions and never installs packages during prediction. MLflow exports
+the pins in its environment requirements. Changing code/assets/pins requires
+a new model version. Large external model downloads are outside this contract.
+
+Custom steps are plain pandas functions in `src/features/custom/`, wrapped with
+`column_step` (new column), `fitted_step` (learn a dict on training rows, apply it
+later) or `filter_step` (pre-split row filter). Each file starts with its rules
+and has small examples; `advanced_class_step.py` shows the Calculator/Applier
+form for rare cases. Try them with the `example_all` recipe in both recipe files.
+Their step calls appear directly inside the parent builders' returned lists,
+alongside the Core steps:
+
+| Parent recipe | Inline custom step |
+| --- | --- |
+| `src/features/pre_split.py` | `minimum_completeness(columns=["a", "b", "c"], min_present=2)` |
+| `src/features/preprocessing.py` | `frequency_encoding(columns=["category"])` |
+
+Uncomment the corresponding import and step, then adapt its column names.
+The list defines execution order; custom factories return normal Core step
+dictionaries. There are no separate column-selection variables or enable
+switches. Keep the JSON preprocessing and pre_split_steps lists empty.
+
+For `minimum_completeness(columns=["a", "b", "c"], min_present=2)`, rows with at least
+two observed fields survive unchanged. Null/NaN are missing; blanks/infinity are
+values. Filter fields need not become model inputs. Training filters do not run
+on scoring rows; use only fields known at the observation cutoff.
+
+For `frequency_encoding(columns=["category"])`, training `["A", "A", "B", null]` learns
+A=0.5 and B=0.25. Missing/new categories map to zero during inference. Each CV
+fold fits its own mapping; the saved model reuses its trained frequencies.
+Other columns and row order stay unchanged. Select string/null categorical
+features in input_columns; do not select target or record-key columns.
+
+Preview the configured project:
+
+```bash
+python src/tools/preview.py --action train
+```
 
 Review source column names and positive `max_rows`/`max_input_mb` budgets.
 Overflow fails. `training_version: null` pins the latest snapshot at run start;
@@ -22,53 +389,355 @@ no dates; temporal training needs an event column and a valid window.
 Snapshot/split, sampling and CV details use defaults without setup
 questions. Override them in init JSON or the generated config; preview after edits.
 
-The generated project searches parameters for the selected model, then refits
-the winner. To set fixed base parameters, edit
-`pipeline.modeling.base_model.params` in `config/workflow.json`, or provide
-`model_params` as a JSON object in an init file. Voting and stacking
-models require composition settings such as `base_estimators`; setup asks for
-`model_params` when one is selected. Use `--list-models` to inspect available
-models and their parameter metadata.
+Model settings have one owner:
 
-For voting or stacking, `src/ensemble.py:build_ensemble_params(model_type)`
-receives the selected registered model type and can return a JSON object of
-ensemble parameters. Its keys override matching keys in
-`pipeline.modeling.base_model.params`; other JSON parameters remain. The default
-returns `None`. Set `USE_EXAMPLES = True` in that file to try its four editable
-classification/regression voting/stacking recipes. Training and preview capture
-the exact recipe source and digest before the tuning hook runs; scoring loads the
-saved fitted artifact. Existing projects without `ensemble.py` still work.
+| Layout | Edit model settings here |
+| --- | --- |
+| Single model | `src/modeling/single_model.py` -> `MODELING` |
+| Competition | `src/modeling/model_competition.py` -> entry in `MODELS` -> `modeling` |
+| Multi-target | `src/modeling/multi_model.py` -> entry in `MODELS` -> `workflow.pipeline.modeling` |
 
-For example, a voting regression model can use
-`{"base_estimators":["linear_regression","ridge"],"base_estimator_params":{"ridge":{"alpha":2.0}}}`
-as `model_params`. A stacking model can additionally set `final_estimator`,
-`final_estimator_params`, `cv` and `passthrough` in the same object. Choose
-component keys valid for the selected classification or regression model.
-Optional classifier calibration uses `calibrate_base_models`,
-`calibration_method` (`sigmoid` or `isotonic`) and `calibration_cv`. Stacking also
-has its own internal `cv` for the final learner; this is separate from the
-workflow's candidate-scoring `cv_*` settings. Keep `n_jobs: 1` to avoid nested
-parallel fits. `tune_base_models` opts into the selected base learners' search
-axes; leave it off to search only the ensemble's own parameters.
+Library helpers run during initialization to write `base_model.params`, search
+strategy/controls and finite `search_space` lists into that model's definition.
+The lists come from Core's model/strategy catalog, including nested parameters
+of selected ensemble members. After initialization, edit these plain Python
+dictionaries directly; use `True`, `False` and `None`. They are an editable
+snapshot: later Core default changes do not silently replace them. Change one
+entry without changing another model.
 
-The generated config uses Core's `hyperparameter_tuner` wrapper. The Core model
-registry supplies a search space for the selected model and strategy. For a project
-override, edit `src/tuning.py:build_search_space()` and return finite candidate
-lists, or provide `search_space` as a JSON object in an init file. The generated
-`pipeline.modeling.search_space: {}` requests Core defaults. The checked-in
-`skyulf-core/templates/databricks/examples/tuning-init.example.json` shows a
-bounded random search using the model's default axes. After selecting a strategy,
-choose **Default** for Core controls or **Custom** for its relevant controls.
-Grid and halving-grid evaluate the full Cartesian space and fail preflight when
-it exceeds `max_candidates` (default 1000, maximum 10000); raise that limit or
-narrow the space. Random, halving-random and Optuna use `n_trials` (maximum 1000)
-as a candidate budget. Halving supports `factor`, `min_resources`,
-and `resource`; `n_estimators` resource also needs numeric starting and maximum
-budgets and a compatible estimator. The resource cannot also be a search axis;
-remove `n_estimators` from the search space with `src/tuning.py` when using that
-resource. Optuna needs `optuna` and `optuna-integration` in the
-training environment; its timeout is a soft stop between fits, not a hard
-interruption of a running estimator.
+For single-model projects, keep `pipeline.modeling` empty in the generated
+`config/workflow.json`; the loader supplies it from `single_model.py`. Other
+layouts keep an internal task placeholder and load their actual models from
+their Python file. Legacy compatibility: older
+projects may still define a single model inline in `workflow.json`, or use
+`candidates.py` / `branches.py`. Do not retain both an old and its replacement
+file, or both a single-model file and a nonempty inline model: conflicting
+definitions fail validation.
+
+### Class and row weights
+
+`class_weight` is configured in each model's parameters. Generated
+models are tuners. Find the model's settings in your layout:
+
+| File in `src/modeling/` | Model settings dictionary |
+| --- | --- |
+| `single_model.py` | `MODELING` |
+| `model_competition.py` | `MODELS["candidate_name"]["modeling"]` |
+| `multi_model.py` | `MODELS["branch_name"]["workflow"]["pipeline"]["modeling"]` |
+
+Use an actual candidate or branch key from your file. For a supported classifier,
+edit that dictionary's existing `base_model.params`, adding the class-weight key:
+
+```python
+"base_model": {
+    "type": "logistic_regression",  # Keep your selected model type.
+    "params": {"class_weight": "balanced"},  # Preserve other params too.
+},
+```
+
+Use Python `None` to disable class weighting. To keep your chosen value fixed,
+remove the `class_weight` entry from the same dictionary's `search_space`.
+To tune class weights instead, keep the search axis and omit the fixed
+`class_weight` key from `base_model.params`. Conflicting fixed and searched
+values fail validation. If you replace the tuner with a direct model, its
+settings live in `params` without `base_model`.
+Do not add class weights to regression models. Class and row weights can be
+enabled separately or together for a supported classifier.
+
+Bundle initialization asks whether to use sample weights before model selection
+(default: No). Selecting Yes asks for the source column and filters the model
+choices to supported models. The generated model file remains editable:
+
+- `single_model.py`: `WEIGHT_COLUMN = None` (or `"training_weight"`).
+- `model_competition.py`: one shared `WEIGHT_COLUMN` for all candidates.
+- `multi_model.py`: each branch's `workflow["weight_column"]` independently.
+
+Use finite nonnegative numeric source values. Each training fold must have
+positive total weight; values are not normalized. None disables that model or
+branch. All declared branch weight columns remain reserved across every branch,
+including disabled branches. They cannot be features, targets, record keys,
+group columns or timestamps, and pre-split steps cannot overwrite them.
+
+Weights affect model fitting, including CV fits. Selection and holdout metrics
+remain unweighted. Weighted training accepts supported models and row-preserving
+built-in preprocessing. Row filtering, deduplication and temporal sorting carry
+weights through explicit row positions. Random sampling carries selected source
+weights; synthetic samplers require `synthetic_weight="class_mean"` to assign
+new rows their training class's mean weight (`"uniform"` assigns one instead).
+Unsupported final models and custom steps without a row-mapping contract fail
+explicitly. Scalers and imputers remain unweighted.
+Edits apply on the next training load after syncing project files. Weight-only
+source edits do not count as new labels for automatic retraining; use manual
+training when that is the only change. Existing model files without weight
+declarations retain their unweighted behavior.
+
+Saved models record the resolved column, source-code digest, pinned table/version,
+aggregate statistics and an ordered record/weight digest. Console, parameter and
+metric summaries contain no raw weight vectors. Existing protected source and
+training Parquet snapshots retain the column for exact lifecycle replay under
+the same permissions as other training data. Scoring uses the saved model,
+does not execute the editable model files, and needs no weight column. Weight columns are
+excluded from model input schemas, explanations and drift inputs.
+
+Use `"search_space": {}` to ask the installed Core version for its current automatic
+space. If you change ensemble members, calibration or the search strategy, update
+the explicit space too, or clear it to `{}`. Calibration changes nested keys from
+`model__parameter` to `model__estimator__parameter`. Fixed model parameters must
+not contradict searched axes. An init-file `model_params` override is preserved
+and keeps automatic `{}` unless an explicit `search_space` is also supplied.
+
+Ensemble composition is in the same `base_model.params`: `base_estimators`, voting
+weights/type, or stacking `final_estimator`, `cv` and `passthrough`. Classifier
+calibration uses `calibrate_base_models`, `calibration_method` and `calibration_cv`.
+Stacking's internal `cv` differs from workflow search/evaluation CV. Generated
+ensembles set `"tune_base_models": True`; keep `"n_jobs": 1` for bounded parallelism.
+New projects do not ship `ensemble.py`/`tuning.py`; the loader still supports these
+optional hooks for old projects. Scoring uses the saved fitted model and settings.
+
+Choose Default or Custom controls for grid, random, halving_grid, halving_random
+or Optuna. Grid strategies evaluate the full Cartesian space; admission fails
+above `max_candidates` (default 1000, maximum 10000). Narrow the space or raise
+that explicit limit. Random/halving-random/Optuna use `n_trials` (maximum 1000).
+Halving accepts factor, min_resources and resource; n_estimators requires a
+compatible estimator and numeric resource limits. The resource cannot also be a
+searched parameter; generated spaces exclude it. Optuna requires optuna and
+optuna-integration; its timeout stops between fits, not during a running fit.
+
+### Optional decision thresholds
+
+Classifier recipes accept `decision_threshold` with `off` (default), `manual`
+or `auto`. Automatic mode reserves `validation_fraction` of the training
+partition before fitting preprocessing or selecting model parameters. With
+`validation_fraction: 0.25`, the saved model fits 75% and thresholds use the
+other 25%; there is no full-training refit afterward. Off/manual modes do not
+reserve these calibration rows. Final holdout rows remain independent.
+
+Threshold objectives and reported metrics are unweighted even when estimator
+fitting uses sample weights. `f1_weighted` averages classes by support; it does
+not apply row weights or optimize weighted business costs. The saved
+`decision_threshold.json` records fit/calibration counts and selection scores.
+
+Outputs use `probability_0`, `probability_1`, etc., in saved `manifest.classes`
+order. These classes retain original target labels after target encoding.
+See the [decision-threshold guide](https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#optional-classification-decision-thresholds)
+for policy examples and multiclass semantics.
+
+### Optional evaluation charts
+
+Bundle initialization asks `evaluation_charts_enabled` (default: `false`). Choosing
+`true` adds a separate `generate_charts` task after model evaluation, plus
+`matplotlib==3.10.0` in the training environment. Charts do not retrain models.
+
+| Layout | Images and destination |
+| --- | --- |
+| Single | Saved model diagnostics in a `Charts` child of its training run |
+| Competition | CV leaderboard and selected model diagnostics share a `Charts` child of the parent training run; final holdout is never used to rank candidates |
+| Model set | Each component has its own `Charts` child; a separate `Charts` child of the set parent contains the overview |
+
+Regression includes actual versus predicted, residuals and error distribution.
+Classification includes raw/normalized confusion matrices and per-class metrics;
+ROC/PR and calibration require model probabilities. Tree models expose native
+feature importance; linear models expose signed coefficients when available.
+Saved CV folds, tuning trials and training loss are plotted only when present.
+Full-holdout metric summaries use existing scalar values and separate metric scales.
+
+Open the **Charts** tab using the links printed by `generate_charts`. Images
+are indexed in dedicated `Charts` child runs with no training parameters, so
+MLflow's image-grid header does not repeat the long parameter list. The original
+training run retains all parameters, metrics and model artifacts. Its
+`skyulf.charts.run_id` tag links to the latest successful chart run.
+
+MLflow can automatically create image cards from logged image keys. If a card
+is missing from your saved layout, choose **Add chart -> Image grid** and select
+a key such as `single_actual_vs_predicted` or `competition_leaderboard`.
+The task output is plain text: created image keys grouped under their MLflow
+Charts links. Sample counts, skipped diagnostics and `charts_run_id` remain in
+`evaluation_charts/report.json` on the parent training run. Component reports
+keep the source `run_id` and the separate chart `destination_run_id`.
+
+`config/workflow.json` controls the saved sample and display budgets:
+
+```json
+"evaluation_charts": {
+  "enabled": true,
+  "max_rows": 2000,
+  "max_features": 20,
+  "max_classes": 20
+}
+```
+
+Enabling charts saves a deterministic bounded sample of actual heldout predictions,
+probabilities and labels in the evaluated model's MLflow artifacts, subject to
+the experiment's access and retention policies. Raw features and record keys are
+excluded. Sampling happens after full-holdout evaluation, preserving temporal
+feature context. Maximums are
+10,000 rows, 50 displayed features and 50 classes; each sample has a 16 MiB budget.
+Pairwise coefficient outputs are capped at 20 boundaries. Sample diagnostics are
+labelled with their row count; full-holdout scalar metrics are never overwritten.
+Missing classes or unavailable model capabilities are reported explicitly.
+
+The task is an independent leaf with no retries. A chart failure can mark the
+overall job failed but does not undo model decisions or repeat training. Inspect
+the chart task and `skyulf.charts.status`; do not repair an old lifecycle invocation.
+Setting `enabled` to `false` disables an already deployed chart task. Adding charts
+to a project generated without them also requires adding the generated task and
+Matplotlib dependency, then redeploying; the flag alone cannot change a job graph.
+
+### Optional SHAP explanations
+
+Bundle setup asks whether to enable SHAP (default: off). Enabling it adds pinned
+`shap==0.49.1` and `matplotlib==3.10.0` dependencies to the training job, on both
+serverless and policy clusters. Scoring does not compute explanations.
+
+The setup budgets apply to single models, each competition candidate and all
+generated multi-target branches. Edit `pipeline.explainability` in
+`config/workflow.json` for single/competition training, or in each
+`src/modeling/multi_model.py` branch to change its settings independently:
+
+```json
+"explainability": {
+  "method": "shap",
+  "max_samples": 100,
+  "max_features": 30,
+  "max_display_samples": 3
+}
+```
+
+Remove the field or set it to `null` (`None` in Python) to disable computation.
+For an existing project, also add the dependencies above to the training job's
+environment/libraries before enabling SHAP manually. Projects generated with
+SHAP disabled have no report tasks: regenerate with SHAP enabled, or add a
+`shap_report.py` task depending only on its matching training task and passing
+that task's `reference_json`. Validate and redeploy the updated graph.
+
+`max_samples` (1-200) bounds training rows used for computation. `max_features`
+(1-50) guards the transformed model input width: exceeding it returns unavailable;
+it does **not** select the top features or drop columns. `max_display_samples`
+(0-50, at most `max_samples`) controls saved sample waterfalls. Zero retains only
+global importance. These settings apply per model, so an eight-model run can do
+eight times the explanation work.
+
+Each enabled `shap_<name>` task displays a mean-absolute importance chart and expandable
+waterfalls with transformed feature values. Red contributions increase the
+explained output; blue contributions decrease it. Base plus contributions is in
+the explainer's output units, which may be raw scores/log-odds for classifiers,
+not probabilities. Importance describes model behavior, not causal effects.
+Sample numbers identify positions in the report, not business record keys.
+
+MLflow saves `explanations.json` and a portable `explanations.html` with embedded
+PNG charts, the exact run link and fitted model URI. No JavaScript/CDN is needed.
+Competition children retain their own reports; the winner's report is also
+retained on the parent with its child-run provenance. Unavailable explanations
+show their reason; disabled training does not import SHAP or plotting packages.
+Inputs are bounded training rows through already fitted inference preprocessing;
+holdout rows and target/time metadata are not explanation features.
+
+### Training graph and notebook files
+
+Each `train_<name>` performs a real fit and retains its split, preprocessing,
+model, CV and tuning information. Its `shap_<name>` task is a separate leaf:
+it displays that exact run's saved report and has no outgoing dependencies.
+SHAP computation still happens during the fit; the leaf does not retrain the
+model. Unavailable explanations show their saved reason. A report-task failure
+is visible in the job but does not prevent model selection or set assembly.
+
+Only SHAP tasks display HTML charts and reports. All other notebook tasks print
+their structured JSON result, including training, comparison, model decisions
+and scoring. Task values and downstream job handoffs use the same saved results.
+
+- Competition: `initialize_run -> choose_action -> load_data -> prepare_dataset`,
+  then one training task per candidate. `select_best_model` waits for every
+  training task, adopts the fitted winner without retraining, and continues to
+  `register_model -> evaluate_model -> model_decision -> training_report`.
+  Loser runs and their reports remain in MLflow; losers are not registered.
+- Multi-model: `initialize_run -> choose_action`, then one training task per
+  target. `register_model_set` waits for every model, packages the complete set
+  and nominates its challenger. `evaluate_model_set` checks each component's
+  quality and comparison with the pinned champion. `model_decision` applies
+  the set's promotion policy or an explicit approve/reject/rollback action.
+  Champion/challenger aliases belong to the set; component versions stay pinned.
+  `training_report` closes the invocation even when a training task fails.
+  After a successful report, `scoring_requested` starts `run_batch_scoring` only
+  when the enabled handoff has a verified champion transition.
+- Single model: the existing `train_and_tune` task retains training information;
+  `validate_model` verifies the fitted candidate before `register_model`.
+  `shap_model` displays its separate report when SHAP is enabled.
+
+The graph uses meaningful model names; notebook implementation is shared:
+
+| File in `src/jobs` | Responsibility |
+| --- | --- |
+| `initialize_run.py` | Pin single/competition source, recipes and champion |
+| `initialize_models.py` | Pin every multi-model recipe, source version and set baseline |
+| `load_data.py`, `prepare_dataset.py` | Load and split the shared single/competition dataset |
+| `train_and_tune.py` | Fit a single model |
+| `train_model.py` | Fit the named competition candidate or multi-model branch |
+| `shap_report.py` | Display one training task's saved SHAP report |
+| `select_best_model.py` | Select the complete competition's winner from training-side CV |
+| `validate_model.py` | Verify the single fitted candidate before registration |
+| `register_model.py`, `evaluate_model.py`, `model_decision.py` | Existing single-model registration and alias controls |
+| `register_model_set.py` | Package the complete set and nominate its challenger |
+| `evaluate_model_set.py` | Evaluate every component against its quality policy and pinned champion |
+| `model_set_decision.py` | Apply set promotion policy or an explicit approve/reject/rollback action |
+| `training_report.py`, `models_report.py` | Final single/competition or multi-model status |
+| `score.py`, `score_models.py` | Saved single-model or model-set scoring |
+| `train_models.py` | Compatibility entrypoint for earlier sequential multi-model callers |
+
+Changing parameters or a recipe keeps the graph unchanged. After adding,
+removing or renaming entries in `src/modeling/model_competition.py` or
+`src/modeling/multi_model.py`, run:
+
+```bash
+python src/tools/refresh_training_graph.py
+databricks bundle validate --strict --target {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}}
+databricks bundle deploy --target {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}}
+```
+
+The refresh script preserves schedules, compute and operator settings. A changed
+model list with an old deployed graph is rejected before any model is trained.
+Tasks can run concurrently when compute permits; each task's row/byte/search
+limits still apply separately. Existing serialized job admission, frozen
+receipts and no-repair/no-retry rules remain in effect.
+
+### Training parameters in MLflow
+
+After training, open the model's MLflow experiment run and select **Parameters**.
+Competition candidates and multi-target branches each record their own settings:
+
+| Parameter | Meaning |
+|---|---|
+| `tuning_strategy`, `tuning_model_type` | Search strategy and selected model family |
+| `tuning_requested_metric`, `tuning_metric` | Requested objective and resolved scorer |
+| `tuning_requested_trials`, `tuning_trials` | Configured trial budget and actual Core trial count |
+| `tuning_random_state`, `tuning_timeout`, `tuning_n_jobs` | Search seed, timeout and workers |
+| `tuning_strategy_params`, `tuning_search_space` | Strategy controls and effective search space |
+| `tuning_best_params.<name>` | Each parameter selected by the final search |
+
+Large parameter previews point to the complete `tuning.json` artifact. Existing
+`cv_*` parameters remain alongside these fields; `tuning_best_score` is a metric.
+With nested CV, Parameters shows the final search on all training rows; individual
+outer-fold selections remain in `tuning.json`. These fields appear on new training
+runs after updating the Core wheel; existing experiment runs are not backfilled.
+
+Fixed and tuned models also expose their fitted configuration in Parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `model_type`, `model_params.<name>` | Model family and actual constructor settings, including defaults and tuned values |
+| `ensemble.base_models`, `ensemble.strategy` | Ordered member names and voting/stacking strategy |
+| `ensemble.voting`, `ensemble.weights` | Applicable voting type and weights in member order |
+| `ensemble.final_estimator`, `ensemble.cv` | Stacking meta-model and its internal folds, separate from workflow CV |
+| `split_strategy`, `split_test_size`, `split_random_state`, `split_stratify` | Active random holdout controls, separate from CV and tuning seeds |
+| `split_start`, `split_holdout_start`, `split_cutoff`, `split_event_column` | Temporal holdout boundaries and clock column; inactive random controls are omitted |
+| `preprocessing_recipe`, `pre_split_recipe` | Selected recipe or declared builder default; `inline` means no project recipe metadata |
+| `preprocessing_steps`, `pre_split_steps` | Ordered step names for each phase |
+
+`training_parameters.json` retains complete summaries when a preview exceeds the
+display limit. Non-JSON constructor objects are described by type; their nested
+constructor settings are separate entries, and the fitted artifact retains the
+actual objects. `builder_default` means the builder has no named recipe default;
+`none` means that optional builder is absent. Previously saved artifacts without
+recipe metadata still work.
 
 The top-level `cv_*` fields are the only fold settings. They score search
 candidates; `cv_enabled: false` uses an internal training-only validation split. There is
@@ -82,20 +751,35 @@ search selects the saved model. Each search gets the configured trial/time
 budget. Outer evaluation and final-search scores are reported separately.
 The final holdout is reserved for model comparison.
 
-The preprocessing and tuning recipes start empty; `ensemble.py` has disabled
-examples to adapt. Keep
-`pipeline.preprocessing` empty in JSON. Put custom classes in the same Python
-file: training saves its source and fitted state; imported sibling modules are
-not packaged with that custom class. Approval and scoring use the saved code,
-even if this file later changes.
+`cv_nested_type` chooses `auto`, `k_fold`, `stratified_k_fold`,
+`time_series_split`, `group_k_fold` or `stratified_group_k_fold` at both nested
+levels. Temporal CV uses `event_column` and `cv_shuffle: false`; `cv_gap`,
+`cv_test_size` and `cv_max_train_size` are row counts (null maximum expands the
+training window). Nested temporal CV requires a temporal final holdout. Missing
+times and timestamps tied across fold boundaries fail explicitly.
+
+Group CV uses `cv_group_column` only as split metadata. Keep it out of
+`input_columns`. Random final holdout splits whole groups; set `stratify: false`.
+A temporal final holdout must also have disjoint groups. Missing groups fail.
+
+For binary nested search, set `"tune_threshold": True` in the model definition to select
+thresholds from inner out-of-fold probabilities. Outer and final holdout labels
+remain untouched. The saved artifact applies the independent final threshold;
+`tuning.json` and the readable results retain threshold evidence. Models without
+probabilities and multiclass threshold tuning fail explicitly.
+
+Preprocessing starts empty; ensemble and tuning settings are generated per model.
+Keep `pipeline.preprocessing` and `pre_split_steps` empty in
+JSON. Put custom pairs in the features package and enable them in the appropriate
+builder. Approval and scoring use saved code, even after project source changes.
 See [setup and advanced inputs][setup] and [custom recipes][recipes].
 
 Install the matching Skyulf wheel in your local environment, then from this project:
 
 ```powershell
-python src/preview.py --action train
-python src/preview.py --list-models
-python src/preview.py --list-preprocessors
+python src/tools/preview.py --action train
+python src/tools/preview.py --list-models
+python src/tools/preview.py --list-preprocessors
 ```
 
 Preview executes your trusted recipe builders and checks configuration; it does
@@ -105,21 +789,42 @@ builders. For another target, pass `--catalog`, `--input-schema`, `--output-sche
 
 ## 2. Build and deploy
 
-From the Skyulf checkout, build into this project's `dist` directory:
+Set `deployment/artifact.json` once: `source` is the path to a Skyulf Core source
+checkout or a release wheel, and `version` is the required Core release. Relative
+paths resolve from this project; keep the source outside generated `dist/skyulf/`.
+Bundle deployment prepares the wheel automatically,
+checks its package name and version, and records its SHA-256 in
+`dist/skyulf/build.json`. A content digest in the wheel's build tag gives changed
+bytes a distinct deployment/cache identity while preserving the release version
+required by existing saved models. The receipt matches the uploaded wheel bytes.
+To prepare it before strict validation:
 
 ```powershell
-uv build --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core
+uv run --no-project python src/tools/build_wheel.py
 ```
 
 From this generated project, with your authenticated CLI profile:
 
 ```powershell
-databricks bundle validate --strict -t dev --profile <profile>
-databricks bundle deploy -t dev --profile <profile>
+databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
+databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
 ```
 
-`dev` uses your profile's workspace and initialized UC bindings. Replace the
-placeholder hosts/catalogs for other targets before using them. The source tables
+Both jobs install `deployment/requirements.txt`. Initial Optuna and optional
+model/ensemble choices populate their exact package pins automatically. Update
+this file when changing those choices in Python later. Custom preprocessing and
+scoring pins in `src/features/requirements.txt` are included in both jobs.
+`deployment/train-requirements.txt` adds only the requested SHAP/chart packages.
+These are direct dependency pins, not a lock of every transitive dependency;
+validate a changed environment before deploying it over an existing model.
+
+Targets are paired by environment: `test/test_development`,
+`syst/syst_development` and `prod/prod_development`. Personal targets are optional,
+use user-scoped names and start with paused schedules. Configure the workspace
+and separate shared/development schemas in
+`deployment/targets.yml` and `deployment/variables.yml`; see
+[deployment setup](deployment/README.md) for external CI/CD, identity choices and
+optional personal targets inside each environment. The source tables
 must already exist; enable Delta Change Data Feed on the scoring source before
 new rows arrive. The first score processes all existing rows in that source.
 Record keys must be unique, nonnull STRING/BIGINT columns.
@@ -133,15 +838,15 @@ initialization choice.
 {{end}}
 
 Deployment creates two jobs and uploads code/configuration; input tables are
-not created. Selected schedules start `UNPAUSED` unless you set their Bundle
-pause variables to `PAUSED`. Training and scoring clocks are independent.
+not created. Shared targets use the configured schedule status; personal targets
+start paused. Training and scoring clocks are independent.
 See [deployment and schedules][schedules] and [existing-project migration][migration].
 
 ## 3. Train, inspect and approve
 
 ```powershell
-databricks bundle run -t dev --profile <profile> train
-databricks bundle run -t dev --profile <profile> score
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile> train
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile> score
 ```
 
 Run `score` after a model is selected. When handoff is enabled, first inspect its
@@ -151,25 +856,53 @@ The `train` job has one active run, with queued training and operator actions:
 
 | Task | Purpose |
 | --- | --- |
-| `prepare_request` | Validate and pin the request |
-| `training_requested` | Select training or operator branch |
-| `train_and_register` | Fit, evaluate and register the candidate |
-| `compare_and_decide` | Compare with champion and apply promotion policy |
-| `apply_operator_action` | Approve, reject or roll back without fitting |
-| `finalize_and_report` | Finalize either branch and publish verified results |
+| `initialize_run` | Validate settings and pin source version, recipe and expected champion |
+| `choose_action` | Select training or an explicit approve/reject/rollback action |
+| `load_data` | Read the bounded pinned source and save its verified dataset |
+| `prepare_dataset` | Apply fixed cleanup and eligibility rules, then save training/holdout partitions |
+| `train_and_tune` | Fit preprocessing inside training folds, run configured CV/tuning, and save the fitted pipeline |
+| `validate_model` | Verify the single fitted candidate |
+| `select_best_model` | Show the competition leaderboard and selected winner |
+| `register_model` | Check heldout evaluation before registering and nominating the candidate |
+| `evaluate_model` | Compare the registered candidate with the pinned champion on the same holdout |
+| `model_decision` | Apply promotion policy or execute an explicit approve/reject/rollback action |
+| `training_report` | Finalize the run and publish verified results and next actions |
+| `register_monitor` | Enroll the activated model, competition winner or model-set components before scoring |
+| `monitor_model` | Measure the successful scoring commit and save shared monitoring results |
+| `drift_report` | Display the saved batch's feature drift values/limits and shared dashboard link |
 | `scoring_requested` | Check whether scoring was requested |
 | `run_batch_scoring` | Invoke the existing score job |
 
-The separate score job has the `score` task. Open **`finalize_and_report`** for
-metrics, the decision and ready-to-copy `next_actions`. Comparison output is in
-`compare_and_decide`; score results are in the child or independent score run.
-Finalization can run after failure; that does not imply a successful result.
+The separate score job has the `score` task. With CDF expiry recovery enabled,
+`recovery_needed` routes recognized expiry to `recover_predictions`, and
+`scoring_report` shows the actual scoring or recovery result. Open **`training_report`** for
+metrics, the decision and ready-to-copy `next_actions`. Search details are in
+`train_and_tune`; champion comparison is in `evaluate_model`. Score results are
+in the child or independent score run. Manual actions skip data and training
+and use `model_decision` directly. Finalization can run after failure; that
+does not imply a successful result.
+
+`prepare_dataset` applies only fixed transformations and filters. Learned
+preprocessing and feature engineering stay inside `train_and_tune` so each CV
+fold learns from its own training rows. With tuning disabled, that task fits
+the configured model directly. With `training_layout=model_competition`, each
+named candidate is fitted and `select_best_model` verifies the complete shared-CV
+leaderboard before the winner reaches registration. Other candidates remain
+inspectable MLflow runs without registered versions.
+
+Bounded source and split datasets are saved as Parquet artifacts under the
+MLflow run's `lifecycle/data/`. Downstream training verifies their saved digests
+and preserves split membership without rereading the source. These artifacts
+contain training data: apply the experiment's access and retention policy.
+Registration and approval retain their source/evidence replay checks.
 
 This project's policies are:
 
 - `score_model_selection={{.score_model_selection}}`: pinned version or champion.
 - `promotion_policy={{.promotion_policy}}`: manual approval or automatic gates.
 - `score_handoff={{.score_handoff}}`: disabled or score after an alias change.
+- `auto_rebuild_on_cdf_expiry={{.auto_rebuild_on_cdf_expiry}}`: optional full rescore
+  after recognized expiry of retained Delta change history.
 
 Set a numeric `quality_threshold` before the first champion approval/promotion.
 Later promotions also need positive improvement meeting `min_improvement`.
@@ -198,15 +931,44 @@ selector. `incremental_append` keeps old predictions and scores new inserts;
 `full_rebuild` builds a versioned generation and switches the view after success.
 An unchanged replay is a no-op. [Prediction behavior and model changes][predictions].
 
+`auto_rebuild_on_cdf_expiry` defaults to `false`. When enabled, a recognized CDF
+history expiry requests a full rescore of the pinned source snapshot and model
+selection through the separate `recover_predictions` task inside this score job.
+This option is independent of `model_change_mode` and supports single models,
+competitions and model sets. It does not train models or change registry aliases.
+The task can read and score the complete source, so the existing input limits
+still apply. It replaces the compatible prediction output atomically after
+checking source/output identities and the expected output version. Table IDs,
+grants and named views remain intact. An exact committed recovery retry is a
+no-op; ordinary incremental scoring then resumes from its saved watermark.
+
+Permission/connectivity failures, disabled CDF, source replacement, schema errors
+and readable source UPDATE/DELETE changes retain their existing failure behavior.
+Recovery is not a general retry or authorization to accept those changes. Older
+model-version generations remain available; rollback within the rebuilt generation
+depends on Delta history retention. Open `scoring_report` for the completed result
+on either the ordinary scoring or recovery branch.
+
 If scoring fails after promotion, retry score independently. Inspect saved
 MLflow evidence and registry state before a fresh lifecycle run; lifecycle repair
 and retry are rejected because effects may already have committed.
+Configure job/task time limits, optional score retries and email/webhook events in
+`deployment/variables.yml`, or override them for a target. See
+[operational settings and score-only recovery](deployment/README.md#time-limits-retries-and-notifications).
+Limits default to unlimited, retries to zero and notification recipients to empty.
 See [failure evidence and pinned replay][replay] and [recovery][schedules].
 
-Keep `workflow_contract: "2"` fixed in the generated notebook parameters.
+Keep `workflow_contract: "3"` fixed in the generated notebook parameters.
 `config_version: 1` is the separate workflow JSON schema version. Changing
 `score_handoff` requires updating `deployed_score_handoff` wherever present in
-`resources/workflow.jobs.yml` and redeploying the matching graph/notebooks/wheel.
+`resources/train.job.yml` and `resources/score.job.yml`, then redeploying the
+matching graph/notebooks/wheel.
+
+Changing `auto_rebuild_on_cdf_expiry` also requires regenerating and redeploying
+the matching score graph, notebooks and wheel. Its generated
+`deployed_auto_rebuild_on_cdf_expiry` parameter must match the JSON boolean in
+both job definitions. Editing only `config/workflow.json` is rejected. Leave
+the flag disabled for existing projects until the recovery tasks are deployed.
 
 [setup]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#guided-setup-and-offline-preview
 [recipes]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#custom-preprocessing-recipes
@@ -216,3 +978,252 @@ Keep `workflow_contract: "2"` fixed in the generated notebook parameters.
 [predictions]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle_walkthrough/#what-happens-to-existing-predictions
 [replay]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle_walkthrough/#inspect-failures-and-replay-a-pinned-training-input
 [schedules]: https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle_walkthrough/#recovery-and-schedules
+
+## Scoring eligibility and business outputs
+
+Choose the mode and target-filter behavior in `src/features/scoring.py`:
+
+```python
+SCORING_MODE = "combined"  # "pre_split", "custom", or "combined"
+SKIP_TARGET_PRE_SPLIT_STEPS = True
+```
+
+| Setting | What happens during prediction |
+| --- | --- |
+| `SCORING_MODE = "pre_split"` (default) | Reuse the saved pre-split recipe. |
+| `SCORING_MODE = "custom"` | Use custom eligibility checks and output rules. |
+| `SCORING_MODE = "combined"` | Pre-split first, then custom eligibility on its survivors, model prediction and custom outputs. |
+| `SKIP_TARGET_PRE_SPLIT_STEPS = False` (default) | In pre_split/combined, reject a recipe that needs actual target values. |
+| `SKIP_TARGET_PRE_SPLIT_STEPS = True` | In pre_split/combined, skip target-reading filters and retain other steps. Ignored in custom mode. |
+
+Combined mode preserves the first pre-split exclusion reason; custom callbacks
+never receive those excluded rows. Callbacks see the original accepted inputs,
+not the fixed-normalization copy used to decide pre-split membership. If pre-split
+excludes every row, custom callbacks and the model are not called. An empty
+pre-split recipe in combined mode still runs the custom sections.
+
+For example, when predicting `price`, a pre-split "price must not be missing"
+filter uses the answer that prediction is meant to provide. This does not change
+the target: the second switch only skips that filter. A "floor_area must not be
+missing" filter still runs. Mixed filters reading both are skipped as a whole;
+separate them if the feature-only check should remain. Fixed edits to target and
+features are projected onto the features. Preview lists saved steps and skipped
+names. An empty recipe in pre_split mode keeps the ordinary prediction schema.
+
+Reused steps operate on a copy to decide membership. The existing saved model
+still applies its fixed feature transformations once to the original accepted
+inputs. Filter fields must be in `input_columns`; add them there and drop them
+from model features in preprocessing if necessary. Deduplicate is local to the
+current batch, not a persistent cross-batch duplicate detector.
+
+For custom and combined modes, the file separates two sections:
+
+Both lists are empty by default. The sample dictionaries in `scoring.py` are
+commented out: uncomment the rules you need and adapt their columns/limits.
+Selecting a mode alone does not activate these examples.
+
+1. **`eligibility` (before prediction):** decide which input rows can be scored.
+   The first example requires `feature_value`; the second requires a finite value
+   between 0 and 120. Adapt the names/limits to your data. Return `[]` to skip checks.
+2. **`outputs` (after prediction):** add business columns beside the model output.
+   The band rule labels predictions below 10 as low, 10 to below 50 as medium,
+   and 50 or above as high. Return `[]` for no business columns.
+
+The actual functions live in `custom/scoring_custom.py`, under matching BEFORE
+and AFTER headings. A `function` path such as
+`custom.scoring_custom.require_value_range` tells the loader which function to
+call; `params` supplies its column/limits. You do not call it manually.
+
+Each rule has a name, immutable version, saved function path and JSON parameters.
+Output rules additionally declare scalar column names/types. Callbacks receive
+pandas frames with an ordered RangeIndex on both model engines. Return exactly
+that index; never drop or reorder rows inside the model's preprocessing.
+
+Training and holdout/CV evaluation remain separate: `pre_split.py` controls
+training eligibility; `scoring.py` chooses reuse, custom rules or their combination. Every source
+key is published once, including exclusions. Opting in adds `scoring_status`
+(`predicted` or `excluded`) and nullable `exclusion_reason`; excluded rows have
+null estimates/business outputs. The Delta receipt records `predicted_count`
+and `excluded_count` alongside total input/output counts. Even an all-excluded
+increment advances the source watermark atomically with its outcome records.
+A failed rule or write advances nothing; a successful retry/no-op cannot duplicate
+keys. Existing targets need the exact new output schema: use a fresh target when
+introducing a scoring policy to an old deployment.
+
+Eligibility runs before temporal preprocessing. Excluded observations do not
+enter lag/rolling history; an all-excluded batch retains the previous tail.
+Input schema validation still applies to every request. Business callbacks are
+trusted saved project code: keep them deterministic and free of mutable network,
+clock or filesystem state. Use the saved asset helper for lookup data.
+
+## Shared model monitoring
+
+Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
+`prod`). Personal development targets do not enroll temporary models or create
+monitoring tables. The `monitoring_allowed` condition excludes enrollment and the
+post-scoring monitoring/drift/retraining branch in `mode: development`; training
+and scoring still run normally, including automatic scoring after activation.
+Development targets also set `monitoring_enabled: "false"` and `on_drift: disabled`.
+The deployment-mode guard remains effective even if shared monitoring destinations
+or an enabled flag are inherited from common settings. Deploy both updated jobs
+with the updated Skyulf wheel for this behavior to apply to an existing project.
+
+Each repository registers its activated model before scoring, and its scored
+version after successful inference, directly in a shared
+Delta inventory. No central model-list file or export/copy step is needed.
+First deploy and initialize Skyulf's `examples/databricks_monitoring/` once.
+Then set these independent variables in this project's deployment target:
+
+```yaml
+monitoring_catalog: operations
+monitoring_schema: model_monitoring
+monitoring_expected_interval_hours: "24"
+monitoring_drift_thresholds: '{"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}'
+monitoring_experiment_name: /Shared/skyulf/monitoring # Optional MLflow evidence
+monitoring_dashboard_url: "https://<workspace-host>/dashboardsv3/<dashboard-id>/published"
+# Optional actual outcomes, possibly in another catalog:
+monitoring_label_table: labels.production.outcomes
+monitoring_result_available_at_column: available_at
+```
+
+Monitoring defaults to enabled; set both locations before running a new project.
+Use `monitoring_enabled: "false"` to opt out. Existing projects with no monitoring
+settings remain unconfigured; providing the destination without the flag enables
+monitoring. True target values are optional: without a configured label table,
+drift/quality still run but model performance cannot be measured.
+
+These locations are for monitoring storage, separate from this project's
+`catalog`, `input_schema`, `output_schema` and `metadata_schema`. The scoring
+principal needs SELECT/MODIFY on the central inventory and access to its
+catalog/schema. The `monitor_model` task also needs SELECT/MODIFY on
+`monitoring_results`, read access to saved training data/models and optional
+labels, and access to its optional MLflow experiment. The central initializer
+creates the inventory, results and dashboard views. A successful score or CDF recovery pins the exact
+scored version and physical output generation. A no-op scoring retry can repair
+registration without creating duplicate predictions. Registration failure is a
+visible job failure; committed predictions remain intact.
+
+For all three layouts, `training_report -> register_monitor`
+enrolls the activated version from its verified lifecycle receipt, before
+`scoring_requested`. Pending or rejected candidates leave enrollment unchanged.
+The `score -> monitor_model -> drift_report` task chain automatically measures each new scoring
+commit; with CDF recovery, `monitor_model` follows `scoring_report`. No-op scoring skips completed observations and repairs missing/failed ones
+from the original saved commit. A measurement failure leaves committed predictions intact and
+fails its own task after saving the error. The central inventory-wide job remains
+available for periodic checks and delayed outcomes; configure its schedule and
+window separately. External alias edits do not trigger enrollment.
+`monitor_model` computes drift, data quality and eligible labeled performance;
+`drift_report` only reads the saved observation for that scoring batch and config.
+Both notebook outputs include an **Open monitoring dashboard** link when the
+shared HTTPS `monitoring_dashboard_url` is configured. The report task needs
+SELECT on the shared results table. A monitoring failure blocks the report task.
+Existing deployed projects must adopt the updated score job/notebooks/variables
+and install the updated wheel, then validate and redeploy; changing Skyulf's
+template files does not alter a previously deployed workspace job automatically.
+For a pause, retain the destination and set `monitoring_enabled: "false"`, then
+run scoring to publish the disabled registration. Removing only the destination
+while monitoring is enabled is invalid; it does not erase existing records.
+
+Automatic enrollment supports single models, competition winners and each
+model-set component. Components retain their concrete version and parent set
+name/version/branch; monitoring reads their individual outputs from the shared
+physical prediction table. Model-set output mode must be `all` or `separate_views`
+when monitoring storage is configured. `combined_only` is rejected before scoring
+because combined business outputs cannot measure each component's performance.
+
+## Optional training after drift
+
+Set these deployment variables to request this repository's existing train job:
+
+```yaml
+on_drift: "retrain" # Default: disabled
+on_drift_cooldown_hours: "24"
+on_drift_min_new_training_rows: "20"
+```
+
+The visible chain is `score -> monitor_model -> drift_report -> check_retraining`
+followed by the `retraining_needed` If/else task. Its true branch runs
+`retrain_on_drift`; its false branch runs `retraining_skipped` with the saved reason.
+The check reads the saved observation, checks the current enrolled version,
+and compares actual eligible training rows with the saved model's training data.
+Feature quality/schema problems, incomplete drift checks, stale observations,
+unchanged training data, active training and cooldown prevent a new request.
+The check does not claim a request or start training. The true branch repeats
+the checks before claiming and submitting, so a concurrent run or data change
+cannot bypass the guards between the two tasks.
+One request starts the complete single, competition or model-set train job.
+It does not wait inside the scoring job or alter quality/approval policy.
+The trigger resolves the unique deployed `${bundle.name}_train` job name at run
+time, preserving the actual scoring job's development prefix and avoiding a
+Bundle dependency cycle with training's scoring handoff.
+
+Set `training_version: null`. Maintain the configured training table upstream:
+new feature rows must contain actual target values when they become available.
+Monitoring's optional label table does not automatically update training data.
+Freshness means eligible training values changed relative to the active model;
+it does not require their arrival time to be after the drift report. The request
+records the assessed Delta version and content digest. The train run independently
+pins its input snapshot at initialization; inspect its saved training specification
+and membership evidence to establish what was actually used if data changed again.
+Predictions are never substituted for real targets. Random splitting includes
+some new eligible rows in training; merely reshuffling old rows does not qualify.
+Temporal rows qualify once they enter the training side of the time boundary.
+Changing the table, column roles, split strategy or engine needs an explicit
+training run before automatic retraining can assess the new contract.
+
+For a daily rolling window, configure `config/workflow.json` (or each branch's
+workflow in `src/modeling/multi_model.py`):
+
+```json
+{
+  "training_window_mode": "rolling_days",
+  "split_strategy": "temporal",
+  "event_column": "transaction_time",
+  "lookback_days": 90,
+  "holdout_days": 14,
+  "window_timezone": null,
+  "monthly_lookback_months": null,
+  "holdout_months": null,
+  "start": null,
+  "holdout_start": null,
+  "cutoff": null
+}
+```
+
+`transaction_time` must be a real selected source column, using the existing date
+parsing settings. Each run selects the preceding 90 elapsed UTC days; temporal
+holds out the latest 14 days. For random use `holdout_days: null` and `test_size`.
+Random with `full_snapshot` needs no event column. Advancing a window does not
+guarantee new training data or better performance.
+
+`monitoring_drift_thresholds` is authoritative for this project's enrollment;
+`{}` uses Core defaults and partial objects override named metrics. Defaults are
+PSI 0.2, KS statistic 0.1, normalized Wasserstein 0.1 and KL divergence 0.1.
+A value must strictly exceed its own threshold. KS p-value is diagnostic only.
+
+The optional trigger creates the owned `retraining_requests` Delta table in the
+selected monitoring namespace, storing job claims, request evidence and run IDs.
+Its principal needs CREATE TABLE there, SELECT/MODIFY on that table and CAN MANAGE
+RUN on the train job, in addition to monitoring's read permissions. Keep train
+`max_concurrent_runs: 1`. Ambiguous API failures retain the pending claim; repair
+the same scoring task to retry the same idempotency token. An unresolved request
+blocks other automatic requests instead of guessing that submission failed.
+The central periodic monitoring job measures delayed labels but does not submit
+training; this trigger runs in the model repository's scoring job.
+
+## Offline checks
+
+Run `python src/tools/smoke.py` without credentials. This reads workflow settings
+and parses Python syntax; it does not execute project hooks, train, access cloud
+data, or write resources. It validates the shared configuration, not resolved
+candidate/branch recipes. Use the existing preview tool for trusted recipe
+inspection and separate runtime tests for training/scoring behavior. A training
+row sample does not prevent writes and is not a smoke mode.
+
+Activation enrollment is ordered by the original serialized lifecycle run start.
+A delayed score cannot replace an activated different version, and repairing an
+older activation cannot replace a newer activation. Enrollment-only repairs read
+the verified original receipt without repeating training or alias changes.
+The private activation-order metadata lives in inventory config_json; table
+schemas and model configuration digests are unchanged. Deploy the updated central
+monitoring runner together with model jobs so inventory readers understand it.

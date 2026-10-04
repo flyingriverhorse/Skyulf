@@ -59,7 +59,7 @@ def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count:
     """
     if dtype == pl.Null:
         return "Unknown"
-    if dtype in (pl.Float32, pl.Float64):
+    if dtype in (pl.Float32, pl.Float64) or dtype.is_decimal():
         return "Numeric"
     if dtype in _INT_DTYPES:
         return _integer_semantic_bucket(n_unique, count)

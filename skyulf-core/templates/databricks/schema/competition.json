@@ -1,0 +1,784 @@
+{
+  "competition_candidate_count": {
+    "order": 54,
+    "type": "string",
+    "default": "3",
+    "description": "2. Competition | How many models should compete for the same target? Each candidate runs sequentially.",
+    "enum": [
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_1": {
+    "order": 55,
+    "type": "string",
+    "default": "ridge_regression",
+    "description": "2. Competition | Candidate 1: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_2": {
+    "order": 56,
+    "type": "string",
+    "default": "random_forest_regressor",
+    "description": "2. Competition | Candidate 2: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_3": {
+    "order": 57,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 3: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_4": {
+    "order": 58,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 4: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_5": {
+    "order": 59,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 5: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_6": {
+    "order": 60,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 6: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_7": {
+    "order": 61,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 7: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_regression_model_8": {
+    "order": 62,
+    "type": "string",
+    "default": "voting_regressor",
+    "description": "2. Competition | Candidate 8: choose a regression model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "regression"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_1": {
+    "order": 63,
+    "type": "string",
+    "default": "logistic_regression",
+    "description": "2. Competition | Candidate 1: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_2": {
+    "order": 64,
+    "type": "string",
+    "default": "random_forest_classifier",
+    "description": "2. Competition | Candidate 2: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_3": {
+    "order": 65,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 3: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_4": {
+    "order": 66,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 4: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "4",
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_5": {
+    "order": 67,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 5: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "5",
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_6": {
+    "order": 68,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 6: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "6",
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_7": {
+    "order": 69,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 7: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "7",
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_classification_model_8": {
+    "order": 70,
+    "type": "string",
+    "default": "voting_classifier",
+    "description": "2. Competition | Candidate 8: choose a classification model (including voting/stacking). Each gets its own Core automatic search space.",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          },
+          "task": {
+            "const": "classification"
+          },
+          "competition_candidate_count": {
+            "enum": [
+              "8"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "competition_preprocessing_recipe": {
+    "order": 71,
+    "type": "string",
+    "default": "default",
+    "description": "2. Competition | Common preprocessing recipe from features/preprocessing.py: default, none, example_imputer, example_frequency, example_imputer_frequency or example_all. Adapt recipe columns to your inputs; per-candidate overrides remain editable in model_competition.py.",
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          }
+        }
+      }
+    }
+  },
+  "competition_max_trials": {
+    "order": 72,
+    "type": "string",
+    "default": "1000",
+    "description": "2. Competition | Total maximum search configurations across all candidates, nested searches and halving rounds (not total model fits). An excessive plan fails before training; it is never silently truncated.",
+    "pattern": "^(?:[1-9]|[1-9][0-9]{1,3}|10000)$",
+    "skip_prompt_if": {
+      "not": {
+        "properties": {
+          "training_layout": {
+            "const": "model_competition"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,24 +1,47 @@
 """Score only new Delta inserts with a bounded local model and atomic receipt."""
 
-from __future__ import annotations
-
 import hashlib
 import importlib
 import json
 import pickle
+from contextlib import nullcontext
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any
 
 import pandas as pd
 
+from skyulf.integrations.databricks._local_frames import frame_bytes, output_scalar
+
 from ...inference.local_pipeline import LocalPipelineArtifact
+from ...inference.local_scoring import scoring_counts
+from ...preprocessing.time_series.history import propose_history
 from ._contracts import PREDICTION_METADATA_COLUMNS, column_name, table_name
 from .admission import BatchConflictError, PublishAdmission, validate_admission
+from .cdf_recovery import (
+    CdfHistoryExpired,
+    CdfRecoveryRequired,
+    check_recovery_state,
+    make_recovery_request,
+    normalize_cdf_error,
+    recovery_receipt_fields,
+    validate_recovery_binding,
+)
 from .delta import DeltaPublishError, history, table_identity
-from .local_batch import _frame_bytes
-from .local_publish import _check_target, _scalar
+from .local_history import history_receipt, incremental_history
+from .local_publish import check_target
 from .local_sdk import LocalWorkflowConfig, PreparedLocalWorkflow
+
+
+class SourceChangeRequiresRebuild(ValueError):
+    """Signal readable CDF updates/deletes that cannot be published as new inserts."""
+
+
+def validate_source_change_policy(value: Any) -> str:
+    """Require explicit permission before replacing results after source corrections."""
+    if value not in ("reject", "rebuild_on_change"):
+        raise ValueError("source_change_policy must be reject or rebuild_on_change.")
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +59,7 @@ class IncrementalBatchResult:
     selected_model_version: str | None = None
 
 
-def _latest(spark: Any, table: str) -> Any:
+def latest_source_version(spark: Any, table: str) -> Any:
     """Read the most recent Delta commit deterministically."""
     functions = importlib.import_module("pyspark.sql.functions")
     row = (
@@ -50,7 +73,7 @@ def _latest(spark: Any, table: str) -> Any:
     return row
 
 
-def _last_receipt(latest: Any, source_id: str, target_id: str) -> dict[str, Any] | None:
+def last_receipt(latest: Any, source_id: str, target_id: str) -> dict[str, Any] | None:
     """Trust a watermark only when the latest target commit contains it."""
     raw = latest["userMetadata"]
     if not raw:
@@ -88,14 +111,21 @@ def _validate_prepared(
     return inputs
 
 
-def _bounded_frame(
+def bounded_frame(
     selected: Any,
     columns: tuple[str, ...],
     record_key_columns: tuple[str, ...],
     max_rows: int,
     max_bytes: int,
+    *,
+    require_unique_keys: bool = True,
 ) -> pd.DataFrame:
-    """Move only a bounded, projected set of source rows to the local model."""
+    """Read bounded rows, optionally deferring key uniqueness until label eligibility.
+
+    Features and predictions require unique keys by default. Label readers can
+    defer that check until future revisions are excluded; null keys and transfer
+    limits remain invalid in either mode.
+    """
     records: list[dict[str, Any]] = []
     decoded_bytes = 0
     for row in (
@@ -109,11 +139,11 @@ def _bounded_frame(
             raise ValueError("Source increment exceeds max_bytes.")
         records.append(record)
     frame = pd.DataFrame.from_records(records, columns=columns)
-    if _frame_bytes(frame) > max_bytes:
+    if frame_bytes(frame) > max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
     if frame.loc[:, list(record_key_columns)].isna().any().any():
         raise ValueError("Source row keys must not be null.")
-    if frame.duplicated(subset=list(record_key_columns)).any():
+    if require_unique_keys and frame.duplicated(subset=list(record_key_columns)).any():
         raise ValueError("Source row keys must be globally unique within this increment.")
     return frame
 
@@ -125,6 +155,7 @@ def run_incremental_local_batch(
     record_key_columns: tuple[str, ...],
     admission: PublishAdmission | None,
     period_column: str | None = None,
+    recovery_request: dict[str, Any] | None = None,
 ) -> IncrementalBatchResult:
     """Score the initial snapshot, then only inserts since the last target receipt.
 
@@ -133,6 +164,8 @@ def run_incremental_local_batch(
     admission. A sole writer may instead use explicit SingleWriterAdmission
     when its job is serialized and no other writer can modify the target.
     A target commit outside this protocol halts automatic scoring.
+    A recovery request explicitly replaces the same target from its pinned
+    full snapshot after CDF history loss; ordinary calls never opt in implicitly.
     """
     inputs = _validate_prepared(prepared, record_key_columns, period_column)
     admission = validate_admission(spark, admission)
@@ -142,8 +175,15 @@ def run_incremental_local_batch(
     source_table, target_table, source_id, target_id = _incremental_table_ids(
         spark, source_table, target_table
     )
-    _require_incremental_change_feed(spark, source_table)
+    require_incremental_change_feed(spark, source_table)
     functions = importlib.import_module("pyspark.sql.functions")
+
+    if recovery_request is not None:
+        request = _bind_single_recovery(prepared, recovery_request)
+        with admission.hold(target_id):
+            return _recover_incremental_batch(
+                spark, prepared, record_key_columns, period_column, inputs, request, functions
+            )
 
     with admission.hold(target_id):
         if (
@@ -151,11 +191,11 @@ def run_incremental_local_batch(
             or table_identity(spark, target_table) != target_id
         ):
             raise BatchConflictError("Source or target table identity changed during admission.")
-        target_latest = _latest(spark, target_table)
-        previous = _last_receipt(target_latest, source_id, target_id)
-        _check_incremental_bootstrap(spark, target_table, previous, functions)
+        target_latest = latest_source_version(spark, target_table)
+        previous = last_receipt(target_latest, source_id, target_id)
+        check_incremental_bootstrap(spark, target_table, previous, functions)
         prior_version = int(previous["source_end_version"]) if previous else None
-        upper_version = int(_latest(spark, source_table)["version"])
+        upper_version = int(latest_source_version(spark, source_table)["version"])
         if prior_version is not None and upper_version < prior_version:
             raise BatchConflictError("Source version moved behind the committed watermark.")
         if prior_version == upper_version:
@@ -170,15 +210,18 @@ def run_incremental_local_batch(
                 config.model.name,
                 config.model.version,
             )
-        selected = _select_incremental_rows(
-            spark, source_table, prior_version, upper_version, period_column, functions
-        )
-        frame = _bounded_frame(
-            selected,
-            (*record_key_columns, *inputs),
+        selected, frame = _read_incremental_input(
+            spark,
+            prepared,
             record_key_columns,
-            config.source.max_rows,
-            config.source.max_bytes,
+            period_column,
+            inputs,
+            source_id,
+            target_id,
+            target_latest,
+            prior_version,
+            upper_version,
+            functions,
         )
         if frame.empty:
             return IncrementalBatchResult(
@@ -193,12 +236,13 @@ def run_incremental_local_batch(
                 config.model.version,
             )
         target = spark.table(target_table)
-        output_names = _check_target(
+        output_names = check_target(
             spark, selected, target, record_key_columns, period_column, prepared
         )
-        bridge = _incremental_prediction_bridge(
-            spark, prepared, frame, inputs, output_names, record_key_columns, target
-        )
+        with incremental_history(prepared, previous) as temporal_session:
+            bridge, coverage = _incremental_prediction_bridge(
+                spark, prepared, frame, inputs, output_names, record_key_columns, target
+            )
         output = (
             bridge.join(
                 selected.select(*record_key_columns, period_column),
@@ -209,7 +253,13 @@ def run_incremental_local_batch(
             else bridge
         )
         run_input, digest, manifest = _incremental_manifest(
-            prepared, source_id, target_id, prior_version, upper_version, frame
+            prepared,
+            source_id,
+            target_id,
+            prior_version,
+            upper_version,
+            frame,
+            history_receipt(temporal_session) | coverage,
         )
         output = _complete_incremental_output(output, target, config, digest, functions, frame)
         committed, recorded = _commit_increment(
@@ -235,6 +285,150 @@ def run_incremental_local_batch(
             config.model.name,
             config.model.version,
         )
+
+
+def _read_incremental_input(
+    spark: Any,
+    prepared: PreparedLocalWorkflow,
+    keys: tuple[str, ...],
+    period: str | None,
+    inputs: tuple[str, ...],
+    source_id: str,
+    target_id: str,
+    target_latest: Any,
+    prior: int | None,
+    upper: int,
+    functions: Any,
+) -> tuple[Any, pd.DataFrame]:
+    """Attach pinned recovery evidence to history loss during CDF materialization only."""
+    config = prepared.config
+    assert config.source.table is not None
+    try:
+        with normalize_cdf_error() if prior is not None else nullcontext():
+            selected = select_incremental_rows(
+                spark, config.source.table, prior, upper, period, functions
+            )
+            frame = bounded_frame(
+                selected, (*keys, *inputs), keys, config.source.max_rows, config.source.max_bytes
+            )
+        return selected, frame
+    except CdfHistoryExpired as exc:
+        if prior is None:
+            raise
+        request = make_recovery_request(
+            **_single_recovery_binding(prepared),
+            source_table_id=source_id,
+            target_table_id=target_id,
+            target_version=int(target_latest["version"]),
+            source_start_version=prior,
+            source_end_version=upper,
+        )
+        raise CdfRecoveryRequired(request) from exc
+
+
+def _bind_single_recovery(
+    prepared: PreparedLocalWorkflow,
+    request: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind a queued recovery to its configured tables and exact loaded local artifact."""
+    return validate_recovery_binding(request, **_single_recovery_binding(prepared))
+
+
+def _single_recovery_binding(prepared: PreparedLocalWorkflow) -> dict[str, Any]:
+    """Describe the already validated local model and configured physical tables."""
+    config = prepared.config
+    return {
+        "layout": "single_model",
+        "source_table": config.source.table,
+        "target_table": config.sink.table,
+        "model_name": config.model.name,
+        "model_version": config.model.version,
+        "model_digest": prepared.preflight.model_digest,
+    }
+
+
+def _recover_incremental_batch(
+    spark: Any,
+    prepared: PreparedLocalWorkflow,
+    keys: tuple[str, ...],
+    period: str | None,
+    inputs: tuple[str, ...],
+    request: dict[str, Any],
+    functions: Any,
+) -> IncrementalBatchResult:
+    """Verify the admitted request and replace one complete pinned snapshot atomically."""
+    source, target_name = request["source_table"], request["target_table"]
+    source_id, target_id = request["source_table_id"], request["target_table_id"]
+    if (
+        table_identity(spark, source) != source_id
+        or table_identity(spark, target_name) != target_id
+    ):
+        raise BatchConflictError("CDF recovery source or target table identity changed.")
+    latest = latest_source_version(spark, target_name)
+    previous = last_receipt(latest, source_id, target_id)
+    if check_recovery_state(request, previous, int(latest["version"])):
+        return IncrementalBatchResult(
+            request["source_start_version"],
+            request["source_end_version"],
+            0,
+            0,
+            int(latest["version"]),
+            previous,
+            True,
+            request["model_name"],
+            request["model_version"],
+        )
+    selected = select_incremental_rows(
+        spark, source, None, request["source_end_version"], period, functions
+    )
+    frame = bounded_frame(
+        selected,
+        (*keys, *inputs),
+        keys,
+        prepared.config.source.max_rows,
+        prepared.config.source.max_bytes,
+    )
+    target = spark.table(target_name)
+    output_names = check_target(spark, selected, target, keys, period, prepared)
+    with incremental_history(prepared, None) as temporal_session:
+        bridge, coverage = _incremental_prediction_bridge(
+            spark, prepared, frame, inputs, output_names, keys, target, replacing=True
+        )
+    output = (
+        bridge.join(selected.select(*keys, period), on=list(keys), how="inner")
+        if period is not None
+        else bridge
+    )
+    fields = history_receipt(temporal_session) | coverage | recovery_receipt_fields(request)
+    fields |= {"expected_target_version": request["target_version"], "write_mode": "overwrite"}
+    _, digest, manifest = _incremental_manifest(
+        prepared, source_id, target_id, None, request["source_end_version"], frame, fields
+    )
+    output = _complete_incremental_output(output, target, prepared.config, digest, functions, frame)
+    committed, recorded = _commit_increment(
+        spark,
+        source,
+        source_id,
+        target_name,
+        target_id,
+        latest,
+        output,
+        request["source_end_version"],
+        manifest,
+        digest,
+        write_mode="overwrite",
+    )
+    return IncrementalBatchResult(
+        None,
+        request["source_end_version"],
+        len(frame),
+        len(frame),
+        int(committed["version"]),
+        recorded,
+        False,
+        request["model_name"],
+        request["model_version"],
+    )
 
 
 def _validate_incremental_source(config: LocalWorkflowConfig) -> None:
@@ -286,7 +480,7 @@ def _validate_incremental_keys(
         raise ValueError("record_key_columns and period_column collide with prediction metadata.")
 
 
-def _require_incremental_change_feed(spark: Any, source_table: str) -> None:
+def require_incremental_change_feed(spark: Any, source_table: str) -> None:
     """Require source change data feed before entering publication admission."""
     detail = spark.sql(f"DESCRIBE DETAIL {table_name(source_table)}").first()
     properties = detail["properties"] or {}
@@ -297,7 +491,7 @@ def _require_incremental_change_feed(spark: Any, source_table: str) -> None:
         raise ValueError("Source Delta Change Data Feed must be enabled before scoring.")
 
 
-def _check_incremental_bootstrap(
+def check_incremental_bootstrap(
     spark: Any, target_table: str, previous: dict[str, Any] | None, functions: Any
 ) -> None:
     """Reject an unreceipted nonempty or previously managed target."""
@@ -318,7 +512,7 @@ def _check_incremental_bootstrap(
             )
 
 
-def _select_incremental_rows(
+def select_incremental_rows(
     spark: Any,
     source_table: str,
     prior_version: int | None,
@@ -332,16 +526,19 @@ def _select_incremental_rows(
             spark.read.format("delta").option("versionAsOf", upper_version).table(source_table)
         )
     else:
-        selected = (
-            spark.read.format("delta")
-            .option("readChangeFeed", "true")
-            .option("startingVersion", prior_version + 1)
-            .option("endingVersion", upper_version)
-            .table(source_table)
-        )
-        if selected.where(functions.col("_change_type") != "insert").limit(1).count():
-            raise ValueError("Source updates and deletes require an explicit rescore policy.")
-        selected = selected.where(functions.col("_change_type") == "insert")
+        with normalize_cdf_error():
+            selected = (
+                spark.read.format("delta")
+                .option("readChangeFeed", "true")
+                .option("startingVersion", prior_version + 1)
+                .option("endingVersion", upper_version)
+                .table(source_table)
+            )
+            if selected.where(functions.col("_change_type") != "insert").limit(1).count():
+                raise SourceChangeRequiresRebuild(
+                    "Source updates and deletes require an explicit rescore policy."
+                )
+            selected = selected.where(functions.col("_change_type") == "insert")
     if period_column is not None:
         if selected.schema[period_column].dataType.typeName() != "timestamp":
             raise ValueError("Source event time must be a Spark timestamp.")
@@ -358,9 +555,15 @@ def _incremental_prediction_bridge(
     output_names: tuple[str, ...],
     record_key_columns: tuple[str, ...],
     target: Any,
+    *,
+    replacing: bool = False,
 ) -> Any:
-    """Score bounded rows, preserve keys and reject already published predictions."""
-    predicted = prepared.predict(frame.loc[:, list(inputs)])
+    """Score bounded rows, preserve keys and return explicit outcome counts."""
+    predicted = (
+        _empty_incremental_predictions(prepared, output_names)
+        if frame.empty
+        else prepared.predict(frame.loc[:, list(inputs)])
+    )
     if list(predicted.columns) != list(output_names) or len(predicted) != len(frame):
         raise ValueError("Local prediction schema or row count differs from the model contract.")
     bridge_frame = pd.concat(
@@ -370,24 +573,39 @@ def _incremental_prediction_bridge(
         ],
         axis=1,
     )
-    if _frame_bytes(bridge_frame) > prepared.config.source.max_bytes:
+    if frame_bytes(bridge_frame) > prepared.config.source.max_bytes:
         raise ValueError("Prediction result exceeds max_bytes.")
     bridge_columns = (*record_key_columns, *output_names)
     bridge = spark.createDataFrame(
         [
-            tuple(_scalar(value) for value in row)
+            tuple(output_scalar(value) for value in row)
             for row in bridge_frame.itertuples(index=False, name=None)
         ],
         schema=target.select(*bridge_columns).schema,
     )
     if (
-        bridge.select(*record_key_columns)
+        not replacing
+        and bridge.select(*record_key_columns)
         .join(target.select(*record_key_columns), on=list(record_key_columns), how="left_semi")
         .limit(1)
         .count()
     ):
         raise BatchConflictError("Source key already has a published prediction.")
-    return bridge
+    return bridge, scoring_counts(predicted)
+
+
+def _empty_incremental_predictions(
+    prepared: PreparedLocalWorkflow,
+    output_names: tuple[str, ...],
+) -> pd.DataFrame:
+    """Commit an empty bootstrap tail without invoking estimators that require rows."""
+    artifact = prepared.artifact
+    assert isinstance(artifact, LocalPipelineArtifact)
+    for step in artifact.pipeline.feature_engineer.fitted_steps:
+        params = step["artifact"]
+        if params.get("history_mode") == "carry":
+            propose_history(params, [])
+    return pd.DataFrame(columns=output_names)
 
 
 def _incremental_manifest(
@@ -397,6 +615,7 @@ def _incremental_manifest(
     prior_version: int | None,
     upper_version: int,
     frame: pd.DataFrame,
+    history_fields: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Fingerprint the exact increment, concrete model and prediction row count."""
     config = prepared.config
@@ -413,6 +632,7 @@ def _incremental_manifest(
         "input_count": len(frame),
         "output_count": len(frame),
     }
+    run_input |= history_fields or {}
     digest = hashlib.sha256(
         json.dumps(run_input, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -456,19 +676,31 @@ def _commit_increment(
     upper_version: int,
     manifest: dict[str, Any],
     digest: str,
+    *,
+    write_mode: str = "append",
 ) -> tuple[Any, dict[str, Any]]:
     """Recheck source and target, append once and verify the persisted receipt."""
-    if table_identity(spark, source_table) != source_id:
-        raise BatchConflictError("Source table identity changed while scoring.")
-    if int(_latest(spark, target_table)["version"]) != int(target_latest["version"]):
+    if (
+        table_identity(spark, source_table) != source_id
+        or table_identity(spark, target_table) != target_id
+    ):
+        raise BatchConflictError("Source or target table identity changed while scoring.")
+    if int(latest_source_version(spark, target_table)["version"]) != int(target_latest["version"]):
         raise BatchConflictError("Target changed while scoring; retry from the latest receipt.")
+    app_id = f"skyulf-incremental:{source_id}:{target_id}"
+    transaction_version = upper_version
+    if write_mode == "overwrite":
+        app_id = f"skyulf-cdf-recovery:{source_id}:{target_id}"
+        transaction_version = int(target_latest["version"]) + 1
     try:
         (
             output.write.format("delta")
-            .mode("append")
+            .mode(write_mode)
             .option("mergeSchema", "false")
-            .option("txnAppId", f"skyulf-incremental:{source_id}:{target_id}")
-            .option("txnVersion", upper_version)
+            .option("overwriteSchema", "false")
+            .option("partitionOverwriteMode", "static")
+            .option("txnAppId", app_id)
+            .option("txnVersion", transaction_version)
             .option("userMetadata", json.dumps(manifest, sort_keys=True))
             .saveAsTable(target_table)
         )
@@ -476,8 +708,8 @@ def _commit_increment(
         if "Concurrent" in type(exc).__name__ or "DELTA_CONCURRENT" in str(exc):
             raise BatchConflictError("Delta rejected a concurrent incremental write.") from exc
         raise DeltaPublishError("Incremental Delta write failed.") from exc
-    committed = _latest(spark, target_table)
-    recorded = _last_receipt(committed, source_id, target_id)
+    committed = latest_source_version(spark, target_table)
+    recorded = last_receipt(committed, source_id, target_id)
     if recorded is None or recorded.get("request_digest") != digest:
         raise DeltaPublishError("Delta returned without a verifiable incremental receipt.")
     return committed, recorded

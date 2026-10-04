@@ -1,13 +1,14 @@
 # SM-36e - Connect optional SHAP setup and readable results
 
-Status: WAIT. User requested 2026-09-27. Depends on SM-36.
+Status: DONE, 2026-09-30. User requested 2026-09-27. Depends on SM-36.
+See [delivery and live evidence](121-sm36e-shap-delivery.md).
 
-Existing functionality: `pipeline.explainability` enables bounded training-only
+Baseline before this task: `pipeline.explainability` enables bounded training-only
 SHAP through fitted preprocessing, writes MLflow `explanations.json`, and shows
 status/sample count in the training task. Core's optional SHAP dependency is not
 automatically included by generated projects. No Bundle SHAP charts exist yet.
 
-## Remaining implementation
+## Delivered scope
 
 - Offer an explicit opt-in during project configuration with bounded samples,
   transformed-feature guard and per-row display count. Keep default training free

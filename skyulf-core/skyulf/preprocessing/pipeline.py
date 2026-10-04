@@ -1,7 +1,10 @@
 """Feature Engineering Pipeline Orchestrator."""
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from typing import Any, ClassVar
 
 import numpy as np
@@ -11,13 +14,17 @@ import polars as pl
 from ..config_validation import validate_preprocessing_steps
 from ..core.execution import ExecutionOptions, FrameSpec
 from ..core.validation import prediction_row_count, validate_prediction_rows
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._feature_state import export_feature_state, restore_feature_state
+from ._helpers import select_rows_by_position
 from ._spark import fit_spark, transform_spark, use_spark
+from ._target_labels import record_target_labels
+from ._weight_policy import prepare_pipeline_weights
 from .base import StatefulTransformer
 from .dispatcher import _check_xy_engine_parity
 from .time_series.lag import LagFeaturesApplier
@@ -30,6 +37,18 @@ logger = logging.getLogger(__name__)
 
 def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
     """Apply once, rejecting row-count changes and built-in temporal permutations."""
+    result, positions = _apply_tracked_step(data, step)
+    if positions is not None and not np.array_equal(positions, np.arange(len(positions))):
+        stage = f"Step '{step['name']}' ({step['type']})"
+        raise ValueError(
+            f"{stage} changed row order. Prediction requires results in input-row order. "
+            f"Sort input by {step['artifact'].get('sort_by')!r} before requesting predictions."
+        )
+    return result
+
+
+def _apply_tracked_step(data: Any, step: dict[str, Any]) -> tuple[Any, np.ndarray | None]:
+    """Track built-in temporal permutations locally, keeping IDs away from target encoders."""
     features, target, was_tuple = unpack_pipeline_input(data)
     expected = prediction_row_count(features)
     applier = step["applier"]
@@ -40,7 +59,7 @@ def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
         validate_prediction_rows(
             expected, prediction_row_count(unpack_pipeline_input(result)[0]), stage=stage
         )
-        return result
+        return result, None
 
     # Only these built-ins use y exclusively to follow sorting/filtering.
     # Keep positional IDs local so later target-aware encoders never see them.
@@ -50,12 +69,20 @@ def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
     positions = np.arange(expected)
     transformed, transformed_positions = applier.apply((features, positions), artifact)
     validate_prediction_rows(expected, prediction_row_count(transformed), stage=stage)
-    if not np.array_equal(transformed_positions, positions):
-        raise ValueError(
-            f"{stage} changed row order. Prediction requires results in input-row order. "
-            f"Sort input by {artifact.get('sort_by')!r} before requesting predictions."
-        )
-    return pack_pipeline_output(transformed, target, was_tuple)
+    transformed_positions = np.asarray(transformed_positions)
+    if not np.array_equal(np.sort(transformed_positions), positions):
+        raise ValueError(f"{stage} did not preserve a permutation of the input rows.")
+    target = select_rows_by_position(target, transformed_positions)
+    return pack_pipeline_output(transformed, target, was_tuple), transformed_positions
+
+
+def _step_weights(data: Any, transformer: Any, previous: Any) -> Any:
+    """Read the weight vector produced by the same step as the current payload."""
+    if isinstance(data, SplitDataset):
+        return data.train_sample_weight
+    if transformer is not None:
+        return transformer.train_sample_weight_
+    return previous
 
 
 class FeatureEngineer:
@@ -74,12 +101,16 @@ class FeatureEngineer:
     # and `_collect_step_metrics` can't drift out of sync with each other.
     _RESAMPLING_TYPES: ClassVar[set[str]] = {"Oversampling", "Undersampling"}
 
-    # Row-dropping steps are train-time cleaning only (F-18). Running them at
-    # inference would silently vanish requested input rows -- prediction
+    # Explicit filters apply to training and evaluation. Running them at
+    # unkeyed inference would silently vanish requested input rows -- prediction
     # responses carry no row keys, so callers could never tell which inputs
     # lost their prediction. Skipping them means a null row surfaces as a
     # visible model error instead of a silent misalignment.
-    _ROW_DROPPING_TYPES: ClassVar[set[str]] = {"Deduplicate", "DropMissingRows"}
+    _ROW_DROPPING_TYPES: ClassVar[set[str]] = {
+        "Deduplicate",
+        "DropMissingRows",
+        "RowFilterFunction",
+    }
 
     def __init__(
         self,
@@ -131,7 +162,7 @@ class FeatureEngineer:
         *,
         frame_spec: FrameSpec | None = None,
         execution_options: ExecutionOptions | None = None,
-    ) -> "FeatureEngineer":
+    ) -> FeatureEngineer:
         """Restore supported fitted steps without fitting, I/O or creating a Spark session.
 
         Spark requires explicit frame_spec and execution_options. Local callers
@@ -173,31 +204,71 @@ class FeatureEngineer:
                 state_max_bytes=self.execution_options.state_max_bytes,
             )
         current_data = data
+        input_rows = prediction_row_count(unpack_pipeline_input(data)[0])
+        coverage_steps: list[dict[str, Any]] = []
 
-        for step in self.fitted_steps:
+        for step in self._transform_steps(preserve_rows=preserve_rows):
             name = step["name"]
             transformer_type = step["type"]
             applier = step["applier"]
             artifact = step["artifact"]
 
-            # Skip splitters during inference/transform
-            if transformer_type in [
-                "TrainTestSplitter",
-                "Split",
-                "feature_target_split",
-                *self._RESAMPLING_TYPES,
-                *self._ROW_DROPPING_TYPES,
-            ]:
-                continue
-
             logger.debug(f"Applying step: {name} ({transformer_type})")
+            rows_before = prediction_row_count(unpack_pipeline_input(current_data)[0])
             current_data = (
                 _apply_prediction_step(current_data, step)
                 if preserve_rows
                 else applier.apply(current_data, artifact)
             )
+            if not preserve_rows:
+                coverage_steps.append(
+                    {
+                        "name": name,
+                        "transformer": transformer_type,
+                        **record_coverage(
+                            rows_before,
+                            prediction_row_count(unpack_pipeline_input(current_data)[0]),
+                            step_name=f"{name} ({transformer_type})",
+                        ),
+                    }
+                )
 
+        if not preserve_rows:
+            self.last_transform_coverage_ = record_coverage(
+                input_rows,
+                prediction_row_count(unpack_pipeline_input(current_data)[0]),
+                coverage_steps,
+            )
         return current_data
+
+    def _transform_steps(self, *, preserve_rows: bool = True) -> list[dict[str, Any]]:
+        """Apply explicit evaluation filters while retaining unkeyed prediction skips."""
+        skipped = {
+            "TrainTestSplitter",
+            "Split",
+            "feature_target_split",
+            *self._RESAMPLING_TYPES,
+        }
+        if preserve_rows:
+            skipped.update(self._ROW_DROPPING_TYPES)
+        return [step for step in self.fitted_steps if step["type"] not in skipped]
+
+    def transform_tracking_order(self, data: Any) -> tuple[Any, np.ndarray]:
+        """Transform local features and report each output row's original input position.
+
+        Only built-in temporal permutations are tracked. Row-count changes fail;
+        ordinary serving continues to reject permutations via preserve_rows=True.
+        """
+        if use_spark(
+            data, getattr(self, "execution_options", None), getattr(self, "frame_spec", None)
+        ):
+            raise ValueError("Positional prediction tracking requires a local frame.")
+        positions = np.arange(prediction_row_count(data))
+        for step in self._transform_steps():
+            data, local_positions = _apply_tracked_step(data, step)
+            if local_positions is not None:
+                positions = positions[local_positions]
+        return data, positions
 
     def fit_transform(
         self,
@@ -206,6 +277,7 @@ class FeatureEngineer:
         *,
         target_column: str | None = None,
         on_split: Callable[[SplitDataset], None] | None = None,
+        sample_weight: Any = None,
     ) -> Any:
         """Runs the pipeline on data.
 
@@ -213,6 +285,8 @@ class FeatureEngineer:
             data: Input frame, feature-target pair, or existing split dataset.
             node_id_prefix (str): Prefix for the per-step transformer identifiers.
             target_column: Execution target excluded from automatic feature selection.
+            sample_weight: Optional raw positional weights, sliced by the actual
+                splitter and stored in the resulting training split.
             on_split: Optional synchronous callback receiving the first actual row
                 split before later transformations run. Skipped splitters and
                 feature-target separation do not invoke it. The callback is not
@@ -226,6 +300,7 @@ class FeatureEngineer:
         uniqueness and per-step identity checks run distributed queries with
         bounded results; local row counts and memory metrics remain unknown.
         """
+        raw_weights = prepare_pipeline_weights(data, sample_weight, self.steps_config)
         spec = getattr(self, "frame_spec", None)
         if use_spark(data, getattr(self, "execution_options", None), spec):
             return self._fit_transform_spark(data, spec, target_column, on_split)
@@ -273,6 +348,12 @@ class FeatureEngineer:
                 step_node_id=step_node_id,
                 current_data=current_data,
                 params=params,
+                sample_weight=raw_weights,
+            )
+
+            raw_weights = _step_weights(current_data, transformer_inst, raw_weights)
+            record_target_labels(
+                data_before, current_data, target_column, transformer_type, fitted_params
             )
 
             if (
@@ -322,6 +403,8 @@ class FeatureEngineer:
         metrics["rows_out"] = metrics["summary"]["rows_out"]
 
         self._portable_fitted = True
+        self.train_sample_weight_ = raw_weights
+        self.evaluation_coverage_ = deepcopy(getattr(current_data, "evaluation_coverage", {}))
         return current_data, metrics
 
     def _fit_transform_spark(
@@ -397,6 +480,7 @@ class FeatureEngineer:
         step_node_id: str,
         current_data: Any,
         params: dict[str, Any],
+        sample_weight: Any = None,
     ) -> tuple:  # Returns (data, params, transformer)
         """Execute one pipeline step. Returns (new_data, fitted_params).
 
@@ -426,7 +510,8 @@ class FeatureEngineer:
             # dataset with no held-out test set.
             if isinstance(current_data, pd.DataFrame | SkyulfDataFrame | tuple | pl.DataFrame):
                 params = calculator.fit(current_data, params)
-                current_data = applier.apply(current_data, params)
+                weight_kwargs = {} if sample_weight is None else {"sample_weight": sample_weight}
+                current_data = applier.apply(current_data, params, **weight_kwargs)
             else:
                 logger.debug(f"Skipping TrainTestSplitter. current_data is {type(current_data)}")
                 logger.warning(
@@ -441,7 +526,13 @@ class FeatureEngineer:
             return current_data, fitted_params, None
 
         logger.debug("Handling standard transformer via StatefulTransformer")
-        current_data = transformer.fit_transform(current_data, params)
+        if sample_weight is not None and not isinstance(current_data, SplitDataset):
+            current_data, sample_weight = transformer.fit_transform_weighted(
+                current_data, params, sample_weight
+            )
+        else:
+            current_data = transformer.fit_transform(current_data, params)
+        transformer.train_sample_weight_ = sample_weight
         fitted_params = transformer.params
         self.fitted_steps.append(
             {

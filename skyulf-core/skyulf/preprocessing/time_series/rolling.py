@@ -1,6 +1,6 @@
 """Rolling-window aggregates (mean/sum/min/max/std/median) over time series."""
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import polars as pl
@@ -20,6 +20,8 @@ from ._common import (
     sort_with_positions_pandas,
     sort_with_positions_polars,
 )
+from ._history_apply import apply_history
+from ._history_state import fit_history
 
 
 def _roll_name(col: str, agg: str, window: int) -> str:
@@ -64,6 +66,8 @@ def _polars_rolling_exprs(
 
 
 def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    if params.get("history_mode") == "carry":
+        return apply_history(X, _y, params, _apply_polars)
     columns: list[str] = params.get("columns", [])
     aggs: list[str] = params.get("aggregations", [])
     if not columns or not aggs:
@@ -115,6 +119,8 @@ def _pandas_roll_column(
 
 
 def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    if params.get("history_mode") == "carry":
+        return apply_history(X, _y, params, _apply_pandas)
     columns: list[str] = params.get("columns", [])
     aggs: list[str] = params.get("aggregations", [])
     if not columns or not aggs:
@@ -162,9 +168,9 @@ class RollingAggregateApplier(BaseApplier):
     learns_from_data=False,
 )
 class RollingAggregateCalculator(BaseCalculator):
-    """Save rolling configuration, not training history.
+    """Save rolling configuration and optional bounded training history.
 
-    Apply includes the current row and only sees the supplied frame. Rolling
+    Apply includes the current row; carry mode also sees saved earlier rows. Rolling
     the known target is rejected; other inputs must be available at prediction time.
     """
 
@@ -177,7 +183,7 @@ class RollingAggregateCalculator(BaseCalculator):
         validate_temporal_target(
             "RollingAggregate", config, target_column=config.get("target_column")
         )
-        return {
+        params: dict[str, Any] = {
             "type": "rolling_aggregate",
             "columns": config.get("columns", []),
             "window": int(config.get("window", 3)),
@@ -186,6 +192,14 @@ class RollingAggregateCalculator(BaseCalculator):
             "group_by": config.get("group_by"),
             "sort_by": config.get("sort_by"),
         }
+        return cast(RollingAggregateArtifact, fit_history(df, config, params, params["window"] - 1))
+
+    def fit_transform_train(self, df: Any, config: dict[str, Any]) -> tuple[Any, Any]:
+        """Save the training tail without using it as context for the training rows."""
+        params = self.fit(df, config)
+        return params, RollingAggregateApplier().apply(
+            df, dict(params) | {"_history_training": True}
+        )
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]

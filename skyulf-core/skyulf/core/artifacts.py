@@ -74,6 +74,17 @@ class SimpleImputerArtifact(TypedDict, total=False):
     total_missing: int
 
 
+class GroupImputerArtifact(TypedDict, total=False):
+    """Group-imputation parameters ([group, value] pairs per column and global fallbacks)."""
+
+    type: str
+    group_by: str
+    strategy: str
+    columns: list[str]
+    group_values: dict[str, list[list[Any]]]
+    fill_values: dict[str, Any]
+
+
 class KNNImputerArtifact(TypedDict, total=False):
     """KNN-imputation parameters (fitted sklearn imputer object and neighbour settings)."""
 
@@ -123,6 +134,13 @@ class WinsorizeArtifact(TypedDict, total=False):
     lower_percentile: float
     upper_percentile: float
     warnings: list[str]
+
+
+class ClipValuesArtifact(TypedDict, total=False):
+    """Fixed clip bounds per column (optional ``lower``/``upper``); rows are never removed."""
+
+    type: str
+    bounds: dict[str, dict[str, float]]
 
 
 class ManualBoundsArtifact(TypedDict, total=False):
@@ -181,6 +199,7 @@ class OversamplingArtifact(TypedDict, total=False):
 
     type: str
     method: str
+    synthetic_weight: str | None
     target_column: str | None
     sampling_strategy: Any
     random_state: int
@@ -542,6 +561,7 @@ class OneHotArtifact(TypedDict, total=False):
     prefix_separator: str
     drop_original: bool
     include_missing: bool
+    missing_encoding_version: int
 
 
 class OrdinalArtifact(TypedDict, total=False):
@@ -620,7 +640,18 @@ class FeatureTargetSplitArtifact(TypedDict, total=False):
 # ── Time series ──────────────────────────────────────────────────────────────
 
 
-class LagFeaturesArtifact(TypedDict, total=False):
+class TemporalHistoryArtifact(TypedDict, total=False):
+    """Optional immutable context seed and bounded continuation contract."""
+
+    history_mode: str
+    history_rows: int
+    history_max_rows: int
+    history_max_bytes: int
+    history_seed: list[dict[str, Any]]
+    history_id: str
+
+
+class LagFeaturesArtifact(TemporalHistoryArtifact, total=False):
     """Lag-feature parameters (columns lagged, lag offsets and group/sort ordering)."""
 
     type: str
@@ -631,7 +662,7 @@ class LagFeaturesArtifact(TypedDict, total=False):
     drop_na: bool
 
 
-class RollingAggregateArtifact(TypedDict, total=False):
+class RollingAggregateArtifact(TemporalHistoryArtifact, total=False):
     """Rolling-aggregate parameters (window size, aggregation functions and group/sort ordering)."""
 
     type: str
@@ -651,3 +682,4 @@ class DateFeaturesArtifact(TypedDict, total=False):
     features: list[str]
     drop_original: bool
     timezone: str
+    epoch_unit: str | None

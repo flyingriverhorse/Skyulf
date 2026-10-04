@@ -3,21 +3,22 @@
 from typing import Any
 from uuid import uuid4
 
+from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
+
 from .promotion import (
     AliasAdmission,
     AliasChangeReceipt,
     AliasConflictError,
-    _active_marker,
-    _admission,
-    _assert_no_pending,
-    _checked_challenger_event,
-    _commit_change,
-    _read_optional_alias,
-    _verify_original_receipt,
-    _verify_staged_challenger,
+    active_marker,
     alias_resource_id,
+    assert_no_pending,
+    checked_challenger_event,
+    commit_change,
+    read_optional_alias,
+    validate_admission,
+    verify_original_receipt,
+    verify_staged_challenger,
 )
-from .registry import _make_client, _require_mlflow
 from .validation import ModelComparisonReport, comparison_digest
 
 
@@ -42,24 +43,24 @@ def reject_candidate(
         raise TypeError("Rejection requires a ModelComparisonReport.")
     if expected_champion_version != report.champion_version:
         raise ValueError("Expected champion must match the rejected comparison.")
-    _admission(admission, registry_uri)
+    validate_admission(admission, registry_uri)
     digest = comparison_digest(report)
-    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
     name = report.model_name
     version = report.candidate_version
     with admission.hold(alias_resource_id(name)):
-        _assert_no_pending(client, name)
-        if _read_optional_alias(client, name, "champion") != expected_champion_version:
+        assert_no_pending(client, name)
+        if read_optional_alias(client, name, "champion") != expected_champion_version:
             raise AliasConflictError("Champion changed before rejection.")
         if (
-            _read_optional_alias(client, name, "challenger") != version
+            read_optional_alias(client, name, "challenger") != version
             or version == expected_champion_version
         ):
             raise AliasConflictError("Challenger changed before rejection.")
-        event = _checked_challenger_event(client, name, version)
+        event = checked_challenger_event(client, name, version)
         if event["k"] == "rejection":
-            return _replayed_rejection(client, name, version, event, digest, reason)
-        stage_event = _verify_staged_challenger(client, report, digest)
+            return replayed_rejection(client, name, version, event, digest, reason)
+        stage_event = verify_staged_challenger(client, report, digest)
         receipt = AliasChangeReceipt(
             event_id=uuid4().hex,
             kind="rejection",
@@ -70,7 +71,7 @@ def reject_candidate(
             comparison_sha256=digest,
             parent_event_id=stage_event,
         )
-        _commit_change(
+        commit_change(
             client,
             receipt,
             [],
@@ -83,7 +84,7 @@ def reject_candidate(
         return receipt
 
 
-def _replayed_rejection(
+def replayed_rejection(
     client: Any,
     name: str,
     version: str,
@@ -101,7 +102,7 @@ def _replayed_rejection(
         raise AliasConflictError(
             "Rejection proof, status or reason differs from the recorded decision."
         )
-    event_id = _active_marker(client, name, version, "challenger")
+    event_id = active_marker(client, name, version, "challenger")
     if event_id is None:
         raise AliasConflictError("Rejected challenger lacks an active decision receipt.")
     receipt = AliasChangeReceipt(
@@ -114,5 +115,5 @@ def _replayed_rejection(
         comparison_sha256=digest,
         parent_event_id=event.get("e"),
     )
-    _verify_original_receipt(client, receipt)
+    verify_original_receipt(client, receipt)
     return receipt

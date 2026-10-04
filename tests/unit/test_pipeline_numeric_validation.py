@@ -300,3 +300,28 @@ def test_oversized_search_candidate_is_not_a_valid_finite_value(client):
         },
     )
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "field,value", [("cv_gap", -1), ("cv_test_size", 0), ("cv_max_train_size", 1.5)]
+)
+def test_invalid_temporal_windows_return_422(client, field, value):
+    """Malformed temporal windows must fail before a job consumes resources."""
+    params = {
+        "run_mode": "fixed",
+        "cv_enabled": True,
+        "cv_type": "nested_cv",
+        "cv_nested_type": "time_series_split",
+        "cv_time_column": "created",
+        "cv_shuffle": False,
+        field: value,
+    }
+    response = client.post(
+        "/run",
+        json={
+            "pipeline_id": "p",
+            "nodes": [{"node_id": "n", "step_type": "training", "params": params}],
+        },
+    )
+    assert response.status_code == 422
+    assert field in response.text

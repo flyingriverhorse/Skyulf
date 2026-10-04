@@ -74,6 +74,9 @@ jobs:
       - name: Lint check (Ruff)
         run: bash .github/scripts/run_check.sh "Ruff lint" ruff check .
 
+      - name: Check generated Databricks template schema
+        run: python skyulf-core/templates/databricks/build_schema.py --check
+
       - name: Format check (Ruff)
         run: bash .github/scripts/run_check.sh "Ruff format" ruff format --check backend skyulf-core tests run_skyulf.py celery_worker.py
 

@@ -21,7 +21,10 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 try:
-    from xgboost import XGBClassifier  # ty: ignore[unresolved-import]
+    # Probe the dependency even when the local adapter module is cached.
+    import xgboost  # ty: ignore[unresolved-import]  # noqa: F401 - optional dependency probe
+
+    from ._xgboost import XGBClassifier
 
     XGBOOST_AVAILABLE = True
 except ImportError:
@@ -118,6 +121,8 @@ class LogisticRegressionCalculator(SklearnCalculator):
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Reject an unsupported solver/penalty pair, then delegate to the base fit."""
         self._validate_solver_penalty(config)
@@ -129,6 +134,7 @@ class LogisticRegressionCalculator(SklearnCalculator):
             log_callback,
             validation_data,
             iteration_callback=iteration_callback,
+            sample_weight=sample_weight,
         )
 
     def _resolve_fit_params(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -242,13 +248,20 @@ class _SeededCalibratedClassifierCV(CalibratedClassifierCV):
         self.random_state = random_state
         self.base_estimator = base_estimator
 
+    def _get_estimator(self) -> Any:
+        """Expose the candidate's seeded base learner to preflight and fitting."""
+        estimator = (
+            _make_calibrated_base_estimator(self.base_estimator)
+            if self.base_estimator is not None
+            else super()._get_estimator()
+        )
+        if "random_state" in estimator.get_params(deep=False):
+            return clone(estimator).set_params(random_state=self.random_state)
+        return estimator
+
     def fit(self, X: Any, y: Any, sample_weight: Any = None, **fit_params: Any) -> Any:
         """Resolve and seed this candidate without modifying a caller-supplied estimator."""
-        if self.base_estimator is not None:
-            self.estimator = _make_calibrated_base_estimator(self.base_estimator)
-        estimator = self._get_estimator()
-        if "random_state" in estimator.get_params(deep=False):
-            self.estimator = clone(estimator).set_params(random_state=self.random_state)
+        self.estimator = self._get_estimator()
         return super().fit(X, y, sample_weight=sample_weight, **fit_params)
 
 
@@ -341,6 +354,8 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Resolve the base estimator in ``config``, then delegate to the base fit."""
         config = self._resolve_base_estimator(config)
@@ -352,6 +367,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
             log_callback,
             validation_data,
             iteration_callback=iteration_callback,
+            sample_weight=sample_weight,
         )
 
     @classmethod
@@ -776,7 +792,7 @@ if LIGHTGBM_AVAILABLE:
         id="lgbm_classifier",
         name="LightGBM Classifier",
         category="Modeling",
-        description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        description="LightGBM: leaf-wise gradient boosting for numeric features; encode categorical inputs first.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
         tags=["classification"],
         learns_from_data=True,
@@ -825,6 +841,8 @@ if LIGHTGBM_AVAILABLE:
             log_callback=None,
             validation_data=None,
             iteration_callback=None,
+            *,
+            sample_weight: Any = None,
         ):
             """Delegate to the base fit with the feature-name warning suppressed."""
             with warnings.catch_warnings():
@@ -837,6 +855,7 @@ if LIGHTGBM_AVAILABLE:
                     log_callback=log_callback,
                     validation_data=validation_data,
                     iteration_callback=iteration_callback,
+                    sample_weight=sample_weight,
                 )
 
         def _boosting_fit_kwargs(self, model, X_np, y_np, iteration_callback):

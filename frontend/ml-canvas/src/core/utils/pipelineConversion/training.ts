@@ -17,6 +17,7 @@ export const buildFixedTrainingParams = (data: Record<string, unknown>): Record<
   cv_shuffle: data.cv_shuffle,
   cv_random_state: data.cv_random_state,
   cv_time_column: data.cv_time_column,
+  ...splitPolicyParams(data),
   execution_mode: data.execution_mode,
 });
 
@@ -39,6 +40,7 @@ export const buildBaseTuningConfig = (data: Record<string, unknown>): Record<str
   cv_shuffle: data.cv_shuffle,
   cv_random_state: data.cv_random_state,
   cv_time_column: data.cv_time_column,
+  ...splitPolicyParams(data),
   random_state: data.random_state,
   tune_threshold: data.tune_threshold ?? false,
 });
@@ -89,3 +91,9 @@ export const convertSegmentationNode: NodeConverter = (node) => {
   };
   return { stepType, params };
 };
+
+/** Omit absent policy fields so legacy recipes retain Core defaults. */
+function splitPolicyParams(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(['cv_nested_type', 'cv_group_column', 'cv_gap', 'cv_test_size', 'cv_max_train_size']
+    .filter(key => data[key] !== undefined).map(key => [key, data[key]]));
+}

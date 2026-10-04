@@ -200,6 +200,58 @@ async def test_external_sparse_transform_keeps_valid_predictions(deployed_client
     np.testing.assert_allclose(response.json()["predictions"], [41, 81])
 
 
+async def test_temporal_history_http_continues_without_mutating_saved_model(deployed_client):
+    """Each successful response carries context; retrying the same input state is deterministic."""
+    client, promote = deployed_client
+    engineer = FeatureEngineer(
+        [
+            {
+                "name": "history",
+                "transformer": "RollingAggregate",
+                "params": {"columns": ["x"], "sort_by": "t", "window": 3, "history_mode": "carry"},
+            }
+        ]
+    )
+    train = pd.DataFrame({"t": [1, 2, 3], "x": [10.0, 20.0, 30.0]})
+    transformed, _ = engineer.fit_transform(train)
+    model = LinearRegression().fit(transformed[["x_roll_mean_3"]], [10.0, 15.0, 20.0])
+    await promote(
+        {
+            "feature_engineer": engineer,
+            "model": model,
+            "feature_columns": ["x_roll_mean_3"],
+            "dropped_columns": ["t", "x"],
+        }
+    )
+    first = await client.post(
+        "/deployment/predict",
+        json={
+            "data": [{"t": 4, "x": 40.0}],
+            "continue_history": True,
+        },
+    )
+    assert first.status_code == 200, first.text
+    np.testing.assert_allclose(first.json()["predictions"], [30.0])
+    state = first.json()["history_state"]
+    rejected = await client.post(
+        "/deployment/predict",
+        json={
+            "data": [{"t": 4, "x": 400.0}],
+            "history_state": state,
+        },
+    )
+    assert rejected.status_code == 400
+    payload = {"data": [{"t": 5, "x": 50.0}], "history_state": state}
+    second = await client.post("/deployment/predict", json=payload)
+    replay = await client.post("/deployment/predict", json=payload)
+    assert second.status_code == 200, second.text
+    assert second.json() == replay.json()
+    np.testing.assert_allclose(second.json()["predictions"], [40.0])
+    unchanged = await client.post("/deployment/predict", json={"data": [{"t": 4, "x": 40.0}]})
+    assert unchanged.status_code == 200, unchanged.text
+    np.testing.assert_allclose(unchanged.json()["predictions"], [30.0])
+
+
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 async def test_sorted_preprocessing_cannot_relabel_predictions_by_position(deployed_client, engine):
     """A reordered temporal result must not be attached to the caller's original row order."""

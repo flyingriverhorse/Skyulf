@@ -1,5 +1,6 @@
 """Feature-generation (math) node."""
 
+import logging
 from copy import deepcopy
 from typing import Any, cast
 
@@ -12,9 +13,31 @@ from .._artifacts import FeatureGenerationArtifact
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import DEFAULT_EPSILON, FEATURE_MATH_ALLOWED_TYPES, _resolve_group_agg_cols
+from ._common import (
+    DEFAULT_EPSILON,
+    FEATURE_MATH_ALLOWED_TYPES,
+    _resolve_group_agg_cols,
+    _similarity_backend,
+    _validate_similarity_backend,
+)
 from ._pandas_ops import _PANDAS_AGG_METHODS, _featgen_apply_pandas
 from ._polars_ops import _featgen_apply_polars
+
+logger = logging.getLogger(__name__)
+
+
+def _check_similarity_runtime(operations: list[dict[str, Any]]) -> None:
+    """Keep fitted similarity implementations stable and identify unpinned legacy artifacts."""
+    for op in operations:
+        if op.get("operation_type") != "similarity":
+            continue
+        backend = op.get("similarity_backend")
+        _validate_similarity_backend(backend)
+        if backend is None:
+            logger.warning(
+                "Legacy similarity artifact has no saved backend; refit to keep feature values "
+                "stable across environments."
+            )
 
 
 def _validate_operation_types(operations: list[dict[str, Any]]) -> None:
@@ -57,6 +80,7 @@ class FeatureGenerationApplier(BaseApplier):
         lacking those mappings must be refitted before inference.
         """
         _validate_operation_types(params.get("operations", []))
+        _check_similarity_runtime(params.get("operations", []))
         if any(
             op.get("operation_type") == "group_agg" and "group_agg_mapping" not in op
             for op in params.get("operations", [])
@@ -139,6 +163,9 @@ class FeatureGenerationCalculator(BaseCalculator):
             "epsilon": config.get("epsilon", DEFAULT_EPSILON),
             "allow_overwrite": config.get("allow_overwrite", False),
         }
+        for op in params["operations"]:
+            if op.get("operation_type") == "similarity":
+                op["similarity_backend"] = _similarity_backend()
         if not any(op.get("operation_type") == "group_agg" for op in params["operations"]):
             return params
 

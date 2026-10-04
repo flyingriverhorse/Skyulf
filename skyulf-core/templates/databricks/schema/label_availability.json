@@ -1,0 +1,329 @@
+{
+  "filter_unavailable_results": {
+    "type": "string",
+    "default": "false",
+    "description": "1. Data | Do answers become known later? true = exclude rows whose answer was not yet available at the chosen time; false = use supplied answers",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "order": 41,
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "result_availability_lag_hours": {
+    "type": "string",
+    "default": "0",
+    "description": "1. Data | When result_cutoff is blank, subtract this many hours from run start. Enter 0 to 87600; example: 48 excludes results available in the last two days. An explicit result_cutoff overrides this lag for every run",
+    "pattern": "^(0|[1-9][0-9]*)$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        }
+      ]
+    },
+    "order": 42
+  },
+  "result_available_at_column": {
+    "order": 43,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Column recording when each answer became known, e.g. claim_confirmed_at. This is a column name, not a date you enter",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "result_time_kind": {
+    "order": 44,
+    "type": "string",
+    "default": "timestamp",
+    "description": "1. Data | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
+    "enum": [
+      "timestamp",
+      "local_timestamp",
+      "date",
+      "text"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "result_text_kind": {
+    "order": 45,
+    "type": "string",
+    "default": "local_datetime",
+    "description": "1. Data | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
+    "enum": [
+      "offset_datetime",
+      "local_datetime",
+      "date"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "result_time_kind": {
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "result_time_format": {
+    "type": "string",
+    "default": "",
+    "description": "1. Data | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
+    "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "result_time_kind": {
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "order": 46
+  },
+  "result_time_timezone": {
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
+    "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "result_time_kind": {
+                    "enum": [
+                      "local_timestamp",
+                      "date"
+                    ]
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "result_time_kind": {
+                        "enum": [
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "result_text_kind": {
+                        "enum": [
+                          "local_datetime",
+                          "date"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "order": 47
+  },
+  "result_date_only": {
+    "type": "string",
+    "default": "reject",
+    "description": "1. Data | This column has a day but no time. May we treat it as the start of that day? midnight = yes, 00:00 in your chosen timezone; reject = stop if such a value is encountered",
+    "enum": [
+      "reject",
+      "midnight"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "result_time_kind": {
+                    "enum": [
+                      "date"
+                    ]
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "result_time_kind": {
+                        "enum": [
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "result_text_kind": {
+                        "enum": [
+                          "date"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "order": 48
+  },
+  "result_cutoff": {
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Use answers known by this time, INCLUDING this instant, e.g. 2026-09-15T00:00:00+02:00. An explicit cutoff applies to every run; blank derives run start minus result_availability_lag_hours",
+    "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "filter_unavailable_results": {
+              "const": "false"
+            }
+          }
+        }
+      ]
+    },
+    "order": 49
+  }
+}

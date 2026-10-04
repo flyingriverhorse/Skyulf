@@ -4,10 +4,9 @@ The payload is pickle: only load artifacts from a trusted producer. The
 checksum detects damaged bytes but does not authenticate their origin.
 """
 
-from __future__ import annotations
-
 import json
 import pickle
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -21,8 +20,11 @@ from sklearn.base import is_classifier
 from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
+from ..preprocessing._target_labels import original_labels
 from ._manifest import checksum, runtime_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
+from .project_dependencies import source_project_requirements, verify_project_requirements
+from .project_scoring import validate_scoring_config
 
 _MAX_MANIFEST_BYTES = 64 * 1024
 _MAX_PIPELINE_BYTES = 256 * 1024 * 1024
@@ -32,7 +34,7 @@ class LocalPipelineManifest(BaseModel):
     """Record the fit engine, raw schema, runtime and serialized pipeline identity."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-    format_version: Literal[1] = 1
+    format_version: Literal[1, 2] = 2
     fitted_engine: Literal["pandas", "polars"]
     input_columns: tuple[str, ...] = Field(min_length=1)
     input_dtypes: tuple[str, ...]
@@ -46,6 +48,7 @@ class LocalPipelineManifest(BaseModel):
     classes: tuple[str | int | float | bool, ...] = ()
     classification_probabilities: bool = True
     use_tuned_thresholds: bool = False
+    project_requirements: tuple[str, ...] = ()
     project_source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
@@ -68,7 +71,11 @@ def _recorded_schemas(pipeline: SkyulfPipeline) -> tuple[SkyulfSchema, SkyulfSch
 
 
 def _manifest(
-    pipeline: SkyulfPipeline, payload: bytes, use_tuned_thresholds: bool
+    pipeline: SkyulfPipeline,
+    payload: bytes,
+    use_tuned_thresholds: bool,
+    *,
+    format_version: Literal[1, 2] = 2,
 ) -> LocalPipelineManifest:
     """Derive metadata from the successful fit rather than caller-supplied labels."""
     raw, features = _recorded_schemas(pipeline)
@@ -80,7 +87,7 @@ def _manifest(
     if fitted_engine not in ("pandas", "polars"):
         raise ValueError("Local artifact requires a recorded pandas or Polars fit engine.")
     classification = is_classifier(model)
-    classes = tuple(np.asarray(model.classes_).tolist()) if classification else ()
+    classes = tuple(original_labels(pipeline, model.classes_).tolist()) if classification else ()
     classification_probabilities = not classification or callable(
         getattr(model, "predict_proba", None)
     )
@@ -88,6 +95,7 @@ def _manifest(
         pipeline, use_tuned_thresholds, classification, classification_probabilities
     )
     return LocalPipelineManifest(
+        format_version=format_version,
         fitted_engine=fitted_engine,
         input_columns=raw.columns,
         input_dtypes=tuple(raw.dtypes.get(name, "unknown") for name in raw.columns),
@@ -100,6 +108,7 @@ def _manifest(
         classes=classes,
         classification_probabilities=classification_probabilities,
         use_tuned_thresholds=use_tuned_thresholds,
+        project_requirements=_project_contract(pipeline),
         project_source_sha256=(
             project_source_digest(pipeline.config["project_python_source"])
             if "project_python_source" in pipeline.config
@@ -120,6 +129,7 @@ def _validate_tuned_thresholds(
 
 def _check_runtime(manifest: LocalPipelineManifest) -> None:
     """Reject incompatible Python or dependency versions before loading pickle."""
+    verify_project_requirements(manifest.project_requirements)
     current = dict(runtime_requirements())
     required = dict(manifest.requirements)
     if set(required) != set(current):
@@ -140,11 +150,17 @@ def _check_runtime(manifest: LocalPipelineManifest) -> None:
 def save_local_pipeline(
     pipeline: SkyulfPipeline, path: str | Path, *, use_tuned_thresholds: bool = False
 ) -> None:
-    """Write a fitted pipeline and its manifest to a new directory."""
+    """Write version 2 with the decision policy inside the checksummed pickle payload."""
     if type(pipeline) is not SkyulfPipeline:
         raise TypeError("Expected a fitted SkyulfPipeline.")
     _recorded_schemas(pipeline)
-    payload = pickle.dumps(pipeline, protocol=pickle.HIGHEST_PROTOCOL)
+    prediction_pipeline = copy(pipeline)
+    prediction_pipeline.feature_engineer = copy(pipeline.feature_engineer)
+    prediction_pipeline.feature_engineer.train_sample_weight_ = None
+    payload = pickle.dumps(
+        {"pipeline": prediction_pipeline, "use_tuned_thresholds": use_tuned_thresholds},
+        protocol=pickle.HIGHEST_PROTOCOL,
+    )
     if len(payload) > _MAX_PIPELINE_BYTES:
         raise ValueError("Local pipeline payload exceeds the size limit.")
     manifest = _manifest(pipeline, payload, use_tuned_thresholds)
@@ -161,7 +177,7 @@ def save_local_pipeline(
         )
 
 
-def _read_bounded(path: Path, limit: int) -> bytes:
+def read_bounded_artifact(path: Path, limit: int) -> bytes:
     """Limit artifact bytes before JSON or pickle decoding."""
     with path.open("rb") as stream:
         data = stream.read(limit + 1)
@@ -171,9 +187,15 @@ def _read_bounded(path: Path, limit: int) -> bytes:
 
 
 def load_local_pipeline(path: str | Path) -> LocalPipelineArtifact:
-    """Validate and load a trusted producer's local pipeline artifact."""
+    """Validate and load a trusted producer's local pipeline artifact.
+
+    Version 1 remains readable only without fitted thresholds, because its
+    payload cannot establish the saved decision policy. Re-export those older
+    threshold-bearing pipelines with an explicit ``use_tuned_thresholds`` choice.
+    Checksums establish integrity, not producer authenticity.
+    """
     source = Path(path)
-    metadata = _read_bounded(source / "manifest.json", _MAX_MANIFEST_BYTES)
+    metadata = read_bounded_artifact(source / "manifest.json", _MAX_MANIFEST_BYTES)
     document = json.loads(
         metadata.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_bad_constant
     )
@@ -182,20 +204,52 @@ def load_local_pipeline(path: str | Path) -> LocalPipelineArtifact:
     manifest = LocalPipelineManifest.model_validate_json(metadata)
     _validate_manifest_schema(manifest)
     _check_runtime(manifest)
-    payload = _read_bounded(source / "pipeline.pkl", _MAX_PIPELINE_BYTES)
+    payload = read_bounded_artifact(source / "pipeline.pkl", _MAX_PIPELINE_BYTES)
     if checksum(payload) != manifest.pipeline_sha256:
         raise ValueError("Local pipeline payload checksum mismatch.")
     if manifest.project_source_sha256 is not None:
-        code = _read_bounded(source / "preprocessing.py", MAX_PROJECT_SOURCE_BYTES).decode("utf-8")
+        code = read_bounded_artifact(source / "preprocessing.py", MAX_PROJECT_SOURCE_BYTES).decode(
+            "utf-8"
+        )
         if project_source_digest(code) != manifest.project_source_sha256:
             raise ValueError("Project preprocessing source checksum mismatch.")
         load_project_module(code)
-    pipeline = pickle.loads(payload)  # nosec B301 -- trusted producer only, after size/runtime/checksum checks
-    if type(pipeline) is not SkyulfPipeline:
-        raise ValueError("Local artifact payload is not a SkyulfPipeline.")
-    if _manifest(pipeline, payload, manifest.use_tuned_thresholds) != manifest:
+    pipeline = _load_pipeline_payload(payload, manifest)
+    if (
+        _manifest(
+            pipeline,
+            payload,
+            manifest.use_tuned_thresholds,
+            format_version=manifest.format_version,
+        )
+        != manifest
+    ):
         raise ValueError("Local artifact manifest disagrees with its fitted pipeline.")
     return LocalPipelineArtifact(manifest, pipeline)
+
+
+def _load_pipeline_payload(payload: bytes, manifest: LocalPipelineManifest) -> SkyulfPipeline:
+    """Restore the versioned payload only after transport and runtime validation."""
+    saved = pickle.loads(payload)  # nosec B301 -- trusted producer only, after size/runtime/checksum checks
+    if manifest.format_version == 2:
+        if type(saved) is not dict or set(saved) != {"pipeline", "use_tuned_thresholds"}:
+            raise ValueError("Invalid local artifact payload envelope.")
+        policy = saved["use_tuned_thresholds"]
+        if type(policy) is not bool:
+            raise ValueError("Local artifact payload threshold policy must be a boolean.")
+        if policy != manifest.use_tuned_thresholds:
+            raise ValueError("Local artifact manifest threshold policy disagrees with its payload.")
+        pipeline = saved["pipeline"]
+    else:
+        pipeline = saved
+    if type(pipeline) is not SkyulfPipeline:
+        raise ValueError("Local artifact payload is not a SkyulfPipeline.")
+    if manifest.format_version == 1 and getattr(pipeline, "_tuned_thresholds", None) is not None:
+        raise ValueError(
+            "Local artifact version 1 cannot bind fitted threshold policy; re-export the "
+            "trusted fitted pipeline with an explicit use_tuned_thresholds choice."
+        )
+    return pipeline
 
 
 def _validate_manifest_schema(manifest: LocalPipelineManifest) -> None:
@@ -230,17 +284,7 @@ def predict_local_pipeline(
         raise TypeError("Expected a LocalPipelineArtifact.")
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
-    native = _prediction_frame(frame, artifact.manifest)
-    expected = SkyulfSchema(
-        artifact.manifest.input_columns,
-        dict(zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)),
-    )
-    expected.assert_compatible(
-        SkyulfSchema.from_dataframe(native),
-        check_dtypes=True,
-        check_order=True,
-        where="local pipeline input",
-    )
+    native = validate_local_input(frame, artifact)
     prediction = np.asarray(
         artifact.pipeline.predict(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
@@ -270,3 +314,34 @@ def _prediction_frame(
     if manifest.fitted_engine == "polars":
         return pl.from_pandas(frame) if isinstance(frame, pd.DataFrame) else frame
     return frame.to_pandas() if isinstance(frame, pl.DataFrame) else frame
+
+
+def _project_contract(pipeline: SkyulfPipeline) -> tuple[str, ...]:
+    """Validate saved scoring policies and dependency pins as part of model identity."""
+    source = pipeline.config.get("project_python_source")
+    config = pipeline.config.get("project_scoring")
+    if config is not None:
+        if not source:
+            raise ValueError("Project scoring requires saved project Python source.")
+        validate_scoring_config(config, source)
+    requirements = source_project_requirements(source) if source else ()
+    verify_project_requirements(requirements)
+    return requirements
+
+
+def validate_local_input(
+    frame: pd.DataFrame | pl.DataFrame, artifact: LocalPipelineArtifact
+) -> pd.DataFrame | pl.DataFrame:
+    """Validate raw columns and dtypes even when scoring eligibility excludes all rows."""
+    native = _prediction_frame(frame, artifact.manifest)
+    expected = SkyulfSchema(
+        artifact.manifest.input_columns,
+        dict(zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)),
+    )
+    expected.assert_compatible(
+        SkyulfSchema.from_dataframe(native),
+        check_dtypes=True,
+        check_order=True,
+        where="local pipeline input",
+    )
+    return native

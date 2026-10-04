@@ -7,15 +7,23 @@ try/except and degrade to a ``-inf`` fold score instead of aborting the
 search.
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from sklearn.model_selection import ParameterGrid, ParameterSampler
 
+from ...data.coverage import transform_evaluation
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit, split_class_weight_params
+from .._cv_weights import fit_preprocessor, prepare_weights, take_weights
+from .._evaluation.common import sanitize_metrics
+from .._evaluation.metrics import calculate_classification_metrics, calculate_regression_metrics
+from .._sample_weights import SampleWeightError
 from ..base import BaseModelCalculator
+from .fold_pipeline import FoldAwareModelStep
 from .metrics import resolve_scorer
 from .params import clean_search_space, instantiate_model, seed_params
 from .schemas import TuningConfig, TuningResult
@@ -48,11 +56,13 @@ def evaluate_candidate_cv(
     y_for_search: Any,
     metric: str,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
+    evaluation_coverage: list[dict[str, Any]] | None = None,
 ) -> float:
     """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -71,6 +81,7 @@ def evaluate_candidate_cv(
     y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
     for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
+        coverage: dict[str, Any] = {"input_rows": len(val_idx)}
         score = fit_and_score_candidate_fold(
             candidate_idx=candidate_idx,
             fold_idx=fold_idx,
@@ -89,9 +100,20 @@ def evaluate_candidate_cv(
             fold_errors=fold_errors,
             seed_params_overlay=seed_params_overlay,
             model_calculator=model_calculator,
+            sample_weight=sample_weight,
+            evaluation_coverage=coverage,
         )
+        if evaluation_coverage is not None:
+            evaluation_coverage.append({"fold": fold_idx + 1, **coverage})
         fold_scores.append(score)
 
+    return _complete_candidate_score(fold_scores, candidate_idx, log_callback)
+
+
+def _complete_candidate_score(
+    fold_scores: list[float], candidate_idx: int, log_callback: Callable[[str], None] | None
+) -> float:
+    """Reject candidates with failed folds rather than averaging a surviving subset."""
     n_failed = sum(1 for s in fold_scores if s == -float("inf"))
     if n_failed:
         if log_callback and n_failed < len(fold_scores):
@@ -108,6 +130,61 @@ def _slice_fold_rows(data: Any, indices: Any) -> Any:
     return data.iloc[indices] if hasattr(data, "iloc") else data[indices]
 
 
+def _score_candidate_fold(
+    model: Any,
+    X_valid: Any,
+    y_valid: Any,
+    y_original: Any,
+    y_encoded: Any,
+    preprocessing: Any,
+    metric: str,
+    problem_type: str | None,
+) -> float:
+    """Score in the original label space, consistently with the other searchers."""
+    scorer = resolve_scorer(metric, y_original, problem_type)
+    view, original_valid = _candidate_evaluation_view(
+        model, y_valid, y_original, y_encoded, preprocessing
+    )
+    return scorer(view, X_valid, original_valid)
+
+
+def _candidate_evaluation_view(
+    model: Any, y_valid: Any, y_original: Any, y_encoded: Any, preprocessing: Any
+) -> tuple[Any, Any]:
+    """Expose predictions and probability columns in the original target class order."""
+    mapping = FoldAwareModelStep._build_label_map(y_original, y_encoded, model, preprocessing)
+    if mapping is None:
+        return model, y_valid
+    view = FoldAwareModelStep(estimator=model)
+    view.model_ = model
+    view.preprocessor_ = None
+    view.label_map_ = mapping
+    original_valid = np.array([mapping[label] for label in np.asarray(y_valid)])
+    return view, original_valid
+
+
+def _collect_candidate_metrics(
+    metrics: dict[str, float],
+    model: Any,
+    X: Any,
+    y: Any,
+    original_y: Any,
+    encoded_y: Any,
+    preprocessing: Any,
+    problem_type: str,
+) -> None:
+    """Evaluate a fitted outer-fold model without adding another training pass."""
+    view, original_valid = _candidate_evaluation_view(
+        model, y, original_y, encoded_y, preprocessing
+    )
+    calculate = (
+        calculate_classification_metrics
+        if problem_type == "classification"
+        else calculate_regression_metrics
+    )
+    metrics.update(sanitize_metrics(calculate(view, X, original_valid)))
+
+
 def fit_and_score_candidate_fold(
     candidate_idx: int,
     fold_idx: int,
@@ -122,11 +199,14 @@ def fit_and_score_candidate_fold(
     val_idx: Any,
     metric: str,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
+    evaluation_metrics: dict[str, float] | None = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> float:
     """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
@@ -139,6 +219,11 @@ def fit_and_score_candidate_fold(
     y_train_fold = _slice_fold_rows(y_any, train_idx)
     X_val_fold = _slice_fold_rows(X_any, val_idx)
     y_val_fold = _slice_fold_rows(y_any, val_idx)
+    y_original = y_train_fold
+
+    fold_weight = prepare_weights(
+        take_weights(sample_weight, train_idx), len(train_idx), preprocessing
+    )
 
     # Instantiate and Fit
     # Note: We must handle potential errors (e.g. incompatible params)
@@ -147,8 +232,12 @@ def fit_and_score_candidate_fold(
         # never see this fold's held-out rows (inside the try so a
         # preprocessing failure is contained like a model-fit failure).
         if preprocessing is not None:
-            X_train_fold, y_train_fold = preprocessing.fit_transform(X_train_fold, y_train_fold)
-            X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
+            X_train_fold, y_train_fold, fold_weight = fit_preprocessor(
+                preprocessing, X_train_fold, y_train_fold, fold_weight
+            )
+        X_val_fold, y_val_fold, _coverage = transform_evaluation(
+            preprocessing, X_val_fold, y_val_fold, coverage_out=evaluation_coverage
+        )
 
         SklearnBridge.validate_features(X_train_fold)
         SklearnBridge.validate_features(X_val_fold)
@@ -157,16 +246,32 @@ def fit_and_score_candidate_fold(
             {**model_calculator.default_params, **(seed_params_overlay or {}), **params},
         )
         model = instantiate_model(model_class, constructor_params)
-        sample_weight = sample_weight_for_fit(model, class_weight, y_train_fold)
+        sample_weight = sample_weight_for_fit(model, class_weight, y_train_fold, fold_weight)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_train_fold, y_train_fold, **fit_kwargs)
 
-        # Score — resolved against the fold's (post-transform) labels so
-        # binary scorers get a valid pos_label even for string targets.
-        scorer = resolve_scorer(
-            metric, y_train_fold, getattr(model_calculator, "problem_type", None)
+        score = _score_candidate_fold(
+            model,
+            X_val_fold,
+            y_val_fold,
+            y_original,
+            y_train_fold,
+            preprocessing,
+            metric,
+            getattr(model_calculator, "problem_type", None),
         )
-        score = scorer(model, X_val_fold, y_val_fold)
+
+        if evaluation_metrics is not None:
+            _collect_candidate_metrics(
+                evaluation_metrics,
+                model,
+                X_val_fold,
+                y_val_fold,
+                y_original,
+                y_train_fold,
+                preprocessing,
+                model_calculator.problem_type,
+            )
 
         if log_callback:
             n_splits = cv.get_n_splits(X_arr, y_arr)
@@ -174,6 +279,8 @@ def fit_and_score_candidate_fold(
                 f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
             )
         return score
+    except SampleWeightError:
+        raise
     except Exception as e:  # noqa: BLE001 - per-fold failures are collected for reporting, must not abort tuning
         if fold_errors is not None:
             fold_errors.append(str(e))
@@ -194,11 +301,12 @@ def evaluate_search_candidates(
     metric: str,
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     fold_errors: list[str] | None = None,
     seed_params_overlay: dict[str, Any] | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
     """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -216,6 +324,7 @@ def evaluate_search_candidates(
         # Use custom cross-validation loop to enable per-fold logging and progress tracking.
         # We instantiate the model with the current candidate parameters and evaluate it
         # using the configured CV strategy.
+        coverage: list[dict[str, Any]] = []
         mean_score = evaluate_candidate_cv(
             i,
             params,
@@ -229,6 +338,8 @@ def evaluate_search_candidates(
             fold_errors,
             seed_params_overlay,
             model_calculator=model_calculator,
+            sample_weight=sample_weight,
+            evaluation_coverage=coverage,
         )
 
         if log_callback:
@@ -237,7 +348,7 @@ def evaluate_search_candidates(
         if progress_callback:
             progress_callback(i + 1, total_candidates, mean_score, params)
 
-        trials.append({"params": params, "score": mean_score})
+        trials.append({"params": params, "score": mean_score, "evaluation_coverage": coverage})
 
         if mean_score > best_score:
             best_score = mean_score
@@ -255,9 +366,10 @@ def run_grid_or_random_search(
     metric: str,
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
     *,
     model_calculator: BaseModelCalculator,
+    sample_weight: Any = None,
 ) -> TuningResult:
     """Runs a custom grid/random search loop instead of sklearn's searchers.
 
@@ -288,6 +400,7 @@ def run_grid_or_random_search(
         fold_errors,
         seed_params(config),
         model_calculator=model_calculator,
+        sample_weight=sample_weight,
     )
 
     if log_callback:

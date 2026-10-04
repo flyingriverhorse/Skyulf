@@ -362,3 +362,54 @@ def test_a_regressor_advertises_neither_classifier_response_method() -> None:
 
     assert not hasattr(step, "predict_proba")
     assert not hasattr(step, "decision_function")
+
+
+@pytest.mark.parametrize("metric", ["roc_auc", "neg_log_loss", "average_precision"])
+def test_reversed_target_encoding_matches_unencoded_probability_scores(metric):
+    """Scorers must choose the same original positive class after target encoding."""
+    X = pd.DataFrame({"x": np.linspace(-3, 3, 40)})
+    y = pd.Series((X["x"] > 0).astype(int))
+    native = LogisticRegression().fit(X, y)
+    wrapped = FoldAwareModelStep(LogisticRegression(), SwapEncodingAdapter()).fit(X, y)
+
+    np.testing.assert_array_equal(wrapped.classes_, native.classes_)
+    np.testing.assert_allclose(wrapped.predict_proba(X), native.predict_proba(X), atol=1e-10)
+    assert get_scorer(metric)(wrapped, X, y) == pytest.approx(get_scorer(metric)(native, X, y))
+
+
+def test_reversed_target_encoding_orients_binary_decision_scores():
+    """Decision-only estimators must score the original positive class too."""
+    X = pd.DataFrame({"x": np.linspace(-3, 3, 40)})
+    y = pd.Series((X["x"] > 0).astype(int))
+    wrapped = FoldAwareModelStep(SVC(), SwapEncodingAdapter()).fit(X, y)
+
+    assert get_scorer("roc_auc")(wrapped, X, y) == pytest.approx(1.0)
+
+
+def test_multiclass_target_encoding_aligns_response_columns():
+    """Canonical class order must also align multiclass decision scores and probabilities."""
+    from sklearn.datasets import make_blobs
+
+    class ReversedEncodingAdapter:
+        """Reverse a three-class target without changing the observations."""
+
+        def fit_transform(self, X, y):
+            """Return features with consistently recoded targets."""
+            return X, 2 - y
+
+        def transform(self, X, y):
+            """Apply the same recoding to held-out target values."""
+            return X, None if y is None else 2 - y
+
+    values, labels = make_blobs(n_samples=60, centers=3, random_state=11)
+    X, y = pd.DataFrame(values), pd.Series(labels)
+    wrapped = FoldAwareModelStep(LogisticRegression(), ReversedEncodingAdapter()).fit(X, y)
+    probabilities = wrapped.predict_proba(X)
+
+    np.testing.assert_array_equal(wrapped.classes_, [0, 1, 2])
+    np.testing.assert_array_equal(
+        wrapped.classes_[probabilities.argmax(axis=1)], wrapped.predict(X)
+    )
+    np.testing.assert_array_equal(
+        wrapped.classes_[wrapped.decision_function(X).argmax(axis=1)], wrapped.predict(X)
+    )

@@ -58,6 +58,6 @@ jobs:
       - name: Exercise real Delta transactions and publish admission
         run: >-
           python -m pytest
-          skyulf-core/tests/integrations/test_batch_contract.py
-          skyulf-core/tests/integrations/test_batch_admission.py
-          skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=
+          skyulf-core/tests/integration/platforms/test_batch_contract.py
+          skyulf-core/tests/integration/platforms/test_batch_admission.py
+          skyulf-core/tests/integration/platforms/test_delta_publish.py -q -o addopts=

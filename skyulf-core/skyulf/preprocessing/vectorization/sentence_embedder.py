@@ -100,6 +100,16 @@ def _embedding_dimension(model: Any) -> int:
 # ── Apply ─────────────────────────────────────────────────────────────────────
 
 
+def _encode_text(
+    text: list[str], model_name: str, normalize: bool, output_width: int
+) -> np.ndarray:
+    """Keep the fitted embedding width for empty partitions without loading model weights."""
+    if not text:
+        return np.empty((0, output_width), dtype=np.float32)
+    model = _load_model(model_name)
+    return model.encode(text, normalize_embeddings=normalize, show_progress_bar=False)
+
+
 def _embed_apply_pandas(
     X: pd.DataFrame, y: Any, params: dict[str, Any]
 ) -> tuple[pd.DataFrame, Any]:
@@ -114,9 +124,8 @@ def _embed_apply_pandas(
     if not valid_cols or not output_columns:
         return X, y
 
-    model = _load_model(model_name)
     text = _join_text_columns(X, valid_cols).tolist()
-    embeddings = model.encode(text, normalize_embeddings=normalize, show_progress_bar=False)
+    embeddings = _encode_text(text, model_name, normalize, len(output_columns))
 
     emb_df = pd.DataFrame(
         embeddings,
@@ -148,10 +157,7 @@ def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     if text is None:
         return None
 
-    model = _load_model(model_name)
-    embeddings = model.encode(
-        text.to_list(), normalize_embeddings=normalize, show_progress_bar=False
-    )
+    embeddings = _encode_text(text.to_list(), model_name, normalize, len(output_columns))
     emb_frame = pl.from_numpy(np.asarray(embeddings), schema=output_columns)
     return _drop_and_concat_polars(X, emb_frame, valid_cols, drop_original)
 

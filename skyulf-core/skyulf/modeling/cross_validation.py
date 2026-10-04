@@ -1,5 +1,7 @@
 """Cross-validation logic for V2 modeling."""
 
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable
 from datetime import date, datetime
@@ -15,19 +17,23 @@ from sklearn.model_selection import (
     TimeSeriesSplit,
 )
 
+from ..data.coverage import transform_evaluation
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
+from ._cv_weights import fit_preprocessor
 
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
     from .fold_preprocessing import FoldPreprocessor
 
+from ._cv_weights import preflight_weights, prepare_weights, take_weights, weight_kwargs
 from ._evaluation.common import sanitize_metrics
 from ._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+from ._sample_weights import SampleWeightError
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +41,7 @@ logger = logging.getLogger(__name__)
 def _aggregate_single_metric(
     key: str, fold_metrics: list[dict[str, float]]
 ) -> dict[str, float] | None:
-    """Aggregates one metric's values across folds into mean/std/min/max, dropping non-finite values."""
+    """Aggregate finite values and expose valid versus total fold counts."""
     values = [m.get(key, np.nan) for m in fold_metrics]
     # Filter nans
     values = [v for v in values if np.isfinite(v)]
@@ -47,6 +53,8 @@ def _aggregate_single_metric(
         "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
         "min": float(np.min(values)),
         "max": float(np.max(values)),
+        "valid_folds": len(values),
+        "total_folds": len(fold_metrics),
     }
 
 
@@ -73,9 +81,14 @@ def _aggregate_metrics(
     return aggregated
 
 
+def _indexable_target(y: Any) -> Any:
+    """Convert Python targets once before positional indexing, retaining native series types."""
+    return np.asarray(y) if isinstance(y, (list, tuple)) else y
+
+
 def perform_cross_validation(
-    calculator: "BaseModelCalculator",
-    applier: "BaseModelApplier",
+    calculator: BaseModelCalculator,
+    applier: BaseModelApplier,
     X: pd.DataFrame | SkyulfDataFrame,
     y: pd.Series | Any,
     config: dict[str, Any],
@@ -86,11 +99,20 @@ def perform_cross_validation(
     time_column: str | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
+    *,
+    cv_nested_type: str = "auto",
+    group_column: str | None = None,
+    gap: int = 0,
+    test_size: int | None = None,
+    max_train_size: int | None = None,
+    inner_folds: int | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Performs K-Fold cross-validation.
 
     Args:
+        sample_weight: Optional positional training weights; held-out metrics stay unweighted.
         calculator: The model calculator (fit logic).
         applier: The model applier (predict logic).
         X: Features.
@@ -101,6 +123,12 @@ def perform_cross_validation(
         shuffle: Whether to shuffle data before splitting (for KFold/Stratified).
         random_state: Random seed for shuffling.
         time_column: Optional column name for sorting when using time_series_split.
+        cv_nested_type: Explicit nested split policy; auto retains task defaults.
+        group_column: Split-only entity identifier excluded from model features.
+        gap: Number of omitted rows between temporal training and validation.
+        test_size: Optional row count per temporal validation fold.
+        max_train_size: Optional rolling training window row limit.
+        inner_folds: Optional fold count for explicit nested policies.
         progress_callback: Optional callback(current_fold, total_folds).
         log_callback: Optional callback for logging messages.
         preprocessing: Optional per-fold preprocessor (F-15). When given, it is
@@ -111,6 +139,44 @@ def perform_cross_validation(
     Returns:
         Dict containing aggregated metrics and per-fold details.
     """
+    from ._policy_cv import (  # noqa: PLC0415 - avoid tuning import cycle
+        perform_policy_cv,
+        policy_config,
+    )
+    from ._tuning.cv_policy import (  # noqa: PLC0415 - avoid tuning import cycle
+        uses_explicit_policy,
+    )
+    from ._tuning.history_policy import has_temporal_history  # noqa: PLC0415 - tuning import cycle
+
+    sample_weight = prepare_weights(sample_weight, len(X), preprocessing)
+    policy = policy_config(
+        cv_type,
+        n_folds,
+        shuffle,
+        random_state,
+        time_column,
+        {
+            "cv_nested_type": cv_nested_type,
+            "group_column": group_column,
+            "gap": gap,
+            "test_size": test_size,
+            "max_train_size": max_train_size,
+            "inner_folds": inner_folds,
+        },
+    )
+    if uses_explicit_policy(policy) or has_temporal_history(preprocessing):
+        return perform_policy_cv(
+            calculator,
+            X,
+            y,
+            config,
+            policy,
+            preprocessing,
+            log_callback,
+            progress_callback,
+            sample_weight,
+        )
+    y = _indexable_target(y)
     problem_type = calculator.problem_type
 
     if log_callback:
@@ -120,7 +186,8 @@ def perform_cross_validation(
     # DataFrame-like X (pandas or Polars); a plain array has no columns to
     # sort/drop by, so time_series_split relies on the caller's row order.
     if cv_type == "time_series_split" and hasattr(X, "columns"):
-        X, y = _sort_by_time(X, y, time_column, log_callback, logger)
+        X, y, positions = _sort_by_time(X, y, time_column, log_callback, logger, True)
+        sample_weight = take_weights(sample_weight, positions)
 
     # Handle nested CV separately
     if cv_type == "nested_cv":
@@ -136,6 +203,7 @@ def perform_cross_validation(
             progress_callback=progress_callback,
             log_callback=log_callback,
             preprocessing=preprocessing,
+            sample_weight=sample_weight,
         )
 
     # 1. Setup Splitter (delegates to _build_splitter so unknown cv_type
@@ -153,6 +221,7 @@ def perform_cross_validation(
     # Ensure numpy for splitting using the Bridge
     X_arr, y_arr = SklearnBridge.to_sklearn((X, y))
 
+    preflight_weights(sample_weight, splitter, X_arr, y_arr)
     # 2. Iterate Folds
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
         fold_results.append(
@@ -169,6 +238,7 @@ def perform_cross_validation(
                 progress_callback=progress_callback,
                 log_callback=log_callback,
                 preprocessing=preprocessing,
+                sample_weight=sample_weight,
             )
         )
 
@@ -216,25 +286,30 @@ def _slice_fold_data(X: Any, y: Any, train_idx: Any, val_idx: Any) -> tuple[Any,
 
 
 def _apply_fold_preprocessing(
-    preprocessing: "FoldPreprocessor | None",
+    preprocessing: FoldPreprocessor | None,
     X_train: Any,
     y_train: Any,
     X_val: Any,
     y_val: Any,
-) -> tuple[Any, Any, Any, Any]:
+    sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
+) -> tuple[Any, Any, Any, Any, Any]:
     """Re-fit preprocessing on this fold's training rows and apply it to the held-out rows.
 
     No-op when ``preprocessing`` is None (data already transformed by caller).
     """
-    if preprocessing is None:
-        return X_train, y_train, X_val, y_val
-    X_train, y_train = preprocessing.fit_transform(X_train, y_train)
-    X_val, y_val = preprocessing.transform(X_val, y_val)
-    return X_train, y_train, X_val, y_val
+    if preprocessing is not None:
+        X_train, y_train, sample_weight = fit_preprocessor(
+            preprocessing, X_train, y_train, sample_weight
+        )
+    X_val, y_val, _coverage = transform_evaluation(
+        preprocessing, X_val, y_val, coverage_out=evaluation_coverage
+    )
+    return X_train, y_train, X_val, y_val, sample_weight
 
 
 def _run_cv_fold(
-    calculator: "BaseModelCalculator",
+    calculator: BaseModelCalculator,
     X: Any,
     y: Any,
     train_idx: Any,
@@ -245,7 +320,8 @@ def _run_cv_fold(
     n_folds: int,
     progress_callback: Callable[[int, int], None] | None,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Fit and evaluate a single CV fold, reporting progress/logging, and return its result entry."""
     if progress_callback:
@@ -254,13 +330,23 @@ def _run_cv_fold(
     if log_callback:
         log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
 
+    sample_weight = take_weights(sample_weight, train_idx)
+    coverage: dict[str, Any] = {}
     X_train_fold, X_val_fold, y_train_fold, y_val_fold = _slice_fold_data(X, y, train_idx, val_idx)
-    X_train_fold, y_train_fold, X_val_fold, y_val_fold = _apply_fold_preprocessing(
-        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold
+    X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight = _apply_fold_preprocessing(
+        preprocessing,
+        X_train_fold,
+        y_train_fold,
+        X_val_fold,
+        y_val_fold,
+        sample_weight,
+        evaluation_coverage=coverage,
     )
 
     # Fit
-    model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
+    model_artifact = calculator.fit(
+        X_train_fold, y_train_fold, config, **weight_kwargs(sample_weight)
+    )
 
     # Evaluate
     if problem_type == "classification":
@@ -277,6 +363,7 @@ def _run_cv_fold(
     return {
         "fold": fold_idx + 1,
         "metrics": sanitize_metrics(metrics),
+        "evaluation_coverage": coverage,
         # We could store predictions here if needed, but might be too heavy
     }
 
@@ -324,7 +411,7 @@ def _auto_detect_sort_column(
     return sort_col
 
 
-def _sort_polars_by_column(X: Any, y: Any, sort_col: str) -> tuple:
+def _sort_polars_by_column(X: Any, y: Any, sort_col: str, return_positions: bool = False) -> tuple:
     """Stably sort a Polars X/y pair, keeping missing dates last and dropping the time key."""
     y_series = y if isinstance(y, pl.Series) else pl.Series(getattr(y, "name", None), y)
     if len(y_series) != len(X):
@@ -337,10 +424,11 @@ def _sort_polars_by_column(X: Any, y: Any, sort_col: str) -> tuple:
         .select(pl.arg_sort_by(sort_col, nulls_last=True, maintain_order=True))
         .to_series()
     )
-    return X[sort_order].drop(sort_col), y_series.gather(sort_order)
+    result = (X[sort_order].drop(sort_col), y_series.gather(sort_order))
+    return (*result, sort_order.to_numpy()) if return_positions else result
 
 
-def _sort_pandas_by_column(X: Any, y: Any, sort_col: str) -> tuple:
+def _sort_pandas_by_column(X: Any, y: Any, sort_col: str, return_positions: bool = False) -> tuple:
     """Stably sort a pandas X/y pair, keeping missing dates last and dropping the time key."""
     if len(y) != len(X):
         raise ValueError("X and y must contain the same number of rows for time-series sorting.")
@@ -361,7 +449,7 @@ def _sort_pandas_by_column(X: Any, y: Any, sort_col: str) -> tuple:
         y = y[sort_order]
     # Drop the time column from features so it doesn't leak into the model
     X = X.drop(columns=[sort_col])
-    return X, y
+    return (X, y, sort_order) if return_positions else (X, y)
 
 
 def _log_time_sort_message(
@@ -379,6 +467,7 @@ def _sort_by_time(
     time_column: str | None,
     log_callback: Callable[[str], None] | None,
     logger: Any,
+    return_positions: bool = False,
 ) -> tuple:
     """Sort X and y by a time column for Time Series Split.
 
@@ -391,6 +480,7 @@ def _sort_by_time(
     sorting AND never dropped the time column from features, leaking it
     directly into training.
     """
+    positions = np.arange(len(X))
     is_polars = get_engine(X).name == EngineName.POLARS
 
     sort_col = time_column
@@ -399,9 +489,9 @@ def _sort_by_time(
 
     if sort_col and sort_col in X.columns:
         if is_polars:
-            X, y = _sort_polars_by_column(X, y, sort_col)
+            X, y, positions = _sort_polars_by_column(X, y, sort_col, True)
         else:
-            X, y = _sort_pandas_by_column(X, y, sort_col)
+            X, y, positions = _sort_pandas_by_column(X, y, sort_col, True)
         _log_time_sort_message(
             f"Time Series CV: data sorted by '{sort_col}'.", "info", log_callback, logger
         )
@@ -420,7 +510,7 @@ def _sort_by_time(
             logger,
         )
 
-    return X, y
+    return (X, y, positions) if return_positions else (X, y)
 
 
 def _log_splitter_fallback(cv_type: str, problem_type: str, logger: Any) -> None:
@@ -500,7 +590,7 @@ def _score_metrics_for_problem(
 
 
 def _run_inner_cv(
-    calculator: "BaseModelCalculator",
+    calculator: BaseModelCalculator,
     X_train_fold: Any,
     y_train_fold: Any,
     config: dict[str, Any],
@@ -510,7 +600,8 @@ def _run_inner_cv(
     random_state: int,
     logger: Any,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
+    sample_weight: Any = None,
 ) -> float:
     """Run the inner CV diagnostic loop and return the mean inner score (NaN if none valid).
 
@@ -524,22 +615,37 @@ def _run_inner_cv(
     key_metric = "accuracy" if problem_type == "classification" else "r2"
 
     X_train_arr, y_train_arr = SklearnBridge.to_sklearn((X_train_fold, y_train_fold))
+    preflight_weights(sample_weight, inner_splitter, X_train_arr, y_train_arr)
     inner_scores: list[float] = []
     for inner_train_idx, inner_val_idx in inner_splitter.split(X_train_arr, y_train_arr):
         X_inner_train = _slice_by_index(X_train_fold, inner_train_idx)
         X_inner_val = _slice_by_index(X_train_fold, inner_val_idx)
         y_inner_train = _slice_by_index(y_train_fold, inner_train_idx)
         y_inner_val = _slice_by_index(y_train_fold, inner_val_idx)
-        X_inner_train, y_inner_train, X_inner_val, y_inner_val = _apply_fold_preprocessing(
-            preprocessing, X_inner_train, y_inner_train, X_inner_val, y_inner_val
+        X_inner_train, y_inner_train, X_inner_val, y_inner_val, inner_weight = (
+            _apply_fold_preprocessing(
+                preprocessing,
+                X_inner_train,
+                y_inner_train,
+                X_inner_val,
+                y_inner_val,
+                take_weights(sample_weight, inner_train_idx),
+            )
         )
 
         try:
-            inner_artifact = calculator.fit(X_inner_train, y_inner_train, config)
+            inner_artifact = calculator.fit(
+                X_inner_train,
+                y_inner_train,
+                config,
+                **weight_kwargs(inner_weight),
+            )
             inner_metrics = _score_metrics_for_problem(
                 inner_artifact, X_inner_val, y_inner_val, problem_type
             )
             inner_scores.append(inner_metrics.get(key_metric, 0.0))
+        except SampleWeightError:
+            raise
         except Exception as e:  # noqa: BLE001 - inner-fold failure becomes NaN, not fatal; logged
             logger.warning(f"Inner fold failed: {e}")
             if log_callback:
@@ -555,7 +661,7 @@ def _run_inner_cv(
 
 
 def _evaluate_outer_fold(
-    calculator: "BaseModelCalculator",
+    calculator: BaseModelCalculator,
     X_train_fold: Any,
     y_train_fold: Any,
     X_val_fold: Any,
@@ -565,13 +671,23 @@ def _evaluate_outer_fold(
     fold_idx: int,
     inner_mean: float,
     log_callback: Callable[[str], None] | None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Fit on the outer training fold, evaluate on the outer validation fold, and log."""
-    X_train_fold, y_train_fold, X_val_fold, y_val_fold = _apply_fold_preprocessing(
-        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold
+    coverage: dict[str, Any] = {}
+    X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight = _apply_fold_preprocessing(
+        preprocessing,
+        X_train_fold,
+        y_train_fold,
+        X_val_fold,
+        y_val_fold,
+        sample_weight,
+        evaluation_coverage=coverage,
     )
-    model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
+    model_artifact = calculator.fit(
+        X_train_fold, y_train_fold, config, **weight_kwargs(sample_weight)
+    )
     metrics = _score_metrics_for_problem(model_artifact, X_val_fold, y_val_fold, problem_type)
 
     if log_callback:
@@ -587,12 +703,13 @@ def _evaluate_outer_fold(
         # None (not NaN) when every inner fold failed, for JSON-safety
         # parity with sanitize_metrics' non-finite-value handling.
         "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
+        "evaluation_coverage": coverage,
     }
 
 
 def _perform_nested_cv(
-    calculator: "BaseModelCalculator",
-    applier: "BaseModelApplier",
+    calculator: BaseModelCalculator,
+    applier: BaseModelApplier,
     X: pd.DataFrame | SkyulfDataFrame,
     y: pd.Series | Any,
     config: dict[str, Any],
@@ -601,7 +718,8 @@ def _perform_nested_cv(
     random_state: int = DEFAULT_RANDOM_STATE,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
-    preprocessing: "FoldPreprocessor | None" = None,
+    preprocessing: FoldPreprocessor | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Performs nested cross-validation with an outer loop for generalization.
 
@@ -627,6 +745,17 @@ def _perform_nested_cv(
 
     X_arr, y_arr = SklearnBridge.to_sklearn((X, y))
 
+    preflight_weights(sample_weight, outer_splitter, X_arr, y_arr)
+    _preflight_nested_weights(
+        sample_weight,
+        outer_splitter,
+        X_arr,
+        y_arr,
+        problem_type,
+        inner_folds,
+        shuffle,
+        random_state,
+    )
     fold_results: list[dict[str, Any]] = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(outer_splitter.split(X_arr, y_arr)):
@@ -655,6 +784,7 @@ def _perform_nested_cv(
             logger,
             log_callback,
             preprocessing,
+            take_weights(sample_weight, train_idx),
         )
 
         # --- Outer evaluation: train on full outer train, evaluate on outer val ---
@@ -671,6 +801,7 @@ def _perform_nested_cv(
                 inner_mean,
                 log_callback,
                 preprocessing,
+                take_weights(sample_weight, train_idx),
             )
         )
 
@@ -692,3 +823,21 @@ def _perform_nested_cv(
             "random_state": random_state,
         },
     }
+
+
+def _preflight_nested_weights(
+    weights: Any,
+    outer: Any,
+    X: Any,
+    y: Any,
+    problem_type: str,
+    folds: int,
+    shuffle: bool,
+    seed: int,
+) -> None:
+    """Reject every inner training subset before legacy nested diagnostics learn."""
+    if weights is None:
+        return
+    for train, _ in outer.split(X, y):
+        inner = _build_kfold_splitter(problem_type, folds, shuffle, seed)
+        preflight_weights(take_weights(weights, train), inner, X[train], y[train])

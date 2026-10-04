@@ -1,0 +1,632 @@
+{
+  "event_column": {
+    "order": 32,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Column containing when each record was observed, e.g. observation_date; used to select older/newer data",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "full_snapshot"
+            }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "auto"
+                }
+              }
+            },
+            {
+              "properties": {
+                "split_strategy": {
+                  "const": "random"
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "nested_cv"
+                      },
+                      "cv_nested_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_enabled": {
+                            "const": "true"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "training_layout": {
+                            "const": "model_competition"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "event_time_kind": {
+    "order": 33,
+    "type": "string",
+    "default": "timestamp",
+    "description": "1. Data | How is this column stored? timestamp = database timestamp representing an instant; local_timestamp = database date/time without timezone; date = day only; text = a string. Choose yourself; setup does not inspect the table",
+    "enum": [
+      "timestamp",
+      "local_timestamp",
+      "date",
+      "text"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "full_snapshot"
+            }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "auto"
+                }
+              }
+            },
+            {
+              "properties": {
+                "split_strategy": {
+                  "const": "random"
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "cv_type": {
+                        "const": "nested_cv"
+                      },
+                      "cv_nested_type": {
+                        "const": "time_series_split"
+                      }
+                    }
+                  }
+                ],
+                "allOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_enabled": {
+                            "const": "true"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "training_layout": {
+                            "const": "model_competition"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "event_text_kind": {
+    "order": 34,
+    "type": "string",
+    "default": "local_datetime",
+    "description": "1. Data | What does the date text contain? offset_datetime = date/time with Z or +02:00; local_datetime = date/time without an offset; date = only a day, e.g. 2026-08-10",
+    "enum": [
+      "offset_datetime",
+      "local_datetime",
+      "date"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "full_snapshot"
+                }
+              }
+            },
+            {
+              "allOf": [
+                {
+                  "properties": {
+                    "training_window_mode": {
+                      "const": "auto"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "split_strategy": {
+                      "const": "random"
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "nested_cv"
+                          },
+                          "cv_nested_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      }
+                    ],
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "cv_enabled": {
+                                "const": "true"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "training_layout": {
+                                "const": "model_competition"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "properties": {
+              "event_time_kind": {
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "event_time_format": {
+    "type": "string",
+    "default": "",
+    "description": "1. Data | How should this date text be read? Example: 10/08/2026 14:30 -> %d/%m/%Y %H:%M; 2026-08-10 -> %Y-%m-%d; 2026-08-10T14:30:00+02:00 -> %Y-%m-%dT%H:%M:%S%z",
+    "pattern": "^[%A-Za-z0-9 /:.,+\\-]*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "full_snapshot"
+                }
+              }
+            },
+            {
+              "allOf": [
+                {
+                  "properties": {
+                    "training_window_mode": {
+                      "const": "auto"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "split_strategy": {
+                      "const": "random"
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "nested_cv"
+                          },
+                          "cv_nested_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      }
+                    ],
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "cv_enabled": {
+                                "const": "true"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "training_layout": {
+                                "const": "model_competition"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "properties": {
+              "event_time_kind": {
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "order": 35
+  },
+  "event_time_timezone": {
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Which location does this clock/date belong to? Enter e.g. Europe/Copenhagen or UTC",
+    "pattern": "^(?:[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*)?$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "full_snapshot"
+                }
+              }
+            },
+            {
+              "allOf": [
+                {
+                  "properties": {
+                    "training_window_mode": {
+                      "const": "auto"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "split_strategy": {
+                      "const": "random"
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "nested_cv"
+                          },
+                          "cv_nested_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      }
+                    ],
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "cv_enabled": {
+                                "const": "true"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "training_layout": {
+                                "const": "model_competition"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "event_time_kind": {
+                    "enum": [
+                      "local_timestamp",
+                      "date"
+                    ]
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "event_time_kind": {
+                        "enum": [
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "event_text_kind": {
+                        "enum": [
+                          "local_datetime",
+                          "date"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "order": 36
+  },
+  "event_date_only": {
+    "type": "string",
+    "default": "reject",
+    "description": "1. Data | This column has a day but no time. May we treat it as the start of that day? midnight = yes, 00:00 in your chosen timezone; reject = stop if such a value is encountered",
+    "enum": [
+      "reject",
+      "midnight"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "training_window_mode": {
+                  "const": "full_snapshot"
+                }
+              }
+            },
+            {
+              "allOf": [
+                {
+                  "properties": {
+                    "training_window_mode": {
+                      "const": "auto"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "split_strategy": {
+                      "const": "random"
+                    }
+                  },
+                  "not": {
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      },
+                      {
+                        "properties": {
+                          "cv_type": {
+                            "const": "nested_cv"
+                          },
+                          "cv_nested_type": {
+                            "const": "time_series_split"
+                          }
+                        }
+                      }
+                    ],
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "cv_enabled": {
+                                "const": "true"
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "training_layout": {
+                                "const": "model_competition"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "not": {
+            "anyOf": [
+              {
+                "properties": {
+                  "event_time_kind": {
+                    "enum": [
+                      "date"
+                    ]
+                  }
+                }
+              },
+              {
+                "allOf": [
+                  {
+                    "properties": {
+                      "event_time_kind": {
+                        "enum": [
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "event_text_kind": {
+                        "enum": [
+                          "date"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "order": 37
+  }
+}

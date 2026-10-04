@@ -6,6 +6,7 @@ estimators without depending on the orchestrator.
 """
 
 import inspect
+from copy import deepcopy
 from dataclasses import replace
 from typing import Any
 
@@ -122,9 +123,14 @@ def instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
     (unless it accepts ``**kwargs``); nested keys — e.g. an ensemble's
     ``random_forest__n_estimators`` — are applied afterwards via
     ``set_params`` because sklearn estimators only accept them that way.
+    Accepted parameter objects are copied, retaining fitted estimator state
+    without allowing nested updates or later fitting to modify caller defaults.
     """
     flat, nested = split_flat_and_nested_params(params)
-    flat = filter_params_to_signature(model_class, flat)
+    constructor = filter_params_to_signature(model_class, flat)
+    replacements = {key: value for key, value in flat.items() if key not in constructor}
+    memo: dict[int, Any] = {}
+    flat = deepcopy(constructor, memo)
 
     # LogisticRegression-only: sklearn >=1.8 deprecates the ``penalty``
     # constructor arg. The tuning engine builds estimators directly
@@ -138,8 +144,14 @@ def instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
         flat = normalize_logistic_regression_params(flat)
 
     model = model_class(**flat)
+    # Named ensemble children are set_params keys, not constructor arguments.
+    get_params = getattr(model, "get_params", None)
+    supported = get_params(deep=True) if replacements and callable(get_params) else {}
+    replacements = {key: value for key, value in replacements.items() if key in supported}
+    if replacements:
+        model.set_params(**deepcopy(replacements, memo))
     if nested:
-        model.set_params(**nested)
+        model.set_params(**deepcopy(nested, memo))
     return model
 
 

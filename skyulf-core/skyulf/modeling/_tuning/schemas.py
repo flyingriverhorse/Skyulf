@@ -21,7 +21,13 @@ class TuningConfig:
     cv_enabled: bool = True
     cv_folds: int = 5
     cv_type: Literal[
-        "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        "k_fold",
+        "stratified_k_fold",
+        "time_series_split",
+        "shuffle_split",
+        "nested_cv",
+        "group_k_fold",
+        "stratified_group_k_fold",
     ] = "k_fold"
     cv_shuffle: bool = True
     cv_random_state: int = DEFAULT_RANDOM_STATE
@@ -45,6 +51,11 @@ class TuningConfig:
     # default decision rule.
     tune_threshold: bool = False
     cv_inner_folds: int | None = None
+    cv_nested_type: str = "auto"
+    cv_group_column: str | None = None
+    cv_gap: int = 0
+    cv_test_size: int | None = None
+    cv_max_train_size: int | None = None
 
 
 @dataclass
@@ -67,3 +78,4 @@ class TuningResult:
     # Independent outer-fold evaluation of the complete search procedure.
     # best_score/trials above still describe the final full-training search.
     nested_cv: dict[str, Any] | None = None
+    excluded_feature_columns: list[str] = field(default_factory=list)

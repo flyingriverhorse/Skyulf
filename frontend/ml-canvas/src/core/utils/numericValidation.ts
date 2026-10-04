@@ -1,3 +1,4 @@
+import { requiresExplicitCVTimeColumn } from './cvPolicy';
 import type { ValidationResult } from '../types/nodes';
 
 /** Preserve an invalid draft as NaN so validation blocks Run instead of truncating it. */
@@ -26,10 +27,11 @@ export function modelNumericIssue(config: object): ValidationResult | undefined 
   if (data.cv_enabled !== false) checks.push(numericIssue('cv_folds', data.cv_folds, 2, true));
   if (data.cv_enabled !== false && data.cv_type === 'nested_cv') {
     checks.push(numericIssue('cv_inner_folds', data.cv_inner_folds, 2, true));
-    if (data.tune_threshold === true) checks.push({ isValid: false, field: 'tune_threshold', message: 'Disable threshold tuning when using nested CV.' });
+
   }
   if (data.strategy === 'stacking') checks.push(numericIssue('cv', data.cv, 2, true));
   if (data.task === 'classification' && data.calibrate_base_models === true) checks.push(numericIssue('calibration_cv', data.calibration_cv, 2, true));
+  checks.push(cvPolicyIssue(data));
   checks.push(parallelJobsIssue(data));
   checks.push(...randomStateIssues(data));
   checks.push(searchSpaceIssue(data));
@@ -76,4 +78,18 @@ export function modelThresholdValid(value: unknown): boolean {
   if (/^(mean|median)$/.test(text)) return true;
   const expression = /^(.+)\*\s*(mean|median)$/.exec(text);
   return expression !== null && expression[1]!.trim() !== '' && Number.isFinite(Number(expression[1]));
+}
+
+/** Validate consumed temporal windows and required split metadata. */
+function cvPolicyIssue(data: Record<string, unknown>): ValidationResult | undefined {
+  if (data.cv_enabled === false) return;
+  const policy = data.cv_type === 'nested_cv' ? data.cv_nested_type : data.cv_type;
+  if (['group_k_fold', 'stratified_group_k_fold'].includes(String(policy)) && !data.cv_group_column) {
+    return { isValid: false, field: 'cv_group_column', message: 'Select a group column for group-isolated CV.' };
+  }
+  if (policy !== 'time_series_split') return;
+  if (requiresExplicitCVTimeColumn(data) && !data.cv_time_column) return { isValid: false, field: 'cv_time_column', message: 'Select a time column for temporal CV with nested folds or custom windows.' };
+  if (data.cv_shuffle !== false) return { isValid: false, field: 'cv_shuffle', message: 'Disable shuffling for temporal CV.' };
+  return [numericIssue('cv_gap', data.cv_gap, 0, true),
+    ...['cv_test_size', 'cv_max_train_size'].map(field => data[field] == null ? undefined : numericIssue(field, data[field], 1, true))].find(Boolean);
 }

@@ -7,6 +7,19 @@ vi.mock('../../../core/hooks/useDatasetSchema', () => ({ useDatasetSchema: () =>
 vi.mock('../../../core/hooks/useUpstreamDroppedColumns', () => ({ useUpstreamDroppedColumns: () => new Set() }));
 vi.mock('../../../core/hooks/useIsWideContainer', () => ({ useIsWideContainer: () => [null, false] }));
 
+/** Carry mode needs explicit time ordering and must preserve prediction row counts. */
+it('selects causal history and rejects missing clocks or row dropping', () => {
+  const config = { ...TimeSeriesNode.getDefaultConfig(), columns: ['value'] };
+  const onChange = vi.fn();
+  const Settings = TimeSeriesNode.settings!;
+  render(<Settings config={config} onChange={onChange} />);
+  fireEvent.change(screen.getByLabelText('Prediction history'), { target: { value: 'carry' } });
+  expect(onChange).toHaveBeenLastCalledWith({ ...config, history_mode: 'carry', drop_na: false });
+  expect(TimeSeriesNode.validate({ ...config, history_mode: 'carry' })).toMatchObject({ isValid: false, field: 'sort_by' });
+  expect(TimeSeriesNode.validate({ ...config, history_mode: 'carry', sort_by: 'time', drop_na: true })).toMatchObject({ isValid: false, field: 'drop_na' });
+  expect(TimeSeriesNode.validate({ ...config, history_mode: 'carry', sort_by: 'time' })).toEqual({ isValid: true });
+});
+
 /** Missing columns take precedence over method-specific errors, which keep their exact field and message. */
 it.each([
   { method: 'lag' as const, field: 'lags', message: 'Provide at least one lag value' },

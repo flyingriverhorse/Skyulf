@@ -131,6 +131,7 @@ export function AdvancedTuningOptions({ config, update, nodeId }: { config: Ense
         </span>
       </label>
 
+      <ThresholdOption config={config} update={update} />
       {showStrategyModal && (
         <StrategySettingsModal
           isOpen={showStrategyModal}
@@ -144,4 +145,12 @@ export function AdvancedTuningOptions({ config, update, nodeId }: { config: Ense
       )}
     </div>
   );
+}
+
+/** Nested thresholds use inner OOF predictions, while ordinary tuning uses validation. */
+function ThresholdOption({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  if (config.task !== 'classification') return null;
+  return <label className="flex gap-2 text-xs text-gray-600 dark:text-gray-400"><input type="checkbox" checked={config.tune_threshold ?? false}
+    onChange={e => update({ tune_threshold: e.target.checked })} />
+    <span>Tune decision threshold (binary probabilities required). Nested CV uses training-only out-of-fold predictions.</span></label>;
 }

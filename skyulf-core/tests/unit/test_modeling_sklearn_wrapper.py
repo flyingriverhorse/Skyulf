@@ -9,6 +9,7 @@ import pytest
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.svm import SVC
 
+from skyulf.core.schema import SchemaMismatchError
 from skyulf.modeling.sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 
@@ -19,6 +20,21 @@ def clf_data():
     X = pd.DataFrame({"f1": rng.normal(0, 1, 40), "f2": rng.normal(0, 1, 40)})
     y = pd.Series((X["f1"] + X["f2"] > 0).astype(int))
     return X, y
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("method", ["predict", "predict_proba"])
+@pytest.mark.parametrize("change", ["reorder", "rename"])
+def test_applier_rejects_changed_feature_contract(clf_data, engine, method, change):
+    """NumPy conversion must not silently reinterpret renamed or swapped features."""
+    X, y = clf_data
+    training = pl.from_pandas(X) if engine == "polars" else X
+    model = SklearnCalculator(LogisticRegression, {}, "classification").fit(training, y, {})
+    changed = X[["f2", "f1"]] if change == "reorder" else X.rename(columns={"f2": "other"})
+    inference = pl.from_pandas(changed) if engine == "polars" else changed
+
+    with pytest.raises(SchemaMismatchError):
+        getattr(SklearnApplier(), method)(inference, model)
 
 
 def test_fit_logs_via_log_callback(clf_data):

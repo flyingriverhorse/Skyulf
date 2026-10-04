@@ -22,9 +22,11 @@ from typing import Any, Literal, cast
 import pandas as pd
 import polars as pl
 
+from skyulf.integrations.databricks._local_frames import frame_bytes
+
 from ...data.dataset import SplitDataset
 from ...inference.local_evaluation import evaluate_local_holdout
-from ...inference.project_code import is_registered_project_step
+from ...inference.project_code import is_project_filter_step
 from ...leakage import step_learns_from_data
 from ...preprocessing.split import DataSplitter
 from ...registry import NodeRegistry
@@ -39,9 +41,11 @@ from ..mlflow.validation import (
     validate_quality_policy,
 )
 from ._contracts import column_name, table_name
-from .local_batch import _frame_bytes, fit_local_workflow
+from .decision_thresholds import threshold_policy
+from .evaluation_chart_data import chart_recorder, chart_settings
+from .local_batch import fit_local_workflow
 from .local_cv import CV_FIELDS, LocalCVSpec, evaluate_training_cv
-from .local_explanations import explain_training_artifact, validate_explanation_config
+from .local_explanations import log_training_explanations, validate_explanation_config
 from .local_pre_split import (
     FIXED_TYPES,
     custom_filter_columns,
@@ -51,8 +55,18 @@ from .local_pre_split import (
     target_contract,
 )
 from .local_search import base_model_config, prepare_search_pipeline
-from .local_search_results import post_selection_cv, tuning_evidence, validate_search_membership
+from .local_search_results import (
+    post_selection_cv,
+    tuning_evidence,
+    tuning_run_params,
+    validate_search_membership,
+)
 from .local_training_evidence import build_training_evidence, evidence_digest
+from .local_weights import (
+    extract_training_weights,
+    training_weight_evidence,
+    validate_weight_snapshot,
+)
 from .training_dates import (
     TrainingDateSpec,
     instant_from_microseconds,
@@ -61,6 +75,7 @@ from .training_dates import (
     parse_training_date,
     training_date_spec,
 )
+from .training_parameters import log_training_parameters
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -82,7 +97,13 @@ class LocalTrainingSpec:
     holdout_start: datetime | None = None
     cutoff: datetime | None = None
     event_column: str | None = None
+    group_column: str | None = None
+    weight_column: str | None = None
+    reserved_weight_columns: tuple[str, ...] = ()
+    weights_python_source: str | None = None
+    weights_python_sha256: str | None = None
     filter_unavailable_results: bool = False
+    drop_missing_labels: bool = False
     result_available_at_column: str | None = None
     result_cutoff: datetime | None = None
     event_time_parsing: TrainingDateSpec = TrainingDateSpec()
@@ -109,6 +130,7 @@ class LocalTrainingSpec:
             values[field] = None if value is None else datetime.fromisoformat(value)
         for field in ("record_key_columns", "input_columns"):
             values[field] = tuple(values[field])
+        values["reserved_weight_columns"] = tuple(values.get("reserved_weight_columns", ()))
         values["pre_split_steps"] = tuple(values.get("pre_split_steps", ()))
         for field in ("event_time_parsing", "result_time_parsing"):
             values[field] = training_date_spec(values[field])
@@ -124,16 +146,22 @@ class LocalTrainingSpec:
             raise ValueError("version must be a nonnegative Delta snapshot version.")
         if self.split_strategy not in ("random", "temporal"):
             raise ValueError("split_strategy must be random or temporal.")
-        if type(self.filter_unavailable_results) is not bool:
-            raise ValueError("filter_unavailable_results must be boolean.")
+        self._validate_label_policy()
         if self.split_strategy == "random":
             self._validate_random_split()
         else:
             self._validate_temporal_split()
         self._validate_result_filter()
+        validate_weight_snapshot(asdict(self))
         self._validate_columns()
         self._validate_budgets_and_sampling()
         self._validate_evidence_digests()
+
+    def _validate_label_policy(self) -> None:
+        """Require explicit boolean values for both independent label eligibility policies."""
+        for field in ("filter_unavailable_results", "drop_missing_labels"):
+            if type(getattr(self, field)) is not bool:
+                raise ValueError(f"{field} must be boolean.")
 
     def _validate_random_split(self) -> None:
         """Check the random split and its optional event-selection window."""
@@ -183,7 +211,14 @@ class LocalTrainingSpec:
         _pre_split_columns(
             self.pre_split_steps,
             self.target_column,
-            (*self.record_key_columns, self.event_column, self.result_available_at_column),
+            (
+                *self.record_key_columns,
+                self.event_column,
+                self.result_available_at_column,
+                self.group_column,
+                self.weight_column,
+                *self.reserved_weight_columns,
+            ),
         )
         names = self.source_columns
         for name in names:
@@ -191,6 +226,7 @@ class LocalTrainingSpec:
         base_names = (
             *self.record_key_columns,
             self.event_column,
+            self.group_column,
             self.result_available_at_column,
             *self.input_columns,
             self.target_column,
@@ -234,16 +270,33 @@ class LocalTrainingSpec:
     @property
     def source_columns(self) -> tuple[str, ...]:
         """Project identities, active dates and model columns without inventing source fields."""
-        dates = tuple(
+        metadata_columns = tuple(
             name
-            for name in (self.event_column, self.result_available_at_column)
+            for name in (
+                self.event_column,
+                self.result_available_at_column,
+                self.group_column,
+                self.weight_column,
+            )
             if name is not None
         )
-        base = (*self.record_key_columns, *dates, *self.input_columns, self.target_column)
+        base = (
+            *self.record_key_columns,
+            *metadata_columns,
+            *self.input_columns,
+            self.target_column,
+        )
         extra = _pre_split_columns(
             self.pre_split_steps,
             self.target_column,
-            (*self.record_key_columns, self.event_column, self.result_available_at_column),
+            (
+                *self.record_key_columns,
+                self.event_column,
+                self.result_available_at_column,
+                self.group_column,
+                self.weight_column,
+                *self.reserved_weight_columns,
+            ),
         )
         return (
             *base,
@@ -254,6 +307,18 @@ class LocalTrainingSpec:
     def dataset_id(self) -> str:
         """Pin source, selection, split and seed independently of mutable driver limits."""
         settings = asdict(self)
+        if self.weight_column is None:
+            for field in (
+                "weight_column",
+                "reserved_weight_columns",
+                "weights_python_source",
+                "weights_python_sha256",
+            ):
+                settings.pop(field)
+        if not self.drop_missing_labels:
+            settings.pop("drop_missing_labels")
+        if self.group_column is None:
+            settings.pop("group_column")
         settings.pop("survivor_key_sha256")
         if not self.training_evidence_sha256:
             settings.pop("training_evidence_sha256")
@@ -341,12 +406,12 @@ def _pre_split_step_columns(
     raise ValueError(f"pre_split_steps[{index}] permits only fixed normalization or row filters.")
 
 
-def _validate_pre_split_step(
+def validate_pre_split_step(
     step: Any, index: int, target_column: str, protected: tuple[str | None, ...]
 ) -> tuple[str, ...] | list[str]:
     """Reject learned or malformed steps before accepting their source dependencies."""
     step_type, params = _pre_split_step_identity(step, index)
-    custom_filter = is_registered_project_step(step_type)
+    custom_filter = is_project_filter_step(step)
     if (
         step_type != "Deduplicate"
         and not custom_filter
@@ -370,7 +435,7 @@ def _pre_split_columns(
         raise ValueError("pre_split_steps must be an ordered sequence of Core steps.")
     columns: list[str] = []
     for index, step in enumerate(steps, 1):
-        columns.extend(_validate_pre_split_step(step, index, target_column, protected))
+        columns.extend(validate_pre_split_step(step, index, target_column, protected))
     for column in columns:
         column_name(column)
     return tuple(dict.fromkeys(columns))
@@ -412,7 +477,14 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
-        (*spec.record_key_columns, spec.event_column, spec.result_available_at_column),
+        (
+            *spec.record_key_columns,
+            spec.event_column,
+            spec.result_available_at_column,
+            spec.group_column,
+            spec.weight_column,
+            *spec.reserved_weight_columns,
+        ),
     )
     names = spec.source_columns
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
@@ -453,16 +525,12 @@ def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, 
     }
     _validate_sample_keys(source, keys, floating, F)
     source_rows = source.count()
-    if spec.filter_unavailable_results:
-        result = column_name(cast(str, spec.result_available_at_column))
-        if (
-            spec.event_column is not None
-            and source.where(f"{result} < {column_name(spec.event_column)}").limit(1).count()
-        ):
-            raise ValueError("Label availability precedes event time.")
-        cutoff = instant_microseconds(cast(datetime, spec.result_cutoff))
-        source = source.where(f"{result} IS NOT NULL AND {result} <= {cutoff}")
-    eligible_rows = source.count() if spec.filter_unavailable_results else source_rows
+    source = _eligible_training_source(source, spec, floating)
+    eligible_rows = (
+        source.count()
+        if spec.filter_unavailable_results or spec.drop_missing_labels
+        else source_rows
+    )
     _validate_sample_targets(source, spec, floating, F)
     # Struct field order, UTC timestamp rendering and the tie-break keys are
     # explicit so partition layout and Spark session timezone cannot change membership.
@@ -482,6 +550,26 @@ def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, 
         "eligible_rows": eligible_rows,
         "unavailable_labels": source_rows - eligible_rows,
     }
+
+
+def _eligible_training_source(source: Any, spec: LocalTrainingSpec, floating: set[str]) -> Any:
+    """Apply label time and missing-target policies before validating the sampling pool."""
+    if spec.filter_unavailable_results:
+        result = column_name(cast(str, spec.result_available_at_column))
+        if (
+            spec.event_column is not None
+            and source.where(f"{result} < {column_name(spec.event_column)}").limit(1).count()
+        ):
+            raise ValueError("Label availability precedes event time.")
+        cutoff = instant_microseconds(cast(datetime, spec.result_cutoff))
+        source = source.where(f"{result} IS NOT NULL AND {result} <= {cutoff}")
+    if spec.drop_missing_labels:
+        target = column_name(spec.target_column)
+        condition = f"{target} IS NOT NULL"
+        if spec.target_column in floating:
+            condition += f" AND NOT isnan({target})"
+        source = source.where(condition)
+    return source
 
 
 def _key_digest(frame: pd.DataFrame, keys: tuple[str, ...]) -> str:
@@ -544,6 +632,40 @@ def _validate_pre_split_survivors(
     )
 
 
+def apply_pre_split_step(
+    native: pd.DataFrame | pl.DataFrame,
+    step: dict[str, Any],
+    *,
+    keys: list[str],
+    target_column: str,
+) -> pd.DataFrame | pl.DataFrame:
+    """Apply one fixed step with identical training and scoring survivor validation."""
+    columns = _validate_pre_split_inputs(native, step, target_column)
+    step_type = step["transformer"]
+    original_columns = list(native.columns)
+    original_dtypes = list(native.dtypes)
+    before_keys = (
+        list(native.select(keys).iter_rows())
+        if isinstance(native, pl.DataFrame)
+        else list(native[keys].itertuples(index=False, name=None))
+    )
+    before_columns = {column: native[column].to_list() for column in native.columns}
+    artifact = NodeRegistry.get_calculator(step["transformer"])().fit(native, step["params"])
+    filtered = NodeRegistry.get_applier(step["transformer"])().apply(native, artifact)
+    _validate_filter_frame(
+        filtered, native, is_project_filter_step(step), original_columns, original_dtypes
+    )
+    _validate_pre_split_survivors(
+        filtered,
+        keys,
+        before_keys,
+        before_columns,
+        target_column=target_column,
+        allowed_edits=set(columns) if step_type in FIXED_TYPES else set(),
+    )
+    return filtered
+
+
 def _apply_pre_split_steps(
     selected: pd.DataFrame, spec: LocalTrainingSpec, engine: str
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
@@ -551,34 +673,16 @@ def _apply_pre_split_steps(
     filter_counts = []
     native = pl.from_pandas(selected) if spec.pre_split_steps and engine == "polars" else selected
     for step in spec.pre_split_steps:
-        columns = _validate_pre_split_inputs(native, step, spec.target_column)
-        step_type = step["transformer"]
-        keys = list(spec.record_key_columns)
-        original_columns = list(native.columns)
-        original_dtypes = list(native.dtypes)
-        before_keys = (
-            list(native.select(keys).iter_rows())
-            if isinstance(native, pl.DataFrame)
-            else list(native[keys].itertuples(index=False, name=None))
-        )
-        before_columns = {column: native[column].to_list() for column in native.columns}
-        artifact = NodeRegistry.get_calculator(step["transformer"])().fit(native, step["params"])
-        filtered = NodeRegistry.get_applier(step["transformer"])().apply(native, artifact)
-        _validate_filter_frame(filtered, native, step_type, original_columns, original_dtypes)
-        _validate_pre_split_survivors(
-            filtered,
-            keys,
-            before_keys,
-            before_columns,
-            target_column=spec.target_column,
-            allowed_edits=set(columns) if step_type in FIXED_TYPES else set(),
+        before_count = len(native)
+        filtered = apply_pre_split_step(
+            native, step, keys=list(spec.record_key_columns), target_column=spec.target_column
         )
         filter_counts.append(
             {
                 "name": step["name"],
                 "transformer": step["transformer"],
-                "input_rows": len(before_keys),
-                "excluded_rows": len(before_keys) - len(filtered),
+                "input_rows": before_count,
+                "excluded_rows": before_count - len(filtered),
                 "output_rows": len(filtered),
             }
         )
@@ -587,6 +691,36 @@ def _apply_pre_split_steps(
         selected = native.to_pandas() if isinstance(native, pl.DataFrame) else native
         selected = selected.reset_index(drop=True)
     return selected, filter_counts
+
+
+def _available_training_snapshot(
+    frame: pd.DataFrame, spec: LocalTrainingSpec, engine: str
+) -> pd.DataFrame:
+    """Validate and order source rows using the shared label and time eligibility policy."""
+    _validate_labeled_snapshot(frame, spec, engine)
+    selected = frame.copy()
+    available = _label_availability(frame, selected, spec)
+    ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
+    return selected.loc[available].sort_values(ordering, kind="stable").reset_index(drop=True)
+
+
+def eligible_training_snapshot(
+    frame: pd.DataFrame, spec: LocalTrainingSpec, *, engine: str = "pandas"
+) -> pd.DataFrame:
+    """Replay eligibility for comparison without imposing a viable model-fit partition.
+
+    Source budgets, keys, dates and sample membership remain validated. Returned
+    survivors retain raw feature values, normalized labels, keys and timestamps;
+    empty populations are valid and no training weight vector is validated.
+    """
+    selected = _available_training_snapshot(frame, spec, engine)
+    _training_sample_digest(selected, spec)
+    raw = selected.set_index(list(spec.record_key_columns), drop=False)
+    selected, _ = _apply_pre_split_steps(selected, spec, engine)
+    surviving_keys = selected.set_index(list(spec.record_key_columns)).index
+    result = raw.loc[surviving_keys].reset_index(drop=True)
+    result[spec.target_column] = selected[spec.target_column].to_numpy()
+    return result
 
 
 def split_labeled_snapshot(
@@ -601,11 +735,8 @@ def split_labeled_snapshot(
     Candidate training installs the saved fixed feature prefix before model fit;
     callers of this function receive untransformed model features.
     """
-    _validate_labeled_snapshot(frame, spec, engine)
-    selected = frame.copy()
-    available = _label_availability(frame, selected, spec)
-    ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
-    selected = selected.loc[available].sort_values(ordering, kind="stable").reset_index(drop=True)
+    selected = _available_training_snapshot(frame, spec, engine)
+    available_count = len(selected)
     raw_selected = selected.copy()
     sample_digest = _training_sample_digest(selected, spec)
     pre_filter_digest = _key_digest(selected, spec.record_key_columns)
@@ -620,23 +751,32 @@ def split_labeled_snapshot(
     train_frame, holdout_frame = _raw_model_partitions(
         train, heldout, raw_selected, spec, keep_training_event
     )
+    weight_evidence = training_weight_evidence(spec, train)
+    if weight_evidence is not None:
+        holdout_frame.attrs["training_weights"] = weight_evidence
     holdout_frame.attrs["holdout_key_sha256"] = digest
     holdout_frame.attrs["sample_key_sha256"] = sample_digest
     holdout_frame.attrs["pre_split_filter_counts"] = filter_counts
     holdout_frame.attrs["pre_filter_key_sha256"] = pre_filter_digest
     holdout_frame.attrs["survivor_key_sha256"] = survivor_digest
     holdout_frame.attrs["train_key_sha256"] = _key_digest(train, spec.record_key_columns)
-    holdout_frame.attrs["pre_filter_rows"] = len(frame.loc[available])
+    holdout_frame.attrs["pre_filter_rows"] = available_count
     holdout_frame.attrs["survivor_rows"] = len(selected)
     holdout_frame.attrs["training_rows"] = len(train)
     holdout_frame.attrs["source_rows"] = len(frame)
-    unavailable = int((~available).sum()) + frame.attrs.get("training_selection", {}).get(
-        "unavailable_labels", 0
+    if spec.group_column:
+        holdout_frame.attrs["group_split"] = _group_split_evidence(
+            train, heldout, spec.group_column
+        )
+    unavailable = (
+        len(frame)
+        - available_count
+        + frame.attrs.get("training_selection", {}).get("unavailable_labels", 0)
     )
     return train_frame, holdout_frame, unavailable
 
 
-def _log_local_model(artifact_path: str | Path, *, run_id: str, tracking_uri: str) -> str:
+def log_local_model(artifact_path: str | Path, *, run_id: str, tracking_uri: str) -> str:
     """Import the optional MLflow pyfunc package only for a tracked run."""
     from ..mlflow.local_model import log_local_model  # noqa: PLC0415
 
@@ -645,7 +785,7 @@ def _log_local_model(artifact_path: str | Path, *, run_id: str, tracking_uri: st
     )
 
 
-def _training_spec_payload(spec: LocalTrainingSpec, engine: str) -> dict[str, Any]:
+def training_spec_payload(spec: LocalTrainingSpec, engine: str) -> dict[str, Any]:
     """Serialize concrete selection settings before and after membership enrichment."""
     payload = asdict(spec)
     for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -671,7 +811,7 @@ class _FittedCandidate:
     evidence_holdout: pd.DataFrame
 
 
-def _candidate_config(
+def candidate_config(
     spec: LocalTrainingSpec,
     config: dict[str, Any],
     *,
@@ -694,13 +834,29 @@ def _candidate_config(
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
-        (*spec.record_key_columns, spec.event_column, spec.result_available_at_column),
+        (
+            *spec.record_key_columns,
+            spec.event_column,
+            spec.result_available_at_column,
+            spec.group_column,
+            spec.weight_column,
+            *spec.reserved_weight_columns,
+        ),
     )
+    validate_cv_holdout_policy(spec, cv)
     validate_explanation_config(config)
     pipeline_config = prepare_search_pipeline(
         config, cv, target_column=spec.target_column, event_column=spec.event_column
     )
     feature_prefix = projected_fixed_steps(spec.pre_split_steps, spec.input_columns)
+    if threshold_policy(pipeline_config)["mode"] != "off":
+        pipeline_config["decision_threshold_context"] = {
+            "split_strategy": spec.split_strategy,
+            "event_column": spec.event_column,
+            "group_column": spec.group_column,
+            "input_columns": list(spec.input_columns),
+            "gap": cv.gap,
+        }
     pipeline_config["preprocessing"] = [*feature_prefix, *pipeline_config.get("preprocessing", [])]
     contract = target_contract(spec.pre_split_steps, spec.target_column)
     pipeline_config.pop("pre_split_target_contract", None)
@@ -725,7 +881,62 @@ def _candidate_config(
     return pipeline_config
 
 
-def _fit_candidate(
+def _candidate_cv(
+    frame: Any,
+    pipeline: dict[str, Any],
+    cv: LocalCVSpec,
+    spec: LocalTrainingSpec,
+    *,
+    search: bool,
+    evaluate_cv: bool,
+    sample_weight: Any = None,
+) -> dict[str, Any] | None:
+    """Validate search membership or run the optional fixed-model diagnostics.
+
+    Competitions evaluate their shared objective separately, avoiding duplicate
+    fixed-model diagnostics while retaining all search membership checks.
+    """
+    if search:
+        validate_search_membership(
+            frame, pipeline, cv, target_column=spec.target_column, event_column=spec.event_column
+        )
+        if threshold_policy(pipeline)["mode"] == "off":
+            return None
+    if evaluate_cv:
+        return evaluate_training_cv(
+            frame,
+            pipeline,
+            cv,
+            target_column=spec.target_column,
+            event_column=spec.event_column if cv.temporal else None,
+            sample_weight=sample_weight,
+        )
+    return None
+
+
+def _keep_fit_time(cv: LocalCVSpec, spec: LocalTrainingSpec, automatic: bool) -> bool:
+    """Retain event metadata for temporal CV or training-only calibration."""
+    return (cv.enabled and cv.temporal) or (automatic and spec.split_strategy == "temporal")
+
+
+def _native_search_cv(search: bool, evaluate_cv: bool, config: dict) -> bool:
+    """Avoid replacing complete decision-policy CV with native search scores."""
+    return search and evaluate_cv and threshold_policy(config)["mode"] == "off"
+
+
+def _candidate_training_frame(
+    frame: pd.DataFrame, spec: LocalTrainingSpec, keep_time: bool
+) -> pd.DataFrame:
+    """Project shared prepared rows to only this candidate's feature and split roles."""
+    columns = [*spec.input_columns, spec.target_column]
+    if spec.group_column:
+        columns.append(spec.group_column)
+    if keep_time and spec.event_column:
+        columns.append(spec.event_column)
+    return frame.loc[:, columns]
+
+
+def fit_candidate(
     spark: Any,
     spec: LocalTrainingSpec,
     config: dict[str, Any],
@@ -736,62 +947,62 @@ def _fit_candidate(
     engine: str,
     cv: LocalCVSpec,
     risk_category: str | None,
+    prepared_data: tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int] | None = None,
+    evaluate_cv: bool = True,
 ) -> _FittedCandidate:
     """Fit CV and final training rows, persisting selection and provenance evidence."""
     run.log_config(pipeline_config, artifact_file="pipeline_config.json")
     run.client.log_dict(run.run_id, config, "training_pipeline_config.json")
     run.log_params({key: getattr(cv, field) for key, field in CV_FIELDS.items()})
-    run.client.log_dict(run.run_id, _training_spec_payload(spec, engine), "training_snapshot.json")
-    frame = read_training_snapshot(spark, spec)
-    temporal_cv = cv.enabled and cv.method == "time_series_split"
-    train_frame, holdout, unavailable = split_labeled_snapshot(
-        frame, spec, keep_training_event=temporal_cv, engine=engine
+    run.client.log_dict(run.run_id, training_spec_payload(spec, engine), "training_snapshot.json")
+    automatic = threshold_policy(pipeline_config)["mode"] == "auto"
+    temporal_cv = _keep_fit_time(cv, spec, automatic)
+    frame, train_frame, holdout, unavailable = prepared_data or read_training_partitions(
+        spark, spec, temporal_cv=temporal_cv, engine=engine
     )
     spec = replace(
         spec,
         holdout_key_sha256=holdout.attrs["holdout_key_sha256"],
         sample_key_sha256=holdout.attrs["sample_key_sha256"],
     )
+    train_frame, sample_weight = extract_training_weights(train_frame, spec.weight_column)
+    train_frame = _candidate_training_frame(train_frame, spec, temporal_cv)
+    if "training_weights" in holdout.attrs:
+        pipeline_config = {**pipeline_config, "training_weights": holdout.attrs["training_weights"]}
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
     native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
     search = pipeline_config["modeling"]["type"] == "hyperparameter_tuner"
-    cv_results = None
-    if search:
-        validate_search_membership(
-            native_train,
-            pipeline_config,
-            cv,
-            target_column=spec.target_column,
-            event_column=spec.event_column,
-        )
-    else:
-        cv_results = evaluate_training_cv(
-            native_train,
-            pipeline_config,
-            cv,
-            target_column=spec.target_column,
-            event_column=spec.event_column if temporal_cv else None,
-        )
-    native_train = _final_fit_frame(native_train, spec, temporal_cv, search)
+    cv_results = _candidate_cv(
+        native_train,
+        pipeline_config,
+        cv,
+        spec,
+        search=search,
+        evaluate_cv=evaluate_cv,
+        sample_weight=sample_weight,
+    )
+    native_train = _final_fit_frame(native_train, spec, temporal_cv, search or automatic)
     artifact = fit_local_workflow(
         pipeline_config,
-        SplitDataset(train=native_train, test=native_train.head(0)),
+        SplitDataset(
+            train=native_train, test=native_train.head(0), train_sample_weight=sample_weight
+        ),
         target_column=spec.target_column,
         artifact_path=artifact_path,
         max_rows=spec.max_rows,
         max_bytes=spec.max_bytes,
     )
-    if search:
+    if _native_search_cv(search, evaluate_cv, pipeline_config):
         cv_results = post_selection_cv(
             native_train,
             artifact,
             cv,
             target_column=spec.target_column,
             event_column=spec.event_column,
+            sample_weight=sample_weight,
         )
     if pipeline_config.get("explainability"):
-        explanation = explain_training_artifact(artifact, native_train)
-        run.client.log_dict(run.run_id, explanation, "explanations.json")
+        log_training_explanations(run, artifact, native_train)
     evidence = build_training_evidence(
         spec, holdout, project_source_sha256=artifact.manifest.project_source_sha256
     )
@@ -815,7 +1026,18 @@ def _fit_candidate(
     )
 
 
-def _log_fitted_candidate(
+def read_training_partitions(
+    spark: Any, spec: LocalTrainingSpec, *, temporal_cv: bool, engine: str
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
+    """Retain the sequential SDK read/split path alongside prepared lifecycle data."""
+    frame = read_training_snapshot(spark, spec)
+    train, holdout, unavailable = split_labeled_snapshot(
+        frame, spec, keep_training_event=temporal_cv, engine=engine
+    )
+    return frame, train, holdout, unavailable
+
+
+def log_fitted_candidate(
     run: Any,
     fitted: _FittedCandidate,
     config: dict[str, Any],
@@ -829,6 +1051,16 @@ def _log_fitted_candidate(
     cv_results, evidence = fitted.cv_results, fitted.evidence
     unavailable = fitted.unavailable_labels
     _log_tuning_evidence(run, artifact, config)
+    threshold_evidence = getattr(artifact.pipeline, "_decision_threshold_evidence", None)
+    if threshold_evidence is not None:
+        run.client.log_dict(run.run_id, threshold_evidence, "decision_threshold.json")
+        run.log_params(
+            {
+                "decision_threshold_mode": threshold_evidence["mode"],
+                "decision_threshold_fitting_rows": threshold_evidence["fitting_rows"],
+            }
+        )
+    log_training_parameters(run, artifact, spec, config)
     if cv_results is not None:
         cv_results.update(
             dataset_id=spec.dataset_id, training_rows=fitted.training_rows, engine=engine
@@ -913,22 +1145,33 @@ def _log_fitted_candidate(
         "holdout_membership.json",
     )
     run.client.log_dict(
-        run.run_id, _training_spec_payload(spec, engine), "candidate_training_spec.json"
+        run.run_id, training_spec_payload(spec, engine), "candidate_training_spec.json"
     )
     fitted.tags = tags
 
 
-def _evaluate_candidate(
-    artifact: Any, native_holdout: Any, *, spec: LocalTrainingSpec, metric: str
+def evaluate_candidate(
+    artifact: Any,
+    native_holdout: Any,
+    *,
+    spec: LocalTrainingSpec,
+    metric: str,
+    chart_run: Any = None,
+    evaluation_charts: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """Require a finite initial holdout metric before any registration."""
-    metrics = evaluate_local_holdout(artifact, native_holdout, target_column=spec.target_column)
+    metrics = evaluate_local_holdout(
+        artifact,
+        native_holdout,
+        target_column=spec.target_column,
+        on_predictions=chart_recorder(chart_run, artifact, spec, evaluation_charts),
+    )
     if metric not in metrics or not math.isfinite(metrics[metric]):
         raise ValueError("Selected metric is unavailable or non-finite on the holdout.")
     return metrics
 
 
-def _compare_candidate(
+def compare_candidate(
     candidate: ResolvedModel,
     champion: ResolvedModel | None,
     native_holdout: Any,
@@ -982,7 +1225,7 @@ def _compare_candidate(
     )
 
 
-def _register_candidate(
+def register_candidate(
     model_uri: str,
     model_name: str,
     *,
@@ -1023,6 +1266,8 @@ def train_local_candidate(
     on_registered: Callable[[ResolvedModel], None] | None = None,
     risk_category: str | None = None,
     cv: LocalCVSpec | None = None,
+    run_tags: dict[str, str] | None = None,
+    evaluation_charts: dict[str, Any] | None = None,
 ) -> LocalCandidateResult:
     """Fit, register and compare; optionally notify an explicit lifecycle owner.
 
@@ -1030,8 +1275,9 @@ def train_local_candidate(
     registration and before comparison, allowing the caller to nominate a
     contender without making the generic training service an alias writer.
     """
+    chart_settings(evaluation_charts)
     cv = LocalCVSpec() if cv is None else cv
-    pipeline_config = _candidate_config(
+    pipeline_config = candidate_config(
         spec,
         config,
         engine=engine,
@@ -1062,7 +1308,8 @@ def train_local_candidate(
     with track_run(tracking, run_name=run_name) as run:
         if run.run_id is None:
             raise RuntimeError("MLflow did not provide a run ID.")
-        fitted = _fit_candidate(
+        run.set_tags(run_tags or {})
+        fitted = fit_candidate(
             spark,
             spec,
             config,
@@ -1073,16 +1320,24 @@ def train_local_candidate(
             cv=cv,
             risk_category=risk_category,
         )
-        metrics = _evaluate_candidate(
+        metrics = evaluate_candidate(
             fitted.artifact,
             fitted.holdout,
             spec=fitted.spec,
             metric=metric,
+            chart_run=run,
+            evaluation_charts=evaluation_charts,
         )
-        _log_fitted_candidate(run, fitted, config, engine=engine, risk_category=risk_category)
+        log_fitted_candidate(
+            run,
+            fitted,
+            config,
+            engine=engine,
+            risk_category=risk_category,
+        )
         run.log_metrics(metrics)
-        model_uri = _log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
-    registered = _register_candidate(
+        model_uri = log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
+    registered = register_candidate(
         model_uri,
         model_name,
         tracking_uri=tracking_uri,
@@ -1097,7 +1352,7 @@ def train_local_candidate(
     )
     if on_registered is not None:
         on_registered(candidate)
-    return _compare_candidate(
+    return compare_candidate(
         candidate,
         champion,
         fitted.holdout,
@@ -1202,7 +1457,7 @@ def _materialize_training_rows(
             raise ValueError("Training source exceeds max_bytes.")
         records.append(record)
     frame = pd.DataFrame.from_records(records, columns=names)
-    if _frame_bytes(frame) > spec.max_bytes:
+    if frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Training frame exceeds max_bytes.")
     return frame
 
@@ -1256,7 +1511,7 @@ def _validate_filter_values(
                 )
             if not numeric:
                 raise ValueError(f"pre_split_steps ManualBounds requires numeric column {column}.")
-    if step_type == "Deduplicate":
+    if step_type == "Deduplicate" and target_column in native.columns:
         _validate_deduplicate_labels(native, columns, target_column)
 
 
@@ -1300,7 +1555,7 @@ def _validate_survivor_values(
 def _validate_filter_frame(
     filtered: Any,
     native: pd.DataFrame | pl.DataFrame,
-    step_type: str,
+    custom_filter: bool,
     original_columns: list[str],
     original_dtypes: list[Any],
 ) -> None:
@@ -1309,7 +1564,7 @@ def _validate_filter_frame(
         raise ValueError("pre_split_steps filter did not return a frame.")
     if list(filtered.columns) != original_columns:
         raise ValueError("pre_split_steps must preserve all source columns.")
-    if is_registered_project_step(step_type) and list(filtered.dtypes) != original_dtypes:
+    if custom_filter and list(filtered.dtypes) != original_dtypes:
         raise ValueError("pre_split_steps custom filter must preserve source dtypes.")
 
 
@@ -1320,7 +1575,14 @@ def _validate_labeled_snapshot(frame: pd.DataFrame, spec: LocalTrainingSpec, eng
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
-        (*spec.record_key_columns, spec.event_column, spec.result_available_at_column),
+        (
+            *spec.record_key_columns,
+            spec.event_column,
+            spec.result_available_at_column,
+            spec.group_column,
+            spec.weight_column,
+            *spec.reserved_weight_columns,
+        ),
     )
     if engine not in ("pandas", "polars"):
         raise ValueError("engine must be pandas or polars.")
@@ -1329,12 +1591,18 @@ def _validate_labeled_snapshot(frame: pd.DataFrame, spec: LocalTrainingSpec, eng
         raise ValueError(
             f"Training snapshot is missing required source columns: {missing_columns}."
         )
-    if len(frame) > spec.max_rows or _frame_bytes(frame) > spec.max_bytes:
+    if len(frame) > spec.max_rows or frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Training snapshot exceeds max_rows or max_bytes.")
     if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
         raise ValueError("Training row keys must not be null.")
     if frame.duplicated(subset=list(spec.record_key_columns)).any():
         raise ValueError("Training row keys must be unique.")
+
+
+def _validate_training_event_window(events: pd.Series, spec: LocalTrainingSpec) -> None:
+    """Require each normalized event to fall within the pinned half-open source window."""
+    if events.isna().any() or (events < spec.start).any() or (events >= spec.cutoff).any():
+        raise ValueError("Training event time falls outside the pinned window.")
 
 
 def _label_availability(
@@ -1351,8 +1619,7 @@ def _label_availability(
             index=frame.index,
             dtype="datetime64[ns, UTC]",
         )
-        if events.isna().any() or (events < spec.start).any() or (events >= spec.cutoff).any():
-            raise ValueError("Training event time falls outside the pinned window.")
+        _validate_training_event_window(events, spec)
         selected[spec.event_column] = events
     available = pd.Series(True, index=frame.index)
     if spec.filter_unavailable_results:
@@ -1367,6 +1634,8 @@ def _label_availability(
         if events is not None and ((labels < events) & labels.notna()).any():
             raise ValueError("Label availability precedes event time.")
         available = labels.notna() & (labels <= spec.result_cutoff)
+    if spec.drop_missing_labels:
+        available &= frame[spec.target_column].notna()
     return available
 
 
@@ -1398,11 +1667,66 @@ def _validate_training_survivors(
         )
 
 
+def _group_split_evidence(
+    train: pd.DataFrame, heldout: pd.DataFrame, column: str
+) -> dict[str, Any]:
+    """Record bounded group membership receipts without exposing raw identities."""
+    train_groups = train[[column]].drop_duplicates().sort_values(column)
+    heldout_groups = heldout[[column]].drop_duplicates().sort_values(column)
+    return {
+        "column": column,
+        "training_groups": len(train_groups),
+        "holdout_groups": len(heldout_groups),
+        "training_groups_sha256": _key_digest(train_groups, (column,)),
+        "holdout_groups_sha256": _key_digest(heldout_groups, (column,)),
+    }
+
+
+def validate_cv_holdout_policy(spec: LocalTrainingSpec, cv: LocalCVSpec) -> None:
+    """Require final holdout boundaries that match the requested nested split policy."""
+    if (
+        cv.enabled
+        and cv.method == "nested_cv"
+        and cv.temporal
+        and spec.split_strategy != "temporal"
+    ):
+        raise ValueError("Nested temporal CV requires a temporal final holdout.")
+    if cv.group_column != spec.group_column:
+        raise ValueError("cv_group_column must match the training spec group_column.")
+    if spec.group_column and spec.stratify:
+        raise ValueError("Group holdout uses whole groups; set stratify=false.")
+
+
+def _partition_group_rows(
+    selected: pd.DataFrame, spec: LocalTrainingSpec
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Isolate complete entities in the final holdout, rejecting missing identities."""
+    groups = selected[spec.group_column]
+    if groups.isna().any():
+        raise ValueError("Group metadata must be nonnull.")
+    if spec.stratify:
+        raise ValueError("Group holdout uses whole groups; set stratify=false.")
+    if spec.split_strategy == "temporal":
+        mask = selected[spec.event_column] >= spec.holdout_start
+        train, heldout = selected.loc[~mask], selected.loc[mask]
+        if set(train[spec.group_column]) & set(heldout[spec.group_column]):
+            raise ValueError("Final temporal holdout must contain disjoint groups.")
+        return train, heldout
+    if groups.nunique() < 2:
+        raise ValueError("Group holdout requires at least two distinct groups.")
+    assert spec.test_size is not None and spec.random_state is not None
+    splitter = DataSplitter(test_size=spec.test_size, random_state=spec.random_state)
+    train, heldout = splitter.split_indices(len(selected), groups=groups)
+    return selected.iloc[train], selected.iloc[heldout]
+
+
 def _partition_training_rows(
     selected: pd.DataFrame, spec: LocalTrainingSpec
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Build reproducible random or temporal partitions with viable labeled row counts."""
-    if spec.split_strategy == "random":
+    if spec.group_column:
+        train, heldout = _partition_group_rows(selected, spec)
+    elif spec.split_strategy == "random":
         if spec.stratify:
             counts = selected[spec.target_column].value_counts()
             if counts.empty or counts.min() < 2:
@@ -1436,6 +1760,10 @@ def _raw_model_partitions(
     train_columns = (
         [*columns, spec.event_column] if keep_training_event and spec.event_column else columns
     )
+    if spec.weight_column:
+        train_columns = [*train_columns, spec.weight_column]
+    if spec.group_column:
+        train_columns = [*train_columns, spec.group_column]
     if spec.pre_split_steps:
         raw_positions = {
             key: index
@@ -1497,8 +1825,8 @@ def _final_fit_frame(
     temporal_cv: bool,
     search: bool,
 ) -> pd.DataFrame | pl.DataFrame:
-    """Remove CV-only event metadata before fitting a fixed final model."""
-    if temporal_cv and not search:
+    """Remove CV-only split metadata before fitting a fixed final model."""
+    if not search:
         model_columns = [*spec.input_columns, spec.target_column]
         native_train = (
             native_train.select(model_columns)
@@ -1515,11 +1843,5 @@ def _log_tuning_evidence(run: Any, artifact: Any, config: dict[str, Any]) -> Non
         if search_result is None:
             raise ValueError("Fitted search artifact lacks tuning evidence.")
         run.client.log_dict(run.run_id, search_result, "tuning.json")
-        run.log_params(
-            {
-                "tuning_strategy": search_result["modeling"]["strategy"],
-                "tuning_metric": search_result["scoring_metric"],
-                "tuning_trials": search_result["n_trials"],
-            }
-        )
+        run.log_params(tuning_run_params(search_result))
         run.log_metrics({"tuning_best_score": search_result["best_score"]})

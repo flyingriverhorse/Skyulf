@@ -18,7 +18,7 @@ from ..preprocessing._spark import (
 from ..preprocessing.pipeline import FeatureEngineer
 from ._manifest import BundleManifest, check_runtime, checksum
 from ._model import load_model
-from .bundle import InferenceBundle, _predict_features, _validate_bundle, _validate_frame
+from .bundle import InferenceBundle, _predict_features, _validate_frame, validate_bundle_contract
 
 
 def predict_spark(
@@ -50,7 +50,7 @@ def predict_spark(
     Estimator pickle payloads must come from a trusted producer.
     """
     _validate_execution(frame_spec, options, mode)
-    _validate_bundle(bundle, options)
+    validate_bundle_contract(bundle, options)
     manifest = bundle.manifest
     if manifest.input_stage != "raw":
         raise ValueError(f"{mode} currently requires a raw input_stage bundle.")

@@ -1,5 +1,6 @@
 """Central registry: maps model_key → param list, plus search-space dicts."""
 
+from copy import deepcopy
 from typing import Any
 
 from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
@@ -547,7 +548,7 @@ _GRID_STRATEGIES = {"grid", "halving_grid"}
 
 
 def get_default_search_space(model_key: str, strategy: str = "random") -> dict[str, Any]:
-    """Return the default search space for *model_key*.
+    """Return an independent copy of the default search space for *model_key*.
 
     For grid-based strategies (``grid`` / ``halving_grid``) the trimmed
     ``GRID_SEARCH_SPACES`` dict is used so the cartesian product stays
@@ -558,8 +559,8 @@ def get_default_search_space(model_key: str, strategy: str = "random") -> dict[s
     be expanded with the selected learners by ``build_ensemble_search_space``.
     """
     if strategy in _GRID_STRATEGIES:
-        return GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {}))
-    return DEFAULT_SEARCH_SPACES.get(model_key, {})
+        return deepcopy(GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {})))
+    return deepcopy(DEFAULT_SEARCH_SPACES.get(model_key, {}))
 
 
 # ---------------------------------------------------------------------------

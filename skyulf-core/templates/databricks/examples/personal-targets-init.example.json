@@ -1,0 +1,6 @@
+{
+  "project_name": "skyulf_personal",
+  "personal_development_targets": "true",
+  "deployment_identity": "deployer",
+  "manage_job_permissions": "false"
+}

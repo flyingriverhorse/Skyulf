@@ -6,6 +6,7 @@ import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
+from ...utils import resolve_columns
 from .._artifacts import MissingIndicatorArtifact
 from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
@@ -99,8 +100,7 @@ def _missing_cols_pandas(X: Any) -> list:
 def _missing_indicator_fit_polars(
     X: Any, _y: Any, config: dict[str, Any]
 ) -> MissingIndicatorArtifact:
-    explicit = config.get("columns")
-    cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_polars(X)
+    cols = resolve_columns(X, config, _missing_cols_polars)
     suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
     _validate_flag_names(X, cols, suffix)
     return {
@@ -113,8 +113,7 @@ def _missing_indicator_fit_polars(
 def _missing_indicator_fit_pandas(
     X: Any, _y: Any, config: dict[str, Any]
 ) -> MissingIndicatorArtifact:
-    explicit = config.get("columns")
-    cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_pandas(X)
+    cols = resolve_columns(X, config, _missing_cols_pandas)
     suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
     _validate_flag_names(X, cols, suffix)
     return {

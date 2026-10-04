@@ -294,6 +294,32 @@ Learned params:
 - `imputer_object` (sklearn object; pickled in pipeline)
 - `n_neighbors`, `weights`
 
+### GroupImputer
+
+Fills missing values from the statistic of the row's own group, for example the
+median employee count of the same industry. Statistics are learned on training
+rows only; a group that was not seen in training (or had no observed value) uses
+the overall training value. The group column itself is never filled.
+
+Config:
+
+- `group_by`: str (required; the column that defines the groups)
+- `strategy`: `mean` | `median` | `most_frequent` (also accepts `mode`; `constant` is rejected — use `SimpleImputer`)
+- `columns`: list[str] (optional; numeric auto-detection for mean/median, all other columns for most_frequent)
+
+Learned params:
+
+- `group_by`, `strategy`, `columns`
+- `group_values`: dict[col -> list of [group, value]]
+- `fill_values`: dict[col -> overall value]
+
+Example step:
+
+```python
+{"name": "fill_employees", "transformer": "GroupImputer",
+ "params": {"columns": ["employees"], "group_by": "industry", "strategy": "median"}}
+```
+
 ### IterativeImputer
 
 Config:
@@ -553,6 +579,27 @@ Config:
 Learned params:
 
 - `bounds`
+
+### ClipValues
+
+Caps values at fixed, user-provided bounds and keeps every row. Unlike
+`Winsorize`, the limits are not learned from data; unlike `ManualBounds`, rows
+are not dropped, so the step also runs at prediction time.
+
+Config:
+
+- `bounds`: dict[col -> {lower?, upper?}] (at least one side per column; finite numbers; numeric columns only)
+
+Learned params:
+
+- `bounds`
+
+Example step:
+
+```python
+{"name": "cap_revenue", "transformer": "ClipValues",
+ "params": {"bounds": {"revenue": {"lower": 0, "upper": 1_000_000}}}}
+```
 
 ### EllipticEnvelope
 

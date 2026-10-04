@@ -57,6 +57,18 @@ describe('SegmentationView error retry', () => {
 });
 
 describe('SegmentationView artifact coverage and metric direction', () => {
+  it('discloses held-out exclusions alongside clustering metrics', () => {
+    // Segmentation metrics must disclose the population left after explicit filters.
+    const data: EvaluationData = { ...clusteringEvaluationData, splits: {
+      ...clusteringEvaluationData.splits,
+      test: { labels: [0], coverage: { input_rows: 3, scored_rows: 1, excluded_rows: 2 } },
+    } };
+    render(<SegmentationView selectedJobIds={['job-1']} coverageEntries={[]} evalJobId="job-1"
+      fetchEvaluationData={vi.fn()} isEvalLoading={false} evalError={null} evaluationData={data}
+      handleDownload={vi.fn()} downloadingChart={null} doneChart={null} />);
+    expect(screen.getByText(/Test: 1 of 3 rows scored; 2 excluded/)).toBeInTheDocument();
+  });
+
   it('renders the availability list distinguishing supported, unsupported, not-yet-computed, and failed runs', () => {
     const coverageEntries: ArtifactCoverageEntry[] = [
       { jobId: 'a', label: 'kmeans (aaaaaaaa)', status: 'available', reason: 'Clustering summary is available for this run.' },

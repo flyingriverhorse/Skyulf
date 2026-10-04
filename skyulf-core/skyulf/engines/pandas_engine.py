@@ -23,7 +23,7 @@ def _to_positional_values(values: Any, target_index: pd.Index) -> Any:
                 "Length mismatch: cannot assign a Series of length "
                 f"{len(values)} to a DataFrame with {len(target_index)} rows."
             )
-        values = pd.Series(values.to_numpy(), index=target_index)
+        values = values.set_axis(target_index)
     return values
 
 

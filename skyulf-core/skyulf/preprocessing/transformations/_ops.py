@@ -12,6 +12,14 @@ import pandas as pd
 import polars as pl
 
 
+def _apply_polars_op(X: Any, item: dict[str, Any], op: Callable[[dict[str, Any]], Any]) -> Any:
+    """Coerce numeric text like pandas while retaining native numeric dtypes."""
+    col = item["column"]
+    if X.schema[col] == pl.String:
+        X = X.with_columns(pl.col(col).str.strip_chars().cast(pl.Float64, strict=False))
+    return X.with_columns(op(item).alias(col))
+
+
 def _polars_log(item: dict[str, Any]) -> Any:
     col = item["column"]
     return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
@@ -32,7 +40,7 @@ def _polars_reciprocal(item: dict[str, Any]) -> Any:
 
 
 def _polars_square(item: dict[str, Any]) -> Any:
-    return pl.col(item["column"]).pow(2)
+    return pl.col(item["column"]).cast(pl.Float64).pow(2)
 
 
 def _polars_exp(item: dict[str, Any]) -> Any:
@@ -73,7 +81,7 @@ def _pandas_reciprocal(series: pd.Series, _item: dict[str, Any]) -> Any:
 
 
 def _pandas_square(series: pd.Series, _item: dict[str, Any]) -> Any:
-    return np.square(series)
+    return np.square(series.astype("float64"))
 
 
 def _pandas_exp(series: pd.Series, item: dict[str, Any]) -> Any:

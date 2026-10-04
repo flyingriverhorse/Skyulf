@@ -1,4 +1,4 @@
-"""Load trusted, self-contained project code under a source-specific module name.
+"""Load trusted project source under a source-specific module or package name.
 
 Like the pipeline pickle, this source is executable trusted model content, not
 untrusted input or a sandbox. Imported third-party packages must be installed.
@@ -12,7 +12,9 @@ from threading import RLock
 from types import ModuleType
 from typing import Any
 
+from ..preprocessing.function_steps import FILTER_STEP
 from ..registry import NodeRegistry
+from .project_package import discard_project_package
 
 MAX_PROJECT_SOURCE_BYTES = 64 * 1024
 _PREFIX = "_skyulf_project_"
@@ -45,7 +47,7 @@ def load_project_module(source: str) -> ModuleType:
         try:
             exec(compile(source, module.__file__, "exec"), module.__dict__)  # nosec B102 - trusted project/model code
         except BaseException:
-            sys.modules.pop(name, None)
+            discard_project_package(name)
             raise
         return module
 
@@ -61,7 +63,8 @@ def custom_step(
     """Register a project's top-level fit/apply classes with a source-specific ID.
 
     Call inside ``build_preprocessing`` or ``build_pre_split_steps``. Classes
-    must live in the same source file. Pre-split use requires an explicit
+    must live together in one saved module, including package submodules.
+    Pre-split use requires an explicit
     filter-only declaration; it is an assertion by trusted project code.
     """
     _validate_custom_classes(calculator, applier)
@@ -145,3 +148,21 @@ def is_registered_project_step(identity: str) -> bool:
         and sys.modules.get(module) is not None
         and identity == f"{module}.{calculator.__qualname__}.{applier.__qualname__}"
     )
+
+
+def is_project_filter_step(step: Any) -> bool:
+    """Recognize a project filter class pair or a function filter from loaded project source."""
+    if type(step) is not dict:
+        return False
+    if step.get("transformer") != FILTER_STEP:
+        return is_registered_project_step(step.get("transformer"))
+    module = project_step_source(step)
+    return module.startswith(_PREFIX) and sys.modules.get(module) is not None
+
+
+def project_step_source(step: dict[str, Any]) -> str:
+    """Return the project identity owning a custom filter: class identity or function module."""
+    if step.get("transformer") == FILTER_STEP:
+        ref = step.get("params", {}).get("function")
+        return ref.partition(":")[0] if isinstance(ref, str) else ""
+    return step.get("transformer", "")

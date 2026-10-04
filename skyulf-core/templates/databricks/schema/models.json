@@ -1,0 +1,102 @@
+{
+  "regression_model": {
+    "order": 594,
+    "type": "string",
+    "default": "linear_regression",
+    "description": "2. Model | Choose a regression model. It starts with its default settings; README explains how to change them",
+    "enum": [
+      "linear_regression",
+      "adaboost_regressor",
+      "decision_tree_regressor",
+      "elasticnet_regression",
+      "extra_trees_regressor",
+      "gradient_boosting_regressor",
+      "hist_gradient_boosting_regressor",
+      "k_neighbors_regressor",
+      "lasso_regression",
+      "lgbm_regressor",
+      "random_forest_regressor",
+      "ridge_regression",
+      "stacking_regressor",
+      "svr",
+      "voting_regressor",
+      "xgboost_regressor"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "enum": [
+                "multi_target",
+                "model_competition"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "task": {
+              "const": "classification"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "classification_model": {
+    "order": 595,
+    "type": "string",
+    "default": "logistic_regression",
+    "description": "2. Model | Choose a classification model. It starts with its default settings; README explains how to change them",
+    "enum": [
+      "logistic_regression",
+      "adaboost_classifier",
+      "bernoulli_nb",
+      "calibrated_classifier",
+      "decision_tree_classifier",
+      "extra_trees_classifier",
+      "gaussian_nb",
+      "gradient_boosting_classifier",
+      "hist_gradient_boosting_classifier",
+      "k_neighbors_classifier",
+      "lgbm_classifier",
+      "multinomial_nb",
+      "random_forest_classifier",
+      "sgd_classifier",
+      "stacking_classifier",
+      "svc",
+      "voting_classifier",
+      "xgboost_classifier"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "enum": [
+                "multi_target",
+                "model_competition"
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "task": {
+              "const": "regression"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "model_params": {
+    "order": 696,
+    "type": "string",
+    "default": "{}",
+    "description": "Optional init-file fixed model params. For custom fixed params, Core resolves the automatic search space; otherwise generated model settings include editable search lists.",
+    "pattern": "^\\{.*\\}$",
+    "skip_prompt_if": {}
+  }
+}

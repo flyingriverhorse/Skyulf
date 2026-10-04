@@ -33,6 +33,8 @@ _STRING_REF_KEYS = (
     "lon1_col",
     "lat2_col",
     "lon2_col",
+    # GroupImputer names one column; LagFeatures/RollingAggregate use a list, not checked here.
+    "group_by",
 )
 _LIST_REF_KEYS = (
     "columns",
@@ -134,7 +136,7 @@ def _feature_input_schema(
     node: NodeConfig, schema: SkyulfSchema, node_map: dict[str, NodeConfig]
 ) -> SkyulfSchema:
     """Exclude separated labels for controls whose Core appliers operate only on X."""
-    if node.step_type not in {"ManualBounds", "GeoDistance"}:
+    if node.step_type not in {"ManualBounds", "ClipValues", "GeoDistance"}:
         return schema
     ancestors = _discover_ancestors_bfs(node.node_id, node_map)
     targets = (

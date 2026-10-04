@@ -5,6 +5,7 @@ from typing import Any, cast
 import polars as pl
 
 from ...core.meta.decorators import node_meta
+from ...engines import PolarsEngine
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingColumnsArtifact
 from .._schema import SkyulfSchema
@@ -14,7 +15,7 @@ from ..dispatcher import apply_dual_engine, fit_dual_engine
 
 def _drop_missing_cols_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
-    return (X.drop(cols) if cols else X), y
+    return (PolarsEngine.wrap(X).drop(cols).to_native() if cols else X), y
 
 
 def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -81,7 +82,9 @@ def _drop_missing_cols_fit_polars(
     cols = {c for c in explicit if c in X.columns}
     threshold = _resolve_threshold(config.get("missing_threshold"))
     if threshold is not None:
-        cols.update(_high_missing_cols_polars(X, threshold))
+        cols.update(
+            c for c in _high_missing_cols_polars(X, threshold) if c != config.get("target_column")
+        )
     return {
         "type": "drop_missing_columns",
         "columns_to_drop": list(cols),
@@ -96,7 +99,9 @@ def _drop_missing_cols_fit_pandas(
     cols = {c for c in explicit if c in X.columns}
     threshold = _resolve_threshold(config.get("missing_threshold"))
     if threshold is not None:
-        cols.update(_high_missing_cols_pandas(X, threshold))
+        cols.update(
+            c for c in _high_missing_cols_pandas(X, threshold) if c != config.get("target_column")
+        )
     return {
         "type": "drop_missing_columns",
         "columns_to_drop": list(cols),

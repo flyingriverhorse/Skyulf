@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import polars as pl
 
+from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
+
 from ..mlflow.challenger import ChallengerLifecycle
 from ..mlflow.promotion import (
     AliasChangeReceipt,
@@ -24,12 +26,7 @@ from ..mlflow.promotion import (
     rollback_promotion,
     stage_challenger,
 )
-from ..mlflow.registry import (
-    RegistryModelNotFoundError,
-    _make_client,
-    _require_mlflow,
-    resolve_model,
-)
+from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
 from ..mlflow.validation import quality_gates_pass
 from ._contracts import input_budget_bytes
 from .admission import SingleWriterAdmission
@@ -43,6 +40,7 @@ from .local_retraining import (
     read_training_snapshot,
     split_labeled_snapshot,
     train_local_candidate,
+    validate_cv_holdout_policy,
 )
 from .local_sdk import (
     InputSource,
@@ -51,15 +49,14 @@ from .local_sdk import (
     OutputSink,
     prepare_local_workflow,
 )
-from .local_training_evidence import load_candidate_evidence as _load_evidence
-from .local_training_evidence import validate_training_evidence
+from .local_training_evidence import load_candidate_evidence, validate_training_evidence
 from .prediction_output import (
-    _IDENTIFIER,
-    _TABLE_NAME,
-    _activate_prediction_view,
-    _managed_prediction_view_exists,
-    _scoring_target,
+    IDENTIFIER_PATTERN,
+    TABLE_NAME_PATTERN,
+    activate_prediction_view,
+    managed_prediction_view_exists,
     provision_prediction_table,
+    scoring_target,
 )
 from .training_dates import training_date_spec
 
@@ -89,7 +86,7 @@ class BundleActionResult:
     next_actions: dict[str, dict[str, str]]
 
 
-def _next_actions(result: Any, policy: str) -> dict[str, dict[str, str]]:
+def next_actions(result: Any, policy: str) -> dict[str, dict[str, str]]:
     """Expose the exact evidence accepted by existing Core approval and rollback APIs."""
     actions: dict[str, dict[str, str]] = {}
     candidate = result.candidate if isinstance(result, AutoTrainingOutcome) else result
@@ -114,7 +111,7 @@ def _next_actions(result: Any, policy: str) -> dict[str, dict[str, str]]:
 
 def build_bundle_result(config: dict[str, Any], action: str, result: Any) -> BundleActionResult:
     """Derive operator inputs and score handoff only from a completed typed outcome."""
-    _, policy = _workflow_policies(config)
+    _, policy = workflow_policies(config)
     receipt = result.alias_change if isinstance(result, AutoTrainingOutcome) else result
     score_requested = (
         config["score_handoff"] == "after_alias_change"
@@ -122,7 +119,7 @@ def build_bundle_result(config: dict[str, Any], action: str, result: Any) -> Bun
         and isinstance(receipt, AliasChangeReceipt)
         and receipt.kind in {"initial", "promotion", "rollback"}
     )
-    return BundleActionResult(action, result, score_requested, _next_actions(result, policy))
+    return BundleActionResult(action, result, score_requested, next_actions(result, policy))
 
 
 def _selection_mode(config: dict[str, Any]) -> str:
@@ -133,7 +130,7 @@ def _selection_mode(config: dict[str, Any]) -> str:
     return mode
 
 
-def _workflow_policies(config: dict[str, Any]) -> tuple[str, str]:
+def workflow_policies(config: dict[str, Any]) -> tuple[str, str]:
     """Validate independent policies while preserving legacy project behavior.
 
     Migrate both fields together and remove model_selection_mode. A mixed or
@@ -174,24 +171,24 @@ def _workflow_policies(config: dict[str, Any]) -> tuple[str, str]:
 def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
     """Bind only UC object names to one validated Bundle target."""
     for name in ("catalog", "input_schema", "output_schema", "metadata_schema"):
-        if not _IDENTIFIER.fullmatch(bindings.get(name, "")):
+        if not IDENTIFIER_PATTERN.fullmatch(bindings.get(name, "")):
             raise ValueError(f"Invalid {name} for a Unity Catalog identifier.")
     suffix = bindings.get("resource_suffix", "")
-    if suffix and (not suffix.startswith("_") or not _IDENTIFIER.fullmatch(suffix)):
+    if suffix and (not suffix.startswith("_") or not IDENTIFIER_PATTERN.fullmatch(suffix)):
         raise ValueError("Invalid resource_suffix for a Unity Catalog identifier.")
     resolved = config.copy()
     for name in _TABLE_FIELDS:
-        resolved[name] = _bind_target_name(name, config[name], bindings, suffix)
+        resolved[name] = bind_target_name(name, config[name], bindings, suffix)
     return resolved
 
 
-def _bind_target_name(name: str, value: Any, bindings: dict[str, str], suffix: str) -> str:
+def bind_target_name(name: str, value: Any, bindings: dict[str, str], suffix: str) -> str:
     """Resolve one UC name and enforce the target's output ownership."""
     if type(value) is not str:
         raise ValueError(f"{name} must be a string.")
     for key, replacement in bindings.items():
         value = value.replace("{" + key + "}", replacement)
-    if not _TABLE_NAME.fullmatch(value):
+    if not TABLE_NAME_PATTERN.fullmatch(value):
         raise ValueError(f"{name} must resolve to a three-part UC name.")
     if name in {"prediction_table", "model_name"}:
         schema = "output_schema" if name == "prediction_table" else "metadata_schema"
@@ -226,9 +223,9 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
     )
 
 
-def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
+def training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     """Keep the evaluation split and source snapshot identical across actions."""
-    _training_window_mode(config)
+    training_window_mode(config)
     version = config.get("training_version")
     if type(version) is not int or version < 0:
         raise ValueError(
@@ -247,7 +244,17 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         holdout_start=_optional_boundary(config, "holdout_start"),
         cutoff=_optional_boundary(config, "cutoff"),
         event_column=config.get("event_column"),
+        group_column=config.get("cv_group_column"),
+        weight_column=config.get("weight_column"),
+        reserved_weight_columns=tuple(config.get("reserved_weight_columns", ())),
+        weights_python_source=config.get("weights_python_source"),
+        weights_python_sha256=config.get("weights_python_sha256"),
         filter_unavailable_results=config.get("filter_unavailable_results", False),
+        drop_missing_labels=(
+            True
+            if config.get("training_layout") == "multi_target"
+            else config.get("drop_missing_labels", False)
+        ),
         result_available_at_column=config.get("result_available_at_column"),
         result_cutoff=_optional_boundary(config, "result_cutoff"),
         record_key_columns=tuple(config["record_key_columns"]),
@@ -325,14 +332,8 @@ def _validate_window_event(config: dict[str, Any], mode: str) -> None:
         raise ValueError("Window selection requires an explicit event_column.")
 
 
-def _training_window_mode(config: dict[str, Any]) -> str:
-    """Validate source selection independently of the random/temporal evaluation split."""
-    mode = config.get("training_window_mode", "full_snapshot")
-    if mode not in ("full_snapshot", "fixed_window", "rolling_calendar"):
-        raise ValueError(
-            "training_window_mode must be full_snapshot, fixed_window or rolling_calendar."
-        )
-    _validate_window_event(config, mode)
+def _validate_calendar_controls(config: dict[str, Any], mode: str) -> None:
+    """Keep existing calendar validation separate from elapsed-day settings."""
     if mode == "rolling_calendar":
         _validate_rolling_window(config)
     elif (
@@ -346,16 +347,47 @@ def _training_window_mode(config: dict[str, Any]) -> str:
         "holdout_months"
     ) is not None:
         raise ValueError("holdout_months must be null outside rolling temporal selection.")
+
+
+def _validate_daily_controls(config: dict[str, Any], mode: str) -> None:
+    """Require bounded integer day counts only for their active selection policy."""
+    if mode != "rolling_days":
+        for field in ("lookback_days", "holdout_days"):
+            if config.get(field) is not None:
+                raise ValueError(f"{field} must be null outside rolling_days selection.")
+        return
+    days = config.get("lookback_days")
+    if type(days) is not int or not 1 <= days <= 36500:
+        raise ValueError("lookback_days must be an integer from 1 to 36500.")
+    holdout = config.get("holdout_days")
+    if config.get("split_strategy") == "temporal":
+        if type(holdout) is not int or not 1 <= holdout < days:
+            raise ValueError("holdout_days must be an integer from 1 to lookback_days - 1.")
+    elif holdout is not None:
+        raise ValueError("holdout_days must be null outside rolling_days temporal selection.")
+
+
+def training_window_mode(config: dict[str, Any]) -> str:
+    """Validate source selection independently of the random/temporal evaluation split."""
+    mode = config.get("training_window_mode", "full_snapshot")
+    if mode not in ("full_snapshot", "fixed_window", "rolling_calendar", "rolling_days"):
+        raise ValueError(
+            "training_window_mode must be full_snapshot, fixed_window, "
+            "rolling_calendar or rolling_days."
+        )
+    _validate_window_event(config, mode)
+    _validate_calendar_controls(config, mode)
+    _validate_daily_controls(config, mode)
     _validate_result_lag(config)
     return mode
 
 
-def _training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
+def training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
     """Resolve data windows independently of how training was triggered."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Training needs a timezone-aware run instant.")
     settings = dict(config)
-    mode = _training_window_mode(config)
+    mode = training_window_mode(config)
     if mode == "rolling_calendar":
         lookback = config["monthly_lookback_months"]
         zone = ZoneInfo(config["window_timezone"])
@@ -377,6 +409,17 @@ def _training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
             ),
             cutoff=cutoff.isoformat(),
         )
+    elif mode == "rolling_days":
+        cutoff = now.astimezone(UTC)
+        settings.update(
+            start=(cutoff - timedelta(days=config["lookback_days"])).isoformat(),
+            holdout_start=(
+                (cutoff - timedelta(days=config["holdout_days"])).isoformat()
+                if config.get("split_strategy") == "temporal"
+                else None
+            ),
+            cutoff=cutoff.isoformat(),
+        )
     if config.get("filter_unavailable_results", False) and config.get("result_cutoff") is None:
         settings["result_cutoff"] = (
             now.astimezone(UTC) - timedelta(hours=config.get("result_availability_lag_hours", 0))
@@ -387,9 +430,10 @@ def _training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
     return settings
 
 
-def _resolve_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
+def resolve_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
     """Pin an explicit or latest snapshot once, using the configured data window."""
-    spec = _training_spec(_training_settings(config, now))
+    spec = training_spec(training_settings(config, now))
+    validate_cv_holdout_policy(spec, LocalCVSpec.from_workflow(config))
     if config.get("training_version") is not None:
         return spec
     table = spec.table
@@ -418,7 +462,7 @@ def _current_champion_version(config: dict[str, Any]) -> str | None:
     return champion.version
 
 
-def _prepare_training(
+def prepare_training(
     spark: Any,
     config: dict[str, Any],
     *,
@@ -439,7 +483,7 @@ def _prepare_training(
         target_column=config["target_column"],
         event_column=config.get("event_column"),
     )
-    spec = _resolve_training_spec(spark, config, now or datetime.now(UTC))
+    spec = resolve_training_spec(spark, config, now or datetime.now(UTC))
     champion = (
         controlled_champion_version(
             config["model_name"],
@@ -452,7 +496,7 @@ def _prepare_training(
     return spec, cv, champion
 
 
-def _automatic_promotion(
+def automatic_promotion(
     spark: Any,
     config: dict[str, Any],
     spec: LocalTrainingSpec,
@@ -466,8 +510,8 @@ def _automatic_promotion(
     report = candidate.comparison
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
-    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
-    saved_report, spec, saved_engine, filter_evidence = _load_evidence(
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
+    saved_report, spec, saved_engine, filter_evidence = load_candidate_evidence(
         client,
         candidate.model_name,
         candidate.model_version,
@@ -538,7 +582,7 @@ def _run_training_action(
     """Train a candidate and preserve failure evidence before applying promotion policy."""
     if experiment_name is None or artifact_path is None:
         raise ValueError("Training needs an experiment and temporary artifact path.")
-    spec, cv, champion_version = _prepare_training(spark, config, policy=policy, now=now)
+    spec, cv, champion_version = prepare_training(spark, config, policy=policy, now=now)
     expected = config.get("champion_version")
     # Legacy automatic selection ignored an explicit champion pin. Preserve
     # that SDK compatibility; current policies and durable tasks check it.
@@ -575,8 +619,9 @@ def _run_training_action(
             on_registered=lifecycle.registered,
             risk_category=config.get("risk_category"),
             cv=cv,
+            evaluation_charts=config.get("evaluation_charts"),
         )
-        alias_change = _automatic_promotion(
+        alias_change = automatic_promotion(
             spark,
             config,
             spec,
@@ -604,6 +649,7 @@ def _run_scoring_action(
     selection: str,
     tracking_uri: str,
     registry_uri: str,
+    recovery_request: dict[str, Any] | None = None,
 ) -> Any:
     """Resolve the scoring pin and activate rebuilt output only after a successful batch."""
     if selection == "champion":
@@ -613,20 +659,22 @@ def _run_scoring_action(
         if champion_version is None:
             raise ValueError("Champion scoring requires a committed champion.")
         config = {**config, "model_version": champion_version}
-    target = _scoring_target(config)
+    target = scoring_target(config)
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
-        _managed_prediction_view_exists(spark, config["prediction_table"])
+        managed_prediction_view_exists(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
     prepared = prepare_local_workflow(_scoring_config(score_config))
-    provision_prediction_table(spark, score_config, prepared)
+    if recovery_request is None:
+        provision_prediction_table(spark, score_config, prepared)
     result = run_incremental_local_batch(
         spark,
         prepared,
         record_key_columns=tuple(config["record_key_columns"]),
         admission=SingleWriterAdmission(),
+        **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
-        _activate_prediction_view(spark, config["prediction_table"], target)
+        activate_prediction_view(spark, config["prediction_table"], target)
     return result
 
 
@@ -653,6 +701,12 @@ def _run_rollback_action(
     )
 
 
+def _validate_action_layout(config: dict[str, Any], action: str) -> None:
+    """Keep single-call training from silently ignoring competition candidates."""
+    if action == "train" and config.get("training_layout") == "model_competition":
+        raise ValueError("Model competition training requires the phased lifecycle job.")
+
+
 def run_action(
     spark: Any,
     config: dict[str, Any],
@@ -666,11 +720,15 @@ def run_action(
     expected_champion_version: str | None = None,
     rejection_reason: str = "",
     promotion_receipt: AliasChangeReceipt | None = None,
+    recovery_request: dict[str, Any] | None = None,
 ) -> Any:
     """Delegate training, scoring and explicit lifecycle actions to existing Core services."""
+    _validate_action_layout(config, action)
+    if recovery_request is not None and action != "score":
+        raise ValueError("CDF recovery is only available for scoring.")
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
-    selection, policy = _workflow_policies(config)
+    selection, policy = workflow_policies(config)
     if action == "rollback":
         return _run_rollback_action(
             config, promotion_receipt, expected_champion_version, tracking_uri, registry_uri
@@ -711,5 +769,6 @@ def run_action(
             selection=selection,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
+            recovery_request=recovery_request,
         )
     raise ValueError(f"Unknown workflow action: {action}.")

@@ -2,20 +2,22 @@
 
 from uuid import uuid4
 
+from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
+
 from .promotion import (
     AliasAdmission,
     AliasChangeReceipt,
     AliasConflictError,
-    _active_marker,
-    _admission,
-    _assert_no_pending,
-    _assert_not_rejected,
-    _checked_challenger_event,
-    _commit_change,
-    _read_optional_alias,
+    active_marker,
     alias_resource_id,
+    assert_no_pending,
+    assert_not_rejected,
+    checked_challenger_event,
+    commit_change,
+    read_optional_alias,
+    validate_admission,
 )
-from .registry import ResolvedModel, _make_client, _require_mlflow, resolve_model
+from .registry import ResolvedModel, resolve_model
 
 
 class ChallengerLifecycle:
@@ -47,19 +49,19 @@ class ChallengerLifecycle:
         """Publish a registered contender as pending before its comparison runs."""
         if not isinstance(candidate, ResolvedModel) or candidate.name != self.model_name:
             raise ValueError("Registered candidate must belong to the lifecycle model.")
-        _admission(self.admission, self.registry_uri)
+        validate_admission(self.admission, self.registry_uri)
         _verify_nomination_digest(candidate, self.tracking_uri, self.registry_uri)
-        client = _make_client(_require_mlflow(), self.tracking_uri, self.registry_uri)
+        client = make_registry_client(require_mlflow(), self.tracking_uri, self.registry_uri)
         with self.admission.hold(alias_resource_id(candidate.name)):
-            _assert_not_rejected(client, candidate.name, candidate.version)
-            champion = _read_optional_alias(client, candidate.name, "champion")
+            assert_not_rejected(client, candidate.name, candidate.version)
+            champion = read_optional_alias(client, candidate.name, "champion")
             if champion != self.expected_champion_version:
                 raise AliasConflictError("Champion changed before challenger nomination.")
             if candidate.version == champion:
                 raise AliasConflictError("Champion cannot also be its own challenger.")
-            existing = _read_optional_alias(client, candidate.name, "challenger")
+            existing = read_optional_alias(client, candidate.name, "challenger")
             if existing is not None:
-                _checked_challenger_event(client, candidate.name, existing)
+                checked_challenger_event(client, candidate.name, existing)
                 if int(existing) > int(candidate.version):
                     raise AliasConflictError("A newer challenger already exists.")
                 if existing == candidate.version:
@@ -74,10 +76,10 @@ class ChallengerLifecycle:
                 new_version=candidate.version,
                 comparison_sha256=candidate.digest,
                 parent_event_id=(
-                    _active_marker(client, candidate.name, champion) if champion else None
+                    active_marker(client, candidate.name, champion) if champion else None
                 ),
             )
-            _commit_change(
+            commit_change(
                 client,
                 receipt,
                 [("challenger", candidate.version, existing)],
@@ -108,15 +110,15 @@ class ChallengerLifecycle:
         candidate = self.candidate
         if candidate is None:
             return
-        client = _make_client(_require_mlflow(), self.tracking_uri, self.registry_uri)
+        client = make_registry_client(require_mlflow(), self.tracking_uri, self.registry_uri)
         with self.admission.hold(alias_resource_id(candidate.name)):
             version = client.get_model_version(candidate.name, candidate.version)
             if (version.tags or {}).get("validation_status") != "pending":
                 return
-            _assert_no_pending(client, candidate.name)
-            if _read_optional_alias(client, candidate.name, "challenger") != candidate.version:
+            assert_no_pending(client, candidate.name)
+            if read_optional_alias(client, candidate.name, "challenger") != candidate.version:
                 raise AliasConflictError("Challenger changed before failure recording.")
-            _checked_challenger_event(client, candidate.name, candidate.version)
+            checked_challenger_event(client, candidate.name, candidate.version)
             receipt = AliasChangeReceipt(
                 event_id=uuid4().hex,
                 kind="evaluation_error",
@@ -125,11 +127,11 @@ class ChallengerLifecycle:
                 prior_version=candidate.version,
                 new_version=candidate.version,
                 comparison_sha256=None,
-                parent_event_id=_active_marker(
+                parent_event_id=active_marker(
                     client, candidate.name, candidate.version, "challenger"
                 ),
             )
-            _commit_change(
+            commit_change(
                 client,
                 receipt,
                 [],

@@ -622,8 +622,9 @@ async def test_legacy_roc_auc_thresholds_remain_readable_and_toggleable(async_se
 
 
 @pytest.mark.asyncio
-async def test_training_provenance_survives_preview_but_not_manual_save(async_session):
-    """A newly saved preview must never inherit the replaced training set's provenance."""
+@pytest.mark.parametrize("nested", [False, True])
+async def test_training_provenance_survives_preview_but_not_manual_save(async_session, nested):
+    """Persist OOF provenance and clear it only when a manual preview replaces the thresholds."""
     await _insert_job(async_session, "provenance-job")
     job = await async_session.get(TrainingJob, "provenance-job")
     assert job is not None
@@ -632,12 +633,16 @@ async def test_training_provenance_survives_preview_but_not_manual_save(async_se
         {
             "decision_thresholds": {"0": 0.6, "1": 0.4},
             "decision_threshold_metric": "f1",
+            **(
+                {"nested_cv": {"threshold_selection": {"selection": "inner_oof"}}} if nested else {}
+            ),
         },
     )
     await async_session.commit()
     async_session.expire_all()
     seeded = await ThresholdTuningService.get_saved(async_session, "provenance-job")
     assert seeded["source"] == "training"
+    assert seeded["split_used"] == ("inner_oof" if nested else "validation")
 
     with patch(
         "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"

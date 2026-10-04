@@ -1,5 +1,7 @@
 """Optuna study search with fold-local fitting and genuine pruning checkpoints."""
 
+from __future__ import annotations
+
 import math
 from collections.abc import Callable, Mapping
 from concurrent.futures import CancelledError
@@ -11,6 +13,8 @@ from sklearn.metrics import check_scoring
 from sklearn.model_selection import check_cv
 from sklearn.utils import _safe_indexing, indexable
 
+from ..._cv_weights import preflight_weights, prepare_weights, take_weights
+from ..._sample_weights import SampleWeightError
 from .optuna_folds import fit_and_score_fold
 
 
@@ -88,7 +92,7 @@ class OptunaPruningSearchCV:
         self.enable_pruning = True
         self.refit = False
 
-    def fit(self, X: Any, y: Any) -> "OptunaPruningSearchCV":
+    def fit(self, X: Any, y: Any, *, sample_weight: Any = None) -> OptunaPruningSearchCV:
         """Materialize shared CV splits once and run independent candidate objectives."""
         if self.mode not in {"folds", "iterations"}:
             raise ValueError(f"Unsupported pruning mode: {self.mode}")
@@ -96,13 +100,15 @@ class OptunaPruningSearchCV:
             raise ValueError("The common iteration budget must be positive.")
         X, y = indexable(X, y)
         cv = check_cv(self.cv, y, classifier=is_classifier(self.estimator))
+        sample_weight = prepare_weights(sample_weight, len(X))
+        preflight_weights(sample_weight, cv, X, y)
         splits = list(cv.split(X, y))
         if not splits:
             raise ValueError("Cross-validation must provide at least one split.")
         self.scorer_ = check_scoring(self.estimator, scoring=self.scoring)
         self.study_ = self.study
         self.study_.optimize(
-            lambda trial: self._objective(trial, X, y, splits),
+            lambda trial: self._objective(trial, X, y, splits, sample_weight),
             n_trials=self.n_trials,
             timeout=self.timeout,
             n_jobs=self.n_jobs,
@@ -112,7 +118,9 @@ class OptunaPruningSearchCV:
         self.n_trials_ = len(self.study_.trials)
         return self
 
-    def _objective(self, trial: Any, X: Any, y: Any, splits: list[Any]) -> float:
+    def _objective(
+        self, trial: Any, X: Any, y: Any, splits: list[Any], sample_weight: Any = None
+    ) -> float:
         """Continue ordinary bad candidates while letting pruning and cancellation escape."""
         try:
             parameters = {
@@ -120,8 +128,8 @@ class OptunaPruningSearchCV:
                 for name, distribution in self.param_distributions.items()
             }
             candidate = clone(self.estimator).set_params(**parameters)
-            return self._score_candidate(trial, candidate, X, y, splits)
-        except (optuna.TrialPruned, CancelledError):
+            return self._score_candidate(trial, candidate, X, y, splits, sample_weight)
+        except (optuna.TrialPruned, CancelledError, SampleWeightError):
             raise
         except Exception as error:
             # Only this marker is caught by Study.optimize: cancellation must
@@ -129,23 +137,37 @@ class OptunaPruningSearchCV:
             raise _TrialFitFailure(f"{type(error).__name__}: {error}") from error
 
     def _score_candidate(
-        self, trial: Any, candidate: Any, X: Any, y: Any, splits: list[Any]
+        self,
+        trial: Any,
+        candidate: Any,
+        X: Any,
+        y: Any,
+        splits: list[Any],
+        sample_weight: Any = None,
     ) -> float:
         """Score complete held-out folds and reject the entire trial if any fold fails."""
         scores: list[float] = []
+        coverage: list[dict[str, Any]] = []
         for fold_index, (train, valid) in enumerate(splits):
             report = None
             if self.mode == "iterations":
                 report = self._iteration_reporter(trial, candidate, scores, fold_index, len(splits))
-            score = fit_and_score_fold(
-                candidate,
-                _safe_indexing(X, train),
-                _safe_indexing(y, train),
-                _safe_indexing(X, valid),
-                _safe_indexing(y, valid),
-                self.scorer_,
-                report=report,
-            )
+            fold_coverage: dict[str, Any] = {"fold": fold_index + 1, "input_rows": len(valid)}
+            coverage.append(fold_coverage)
+            try:
+                score = fit_and_score_fold(
+                    candidate,
+                    _safe_indexing(X, train),
+                    _safe_indexing(y, train),
+                    _safe_indexing(X, valid),
+                    _safe_indexing(y, valid),
+                    self.scorer_,
+                    report=report,
+                    sample_weight=take_weights(sample_weight, train),
+                    evaluation_coverage=fold_coverage,
+                )
+            finally:
+                trial.set_user_attr("evaluation_coverage", coverage)
             scores.append(_finite_score(score))
             if self.mode == "folds":
                 trial.report(math.fsum(scores) / len(scores), fold_index)

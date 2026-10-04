@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import get_settings
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
+from skyulf.preprocessing.time_series.history import TemporalHistorySession
 
 logger = logging.getLogger(__name__)
 
@@ -104,16 +105,19 @@ async def predict(
         if not deployment:
             raise HTTPException(status_code=404, detail="No active deployment found")
 
+        history_options, history = _prediction_history(prediction_request, deployment.job_id)
         predictions, thresholds_applied = await DeploymentService.predict(
             session,
             prediction_request.data,
             override_thresholds=prediction_request.override_thresholds,
+            **history_options,
         )
 
         return PredictionResponse(
             predictions=predictions,
             model_version=deployment.job_id,
             thresholds_applied=thresholds_applied,
+            history_state=history.state if history is not None else None,
         )
     except HTTPException:
         raise
@@ -127,3 +131,11 @@ async def predict(
     except Exception:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=500, detail="Prediction failed") from None
+
+
+def _prediction_history(prediction_request: PredictionRequest, model_id: str) -> tuple:
+    """Start explicit caller-owned continuation without mutating server model caches."""
+    if not prediction_request.continue_history and prediction_request.history_state is None:
+        return {}, None
+    history = TemporalHistorySession(model_id, prediction_request.history_state)
+    return {"history": history}, history

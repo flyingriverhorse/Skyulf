@@ -1,0 +1,52 @@
+"""Editable candidates generated from Bundle answers for one shared target.
+
+Each entry owns its model params, tuning controls and populated search_space.
+Change an entry below without changing another candidate. Set search_space to {}
+to use Core's current automatic space instead of the generated snapshot. Changing
+ensemble base models or calibration also requires updating their nested search
+keys, or clearing the space to {}. Fixed params must not contradict searched axes.
+
+Select preprocessing_recipe from the builders in features/preprocessing.py.
+Source, task, target, pre-split, holdout, CV and comparison metric remain shared.
+Scoring replays the saved winner; it does not rerun candidate definitions.
+"""
+
+from copy import deepcopy
+
+# To fix class weights for one supported classifier, edit that candidate below:
+#   MODELS["candidate_name"]["modeling"]["base_model"]["params"]["class_weight"]
+# Replace candidate_name with an actual MODELS key. Add "class_weight": "balanced"
+# to its existing params, or use Python None to disable it. Remove "class_weight"
+# from that candidate's modeling.search_space to keep it fixed. To tune it instead,
+# keep the search axis and omit the fixed key from base_model.params.
+# Other candidates keep their own settings.
+# Sample weights are optional and independent of class_weight.
+# Set WEIGHT_COLUMN below to a training column, e.g. "training_weight".
+# None disables sample weights; scoring never needs this column.
+# Both settings can be enabled together. Class weights apply only to classifiers.
+
+
+WEIGHT_COLUMN = {{if eq .sample_weight_enabled "true"}}"{{.weight_column}}"{{else}}None{{end}}
+
+MODELS = {
+{{if eq .training_layout "model_competition"}}
+{{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.competition_candidate_count}}
+{{$model := index $ (printf "competition_%s_model_%s" $.task $slot)}}
+{{if eq $.sample_weight_enabled "true"}}{{$model = index $ (printf "competition_%s_model_%s_weighted" $.task $slot)}}{{end}}
+    "{{$model}}_{{$slot}}": {
+        # Optional classification policy per candidate; see single_model.py examples.
+        "decision_threshold": {"mode": "off"},
+        "preprocessing_recipe": "{{$.competition_preprocessing_recipe}}",
+        "modeling": {{template "modeling" (map (pair "indent" "        ") (pair "values" $) (pair "prefix" "") (pair "model" $model) (pair "task" $.task) (pair "ensemble_prefix" (printf "competition_ensemble_%s_" $slot)))}},
+    },
+{{end}}{{end}}{{end}}
+}
+
+
+def build_candidates(task):
+    """Return detached model settings for the task selected during Bundle setup."""
+    if task != "{{.task}}":
+        raise ValueError("Candidate task differs from the task selected during Bundle setup.")
+    if not MODELS:
+        raise ValueError("Choose model_competition during Bundle setup to generate candidates.")
+    return deepcopy(MODELS)

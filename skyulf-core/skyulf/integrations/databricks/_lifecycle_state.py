@@ -7,14 +7,19 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ..mlflow.registry import _make_client, _require_mlflow
+from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
+
 from ..mlflow.tracking import TrackingRun
 from .local_training_evidence import evidence_digest
 
-_PREDECESSORS = {
+PHASE_PREDECESSORS = {
+    "load_data": "prepare",
+    "prepare_dataset": "load_data",
+    "select_best_model": "train",
     "train": "prepare",
     "evaluate_register": "train",
     "compare": "evaluate_register",
+    "generate_charts": "compare",
     "decide": "compare",
     "operator": "prepare",
     "finalize": "prepare",
@@ -61,13 +66,13 @@ class LifecyclePhaseResult:
     output: dict[str, Any]
 
 
-class _PhaseStore:
+class PhaseStore:
     """Read and write explicit client artifacts without a fluent active MLflow run."""
 
     def __init__(self, tracking_uri: str, context: LifecycleContext) -> None:
         """Keep the client store and validated invocation fixed across each operation."""
         self.context = context
-        self.client = _make_client(_require_mlflow(), tracking_uri, None)
+        self.client = make_registry_client(require_mlflow(), tracking_uri, None)
         self.run_id = ""
         self.request_digest = ""
         self.request: dict[str, Any] = {}
@@ -146,7 +151,7 @@ class _PhaseStore:
     def _validate_predecessor_chain(self, phase: str, value: dict[str, Any]) -> None:
         """Recursively verify the expected predecessor before reusing a receipt."""
         previous = value.get("predecessor")
-        expected = _PREDECESSORS.get(phase)
+        expected = self.predecessor(phase)
         if expected is None:
             if phase != "prepare" or previous is not None:
                 raise ValueError("Invalid lifecycle predecessor chain.")
@@ -156,6 +161,30 @@ class _PhaseStore:
             or previous != self.reference(self.receipt(expected))
         ):
             raise ValueError("Lifecycle predecessor identity differs from saved evidence.")
+
+    def predecessor(self, phase: str) -> str | None:
+        """Use the graph pinned at initialization when validating the receipt chain."""
+        if "branch_plan" in self.request:
+            branches = {
+                f"branch_{item['name']}" for item in self.request["branch_plan"]["branches"]
+            }
+            if phase in branches | {"register_model_set"}:
+                return "prepare"
+            if phase in {"evaluate_model_set", "model_decision", "generate_charts"}:
+                return {
+                    "evaluate_model_set": "register_model_set",
+                    "model_decision": "evaluate_model_set",
+                    "generate_charts": "evaluate_model_set",
+                }[phase]
+        if phase.startswith("candidate_") and phase.removeprefix("candidate_") in self.request.get(
+            "competition", {}
+        ).get("candidates", {}):
+            return "prepare_dataset"
+        if self.request.get("graph_version", 2) == 3:
+            overrides = {"train": "prepare_dataset", "evaluate_register": "select_best_model"}
+            if phase in overrides:
+                return overrides[phase]
+        return PHASE_PREDECESSORS.get(phase)
 
     def reference(self, receipt: dict[str, Any]) -> dict[str, str]:
         """Expose only durable identity and digest strings to task values."""

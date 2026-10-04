@@ -14,6 +14,7 @@ from .._artifacts import PolynomialFeaturesArtifact
 from .._helpers import select_then_to_numpy
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._common import _validate_generated_names
 
 
 def _polynomial_compute(
@@ -29,20 +30,23 @@ def _polynomial_compute(
     transformed = poly.transform(X_subset)
     if hasattr(transformed, "to_numpy"):
         transformed = transformed.to_numpy()
-    feature_names = poly.get_feature_names_out(valid_cols)
-
-    include_input = params.get("include_input_features", False)
-    keep = [i for i, p in enumerate(poly.powers_) if not (sum(p) == 1 and not include_input)]
+    keep, new_names = _polynomial_names(poly, valid_cols, params)
     if not keep:
         return None
+    return np.ascontiguousarray(transformed[:, keep]), new_names
 
-    transformed = np.ascontiguousarray(transformed[:, keep])
-    feature_names = feature_names[keep]
-    output_prefix = params.get("output_prefix", "poly")
-    new_names = [
-        f"{output_prefix}_{name.replace(' ', '_').replace('^', '_pow_')}" for name in feature_names
+
+def _polynomial_names(
+    poly: PolynomialFeatures, columns: list[str], params: dict[str, Any]
+) -> tuple[list[int], list[str]]:
+    """Derive the exact emitted names without transforming data or changing stored metadata."""
+    include_input = params.get("include_input_features", False)
+    keep = [
+        i for i, powers in enumerate(poly.powers_) if not (sum(powers) == 1 and not include_input)
     ]
-    return transformed, new_names
+    names = poly.get_feature_names_out(columns)[keep]
+    prefix = params.get("output_prefix", "poly")
+    return keep, [f"{prefix}_{name.replace(' ', '_').replace('^', '_pow_')}" for name in names]
 
 
 def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -58,8 +62,9 @@ def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
     if result is None:
         return X, _y
     transformed, new_names = result
+    _validate_generated_names(new_names, list(X.columns), "PolynomialFeatures")
     df_poly = pl.DataFrame(transformed, schema=new_names)
-    return pl.concat([X, df_poly], how="horizontal"), _y
+    return X.hstack(df_poly), _y
 
 
 def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -75,6 +80,7 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
     if result is None:
         return X, _y
     transformed, new_names = result
+    _validate_generated_names(new_names, list(X.columns), "PolynomialFeatures")
     df_poly = pd.DataFrame(cast(Any, transformed), columns=cast(Any, new_names), index=X.index)
     return pd.concat(cast(Any, [X, df_poly]), axis=1), _y
 
@@ -90,7 +96,8 @@ class PolynomialFeaturesApplier(BaseApplier):
         artifact only carries configuration. Artifact columns absent from ``X``
         are filtered out first, and the default ``include_input_features=False``
         drops the degree-1 terms so the originals are not duplicated. ``X`` is
-        returned unchanged when nothing survives.
+        returned unchanged when nothing survives. Emitted names must be unique
+        and must not collide with existing columns.
         """
         return apply_dual_engine(
             X, params, {"polars": _polynomial_apply_polars, "pandas": _polynomial_apply_pandas}
@@ -119,7 +126,7 @@ class PolynomialFeaturesCalculator(BaseCalculator):
         ``auto_detect`` is set. ``PolynomialFeatures`` is fitted here purely to
         derive ``feature_names`` — the expansion itself is recomputed at apply
         time. Returns an empty artifact, a no-op passthrough, when no column
-        resolves.
+        resolves. Ambiguous generated names raise ``ValueError`` before replay.
         """
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):
@@ -138,6 +145,8 @@ class PolynomialFeaturesCalculator(BaseCalculator):
             degree=degree, interaction_only=interaction_only, include_bias=include_bias
         )
         poly.fit(X_np)
+        _, names = _polynomial_names(poly, cols, config)
+        _validate_generated_names(names, list(X.columns), "PolynomialFeatures")
         return cast(
             PolynomialFeaturesArtifact,
             {

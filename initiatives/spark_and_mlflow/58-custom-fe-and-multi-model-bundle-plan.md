@@ -213,7 +213,13 @@ next model's input.
 
 ## SM-36a - Project-owned feature engineering and output rules
 
-Dependency: SM-33D. Execute after SM-36 in the local improvement sequence.
+Status 2026-09-29: DONE for the approved bounded project-delivery scope.
+Evidence: reports102, 105 and [106](106-sm36a-project-delivery.md).
+Dedup/fixed replay was delivered in SM-33H3; group/temporal CV in SM-36g/h.
+Arbitrary custom pre-split value edits, optional H3/sentence-model runtime
+validation and new generic data-quality gates remain separate follow-ups.
+
+Dependency: SM-33D. Executed after SM-36 in the local improvement sequence.
 
 User update 2026-09-26: [report 62](62-pre-split-cleaning-and-leakage-plan.md)
 audits the existing operation-aware leakage classifier. SM-33H1/H2 bring forward
@@ -221,30 +227,30 @@ the initial pre-split training filters and saved-rule lifecycle replay before
 SM-34. They do not add general custom callbacks or weaken Deduplicate's current
 pre-split rejection. Broader work below stays here:
 
-- [ ] Review deterministic duplicate/group separation and label conflicts before
+- [x] Review deterministic duplicate/group separation and label conflicts before
   changing Core/backend policy; do not mark all dedup operations stateless.
-- [ ] Define raw-input replay for any feature-changing pre-split transforms,
+- [x] Define raw-input replay for any feature-changing pre-split transforms,
   avoiding omitted or double-applied normalization during model inference.
-- [ ] Define keyed scoring exclusions with reasons/coverage and incremental
+- [x] Define keyed scoring exclusions with reasons/coverage and incremental
   progress; training-only target filters must never run on unlabeled score input.
-- [ ] Review lag/rolling history and point-in-time boundaries separately from
+- [x] Review lag/rolling history and point-in-time boundaries separately from
   the fit-statistics leakage flag.
 
-- [ ] Add an opt-in project Python package, with an editable feature-engineering
+- [x] Add an opt-in project Python package, with an editable feature-engineering
   module (for example `src/<project_package>/features.py`). Reuse existing
   Calculator/Applier registration; avoid editing Skyulf source per project.
-- [ ] Separate stateless expressions, learned transformations and source
+- [x] Separate stateless expressions, learned transformations and source
   eligibility filters. Preserve record keys and explicit row inclusion/exclusion
   evidence rather than hiding dropped rows inside prediction.
-- [ ] Fit learned state only on training rows and inside each CV/tuning fold.
+- [x] Fit learned state only on training rows and inside each CV/tuning fold.
   Reuse the saved state during evaluation, approval and inference; handle unseen
   categories and group-imputation fallbacks explicitly.
-- [ ] Package project code, dependencies, state and code identity with the model
+- [x] Package project code, dependencies, state and code identity with the model
   delivery contract. A source file used during train must also be importable when
   MLflow loads the artifact in a fresh scoring/serving process.
-- [ ] Support named deterministic post-prediction rules with declared output
+- [x] Support named deterministic post-prediction rules with declared output
   columns/types and versioned parameters. Keep company rules out of generic Core.
-- [ ] Verify pandas/Polars parity, clean-process artifact loading, train/inference
+- [x] Verify pandas/Polars parity, clean-process artifact loading, train/inference
   schema and feature order, keys, nulls, unknown groups, and row-scope contracts.
   Expose readable config and an English example before marking the task done.
 
@@ -252,19 +258,23 @@ pre-split rejection. Broader work below stays here:
 
 Dependencies: SM-36, SM-36a.
 
-- [ ] Allow named training branches with their own target, features, preprocessing,
+Status: DONE; [implementation and live evidence](107-sm36b-training-branches.md).
+Replay means a fresh registration attempt with identical pinned selection, not
+exactly-once retry. Coherent activation/composed scoring remain SM-36c.
+
+- [x] Allow named training branches with their own target, features, preprocessing,
   estimator, optional tuning/CV, quality metric and registered model name.
-- [ ] Pin the shared source snapshot and reproducible split/sample evidence.
+- [x] Pin the shared source snapshot and reproducible split/sample evidence.
   Define per-target label availability explicitly; missing labels for one target
   must not silently discard training rows for every other branch.
-- [ ] Separate independent targets from a same-target algorithm search. The latter
+- [x] Separate independent targets from a same-target algorithm search. The latter
   is model selection; different-target models may all remain in use.
-- [ ] Log a parent workflow run and linked component runs, fitted pipelines,
+- [x] Log a parent workflow run and linked component runs, fitted pipelines,
   metrics, dependencies and immutable model versions. Keep each target's
   champion/challenger comparisons within its own task and metric contract.
-- [ ] Support sequential execution first; any concurrent mode must enforce an
+- [x] Support sequential execution first; any concurrent mode must enforce an
   aggregate local memory budget. Three models need not mean three user-facing jobs.
-- [ ] Test three branches, distinct label subsets, reproducible retry, a failed
+- [x] Test three branches, distinct label subsets, reproducible retry, a failed
   branch and leakage-free evaluation. Do not publish a complete model set when
   required components failed.
 

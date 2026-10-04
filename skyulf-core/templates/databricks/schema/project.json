@@ -1,0 +1,119 @@
+{
+  "training_layout": {
+    "order": 0,
+    "type": "string",
+    "default": "single_model",
+    "description": "Training layout: single_model = guided model setup; multi_target = shared setup, then define target/model recipes in src/modeling/multi_model.py and score them as one versioned model set; model_competition = compare candidates for one target using shared CV, then select one winner; select models below and generate editable src/modeling/model_competition.py",
+    "enum": [
+      "single_model",
+      "multi_target",
+      "model_competition"
+    ]
+  },
+  "project_name": {
+    "order": 1,
+    "type": "string",
+    "default": "skyulf_local",
+    "description": "1. Data | Project folder and Bundle name (letters, digits and underscores)",
+    "pattern": "^[a-z][a-z0-9_]*$"
+  },
+  "engine": {
+    "order": 2,
+    "type": "string",
+    "default": "pandas",
+    "description": "1. Data | Library used for training and prediction: pandas or Polars; both can run inside Databricks",
+    "enum": [
+      "pandas",
+      "polars"
+    ]
+  },
+  "task": {
+    "order": 3,
+    "type": "string",
+    "default": "regression",
+    "description": "1. Data | What will the model predict? regression = a number; classification = a category",
+    "enum": [
+      "regression",
+      "classification"
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "catalog": {
+    "order": 4,
+    "type": "string",
+    "default": "REPLACE_TEST_CATALOG",
+    "description": "Optional init-file test catalog; otherwise configure deployment/variables.yml",
+    "skip_prompt_if": {},
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+  },
+  "schema": {
+    "order": 5,
+    "type": "string",
+    "default": "REPLACE_TEST_SCHEMA",
+    "description": "Optional init-file test schema; otherwise configure deployment/variables.yml",
+    "skip_prompt_if": {},
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+  },
+  "source_table_name": {
+    "order": 6,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Training INPUT table: existing rows with features and known answers. Enter table name only; blank uses <project_name>_source",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "record_key_columns": {
+    "order": 9,
+    "type": "string",
+    "default": "entity_id",
+    "description": "1. Data | Columns identifying one record, e.g. customer_id or customer_id, observation_id. Separate names with commas; no brackets or quotes",
+    "pattern": "^[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*(?:,[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*)*$"
+  },
+  "input_columns": {
+    "order": 10,
+    "type": "string",
+    "default": "feature_value",
+    "description": "1. Data | Columns the model learns from, e.g. income, age, balance. Separate names with commas; exclude record keys and the answer column",
+    "pattern": "^[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*(?:,[ \\t]*[A-Za-z_][A-Za-z0-9_]*[ \\t]*)*$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "target_column": {
+    "order": 11,
+    "type": "string",
+    "default": "target",
+    "description": "1. Data | Column containing the known answer during training, e.g. churn or claim_amount",
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "training_version": {
+    "order": 12,
+    "type": "string",
+    "default": "null",
+    "description": "1. Data | Training table snapshot number from Databricks table History, e.g. 0 or 12 (not a model version). null = resolve latest once at run start; an explicit version pins that snapshot for manual and scheduled runs",
+    "pattern": "^(?:null|0|[1-9][0-9]*)$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  }
+}

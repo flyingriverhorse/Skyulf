@@ -88,11 +88,14 @@ export function HyperparametersSection({
                       {param.type === 'select' ? (
                         <select
                           id={`${fieldId}-param-${param.name}`}
-                          value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
-                          onChange={(e) => onChange({
-                            ...config,
-                            hyperparameters: { ...config.hyperparameters, [param.name]: e.target.value }
-                          })}
+                          value={String(config.hyperparameters[param.name] !== undefined ? config.hyperparameters[param.name] : param.default)}
+                          onChange={(e) => {
+                            const selectedOption = param.options?.find(opt => String(opt.value) === e.target.value);
+                            onChange({
+                              ...config,
+                              hyperparameters: { ...config.hyperparameters, [param.name]: selectedOption ? selectedOption.value : e.target.value },
+                            });
+                          }}
                           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                         >
                           {param.options?.map((opt: { label: string; value: unknown }) => (

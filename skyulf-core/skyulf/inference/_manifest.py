@@ -46,6 +46,7 @@ class ThresholdProvenance(BaseModel):
     tuning_values: tuple[float, ...] = ()
     pipeline_values: tuple[float, ...] = ()
     metric: str | None = None
+    positive_class: Label | None = None
 
 
 class BundleManifest(BaseModel):
@@ -122,6 +123,10 @@ class BundleManifest(BaseModel):
     def _validate_thresholds(self) -> None:
         """Threshold arrays are class-ordered and must agree with their active source."""
         state = self.thresholds
+        if state.positive_class is not None and (
+            len(self.classes) != 2 or state.positive_class not in self.classes or not state.values
+        ):
+            raise ValueError("Threshold positive_class requires an active binary decision policy.")
         for values in (state.values, state.tuning_values, state.pipeline_values):
             self._validate_threshold_values(values)
         selected = {
@@ -203,6 +208,8 @@ def check_runtime(manifest: BundleManifest) -> None:
 def semantic_digest(manifest: BundleManifest) -> str:
     """Hash semantic metadata and fitted model state independently of pickle wire encoding."""
     content = manifest.model_dump(exclude={"semantic_digest", "model_sha256", "fe_sha256"})
+    if content["thresholds"]["positive_class"] is None:
+        content["thresholds"].pop("positive_class")
     return artifact_digest(content).hex()
 
 

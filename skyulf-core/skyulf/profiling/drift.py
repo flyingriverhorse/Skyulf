@@ -4,15 +4,18 @@ Every column shared by the two datasets is scored with distribution metrics —
 PSI, Wasserstein distance, KS and KL divergence for numeric columns, PSI over
 the category frequencies for categorical ones — and columns present on only
 one side are reported separately as schema drift. Thresholds are per-metric
-and caller-overridable; the KS verdict is taken on the statistic rather than
-the p-value, which shrinks with sample size.
+and caller-overridable. A distribution verdict also requires statistical
+support after Bonferroni correction across the tested feature family.
 """
 
 import logging
+from collections import Counter
 
 import numpy as np
 import polars as pl
 from pydantic import BaseModel
+
+from ._drift_evidence import DriftEvidence, categorical_evidence, correct_evidence, numeric_evidence
 
 try:
     from scipy.stats import entropy, ks_2samp, wasserstein_distance
@@ -32,13 +35,12 @@ PSI_MODERATE = 0.1
 class DriftMetric(BaseModel):
     """One drift statistic for one column.
 
-    ``value`` is reported on the same scale as ``threshold`` whenever ``value``
-    is what the verdict was made on, so ``value > threshold`` reproduces
-    ``has_drift`` and consumers that re-derive the verdict (the UI's threshold
-    sliders do) need no metric-specific knowledge. The one exception is
-    ``ks_test_p_value``: it rides along for diagnostics, never decides drift
-    (the p-value shrinks with sample size), and carries the KS statistic's
-    threshold rather than one of its own.
+    ``value > threshold`` reproduces the effect-size diagnostic ``has_drift``.
+    A final column verdict additionally requires ``evidence.status ==
+    "supported"``; threshold sliders must preserve that statistical guard.
+    The exception is ``ks_test_p_value``: this raw diagnostic carries the KS
+    statistic's effect flag and threshold for compatibility. The separate
+    evidence record applies feature-family correction to its probability.
 
     ``raw_value`` is set only where ``value`` is a transform of a more familiar
     quantity — the Wasserstein distance is reported normalized by the reference
@@ -77,6 +79,7 @@ class ColumnDrift(BaseModel):
     drift_detected: bool
     suggestions: list[str] = []
     distribution: DriftDistribution | None = None
+    evidence: DriftEvidence | None = None
 
 
 class DriftReport(BaseModel):
@@ -116,10 +119,10 @@ class DriftCalculator:
         """Calculates drift for all common columns.
 
         ``drifted_columns_count`` covers both kinds of drift: columns whose
-        value distribution moved past a threshold, and columns that appeared or
-        disappeared between the two schemas. A vanished column used to leave the
-        count at 0, so the report claimed no drift while the backend classified
-        that same structural change as critical.
+        value distribution moved past an effect threshold with statistical
+        support, and columns that appeared or disappeared between the schemas.
+        A vanished column used to leave the count at 0, so the report claimed no
+        drift while the backend classified that same structural change as critical.
         """
         if not SCIPY_AVAILABLE:
             raise ImportError("scipy is required for drift calculation")
@@ -128,7 +131,6 @@ class DriftCalculator:
         missing_columns, new_columns = self._detect_schema_drift()
 
         column_drifts = {}
-        drifted_count = 0
 
         for col in self.common_columns:
             col_drift = self._calculate_column_drift(col, thresholds)
@@ -136,8 +138,8 @@ class DriftCalculator:
                 continue
 
             column_drifts[col] = col_drift
-            if col_drift.drift_detected:
-                drifted_count += 1
+        self._apply_statistical_evidence(column_drifts)
+        drifted_count = sum(column.drift_detected for column in column_drifts.values())
 
         return DriftReport(
             reference_rows=len(self.reference_df),
@@ -147,6 +149,28 @@ class DriftCalculator:
             missing_columns=missing_columns,
             new_columns=new_columns,
         )
+
+    @staticmethod
+    def _apply_statistical_evidence(columns: dict[str, ColumnDrift]) -> None:
+        """Require both practical effect and statistical support, preserving schema alerts."""
+        correct_evidence(
+            [column.evidence for column in columns.values() if column.evidence is not None]
+        )
+        for column in columns.values():
+            evidence = column.evidence
+            if evidence is None:
+                continue
+            column.drift_detected = column.drift_detected and evidence.status == "supported"
+            if not column.drift_detected:
+                column.suggestions = [evidence.reason] if evidence.reason else []
+
+    @staticmethod
+    def _numeric_evidence(
+        metrics: list[DriftMetric], reference_count: int, current_count: int
+    ) -> DriftEvidence:
+        """Use the already measured KS result without rerunning or changing its exact ordering."""
+        probability = next(metric.value for metric in metrics if metric.metric == "ks_test_p_value")
+        return numeric_evidence(probability, reference_count, current_count)
 
     def _calculate_column_drift(self, col: str, thresholds: dict[str, float]) -> ColumnDrift | None:
         """Compare compatible representations and report incompatible column types explicitly."""
@@ -163,6 +187,9 @@ class DriftCalculator:
                 return self._type_drift(col)
             return self._calculate_categorical_drift(col, thresholds)
 
+        if dtype in (pl.Date, pl.Datetime):
+            return self._calculate_temporal_column_drift(col, thresholds)
+
         if not dtype.is_numeric():
             if dtype != current.dtype:
                 return self._type_drift(col)
@@ -170,6 +197,52 @@ class DriftCalculator:
             return None
 
         return self._calculate_numeric_column_drift(col, thresholds)
+
+    @staticmethod
+    def _compatible_temporal_types(reference: pl.DataType, current: pl.DataType) -> bool:
+        """Compare aware instants or naive wall times without inventing a timezone."""
+        if reference == pl.Date:
+            return current == pl.Date
+        if isinstance(reference, pl.Datetime) and isinstance(current, pl.Datetime):
+            return (reference.time_zone is None) == (current.time_zone is None)
+        return False
+
+    @staticmethod
+    def _temporal_ticks(series: pl.Series) -> np.ndarray:
+        """Use exact nanoseconds beyond the narrower Int64 nanosecond epoch range."""
+        scale = (
+            {"ms": 1_000_000, "us": 1_000, "ns": 1}[series.dtype.time_unit]
+            if isinstance(series.dtype, pl.Datetime)
+            else 86_400_000_000_000
+        )
+        ticks = series.drop_nulls().to_physical().to_list()
+        return np.array([value * scale for value in ticks], dtype=object)
+
+    def _calculate_temporal_column_drift(
+        self, col: str, thresholds: dict[str, float]
+    ) -> ColumnDrift:
+        """Score Date or Datetime shifts, reporting raw Wasserstein distance in seconds.
+
+        Datetime unit and aware timezone representations share physical instants.
+        Date remains distinct from Datetime, and aware/naive values remain
+        incompatible. Exact common centering keeps sub-microsecond differences;
+        temporal histograms are omitted instead of labeling numeric bins as dates.
+        """
+        reference, current = self.reference_df[col], self.current_df[col]
+        if not self._compatible_temporal_types(reference.dtype, current.dtype):
+            return self._type_drift(col)
+        ref_data, curr_data = self._temporal_ticks(reference), self._temporal_ticks(current)
+        origin = min(min(ref_data), min(curr_data))
+        metrics, drifted, flags = self._compute_numeric_metrics(
+            ref_data - origin, curr_data - origin, thresholds, value_scale=1_000_000_000
+        )
+        return ColumnDrift(
+            column=col,
+            metrics=metrics,
+            drift_detected=drifted,
+            suggestions=self._numeric_drift_suggestions(drifted, flags),
+            evidence=self._numeric_evidence(metrics, len(ref_data), len(curr_data)),
+        )
 
     def _type_drift(self, col: str) -> ColumnDrift:
         """Keep an incompatible common column visible through the existing metric contract."""
@@ -187,6 +260,10 @@ class DriftCalculator:
     @staticmethod
     def _numeric_values(series: pl.Series) -> np.ndarray:
         """Remove missing observations while preserving native numeric precision where possible."""
+        if series.dtype == pl.Int128:
+            # Polars' native NumPy conversion panics for Int128. Python integers
+            # preserve all 128 bits without invoking that unsupported native path.
+            return np.array(series.drop_nulls().to_list(), dtype=object)
         # Decimal arrays use Python objects, which cannot mix with scipy's float
         # distances. Integer/float arrays retain their own widths and fractions.
         if series.dtype.is_decimal():
@@ -203,7 +280,7 @@ class DriftCalculator:
         """Merge user-supplied drift thresholds over the defaults."""
         default_thresholds = {
             "psi": 0.2,
-            "ks_statistic": 0.1,  # max CDF distance, sample-size robust (unlike the p-value)
+            "ks_statistic": 0.1,  # practical maximum CDF-distance threshold
             "wasserstein": 0.1,  # applied to the std-normalized distance, so it is scale-free
             "kl_divergence": 0.1,
         }
@@ -258,10 +335,79 @@ class DriftCalculator:
             drift_detected=is_drifted,
             suggestions=suggestions,
             distribution=distribution,
+            evidence=self._numeric_evidence(metrics, len(ref_data), len(curr_data)),
+        )
+
+    @staticmethod
+    def _is_integer_array(values: np.ndarray) -> bool:
+        """Recognize native integer arrays and our Python-integer Int128 representation."""
+        return values.dtype.kind in "iuO"
+
+    @staticmethod
+    def _integer_wasserstein(reference: np.ndarray, current: np.ndarray) -> float:
+        """Integrate empirical CDF gaps with exact integer coordinates and population counts.
+
+        scipy converts coordinates to float before subtraction, erasing unit
+        shifts beyond 2**53. Subtract coordinates and accumulate transport in
+        Python integers, then convert only the final distance to float.
+        """
+        ref_counts = Counter(map(int, reference))
+        curr_counts = Counter(map(int, current))
+        points = sorted(ref_counts.keys() | curr_counts.keys())
+        ref_total, curr_total = len(reference), len(current)
+        ref_count = curr_count = transport = 0
+        previous = points[0]
+        for point in points:
+            cdf_gap = abs(ref_count * curr_total - curr_count * ref_total)
+            transport += (point - previous) * cdf_gap
+            ref_count += ref_counts[point]
+            curr_count += curr_counts[point]
+            previous = point
+        return transport / (ref_total * curr_total)
+
+    def _wasserstein_statistics(
+        self, reference: np.ndarray, current: np.ndarray
+    ) -> tuple[float, float]:
+        """Keep exact integer transport and center integer values before reference scaling."""
+        if self._is_integer_array(reference):
+            origin = int(reference[0])
+            centered = np.array([int(value) - origin for value in reference], dtype=np.float64)
+            std_ref = float(np.std(centered))
+        else:
+            std_ref = float(np.std(reference))
+        if self._is_integer_array(reference) and self._is_integer_array(current):
+            distance = self._integer_wasserstein(reference, current)
+        else:
+            distance = float(wasserstein_distance(reference, current))
+        return distance, std_ref
+
+    @staticmethod
+    def _ks_values(reference: np.ndarray, current: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Encode exact ordering when scipy cannot safely combine integer representations.
+
+        Int128 objects exceed scipy's native-width NaN checks, while some
+        signed/unsigned pairs concatenate as floats. The two-sample KS statistic
+        and p-value depend only on shared ordering and ties, so joint integer
+        ranks preserve both without rounding values.
+        """
+        kinds = {reference.dtype.kind, current.dtype.kind}
+        float_promotion = kinds == {"i", "u"} and np.result_type(reference, current).kind == "f"
+        if "O" not in kinds and not float_promotion:
+            return reference, current
+        ref_values, curr_values = reference.tolist(), current.tolist()
+        ranks = {value: rank for rank, value in enumerate(sorted(set(ref_values + curr_values)))}
+        return (
+            np.array([ranks[value] for value in ref_values]),
+            np.array([ranks[value] for value in curr_values]),
         )
 
     def _compute_numeric_metrics(
-        self, ref_data: np.ndarray, curr_data: np.ndarray, thresholds: dict[str, float]
+        self,
+        ref_data: np.ndarray,
+        curr_data: np.ndarray,
+        thresholds: dict[str, float],
+        *,
+        value_scale: float = 1.0,
     ) -> tuple[list[DriftMetric], bool, dict[str, float | bool]]:
         """Compute Wasserstein distance, KS test, PSI, and KL divergence for a numeric column.
 
@@ -273,13 +419,13 @@ class DriftCalculator:
         is_drifted = False
 
         # 1. Wasserstein Distance
-        wd = wasserstein_distance(ref_data, curr_data)
+        wd, std_ref = self._wasserstein_statistics(ref_data, curr_data)
+        wd, std_ref = wd / value_scale, std_ref / value_scale
         # WD is in data units, so a fixed threshold cannot mean the same thing
         # for a column measured in cents and one measured in kilometres. The
         # reported value is the distance normalized by the reference std, which
         # is what `threshold` applies to. A constant reference has no scale to
         # normalize by — fall back to the raw distance rather than emit inf.
-        std_ref = np.std(ref_data)
         norm_wd = wd / std_ref if std_ref > 0 else wd
 
         wd_drift = norm_wd > thresholds["wasserstein"]
@@ -296,11 +442,10 @@ class DriftCalculator:
             is_drifted = True
 
         # 2. KS Test
-        # The drift decision is made on the statistic (max CDF distance), not
-        # the p-value: the p-value shrinks with sample size, so an identical
-        # tiny shift looks significant at n=100k but not at n=100. The p-value
-        # is kept in the report for diagnostics.
-        ks_stat, ks_p = ks_2samp(ref_data, curr_data)
+        # The statistic is a practical-effect diagnostic. The independent
+        # evidence record uses this p-value only after feature-family correction;
+        # both effect and statistical support are required for a final verdict.
+        ks_stat, ks_p = ks_2samp(*self._ks_values(ref_data, curr_data))
         ks_drift = ks_stat > thresholds["ks_statistic"]
         metrics.append(
             DriftMetric(
@@ -410,6 +555,10 @@ class DriftCalculator:
             ref_hist, bin_edges = np.histogram(ref_data, bins=bins, range=(min_val, max_val))
             curr_hist, _ = np.histogram(curr_data, bins=bins, range=(min_val, max_val))
 
+            if not np.isfinite(bin_edges).all() or np.any(np.diff(bin_edges) <= 0):
+                # Float-valued histogram bounds cannot describe distinct bins at
+                # some integer magnitudes. An empty plot is preferable to false bins.
+                return DriftDistribution(bins=[])
             drift_bins = [
                 DriftBin(
                     bin_start=float(bin_edges[i]),
@@ -476,18 +625,32 @@ class DriftCalculator:
                 )
         return suggestions
 
+    @staticmethod
+    def _categorical_values(series: pl.Series, boolean_labels: bool) -> pl.Series | None:
+        """Normalize boolean serialization while keeping ordinary category labels exact."""
+        values = series.cast(pl.String, strict=False).drop_nulls()
+        if boolean_labels:
+            values = values.str.to_lowercase()
+            if not values.is_in(["true", "false"]).all():
+                return None
+        return values
+
     def _calculate_categorical_drift(
         self, col: str, thresholds: dict[str, float]
     ) -> "ColumnDrift | None":
-        """Calculates PSI-based drift for a categorical/text/boolean column.
+        """Calculate categorical PSI with separate unsmoothed count-test evidence.
 
         Uses the category frequency distribution — the union of categories seen
         in either dataset. Returns ``None`` if the column looks like free-text
         or a high-cardinality identifier (not a meaningful categorical
         distribution), or if either side has no non-null values.
         """
-        ref_data = self.reference_df[col].cast(pl.Utf8, strict=False).drop_nulls()
-        curr_data = self.current_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+        reference, current = self.reference_df[col], self.current_df[col]
+        boolean_labels = pl.Boolean in (reference.dtype, current.dtype)
+        ref_data = self._categorical_values(reference, boolean_labels)
+        curr_data = self._categorical_values(current, boolean_labels)
+        if ref_data is None or curr_data is None:
+            return self._type_drift(col)
 
         if len(ref_data) == 0 or len(curr_data) == 0:
             return None
@@ -497,15 +660,15 @@ class DriftCalculator:
             return None
 
         percents = self._categorical_percent_arrays(ref_data, curr_data, col)
-        if percents is None:
-            return None
-        _categories, expected_percents, actual_percents = percents
-
-        psi_val = float(
-            np.sum(
-                (actual_percents - expected_percents) * np.log(actual_percents / expected_percents)
+        psi_val = 0.0
+        if percents is not None:
+            _categories, expected_percents, actual_percents = percents
+            psi_val = float(
+                np.sum(
+                    (actual_percents - expected_percents)
+                    * np.log(actual_percents / expected_percents)
+                )
             )
-        )
         psi_drift = psi_val > thresholds["psi"]
 
         metrics = [
@@ -524,6 +687,7 @@ class DriftCalculator:
             metrics=metrics,
             drift_detected=psi_drift,
             suggestions=suggestions,
+            evidence=categorical_evidence(ref_data.to_list(), curr_data.to_list()),
             distribution=None,
         )
 

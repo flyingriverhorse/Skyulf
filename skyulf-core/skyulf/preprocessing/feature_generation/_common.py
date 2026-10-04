@@ -100,20 +100,38 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -
     return numerator / adjusted
 
 
-def _compute_similarity_score(a: Any, b: Any, method: str) -> float:
+def _similarity_backend() -> str:
+    """Choose the available implementation once when fitting similarity features."""
+    return "rapidfuzz" if _HAS_RAPIDFUZZ else "difflib"
+
+
+def _validate_similarity_backend(backend: str | None) -> None:
+    """Reject an unavailable saved backend before operations can swallow its failure."""
+    if backend not in (None, "rapidfuzz", "difflib"):
+        raise ValueError(f"Unsupported fitted similarity backend {backend!r}; refit the node.")
+    if backend == "rapidfuzz" and not _HAS_RAPIDFUZZ:
+        raise ImportError(
+            "This similarity artifact requires rapidfuzz; install rapidfuzz or refit."
+        )
+
+
+def _compute_similarity_score(a: Any, b: Any, method: str, backend: str | None = None) -> float:
+    """Compute pair similarity using the fitted implementation when supplied."""
     text_a = "" if pd.isna(a) else str(a)
     text_b = "" if pd.isna(b) else str(b)
     if not text_a and not text_b:
         return 100.0
     if not text_a or not text_b:
         return 0.0
-    if _HAS_RAPIDFUZZ:
+    if (backend or _similarity_backend()) == "rapidfuzz":
         attr = _FUZZ_METHODS.get(method, "ratio")
         return float(getattr(fuzz, attr)(text_a, text_b))
     return SequenceMatcher(None, text_a, text_b).ratio() * 100.0
 
 
-def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Series:
+def _vectorised_similarity(
+    s_a: pd.Series, s_b: pd.Series, method: str, backend: str | None = None
+) -> pd.Series:
     """Vectorised element-wise similarity between two pandas string Series.
 
     Avoids df.apply(axis=1) overhead by:
@@ -136,7 +154,7 @@ def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Se
         # Duplicate labels identify several rows; pair and assign by position.
         for position in np.flatnonzero(needs_compute.to_numpy()):
             result.iloc[position] = _compute_similarity_score(
-                a_str.iloc[position], b_str.iloc[position], method
+                a_str.iloc[position], b_str.iloc[position], method, backend
             )
 
     return result
@@ -195,3 +213,14 @@ def _resolve_group_agg_cols(op: dict[str, Any], existing: list[str]) -> tuple[st
     if not group_cols or not target_cols:
         return None
     return group_cols[0], target_cols[0], op.get("method") or "mean"
+
+
+def _validate_generated_names(names: list[str], existing: list[str], node: str) -> None:
+    """Reject ambiguous generated names before appending or replacing any caller column."""
+    if len(names) != len(set(names)):
+        raise ValueError(f"{node}: generated feature names must be unique.")
+    collisions = sorted(set(names).intersection(existing))
+    if collisions:
+        raise ValueError(
+            f"{node}: generated feature names collide with existing columns: {collisions}"
+        )

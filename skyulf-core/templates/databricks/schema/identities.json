@@ -1,0 +1,33 @@
+{
+  "personal_development_targets": {
+    "order": 746,
+    "type": "string",
+    "default": "false",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "description": "6. Deployment | Add personal development targets inside test, syst and prod workspaces? Jobs and outputs stay user-scoped; schedules start paused"
+  },
+  "deployment_identity": {
+    "order": 747,
+    "type": "string",
+    "default": "deployer",
+    "enum": [
+      "deployer",
+      "shared_service_principal",
+      "separate_service_principals"
+    ],
+    "description": "6. Deployment | Shared targets: keep existing deployment ownership, use one service principal, or separate train/score principals; configure IDs in deployment/variables.yml"
+  },
+  "manage_job_permissions": {
+    "order": 748,
+    "type": "string",
+    "default": "false",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "description": "6. Deployment | Manage shared job permissions in this Bundle? false = keep access managed by your existing platform; true = configure deployment/variables.yml"
+  }
+}

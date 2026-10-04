@@ -1,0 +1,436 @@
+{
+  "date": "2026-09-29",
+  "base_commit": "90808117",
+  "wheel_sha256": "92d7dc18ea8a5026c7d86421520cd3b9bef165622c83b4816560e0e3fd1324bd",
+  "local_and_installed_module_hashes_verified": true,
+  "run_id": 119140789004450,
+  "run_page_url": "https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/607370112359176/run/119140789004450",
+  "state": {
+    "life_cycle_state": "TERMINATED",
+    "result_state": "SUCCESS",
+    "state_message": "",
+    "user_cancelled_or_timedout": false
+  },
+  "tasks": [
+    {
+      "task_key": "pandas",
+      "run_id": 551257986947700,
+      "state": {
+        "life_cycle_state": "TERMINATED",
+        "result_state": "SUCCESS",
+        "state_message": "",
+        "user_cancelled_or_timedout": false
+      }
+    },
+    {
+      "task_key": "contracts",
+      "run_id": 233552710097983,
+      "state": {
+        "life_cycle_state": "TERMINATED",
+        "result_state": "SUCCESS",
+        "state_message": "",
+        "user_cancelled_or_timedout": false
+      }
+    },
+    {
+      "task_key": "polars",
+      "run_id": 440447540740168,
+      "state": {
+        "life_cycle_state": "TERMINATED",
+        "result_state": "SUCCESS",
+        "state_message": "",
+        "user_cancelled_or_timedout": false
+      }
+    }
+  ],
+  "contracts": {
+    "exit_code": 0,
+    "wheel_sha256": "92d7dc18ea8a5026c7d86421520cd3b9bef165622c83b4816560e0e3fd1324bd",
+    "suite": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "6",
+      "tests": "232",
+      "time": "358.911",
+      "timestamp": "2026-09-29T13:29:42.408776+00:00",
+      "hostname": "spark.host.local"
+    }
+  },
+  "pipelines": {
+    "pandas": {
+      "status": "passed",
+      "stages": [
+        "installed_wheel_verified",
+        "manual_candidate_and_component_tags",
+        "manual_initial_champion",
+        "automatic_replacement",
+        "automatic_tie_blocked",
+        "explicit_rejection_and_replay",
+        "displaced_challenger_and_stale_guards",
+        "rollback_and_replay",
+        "scoring_combined_only",
+        "scoring_separate_views"
+      ],
+      "final_aliases": {
+        "challenger": "4",
+        "champion": "1",
+        "previous_challenger": "3"
+      },
+      "initial_candidate": {
+        "name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+        "version": "1",
+        "digest": "d5a3aabf129cc5e25558f3384c1f10c09917bac1391c4078e4ee13d63ba57021"
+      },
+      "initial_approval": {
+        "event_id": "c7c03c8a33da47098b97bac77381be95",
+        "kind": "initial",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+        "alias": "champion",
+        "prior_version": null,
+        "new_version": "1",
+        "comparison_sha256": "11ab1b80c13c8447b63538d212ef834491a4d102a3c068d34579d363a0040cc6",
+        "parent_event_id": null,
+        "previous_champion_version": null
+      },
+      "automatic_promotion": {
+        "event_id": "509d9179049646b895289359a5c1a5ff",
+        "kind": "promotion",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+        "alias": "champion",
+        "prior_version": "1",
+        "new_version": "2",
+        "comparison_sha256": "1263df1ede221ac7a66d36e8dd89c61678c46006707cc85dc581e260dec832b9",
+        "parent_event_id": "c7c03c8a33da47098b97bac77381be95",
+        "previous_champion_version": null
+      },
+      "failed_quality_components": [
+        "cost",
+        "revenue",
+        "risk"
+      ],
+      "rejection": {
+        "event_id": "83d3d4d89571482f8a75bae5f770bd9c",
+        "kind": "rejection",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+        "alias": "challenger",
+        "prior_version": "3",
+        "new_version": "3",
+        "comparison_sha256": "ef71d06b5127475ad9f8f794c6006aa17dfbadc33e50ce986680600b9d1d0dcc",
+        "parent_event_id": "a68327096f2e4196a10da5474e1f2be7",
+        "previous_champion_version": null
+      },
+      "rollback": {
+        "event_id": "6f9d07d5292a4671b0dd4ec742c205be",
+        "kind": "rollback",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+        "alias": "champion",
+        "prior_version": "2",
+        "new_version": "1",
+        "comparison_sha256": "1263df1ede221ac7a66d36e8dd89c61678c46006707cc85dc581e260dec832b9",
+        "parent_event_id": "509d9179049646b895289359a5c1a5ff",
+        "previous_champion_version": null
+      },
+      "publications": {
+        "combined_only": {
+          "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+          "model_set_version": "1",
+          "model_set_digest": "d5a3aabf129cc5e25558f3384c1f10c09917bac1391c4078e4ee13d63ba57021",
+          "prediction_table": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_combined_only",
+          "publication": {
+            "mode": "combined_only"
+          },
+          "source_change_policy": "rebuild_on_change",
+          "prediction_views": [],
+          "source_end_version": 0,
+          "input_count": 0,
+          "output_count": 0,
+          "commit_version": 1,
+          "manifest": {
+            "artifact_kind": "model_set",
+            "expected_target_version": 0,
+            "input_count": 80,
+            "model_set_digest": "d5a3aabf129cc5e25558f3384c1f10c09917bac1391c4078e4ee13d63ba57021",
+            "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+            "model_set_version": "1",
+            "output_count": 80,
+            "request_digest": "fa465f2cdda49ba24aa8c3803aca4b3ab011456635f556eda6b1746b4e07dafc",
+            "run_id": "fa465f2cdda49ba24aa8c3803aca4b3ab011456635f556eda6b1746b4e07dafc",
+            "set_history": {},
+            "skyulf_mode": "incremental_append",
+            "source_change_policy": "rebuild_on_change",
+            "source_end_version": 0,
+            "source_rebuilt": false,
+            "source_start_version": null,
+            "source_table_id": "588f70d0-6446-4f38-9e6a-842a1b363f6a",
+            "target_table_id": "5c4c3fe2-4690-41ba-a258-fb3b2eaa8763",
+            "write_mode": "append"
+          },
+          "noop": true
+        },
+        "separate_views": {
+          "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+          "model_set_version": "1",
+          "model_set_digest": "d5a3aabf129cc5e25558f3384c1f10c09917bac1391c4078e4ee13d63ba57021",
+          "prediction_table": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_separate_views",
+          "publication": {
+            "mode": "separate_views",
+            "model_view_template": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_view_{branch}",
+            "combined_view": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_profit"
+          },
+          "source_change_policy": "rebuild_on_change",
+          "prediction_views": [
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_view_cost",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_view_revenue",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_view_risk",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_profit"
+          ],
+          "source_end_version": 0,
+          "input_count": 0,
+          "output_count": 0,
+          "commit_version": 1,
+          "manifest": {
+            "artifact_kind": "model_set",
+            "expected_target_version": 0,
+            "input_count": 80,
+            "model_set_digest": "d5a3aabf129cc5e25558f3384c1f10c09917bac1391c4078e4ee13d63ba57021",
+            "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+            "model_set_version": "1",
+            "output_count": 80,
+            "request_digest": "553baedb142253dad05f6649ea7f0c40a5401f928d36ac57e494d734f74d7e80",
+            "run_id": "553baedb142253dad05f6649ea7f0c40a5401f928d36ac57e494d734f74d7e80",
+            "set_history": {},
+            "skyulf_mode": "incremental_append",
+            "source_change_policy": "rebuild_on_change",
+            "source_end_version": 0,
+            "source_rebuilt": false,
+            "source_start_version": null,
+            "source_table_id": "588f70d0-6446-4f38-9e6a-842a1b363f6a",
+            "target_table_id": "39380f4f-dbfb-4533-9b54-0457dee9eecd",
+            "write_mode": "append"
+          },
+          "noop": true
+        }
+      }
+    },
+    "polars": {
+      "status": "passed",
+      "stages": [
+        "installed_wheel_verified",
+        "manual_candidate_and_component_tags",
+        "manual_initial_champion",
+        "automatic_replacement",
+        "automatic_tie_blocked",
+        "explicit_rejection_and_replay",
+        "displaced_challenger_and_stale_guards",
+        "rollback_and_replay",
+        "scoring_combined_only",
+        "scoring_separate_views"
+      ],
+      "final_aliases": {
+        "challenger": "4",
+        "champion": "1",
+        "previous_challenger": "3"
+      },
+      "initial_candidate": {
+        "name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+        "version": "1",
+        "digest": "039c999b761856dcc0b8f9e2eac4e922cbba855edbc0f7d3e2b5a7e73c6a6b66"
+      },
+      "initial_approval": {
+        "event_id": "8090ad23945b45e49c6dfb8fd51bcd79",
+        "kind": "initial",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+        "alias": "champion",
+        "prior_version": null,
+        "new_version": "1",
+        "comparison_sha256": "cb3e8cf0552fbcd659d6e9fbdd36b9bc074f7166051a98b7550711d8bddf4370",
+        "parent_event_id": null,
+        "previous_champion_version": null
+      },
+      "automatic_promotion": {
+        "event_id": "793efa1d4433437fb993e3eea8711773",
+        "kind": "promotion",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+        "alias": "champion",
+        "prior_version": "1",
+        "new_version": "2",
+        "comparison_sha256": "d24bd3601ee4cba24af09d6a1f68969ce2017bbcdcefe77e91fbe326f918edb2",
+        "parent_event_id": "8090ad23945b45e49c6dfb8fd51bcd79",
+        "previous_champion_version": null
+      },
+      "failed_quality_components": [
+        "cost",
+        "revenue",
+        "risk"
+      ],
+      "rejection": {
+        "event_id": "cdd4bb1bd0f244b6bc0cb1d238247872",
+        "kind": "rejection",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+        "alias": "challenger",
+        "prior_version": "3",
+        "new_version": "3",
+        "comparison_sha256": "2bc0d0a8340484c85dac1de752d0f7859cb6f93df4939c16e3daaf89e952c221",
+        "parent_event_id": "0eb9fc35fbc140f78877280ef60a757c",
+        "previous_champion_version": null
+      },
+      "rollback": {
+        "event_id": "b21788828eda40f788231f6839232fa2",
+        "kind": "rollback",
+        "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+        "alias": "champion",
+        "prior_version": "2",
+        "new_version": "1",
+        "comparison_sha256": "d24bd3601ee4cba24af09d6a1f68969ce2017bbcdcefe77e91fbe326f918edb2",
+        "parent_event_id": "793efa1d4433437fb993e3eea8711773",
+        "previous_champion_version": null
+      },
+      "publications": {
+        "combined_only": {
+          "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+          "model_set_version": "1",
+          "model_set_digest": "039c999b761856dcc0b8f9e2eac4e922cbba855edbc0f7d3e2b5a7e73c6a6b66",
+          "prediction_table": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_combined_only",
+          "publication": {
+            "mode": "combined_only"
+          },
+          "source_change_policy": "rebuild_on_change",
+          "prediction_views": [],
+          "source_end_version": 0,
+          "input_count": 0,
+          "output_count": 0,
+          "commit_version": 1,
+          "manifest": {
+            "artifact_kind": "model_set",
+            "expected_target_version": 0,
+            "input_count": 80,
+            "model_set_digest": "039c999b761856dcc0b8f9e2eac4e922cbba855edbc0f7d3e2b5a7e73c6a6b66",
+            "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+            "model_set_version": "1",
+            "output_count": 80,
+            "request_digest": "c61988235648522a0a27499434ca982cb377051992a9b3a94d6ef04def51e9ae",
+            "run_id": "c61988235648522a0a27499434ca982cb377051992a9b3a94d6ef04def51e9ae",
+            "set_history": {},
+            "skyulf_mode": "incremental_append",
+            "source_change_policy": "rebuild_on_change",
+            "source_end_version": 0,
+            "source_rebuilt": false,
+            "source_start_version": null,
+            "source_table_id": "8add8c12-33bf-45a2-9e2f-48302851fa48",
+            "target_table_id": "81b4ff39-f919-4a24-8716-258a4fe891ec",
+            "write_mode": "append"
+          },
+          "noop": true
+        },
+        "separate_views": {
+          "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+          "model_set_version": "1",
+          "model_set_digest": "039c999b761856dcc0b8f9e2eac4e922cbba855edbc0f7d3e2b5a7e73c6a6b66",
+          "prediction_table": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_separate_views",
+          "publication": {
+            "mode": "separate_views",
+            "model_view_template": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_view_{branch}",
+            "combined_view": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_profit"
+          },
+          "source_change_policy": "rebuild_on_change",
+          "prediction_views": [
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_view_cost",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_view_revenue",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_view_risk",
+            "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_profit"
+          ],
+          "source_end_version": 0,
+          "input_count": 0,
+          "output_count": 0,
+          "commit_version": 1,
+          "manifest": {
+            "artifact_kind": "model_set",
+            "expected_target_version": 0,
+            "input_count": 80,
+            "model_set_digest": "039c999b761856dcc0b8f9e2eac4e922cbba855edbc0f7d3e2b5a7e73c6a6b66",
+            "model_set_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+            "model_set_version": "1",
+            "output_count": 80,
+            "request_digest": "2429d7a0a06a985b0b50cbf6bfbcedb00ca5ce8b3d8e2ec06eea57bcc364e995",
+            "run_id": "2429d7a0a06a985b0b50cbf6bfbcedb00ca5ce8b3d8e2ec06eea57bcc364e995",
+            "set_history": {},
+            "skyulf_mode": "incremental_append",
+            "source_change_policy": "rebuild_on_change",
+            "source_end_version": 0,
+            "source_rebuilt": false,
+            "source_start_version": null,
+            "source_table_id": "8add8c12-33bf-45a2-9e2f-48302851fa48",
+            "target_table_id": "e439f342-bda6-4641-8d83-9cfe3c11ae36",
+            "write_mode": "append"
+          },
+          "noop": true
+        }
+      }
+    }
+  },
+  "registry_readback": {
+    "pandas": {
+      "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_set",
+      "aliases": {
+        "challenger": "4",
+        "champion": "1",
+        "previous_challenger": "3"
+      },
+      "rejected_version": "3",
+      "rejection_reason": "No improvement",
+      "component_aliases": {
+        "revenue": {},
+        "risk": {},
+        "cost": {}
+      },
+      "model_tags": {
+        "model_set_cost_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_cost",
+        "model_set_cost_type": "voting_regressor",
+        "model_set_cost_version": "4",
+        "model_set_model_count": "3",
+        "model_set_promotion_policy": "automatic",
+        "model_set_quality_artifact": "runs:/b87c65c8f3504d3d88fd08fb36515983/model_set_quality/4/0f55e3f9e2623cb1475b17be4f893b0670c4cac7b44b64e805e14e9d06c89846/decision.json",
+        "model_set_quality_sha256": "0f55e3f9e2623cb1475b17be4f893b0670c4cac7b44b64e805e14e9d06c89846",
+        "model_set_quality_status": "failed",
+        "model_set_revenue_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_revenue",
+        "model_set_revenue_type": "ridge_regression",
+        "model_set_revenue_version": "4",
+        "model_set_risk_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_pandas_risk",
+        "model_set_risk_type": "logistic_regression",
+        "model_set_risk_version": "4"
+      }
+    },
+    "polars": {
+      "model_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_set",
+      "aliases": {
+        "challenger": "4",
+        "champion": "1",
+        "previous_challenger": "3"
+      },
+      "rejected_version": "3",
+      "rejection_reason": "No improvement",
+      "component_aliases": {
+        "revenue": {},
+        "risk": {},
+        "cost": {}
+      },
+      "model_tags": {
+        "model_set_cost_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_cost",
+        "model_set_cost_type": "voting_regressor",
+        "model_set_cost_version": "4",
+        "model_set_model_count": "3",
+        "model_set_promotion_policy": "automatic",
+        "model_set_quality_artifact": "runs:/d407719e03264d36a5b7c50361855b75/model_set_quality/4/a6e60abbbe46d0d77a501d2a3a5970edc697684476e1c1bce1bd1ae7726ae776/decision.json",
+        "model_set_quality_sha256": "a6e60abbbe46d0d77a501d2a3a5970edc697684476e1c1bce1bd1ae7726ae776",
+        "model_set_quality_status": "failed",
+        "model_set_revenue_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_revenue",
+        "model_set_revenue_type": "ridge_regression",
+        "model_set_revenue_version": "4",
+        "model_set_risk_name": "workspace.skyulf_validation_20260929.setlife_20260929_r1_polars_risk",
+        "model_set_risk_type": "logistic_regression",
+        "model_set_risk_version": "4"
+      }
+    }
+  }
+}

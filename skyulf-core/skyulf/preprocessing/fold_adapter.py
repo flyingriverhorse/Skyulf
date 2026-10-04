@@ -12,7 +12,9 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ..modeling._cv_weights import fit_preprocessor, prepare_weights
 from ..registry import NodeRegistry
+from ._target_labels import original_target_labels
 from .pipeline import FeatureEngineer
 
 # Splitter steps already ran upstream of the CV/tuning boundary; re-running
@@ -141,7 +143,7 @@ class MergedBranchFoldAdapter:
         # the positional merge keeps every observation in its original order.
         self.changes_row_count = False
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Fit fresh branch engineers on this fold's payload and merge the results.
 
         Every branch engineer is rebuilt from the stored step lists on each call
@@ -151,6 +153,7 @@ class MergedBranchFoldAdapter:
         Raises:
             ValueError: If ``X`` still embeds the configured target column.
         """
+        self.train_sample_weight_ = prepare_weights(sample_weight, frame_rows(X), self)
         self._validate_payload(X)
         engineers = [FeatureEngineer(list(steps)) for steps in self._branch_step_lists]
         frames, ys = self._run_branches(engineers, (X, y), fit=True)
@@ -184,7 +187,11 @@ class MergedBranchFoldAdapter:
         if input_y is not None and frame_rows(input_y) != expected_rows:
             raise ValueError("Merged fold features and target have different row counts")
         for engineer in engineers:
-            out = engineer.fit_transform(payload)[0] if fit else engineer.transform(payload)
+            out = (
+                engineer.fit_transform(payload, target_column=self._target_column)[0]
+                if fit
+                else engineer.transform(payload)
+            )
             frame, y_out = self._validated_branch_output(out, input_y, expected_rows)
             frames.append(frame)
             ys.append(y_out)
@@ -222,6 +229,12 @@ class MergedBranchFoldAdapter:
         """Reject targets embedded in the feature columns before branch execution."""
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
+
+    def original_target_labels(self, labels: Any) -> Any:
+        """Decode the first branch, which supplies the merged fold's target."""
+        if self._engineers is None:
+            raise RuntimeError("Target decoding called before fit_transform()")
+        return original_target_labels(self._engineers[0].fitted_steps, labels)
 
 
 class FeatureEngineerFoldAdapter:
@@ -266,7 +279,7 @@ class FeatureEngineerFoldAdapter:
             NodeRegistry.get_calculator(step["transformer"])
         self._engineer: FeatureEngineer | None = None
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Fit a fresh engineer on this fold's ``(X, y)`` payload and return it.
 
         A new :class:`FeatureEngineer` is built on every call, so nothing fitted
@@ -277,9 +290,32 @@ class FeatureEngineerFoldAdapter:
         """
         self._validate_payload(X)
         engineer = FeatureEngineer(self._steps_config)
-        transformed, _metrics = engineer.fit_transform((X, y))
+        transformed, _metrics = engineer.fit_transform(
+            (X, y), sample_weight=sample_weight, target_column=self._target_column
+        )
         self._engineer = engineer
+        self.train_sample_weight_ = engineer.train_sample_weight_
         return transformed
+
+    @property
+    def temporal_history_columns(self) -> set[str]:
+        """Report ordering/entity columns needed until carry features are computed."""
+        columns = set()
+        for step in self._steps_config:
+            params = step.get("params", {})
+            if params.get("history_mode") == "carry":
+                columns.update([params.get("sort_by"), *(params.get("group_by") or [])])
+        return columns - {None}
+
+    def retain_split_metadata(self, column: str) -> None:
+        """Drop retained split metadata after preprocessing, including during serving."""
+        step = {
+            "name": f"exclude_split_metadata_{column}",
+            "transformer": "DropMissingColumns",
+            "params": {"columns": [column], "missing_threshold": None},
+        }
+        if step not in self._steps_config:
+            self._steps_config = [*self._steps_config, step]
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Apply the engineer fitted by the last :meth:`fit_transform`.
@@ -301,6 +337,7 @@ class FeatureEngineerFoldAdapter:
         # ``pack_pipeline_output``'s tuple-shape-lost diagnostic on every step.
         payload = (X, y) if y is not None else X
         transformed = self._engineer.transform(payload)
+        self.last_transform_coverage_ = deepcopy(self._engineer.last_transform_coverage_)
         # Some appliers return a bare frame instead of the ``(X, y)`` payload;
         # re-pair so callers always get the FoldPreprocessor protocol shape.
         if not (isinstance(transformed, tuple) and len(transformed) == 2):
@@ -310,6 +347,19 @@ class FeatureEngineerFoldAdapter:
     def _validate_payload(self, X: Any) -> None:
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
+
+    def original_target_labels(self, labels: Any) -> Any:
+        """Decode the recorded fitted target chain independently of row permutations."""
+        if self._engineer is None:
+            raise RuntimeError("Target decoding called before fit_transform()")
+        return original_target_labels(self._engineer.fitted_steps, labels)
+
+    def transform_tracking_order(self, X: Any) -> tuple[Any, Any]:
+        """Expose temporal row lineage for searcher prediction and nested thresholds."""
+        if self._engineer is None:
+            raise RuntimeError("transform() called before fit_transform()")
+        self._validate_payload(X)
+        return self._engineer.transform_tracking_order(X)
 
 
 def frame_rows(frame: Any) -> int:
@@ -350,15 +400,35 @@ class AuditedFoldPreprocessor:
         """Return the wrapped preprocessor."""
         return self._inner
 
-    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+    def fit_transform(self, X: Any, y: Any, *, sample_weight: Any = None) -> tuple[Any, Any]:
         """Log the fit-time input row count, then delegate to ``inner``."""
         self.fit_rows.append(frame_rows(X))
-        return self._inner.fit_transform(X, y)
+
+        X, y, self.train_sample_weight_ = fit_preprocessor(self._inner, X, y, sample_weight)
+        return X, y
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Log the transform-time input row count, then delegate to ``inner``."""
         self.transform_rows.append(frame_rows(X))
-        return self._inner.transform(X, y)
+        result = self._inner.transform(X, y)
+        self.last_transform_coverage_ = deepcopy(
+            getattr(self._inner, "last_transform_coverage_", {})
+        )
+        return result
+
+    def original_target_labels(self, labels: Any) -> Any:
+        """Forward optional fitted target decoding without inferring label identities."""
+        decode = getattr(self._inner, "original_target_labels", None)
+        return decode(labels) if decode is not None else None
+
+    def transform_tracking_order(self, X: Any) -> tuple[Any, Any]:
+        """Record prediction transforms while retaining optional positional lineage."""
+        self.transform_rows.append(frame_rows(X))
+        transform = getattr(self._inner, "transform_tracking_order", None)
+        if transform is not None:
+            return transform(X)
+        transformed, _ = self._inner.transform(X, None)
+        return transformed, None
 
     def summary(self, train_rows: int | None = None) -> dict[str, Any]:
         """Return per-fold call counts and the largest fit payload seen.

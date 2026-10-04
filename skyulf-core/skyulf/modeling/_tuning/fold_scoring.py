@@ -6,10 +6,10 @@ from functools import partial
 from typing import Any
 
 import numpy as np
-import pandas as pd
 from sklearn.metrics import check_scoring
 from sklearn.pipeline import Pipeline
 
+from ...data.coverage import transform_evaluation
 from .fold_pipeline import FoldAwareModelStep
 
 
@@ -22,15 +22,20 @@ def _fold_step(estimator: Any) -> FoldAwareModelStep | None:
     return estimator if isinstance(estimator, FoldAwareModelStep) else None
 
 
-def _score_fold(scorer: Callable, estimator: Any, X: Any, y: Any) -> float:
-    """Transform X/y once and score a disposable view using the original class labels."""
+def prepare_fold_evaluation(
+    estimator: Any, X: Any, y: Any, *, allow_empty: bool = False
+) -> tuple[Any, Any, Any, dict[str, Any]]:
+    """Return a disposable scoring view and one aligned eligible evaluation pair."""
     step = _fold_step(estimator)
     if step is None or step.preprocessor_ is None:
-        return scorer(estimator, X, y)
+        X, y, coverage = transform_evaluation(None, X, y, allow_empty=allow_empty)
+        return estimator, X, y, coverage
     X, y = step._ensure_frames(X, y)
-    X_t, y_t = step.preprocessor_.transform(X, y)
+    X_t, y_t, coverage = transform_evaluation(step.preprocessor_, X, y, allow_empty=allow_empty)
     if step.label_map_ is not None:
-        y_t = pd.Series(np.asarray(y_t)).map(step.label_map_).to_numpy()
+        # Some custom preprocessors encode only during fit; preserve labels
+        # already in the public class space instead of replacing them with NaN.
+        y_t = np.asarray([step.label_map_.get(label, label) for label in np.asarray(y_t)])
 
     # Preserve response methods/classes without applying preprocessing again.
     # Copies also leave the real fitted pipeline intact if the scorer raises.
@@ -40,10 +45,28 @@ def _score_fold(scorer: Callable, estimator: Any, X: Any, y: Any) -> float:
     if isinstance(estimator, Pipeline):
         scoring_estimator = copy.copy(estimator)
         scoring_estimator.steps = [("model", scoring_step)]
-    return scorer(scoring_estimator, X_t, y_t)
+    return scoring_estimator, X_t, y_t, coverage
 
 
-def wrap_fold_scorer(estimator: Any, scoring: Any) -> Any:
+def _score_fold(
+    scorer: Callable, estimator: Any, X: Any, y: Any, *, include_coverage: bool = False
+) -> Any:
+    """Score eligible pairs and optionally transport small diagnostics through sklearn workers."""
+    view, X_t, y_t, coverage = prepare_fold_evaluation(
+        estimator, X, y, allow_empty=include_coverage
+    )
+    # Halving workers must return the empty population alongside the failed score
+    # so the parent can explain the failure without fitting or scoring again.
+    score = scorer(view, X_t, y_t) if len(X_t) else float("nan")
+    if include_coverage:
+        return {"score": score, **{key: coverage[key] for key in _COVERAGE_KEYS}}
+    return score
+
+
+_COVERAGE_KEYS = ("input_rows", "scored_rows", "excluded_rows")
+
+
+def wrap_fold_scorer(estimator: Any, scoring: Any, *, include_coverage: bool = False) -> Any:
     """Adapt ordinary searcher scoring when a Skyulf fold step transforms the data.
 
     The scorer may request labels, probabilities or decision scores repeatedly;
@@ -51,6 +74,8 @@ def wrap_fold_scorer(estimator: Any, scoring: Any) -> Any:
     and generic sklearn pipelines retain their original scorer contract.
     """
     step = _fold_step(estimator)
-    if step is None or step.preprocessor is None:
+    if not include_coverage and (step is None or step.preprocessor is None):
         return scoring
-    return partial(_score_fold, check_scoring(estimator, scoring=scoring))
+    return partial(
+        _score_fold, check_scoring(estimator, scoring=scoring), include_coverage=include_coverage
+    )

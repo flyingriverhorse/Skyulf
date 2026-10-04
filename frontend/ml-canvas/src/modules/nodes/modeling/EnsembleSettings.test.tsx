@@ -402,3 +402,13 @@ it('preserves the existing settings lifetimes across mode changes', async () => 
   expect(screen.getByRole('button', { name: 'Base model tuning details' })).toHaveAttribute('aria-expanded', 'false');
   expect(screen.getByRole('button', { name: 'Cross Validation' })).toHaveAttribute('aria-expanded', 'true');
 });
+
+/** Model and ensemble controls must expose the same policy and isolate group metadata. */
+it('selects a nested group policy and exposes its split-only identifier', async () => {
+  const onChange = await renderSettings({ run_mode: 'advanced', cv_enabled: true, cv_type: 'nested_cv', cv_nested_type: 'group_k_fold', cv_group_column: 'customer' });
+  fireEvent.click(screen.getByRole('button', { name: 'Cross Validation' }));
+  expect(screen.getByRole('combobox', { name: 'Group column' })).toBeVisible();
+  fireEvent.change(screen.getByRole('combobox', { name: 'Nested split policy' }), { target: { value: 'time_series_split' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cv_nested_type: 'time_series_split', cv_shuffle: false }));
+  expect(screen.getByLabelText(/Tune decision threshold/)).toBeVisible();
+});

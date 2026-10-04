@@ -1,0 +1,222 @@
+"""Optional MLflow packaging for a complete pinned, locally executable model set."""
+
+import inspect
+import tempfile
+from collections.abc import Iterable
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+
+import mlflow  # ty: ignore[unresolved-import]
+import pandas as pd
+
+from skyulf.integrations.mlflow._client import make_tracking_client
+from skyulf.integrations.mlflow._model_metadata import (
+    mlflow_dtype,
+    scrub_local_artifact_uri,
+)
+
+from ...inference.local_pipeline import load_local_pipeline, read_bounded_artifact
+from ...inference.model_set import ModelSetArtifact, load_model_set
+from ...inference.model_set_scoring import model_set_output_schema, predict_model_set
+from ...inference.project_code import MAX_PROJECT_SOURCE_BYTES
+from ...inference.project_dependencies import (
+    parse_project_requirements,
+    source_project_requirements,
+)
+from ._nullable_transport import (
+    TRANSPORT_KEY,
+    decode_frame,
+    restore_nullable_dtypes,
+    transport_spec,
+    validated_transport,
+)
+from .local_model import normalized_dtype, pip_requirements, validate_local_destination
+from .registry import (
+    ResolvedModel,
+    digest_metadata,
+    download_registered_package,
+    packaged_artifact_path,
+    translate_error,
+    validate_concrete_version,
+    validate_registry_options,
+)
+
+
+class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
+    """Execute the frozen components and composition shipped in one package."""
+
+    def __init__(self, input_transport: dict[str, Any] | None = None) -> None:
+        """Defer loading fitted assets until MLflow supplies package context."""
+        self._artifact: ModelSetArtifact | None = None
+        self._input_transport = deepcopy(input_transport)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Exclude process-local artifact paths and cached fitted objects."""
+        return {**self.__dict__, "_artifact": None}
+
+    def load_context(self, context: Any) -> None:
+        """Validate all packaged components and rules before prediction."""
+        try:
+            path = context.artifacts["model_set"]
+        except (AttributeError, KeyError) as exc:
+            raise ValueError("MLflow model is missing its model set artifact.") from exc
+        self._artifact = load_model_set(path)
+        self.input_transport()
+
+    def input_transport(self) -> dict[str, Any] | None:
+        """Return the artifact-validated nullable input contract without mutable aliases."""
+        if self._artifact is None:
+            raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
+        return validated_transport(
+            getattr(self, "_input_transport", None),
+            ((column.name, column.dtype) for column in self._artifact.manifest.input_schema),
+        )
+
+    def predict(
+        self, context: Any, model_input: pd.DataFrame, params: dict[str, Any] | None = None
+    ) -> pd.DataFrame:
+        """Score one bounded whole frame using explicit, preserved record keys."""
+        del context, params
+        if self._artifact is None:
+            raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
+        if not isinstance(model_input, pd.DataFrame):
+            raise TypeError("Skyulf model set pyfunc requires a pandas DataFrame.")
+        model_input = decode_frame(model_input, self.input_transport())
+        model_input = restore_nullable_dtypes(
+            model_input,
+            ((column.name, column.dtype) for column in self._artifact.manifest.input_schema),
+        )
+        return predict_model_set(model_input, self._artifact)
+
+
+def log_model_set(
+    local_artifact_path: str | Path,
+    *,
+    run_id: str,
+    artifact_path: str,
+    tracking_uri: str | None = None,
+) -> str:
+    """Log a complete model set without selecting aliases or retaining producer paths."""
+    validate_local_destination(run_id, artifact_path, tracking_uri)
+    artifact = load_model_set(local_artifact_path)
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
+    signature = _signature(artifact)
+    requirements = _set_requirements(artifact)
+    client = make_tracking_client(tracking_uri)
+    client.get_run(run_id)
+    with tempfile.TemporaryDirectory(prefix="skyulf-set-mlflow-") as directory:
+        model_path = Path(directory) / "model"
+        options = {}
+        if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
+            options["uv_project_path"] = directory
+        mlflow.pyfunc.save_model(
+            path=str(model_path),
+            python_model=SkyulfModelSetPythonModel(transport),
+            artifacts={"model_set": str(artifact.directory)},
+            signature=signature,
+            pip_requirements=requirements,
+            metadata={
+                "skyulf_artifact_kind": "model_set",
+                "skyulf_execution_scope": "whole_frame_local",
+                "model_set_digest": artifact.manifest.set_sha256,
+                **({TRANSPORT_KEY: transport} if transport else {}),
+            },
+            mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
+            **options,
+        )
+        scrub_local_artifact_uri(model_path, "model_set")
+        client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
+    return f"runs:/{run_id}/{artifact_path}"
+
+
+def _signature(artifact: ModelSetArtifact) -> Any:
+    """Require an exact MLflow scalar representation for every input and output."""
+    from mlflow.models import ModelSignature  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    from mlflow.types import ColSpec, Schema  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
+    encoded = transport["columns"] if transport else {}
+
+    def schema(columns: Any, encode: bool = False) -> Any:
+        """Preserve names and order while rejecting lossy unsupported scalar types."""
+        return Schema(
+            [
+                ColSpec(
+                    mlflow_dtype(
+                        "string" if encode and c.name in encoded else normalized_dtype(c.dtype)
+                    ),
+                    name=c.name,
+                )
+                for c in columns
+            ]
+        )
+
+    return ModelSignature(
+        inputs=schema(artifact.manifest.input_schema, encode=True),
+        outputs=schema(model_set_output_schema(artifact)),
+    )
+
+
+def _set_requirements(artifact: ModelSetArtifact) -> list[str]:
+    """Merge component and captured composition pins without producer URLs or conflicts."""
+    requirements: dict[str, str] = {}
+    for component in artifact.manifest.components:
+        pins = pip_requirements(
+            load_local_pipeline(artifact.directory / "components" / component.branch)
+        )
+        _merge_requirements(requirements, pins)
+    source = read_bounded_artifact(artifact.directory / "composition.py", MAX_PROJECT_SOURCE_BYTES)
+    _merge_requirements(requirements, source_project_requirements(source.decode("utf-8")))
+    return list(requirements.values())
+
+
+def _merge_requirements(requirements: dict[str, str], pins: Iterable[str]) -> None:
+    """Require every source of a distribution dependency to agree on one exact pin."""
+    for raw in pins:
+        normalized = parse_project_requirements(raw)[0]
+        key = normalized.split("==")[0]
+        if key in requirements and requirements[key] != normalized:
+            raise ValueError(f"Conflicting model set requirement pins for {key}.")
+        requirements[key] = normalized
+
+
+def load_registered_model_set(
+    resolved: ResolvedModel,
+    *,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> ModelSetArtifact:
+    """Load one concrete trusted set and verify package kind and complete digest."""
+    if not isinstance(resolved, ResolvedModel):
+        raise TypeError("resolved must be a ResolvedModel.")
+    validate_registry_options(resolved.name, tracking_uri, registry_uri)
+    validate_concrete_version(resolved)
+    if not isinstance(resolved.digest, str) or not resolved.digest.strip():
+        raise ValueError("Resolved model set requires a digest.")
+    client = mlflow.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
+    try:
+        local = download_registered_package(
+            mlflow, client, resolved.name, resolved.version, tracking_uri
+        )
+        model = mlflow.models.Model.load(Path(local))
+    except Exception as exc:  # noqa: BLE001 - registry artifact transport boundary
+        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+    metadata = digest_metadata(model.metadata or {})
+    digest = metadata.get("model_set_digest")
+    expected = {
+        "skyulf_artifact_kind": "model_set",
+        "skyulf_execution_scope": "whole_frame_local",
+    }
+    if digest != resolved.digest or any(
+        metadata.get(key) != value for key, value in expected.items()
+    ):
+        raise ValueError("Packaged model set kind, scope or digest differs from resolved identity.")
+    artifact = load_model_set(packaged_artifact_path(Path(local), model.flavors, "model_set"))
+    if artifact.manifest.set_sha256 != resolved.digest:
+        raise ValueError("Loaded model set digest differs from resolved identity.")
+    return artifact

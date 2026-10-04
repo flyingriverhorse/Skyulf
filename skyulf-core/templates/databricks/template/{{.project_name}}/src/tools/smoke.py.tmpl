@@ -1,0 +1,23 @@
+"""Check project configuration and source syntax without running editable hooks."""
+
+import argparse
+import json
+from pathlib import Path
+
+from skyulf.integrations.databricks.project_checks import check_project
+
+
+def main():
+    """Run credential-free static checks and print their explicitly bounded scope."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--catalog", default="{{.catalog}}")
+    parser.add_argument("--input-schema", default="{{.schema}}")
+    parser.add_argument("--output-schema", default="{{.schema}}")
+    parser.add_argument("--metadata-schema", default="{{.schema}}")
+    parser.add_argument("--resource-suffix", default="")
+    args = parser.parse_args()
+    print(json.dumps(check_project(Path(__file__).resolve().parents[2], vars(args)), indent=2))
+
+
+if __name__ == "__main__":
+    main()

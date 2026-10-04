@@ -15,13 +15,13 @@ import pandas as pd
 import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from ...inference._manifest import ColumnSpec, label_dtype
+from ...inference._manifest import ColumnSpec
 from ...inference.bundle import InferenceBundle, load_bundle, predict_local
 from ...inference.local_pipeline import (
     LocalPipelineArtifact,
     load_local_pipeline,
-    predict_local_pipeline,
 )
+from ...inference.local_scoring import score_local_pipeline, scoring_output_schema
 from ..mlflow.registry import (
     RegistryAccessError,
     RegistryDependencyError,
@@ -293,7 +293,7 @@ class PreparedLocalWorkflow:
         """Score only a bounded caller-owned batch with the selected contract."""
         _check_frame_budget(frame, self.config.source)
         if isinstance(self.artifact, LocalPipelineArtifact):
-            return predict_local_pipeline(frame, self.artifact)
+            return score_local_pipeline(frame, self.artifact)
         return predict_local(frame, self.artifact)
 
 
@@ -495,20 +495,7 @@ def _local_pipeline_metadata(
 
 def _local_output_schema(artifact: LocalPipelineArtifact) -> tuple[ColumnSpec, ...]:
     """Derive ordered prediction columns from the saved task and classes."""
-    manifest = artifact.manifest
-    label = "float64" if manifest.task == "regression" else label_dtype(manifest.classes)
-    output = (
-        ColumnSpec(name="prediction", dtype=label),
-        *(
-            tuple(
-                ColumnSpec(name=f"probability_{i}", dtype="float64")
-                for i in range(len(manifest.classes))
-            )
-            if manifest.task == "classification" and manifest.classification_probabilities
-            else ()
-        ),
-    )
-    return output
+    return scoring_output_schema(artifact)
 
 
 def _collect_estimator_issues(
@@ -559,7 +546,7 @@ def _probe_prediction(
         try:
             _check_frame_budget(probe_frame, config.source)
             if isinstance(artifact, LocalPipelineArtifact):
-                predict_local_pipeline(probe_frame, artifact)
+                score_local_pipeline(probe_frame, artifact)
             else:
                 predict_local(probe_frame, artifact)
         except (TypeError, ValueError, RuntimeError) as exc:

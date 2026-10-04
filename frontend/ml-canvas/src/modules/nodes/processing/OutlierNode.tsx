@@ -17,7 +17,7 @@ const OutlierSettings: React.FC<OutlierSettingsProps> = ({
   onChange,
   nodeId,
 }) => {
-  const { datasetId, isLoading, numericColumns, metrics, nodeResult, backendRecommendations } = useOutlierData(nodeId, config.method === 'manual_bounds');
+  const { datasetId, isLoading, numericColumns, metrics, nodeResult, backendRecommendations } = useOutlierData(nodeId, config.method === 'manual_bounds' || config.method === 'clip');
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();

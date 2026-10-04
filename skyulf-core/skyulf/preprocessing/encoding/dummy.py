@@ -10,6 +10,7 @@ import pandas as pd
 import polars as pl
 
 from ...core.meta.decorators import node_meta
+from ...engines import PolarsEngine
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import DummyEncoderArtifact
@@ -154,7 +155,7 @@ def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
         exprs.extend(
             (rendered == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}") for cat in cats
         )
-    retained = X.drop(valid_cols)
+    retained = PolarsEngine.wrap(X).drop(valid_cols).to_native()
     if not exprs:
         return retained, y
     encoded = X.select(exprs)
@@ -237,6 +238,8 @@ def _build_dummy_artifact(
 def _dummy_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "DummyEncoder", y)
+    # Normalize only new fits; saved NaN categories retain their original replay.
+    X = X.with_columns(pl.col(col).fill_nan(None) for col in cols if X.schema[col].is_float())
 
     categories: dict[str, list[str]] = {}
     for col in cols:
@@ -274,9 +277,9 @@ class DummyEncoderCalculator(BaseCalculator):
 
     The target column is excluded first: dummy encoding replaces the column it
     encodes with several derived ones, which would break a downstream
-    Feature/Target Split. Nulls are dropped before the list is built, so they
-    never become a category. An explicit ``columns: []`` yields an empty
-    artifact so the applier no-ops.
+    Feature/Target Split. Nulls and float NaN are dropped before the list is
+    built, so they never become a category. An explicit ``columns: []`` yields
+    an empty artifact so the applier no-ops.
     """
 
     @fit_method

@@ -82,6 +82,39 @@ def _finalize_resampled(
     return X_res, y_res
 
 
+def _validate_sample_indices(
+    indices: Any, source_rows: int, feature_rows: int, target_rows: int
+) -> np.ndarray:
+    """Require a complete positional selection map before gathering original values."""
+    positions = np.asarray(indices)
+    if (
+        positions.ndim != 1
+        or positions.dtype.kind not in "iu"
+        or len(positions) != feature_rows
+        or len(positions) != target_rows
+        or np.any(positions < 0)
+        or np.any(positions >= source_rows)
+    ):
+        raise ValueError("Sampler returned invalid sample_indices_ for the resampled rows.")
+    return positions
+
+
+def _restore_selected_rows(
+    sampler: Any, X: pd.DataFrame, y: Any, X_res: Any, y_res: Any
+) -> tuple[Any, Any]:
+    """Retain exact selected values while preserving the sampler's output indexes and names."""
+    indices = getattr(sampler, "sample_indices_", None)
+    if indices is None:
+        return X_res, y_res
+    positions = _validate_sample_indices(indices, len(X), len(X_res), len(y_res))
+    feature_index = X_res.index if isinstance(X_res, pd.DataFrame) else pd.RangeIndex(len(X_res))
+    target_index = y_res.index if isinstance(y_res, pd.Series) else pd.RangeIndex(len(y_res))
+    selected_X = X.iloc[positions].set_axis(feature_index)
+    selected_y = pd.Series(y).iloc[positions].set_axis(target_index)
+    selected_y.name = getattr(y_res, "name", selected_y.name)
+    return selected_X, selected_y
+
+
 def _run_sampler(
     X_pd: pd.DataFrame,
     y_pd: Any,
@@ -96,6 +129,7 @@ def _run_sampler(
     if sampler is None:
         return None
     X_res, y_res = sampler.fit_resample(X_pd, y_pd)
+    X_res, y_res = _restore_selected_rows(sampler, X_pd, y_pd, X_res, y_res)
     fallback_name = getattr(y_pd, "name", None) if y_pd is not None else params.get("target_column")
     return _finalize_resampled(X_res, y_res, X_pd.columns, fallback_name)
 
@@ -296,6 +330,7 @@ class OversamplingCalculator(BaseCalculator):
         """
         return {
             "type": "oversampling",
+            "synthetic_weight": config.get("synthetic_weight"),
             "method": config.get("method", "smote"),
             "target_column": config.get("target_column"),
             "sampling_strategy": config.get("sampling_strategy", "auto"),

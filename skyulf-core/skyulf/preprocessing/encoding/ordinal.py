@@ -21,8 +21,8 @@ from .._category_keys import (
 )
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _parse_categories_order, detect_categorical_columns
+from ._target import apply_target_encoder, fit_target_encoder
 
 # -----------------------------------------------------------------------------
 # Apply
@@ -51,7 +51,9 @@ def _apply_features_polars(
         ]
     )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
-    encoded = encoder.transform(X_np)
+    encoded = (
+        encoder.transform(X_np) if len(X) else np.empty((0, len(valid_cols)), dtype=encoder.dtype)
+    )
     new_cols_pl = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
     return X.with_columns(new_cols_pl)
 
@@ -62,7 +64,11 @@ def _apply_features_pandas(
     X_out = X.copy()
     X_subset = _subset_to_str_pandas(X_out, valid_cols, canonical_keys)
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    X_out[valid_cols] = encoder.transform(X_input)
+    X_out[valid_cols] = (
+        encoder.transform(X_input)
+        if len(X)
+        else np.empty((0, len(valid_cols)), dtype=encoder.dtype)
+    )
     return X_out
 
 
@@ -100,6 +106,8 @@ def _target_to_str_array(y: Any) -> Any:
 
 
 def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
+    if len(y) == 0:
+        return pl.Series(getattr(y, "name", "target"), [], dtype=pl.Float32)
     y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     y_name = y.name if hasattr(y, "name") else "target"
@@ -107,11 +115,16 @@ def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
 
 
 def _apply_target_pandas(y: Any, enc: OrdinalEncoder) -> Any:
+    index = getattr(y, "index", None)
+    if callable(index):
+        index = None
+    if len(y) == 0:
+        return pd.Series(index=index, name=getattr(y, "name", None), dtype="float32")
     y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     return pd.Series(
         encoded,
-        index=y.index if hasattr(y, "index") else None,
+        index=index,
         name=y.name if hasattr(y, "name") else None,
     )
 
@@ -159,8 +172,9 @@ class OrdinalEncoderApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch to the engine-specific encode, forwarding ``(X, y)`` only when ``y`` exists."""
-        return apply_dual_engine(
-            (X, y) if y is not None else X,
+        return apply_target_encoder(
+            X,
+            y,
             params,
             {"polars": _ordinal_apply_polars, "pandas": _ordinal_apply_pandas},
         )
@@ -183,7 +197,7 @@ def _make_ordinal_encoder(
     return OrdinalEncoder(
         categories=categories,
         handle_unknown=handle_unknown,
-        unknown_value=unknown_value,
+        unknown_value=unknown_value if handle_unknown == "use_encoded_value" else None,
         dtype=np.float32,
     )
 
@@ -301,8 +315,9 @@ def _ordinal_fit_dispatch(
     if not feature_cols and not encode_target:
         return {}
 
-    feature_encoder, counts = _maybe_fit_features(X, feature_cols, config, build_subset)
-    target_encoders = _maybe_fit_target_block(y, len(feature_cols), config, encode_target)
+    feature_config, target_config = _encoding_orders(config, feature_cols, encode_target)
+    feature_encoder, counts = _maybe_fit_features(X, feature_cols, feature_config, build_subset)
+    target_encoders = _maybe_fit_target_block(y, len(feature_cols), target_config, encode_target)
 
     return {
         "type": "ordinal",
@@ -312,6 +327,24 @@ def _ordinal_fit_dispatch(
         "categories_count": counts,
         "category_key_version": 1,
     }
+
+
+def _encoding_orders(config: dict, features: list[str], encode_target: bool) -> tuple[dict, dict]:
+    """Keep explicit category rows attached to column names when separating the target."""
+    columns = config.get("columns") or []
+    parsed = _parse_categories_order(config.get("categories_order"), len(columns))
+    target = config.get("target_column")
+    if not isinstance(parsed, list):
+        return config, config
+    orders = dict(zip(columns, parsed, strict=True))
+    feature_rows = [",".join(orders[column]) for column in features]
+    feature_config = {**config, "categories_order": feature_rows}
+    if not encode_target or target not in columns:
+        return feature_config, config
+    return (
+        feature_config,
+        {**config, "categories_order": [*feature_rows, ",".join(orders[target])]},
+    )
 
 
 def _ordinal_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
@@ -373,8 +406,9 @@ class OrdinalEncoderCalculator(BaseCalculator):
         """Fit the encoders on the frame's own engine, forwarding ``y`` when present."""
         return cast(
             OrdinalArtifact,
-            fit_dual_engine(
-                (X, y) if y is not None else X,
+            fit_target_encoder(
+                X,
+                y,
                 config,
                 {"polars": _ordinal_fit_polars, "pandas": _ordinal_fit_pandas},
             ),

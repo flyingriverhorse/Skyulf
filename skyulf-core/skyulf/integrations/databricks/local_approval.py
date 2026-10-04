@@ -10,30 +10,27 @@ from typing import Any
 
 import polars as pl
 
+from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
+
 from ..mlflow.promotion import (
     AliasChangeReceipt,
     AliasConflictError,
     ExclusiveAliasWriterAdmission,
-    _active_marker,
-    _event_tag,
-    _read_event,
-    _verify_original_receipt,
-    _verify_staged_challenger,
+    active_marker,
     controlled_champion_version,
+    event_tag,
     initialize_champion,
     promote_candidate,
+    read_event,
+    verify_original_receipt,
+    verify_staged_challenger,
 )
-from ..mlflow.registry import (
-    _make_client,
-    _require_mlflow,
-    resolve_model,
-)
+from ..mlflow.registry import resolve_model
 from ..mlflow.rejection import reject_candidate
 from ..mlflow.validation import ModelComparisonReport, validate_quality_policy
 from . import local_retraining
 from ._contracts import input_budget_bytes
-from .local_training_evidence import load_candidate_evidence as _load_evidence
-from .local_training_evidence import validate_training_evidence
+from .local_training_evidence import load_candidate_evidence, validate_training_evidence
 
 
 def resolve_candidate_comparison_digest(
@@ -57,15 +54,15 @@ def resolve_candidate_comparison_digest(
     current = controlled_champion_version(
         name, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
-    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
     replay = action == "approve" and current == candidate_version
     alias = "champion" if replay else "challenger"
-    event_id = _active_marker(client, name, candidate_version, alias)
+    event_id = active_marker(client, name, candidate_version, alias)
     if event_id is None:
         raise AliasConflictError("Candidate has no active saved comparison receipt.")
-    raw = (client.get_model_version(name, candidate_version).tags or {}).get(_event_tag(event_id))
+    raw = (client.get_model_version(name, candidate_version).tags or {}).get(event_tag(event_id))
     try:
-        event = _read_event(raw)
+        event = read_event(raw)
     except (TypeError, ValueError) as exc:
         raise AliasConflictError("Saved comparison receipt is malformed.") from exc
     return _comparison_receipt_digest(event, action, replay)
@@ -75,13 +72,13 @@ def _completed_approval(
     client: Any, report: ModelComparisonReport, digest: str
 ) -> AliasChangeReceipt:
     """Replay only the same still-active committed transition, never a later rollback."""
-    event_id = _active_marker(client, report.model_name, report.candidate_version)
+    event_id = active_marker(client, report.model_name, report.candidate_version)
     if event_id is None:
         raise AliasConflictError("Candidate lacks an active approval receipt.")
     raw = client.get_model_version(report.model_name, report.candidate_version).tags.get(
-        _event_tag(event_id)
+        event_tag(event_id)
     )
-    event = _read_event(raw)
+    event = read_event(raw)
     if not isinstance(event, dict) or (
         event.get("k") not in {"initial", "promotion"}
         or event.get("h") != digest
@@ -99,7 +96,7 @@ def _completed_approval(
         parent_event_id=event.get("e"),
         previous_champion_version=event.get("o"),
     )
-    _verify_original_receipt(client, receipt)
+    verify_original_receipt(client, receipt)
     return receipt
 
 
@@ -141,8 +138,8 @@ def reject_local_candidate(
     )
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
-    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
-    report, _, _, _ = _load_evidence(
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
+    report, _, _, _ = load_candidate_evidence(
         client,
         config["model_name"],
         candidate_version,
@@ -192,8 +189,8 @@ def approve_local_candidate(
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
     name = config["model_name"]
-    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
-    report, spec, engine, filter_evidence = _load_evidence(
+    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
+    report, spec, engine, filter_evidence = load_candidate_evidence(
         client, name, candidate_version, comparison_sha256, registry_uri=registry_uri
     )
     _validate_approval_policy(config, report, expected_champion_version)
@@ -209,7 +206,7 @@ def approve_local_candidate(
         return _completed_approval(client, report, comparison_sha256)
     if current != expected_champion_version:
         raise AliasConflictError("Champion changed since the requested comparison.")
-    _verify_staged_challenger(client, report, comparison_sha256)
+    verify_staged_challenger(client, report, comparison_sha256)
     bounded_spec = replace(
         spec,
         max_rows=min(spec.max_rows, config["max_rows"]),

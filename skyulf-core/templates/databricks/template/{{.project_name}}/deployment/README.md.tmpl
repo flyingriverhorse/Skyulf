@@ -1,0 +1,332 @@
+# Deployment and personal development
+
+This project is a standard Databricks Bundle. Deploy it with your own CLI profile
+or existing CI/CD service account. No GitHub workflow or company adapter is
+required or generated. Authentication stays in the CLI/CI environment; do not
+put tokens or passwords in these files.
+
+## Files and environments
+
+`databricks.yml` includes `deployment/variables.yml`, `deployment/targets.yml`
+and the two job files under `resources/`. Keep the `train` and `score` job keys:
+changing them can recreate deployed jobs and lose their history.
+
+| Target | Intended use | Output/model names | Workspace files |
+| --- | --- | --- | --- |
+| `test`, `syst`, `prod` | Shared deployment, usually through existing CI/CD | Shared names | Team-managed project directory |
+| `test_development`, `syst_development`, `prod_development` | Optional personal work in the selected environment | `_<env>_dev_<user-id>` suffix | Personal directory per environment |
+
+There is no separate `dev` target. With personal targets enabled,
+`test_development` is the only default. Otherwise no target is default: select
+`test`, `syst` or `prod` explicitly with `-t`. Shared targets use production mode,
+including `test`:
+the name `test` describes the environment, not a personal development deployment.
+Different targets may use one workspace with different catalogs/schemas, or
+different workspaces. Configure distinct shared destinations when environments
+use the same workspace. The template does not create catalogs, schemas, users or
+service principals.
+
+The initializer choice `personal_development_targets` controls whether the
+three additional personal targets are generated. Current choice:
+`{{.personal_development_targets}}`. Personal targets do not receive shared
+service-principal identities or shared job ACL overrides. Their resolved suffix
+uses the workspace user ID, not just an email prefix, so two users named `alice`
+cannot share output/model names accidentally. Use each developer's own profile;
+one shared service account represents one identity, not several developers.
+
+Personal job names are `dev_<user>_train` and `dev_<user>_score`, without a project
+or environment label. Shared test/syst/prod jobs keep `<project>_train` and
+`<project>_score`, without a user prefix. Environment-specific roots and output
+suffixes keep targets distinct when users choose to share one workspace.
+
+Personal names isolate deployments; they do not replace Unity Catalog grants.
+Reading production inputs still requires permission. Personal model/output
+schemas must also allow that developer's writes. If the company disallows writes
+in production schemas, set the environment's development output and metadata
+schema variables to approved sandbox schemas while retaining the source schema.
+Do not give personal accounts production model ownership to make a trial work.
+
+## Configure once, then validate
+
+The initializer does not ask for catalog/schema names. It generates editable
+bindings for test/syst/prod in `variables.yml` with `REPLACE_*` placeholders.
+An initialization JSON file may still provide `catalog` and `schema` to prefill
+shared test values. These settings reference existing UC objects; they do not
+create them.
+
+1. Set the same workspace `host` in each shared/personal environment pair in
+   `targets.yml`. Host is a literal because the CLI
+   needs it before resolving Bundle variables for authentication.
+2. Set `<env>_catalog`, `<env>_input_schema`, `<env>_output_schema` and
+   `<env>_metadata_schema` in `variables.yml`, or supply these scalar variables
+   with `BUNDLE_VAR_<name>` / `--var` in your existing pipeline. Personal targets
+   share the environment catalog, but have separate `<env>_development_input_schema`,
+   `<env>_development_output_schema` and `<env>_development_metadata_schema` values.
+   Point these at approved development schemas, or reuse the shared input schema
+   if that matches your access policy.
+3. Set `<env>_root_path` to a directory managed by your team. The proposed
+   `/Workspace/Projects/{{.project_name}}/<env>` path must have suitable access
+   controls; its name does not create an ACL. Avoid a personal deployer's home
+   and folders writable by unrelated users for a shared production deployment.
+4. Configure the chosen identities and access below, then build the project wheel
+   into `dist/` as described in the project README.
+
+```sh
+databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_TEST_PROFILE
+databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_TEST_PROFILE
+```
+
+With personal targets enabled, a user already authorized for the production
+workspace can deploy a personal trial there:
+
+```sh
+databricks bundle validate --strict -t prod_development --profile YOUR_PROD_DEV_PROFILE
+databricks bundle deploy -t prod_development --profile YOUR_PROD_DEV_PROFILE
+databricks bundle run -t prod_development --profile YOUR_PROD_DEV_PROFILE train
+```
+
+Scheduled train and score triggers start PAUSED for every personal target,
+when enabled. Manual runs still work. The target explicitly overrides schedule
+variables, because a pause preset alone cannot override an explicit job schedule.
+Only enable a personal schedule intentionally in that target's variables.
+Shared targets retain the initializer's schedule choices.
+
+An external pipeline uses the same project and standard commands after its own
+authentication step:
+
+```sh
+databricks bundle validate --strict -t prod
+databricks bundle deploy -t prod
+```
+
+Deploy updates definitions; running train/score is a separate pipeline decision.
+Bundle variables are deployment-time settings. Use job parameters for individual
+run inputs, not new deployment-variable values on a previously deployed job.
+
+## Deployment identity and run identity
+
+The credentials executing `bundle deploy` are the deployment identity. Job
+`run_as` controls execution. Current initializer choice:
+`{{.deployment_identity}}`.
+
+| Choice | Shared train/score configuration |
+| --- | --- |
+| `deployer` | Emit no `run_as` override; preserve standard job ownership or externally managed identity |
+| `shared_service_principal` | Both jobs use `shared_service_principal` |
+| `separate_service_principals` | Train uses `train_service_principal`; score uses `score_service_principal` |
+
+For explicit service principals, configure application IDs, not account display
+names. A deployment service account may also be the shared run identity. Separate
+deployment and execution accounts are supported, not required. Override the
+identity variables under the corresponding target when each environment has its
+own accounts. The deployer needs permission to use the selected run identity.
+`deployer` is an omission of configuration, not a command to change an existing
+job's owner or reset an existing run identity. Inspect existing jobs on migration.
+
+For a user-based shared installation, edit that target's job-level `run_as` to
+`user_name` instead of `service_principal_name`; do not specify both keys. Personal
+targets already use their normal deployment identity without inheriting shared
+overrides. Keep identities at job scope so later unrelated resource types do not
+inherit execution settings they cannot support.
+
+## Job access
+
+Every target includes `permissions: []`, ready for environment-specific access
+entries. An empty list declares no additional grants. Entries added here apply
+to both jobs in that target; personal targets have their own list and do not
+inherit a shared target's permissions. For example:
+
+```yaml
+permissions:
+  - level: CAN_VIEW
+    group_name: YOUR_ENVIRONMENT_VIEWERS
+```
+
+Use the optional per-job lists below when train and score need different access.
+Avoid duplicating the same principal at target and job scope.
+
+Current `manage_job_permissions` choice: `{{.manage_job_permissions}}`.
+When false, a new project omits explicit shared job ACL resources so your existing
+deployment/platform setup can manage them. Changing an existing deployment from
+managed to external ACLs requires an intentional state/permission handoff: removing
+a previously managed permissions resource can reset existing nonadmin access.
+Review the deployment plan before changing this choice. When true, configure the
+`train_permissions` and `score_permissions` lists in `variables.yml` or per-target
+variable overrides.
+The default lists are empty; they do not create operator access.
+
+For example, a train ACL can contain:
+
+```yaml
+train_permissions:
+  type: complex
+  default:
+    - group_name: YOUR_JOB_MANAGERS
+      level: CAN_MANAGE
+    - group_name: YOUR_LIFECYCLE_OPERATORS
+      level: CAN_MANAGE_RUN
+    - group_name: YOUR_JOB_VIEWERS
+      level: CAN_VIEW
+```
+
+Use existing groups. Keep broad management privileges limited to trusted job/code
+maintainers. `CAN_MANAGE_RUN` applies to the whole train job, including its
+supported train/approve/reject/rollback parameters; it is not an approve-only role.
+Job access does not grant data or model access to the caller.
+
+If automatic score handoff is enabled and identities differ, the train run
+identity also needs permission to invoke the score job. Include that service
+principal in `score_permissions` with `CAN_MANAGE_RUN`, or arrange the equivalent
+access externally. The child score job must retain its own scoring `run_as`.
+
+## Data, model and experiment access
+
+Configure Unity Catalog and workspace access with your existing governance
+process. The Bundle does not silently create UC objects, transfer ownership or
+grant privileges on existing resources.
+
+| Execution identity | Required access to arrange |
+| --- | --- |
+| Train/lifecycle | Read training inputs; create/register model versions in the model schema; own the models whose aliases it changes; write the project's MLflow experiment |
+| Score | Read scoring inputs; execute/read the pinned registered models and their artifacts; create/write prediction tables, generations and views in the designated output schema |
+| Both | Use the required catalogs/schemas, read deployed code/wheel assets, and use the selected serverless compute or approved cluster policy |
+
+Grant experiment access explicitly through your workspace governance, or manage
+an experiment resource at exactly `${workspace.root_path}/experiment` in a
+separate approved Bundle resource file. An experiment's workspace permissions
+and a UC model's privileges are different controls. Keep model/schema creation
+and grants optional and explicit; do not take over existing objects on deploy.
+
+For enforced writer separation, score must not own the registered models or
+inherit model ownership through a group. Broader inherited permissions can defeat
+the intended separation even with different service principal IDs. A single
+account can run the project, but it cannot prove that scoring is forbidden from
+changing aliases. Keep the existing one-run train/score queues and ensure another
+job or operator is not independently writing the same aliases/output namespace.
+
+## Time limits, retries and notifications
+
+Operational settings live in `variables.yml`; initialization asks no extra
+questions. Override them under a target's `variables` when environments differ.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `train_timeout_seconds`, `score_timeout_seconds` | `0` | Whole-job limit; zero means unlimited |
+| `train_task_timeout_seconds`, `score_task_timeout_seconds` | `0` | Notebook-task limit; zero means unlimited |
+| `score_max_retries` | `0` | Optional finite score retries after failure |
+| `score_min_retry_interval_millis` | `60000` | Minimum interval between score attempts |
+| `train_health_rules`, `score_health_rules` | `[]` | Optional duration-warning rules |
+| `train_email_notifications`, `score_email_notifications` | `{}` | Optional event-to-email mappings |
+| `train_webhook_notifications`, `score_webhook_notifications` | `{}` | Optional event-to-notification-destination mappings |
+
+Choose limits from measured project runs. A duration warning does not stop the
+job; a timeout does. The task limit also applies to generated model/SHAP tasks
+after `refresh_training_graph.py`. The train job includes its automatic score
+handoff, so leave time for that child run when configuring its whole-job limit.
+
+For example, add these values under `targets.test.variables` in `targets.yml`:
+
+```yaml
+train_timeout_seconds: 14400
+train_task_timeout_seconds: 7200
+score_timeout_seconds: 3600
+score_task_timeout_seconds: 3000
+score_max_retries: 2
+score_min_retry_interval_millis: 60000
+train_health_rules:
+  - metric: RUN_DURATION_SECONDS
+    op: GREATER_THAN
+    value: 10800
+train_email_notifications:
+  on_failure: ["YOUR_ONCALL_EMAIL"]
+  on_duration_warning_threshold_exceeded: ["YOUR_ONCALL_EMAIL"]
+score_email_notifications:
+  on_failure: ["YOUR_ONCALL_EMAIL"]
+score_webhook_notifications:
+  on_failure:
+    - id: "YOUR_EXISTING_NOTIFICATION_DESTINATION_ID"
+```
+
+Webhook values are existing workspace destination IDs, not URLs or secrets.
+No destination is created and no recipient is added by default. Configure
+duration events alongside a health rule. Job-level failure notifications report
+the final failed job, rather than every failed retry attempt. See the official
+[notification settings](https://docs.databricks.com/aws/en/jobs/notifications).
+Global defaults apply to personal targets too; use target overrides to keep
+personal trials separate from shared on-call recipients.
+
+Lifecycle tasks and the automatic handoff always have zero retries. Existing
+runtime guards also reject lifecycle repair/retry before mutations. Scoring
+retries are opt-in, finite (never `-1`), and do not retry timeouts. Serverless
+automatic optimization remains disabled so it cannot add hidden attempts. See
+[Databricks task retry settings](https://docs.databricks.com/aws/en/jobs/configure-task).
+
+When `auto_rebuild_on_cdf_expiry=true` was selected during initialization, the
+same notebook timeout and retry settings also apply to `recover_predictions`
+and `scoring_report`. These tasks use the existing score job's identity,
+single-run queue, compute and notifications. The `recovery_needed` condition
+does not run a notebook or retry scoring. Recovery consumes the score task's
+pinned request; an exact already committed recovery is a no-op. The final report
+joins the ordinary and recovery branches with `NONE_FAILED`, so failed recovery
+does not publish a success report.
+
+Enable score retries only while the job remains the sole output writer and the
+configured model/source policies suit another attempt. An attempt re-evaluates
+the configured model selector and current source watermark; it is not an exact
+replay of the failed snapshot. Use a concrete `score_model_version` when recovery
+must keep the same model. An uncertain write, foreign commit, source replacement
+or incompatible schema requires inspecting the receipt/history and fixing the
+cause; retries do not bypass those guards. Expired CDF also requires operator
+action unless optional CDF recovery is enabled and the expiry is recognized.
+A timeout cannot undo an
+already committed write or alias change.
+
+If training/promotion succeeded and only scoring failed, inspect the child run
+and run **only the score job** after fixing the error. Use Run with different
+settings on score to enter the concrete version recorded by the failed attempt,
+or leave it blank to deliberately use the configured selector. Do not rerun train
+or approve just to recover predictions. Single/competition versions identify the
+selected model; multi-target versions identify the complete model set. An
+unchanged successful replay produces no new prediction writes.
+
+The score output shows the source table and end version, output table, selected
+model/version, row counts, commit version and no-op status. Previous-write
+provenance stays labeled separately on a no-op. Raw JSON remains available for
+automation. These settings and summaries are covered locally; actual timeout,
+retry scheduling and notification delivery require workspace verification.
+
+## Existing deployments and verification limits
+
+This layout replaces the standalone `dev` target with optional environment pairs
+and changes shared roots and personal schema bindings. Regenerate
+into a separate directory and review changes before updating a deployed project.
+Moving deployment roots can point the CLI at new state; do not blindly deploy a
+second writer. Preserve the old root and explicit namespace settings for an
+existing deployment until an intentional migration/binding has been verified.
+Never delete old jobs or output tables as part of this template update.
+
+Local rendering and strict resolution tests verify configuration, distinct user
+namespaces, paused personal schedules and identity/ACL wiring. They do not prove
+real workspace grants, source access, job ownership, model alias denial or queue
+behavior. Verify those with the intended accounts before treating writer
+separation as enforced in production.
+
+## Runtime packaging
+
+Set the Core source directory or release wheel and expected version in
+`artifact.json`. Bundle deploy runs `src/tools/build_wheel.py`; its verified
+output and SHA-256 receipt live in `dist/skyulf/`. Do not edit wheel paths in job
+resources. Run the build command once before strict validation of a fresh project.
+The wheel filename includes its content digest as a build tag. Changed bytes
+therefore get a distinct deployment/cache identity without changing the release
+version required by existing models. The receipt matches the uploaded bytes.
+
+`requirements.txt` is shared by both jobs and includes exact project pins from
+`src/features/requirements.txt`. `train-requirements.txt` adds optional report
+packages. Initial model choices populate optional dependencies; update this file
+when changing Python model declarations later. Transitive dependencies are not
+fully locked by these direct pins.
+
+Override `job_tags`, `serverless_environment_version`, `serverless_budget_policy_id`,
+or policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`
+through target variables. A blank budget policy uses the workspace defaults.

@@ -81,17 +81,36 @@ def _polars_mapping_exprs(X: Any, valid: list[str], mapping: dict[str, Any]) -> 
     return exprs
 
 
-def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> list[Any]:
-    exprs: list[Any] = []
-    is_map = _is_mapping_like(to_replace)
-    for col in valid:
-        if is_map:
-            exprs.append(pl.col(col).replace_strict(to_replace, default=pl.col(col)).alias(col))
-        else:
-            exprs.append(
-                pl.col(col).replace_strict({to_replace: value}, default=pl.col(col)).alias(col)
-            )
-    return exprs
+def _replacement_pairs(to_replace: Any, value: Any) -> list[tuple[Any, Any]]:
+    """Keep list rules ordered without merging boolean and numeric keys."""
+    if not pd.api.types.is_list_like(to_replace):
+        if pd.api.types.is_list_like(value):
+            raise TypeError("A scalar to_replace requires a scalar replacement value.")
+        return [(to_replace, value)]
+    keys = list(to_replace)
+    values = list(value) if pd.api.types.is_list_like(value) else [value] * len(keys)
+    if len(keys) != len(values):
+        raise ValueError("Replacement lists must have the same length.")
+    return list(zip(keys, values, strict=True))
+
+
+def _replacement_key_matches_dtype(key: Any, dtype_kind: str) -> bool:
+    """Respect pandas's distinction between boolean and numeric typed columns."""
+    if pd.api.types.is_bool(key):
+        return dtype_kind not in ("i", "u", "f")
+    return dtype_kind != "b" or not pd.api.types.is_number(key)
+
+
+def _coerce_replacement_pairs(
+    pairs: list[tuple[Any, Any]], dtype_kind: str
+) -> list[tuple[Any, Any]]:
+    """Coerce JSON string keys while retaining the order of applicable rules."""
+    coerced = []
+    for key, value in pairs:
+        key = _coerce_key(key, dtype_kind)
+        if key is not _SKIP_MAPPING_KEY and _replacement_key_matches_dtype(key, dtype_kind):
+            coerced.append((key, value))
+    return coerced
 
 
 def _value_replacement_exprs_polars(
@@ -105,7 +124,14 @@ def _value_replacement_exprs_polars(
         return _polars_mapping_exprs(X, valid, mapping)
     if to_replace is None:
         return []
-    return _polars_to_replace_exprs(valid, to_replace, value)
+    if _is_mapping_like(to_replace):
+        return _polars_mapping_exprs(X, valid, dict(to_replace.items()))
+    pairs = _replacement_pairs(to_replace, value)
+    exprs = []
+    for col in valid:
+        col_map = dict(_coerce_replacement_pairs(pairs, _polars_dtype_kind(X.schema[col])))
+        exprs.append(pl.col(col).replace_strict(col_map, default=pl.col(col)).alias(col))
+    return exprs
 
 
 def _pandas_dtype_kind(dtype: Any) -> str:
@@ -139,17 +165,16 @@ def _pandas_apply_mapping(
     return df_out
 
 
-def _pandas_apply_to_replace(
-    df_out: pd.DataFrame, valid: list[str], to_replace: Any, value: Any
-) -> pd.DataFrame:
-    is_map = _is_mapping_like(to_replace)
-    with pd.option_context("future.no_silent_downcasting", True):
-        for col in valid:
-            if is_map:
-                df_out[col] = df_out[col].replace(to_replace).infer_objects()
-            else:
-                df_out[col] = df_out[col].replace(to_replace, value).infer_objects()
-    return df_out
+def _pandas_replace_pairs(
+    series: pd.Series, pairs: list[tuple[Any, Any]], scalar: bool
+) -> pd.Series:
+    """Keep native scalar null handling and ordered list replacement semantics."""
+    if scalar and pairs:
+        key, value = pairs[0]
+        return series.replace(key, value).infer_objects()
+    keys = [key for key, _ in pairs]
+    values = [replacement for _, replacement in pairs]
+    return series.replace(keys, values).infer_objects()
 
 
 def _apply_value_replacement_pandas(
@@ -163,7 +188,16 @@ def _apply_value_replacement_pandas(
         return _pandas_apply_mapping(df_out, valid, mapping)
     if to_replace is None:
         return df_out
-    return _pandas_apply_to_replace(df_out, valid, to_replace, value)
+    if _is_mapping_like(to_replace):
+        return _pandas_apply_mapping(df_out, valid, dict(to_replace.items()))
+    pairs = _replacement_pairs(to_replace, value)
+    with pd.option_context("future.no_silent_downcasting", True):
+        for col in valid:
+            rules = _coerce_replacement_pairs(pairs, _pandas_dtype_kind(df_out[col].dtype))
+            df_out[col] = _pandas_replace_pairs(
+                df_out[col], rules, scalar=not pd.api.types.is_list_like(to_replace)
+            )
+    return df_out
 
 
 class ValueReplacementApplier(BaseApplier):
@@ -172,8 +206,9 @@ class ValueReplacementApplier(BaseApplier):
     The pandas and polars paths must agree value-for-value. A ``mapping`` wins
     over ``to_replace``/``value`` when both are configured, and may be flat
     (one map applied to every column) or nested (``{column: {old: new}}``).
-    Mapping keys are coerced to the column's dtype before lookup, and a column
-    selection that resolves to nothing makes the node a no-op.
+    Mapping and ``to_replace`` keys are coerced to the column's dtype before
+    lookup. A list of keys can share one replacement or have a same-length
+    list of replacements. A column selection resolving to nothing is a no-op.
     """
 
     @apply_method

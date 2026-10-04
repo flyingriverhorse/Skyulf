@@ -56,6 +56,7 @@ function connectedCrossValidation(data: ModelData, config: EnsembleConfig): Part
     cv_shuffle: data.cv_shuffle !== undefined ? data.cv_shuffle : config.cv_shuffle,
     cv_random_state: data.cv_random_state ?? config.cv_random_state,
     ...(timeColumn !== undefined ? { cv_time_column: timeColumn } : {}),
+    ...connectedPolicy(data, config),
   };
 }
 
@@ -113,4 +114,11 @@ export function connectedModelPatch(models: Node<ModelData>[], config: EnsembleC
   if (paramsChanged) patch.base_estimator_params = params;
   if (Object.keys(patch).length === 0) return null;
   return { ...patch, base_estimator_params: params };
+}
+
+/** Preserve explicit zero gaps and empty window limits from the connected recipe. */
+function connectedPolicy(data: ModelData, config: EnsembleConfig): Partial<EnsembleConfig> {
+  const fields = ['cv_nested_type', 'cv_group_column', 'cv_gap', 'cv_test_size', 'cv_max_train_size', 'tune_threshold'] as const;
+  return Object.fromEntries(fields.map(field => [field, data[field] !== undefined ? data[field] : config[field]])
+    .filter(([, value]) => value !== undefined));
 }

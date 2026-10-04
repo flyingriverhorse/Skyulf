@@ -1,7 +1,5 @@
 """Read-only comparison of pinned registered local pipeline versions."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import math

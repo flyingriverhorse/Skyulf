@@ -6,8 +6,6 @@ The adapter transports the existing bundle directory and delegates prediction
 to :func:`skyulf.inference.bundle.predict_local`.
 """
 
-from __future__ import annotations
-
 import inspect
 import tempfile
 from pathlib import Path
@@ -15,6 +13,12 @@ from typing import Any
 
 import mlflow  # ty: ignore[unresolved-import]
 import pandas as pd
+
+from skyulf.integrations.mlflow._client import make_tracking_client
+from skyulf.integrations.mlflow._model_metadata import (
+    mlflow_dtype,
+    scrub_local_artifact_uri,
+)
 
 from ...inference.bundle import InferenceBundle, load_bundle, predict_local, save_bundle
 
@@ -67,7 +71,7 @@ def log_model(
     """
     run_id = _validate_arguments(bundle, run_id, artifact_path, tracking_uri)
     signature = _signature(bundle)
-    client = _make_client(tracking_uri)
+    client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-mlflow-") as directory:
         bundle_path = Path(directory) / "bundle"
@@ -90,7 +94,7 @@ def log_model(
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
             **save_options,
         )
-        _scrub_local_artifact_uri(model_path)
+        scrub_local_artifact_uri(model_path)
         client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
 
@@ -110,30 +114,10 @@ def _validate_arguments(
     return run_id
 
 
-def _make_client(tracking_uri: str | None) -> Any:
-    """Construct the MLflow client used to validate and upload one run artifact."""
-    from mlflow import (  # noqa: PLC0415 - optional module boundary  # ty: ignore[unresolved-import]
-        MlflowClient,
-    )
-
-    return MlflowClient(tracking_uri=tracking_uri)
-
-
-def _scrub_local_artifact_uri(model_path: Path, artifact_key: str = "bundle") -> None:
-    """Remove the temporary producer path from the portable MLflow metadata."""
-    model = mlflow.models.Model.load(str(model_path))
-    flavor = model.flavors[mlflow.pyfunc.FLAVOR_NAME]
-    artifacts = flavor.get("artifacts", {})
-    saved_artifact = artifacts.get(artifact_key)
-    if isinstance(saved_artifact, dict) and "uri" in saved_artifact:
-        saved_artifact["uri"] = artifact_key
-    model.save(str(model_path / "MLmodel"))
-
-
 def _metadata(bundle: InferenceBundle) -> dict[str, str]:
     """Record contract identity without copying rows, credentials or sessions."""
     return {
-        "skyulf_bundle_digest": bundle.semantic_digest,
+        "bundle_digest": bundle.semantic_digest,
         "skyulf_input_stage": bundle.input_stage,
         "skyulf_task": bundle.manifest.task,
         "skyulf_feature_order": ",".join(bundle.feature_order),
@@ -182,40 +166,17 @@ def _signature(bundle: InferenceBundle) -> Any:
 
     inputs = Schema(
         [
-            ColSpec(_mlflow_dtype(column.dtype), name=column.name)
+            ColSpec(mlflow_dtype(column.dtype), name=column.name)
             for column in bundle.manifest.input_schema
         ]
     )
     outputs = Schema(
         [
-            ColSpec(_mlflow_dtype(column.dtype), name=column.name)
+            ColSpec(mlflow_dtype(column.dtype), name=column.name)
             for column in bundle.manifest.output_schema
         ]
     )
     return ModelSignature(inputs=inputs, outputs=outputs)
-
-
-def _mlflow_dtype(dtype: str) -> Any:
-    """Map the bundle's primitive dtype vocabulary to MLflow tabular types."""
-    from mlflow.types import (  # noqa: PLC0415 - optional module boundary  # ty: ignore[unresolved-import]
-        DataType,
-    )
-
-    mapping = {
-        "bool": DataType.boolean,
-        "int32": DataType.integer,
-        "int64": DataType.long,
-        "float32": DataType.float,
-        "float64": DataType.double,
-        "string": DataType.string,
-    }
-    try:
-        return mapping[dtype]
-    except KeyError as exc:
-        raise ValueError(
-            "MLflow column signatures cannot preserve this bundle dtype exactly: "
-            f"{dtype}. Use int32/int64, float32/float64, bool or string."
-        ) from exc
 
 
 def _validate_artifact_destination(artifact_path: str, tracking_uri: str | None) -> None:

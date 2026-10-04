@@ -80,10 +80,35 @@ it('explains an empty advanced search and Basic parameter precedence', async () 
 });
 
 /** Controlled updates exercise the same effect and focus lifetimes as the node inspector. */
-function SettingsHarness({ initial }: { initial: TrainingConfig }) {
+function SettingsHarness({ initial, onChange }: { initial: TrainingConfig; onChange?: (value: TrainingConfig) => void }) {
   const [value, setValue] = useState(initial);
-  return <TrainingSettings config={value} onChange={setValue} nodeId="model" />;
+  return <TrainingSettings config={value} onChange={next => { onChange?.(next); setValue(next); }} nodeId="model" />;
 }
+
+/** Selecting metadata options must retain their original types in Basic training. */
+it('keeps class weight null and numeric select values when customizing', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([
+    { name: 'class_weight', label: 'Class Weight', type: 'select', default: null, options: [
+      { label: 'None (equal weight)', value: null }, { label: 'Balanced', value: 'balanced' },
+    ] },
+    { name: 'max_depth', label: 'Max Depth', type: 'select', default: 3, options: [
+      { label: 'Three', value: 3 }, { label: 'Five', value: 5 },
+    ] },
+  ]);
+  const onChange = vi.fn();
+  await act(async () => render(<SettingsHarness initial={config} onChange={onChange} />));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Customize' }));
+  const classWeight = screen.getByRole('combobox', { name: 'Class Weight' });
+  expect(classWeight).toHaveValue('null');
+  fireEvent.change(classWeight, { target: { value: 'balanced' } });
+  expect(onChange.mock.lastCall?.[0].hyperparameters.class_weight).toBe('balanced');
+  fireEvent.change(classWeight, { target: { value: 'null' } });
+  expect(onChange.mock.lastCall?.[0].hyperparameters.class_weight).toBeNull();
+  expect(classWeight).toHaveValue('null');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Max Depth' }), { target: { value: '5' } });
+  expect(onChange.mock.lastCall?.[0].hyperparameters.max_depth).toBe(5);
+});
 
 /** Changing a Basic model must discard the old model's saved search before entering Advanced. */
 it('loads the new model search after a Basic model change instead of retaining old drafts', async () => {
@@ -283,4 +308,13 @@ it('opens best-parameter history in advanced mode', async () => {
   expect(screen.getByText('View parameters for:')).toBeVisible();
   expect(jobsApi.getTuningHistory).toHaveBeenCalledWith('random_forest_classifier');
   expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+});
+
+/** Nested chronology needs visible window settings and permits training-only thresholds. */
+it('shows nested temporal policy and window controls', async () => {
+  await renderSettings({ run_mode: 'advanced', cv_enabled: true, cv_type: 'nested_cv', cv_nested_type: 'time_series_split', cv_time_column: 'created', cv_shuffle: false, tune_threshold: true, search_space: { max_depth: [2] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cross Validation' }));
+  expect(screen.getByRole('combobox', { name: 'Nested split policy' })).toHaveValue('time_series_split');
+  expect(screen.getByRole('spinbutton', { name: 'Gap (rows)' })).toHaveValue(0);
+  expect(screen.getByRole('button', { name: 'Tune model' })).toBeEnabled();
 });

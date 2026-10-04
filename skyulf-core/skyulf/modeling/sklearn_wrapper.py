@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import ConvergenceWarning
 
+from ..core.schema import SkyulfSchema, validate_schema
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
@@ -16,9 +17,17 @@ from ._class_weights import (
     sample_weight_for_fit,
     split_class_weight_params,
 )
+from ._sample_weights import SampleWeightError
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_feature_schema(data: Any, model: Any) -> None:
+    """Check a named fit contract before NumPy conversion discards feature names."""
+    schema = getattr(model, "_skyulf_input_schema", None)
+    if schema is not None:
+        validate_schema(schema, data, check_order=True, where="model input")
 
 
 class SklearnCalculator(BaseModelCalculator):
@@ -59,8 +68,14 @@ class SklearnCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Fit the Scikit-Learn model."""
+        if sample_weight is not None and self.problem_type not in ("classification", "regression"):
+            raise SampleWeightError(
+                "sample_weight is supported only for classification and regression in V1."
+            )
         # 1. Merge Config with Defaults
         params = self._resolve_fit_params(config)
 
@@ -81,9 +96,7 @@ class SklearnCalculator(BaseModelCalculator):
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
         X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=True)
 
-        sample_weight = None
-        if class_weight_to_apply is not None:
-            sample_weight = self._compute_sample_weight_for_fit(model, class_weight_to_apply, y_np)
+        sample_weight = sample_weight_for_fit(model, class_weight_to_apply, y_np, sample_weight)
 
         # sklearn's ConvergenceWarning (raised via `warnings.warn`, not the
         # `logging` module) would otherwise only reach the server's stderr
@@ -107,6 +120,8 @@ class SklearnCalculator(BaseModelCalculator):
         # get pickled for storage/serving.
         if detach_callbacks:
             model.callbacks = None
+        if hasattr(X, "columns"):
+            model._skyulf_input_schema = SkyulfSchema.from_dataframe(X)
         for w in caught:
             if issubclass(w.category, ConvergenceWarning):
                 conv_msg = f"{self.model_class.__name__} did not fully converge: {w.message}"
@@ -223,6 +238,7 @@ class SklearnApplier(BaseModelApplier):
         inputs fall back to a default index.
         """
         # Convert to Numpy
+        _validate_feature_schema(df, model_artifact)
         X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
 
         preds = model_artifact.predict(X_np)
@@ -248,6 +264,7 @@ class SklearnApplier(BaseModelApplier):
         if not hasattr(model_artifact, "predict_proba"):
             return None
 
+        _validate_feature_schema(df, model_artifact)
         X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
         probs = model_artifact.predict_proba(X_np)
 

@@ -30,6 +30,7 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'SimpleImputer',
   'KNNImputer',
   'IterativeImputer',
+  'GroupImputer',
   // Scaling
   'StandardScaler',
   'MinMaxScaler',

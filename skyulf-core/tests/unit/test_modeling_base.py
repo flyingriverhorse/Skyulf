@@ -40,6 +40,8 @@ class _DummyCalculator(BaseModelCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
         """Return a simple dict as the model artifact."""
         return {"fitted": True, "n_samples": len(X)}
@@ -68,10 +70,21 @@ class _ColumnsRecordingCalculator(_DummyCalculator):
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight=None,
     ):
         """Record the fitted feature columns and return the dummy artifact."""
         self.feature_columns = list(X.columns)
-        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+        return super().fit(
+            X,
+            y,
+            config,
+            progress_callback,
+            log_callback,
+            validation_data,
+            iteration_callback,
+            sample_weight=sample_weight,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -381,6 +394,8 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
             log_callback=None,
             validation_data=None,
             iteration_callback=None,
+            *,
+            sample_weight=None,
             preprocessing=None,
             validation_frames=None,
         ):
@@ -453,6 +468,8 @@ def test_fit_predict_routes_preprocessing_validation_frames():
             validation_data=None,
             preprocessing=None,
             iteration_callback=None,
+            *,
+            sample_weight=None,
             validation_frames=None,
         ):
             self.fit_kwargs = {

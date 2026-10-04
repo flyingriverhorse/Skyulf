@@ -1,14 +1,13 @@
 """Explicit scheduled batch execution through the existing Spark predictor."""
 
-import hashlib
 import importlib
-import json
-from dataclasses import asdict
 from importlib.metadata import version
 from typing import Any
 
+from skyulf.integrations.databricks._batch_manifest import batch_manifest
+
 from ...core.execution import ExecutionOptions, FrameSpec
-from ...inference.bundle import InferenceBundle, _validate_bundle
+from ...inference.bundle import InferenceBundle, validate_bundle_contract
 from ...inference.spark import predict_spark
 from ._contracts import PREDICTION_METADATA_COLUMNS, BatchResult, BatchSpec, table_name
 from .admission import PublishAdmission, validate_admission
@@ -71,7 +70,7 @@ def run_batch(
         output_count = output.count()
         if input_count != output_count:
             raise ValueError("Prediction changed source row membership.")
-        manifest = _manifest(
+        manifest = batch_manifest(
             spec, source_id, source, snapshot.committed_us, input_count, output_count
         )
         committed_version, recorded, replayed = publish_replace_period(
@@ -88,30 +87,6 @@ def run_batch(
     finally:
         if persisted:
             output.unpersist()
-
-
-def _manifest(
-    spec: BatchSpec,
-    source_id: str,
-    source: str,
-    committed_us: int,
-    input_count: int,
-    output_count: int,
-) -> dict[str, Any]:
-    """Fingerprint the complete request and retain snapshot, code and model evidence."""
-    request = asdict(spec)
-    for key in ("period_start", "period_end", "as_of"):
-        request[key] = getattr(spec, key + "_utc").isoformat()
-    request.update(source_table_id=source_id, source_table=source)
-    payload = json.dumps(request, sort_keys=True, separators=(",", ":"))
-    return dict(
-        request,
-        request_digest=hashlib.sha256(payload.encode()).hexdigest(),
-        input_count=input_count,
-        output_count=output_count,
-        source_committed_us=committed_us,
-        source_temporal_contract="delta_snapshot_committed_by_as_of",
-    )
 
 
 def _validate_batch_request(
@@ -131,7 +106,7 @@ def _validate_batch_request(
         raise ValueError("run_batch requires a Spark inference mode.")
     admission = validate_admission(spark, admission)
     table_name(source)
-    _validate_bundle(bundle, options)
+    validate_bundle_contract(bundle, options)
     if bundle.semantic_digest != spec.model_digest:
         raise ValueError("Bundle digest differs from the selected model identity.")
     runtime_version = version("skyulf-core")

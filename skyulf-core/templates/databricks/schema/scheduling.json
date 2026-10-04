@@ -1,0 +1,152 @@
+{
+  "retraining_mode": {
+    "order": 715,
+    "type": "string",
+    "default": "manual",
+    "description": "4. Lifecycle | Start training yourself, or enable automatic training on your cron schedule after deployment",
+    "enum": [
+      "manual",
+      "scheduled"
+    ]
+  },
+  "retraining_cron_expression": {
+    "order": 716,
+    "type": "string",
+    "default": "0 0 3 3 * ?",
+    "description": "4. Lifecycle | When to train (Quartz cron)? 0 0 3 3 * ? = monthly on day 3 at 03:00; 0 0 3 1 1,7 ? = Jan 1 and Jul 1 at 03:00. Does not set the data window",
+    "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
+    "skip_prompt_if": {
+      "properties": {
+        "retraining_mode": {
+          "const": "manual"
+        }
+      }
+    }
+  },
+  "retraining_timezone_id": {
+    "order": 717,
+    "type": "string",
+    "default": "UTC",
+    "description": "4. Lifecycle | Timezone for the job clock: Europe/Copenhagen means 03:00 Copenhagen time. UTC means 03:00 UTC. This does not change dates in your data",
+    "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+    "skip_prompt_if": {
+      "properties": {
+        "retraining_mode": {
+          "const": "manual"
+        }
+      }
+    }
+  },
+  "retraining_pause_status": {
+    "type": "string",
+    "default": "UNPAUSED",
+    "enum": [
+      "UNPAUSED",
+      "PAUSED"
+    ],
+    "description": "4. Lifecycle | Enable the training clock after deployment (UNPAUSED), or keep it paused (PAUSED)?",
+    "skip_prompt_if": {
+      "properties": {
+        "retraining_mode": {
+          "const": "manual"
+        }
+      }
+    },
+    "order": 718
+  },
+  "scoring_mode": {
+    "type": "string",
+    "default": "manual",
+    "enum": [
+      "manual",
+      "scheduled"
+    ],
+    "description": "4. Lifecycle | Start scoring yourself, or schedule it independently of training?",
+    "order": 719,
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "scoring_cron_expression": {
+    "type": "string",
+    "default": "0 0 * * * ?",
+    "description": "4. Lifecycle | When to score (Quartz cron)? 0 0 * * * ? runs hourly. This does not change the training window",
+    "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "scoring_mode": {
+              "const": "manual"
+            }
+          }
+        }
+      ]
+    },
+    "order": 720
+  },
+  "scoring_timezone_id": {
+    "type": "string",
+    "default": "UTC",
+    "description": "4. Lifecycle | Timezone for the scoring clock, e.g. UTC or Europe/Copenhagen. Independent of the training clock and source dates",
+    "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "scoring_mode": {
+              "const": "manual"
+            }
+          }
+        }
+      ]
+    },
+    "order": 721
+  },
+  "scoring_pause_status": {
+    "type": "string",
+    "default": "UNPAUSED",
+    "enum": [
+      "UNPAUSED",
+      "PAUSED"
+    ],
+    "description": "4. Lifecycle | Enable the scoring clock after deployment (UNPAUSED), or keep it paused (PAUSED)?",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "scoring_mode": {
+              "const": "manual"
+            }
+          }
+        }
+      ]
+    },
+    "order": 722
+  }
+}

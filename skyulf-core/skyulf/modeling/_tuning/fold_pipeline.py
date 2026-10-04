@@ -16,6 +16,8 @@ The tuning engine wraps the step as::
 and routes the search space through ``model__estimator__<param>``.
 """
 
+from __future__ import annotations
+
 import copy
 from collections.abc import Callable
 from typing import Any
@@ -25,8 +27,19 @@ import pandas as pd
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.utils.metaestimators import available_if
 
+from ...core.validation import validate_prediction_rows
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit
+from .._cv_weights import fit_preprocessor, prepare_weights
+from .._sample_weights import SampleWeightError
+
+
+class FatalSampleWeightError(BaseException):
+    """Carry weight failures through sklearn's candidate-level Exception handler.
+
+    This private search boundary signal is restored to SampleWeightError by the
+    runner, including after joblib transports it from a parallel worker.
+    """
 
 
 def _fitted_model_has(attr: str) -> Callable[[Any], bool]:
@@ -71,6 +84,7 @@ class FoldAwareModelStep(BaseEstimator):
         preprocessor: Any = None,
         feature_names: tuple[str, ...] | None = None,
         class_weight: Any = None,
+        propagate_weight_errors: bool = False,
     ) -> None:
         """Store the wrap targets verbatim; nothing is copied or fitted here.
 
@@ -85,6 +99,7 @@ class FoldAwareModelStep(BaseEstimator):
         self.preprocessor = preprocessor
         self.feature_names = feature_names
         self.class_weight = class_weight
+        self.propagate_weight_errors = propagate_weight_errors
 
     def _ensure_frames(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Rebuild named pandas frames when slicing hands non-pandas input.
@@ -109,22 +124,33 @@ class FoldAwareModelStep(BaseEstimator):
         return X, y
 
     @staticmethod
-    def _build_label_map(y_orig: Any, y_t: Any, model: Any) -> dict[Any, Any] | None:
+    def _build_label_map(
+        y_orig: Any, y_t: Any, model: Any, preprocessor: Any = None
+    ) -> dict[Any, Any] | None:
         """Map encoded labels back to the original space, when encoding happened.
 
-        Built from paired uniques over the whole fold — full coverage, no
-        sampling risk for rare classes. ``None`` for regressors and for
-        targets the chain left untouched.
+        Prefer the fitted encoder artifacts, which survive resampling and
+        temporal permutations. Generic adapters fall back to paired uniques
+        only when that produces an unambiguous bijection.
         """
         if not is_classifier(model):
             return None
         orig = np.asarray(y_orig)
         enc = np.asarray(y_t)
+        decode = getattr(preprocessor, "original_target_labels", None)
+        if decode is not None:
+            labels = np.unique(enc)
+            decoded = decode(labels)
+            if decoded is not None:
+                return (
+                    None
+                    if np.array_equal(labels, decoded)
+                    else dict(zip(labels.tolist(), np.asarray(decoded).tolist(), strict=True))
+                )
         if orig.shape == enc.shape:
             if np.array_equal(orig, enc):
                 return None
-            pairs = pd.unique(pd.Series(list(zip(orig.tolist(), enc.tolist(), strict=True))))
-            return {encoded: original for original, encoded in pairs}
+            return _paired_label_map(orig, enc)
         # Row-count-changing chains (resampling) make row-wise pairing
         # impossible; unchanged value spaces need no map.
         if set(np.unique(orig).tolist()) == set(np.unique(enc).tolist()):
@@ -157,7 +183,7 @@ class FoldAwareModelStep(BaseEstimator):
             tags.target_tags = model_tags.target_tags
         return tags
 
-    def fit(self, X: Any, y: Any = None) -> "FoldAwareModelStep":
+    def fit(self, X: Any, y: Any = None, *, sample_weight: Any = None) -> FoldAwareModelStep:
         """Fit preprocessing and model on this fold's training rows only.
 
         Preprocessor and estimator are deep-copied first, so clones made by
@@ -166,28 +192,51 @@ class FoldAwareModelStep(BaseEstimator):
         chains leakage-free inside the searcher's own CV. A label map is
         built when the chain re-encoded ``y``, for ``predict`` to invert.
         """
+        try:
+            return self._fit(X, y, sample_weight=sample_weight)
+        except SampleWeightError as exc:
+            if self.propagate_weight_errors:
+                raise FatalSampleWeightError(str(exc)) from exc
+            raise
+
+    def _fit(self, X: Any, y: Any, *, sample_weight: Any) -> FoldAwareModelStep:
+        """Apply the fold's preprocessing and effective weights before fitting."""
+        sample_weight = prepare_weights(sample_weight, len(X), self.preprocessor)
         if self.preprocessor is not None:
             X, y = self._ensure_frames(X, y)
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
-        X_t, y_t = worker.fit_transform(X, y) if worker is not None else (X, y)
+        X_t, y_t, sample_weight = fit_preprocessor(worker, X, y, sample_weight)
         SklearnBridge.validate_features(X_t)
-        sample_weight = sample_weight_for_fit(model, self.class_weight, y_t)
+        sample_weight = sample_weight_for_fit(model, self.class_weight, y_t, sample_weight)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_t, y_t, **fit_kwargs)
         self.preprocessor_ = worker
         self.model_ = model
-        self.label_map_ = self._build_label_map(y, y_t, model)
+        self.label_map_ = self._build_label_map(y, y_t, model, worker)
         return self
 
     def _transform_x(self, X: Any) -> Any:
         if self.preprocessor_ is None:
             SklearnBridge.validate_features(X)
-            return X
+            return X, None
         X, _y = self._ensure_frames(X, None)
-        X_t, _y_t = self.preprocessor_.transform(X, None)
+        tracker = getattr(self.preprocessor_, "transform_tracking_order", None)
+        if tracker is not None:
+            X_t, positions = tracker(X)
+        else:
+            X_t, _y_t = self.preprocessor_.transform(X, None)
+            positions = None
         SklearnBridge.validate_features(X_t)
-        return X_t
+        validate_prediction_rows(len(X), len(X_t), stage="Fold preprocessing")
+        return X_t, positions
+
+    def _response(self, method: str, X: Any) -> Any:
+        """Restore model responses to caller order after local temporal preprocessing."""
+        transformed, positions = self._transform_x(X)
+        response = getattr(self.model_, method)(transformed)
+        validate_prediction_rows(len(X), len(response), stage="Fold model response")
+        return response if positions is None else np.asarray(response)[np.argsort(positions)]
 
     def predict(self, X: Any) -> Any:
         """Predict with the fitted model on X run through the fitted chain.
@@ -196,39 +245,58 @@ class FoldAwareModelStep(BaseEstimator):
         the fit-time label map so the searcher's scorer compares against
         the untouched ``y`` it holds.
         """
-        pred = self.model_.predict(self._transform_x(X))
+        pred = self._response("predict", X)
         if self.label_map_ is not None:
             pred = pd.Series(np.asarray(pred)).map(self.label_map_).to_numpy()
         return pred
 
     @available_if(_fitted_model_has("predict_proba"))
     def predict_proba(self, X: Any) -> Any:
-        """Class probabilities from the fitted model over the transformed X.
-
-        Probabilities need no remapping: their columns already align with
-        the mapped-back ``classes_`` property, so scorers see a consistent
-        label space. Present only when the wrapped model has the method —
-        offering it unconditionally made scorers prefer it over a working
-        ``decision_function`` and then fail on estimators that cannot
-        produce probabilities.
-        """
-        return self.model_.predict_proba(self._transform_x(X))
+        """Align probability columns with canonical original-label class order."""
+        probabilities = self._response("predict_proba", X)
+        return np.asarray(probabilities)[:, np.argsort(self._mapped_classes())]
 
     @available_if(_fitted_model_has("decision_function"))
     def decision_function(self, X: Any) -> Any:
-        """Decision scores from the fitted model over the transformed X.
-
-        Scores need no remapping for the same reason probabilities do not:
-        they are laid out per class in the fitted model's own order, and the
-        label map preserves that order when it maps ``classes_`` back, so
-        column *i* still belongs to ``classes_[i]``.
-        """
-        return self.model_.decision_function(self._transform_x(X))
+        """Orient margins toward the same original classes as probability scorers."""
+        scores = self._response("decision_function", X)
+        order = np.argsort(self._mapped_classes())
+        if len(order) == 2:
+            return -scores if order[0] != 0 else scores
+        if getattr(self.model_, "decision_function_shape", None) == "ovo":
+            return _reorder_pairwise_scores(np.asarray(scores), order)
+        return np.asarray(scores)[:, order]
 
     @property
     def classes_(self) -> Any:
-        """The base model's classes mapped back to the original label space."""
+        """Canonical original-label order expected by sklearn probability scorers."""
+        return np.sort(self._mapped_classes())
+
+    def _mapped_classes(self) -> np.ndarray:
+        """Decode classes while retaining the fitted model's response column order."""
         classes = self.model_.classes_
         if self.label_map_ is None:
             return classes
         return np.array([self.label_map_.get(c, c) for c in np.asarray(classes).tolist()])
+
+
+def _reorder_pairwise_scores(scores: np.ndarray, order: np.ndarray) -> np.ndarray:
+    """Preserve SVC's one-versus-one class pairs and margin direction after decoding."""
+    pairs = [(i, j) for i in range(len(order)) for j in range(i + 1, len(order))]
+    result = []
+    for i, j in pairs:
+        left, right = order[i], order[j]
+        column = pairs.index((min(left, right), max(left, right)))
+        result.append(scores[:, column] if left < right else -scores[:, column])
+    return np.column_stack(result)
+
+
+def _paired_label_map(original: np.ndarray, encoded: np.ndarray) -> dict[Any, Any]:
+    """Reject ambiguous generic adapters instead of silently choosing the last row's label."""
+    pairs = pd.unique(pd.Series(list(zip(original.tolist(), encoded.tolist(), strict=True))))
+    mapping = {code: label for label, code in pairs}
+    if len(mapping) != len(pairs) or len(set(mapping.values())) != len(mapping):
+        raise ValueError(
+            "Ambiguous target mapping; preprocessing must expose original_target_labels."
+        )
+    return mapping

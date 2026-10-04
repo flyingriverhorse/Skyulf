@@ -395,15 +395,18 @@ executed under the user's separate H3 approval with the verified current wheel.
 All three tasks passed in 437.664 seconds; detailed evidence appears below.
 No H3 commit or push has been made.
 
-## SM-36a remaining policy work (explicitly separate)
+## SM-36a policy delivery (completed 2026-09-29)
 
-- Existing Deduplicate integration and fixed normalization replay moved to
-  SM-33H3. Group-disjoint split is parked; it is not part of that dedup task.
-- [ ] Add explicit keyed scoring eligibility/rejection results, coverage counts and
-  incremental cursor/publication semantics; no silent row loss or retry loops.
-- [ ] Separately assess lag/rolling history, group and temporal boundaries and serving
-  context. A learns_from_data=False flag is not sufficient evidence for this scope.
-- [ ] Broader custom code/dependency packaging and output rules remain as in report 58.
+- Existing Deduplicate and fixed normalization replay moved to SM-33H3.
+  Group-disjoint splitting was subsequently delivered through SM-36h.
+- [x] Keyed scoring eligibility/rejection outcomes, coverage and atomic
+  incremental cursor/publication semantics: [report106](106-sm36a-project-delivery.md).
+- [x] Bounded lag/rolling history, temporal boundaries and explicit continuation:
+  [report105](105-sm36a-temporal-history-delivery.md). Arbitrary row-local serving
+  and target-history forecasting are not claimed.
+- [x] Saved custom code, bounded assets/exact dependency pins and named versioned
+  output rules: report106. Optional H3/sentence-model runtime checks and custom
+  pre-split value normalization remain separate from this completed scope.
 
 ## Audit evidence and implementation checks
 

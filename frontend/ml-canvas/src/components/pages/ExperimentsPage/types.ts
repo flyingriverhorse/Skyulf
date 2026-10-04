@@ -1,5 +1,14 @@
+/** Denominator measured before the configured held-out filters. */
+export interface EvaluationPopulation {
+  input_rows: number | null;
+  scored_rows: number;
+  excluded_rows: number | null;
+  reason?: string;
+}
+
 /** Evaluation data for a single train/test/val split. */
 export interface EvaluationSplit {
+  coverage?: EvaluationPopulation;
   y_true: (string | number)[];
   y_pred: (string | number)[];
   y_proba?: {
@@ -37,6 +46,7 @@ export interface ClusteringSummary {
 /** Raw split payload for an unsupervised clustering job — no y_true/y_pred,
  * only the predicted cluster label per row plus the centroid summary. */
 export interface ClusteringSplit {
+  coverage?: EvaluationPopulation;
   labels: number[];
   clustering?: ClusteringSummary;
   metrics?: Record<string, number>;
@@ -73,4 +83,3 @@ export interface ShapExplanationData {
   samples: ShapSample[];
   interactions?: ShapInteractionData | null;
 }
-

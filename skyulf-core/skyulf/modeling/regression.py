@@ -577,6 +577,8 @@ if LIGHTGBM_AVAILABLE:
             log_callback=None,
             validation_data=None,
             iteration_callback=None,
+            *,
+            sample_weight: Any = None,
         ):
             """Delegate to the base fit with the feature-name warning suppressed."""
             with warnings.catch_warnings():
@@ -589,6 +591,7 @@ if LIGHTGBM_AVAILABLE:
                     log_callback=log_callback,
                     validation_data=validation_data,
                     iteration_callback=iteration_callback,
+                    sample_weight=sample_weight,
                 )
 
         def _boosting_fit_kwargs(self, model, X_np, y_np, iteration_callback):

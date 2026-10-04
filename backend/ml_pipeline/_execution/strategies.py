@@ -180,20 +180,23 @@ class JobStrategy(ABC):
 
         The node runner only emits ``decision_thresholds`` when the tuning
         engine actually selected a threshold (classification, binary target,
-        ``predict_proba``, validation split all present), so the key's
-        presence is the opt-in-and-succeeded signal. The selection always
-        runs on the validation split.
+        ``predict_proba`` available), so the key's presence is the
+        opt-in-and-succeeded signal. Ordinary tuning selects on validation;
+        nested tuning records training-only inner out-of-fold selection.
         """
         thresholds = final_metrics.get("decision_thresholds")
         if not isinstance(thresholds, dict) or not thresholds:
             return
+        nested = final_metrics.get("nested_cv", {})
+        selection = nested.get("threshold_selection") if isinstance(nested, dict) else None
+        inner_oof = isinstance(selection, dict) and selection.get("selection") == "inner_oof"
         job.tuned_thresholds = {
             # Dict order preserves the model's classes_ order (the node
             # runner stringifies keys without re-sorting).
             "thresholds": thresholds,
             "classes": list(thresholds.keys()),
             "metric": final_metrics.get("decision_threshold_metric"),
-            "split_used": "validation",
+            "split_used": "inner_oof" if inner_oof else "validation",
             "computed_at": datetime.now(UTC).isoformat(),
             # Provenance: lets the UI distinguish training-time-seeded
             # thresholds from ones a user previewed + saved manually.

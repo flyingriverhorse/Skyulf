@@ -15,13 +15,14 @@ from .._artifacts import GeneralTransformationArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._ops import _PANDAS_OPS, _POLARS_OPS
+from ._ops import _PANDAS_OPS, _POLARS_OPS, _apply_polars_op
 from ._power_common import build_pretrained_power_transformer
 
 logger = logging.getLogger(__name__)
 
 _POWER_METHODS = {"box-cox", "yeo-johnson"}
 _FLOAT_METHODS = {
+    "square",
     "log",
     "sqrt",
     "square_root",
@@ -49,7 +50,7 @@ def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
             scaler_params=item.get("scaler_params"),
         )
         vals = X_out[col].to_numpy().reshape(-1, 1)
-        flat = pt.transform(vals).ravel()
+        flat = np.asarray(pt.transform(vals)).ravel()
         return X_out.with_columns(pl.Series(flat).alias(col))
     except Exception as e:  # noqa: BLE001 - per-column transform failure is logged; column left unchanged
         logger.warning(f"Failed to apply {method} for column {col}: {e}")
@@ -110,7 +111,7 @@ class GeneralTransformationApplier(BaseApplier):
             op = _POLARS_OPS.get(method)
             if op is None:
                 continue
-            X_out = X_out.with_columns(op(item).alias(col))
+            X_out = _apply_polars_op(X_out, item, op)
         return X_out, _y
 
     @staticmethod
@@ -170,6 +171,8 @@ def _fit_transformation_rule(
     """Fit one ordered rule, omitting power transforms that cannot fit its current input."""
     method = item.get("method")
     fitted_item: dict[str, Any] = {"column": col, "method": method}
+    if method == "exp" and "clip_threshold" in item:
+        fitted_item["clip_threshold"] = item["clip_threshold"]
     if method not in _POWER_METHODS:
         return fitted_item
 
@@ -215,8 +218,6 @@ class GeneralTransformationCalculator(BaseCalculator):
             col = item.get("column")
             method = item.get("method")
             if col not in schema.columns or method is None:
-                continue
-            if method == "square":
                 continue
             if method in _FLOAT_METHODS:
                 touched.add(col)

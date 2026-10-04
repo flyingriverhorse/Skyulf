@@ -1,0 +1,15 @@
+{{/* Emit JSON input as Python literals, preserving strings containing JSON keywords. */}}
+{{- define "python_value" -}}
+{{- range $token := (regexp `(?s)"(?:[^"\\]|\\.)*"|true|false|null|.`).FindAllString (printf "%v" .) -1 -}}
+{{- if eq $token "true" -}}True
+{{- else if eq $token "false" -}}False
+{{- else if eq $token "null" -}}None
+{{- else if (regexp `^"`).MatchString $token -}}
+{{- range $part := (regexp `\\.|[^\\]+`).FindAllString $token -1 -}}
+{{- if eq $part `\/` -}}/{{- else -}}{{$part}}{{- end -}}
+{{- end -}}
+{{- if (regexp `(?i)\\ud[89a-f][0-9a-f]{2}`).MatchString $token -}}.encode("utf-16", "surrogatepass").decode("utf-16", "surrogatepass"){{- end -}}
+{{- else -}}{{$token}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

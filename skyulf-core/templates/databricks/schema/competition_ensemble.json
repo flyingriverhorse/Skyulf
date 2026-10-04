@@ -1,0 +1,3086 @@
+{
+  "competition_ensemble_SLOT_regression_base_count": {
+    "order": 0,
+    "type": "string",
+    "default": "2",
+    "description": "2. Candidate SLOT ensemble | Number of distinct base models for this candidate. Select their names from the next menus; automatic search spaces follow your choices.",
+    "enum": [
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_1": {
+    "order": 1,
+    "type": "string",
+    "default": "linear_regression",
+    "description": "2. Candidate SLOT ensemble | Base model 1. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_1": {
+    "order": 2,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 1 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_2": {
+    "order": 3,
+    "type": "string",
+    "default": "ridge",
+    "description": "2. Candidate SLOT ensemble | Base model 2. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_2": {
+    "order": 4,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 2 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_3": {
+    "order": 5,
+    "type": "string",
+    "default": "lasso",
+    "description": "2. Candidate SLOT ensemble | Base model 3. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_3": {
+    "order": 6,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 3 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_4": {
+    "order": 7,
+    "type": "string",
+    "default": "elasticnet",
+    "description": "2. Candidate SLOT ensemble | Base model 4. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_4": {
+    "order": 8,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 4 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_5": {
+    "order": 9,
+    "type": "string",
+    "default": "random_forest",
+    "description": "2. Candidate SLOT ensemble | Base model 5. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_5": {
+    "order": 10,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 5 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_6": {
+    "order": 11,
+    "type": "string",
+    "default": "extra_trees",
+    "description": "2. Candidate SLOT ensemble | Base model 6. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_6": {
+    "order": 12,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 6 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_7": {
+    "order": 13,
+    "type": "string",
+    "default": "gradient_boosting",
+    "description": "2. Candidate SLOT ensemble | Base model 7. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_7": {
+    "order": 14,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 7 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_8": {
+    "order": 15,
+    "type": "string",
+    "default": "hist_gradient_boosting",
+    "description": "2. Candidate SLOT ensemble | Base model 8. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_8": {
+    "order": 16,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 8 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_9": {
+    "order": 17,
+    "type": "string",
+    "default": "adaboost",
+    "description": "2. Candidate SLOT ensemble | Base model 9. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_9": {
+    "order": 18,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 9 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_10": {
+    "order": 19,
+    "type": "string",
+    "default": "decision_tree",
+    "description": "2. Candidate SLOT ensemble | Base model 10. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_10": {
+    "order": 20,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 10 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "10",
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_11": {
+    "order": 21,
+    "type": "string",
+    "default": "svr",
+    "description": "2. Candidate SLOT ensemble | Base model 11. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_11": {
+    "order": 22,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 11 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "11",
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_12": {
+    "order": 23,
+    "type": "string",
+    "default": "knn",
+    "description": "2. Candidate SLOT ensemble | Base model 12. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_12": {
+    "order": 24,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 12 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "12",
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_13": {
+    "order": 25,
+    "type": "string",
+    "default": "xgboost",
+    "description": "2. Candidate SLOT ensemble | Base model 13. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_13": {
+    "order": 26,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 13 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "13",
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_base_14": {
+    "order": 27,
+    "type": "string",
+    "default": "lightgbm",
+    "description": "2. Candidate SLOT ensemble | Base model 14. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor",
+                  "stacking_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_weight_14": {
+    "order": 28,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 14 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "voting_regressor"
+                ]
+              },
+              "competition_ensemble_SLOT_regression_base_count": {
+                "enum": [
+                  "14"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_count": {
+    "order": 29,
+    "type": "string",
+    "default": "2",
+    "description": "2. Candidate SLOT ensemble | Number of distinct base models for this candidate. Select their names from the next menus; automatic search spaces follow your choices.",
+    "enum": [
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_1": {
+    "order": 30,
+    "type": "string",
+    "default": "logistic_regression",
+    "description": "2. Candidate SLOT ensemble | Base model 1. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_1": {
+    "order": 31,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 1 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_2": {
+    "order": 32,
+    "type": "string",
+    "default": "random_forest",
+    "description": "2. Candidate SLOT ensemble | Base model 2. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_2": {
+    "order": 33,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 2 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "2",
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_3": {
+    "order": 34,
+    "type": "string",
+    "default": "extra_trees",
+    "description": "2. Candidate SLOT ensemble | Base model 3. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_3": {
+    "order": 35,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 3 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "3",
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_4": {
+    "order": 36,
+    "type": "string",
+    "default": "gradient_boosting",
+    "description": "2. Candidate SLOT ensemble | Base model 4. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_4": {
+    "order": 37,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 4 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "4",
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_5": {
+    "order": 38,
+    "type": "string",
+    "default": "hist_gradient_boosting",
+    "description": "2. Candidate SLOT ensemble | Base model 5. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_5": {
+    "order": 39,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 5 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "5",
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_6": {
+    "order": 40,
+    "type": "string",
+    "default": "adaboost",
+    "description": "2. Candidate SLOT ensemble | Base model 6. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_6": {
+    "order": 41,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 6 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "6",
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_7": {
+    "order": 42,
+    "type": "string",
+    "default": "decision_tree",
+    "description": "2. Candidate SLOT ensemble | Base model 7. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_7": {
+    "order": 43,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 7 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "7",
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_8": {
+    "order": 44,
+    "type": "string",
+    "default": "gaussian_nb",
+    "description": "2. Candidate SLOT ensemble | Base model 8. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_8": {
+    "order": 45,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 8 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "8",
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_9": {
+    "order": 46,
+    "type": "string",
+    "default": "sgd_classifier",
+    "description": "2. Candidate SLOT ensemble | Base model 9. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_9": {
+    "order": 47,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 9 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "9",
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_10": {
+    "order": 48,
+    "type": "string",
+    "default": "svc",
+    "description": "2. Candidate SLOT ensemble | Base model 10. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_10": {
+    "order": 49,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 10 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "10",
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_11": {
+    "order": 50,
+    "type": "string",
+    "default": "knn",
+    "description": "2. Candidate SLOT ensemble | Base model 11. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_11": {
+    "order": 51,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 11 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "11",
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_12": {
+    "order": 52,
+    "type": "string",
+    "default": "xgboost",
+    "description": "2. Candidate SLOT ensemble | Base model 12. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_12": {
+    "order": 53,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 12 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "12",
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_base_13": {
+    "order": 54,
+    "type": "string",
+    "default": "lightgbm",
+    "description": "2. Candidate SLOT ensemble | Base model 13. Select a different model for each position. XGBoost/LightGBM require their optional dependencies.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_weight_13": {
+    "order": 55,
+    "type": "string",
+    "default": "1",
+    "description": "2. Candidate SLOT ensemble | Weight of base model 13 in this voting candidate (nonnegative; at least one weight must be positive).",
+    "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_classification_base_count": {
+                "enum": [
+                  "13"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_voting": {
+    "order": 56,
+    "type": "string",
+    "default": "soft",
+    "description": "2. Candidate SLOT ensemble | Voting type: soft averages probabilities; hard uses majority votes.",
+    "enum": [
+      "soft",
+      "hard"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_cv": {
+    "order": 57,
+    "type": "string",
+    "default": "3",
+    "description": "2. Candidate SLOT ensemble | Stacking internal out-of-fold count (2-20), separate from shared search/evaluation CV.",
+    "pattern": "^(?:[2-9]|1[0-9]|20)$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "stacking_regressor"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "stacking_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_regression_final": {
+    "order": 58,
+    "type": "string",
+    "default": "ridge",
+    "description": "2. Candidate SLOT ensemble | Stacking meta-model, trained on out-of-fold base predictions.",
+    "enum": [
+      "linear_regression",
+      "ridge",
+      "lasso",
+      "elasticnet",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "svr",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "stacking_regressor"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_classification_final": {
+    "order": 59,
+    "type": "string",
+    "default": "logistic_regression",
+    "description": "2. Candidate SLOT ensemble | Stacking meta-model, trained on out-of-fold base predictions.",
+    "enum": [
+      "logistic_regression",
+      "random_forest",
+      "extra_trees",
+      "gradient_boosting",
+      "hist_gradient_boosting",
+      "adaboost",
+      "decision_tree",
+      "gaussian_nb",
+      "sgd_classifier",
+      "svc",
+      "knn",
+      "xgboost",
+      "lightgbm"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "stacking_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_passthrough": {
+    "order": 60,
+    "type": "string",
+    "default": "false",
+    "description": "2. Candidate SLOT ensemble | Also give original input features to this stacking meta-model.",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "regression"
+              },
+              "competition_regression_model_SLOT": {
+                "enum": [
+                  "stacking_regressor"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "stacking_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_calibrate": {
+    "order": 61,
+    "type": "string",
+    "default": "false",
+    "description": "2. Candidate SLOT ensemble | Calibrate probabilities of this candidate's base classifiers.",
+    "enum": [
+      "false",
+      "true"
+    ],
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "competition_ensemble_SLOT_calibration_cv": {
+    "order": 62,
+    "type": "string",
+    "default": "3",
+    "description": "2. Candidate SLOT ensemble | Calibration fold count for this candidate.",
+    "pattern": "^(?:[2-9]|1[0-9]|20)$",
+    "skip_prompt_if": {
+      "not": {
+        "anyOf": [
+          {
+            "properties": {
+              "training_layout": {
+                "const": "model_competition"
+              },
+              "competition_candidate_count": {
+                "pattern": "^[SLOT-8]$"
+              },
+              "task": {
+                "const": "classification"
+              },
+              "competition_classification_model_SLOT": {
+                "enum": [
+                  "voting_classifier",
+                  "stacking_classifier"
+                ]
+              },
+              "competition_ensemble_SLOT_calibrate": {
+                "const": "true"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

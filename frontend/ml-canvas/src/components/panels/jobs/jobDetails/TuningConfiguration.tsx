@@ -13,6 +13,12 @@ type TuningConfig = {
   cv_folds?: number;
   cv_inner_folds?: number;
   cv_shuffle?: boolean;
+  cv_nested_type?: string;
+  cv_group_column?: string;
+  cv_time_column?: string;
+  cv_gap?: number;
+  cv_test_size?: number | null;
+  cv_max_train_size?: number | null;
 };
 
 function TuningEnsemble({ ensemble }: { ensemble: EnsembleSummary | null }) {
@@ -179,6 +185,7 @@ function TuningCrossValidation({ config }: { config: TuningConfig }) {
               <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{getInnerFoldCount(config)}</span>
             </div>
           )}
+          <SplitPolicyDetails config={config} />
           <div>
             <span className="text-gray-500">Shuffle:</span>
             <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{config.cv_shuffle ? 'Yes' : 'No'}</span>
@@ -187,4 +194,12 @@ function TuningCrossValidation({ config }: { config: TuningConfig }) {
       )}
     </>
   );
+}
+
+function SplitPolicyDetails({ config }: { config: TuningConfig }) {
+  const rows = [['Nested policy', config.cv_nested_type], ['Group column', config.cv_group_column], ['Time column', config.cv_time_column],
+    ['Gap (rows)', config.cv_gap], ['Test size (rows)', config.cv_test_size], ['Maximum training size (rows)', config.cv_max_train_size]];
+  return <>{rows.filter(([, value]) => value != null).map(([label, value]) => <div key={String(label)}>
+    <span className="text-gray-500">{label}:</span><span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{value}</span>
+  </div>)}</>;
 }

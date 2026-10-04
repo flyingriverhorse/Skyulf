@@ -1,6 +1,6 @@
 # SM-24a held-out metrics in the model MLflow run
 
-Status: completed on 2026-09-23 for the isolated small-data Databricks workflow. The [notebook](../../skyulf-core/examples/databricks_local_sm24a_job.py) now evaluates the saved local pipeline on the 200 rows reserved from each 1,000-row training source and logs the resulting metrics in the same MLflow run as its model artifact. The reusable calculation is `evaluate_local_holdout` in the local Databricks integration.
+Status: completed on 2026-09-23 for the isolated small-data Databricks workflow. The one-time `databricks_local_sm24a_job.py` notebook evaluated the saved local pipeline on the 200 rows reserved from each 1,000-row training source and logged the resulting metrics in the same MLflow run as its model artifact. The notebook was removed during example cleanup on 2026-10-04. The reusable calculation is `evaluate_local_holdout` in the local Databricks integration.
 
 ## Split and metric contract
 

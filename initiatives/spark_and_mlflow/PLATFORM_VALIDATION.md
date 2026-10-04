@@ -161,7 +161,7 @@ the prepared notebook/request are under `.cache/sm16-live-permissions*`.
 
 ### Monthly Delta and alias stage
 
-The reusable `examples/databricks_delta_smoke.py` passed **5 real Delta tests**
+The probe now kept at `tests/fixtures/databricks_delta_smoke.py` passed **5 real Delta tests**
 in 62.76s, plus Ruff/format/Ty and independent review. It retains three unique
 test-owned tables and exercises real public batch publication, replay,
 stale-version rejection, empty protection and explicit empty replacement.
@@ -278,7 +278,7 @@ the explicit cooperative-writer and manual-recovery boundaries.
 
 ### Probe contract
 
-Script: [databricks_batch_smoke.py](../../skyulf-core/examples/databricks_batch_smoke.py).
+Test fixture: [databricks_batch_smoke.py](../../skyulf-core/tests/fixtures/databricks_batch_smoke.py).
 
 1. Fit a tiny pandas or Polars pipeline: mean SimpleImputer, StandardScaler,
    linear regression with a known `y = 2*x` numerical oracle.

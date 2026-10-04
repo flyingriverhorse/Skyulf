@@ -61,14 +61,18 @@ def apply_thresholds(
     y_proba: Any,
     thresholds: dict[Any, float] | float,
     classes: Any = None,
+    *,
+    positive_class: Any = None,
 ) -> np.ndarray:
     """Convert predicted probabilities into class predictions using per-class thresholds.
 
     Binary (``thresholds`` is a single float, or a dict over the two classes):
     predicts the positive (second) class when ``y_proba[:, 1] >= threshold``,
-    else the first class. A one-entry dict supplies that threshold directly; a
-    full-coverage pair — the shape ``optimize_thresholds`` returns, where
-    ``t0 == 1 - t1`` — is compared in scaled space (``p1/t1 >= p0/t0``), which
+    else the first class. A one-entry dict applies its cutoff to the named
+    class's probability, with ties selecting that class. An explicit
+    ``positive_class`` must agree with that key. A full-coverage pair
+    (the shape returned by ``optimize_thresholds``, where ``t0 == 1 - t1``)
+    is compared in scaled space (``p1/t1 >= p0/t0``), which
     reduces to the same rule. Either way an exact tie predicts the positive
     class, matching ``>=``.
 
@@ -85,6 +89,7 @@ def apply_thresholds(
         classes: Explicit class label order matching ``y_proba``'s columns.
             Required when ``y_proba`` has more than 2 columns and
             ``thresholds`` is a dict (to know column-to-class mapping).
+        positive_class: Optional binary positive label; it wins exact cutoff ties.
 
     Returns:
         1D numpy array of predicted class labels, length n_samples.
@@ -93,16 +98,10 @@ def apply_thresholds(
         ValueError: If ``y_proba`` isn't 2D, or ``thresholds`` doesn't cover
             every class implied by ``y_proba``'s column count.
     """
-    y_proba = np.asarray(y_proba, dtype=float)
-    if y_proba.ndim != 2:
-        raise ValueError(f"y_proba must be 2D (n_samples, n_classes); got shape {y_proba.shape}")
-
+    y_proba, classes = _probability_columns(y_proba, classes)
     n_classes = y_proba.shape[1]
-    if classes is None:
-        classes = np.arange(n_classes)
-    classes = np.asarray(classes)
-    if len(classes) != n_classes:
-        raise ValueError(f"classes has {len(classes)} entries but y_proba has {n_classes} columns")
+    if positive_class is not None:
+        return _apply_named_binary(y_proba, thresholds, classes, positive_class)
 
     if n_classes == 2 and not isinstance(thresholds, dict):
         threshold = float(thresholds)
@@ -115,15 +114,38 @@ def apply_thresholds(
         )
 
     if n_classes == 2 and len(thresholds) == 1:
-        (threshold,) = thresholds.values()
-        threshold = float(threshold)
-        return np.where(y_proba[:, 1] >= threshold, classes[1], classes[0])
+        return _apply_named_binary(y_proba, thresholds, classes, next(iter(thresholds)))
 
     thresholds_array = _class_threshold_array(thresholds, classes)
     if n_classes == 2:
         return _apply_binary_weights(y_proba, thresholds_array, classes)
     scaled = y_proba / thresholds_array
     return classes[np.argmax(scaled, axis=1)]
+
+
+def _probability_columns(y_proba: Any, classes: Any) -> tuple[np.ndarray, np.ndarray]:
+    """Validate the probability matrix and retain its explicit class-column order."""
+    y_proba = np.asarray(y_proba, dtype=float)
+    if y_proba.ndim != 2:
+        raise ValueError(f"y_proba must be 2D (n_samples, n_classes); got shape {y_proba.shape}")
+    n_classes = y_proba.shape[1]
+    classes = np.arange(n_classes) if classes is None else np.asarray(classes)
+    if len(classes) != n_classes:
+        raise ValueError(f"classes has {len(classes)} entries but y_proba has {n_classes} columns")
+    return y_proba, classes
+
+
+def _apply_named_binary(y_proba: Any, thresholds: Any, classes: Any, positive: Any) -> np.ndarray:
+    """Apply an explicit probability cutoff with inclusive ties for either binary label."""
+    if len(classes) != 2 or positive not in classes:
+        raise ValueError("positive_class must match a binary probability column.")
+    position = int(np.flatnonzero(classes == positive)[0])
+    if isinstance(thresholds, dict) and positive not in thresholds:
+        raise ValueError("thresholds must include the selected positive_class key.")
+    cutoff = float(thresholds[positive] if isinstance(thresholds, dict) else thresholds)
+    if not np.isfinite(cutoff) or not 0 <= cutoff <= 1:
+        raise ValueError("Named binary threshold must be finite and between zero and one.")
+    return np.where(y_proba[:, position] >= cutoff, classes[position], classes[1 - position])
 
 
 def _grid_search_binary(
@@ -257,7 +279,8 @@ def optimize_thresholds(
             Defaults to ``sorted(np.unique(y_true))``.
         strategy: ``"grid"`` or ``"nelder-mead"``. If ``None`` (default),
             auto-selects ``"grid"`` for exactly 2 classes and
-            ``"nelder-mead"`` for 3+ classes.
+            ``"nelder-mead"`` for 3+ classes. Explicit ``"grid"`` requires
+            exactly two classes.
         grid_points: Number of threshold candidates for the ``"grid"``
             strategy, evenly spaced over (0, 1) exclusive.
 
@@ -265,7 +288,8 @@ def optimize_thresholds(
         Dict mapping each class label to its tuned threshold.
 
     Raises:
-        ValueError: If ``strategy`` is not one of ``"grid"``/``"nelder-mead"``/``None``.
+        ValueError: If ``strategy`` is unknown or ``"grid"`` is requested
+            for anything other than binary classification.
     """
     y_true = np.asarray(y_true)
     y_proba = np.asarray(y_proba, dtype=float)
@@ -277,5 +301,9 @@ def optimize_thresholds(
         raise ValueError(f"Unknown strategy {strategy!r}; expected 'grid' or 'nelder-mead'")
 
     if strategy == "grid":
+        if len(classes) != 2:
+            raise ValueError(
+                "The 'grid' strategy requires binary classification (exactly two classes)."
+            )
         return _grid_search_binary(y_true, y_proba, metric, classes, grid_points)
     return _nelder_mead_multiclass(y_true, y_proba, metric, classes)

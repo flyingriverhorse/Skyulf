@@ -27,6 +27,25 @@ from ._common import (
 from ._spark_simple import apply_spark_imputer, fit_spark_imputer
 
 
+def _fill_pandas_series(series: pd.Series, value: Any, strategy: str | None) -> pd.Series:
+    """Promote numeric means and extend categories only when the fill value needs it."""
+    if is_decimal_series(series) and strategy in {"mean", "median"}:
+        series = pd.to_numeric(series)
+    if (
+        isinstance(value, float)
+        and isinstance(series.dtype, pd.api.extensions.ExtensionDtype)
+        and pd.api.types.is_numeric_dtype(series.dtype)
+    ):
+        series = series.astype("float64")
+    if (
+        isinstance(series.dtype, pd.CategoricalDtype)
+        and pd.notna(value)
+        and value not in series.cat.categories
+    ):
+        series = series.cat.add_categories([value])
+    return series.fillna(value)
+
+
 class SimpleImputerApplier(BaseApplier):
     """Apply fitted Simple Imputer fill values to missing values in selected columns.
 
@@ -99,18 +118,7 @@ class SimpleImputerApplier(BaseApplier):
             if col not in X_out.columns:
                 X_out[col] = val
             else:
-                series = X_out[col]
-                if is_decimal_series(series) and params.get("strategy") in {"mean", "median"}:
-                    series = pd.to_numeric(series)
-                # Nullable numeric extension dtypes (Int64...) refuse a float
-                # fill value; upcast like the Polars fill does (F-10).
-                if (
-                    isinstance(val, float)
-                    and isinstance(series.dtype, pd.api.extensions.ExtensionDtype)
-                    and pd.api.types.is_numeric_dtype(series.dtype)
-                ):
-                    series = series.astype("float64")
-                X_out[col] = series.fillna(val)
+                X_out[col] = _fill_pandas_series(X_out[col], val, params.get("strategy"))
         return X_out, _y
 
 
@@ -267,6 +275,10 @@ class SimpleImputerCalculator(BaseCalculator):
         fit_data = (
             decimal_columns_to_float(X[cols], cols) if strategy in {"mean", "median"} else X[cols]
         )
+        if strategy == "most_frequent":
+            # Preserve nullable integers/booleans as scalar values and normalize
+            # pd.NA, which sklearn's object-array missing mask cannot compare.
+            fit_data = X[cols].to_numpy(dtype=object, na_value=float("nan"))
         imputer.fit(fit_data)
 
         if strategy == "constant" and fill_value is not None:

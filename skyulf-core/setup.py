@@ -16,7 +16,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.9.0",
+    version="0.9.1",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -32,7 +32,7 @@ setup(
     install_requires=[
         "pandas>=2.0.0,<3.0.0",
         "numpy>=1.24.0",
-        "scikit-learn>=1.4.0,<2.0.0",
+        "scikit-learn>=1.7.0,<2.0.0",
         "joblib>=1.3.0",
         "polars>=1.43.2",
         "pyarrow>=21.0.0",
@@ -63,7 +63,7 @@ setup(
             "causal-learn>=0.1.3.0",
         ],
         "text": ["vaderSentiment>=3.3.2"],
-        "nlp": ["sentence-transformers>=2.2.0"],
+        "nlp": ["sentence-transformers>=6.0.0,<7.0.0"],
         "geo": [
             "geopandas>=0.14.0,<1.2.0",
             "shapely>=2.0.2,<2.2.0",
@@ -78,7 +78,8 @@ setup(
             "optuna-integration>=3.0.0",
             "cmaes>=0.10.0",  # Required by optuna's CmaEsSampler (not bundled with optuna itself)
         ],
-        "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0"],
+        # 0.1.6 changes target unpacking and breaks imbalanced-learn's g_score.
+        "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0", "sklearn-compat==0.1.5"],
         "modeling-xgboost": ["xgboost>=2.1.4"],
         "modeling-lightgbm": ["lightgbm>=4.0.0"],
         "explainability": ["shap>=0.46.0,<1.0.0"],
@@ -94,9 +95,10 @@ setup(
             "optuna-integration>=3.0.0",
             "cmaes>=0.10.0",
             "imbalanced-learn>=0.13.0",
+            "sklearn-compat==0.1.5",
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
-            "sentence-transformers>=2.2.0",
+            "sentence-transformers>=6.0.0,<7.0.0",
             "shap>=0.46.0,<1.0.0",
             "mlflow>=3.10,<4.0",
         ],

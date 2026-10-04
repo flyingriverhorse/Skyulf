@@ -28,7 +28,10 @@ def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[A
         c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
     ]
     fill_val = op.get("fillna") if op.get("fillna") is not None else 0
-    col_exprs = [pl.col(c).cast(pl.Float64).fill_nan(fill_val).fill_null(fill_val) for c in valid]
+    col_exprs = [
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(fill_val).fill_null(fill_val)
+        for c in valid
+    ]
     const_vals = [float(c) for c in op.get("constants", [])]
     return col_exprs, const_vals
 
@@ -76,7 +79,8 @@ def _polars_divide(col_exprs: list[Any], const_vals: list[float], epsilon: float
     for e in others:
         expr = expr / safe_denom(e)
     for c in const_vals:
-        expr = expr / (c if abs(c) > epsilon else epsilon)
+        denom = c if abs(c) >= epsilon else -epsilon if c < 0 else epsilon
+        expr = expr / denom
     return expr
 
 
@@ -100,12 +104,12 @@ def _polars_arith(op: dict[str, Any], existing: list[str], epsilon: float) -> An
 def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
     """Sum ratio operands with null/NaN as zero and preserve the denominator's sign."""
     nums = [
-        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(0).fill_null(0)
         for c in op.get("input_columns", [])
         if c in existing
     ]
     dens = [
-        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(0).fill_null(0)
         for c in op.get("secondary_columns", [])
         if c in existing
     ]
@@ -127,7 +131,9 @@ def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> 
     b_empty = pl.col(col_b).is_null() | (pl.col(col_b).cast(pl.String) == "")
 
     def sim_func(struct_val: Any) -> float:
-        return _compute_similarity_score(struct_val.get("a"), struct_val.get("b"), method)
+        return _compute_similarity_score(
+            struct_val.get("a"), struct_val.get("b"), method, op.get("similarity_backend")
+        )
 
     return (
         pl.when(a_empty & b_empty)
@@ -233,6 +239,26 @@ _POLARS_AGG_BUILDERS: dict[str, Callable[[Any], Any]] = {
 }
 
 
+def _polars_fitted_group_values(group_expr: Any, fitted: dict[str, Any], group_dtype: Any) -> Any:
+    """Map only keys whose conversion preserves their value and boolean identity."""
+    keys = pl.Series("group_keys", fitted["keys"], dtype=group_dtype, strict=False)
+    retained = [
+        index
+        for index, (original, converted) in enumerate(zip(fitted["keys"], keys, strict=True))
+        if converted is not None
+        and isinstance(original, bool) == isinstance(converted, bool)
+        and original == converted
+    ]
+    if not retained:
+        return pl.lit(None, dtype=pl.Float64)
+    return group_expr.replace_strict(
+        keys.gather(retained),
+        [fitted["values"][index] for index in retained],
+        default=None,
+        return_dtype=pl.Float64,
+    )
+
+
 def _polars_group_agg(
     op: dict[str, Any], existing: list[str], _epsilon: float, group_dtype: Any = None
 ) -> Any | None:
@@ -245,13 +271,7 @@ def _polars_group_agg(
         group_expr = pl.col(group_col)
         if group_dtype in (pl.Float32, pl.Float64):
             group_expr = group_expr.fill_nan(None)
-        mapped = (
-            group_expr.replace_strict(
-                fitted["keys"], fitted["values"], default=None, return_dtype=pl.Float64
-            )
-            if fitted["keys"]
-            else pl.lit(None, dtype=pl.Float64)
-        )
+        mapped = _polars_fitted_group_values(group_expr, fitted, group_dtype)
         return (
             pl.when(group_expr.is_null())
             .then(pl.lit(fitted.get("null_value"), dtype=pl.Float64))

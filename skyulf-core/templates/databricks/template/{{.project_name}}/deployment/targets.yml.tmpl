@@ -1,0 +1,228 @@
+# Shared environments are independent of your CI/CD provider.
+# Personal development targets deliberately have no shared run_as or job ACL overrides.
+# Personal names retain the train/score role after the user prefix.
+targets:
+  test:
+    mode: production
+    default: false
+    permissions: []
+    workspace:
+      host: https://replace-test.example.invalid
+      root_path: ${var.test_root_path}
+    variables:
+      catalog: ${var.test_catalog}
+      input_schema: ${var.test_input_schema}
+      output_schema: ${var.test_output_schema}
+      metadata_schema: ${var.test_metadata_schema}
+      resource_suffix: ""
+{{if or (ne .deployment_identity "deployer") (eq .manage_job_permissions "true")}}
+    resources:
+      jobs:
+        train:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.train_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.train_permissions}
+{{end}}
+        score:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.score_permissions}
+{{end}}
+{{end}}
+{{if eq .personal_development_targets "true"}}
+  test_development:
+    mode: development
+    default: true
+    permissions: []
+    presets:
+      name_prefix: "dev_${workspace.current_user.short_name}_"
+      trigger_pause_status: PAUSED
+    resources:
+      jobs:
+        train:
+          name: train
+        score:
+          name: score
+    workspace:
+      host: https://replace-test.example.invalid
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/test_development
+    variables:
+      catalog: ${var.test_catalog}
+      input_schema: ${var.test_development_input_schema}
+      output_schema: ${var.test_development_output_schema}
+      metadata_schema: ${var.test_development_metadata_schema}
+      resource_suffix: _test_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
+{{if eq .retraining_mode "scheduled"}}
+      retraining_pause_status: PAUSED
+{{end}}
+{{if eq .scoring_mode "scheduled"}}
+      scoring_pause_status: PAUSED
+{{end}}
+{{end}}
+
+  syst:
+    mode: production
+    default: false
+    permissions: []
+    workspace:
+      host: https://replace-syst.example.invalid
+      root_path: ${var.syst_root_path}
+    variables:
+      catalog: ${var.syst_catalog}
+      input_schema: ${var.syst_input_schema}
+      output_schema: ${var.syst_output_schema}
+      metadata_schema: ${var.syst_metadata_schema}
+      resource_suffix: ""
+{{if or (ne .deployment_identity "deployer") (eq .manage_job_permissions "true")}}
+    resources:
+      jobs:
+        train:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.train_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.train_permissions}
+{{end}}
+        score:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.score_permissions}
+{{end}}
+{{end}}
+{{if eq .personal_development_targets "true"}}
+  syst_development:
+    mode: development
+    default: false
+    permissions: []
+    presets:
+      name_prefix: "dev_${workspace.current_user.short_name}_"
+      trigger_pause_status: PAUSED
+    resources:
+      jobs:
+        train:
+          name: train
+        score:
+          name: score
+    workspace:
+      host: https://replace-syst.example.invalid
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/syst_development
+    variables:
+      catalog: ${var.syst_catalog}
+      input_schema: ${var.syst_development_input_schema}
+      output_schema: ${var.syst_development_output_schema}
+      metadata_schema: ${var.syst_development_metadata_schema}
+      resource_suffix: _syst_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
+{{if eq .retraining_mode "scheduled"}}
+      retraining_pause_status: PAUSED
+{{end}}
+{{if eq .scoring_mode "scheduled"}}
+      scoring_pause_status: PAUSED
+{{end}}
+{{end}}
+
+  prod:
+    mode: production
+    default: false
+    permissions: []
+    workspace:
+      host: https://replace-prod.example.invalid
+      root_path: ${var.prod_root_path}
+    variables:
+      catalog: ${var.prod_catalog}
+      input_schema: ${var.prod_input_schema}
+      output_schema: ${var.prod_output_schema}
+      metadata_schema: ${var.prod_metadata_schema}
+      resource_suffix: ""
+{{if or (ne .deployment_identity "deployer") (eq .manage_job_permissions "true")}}
+    resources:
+      jobs:
+        train:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.train_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.train_permissions}
+{{end}}
+        score:
+{{if eq .deployment_identity "shared_service_principal"}}
+          run_as:
+            service_principal_name: ${var.shared_service_principal}
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+          run_as:
+            service_principal_name: ${var.score_service_principal}
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+          permissions: ${var.score_permissions}
+{{end}}
+{{end}}
+{{if eq .personal_development_targets "true"}}
+  prod_development:
+    mode: development
+    default: false
+    permissions: []
+    presets:
+      name_prefix: "dev_${workspace.current_user.short_name}_"
+      trigger_pause_status: PAUSED
+    resources:
+      jobs:
+        train:
+          name: train
+        score:
+          name: score
+    workspace:
+      host: https://replace-prod.example.invalid
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/prod_development
+    variables:
+      catalog: ${var.prod_catalog}
+      input_schema: ${var.prod_development_input_schema}
+      output_schema: ${var.prod_development_output_schema}
+      metadata_schema: ${var.prod_development_metadata_schema}
+      resource_suffix: _prod_dev_${workspace.current_user.id}
+      # Ephemeral dev models never enter the shared monitoring inventory.
+      monitoring_enabled: "false"
+      on_drift: disabled
+{{if eq .retraining_mode "scheduled"}}
+      retraining_pause_status: PAUSED
+{{end}}
+{{if eq .scoring_mode "scheduled"}}
+      scoring_pause_status: PAUSED
+{{end}}
+{{end}}

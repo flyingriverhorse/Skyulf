@@ -13,16 +13,20 @@ from ..mlflow.promotion import AliasChangeReceipt
 from .job_output import render_bundle_output, render_lifecycle_output
 from .local_approval import resolve_candidate_comparison_digest
 from .local_workflow import BundleActionResult as BundleActionResult
-from .local_workflow import _next_actions as _next_actions
 from .local_workflow import (
-    _workflow_policies,
+    build_bundle_result,
     resolve_target_config,
     run_action,
+    workflow_policies,
 )
-from .local_workflow import build_bundle_result as _bundle_result
+from .monitoring_registration import (
+    publish_monitoring_request,
+    register_scoring_monitor,
+    validate_monitoring_settings,
+)
 from .workflow_config import validate_deployed_contract, validate_workflow_config
 
-_OPERATOR_FIELDS = {
+OPERATOR_FIELDS = {
     "candidate_version",
     "comparison_sha256",
     "expected_champion_version",
@@ -31,7 +35,7 @@ _OPERATOR_FIELDS = {
 }
 
 
-def _version(value: str, *, allow_none: bool = False) -> str | None:
+def parse_model_version(value: str, *, allow_none: bool = False) -> str | None:
     """Require a concrete version or an explicitly chosen bootstrap sentinel."""
     if allow_none and value == "none":
         return None
@@ -40,7 +44,7 @@ def _version(value: str, *, allow_none: bool = False) -> str | None:
     return value
 
 
-def _operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
+def operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
     """Reject incomplete and irrelevant operator inputs before any Core side effects."""
     allowed = {
         "approve": {"candidate_version", "comparison_sha256", "expected_champion_version"},
@@ -52,11 +56,11 @@ def _operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
         },
         "rollback": {"promotion_receipt_json", "expected_champion_version"},
     }.get(action, set())
-    if any(values.get(key, "") for key in _OPERATOR_FIELDS - allowed):
+    if any(values.get(key, "") for key in OPERATOR_FIELDS - allowed):
         raise ValueError(f"Unexpected operator parameters for {action}.")
     if not allowed:
         return {}
-    expected = _version(
+    expected = parse_model_version(
         values.get("expected_champion_version", ""), allow_none=action != "rollback"
     )
     options: dict[str, Any] = {"expected_champion_version": expected}
@@ -64,7 +68,7 @@ def _operator_options(action: str, values: dict[str, str]) -> dict[str, Any]:
         receipt = _rollback_receipt(values, expected)
         options["promotion_receipt"] = receipt
         return options
-    options["candidate_version"] = _version(values.get("candidate_version", ""))
+    options["candidate_version"] = parse_model_version(values.get("candidate_version", ""))
     digest = values.get("comparison_sha256", "")
     if digest and not re.fullmatch(r"[a-f0-9]{64}", digest):
         raise ValueError("comparison_sha256 must be empty or an exact 64-character digest.")
@@ -100,7 +104,7 @@ def _validate_rollback_receipt(receipt: AliasChangeReceipt, expected: str | None
         raise ValueError
     if receipt.new_version != expected or receipt.prior_version is None:
         raise ValueError
-    _version(receipt.prior_version)
+    parse_model_version(receipt.prior_version)
 
 
 def run_bundle_action(
@@ -111,6 +115,7 @@ def run_bundle_action(
     task_role: str,
     experiment_name: str | None = None,
     artifact_path: str | Path | None = None,
+    recovery_request: dict[str, Any] | None = None,
 ) -> BundleActionResult:
     """Run one role-bound action; score handoff follows only a successful champion transition.
 
@@ -122,10 +127,10 @@ def run_bundle_action(
         raise ValueError(
             "Regenerate the Bundle config and job graph with both independent policies."
         )
-    _, policy = _workflow_policies(config)
+    _, policy = workflow_policies(config)
     if config.get("score_handoff") not in {"disabled", "after_alias_change"}:
         raise ValueError("score_handoff must be disabled or after_alias_change.")
-    _validate_job_parameters(parameters)
+    validate_job_parameters(parameters)
     action = _role_action(task_role, parameters)
     override = parameters.get("score_model_version", "")
     if override:
@@ -134,24 +139,43 @@ def run_bundle_action(
         config = {
             **config,
             "score_model_selection": "pinned_version",
-            "model_version": _version(override),
+            "model_version": parse_model_version(override),
         }
     if "config_version" in config:
         config = validate_workflow_config(config, action=action)
-    options = _operator_options(action, parameters)
+    options = _bundle_action_options(
+        action, parameters, config, experiment_name, artifact_path, recovery_request
+    )
+    result = run_action(spark, config, action, **options)
+    return build_bundle_result(config, action, result)
+
+
+def _bundle_action_options(
+    action: str,
+    parameters: dict[str, str],
+    config: dict[str, Any],
+    experiment_name: str | None,
+    artifact_path: str | Path | None,
+    recovery_request: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Validate recovery scope before resolving lifecycle evidence or training settings."""
+    if recovery_request is not None and action != "score":
+        raise ValueError("CDF recovery is only available for scoring.")
+    options = operator_options(action, parameters)
+    if recovery_request is not None:
+        options["recovery_request"] = recovery_request
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
             config, options["candidate_version"], action=action
         )
     if action == "train":
         options.update(experiment_name=experiment_name, artifact_path=artifact_path)
-    result = run_action(spark, config, action, **options)
-    return _bundle_result(config, action, result)
+    return options
 
 
-def _validate_job_parameters(parameters: dict[str, str]) -> None:
+def validate_job_parameters(parameters: dict[str, str]) -> None:
     """Reject malformed or role-overriding job inputs before selecting an action."""
-    for key in _OPERATOR_FIELDS | {
+    for key in OPERATOR_FIELDS | {
         "lifecycle_action",
         "task_role",
         "action",
@@ -178,7 +202,7 @@ def _role_action(task_role: str, parameters: dict[str, str]) -> str:
     return action
 
 
-def _read_notebook_config(values: dict[str, str]) -> dict[str, Any]:
+def read_notebook_config(values: dict[str, str]) -> dict[str, Any]:
     """Load and bind the project once at the notebook's configuration boundary."""
     config = json.loads(Path(values["config_path"]).read_text(encoding="utf-8"))
     required = {"training_table", "score_source_table", "prediction_table", "model_name"}
@@ -208,13 +232,14 @@ def _read_notebook_config(values: dict[str, str]) -> dict[str, Any]:
     return config
 
 
-def _notebook_output(
+def notebook_output(
     payload: dict[str, Any],
     dbutils: Any,
     *,
     render: Callable[[dict[str, Any]], str],
     display_html: Callable[[str], Any] | None,
     exit_notebook: bool,
+    explanation_tracking_uri: str | None = None,
 ) -> str:
     """Publish readable and machine output without retrying completed side effects."""
     output = json.dumps(payload, default=str, allow_nan=False)
@@ -226,15 +251,36 @@ def _notebook_output(
             print(json.dumps(payload, indent=2, default=str, allow_nan=False))
     else:
         print(json.dumps(payload, indent=2, default=str, allow_nan=False))
+    if explanation_tracking_uri and display_html is not None:
+        _display_training_explanations(payload, explanation_tracking_uri, display_html)
     if exit_notebook:
         dbutils.notebook.exit(output)
     return output
 
 
-def _lifecycle_widget_context(values: dict[str, str]) -> dict[str, Any]:
+def _display_training_explanations(
+    payload: dict, tracking_uri: str, display_html: Callable
+) -> None:
+    """Keep optional report retrieval outside the committed training operation."""
+    from skyulf.integrations.mlflow._client import (  # noqa: PLC0415 - preserve lazy dependency boundary
+        make_tracking_client,
+    )
+
+    from .explanation_report import display_explanation_reports  # noqa: PLC0415
+
+    try:
+        client = make_tracking_client(tracking_uri)
+        display_explanation_reports(payload, client, display_html)
+    except Exception:  # noqa: BLE001 - never retry training because optional display failed
+        logging.getLogger(__name__).warning("SHAP reports unavailable; inspect MLflow artifacts.")
+
+
+def lifecycle_widget_context(values: dict[str, str]) -> dict[str, Any]:
     """Reject unresolved invocation values and unsupported repairs before loading files."""
-    if values.get("workflow_contract") != "2":
-        raise ValueError("Lifecycle tasks require graph contract 2; regenerate/redeploy together.")
+    if values.get("workflow_contract") not in {"2", "3"}:
+        raise ValueError(
+            "Lifecycle tasks require graph contract 2 or 3; regenerate/redeploy together."
+        )
     if any(values.get(key) for key in ("phase", "task_role", "action", "score_model_version")):
         raise ValueError("Notebook phase and lifecycle role cannot be overridden by parameters.")
     for key in ("job_id", "job_run_id"):
@@ -259,7 +305,7 @@ def _prepared_notebook_request(
     action = values.get("lifecycle_action", "")
     if action not in {"train", "approve", "reject", "rollback"}:
         raise ValueError("Lifecycle action must be train, approve, reject or rollback.")
-    config = _read_notebook_config(values)
+    config = read_notebook_config(values)
     if action == "train" and preprocessing_path is not None:
         from .project import load_project_workflow  # noqa: PLC0415 - training-only project code
 
@@ -267,7 +313,12 @@ def _prepared_notebook_request(
             config, Path(values["config_path"]).parent / preprocessing_path
         )
     config = validate_workflow_config(config, action=action)
-    options = _operator_options(action, values)
+    validate_monitoring_settings(values, config)
+    if action == "train" and "competition" in config:
+        from .training_node_notebook import validate_model_task_names  # noqa: PLC0415
+
+        validate_model_task_names(values, set(config["competition"]["candidates"]))
+    options = operator_options(action, values)
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
             config, options["candidate_version"], action=action
@@ -281,7 +332,7 @@ def _prepared_notebook_request(
     }
 
 
-def _saved_notebook_request(values: dict[str, str]) -> dict[str, Any]:
+def saved_notebook_request(values: dict[str, str]) -> dict[str, Any]:
     """Validate the frozen predecessor reference and prepared tracking URI."""
     try:
         reference = json.loads(values["reference_json"])
@@ -295,6 +346,33 @@ def _saved_notebook_request(values: dict[str, str]) -> dict[str, Any]:
     return {"reference": reference, "tracking_uri": tracking_uri}
 
 
+def _validate_notebook_phase_contract(phase: str, values: dict[str, str]) -> None:
+    """Reject mismatched old/new notebooks before preparing or reading saved state."""
+    new_phases = {
+        "initialize",
+        "load_data",
+        "prepare_dataset",
+        "select_best_model",
+        "model_decision",
+    }
+    old_phases = {"prepare", "train_register", "compare_decide", "operator"}
+    contract = values["workflow_contract"]
+    if (phase in new_phases and contract != "3") or (phase in old_phases and contract != "2"):
+        raise ValueError("Notebook and job graph contract differ; regenerate/redeploy together.")
+
+
+def _notebook_task_states(phase: str, values: dict[str, str]) -> dict[str, str] | None:
+    """Keep graph-specific completion states separate from the pinned action."""
+    if phase != "complete":
+        return None
+    if values["workflow_contract"] == "3":
+        return {"decision": values.get("decision_result_state", "")}
+    return {
+        "training": values.get("training_result_state", ""),
+        "operator": values.get("operator_result_state", ""),
+    }
+
+
 def run_lifecycle_notebook(
     spark: Any,
     dbutils: Any,
@@ -303,15 +381,17 @@ def run_lifecycle_notebook(
     display_html: Callable[[str], Any] | None = None,
     exit_notebook: bool = True,
     preprocessing_path: str | Path | None = None,
+    separate_shap: bool = False,
 ) -> str:
     """Execute a fixed lifecycle phase using durable evidence from its predecessor.
 
-    Only prepare reads editable configuration and project Python. Later tasks
+    Only prepare/initialize read editable configuration and project Python. Later tasks
     receive references from this job invocation and load the frozen MLflow
     evidence. Notebook metadata is a misuse guard, not workspace authorization.
     """
     values = dbutils.widgets.getAll()
-    context_values = _lifecycle_widget_context(values)
+    context_values = lifecycle_widget_context(values)
+    _validate_notebook_phase_contract(phase, values)
     from .lifecycle_tasks import (  # noqa: PLC0415 - shared runtime helpers avoid a module cycle
         LifecycleContext,
         run_lifecycle_phase,
@@ -319,17 +399,10 @@ def run_lifecycle_notebook(
 
     options = (
         _prepared_notebook_request(values, preprocessing_path)
-        if phase == "prepare"
-        else _saved_notebook_request(values)
+        if phase in {"prepare", "initialize"}
+        else saved_notebook_request(values)
     )
-    task_states = (
-        {
-            "training": values.get("training_result_state"),
-            "operator": values.get("operator_result_state"),
-        }
-        if phase == "complete"
-        else None
-    )
+    task_states = _notebook_task_states(phase, values)
     outcome = run_lifecycle_phase(
         spark,
         phase=phase,
@@ -340,24 +413,50 @@ def run_lifecycle_notebook(
     dbutils.jobs.taskValues.set(
         key="reference_json", value=json.dumps(outcome.reference, sort_keys=True)
     )
-    if phase == "prepare":
+    if phase in {"prepare", "initialize"}:
         dbutils.jobs.taskValues.set(key="tracking_uri", value=options["tracking_uri"])
         dbutils.jobs.taskValues.set(
             key="training_requested", value=outcome.output["training_requested"]
         )
     if phase in {"result", "complete"}:
         dbutils.jobs.taskValues.set(key="score_requested", value=outcome.output["score_requested"])
-    return _notebook_output(
+    render = _lifecycle_notebook_renderer(phase, outcome, options["tracking_uri"], separate_shap)
+    return notebook_output(
         outcome.output,
         dbutils,
-        render=(
-            render_bundle_output
-            if phase in {"result", "complete"}
-            else lambda payload: render_lifecycle_output(phase, payload)
-        ),
+        render=render,
         display_html=display_html,
         exit_notebook=exit_notebook,
+        explanation_tracking_uri=(
+            options["tracking_uri"]
+            if phase in {"train", "train_register"}
+            and not separate_shap
+            and outcome.output.get("explanations", {}).get("status") in {"completed", "unavailable"}
+            else None
+        ),
     )
+
+
+def _lifecycle_notebook_renderer(
+    phase: str, outcome: Any, tracking_uri: str, separate_shap: bool
+) -> Callable:
+    """Keep training settings visible when SHAP is displayed by a separate task."""
+    if phase in {"result", "complete"}:
+        return render_bundle_output
+    if phase == "select_best_model" and outcome.output.get("selection_mode") == "single_candidate":
+        return lambda payload: render_lifecycle_output("validate_model", payload)
+    if phase == "train" and separate_shap:
+        from skyulf.integrations.mlflow._client import (  # noqa: PLC0415 - preserve lazy dependency boundary
+            make_tracking_client,
+        )
+
+        from .training_node_output import render_training_node  # noqa: PLC0415
+
+        client = make_tracking_client(tracking_uri)
+        return lambda payload: render_training_node(
+            client, outcome.reference["run_id"], {"training": payload}
+        )
+    return lambda payload: render_lifecycle_output(phase, payload)
 
 
 def run_score_notebook(
@@ -373,6 +472,8 @@ def run_score_notebook(
     replaces the readable report with the exit value in the same cell.
     Scoring uses saved model code and creates no training artifact directory.
     """
+    from .scoring_recovery import run_scoring_step  # noqa: PLC0415 - shared notebook routing
+
     values = dbutils.widgets.getAll()
     # Databricks pushes parent job parameters into Run Job children. The score
     # entrypoint ignores inherited lifecycle evidence and always dispatches score.
@@ -380,12 +481,27 @@ def run_score_notebook(
     parameters = {
         key: value
         for key, value in values.items()
-        if key not in _OPERATOR_FIELDS | {"lifecycle_action"}
+        if key not in OPERATOR_FIELDS | {"lifecycle_action"}
     }
-    config = _read_notebook_config(values)
-    outcome = run_bundle_action(spark, config, parameters, task_role="score")
-    return _notebook_output(
-        asdict(outcome),
+    config = read_notebook_config(values)
+
+    def score() -> dict[str, Any]:
+        """Keep the original outcome intact while allowing typed recovery routing."""
+        validate_monitoring_settings(values, config)
+        outcome = run_bundle_action(spark, config, parameters, task_role="score")
+        payload = {
+            **asdict(outcome),
+            "source_table": config["score_source_table"],
+            "prediction_table": config["prediction_table"],
+        }
+        registration = register_scoring_monitor(spark, config, values, payload)
+        if registration is not None:
+            payload["monitoring"] = registration
+            publish_monitoring_request(dbutils, payload)
+        return payload
+
+    return notebook_output(
+        run_scoring_step(config, dbutils, score),
         dbutils,
         render=render_bundle_output,
         display_html=display_html,
@@ -403,7 +519,7 @@ def _run_legacy_lifecycle_notebook(
 ) -> str:
     """Preserve the sequential notebook API for callers outside the phased graph."""
     values = dbutils.widgets.getAll()
-    config = _read_notebook_config(values)
+    config = read_notebook_config(values)
     if preprocessing_path is not None and values.get("lifecycle_action") == "train":
         from .project import load_project_workflow  # noqa: PLC0415 - project code is training-only
 
@@ -421,12 +537,17 @@ def _run_legacy_lifecycle_notebook(
         )
     payload = asdict(outcome)
     dbutils.jobs.taskValues.set(key="score_requested", value=outcome.score_requested)
-    return _notebook_output(
+    return notebook_output(
         payload,
         dbutils,
         render=render_bundle_output,
         display_html=display_html,
         exit_notebook=exit_notebook,
+        explanation_tracking_uri=(
+            (config.get("tracking_uri") or "databricks")
+            if outcome.action == "train" and config.get("pipeline", {}).get("explainability")
+            else None
+        ),
     )
 
 

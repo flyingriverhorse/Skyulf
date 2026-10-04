@@ -52,6 +52,11 @@ export interface EnsembleConfig {
   cv_shuffle: boolean;
   cv_random_state: number;
   cv_time_column?: string;
+  cv_nested_type?: string;
+  cv_group_column?: string;
+  cv_gap?: number;
+  cv_test_size?: number | null;
+  cv_max_train_size?: number | null;
   // Per-base-model fixed hyperparameters: { base_key: { param: value } }.
   base_estimator_params?: Record<string, Record<string, unknown>>;
   final_estimator_params?: Record<string, unknown>;
@@ -61,6 +66,7 @@ export interface EnsembleConfig {
   n_trials: number;
   metric: string;
   tune_base_models: boolean;
+  tune_threshold?: boolean;
   random_state: number;
   strategy_params?: Record<string, unknown>;
 }
@@ -137,6 +143,12 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     config.cv_shuffle,
     config.cv_random_state,
     config.cv_time_column,
+    config.cv_nested_type,
+    config.cv_group_column,
+    config.cv_gap,
+    config.cv_test_size,
+    config.cv_max_train_size,
+    config.tune_threshold,
     config.base_estimator_params,
     onChange,
   ]);

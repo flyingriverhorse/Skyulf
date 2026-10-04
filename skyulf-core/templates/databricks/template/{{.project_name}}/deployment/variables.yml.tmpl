@@ -1,0 +1,255 @@
+# Authentication belongs to your CLI profile or external CI/CD, never to this file.
+# Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+variables:
+  job_tags:
+    description: Optional job attribution tags for either compute mode
+    type: complex
+    default: {}
+{{if eq .compute_mode "serverless"}}
+  serverless_environment_version:
+    description: Compatible serverless environment version for both jobs
+    default: "4"
+  serverless_budget_policy_id:
+    description: Optional existing serverless budget policy; blank uses workspace defaults
+    default: ""
+{{else}}
+  spark_version:
+    description: Approved Databricks runtime for this target
+    default: "{{.spark_version}}"
+  node_type_id:
+    description: Approved worker node type for this target
+    default: "{{.node_type_id}}"
+  min_workers:
+    description: Policy cluster autoscaling minimum
+    default: 2
+  max_workers:
+    description: Policy cluster autoscaling maximum
+    default: 4
+{{end}}
+  on_drift:
+    description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
+    default: "disabled"
+  on_drift_cooldown_hours:
+    description: Minimum hours between automatic training requests for this train job
+    default: "24"
+  on_drift_min_new_training_rows:
+    description: Minimum new or changed labeled rows in the actual training partition
+    default: "1"
+  monitoring_drift_thresholds:
+    description: 'JSON overrides for psi, ks_statistic, wasserstein, kl_divergence; {} uses Core defaults'
+    default: '{}'
+  monitoring_enabled:
+    description: Enroll activated models and measure drift after scoring; false pauses monitoring
+    default: "true"
+  monitoring_dashboard_url:
+    description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
+    default: ""
+  monitoring_experiment_name:
+    description: Optional MLflow experiment for post-scoring monitoring reports
+    default: ""
+  monitoring_catalog:
+    description: Central monitoring catalog, independent of model and input catalogs
+    default: ""
+  monitoring_schema:
+    description: Existing central monitoring schema shared by model repositories
+    default: ""
+  monitoring_label_table:
+    description: Optional fully qualified table of actual outcomes for monitoring
+    default: ""
+  monitoring_result_available_at_column:
+    description: UTC outcome availability column in the monitoring label table
+    default: ""
+  monitoring_expected_interval_hours:
+    description: Maximum scoring age before the dashboard reports stale
+    default: "24"
+  # Operations are configured here or per target; no extra initializer questions.
+  # Zero timeout preserves unlimited execution until a project chooses its limits.
+  train_timeout_seconds:
+    description: Whole train job timeout in seconds; 0 disables the limit
+    default: 0
+  train_task_timeout_seconds:
+    description: Per-notebook train timeout in seconds; 0 disables the limit
+    default: 0
+  score_timeout_seconds:
+    description: Whole score job timeout in seconds; 0 disables the limit
+    default: 0
+  score_task_timeout_seconds:
+    description: Score notebook timeout in seconds; 0 disables the limit
+    default: 0
+  score_max_retries:
+    description: Opt-in score retries after failure; 0 disables retries; never use -1
+    default: 0
+  score_min_retry_interval_millis:
+    description: Minimum delay between score attempts when retries are enabled
+    default: 60000
+  train_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for train
+    type: complex
+    default: []
+  score_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for score
+    type: complex
+    default: []
+  train_email_notifications:
+    description: Optional train email events and recipient lists
+    type: complex
+    default: {}
+  score_email_notifications:
+    description: Optional score email events and recipient lists
+    type: complex
+    default: {}
+  train_webhook_notifications:
+    description: Optional train events with existing notification destination IDs
+    type: complex
+    default: {}
+  score_webhook_notifications:
+    description: Optional score events with existing notification destination IDs
+    type: complex
+    default: {}
+  catalog:
+    description: Unity Catalog catalog selected by the active target
+    default: {{.catalog}}
+  input_schema:
+    description: Existing training and scoring source schema
+    default: {{.schema}}
+  output_schema:
+    description: Prediction output schema
+    default: {{.schema}}
+  metadata_schema:
+    description: Registered model schema
+    default: {{.schema}}
+  resource_suffix:
+    description: Optional namespace suffix for shared development targets
+    default: ""
+{{if eq .retraining_mode "scheduled"}}
+  retraining_cron_expression:
+    description: Editable Quartz cron for the enabled training job
+    default: "{{.retraining_cron_expression}}"
+  retraining_timezone_id:
+    description: IANA timezone for the enabled training schedule
+    default: "{{.retraining_timezone_id}}"
+  retraining_pause_status:
+    description: Enable or pause the training clock independently of manual runs
+    default: "{{.retraining_pause_status}}"
+{{end}}
+{{if eq .scoring_mode "scheduled"}}
+  scoring_cron_expression:
+    description: Editable Quartz cron for the independent scoring job
+    default: "{{.scoring_cron_expression}}"
+  scoring_timezone_id:
+    description: IANA timezone for the scoring clock
+    default: "{{.scoring_timezone_id}}"
+  scoring_pause_status:
+    description: Enable or pause the scoring clock independently of manual runs
+    default: "{{.scoring_pause_status}}"
+{{end}}
+{{if eq .compute_mode "policy_cluster"}}
+  cluster_policy_id:
+    description: Approved policy looked up in the active workspace
+    lookup:
+      cluster_policy: {{printf "%q" .cluster_policy_name}}
+  cost_tag_value:
+    description: Approved cluster cost allocation tag value
+    default: {{printf "%q" .cost_tag_value}}
+{{end}}
+  test_catalog:
+    description: "test catalog; shared and personal targets use the same environment binding"
+    default: "{{.catalog}}"
+  test_input_schema:
+    description: "test input_schema for the shared target"
+    default: "{{.schema}}"
+  test_output_schema:
+    description: "test output_schema for the shared target"
+    default: "{{.schema}}"
+  test_metadata_schema:
+    description: "test metadata_schema for the shared target"
+    default: "{{.schema}}"
+{{if eq .personal_development_targets "true"}}
+  test_development_input_schema:
+    description: Existing input_schema for personal work in test
+    default: "REPLACE_TEST_DEVELOPMENT_INPUT_SCHEMA"
+  test_development_output_schema:
+    description: Existing output_schema for personal work in test
+    default: "REPLACE_TEST_DEVELOPMENT_OUTPUT_SCHEMA"
+  test_development_metadata_schema:
+    description: Existing metadata_schema for personal work in test
+    default: "REPLACE_TEST_DEVELOPMENT_METADATA_SCHEMA"
+{{end}}
+  test_root_path:
+    description: Team-managed Bundle root for the shared test target
+    default: "/Workspace/Projects/{{.project_name}}/test"
+  syst_catalog:
+    description: "syst catalog; shared and personal targets use the same environment binding"
+    default: "REPLACE_SYST_CATALOG"
+  syst_input_schema:
+    description: "syst input_schema for the shared target"
+    default: "REPLACE_SYST_INPUT_SCHEMA"
+  syst_output_schema:
+    description: "syst output_schema for the shared target"
+    default: "REPLACE_SYST_OUTPUT_SCHEMA"
+  syst_metadata_schema:
+    description: "syst metadata_schema for the shared target"
+    default: "REPLACE_SYST_METADATA_SCHEMA"
+{{if eq .personal_development_targets "true"}}
+  syst_development_input_schema:
+    description: Existing input_schema for personal work in syst
+    default: "REPLACE_SYST_DEVELOPMENT_INPUT_SCHEMA"
+  syst_development_output_schema:
+    description: Existing output_schema for personal work in syst
+    default: "REPLACE_SYST_DEVELOPMENT_OUTPUT_SCHEMA"
+  syst_development_metadata_schema:
+    description: Existing metadata_schema for personal work in syst
+    default: "REPLACE_SYST_DEVELOPMENT_METADATA_SCHEMA"
+{{end}}
+  syst_root_path:
+    description: Team-managed Bundle root for the shared syst target
+    default: "/Workspace/Projects/{{.project_name}}/syst"
+  prod_catalog:
+    description: "prod catalog; shared and personal targets use the same environment binding"
+    default: "REPLACE_PROD_CATALOG"
+  prod_input_schema:
+    description: "prod input_schema for the shared target"
+    default: "REPLACE_PROD_INPUT_SCHEMA"
+  prod_output_schema:
+    description: "prod output_schema for the shared target"
+    default: "REPLACE_PROD_OUTPUT_SCHEMA"
+  prod_metadata_schema:
+    description: "prod metadata_schema for the shared target"
+    default: "REPLACE_PROD_METADATA_SCHEMA"
+{{if eq .personal_development_targets "true"}}
+  prod_development_input_schema:
+    description: Existing input_schema for personal work in prod
+    default: "REPLACE_PROD_DEVELOPMENT_INPUT_SCHEMA"
+  prod_development_output_schema:
+    description: Existing output_schema for personal work in prod
+    default: "REPLACE_PROD_DEVELOPMENT_OUTPUT_SCHEMA"
+  prod_development_metadata_schema:
+    description: Existing metadata_schema for personal work in prod
+    default: "REPLACE_PROD_DEVELOPMENT_METADATA_SCHEMA"
+{{end}}
+  prod_root_path:
+    description: Team-managed Bundle root for the shared prod target
+    default: "/Workspace/Projects/{{.project_name}}/prod"
+{{if eq .deployment_identity "shared_service_principal"}}
+  shared_service_principal:
+    description: Application ID for shared train and score; override per target
+    default: REPLACE_SHARED_SERVICE_PRINCIPAL
+{{end}}
+{{if eq .deployment_identity "separate_service_principals"}}
+  train_service_principal:
+    description: Lifecycle/model writer application ID; override per target
+    default: REPLACE_TRAIN_SERVICE_PRINCIPAL
+  score_service_principal:
+    description: Prediction writer application ID without model ownership; override per target
+    default: REPLACE_SCORE_SERVICE_PRINCIPAL
+{{end}}
+{{if eq .manage_job_permissions "true"}}
+  train_permissions:
+    description: Shared train job ACL entries; set before deploying shared targets
+    type: complex
+    default: []
+  score_permissions:
+    description: Shared score job ACL entries, including the train caller for automatic handoff
+    type: complex
+    default: []
+{{end}}

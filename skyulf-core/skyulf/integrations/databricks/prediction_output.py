@@ -3,11 +3,11 @@
 import re
 from typing import Any
 
-_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+IDENTIFIER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
-_TABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2}\Z")
+TABLE_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2}\Z")
 
-_OUTPUT_TYPES = {
+OUTPUT_TYPES = {
     "float64": ("double", "DOUBLE"),
     "int64": ("long", "BIGINT"),
     "string": ("string", "STRING"),
@@ -15,14 +15,14 @@ _OUTPUT_TYPES = {
 }
 
 
-def _scoring_target(config: dict[str, Any]) -> str:
+def scoring_target(config: dict[str, Any]) -> str:
     """Choose a stable append target or a physical model-version generation."""
     mode = config.get("model_change_mode", "incremental_append")
     if type(mode) is not str or mode not in {"incremental_append", "full_rebuild"}:
         raise ValueError("model_change_mode must be incremental_append or full_rebuild.")
     base = config["prediction_table"]
     version = config["model_version"]
-    if not _TABLE_NAME.fullmatch(base):
+    if not TABLE_NAME_PATTERN.fullmatch(base):
         raise ValueError("prediction_table must be a three-part UC name.")
     if (
         type(version) is not str
@@ -36,7 +36,7 @@ def _scoring_target(config: dict[str, Any]) -> str:
     return base
 
 
-def _managed_prediction_view_exists(spark: Any, logical: str) -> bool:
+def managed_prediction_view_exists(spark: Any, logical: str) -> bool:
     """Reject a table or unrelated view before creating prediction resources."""
     if not spark.catalog.tableExists(logical):
         return False
@@ -48,30 +48,38 @@ def _managed_prediction_view_exists(spark: Any, logical: str) -> bool:
     return True
 
 
-def _activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
+def activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
     """Expose a complete generation without replacing prior prediction tables."""
     if (
-        not _TABLE_NAME.fullmatch(logical)
-        or not _TABLE_NAME.fullmatch(generation)
+        not TABLE_NAME_PATTERN.fullmatch(logical)
+        or not TABLE_NAME_PATTERN.fullmatch(generation)
         or not re.fullmatch(re.escape(logical) + r"_v[1-9][0-9]*", generation)
     ):
         raise ValueError("Prediction view and generation names must match one UC target.")
     physical = spark.table(generation)
+    exists = managed_prediction_view_exists(spark, logical)
+    if exists:
+        _validate_generation_schema(spark, logical, physical)
+        if _view_reads_generation(spark, logical, generation):
+            return
     if not physical.limit(1).count():
         raise ValueError("A full-rebuild generation must contain predictions before activation.")
-    if not _managed_prediction_view_exists(spark, logical):
+    if not exists:
         spark.sql(
             f"CREATE VIEW {logical} TBLPROPERTIES ('skyulf.mode' = 'full_rebuild') "
             f"AS SELECT * FROM {generation}"
         ).collect()
         return
-    _validate_generation_schema(spark, logical, physical)
-    definition = spark.sql(f"SHOW CREATE TABLE {logical}").first()
-    if definition is not None:
-        sql = definition["createtab_stmt"].casefold().replace("`", "")
-        if re.search(r"\bfrom\s+" + re.escape(generation.casefold()) + r"\b", sql):
-            return
     spark.sql(f"ALTER VIEW {logical} AS SELECT * FROM {generation}").collect()
+
+
+def _view_reads_generation(spark: Any, logical: str, generation: str) -> bool:
+    """Keep a recovered empty generation active without treating it as a new release."""
+    definition = spark.sql(f"SHOW CREATE TABLE {logical}").first()
+    if definition is None:
+        return False
+    sql = definition["createtab_stmt"].casefold().replace("`", "")
+    return re.search(r"\bfrom\s+" + re.escape(generation.casefold()) + r"\b", sql) is not None
 
 
 def _prediction_columns(
@@ -86,9 +94,9 @@ def _prediction_columns(
             raise ValueError(f"Source row key {key!r} must be STRING or BIGINT.")
         columns.append((key, kind, "STRING" if kind == "string" else "BIGINT"))
     for output in prepared.preflight.output_schema:
-        if not _IDENTIFIER.fullmatch(output.name) or output.dtype not in _OUTPUT_TYPES:
+        if not IDENTIFIER_PATTERN.fullmatch(output.name) or output.dtype not in OUTPUT_TYPES:
             raise ValueError("Saved model output has an unsupported name or type.")
-        kind, sql_type = _OUTPUT_TYPES[output.dtype]
+        kind, sql_type = OUTPUT_TYPES[output.dtype]
         columns.append((output.name, kind, sql_type))
     columns.extend((name, "string", "STRING") for name in ("run_id", "model_name", "model_version"))
     if len({name.lower() for name, _, _ in columns}) != len(columns):
@@ -96,7 +104,7 @@ def _prediction_columns(
     return tuple(columns)
 
 
-def _check_existing_table(spark: Any, name: str, columns: tuple[tuple[str, str, str], ...]) -> None:
+def check_existing_table(spark: Any, name: str, columns: tuple[tuple[str, str, str], ...]) -> None:
     """Reject an existing prediction target with a different schema."""
     actual = {field.name: field.dataType.typeName() for field in spark.table(name).schema.fields}
     expected = {column: kind for column, kind, _ in columns}
@@ -137,7 +145,7 @@ def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any
                 raise ValueError(
                     "Existing prediction generation belongs to another model or workflow."
                 )
-        _check_existing_table(spark, target_name, columns)
+        check_existing_table(spark, target_name, columns)
     if not target_exists:
         _create_prediction_table(
             spark, config, source, target_name, columns, generation, generation_properties
@@ -164,7 +172,7 @@ def _prediction_source_keys(config: dict[str, Any], prepared: Any, source: Any) 
     if not keys or tuple(config["input_columns"]) != inputs:
         raise ValueError("Configured keys or model inputs differ from the fitted model.")
     names = (*keys, *inputs)
-    if any(not _IDENTIFIER.fullmatch(name) for name in names):
+    if any(not IDENTIFIER_PATTERN.fullmatch(name) for name in names):
         raise ValueError("Source keys and model inputs need simple column identifiers.")
     if len({name.lower() for name in names}) != len(names):
         raise ValueError("Source keys and model inputs must be distinct.")
@@ -180,7 +188,7 @@ def _validate_prediction_request(
     source_name = config["score_source_table"]
     target_name = config["prediction_table"]
     for name in (source_name, target_name, config["model_name"]):
-        if not _TABLE_NAME.fullmatch(name):
+        if not TABLE_NAME_PATTERN.fullmatch(name):
             raise ValueError("Scoring needs valid three-part Unity Catalog names.")
     if source_name == target_name:
         raise ValueError("Prediction output must differ from the source table.")

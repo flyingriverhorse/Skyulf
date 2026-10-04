@@ -5,6 +5,7 @@ import type { ThresholdMutationState } from './useThresholdMutation';
 import { EvaluationControls } from './EvaluationControls';
 import { ThresholdTuningControls } from './ThresholdTuningControls';
 import { EvaluationCharts } from './EvaluationCharts';
+import { EvaluationCoverage } from './EvaluationCoverage';
 
 type BodyProps = EvaluationViewProps & EvaluationPresentation & ThresholdMutationState;
 
@@ -36,9 +37,12 @@ export function EvaluationBody(props: BodyProps) {
     // Clustering jobs have no y_true/y_pred (only predicted cluster
     // labels), so the classification/regression charts below don't
     // apply — point the user at the dedicated Segmentation tab instead.
-    <div className="h-64 flex flex-col items-center justify-center text-gray-400 italic text-center">
-      <p>This is a Segmentation (clustering) run.</p>
-      <p className="text-xs mt-2 opacity-70">See the &quot;Segmentation&quot; tab for cluster sizes, centroids, and quality metrics.</p>
+    <div className="space-y-6">
+      <EvaluationCoverage data={evaluationData} />
+      <div className="h-64 flex flex-col items-center justify-center text-gray-400 italic text-center">
+        <p>This is a Segmentation (clustering) run.</p>
+        <p className="text-xs mt-2 opacity-70">See the &quot;Segmentation&quot; tab for cluster sizes, centroids, and quality metrics.</p>
+      </div>
     </div>
   );
   return <EvaluationContent {...props} evaluationData={evaluationData} />;
@@ -50,6 +54,7 @@ function EvaluationContent(props: BodyProps & ChartEvaluationProps) {
   return <div className={`space-y-6 transition-opacity ${isEvalLoading ? 'opacity-60' : ''}`}>
     {isEvalLoading && <div className="text-xs text-gray-500 dark:text-gray-400 italic">Loading evaluation data…</div>}
     <EvaluationControls {...props} />
+    <EvaluationCoverage data={evaluationData} />
     {/* Tab-level one-line description of what's driving the charts below */}
     {evaluationData.problem_type === 'classification' && (
       <p className="text-xs text-gray-500 dark:text-gray-400 italic px-1">

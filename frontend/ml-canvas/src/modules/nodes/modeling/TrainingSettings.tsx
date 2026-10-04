@@ -36,6 +36,11 @@ export interface TrainingConfig {
   cv_shuffle: boolean;
   cv_random_state: number;
   cv_time_column?: string;
+  cv_nested_type?: string;
+  cv_group_column?: string;
+  cv_gap?: number;
+  cv_test_size?: number | null;
+  cv_max_train_size?: number | null;
   execution_mode?: ExecutionMode;
 }
 

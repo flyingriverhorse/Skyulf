@@ -1,0 +1,201 @@
+{
+  "score_source_table_name": {
+    "order": 7,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "prediction_table_name": {
+    "order": 8,
+    "type": "string",
+    "default": "",
+    "description": "1. Data | Prediction OUTPUT table name, e.g. customer_predictions. Results are written here; blank uses <project_name>_predictions",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "model_change_mode": {
+    "order": 723,
+    "type": "string",
+    "default": "incremental_append",
+    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes the complete source with the new selection. Independent of source UPDATE/DELETE handling",
+    "enum": [
+      "incremental_append",
+      "full_rebuild"
+    ]
+  },
+  "score_model_selection": {
+    "order": 725,
+    "type": "string",
+    "default": "pinned_version",
+    "description": "4. Lifecycle | Score with one pinned version or resolve the controlled champion on each run",
+    "enum": [
+      "pinned_version",
+      "champion"
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "promotion_policy": {
+    "order": 726,
+    "type": "string",
+    "default": "manual_approval",
+    "description": "4. Lifecycle | Require operator approval or promote automatically after quality gates pass",
+    "enum": [
+      "manual_approval",
+      "automatic"
+    ],
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "score_handoff": {
+    "order": 727,
+    "type": "string",
+    "default": "disabled",
+    "description": "4. Lifecycle | Optionally start the score job after successful champion initialization, promotion or rollback (single, competition or model set). Pending approval, failed quality and rejection do not start scoring",
+    "enum": [
+      "disabled",
+      "after_alias_change"
+    ]
+  },
+  "regression_metric": {
+    "order": 728,
+    "type": "string",
+    "default": "heldout_rmse",
+    "description": "4. Lifecycle | Metric for comparing regression models on separate test data (heldout). Lower error is better; higher R2 or explained variance is better",
+    "enum": [
+      "heldout_rmse",
+      "heldout_explained_variance",
+      "heldout_mae",
+      "heldout_mape",
+      "heldout_mse",
+      "heldout_r2"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "task": {
+              "const": "classification"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "classification_metric": {
+    "order": 729,
+    "type": "string",
+    "default": "heldout_accuracy",
+    "description": "4. Lifecycle | Metric for comparing classification models on separate test data (heldout). Some metrics need probabilities or specific class counts",
+    "enum": [
+      "heldout_accuracy",
+      "heldout_balanced_accuracy",
+      "heldout_f1",
+      "heldout_f1_weighted",
+      "heldout_g_score",
+      "heldout_log_loss",
+      "heldout_matthews_corrcoef",
+      "heldout_pr_auc",
+      "heldout_pr_auc_weighted",
+      "heldout_precision",
+      "heldout_precision_weighted",
+      "heldout_recall",
+      "heldout_recall_weighted",
+      "heldout_roc_auc",
+      "heldout_roc_auc_ovo",
+      "heldout_roc_auc_ovo_weighted",
+      "heldout_roc_auc_ovr",
+      "heldout_roc_auc_ovr_weighted",
+      "heldout_roc_auc_weighted"
+    ],
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "task": {
+              "const": "regression"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "min_improvement": {
+    "order": 730,
+    "type": "number",
+    "default": 0.0,
+    "minimum": 0,
+    "description": "4. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass",
+    "skip_prompt_if": {}
+  },
+  "quality_threshold": {
+    "order": 731,
+    "type": "string",
+    "default": "null",
+    "description": "4. Lifecycle | Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
+    "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "multi_target"
+        }
+      }
+    }
+  },
+  "auto_rebuild_on_cdf_expiry": {
+    "order": 724,
+    "type": "string",
+    "default": "false",
+    "description": "4. Lifecycle | Automatically rebuild predictions when retained Delta change history has expired? Adds a visible recovery task to the score job. May rescore the full source; independent of model-change policy",
+    "enum": [
+      "false",
+      "true"
+    ]
+  },
+  "risk_category": {
+    "order": 732,
+    "type": "string",
+    "default": "",
+    "description": "4. Lifecycle | Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
+    "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$",
+    "skip_prompt_if": {}
+  }
+}

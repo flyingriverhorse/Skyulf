@@ -225,6 +225,8 @@ def step_learns_from_data(
     target_column: str | None = None,
 ) -> bool:
     """Classify one configured step; unknown implementations fail closed."""
+    if step_type in {"LagFeatures", "RollingAggregate"} and params.get("history_mode") == "carry":
+        return True
     if leakage_exemption_reason(step_type, params, target_column=target_column) is not None:
         return False
     metadata = NodeRegistry.get_all_metadata().get(step_type, {})
@@ -244,6 +246,7 @@ def validate_temporal_target(
     A separate observed feature is allowed; its availability at prediction
     time remains the caller's responsibility.
     """
+    _validate_history_target(step_type, params, target_column)
     if (
         step_type == "RollingAggregate"
         and target_column is not None
@@ -255,6 +258,22 @@ def validate_temporal_target(
             "the current row and would expose that row's answer as a feature. "
             "Use a separate historical feature available at prediction time."
         )
+
+
+def _validate_history_target(step_type: str, params: dict[str, Any], target: str | None) -> None:
+    """Carry only observed features and keys; target history requires a forecasting contract."""
+    if (
+        step_type not in {"LagFeatures", "RollingAggregate"}
+        or params.get("history_mode") != "carry"
+    ):
+        return
+    inputs = [
+        *(params.get("columns") or []),
+        *(params.get("group_by") or []),
+        params.get("sort_by"),
+    ]
+    if target is not None and target in inputs:
+        raise ValueError("carry history requires observed features, not the prediction target.")
 
 
 def validate_leakage_safety(

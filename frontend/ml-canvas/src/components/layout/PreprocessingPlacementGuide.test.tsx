@@ -4,9 +4,9 @@ import { HelpGuideModal } from './HelpGuideModal';
 
 describe('PreprocessingPlacementGuide', () => {
   /** Saved graphs can contain aliases, so every registered ID must be discoverable. */
-  it('shows all 62 registrations including distinct aliases', () => {
+  it('shows all 64 registrations including distinct aliases', () => {
     render(<HelpGuideModal isOpen onClose={() => {}} initialTab="leakage" />);
-    expect(screen.getAllByRole('article')).toHaveLength(62);
+    expect(screen.getAllByRole('article')).toHaveLength(64);
     for (const id of ['FeatureGeneration', 'FeatureGenerationNode', 'FeatureMath', 'TrainTestSplitter', 'Split']) {
       expect(screen.getByText(id, { selector: 'code' })).toBeInTheDocument();
     }
@@ -54,7 +54,7 @@ describe('PreprocessingPlacementGuide', () => {
     });
     expect(screen.queryAllByRole('article')).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
-    expect(screen.getAllByRole('article')).toHaveLength(62);
+    expect(screen.getAllByRole('article')).toHaveLength(64);
   });
 });
 

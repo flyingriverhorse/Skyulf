@@ -1,0 +1,27 @@
+bundle:
+  name: skyulf_shared_monitoring
+
+include:
+  - resources/monitoring.job.yml
+  # After the first job provisions views, add resources/monitoring.dashboard.yml here.
+
+sync:
+  exclude:
+    - src/*.lvdash.json
+
+variables:
+  monitoring_catalog:
+    description: Central Unity Catalog catalog owned by the monitoring job.
+  monitoring_schema:
+    description: Central schema for the monitoring tables and views.
+  warehouse_id:
+    description: SQL warehouse for the AI/BI dashboard.
+  wheel_path:
+    description: Remote workspace or Unity Catalog Volume path for the built Skyulf wheel.
+  experiment_name:
+    description: Existing MLflow experiment path for monitoring observation runs.
+
+targets:
+  dev:
+    default: true
+    mode: development

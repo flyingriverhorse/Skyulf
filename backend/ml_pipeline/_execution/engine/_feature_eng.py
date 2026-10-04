@@ -24,6 +24,7 @@ from skyulf.preprocessing.fold_adapter import (
 )
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
+from ..._internal._code_only_nodes import reject_code_only_steps
 from ...constants import StepType
 from ..schemas import NodeConfig
 
@@ -579,6 +580,7 @@ class FeatureEngMixin:
 
         strategy = self._get_merge_strategy(training_node.node_id)
         fork_artifact = self.artifact_store.load(fork_id)
+        self._fold_policy_dataset = fork_artifact
         payload = self._split_train_payload(fork_artifact, target_col)
         validation_payload = self._split_validation_payload(fork_artifact, target_col)
         adapter = MergedBranchFoldAdapter(
@@ -615,6 +617,7 @@ class FeatureEngMixin:
         graphs and payload reconstruction failures block scoring by default.
         Explicit ``on_leakage='warn'`` or ``'ignore'`` permits legacy fallback.
         """
+        self._fold_policy_dataset = None
         warning = None
         code: str | None = None
         try:
@@ -677,6 +680,7 @@ class FeatureEngMixin:
                     # The first row splitter ends at a node boundary, so its stored
                     # output artifact is the pre-transform SplitDataset itself.
                     split_artifact = self.artifact_store.load(node_id)
+                    self._fold_policy_dataset = split_artifact
                     payload = self._split_train_payload(split_artifact, target_col)
                     validation_payload = self._split_validation_payload(split_artifact, target_col)
                 else:
@@ -686,6 +690,7 @@ class FeatureEngMixin:
                     split_artifact = self.artifact_store.load(f"exec_{node_id}_split")
                     if not isinstance(split_artifact, SplitDataset):
                         raise ValueError("Saved pre-transform split payload is not a SplitDataset")
+                    self._fold_policy_dataset = split_artifact
                     payload = self._split_train_payload(split_artifact, target_col)
                     validation_payload = self._split_validation_payload(split_artifact, target_col)
 
@@ -726,6 +731,7 @@ class FeatureEngMixin:
             self.artifact_store.save(f"exec_{node.node_id}_input", df)
 
         # params: {"steps": [...]}
+        reject_code_only_steps(node.step_type, node.params)
         steps = node.params.get("steps", [])
         engineer = FeatureEngineer(steps)
 

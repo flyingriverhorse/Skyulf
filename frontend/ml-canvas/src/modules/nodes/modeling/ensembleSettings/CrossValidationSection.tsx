@@ -1,7 +1,8 @@
+import { CVPolicySettings, policyChange, temporalPolicy } from '../components/CVPolicySettings';
 import { ValidationField } from '../../../../components/shared/ValidationField';
 import { numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import { useId } from 'react';
-import { AlertTriangle, BarChart3, ChevronRight } from 'lucide-react';
+import { BarChart3, ChevronRight } from 'lucide-react';
 import type { ColumnProfile } from '../../../../core/api/client';
 import type { EnsembleConfig } from '../EnsembleSettings';
 import { HelpTooltip } from '../components/HelpTooltip';
@@ -81,7 +82,7 @@ function CrossValidationFields({ config, update, columns, fieldId }: {
           <select
             id={`${fieldId}-cv_type`}
             value={config.cv_type ?? 'k_fold'}
-            onChange={(e) => { update({ cv_type: e.target.value }); }}
+            onChange={(e) => { update(policyChange('cv_type', e.target.value, config)); }}
             className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
           >
             <option value="k_fold">K-Fold</option>
@@ -89,6 +90,8 @@ function CrossValidationFields({ config, update, columns, fieldId }: {
             <option value="time_series_split">Time Series</option>
             <option value="shuffle_split">Shuffle Split</option>
             <option value="nested_cv">Nested CV</option>
+            <option value="group_k_fold">Group K-Fold</option>
+            <option value="stratified_group_k_fold">Stratified Group K-Fold</option>
           </select>
         </div>
       </div>
@@ -97,54 +100,19 @@ function CrossValidationFields({ config, update, columns, fieldId }: {
         <NestedFoldSettings fieldId={fieldId} outerFolds={config.cv_folds} innerFolds={config.cv_inner_folds}
           onChange={(value) => { update({ cv_inner_folds: value }); }} />
       )}
-      {config.cv_type === 'time_series_split' && (
-        <div className="space-y-2">
-          <div className="flex items-start gap-1.5 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-            <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
-          </div>
-          <div>
-            <label htmlFor={`${fieldId}-cv_time_column`} className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
-            <select
-              id={`${fieldId}-cv_time_column`}
-              value={config.cv_time_column ?? ''}
-              onChange={(e) => { update({ cv_time_column: e.target.value }); }}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
-            >
-              <option value="">Auto-detect</option>
-              {columns
-                .filter((col) => {
-                  const dt = String(col.dtype).toLowerCase();
-                  return dt.includes('datetime') || dt.includes('date') || dt.includes('time') || dt.includes('timestamp');
-                })
-                .map((col) => (
-                  <option key={col.name} value={col.name}>{col.name}</option>
-                ))
-              }
-              {columns
-                .filter((col) => {
-                  const dt = String(col.dtype).toLowerCase();
-                  return !(dt.includes('datetime') || dt.includes('date') || dt.includes('time') || dt.includes('timestamp'));
-                })
-                .map((col) => (
-                  <option key={col.name} value={col.name}>{col.name}</option>
-                ))
-              }
-            </select>
-          </div>
-        </div>
-      )}
+      <CVPolicySettings config={config} fieldId={fieldId} columns={columns} update={update} />
 
       <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
         <input
           type="checkbox"
           checked={config.cv_shuffle !== false}
+          disabled={temporalPolicy(config)}
           onChange={(e) => { update({ cv_shuffle: e.target.checked }); }}
           className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
         />
         Shuffle Data
       </label>
-      {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
+      {config.cv_shuffle !== false && !temporalPolicy(config) && (
         <div>
           <span className="flex items-center gap-1 text-xs text-gray-500 mb-1">
             <label htmlFor={`${fieldId}-cv_random_state`}>Fold Split Seed</label>

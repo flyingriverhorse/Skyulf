@@ -11,6 +11,7 @@ predict, cross-validation and evaluation.
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, cast
 
 import pandas as pd
@@ -18,11 +19,14 @@ import polars as pl
 
 # Use relative imports assuming the structure is preserved
 from .._validation import raise_invalid_choice
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 from ._evaluation.classification import evaluate_classification_model
 from ._evaluation.clustering import evaluate_clustering_model
 from ._evaluation.regression import evaluate_regression_model
+from ._evaluation.schemas import ModelEvaluationReport
+from ._sample_weights import validate_sample_weight
 from .cross_validation import perform_cross_validation
 from .fold_preprocessing import FoldPreprocessor
 
@@ -162,8 +166,16 @@ class BaseModelCalculator(ABC):
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
         """Trains the model and returns the fitted model artifact.
+
+        ``class_weight`` is a model setting in ``config["params"]`` for
+        supported classifiers. ``sample_weight`` is a separate vector aligned
+        with the rows of ``X`` and ``y``; it can also weight regression fits.
+        A tuner keeps class weights in ``base_model.params`` (or searches them
+        in ``search_space``) and slices row weights for each training fold.
 
         The return type is intentionally `Any` rather than a narrower
         TypeVar/Protocol: most calculators (see `sklearn_wrapper.py`) return a
@@ -199,6 +211,24 @@ class BaseModelApplier(ABC):
         Returns DataFrame where columns are classes.
         """
         return None
+
+
+def _fit_predict_weights(
+    dataset: SplitDataset, preprocessing: Any, raw_train: Any, raw_weights: Any
+) -> Any:
+    """Keep raw preprocessing weights separate from the processed dataset row axis."""
+    if preprocessing is None:
+        if raw_weights is not None:
+            raise ValueError("preprocessing_sample_weight requires preprocessing")
+        return dataset.train_sample_weight
+    if raw_train is None:
+        raise ValueError("preprocessing requires the preprocessing_train (X, y) payload")
+    if raw_weights is None and dataset.train_sample_weight is not None:
+        raise ValueError(
+            "preprocessing_sample_weight must supply original weights aligned with "
+            "preprocessing_train; processed dataset weights cannot be reused"
+        )
+    return validate_sample_weight(raw_weights, len(raw_train[0]))
 
 
 class StatefulEstimator:
@@ -262,9 +292,46 @@ class StatefulEstimator:
         progress_callback: Callable[[int, int], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         preprocessing: FoldPreprocessor | None = None,
+        *,
+        cv_nested_type: str = "auto",
+        group_column: str | None = None,
+        gap: int = 0,
+        test_size: int | None = None,
+        max_train_size: int | None = None,
+        inner_folds: int | None = None,
     ) -> dict[str, Any]:
         """Performs cross-validation on the training split."""
         X_train, y_train = self._extract_xy(dataset.train, target_column)
+        from ._policy_cv import (  # noqa: PLC0415 - avoid tuning import cycle
+            policy_config,
+        )
+        from ._tuning.cv_policy import (  # noqa: PLC0415 - avoid tuning import cycle
+            validate_holdout_metadata,
+        )
+
+        policy = policy_config(
+            cv_type,
+            n_folds,
+            shuffle,
+            random_state,
+            time_column,
+            {
+                "cv_nested_type": cv_nested_type,
+                "group_column": group_column,
+                "gap": gap,
+                "test_size": test_size,
+                "max_train_size": max_train_size,
+                "inner_folds": inner_folds,
+            },
+        )
+        for heldout in (dataset.test, dataset.validation):
+            if self._is_non_empty_split(heldout):
+                validate_holdout_metadata(
+                    X_train,
+                    self._extract_xy(heldout, target_column)[0],
+                    policy,
+                    self.calculator.problem_type,
+                )
 
         return perform_cross_validation(
             calculator=self.calculator,
@@ -280,6 +347,17 @@ class StatefulEstimator:
             progress_callback=progress_callback,
             log_callback=log_callback,
             preprocessing=preprocessing,
+            cv_nested_type=cv_nested_type,
+            group_column=group_column,
+            gap=gap,
+            test_size=test_size,
+            max_train_size=max_train_size,
+            inner_folds=inner_folds,
+            **(
+                {"sample_weight": dataset.train_sample_weight}
+                if dataset.train_sample_weight is not None
+                else {}
+            ),
         )
 
     @staticmethod
@@ -375,6 +453,8 @@ class StatefulEstimator:
         preprocessing_train: tuple[Any, Any] | None = None,
         preprocessing_validation: tuple[Any, Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
+        *,
+        preprocessing_sample_weight: Any = None,
     ) -> dict[str, pd.Series]:
         """Fits the model on training data and returns predictions for all splits.
 
@@ -386,10 +466,17 @@ class StatefulEstimator:
         dataset's (post-transform) splits. ``preprocessing_validation`` is
         the matching pre-transform validation payload for holdout tuning —
         ``dataset.validation`` is post-transform, so the refit cannot score
-        against it directly.
+        against it directly. ``preprocessing_sample_weight`` is the original
+        positional weight vector aligned with ``preprocessing_train``. It is
+        required when the processed dataset carries weights: processed rows may
+        have been reordered or filtered, so their weights cannot be reused.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
         dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
+
+        fit_weight = _fit_predict_weights(
+            dataset, preprocessing, preprocessing_train, preprocessing_sample_weight
+        )
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -416,6 +503,7 @@ class StatefulEstimator:
                 preprocessing=preprocessing,
                 validation_frames=preprocessing_validation,
                 iteration_callback=iteration_callback,
+                **({"sample_weight": fit_weight} if fit_weight is not None else {}),
             )
         else:
             self.model = self.calculator.fit(
@@ -426,6 +514,7 @@ class StatefulEstimator:
                 log_callback=log_callback,
                 validation_data=validation_data,
                 iteration_callback=iteration_callback,
+                **({"sample_weight": fit_weight} if fit_weight is not None else {}),
             )
 
         # 3. Predict on all splits
@@ -443,7 +532,7 @@ class StatefulEstimator:
             predictions["test"] = self.applier.predict(X_test, self.model)
 
         # Validation Predictions
-        if dataset.validation is not None:
+        if self._is_non_empty_split(dataset.validation):
             X_val = self._extract_split_features(dataset.validation, target_column)
             predictions["validation"] = self.applier.predict(X_val, self.model)
 
@@ -504,12 +593,44 @@ class StatefulEstimator:
                     reference_column,
                 )
 
+        self._attach_evaluation_coverage(dataset, splits_payload, evaluation_data)
+
         # Return report object (simplified for now, assuming schema matches)
         return {
             "problem_type": problem_type,
             "splits": splits_payload,
             "raw_data": evaluation_data,
         }
+
+    @staticmethod
+    def _attach_evaluation_coverage(
+        dataset: SplitDataset, reports: dict[str, Any], raw_data: dict[str, Any]
+    ) -> None:
+        """Expose eligible-row denominators, including splits completely excluded by filters."""
+        for name in ("train", "test", "validation"):
+            payload = getattr(dataset, name)
+            if payload is None:
+                continue
+            frame = payload[0] if isinstance(payload, tuple) else payload
+            coverage = deepcopy(dataset.evaluation_coverage.get(name))
+            if coverage is None:
+                coverage = record_coverage(len(frame), len(frame))
+            report = reports.get(name)
+            if report is None and coverage["excluded_rows"] != 0 and coverage["scored_rows"] == 0:
+                report = ModelEvaluationReport(
+                    dataset_name=name,
+                    metrics={},
+                    omitted_metrics={"evaluation": "No eligible rows remain after preprocessing."},
+                )
+                reports[name] = report
+                raw_data["splits"][name] = (
+                    {"labels": []}
+                    if raw_data["problem_type"] == "clustering"
+                    else {"y_true": [], "y_pred": []}
+                )
+            if report is not None:
+                report.coverage = coverage
+                raw_data["splits"].setdefault(name, {})["coverage"] = deepcopy(coverage)
 
     def _evaluate_split(
         self,
@@ -537,6 +658,7 @@ class StatefulEstimator:
         if problem_type != "clustering" and y is None:
             return None
 
+        X = self._evaluation_features(X)
         y_pred = self.applier.predict(X, self.model)
         model_to_evaluate = self._unwrap_tuned_model()
 
@@ -556,7 +678,9 @@ class StatefulEstimator:
         y_proba = self._predict_proba_payload(X, problem_type)
         evaluation_data["splits"][split_name] = self._build_split_raw_data(y, y_pred, y_proba)
 
-        return self._evaluate_split_with_model(model_to_evaluate, split_name, X, y, problem_type)
+        return self._evaluate_split_with_model(
+            model_to_evaluate, split_name, X, y, problem_type, predictions=y_pred
+        )
 
     @staticmethod
     def _build_split_raw_data(
@@ -570,6 +694,16 @@ class StatefulEstimator:
         if y_proba:
             split_data["y_proba"] = y_proba
         return split_data
+
+    def _evaluation_features(self, X: Any) -> Any:
+        """Exclude persisted split metadata from both predictions and metric evaluation."""
+        from ._tuning.cv_policy import (  # noqa: PLC0415 - avoid tuning import cycle
+            prediction_features,
+        )
+
+        if isinstance(self.model, tuple) and len(self.model) == 2:
+            return prediction_features(X, self.model[1])
+        return X
 
     @staticmethod
     def _build_clustering_split_raw_data(labels: Any, split_report: Any = None) -> dict[str, Any]:
@@ -621,6 +755,8 @@ class StatefulEstimator:
         y: Any,
         problem_type: str,
         reference_column: str = "",
+        *,
+        predictions: Any | None = None,
     ) -> Any:
         """Dispatches to the classification, regression, or clustering evaluator.
 
@@ -630,7 +766,11 @@ class StatefulEstimator:
         """
         if problem_type == "classification":
             return evaluate_classification_model(
-                model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
+                model=model_to_evaluate,
+                dataset_name=split_name,
+                X_test=X,
+                y_test=y,
+                predictions=predictions,
             )
         elif problem_type == "regression":
             return evaluate_regression_model(

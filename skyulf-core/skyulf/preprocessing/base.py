@@ -5,16 +5,28 @@ import time
 import tracemalloc
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
+from copy import deepcopy
+from importlib import import_module
 from typing import Any, Protocol, cast, runtime_checkable
 
 import pandas as pd
 import polars as pl
 
 from ..core.protocols import ApplierProtocol, CalculatorProtocol
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
+from ..modeling._sample_weights import validate_sample_weight
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._schema import SkyulfSchema
+from ._weight_policy import (
+    apply_weighted,
+    has_builtin_row_mapping,
+    is_sampling_applier,
+    validate_training_representation,
+    validate_weighted_components,
+    validate_weighted_transformer,
+)
 
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
 # so callers see the concrete return type. Bound to Mapping (not Dict) so
@@ -184,6 +196,7 @@ class StatefulTransformer:
         self.peak_memory_bytes: int = 0
         self.rows_in: int = 0
         self.rows_out: int = 0
+        self.train_sample_weight_: Any = None
 
     def fit_transform(
         self,
@@ -199,6 +212,7 @@ class StatefulTransformer:
         attributed to this step and tracing is left running; otherwise it is
         started here and stopped again on exit.
         """
+        validate_weighted_transformer(dataset, self.calculator, self.applier)
         self.rows_in, _ = get_data_stats(dataset)
         tracing_was_active = tracemalloc.is_tracing()
         if not tracing_was_active:
@@ -244,6 +258,39 @@ class StatefulTransformer:
             return self._apply_guarded(data, self.params)
         return self.applier.apply(data, self.params)
 
+    def fit_transform_weighted(self, data: Any, config: Any, weights: Any) -> tuple[Any, Any]:
+        """Fit on real targets and propagate weights through the actual row selection."""
+        if weights is None:
+            return self._fit_and_apply_training_data(data, config), None
+        validate_weighted_components(self.calculator, self.applier)
+        weights = validate_sample_weight(weights, len(unpack_pipeline_input(data)[0]))
+        resampling = import_module("skyulf.preprocessing.resampling")
+
+        if type(self.calculator) in (
+            resampling.OversamplingCalculator,
+            resampling.UndersamplingCalculator,
+        ):
+            helper = import_module("skyulf.preprocessing._weighted_resampling")
+
+            self.params, transformed, weights = helper.fit_resample_weighted(
+                self.calculator, self.applier, data, config, weights
+            )
+            return transformed, weights
+        if has_builtin_row_mapping(self.applier):
+            self.params = cast(dict[str, Any], self.calculator.fit(data, config))
+            return apply_weighted(
+                self.applier, data, self.params | {"_history_training": True}, weights
+            )
+        if isinstance(self.calculator, TrainTransformCalculatorProtocol):
+            validate_training_representation(self.calculator, self.applier)
+            transformed = self._fit_and_apply_training_data(data, config)
+
+            return transformed, validate_sample_weight(
+                weights, len(unpack_pipeline_input(transformed)[0])
+            )
+        self.params = cast(dict[str, Any], self.calculator.fit(data, config))
+        return apply_weighted(self.applier, data, self.params, weights)
+
     def _fit_transform_inner(
         self,
         dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple,
@@ -266,7 +313,9 @@ class StatefulTransformer:
             return self._fit_and_apply_training_data(dataset, config, guard_split_output=False)
 
         # 1. Calculate on Train
-        new_train = self._fit_and_apply_training_data(dataset.train, config)
+        new_train, train_weight = self.fit_transform_weighted(
+            dataset.train, config, dataset.train_sample_weight
+        )
 
         # 2. Apply fitted params to held-out splits only
         new_test = dataset.test
@@ -277,7 +326,39 @@ class StatefulTransformer:
         if self.apply_on_validation and dataset.validation is not None:
             new_val = self._apply_guarded(dataset.validation, self.params)
 
-        return SplitDataset(train=new_train, test=new_test, validation=new_val)
+        return SplitDataset(
+            train=new_train,
+            test=new_test,
+            validation=new_val,
+            train_sample_weight=train_weight,
+            evaluation_coverage=self._evaluation_coverage(dataset, new_test, new_val),
+        )
+
+    def _evaluation_coverage(
+        self, dataset: SplitDataset, new_test: Any, new_val: Any
+    ) -> dict[str, dict[str, Any]]:
+        """Carry held-out denominators across nodes without storing row-level data."""
+        coverage = deepcopy(dataset.evaluation_coverage)
+        for name, result in (("test", new_test), ("validation", new_val)):
+            original = getattr(dataset, name)
+            if original is None or result is None:
+                continue
+            before = len(unpack_pipeline_input(original)[0])
+            after = len(unpack_pipeline_input(result)[0])
+            previous = coverage.get(name, record_coverage(before, before))
+            steps = list(previous.get("steps", []))
+            if before != after:
+                steps.append(
+                    {"name": self.node_id, **record_coverage(before, after, step_name=self.node_id)}
+                )
+            coverage[name] = record_coverage(
+                previous["input_rows"],
+                after,
+                steps,
+                reason=previous.get("reason"),
+                step_name=self.node_id,
+            )
+        return coverage
 
     def _apply_guarded(self, data: Any, params: dict[str, Any]) -> Any:
         """Apply the applier to `data` and raise if it produces a nested SplitDataset."""
@@ -292,7 +373,16 @@ class StatefulTransformer:
         self, dataset: SplitDataset, params: dict[str, Any]
     ) -> SplitDataset:
         """Apply the applier to each split (train/test/validation) of a SplitDataset."""
-        new_train = self._apply_guarded(dataset.train, params)
+        validate_weighted_transformer(dataset, self.calculator, self.applier)
+        if is_sampling_applier(self.applier):
+            return dataset
+        if dataset.train_sample_weight is None:
+            new_train, train_weight = self._apply_guarded(dataset.train, params), None
+        else:
+            weights = validate_sample_weight(
+                dataset.train_sample_weight, len(unpack_pipeline_input(cast(Any, dataset.train))[0])
+            )
+            new_train, train_weight = apply_weighted(self.applier, dataset.train, params, weights)
 
         new_test = dataset.test
         if self.apply_on_test:
@@ -302,7 +392,13 @@ class StatefulTransformer:
         if self.apply_on_validation and dataset.validation is not None:
             new_val = self._apply_guarded(dataset.validation, params)
 
-        return SplitDataset(train=new_train, test=new_test, validation=new_val)
+        return SplitDataset(
+            train=new_train,
+            test=new_test,
+            validation=new_val,
+            train_sample_weight=train_weight,
+            evaluation_coverage=self._evaluation_coverage(dataset, new_test, new_val),
+        )
 
     def transform(
         self, dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple
@@ -312,7 +408,9 @@ class StatefulTransformer:
         Input detection mirrors :meth:`_fit_transform_inner` so a bare frame or
         an ``(X, y)`` tuple goes straight to the applier, while a
         ``SplitDataset`` is applied split-by-split honouring
-        ``apply_on_test``/``apply_on_validation``. Calling this before any
+        ``apply_on_test``/``apply_on_validation``. Built-in resamplers leave
+        ``SplitDataset`` unchanged during replay, with or without weights.
+        Calling this before any
         :meth:`fit_transform` hands the applier an empty params dict rather
         than raising.
         """

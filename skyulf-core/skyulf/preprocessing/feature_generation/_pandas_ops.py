@@ -90,7 +90,7 @@ def _pandas_divide(
     for s in others:
         res = _safe_divide(res, s, epsilon)
     for c in const_vals:
-        denom = c if abs(c) > epsilon else epsilon
+        denom = c if abs(c) >= epsilon else -epsilon if c < 0 else epsilon
         res = res.div(denom)
     return res
 
@@ -137,7 +137,9 @@ def _pandas_similarity(op: dict[str, Any], df_out: Any, _eps: float) -> pd.Serie
     if pair is None:
         return None
     col_a, col_b = pair
-    return _vectorised_similarity(df_out[col_a], df_out[col_b], op.get("method") or "ratio")
+    return _vectorised_similarity(
+        df_out[col_a], df_out[col_b], op.get("method") or "ratio", op.get("similarity_backend")
+    )
 
 
 def _pandas_season(d: Any) -> Any:
@@ -153,6 +155,15 @@ def _pandas_time_of_day(d: Any) -> Any:
     return pd.Series(np.select(conditions, choices, default=TIME_OF_DAY_DEFAULT), index=d.index)
 
 
+def _pandas_is_weekend(d: Any) -> Any:
+    """Preserve missing dates while retaining the existing dtype for fully observed batches."""
+    result = (d.dt.dayofweek >= 5).astype(int)
+    missing = d.isna()
+    if missing.any():
+        result = result.astype("Int64").mask(missing)
+    return result
+
+
 _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "year": lambda d: d.dt.year,
     "month": lambda d: d.dt.month,
@@ -162,7 +173,7 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "second": lambda d: d.dt.second,
     "quarter": lambda d: d.dt.quarter,
     "weekday": lambda d: d.dt.dayofweek,
-    "is_weekend": lambda d: (d.dt.dayofweek >= 5).astype(int),
+    "is_weekend": _pandas_is_weekend,
     "week": lambda d: d.dt.isocalendar().week.astype("Int64"),
     "month_name": lambda d: d.dt.month_name(),
     "day_name": lambda d: d.dt.day_name(),

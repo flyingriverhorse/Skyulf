@@ -1,0 +1,14 @@
+{
+  "_help": [
+    "WHAT: an asset is a small data file your own code reads, e.g. a lookup table city -> region. Most projects need none; then keep files as [].",
+    "NOT FOR LEARNED VALUES: averages, encodings or scaler values are learned and saved automatically by fitted steps. Do not put them here.",
+    "STEP 1: create the file inside src/features, e.g. src/features/assets/city_region.json with {\"London\": \"UK\", \"Vilnius\": \"LT\"}.",
+    "STEP 2: list its path below, relative to src/features: \"files\": [\"assets/city_region.json\"].",
+    "STEP 3: read it in your custom code: json.loads(read_project_asset(__package__, \"assets/city_region.json\")) with from skyulf.inference.project_package import read_project_asset. The path always starts at src/features, also from custom/ files.",
+    "READY-MADE EXAMPLES (commented out): Example 4 in custom/preprocessing_custom.py (a new column) and Example 4 in custom/pre_split_custom.py (a row filter). Listing a file here does not run anything by itself; a step in a recipe must use it.",
+    "SAVED WITH THE MODEL: the file content is stored in the model. Editing the file later does not change existing models; train again to use the new content.",
+    "LIMITS: small trusted files only. Code plus assets must fit 64 KiB. No absolute paths, '..', symlinks or Python files. The older format [\"assets/city_region.json\"] also works.",
+    "PACKAGES: assets do not install libraries. Put exact pins in requirements.txt and install them in the job environments."
+  ],
+  "files": []
+}

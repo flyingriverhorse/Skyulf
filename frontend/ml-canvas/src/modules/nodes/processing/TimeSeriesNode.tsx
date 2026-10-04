@@ -15,6 +15,7 @@ interface TimeSeriesConfig {
   // Ordering / grouping (shared by lag + rolling)
   sort_by?: string | undefined;
   group_by?: string[] | undefined;
+  history_mode?: 'batch' | 'carry';
   // Lag
   lags?: number[] | undefined;
   drop_na?: boolean | undefined;
@@ -132,11 +133,30 @@ function LagSettings({ config, update }: { config: TimeSeriesConfig; update: Upd
       <input
         type="checkbox"
         checked={config.drop_na ?? false}
+        disabled={config.history_mode === 'carry'}
         onChange={e => { update({ drop_na: e.target.checked }); }}
       />
       Drop rows with NaN introduced by shifting
     </label>
   </div>
+  );
+}
+
+function HistorySettings({ config, update }: { config: TimeSeriesConfig; update: UpdateFn }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs font-medium" htmlFor="temporal-history-mode">Prediction history</label>
+      <select id="temporal-history-mode" className="w-full p-1.5 border rounded bg-background text-xs"
+        value={config.history_mode ?? 'batch'}
+        onChange={e => { update({ history_mode: e.target.value as 'batch' | 'carry', drop_na: false }); }}>
+        <option value="batch">Current batch only</option>
+        <option value="carry">Continue from training history</option>
+      </select>
+      {config.history_mode === 'carry' && <p className="text-xs text-muted-foreground">
+        Place after the train/test split. Select a time column and use chronological splits/CV.
+        Each entity keeps its own recent observations. Later prediction batches need the previous successful history state.
+      </p>}
+    </div>
   );
 }
 
@@ -259,7 +279,10 @@ function TimeSeriesSettings({ config, onChange, nodeId }: {
 
       <div className="space-y-3">
         {config.method !== 'date' && (
-          <OrderingSelectors config={config} allColumns={allColumns} update={update} />
+          <>
+            <OrderingSelectors config={config} allColumns={allColumns} update={update} />
+            <HistorySettings config={config} update={update} />
+          </>
         )}
         {config.method === 'lag' && <LagSettings config={config} update={update} />}
         {config.method === 'rolling' && <RollingSettings config={config} update={update} />}
@@ -303,6 +326,13 @@ function validateMethodSettings(config: TimeSeriesConfig): { isValid: boolean; m
 function validateTimeSeries(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
   if ((config.columns?.length ?? 0) === 0)
     return { isValid: false, field: 'columns', message: 'Select at least one column' };
+  if (config.method !== 'date' && config.history_mode === 'carry') return validateHistorySettings(config);
+  return validateMethodSettings(config);
+}
+
+function validateHistorySettings(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
+  if (!config.sort_by) return { isValid: false, field: 'sort_by', message: 'Select a time column for prediction history' };
+  if (config.drop_na) return { isValid: false, field: 'drop_na', message: 'Use imputation to preserve prediction rows with history' };
   return validateMethodSettings(config);
 }
 

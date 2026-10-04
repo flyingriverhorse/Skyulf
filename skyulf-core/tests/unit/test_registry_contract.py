@@ -22,6 +22,7 @@ import polars as pl
 import pytest
 
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+from skyulf.preprocessing.function_steps import function_ref
 from skyulf.registry import NodeRegistry
 
 # ---------------------------------------------------------------------------
@@ -97,10 +98,12 @@ _COLUMN_HINTS: dict[str, dict[str, Any]] = {
     "SimpleImputer": {"columns": _NUM, "strategy": "mean"},
     "KNNImputer": {"columns": _NUM, "n_neighbors": 3},
     "IterativeImputer": {"columns": _NUM},
+    "GroupImputer": {"columns": _NUM, "group_by": "cat_a", "strategy": "mean"},
     # Outliers (row-dropping)
     "IQR": {"columns": _NUM},
     "ZScore": {"columns": _NUM},
     "Winsorize": {"columns": _NUM},
+    "ClipValues": {"bounds": {"num_a": {"lower": -1.0, "upper": 1.0}, "num_b": {"upper": 6}}},
     "ManualBounds": {"columns": _NUM, "lower_bound": -10, "upper_bound": 10},
     "EllipticEnvelope": {"columns": ["num_a", "num_b"], "contamination": 0.1},
     # Bucketing
@@ -173,6 +176,41 @@ _COLUMN_HINTS: dict[str, dict[str, Any]] = {
     "H3Index": {"lat_col": "lat1", "lon_col": "lon1", "resolution": 5},
 }
 
+
+def _contract_ratio(df):
+    """Column function used to exercise ColumnFunction under the contract."""
+    return df["num_a"] / df["num_b"]
+
+
+def _contract_learn_mean(df, y):
+    """Learn function used to exercise FittedFunction under the contract."""
+    return {"mean": df["num_a"].mean()}
+
+
+def _contract_fill_mean(df, state):
+    """Apply function that fills NaN with the learned mean."""
+    return df["num_a"].fillna(state["mean"])
+
+
+def _contract_keep(df):
+    """Row filter keeping missing values and values above -0.5."""
+    return df["num_a"].isna() | (df["num_a"] > -0.5)
+
+
+# Function nodes have no meaningful defaults: they need a user function.
+_COLUMN_HINTS.update(
+    {
+        "ColumnFunction": {"function": function_ref(_contract_ratio), "output": ["ratio"]},
+        "FittedFunction": {
+            "learn": function_ref(_contract_learn_mean),
+            "apply": function_ref(_contract_fill_mean),
+            "output": ["num_a"],
+            "replace": True,
+        },
+        "RowFilterFunction": {"function": function_ref(_contract_keep), "columns": ["num_a"]},
+    }
+)
+
 # ---------------------------------------------------------------------------
 # Nodes that need tuple input or external libraries not worth pulling in here.
 # ---------------------------------------------------------------------------
@@ -220,6 +258,7 @@ _ROW_DROPPING: set[str] = {
     "EllipticEnvelope",
     "Deduplicate",
     "DropMissingRows",
+    "RowFilterFunction",
 }
 
 # ---------------------------------------------------------------------------

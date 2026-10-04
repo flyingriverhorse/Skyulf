@@ -124,3 +124,37 @@ def test_split_dataset_input_resolves_to_train_frame():
 def test_frameless_payload_is_ignored():
     payload = (np.array([[1.0, 2.0]]), np.array([0]))
     _runner()._assert_numeric_training_frame(_node(), payload, "target", {})
+
+
+@pytest.mark.parametrize(
+    "policy,column", [("time_series_split", "cv_time_column"), ("group_k_fold", "cv_group_column")]
+)
+def test_nested_split_metadata_is_preserved_and_excluded_from_features(policy, column):
+    """String split identifiers must reach Core without becoming estimator features."""
+    frame = pd.DataFrame({"metadata": ["a", "b"], "f1": [1.0, 2.0], "target": [0, 1]})
+    params = {"cv_type": "nested_cv", "cv_nested_type": policy, column: "metadata"}
+    _runner()._assert_numeric_training_frame(_node(), frame, "target", params)
+    assert frame["metadata"].tolist() == ["a", "b"]
+
+
+@pytest.mark.parametrize(
+    "policy,column", [("group_k_fold", "cv_group_column"), ("time_series_split", "cv_time_column")]
+)
+def test_policy_holdout_rejects_overlapping_original_split(policy, column):
+    """Invalid supplied final splits must fail before search or estimator fitting."""
+    from skyulf.data.dataset import SplitDataset
+
+    train = pd.DataFrame({"metadata": [1, 2], "x": [1.0, 2.0]})
+    held = pd.DataFrame({"metadata": [2, 3], "x": [3.0, 4.0]})
+    if policy == "time_series_split":
+        train["metadata"] = pd.to_datetime(["2026-01-01", "2026-01-02"])
+        held["metadata"] = pd.to_datetime(["2026-01-02", "2026-01-03"])
+    data = SplitDataset(train=train, test=held, validation=None)
+    params = {
+        "cv_enabled": True,
+        "cv_type": "nested_cv",
+        "cv_nested_type": policy,
+        column: "metadata",
+    }
+    with pytest.raises(ValueError, match="holdout"):
+        _runner()._validate_policy_holdouts(data, params, "regression")

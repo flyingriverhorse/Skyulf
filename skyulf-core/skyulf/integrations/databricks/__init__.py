@@ -1,5 +1,7 @@
 """Optional Databricks batch and Delta integrations."""
 
+from typing import TYPE_CHECKING, Any
+
 from .batch import BatchResult, BatchSpec, run_batch
 from .local_batch import (
     LocalScoreResult,
@@ -32,9 +34,41 @@ from .local_sdk import (
 )
 from .training_dates import TrainingDateSpec
 
+if TYPE_CHECKING:
+    from .local_branches import (
+        BranchTrainingResult,
+        TrainingBranch,
+        branch_training_payload,
+        prepare_training_branches,
+        restore_training_branches,
+        train_local_branches,
+    )
+
+_BRANCH_EXPORTS = {
+    "BranchTrainingResult",
+    "TrainingBranch",
+    "branch_training_payload",
+    "prepare_training_branches",
+    "restore_training_branches",
+    "train_local_branches",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Load training orchestration only after low-level alias imports have finished."""
+    if name not in _BRANCH_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from . import local_branches  # noqa: PLC0415 - avoid promotion/admission import cycle
+
+    value = getattr(local_branches, name)
+    globals()[name] = value
+    return value
+
+
 __all__ = [
     "BatchResult",
     "BatchSpec",
+    "BranchTrainingResult",
     "IncrementalBatchResult",
     "InputSource",
     "LocalWorkflowConfig",
@@ -49,16 +83,21 @@ __all__ = [
     "PreflightResult",
     "PreparedLocalWorkflow",
     "TrainingDateSpec",
+    "TrainingBranch",
+    "branch_training_payload",
     "evaluate_local_holdout",
     "fit_local_workflow",
     "preflight_local",
     "prepare_local_workflow",
+    "prepare_training_branches",
     "read_local_source",
     "read_training_snapshot",
+    "restore_training_branches",
     "run_batch",
     "run_incremental_local_batch",
     "run_local_batch",
     "score_local_source",
     "split_labeled_snapshot",
     "train_local_candidate",
+    "train_local_branches",
 ]

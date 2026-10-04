@@ -1,7 +1,7 @@
 # SM-36g: nested temporal cross-validation
 
-Date: 2026-09-27. Status: READY; requested, not implemented.
-Dependency: SM-36f true nested tuning. No implementation is included in this task.
+Date: 2026-09-27. Completed: 2026-09-28. Status: DONE for documented scope.
+Dependency: SM-36f true nested tuning. Implementation and acceptance are recorded below.
 
 ## Outcome
 
@@ -37,3 +37,12 @@ Keep ordinary Time Series CV and current stratified/KFold nested behavior intact
   replay and persisted evidence. Run bounded pandas/Polars cases on Databricks.
 - Update user documentation and record exact passed/failed/skipped evidence before
   changing this task to DONE.
+
+## Completion evidence
+
+Implemented across Core/backend/Canvas/Bundle, with real nested selection and
+saved evidence. Final changed-feature suite: 291 passed; frontend: 134 passed;
+three generated bundles passed strict CLI validation. Databricks: 16/16 cases,
+384 replay predictions and independent persisted SHA verification.
+See [combined acceptance and limitations](101-sm36ghi-nested-policy-acceptance.md).
+Nested changes are included in the delivery commit; baseline graph commit is 42bc0d37.

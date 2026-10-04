@@ -90,7 +90,7 @@ These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tu
 | `cv_folds` | `int` | `5` | Number of CV folds |
 | `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
 | `cv_time_column` | `str\|null` | `null` | Column name to sort by when using `time_series_split`. Auto-detects datetime column if omitted |
-| `tune_threshold` | `bool` | `false` | After tuning a binary classifier, select the decision threshold that maximises `metric` on the validation split and apply it in predictions. See [Threshold Tuning](threshold_tuning.md#integrated-with-hyperparameter-tuning) |
+| `tune_threshold` | `bool` | `false` | Select a binary decision threshold using validation data for ordinary tuning, or inner OOF predictions for nested tuning, and apply it in predictions. See [Threshold Tuning](threshold_tuning.md#integrated-with-hyperparameter-tuning) |
 | `progress` | `bool` | `false` | Console trial progress for core-only runs (see [Built-in console progress](#built-in-console-progress-no-callback-needed)). Ignored when you pass your own `progress_callback` |
 
 ## Strategy-specific params
@@ -134,8 +134,15 @@ it never repeats observations through an artificial epoch loop.
 
 A single validation holdout has no remaining fold to skip. Such searches need
 an eligible iteration hook; otherwise pruning is disabled with a reason.
-An explicitly supplied validation split takes precedence over tuning CV,
-including when a later evaluation is configured to use cross-validation.
+For ordinary KFold/stratified KFold/ShuffleSplit tuning, an explicitly supplied
+validation split takes precedence over tuning CV. Explicit group policies and
+temporal policies with configured gap/window sizes retain their training-only
+CV boundaries; the separate validation split does not select their parameters.
+Carry-history preprocessing also retains its required temporal split policy.
+Nested tuning reserves the separate split and uses training-only inner CV.
+When enabled, ordinary post-fit threshold tuning can still use validation data;
+that population is therefore not an untouched final test set. Keep final test
+rows separate from parameter and threshold selection.
 `none` or `pruning=false` retains ordinary fitting. Only fully evaluated,
 finite-scoring trials are eligible for best parameters and final refit. Pruned
 trial scores are not shown as completed CV means; if none completes, tuning
@@ -175,9 +182,17 @@ unconfirmed because support cannot be established without executing that graph.
 | `shuffle_split` | When you want random train/test splits per fold |
 | `nested_cv` | Unbiased evaluation — outer loop for generalization, inner loop for hyperparameter stability |
 
-> **Nested CV** runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at `n_folds - 1`) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.
->
-> **With tuning enabled (`run_mode: "advanced"`):** When `nested_cv` is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses `stratified_k_fold` (classification) or `k_fold` (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.
+**Nested CV** repeats the selected tuning strategy inside each outer training
+partition, refitting preprocessing inside every inner fold. The outer fold only
+evaluates its independently selected recipe. A separate search over all training
+rows selects the deployable model. Search budgets apply separately to each search.
+
+Use `cv_inner_folds` for the inner count and `cv_nested_type` for task-automatic,
+K-Fold, stratified, temporal, group or stratified-group policies. Temporal/group
+metadata is excluded from model features and checked at both levels. Binary
+`tune_threshold=True` selects thresholds from inner OOF predictions, with an
+independent final threshold; final holdout labels cannot select it.
+See [Cross-Validation](cross_validation.md#nested-cv) for boundaries and controls.
 
 ### Time column for Time Series Split
 

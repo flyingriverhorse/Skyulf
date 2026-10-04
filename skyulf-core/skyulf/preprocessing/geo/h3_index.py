@@ -44,7 +44,10 @@ def _h3_cell_or_none(lat: Any, lon: Any, h3: Any, resolution: int) -> Any:
     if pd.isna(lat) or pd.isna(lon):
         return None
     try:
-        return h3.latlng_to_cell(float(lat), float(lon), resolution)
+        latitude, longitude = float(lat), float(lon)
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            return None
+        return h3.latlng_to_cell(latitude, longitude, resolution)
     except (ValueError, TypeError):
         return None
 

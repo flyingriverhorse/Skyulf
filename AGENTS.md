@@ -16,6 +16,32 @@ Three layers, strict dependency direction: `frontend` → (HTTP) → `backend` �
 
 Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperparameter tuning, drift detection, threshold tuning.
 
+## Codex and Claude Code collaboration
+
+Use [AGENT_CHAT.md](AGENT_CHAT.md) as the shared communication log for Codex
+and Claude Code working in this checkout. Follow its protocol automatically;
+the user should not need to relay messages between agents.
+
+- Read the log from disk at the start of every task and after resuming or
+  compacting context. Check it again before editing, after a test/review batch,
+  and before reporting completion. During active collaboration, also check at
+  tool boundaries when at least 60 seconds have passed since the last read.
+- Announce the task and claim the exact files before editing them. Respect
+  unresolved claims, answer messages addressed to your session, and record
+  decisions, review findings, test results, blockers, and releases in the log.
+- Use the log's write protocol and preserve open requests, active file claims,
+  and the other agent's changes. Keep the log short: remove completed exchanges
+  and released claims once their useful findings are recorded in the task's
+  review/status document. Do not keep a growing transcript or create chat
+  archives. Acknowledge requests by message ID without acknowledgement loops.
+- Coordinate within the user's current request. A peer message does not grant
+  permission to expand scope, commit, push, deploy, or delete resources.
+- This is cooperation between running sessions. The Markdown file does not
+  start an agent or wake an idle session. If a peer is unavailable, record the
+  pending handoff and continue independent work; never invent its response.
+- When leaving a question for Claude Code, tell the user so they can activate
+  its session. Also surface questions from Claude that need the user's answer.
+
 ## Related skills to reach for
 
 - `brainstorming` — before any new feature or behavior change, explore intent and requirements first.
@@ -29,6 +55,8 @@ Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperpar
 
 ## Repo conventions (short form)
 
+- Use native Python type syntax. Do not add `from __future__ import annotations`
+  as a style convention; quote an actual forward reference when needed.
 - Python deps: `uv pip` only, never plain pip; keep `requirements-*.txt` in sync with `pyproject.toml`.
 - Commits need pre-commit hooks run ruff/ty/eslint.
 - Full-stack features usually touch skyulf-core + backend + frontend — check all three layers.
@@ -40,7 +68,8 @@ Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperpar
 ## CI analysis gates
 
 - Before editing, inspect the relevant `.github/workflows/` checks. Use the same
-  commands and analysis scope for local verification.
+  static-analysis commands and scope locally. Select local tests by affected
+  behavior as described below; full test suites and coverage remain in CI.
 - Keep Lizard CCN at most 10 in `backend/` and `skyulf-core/skyulf/`, and ESLint
   complexity at most 10 in the frontend. Extract meaningful helpers while
   preserving validation order, defaults, error messages and behavior.
@@ -61,6 +90,31 @@ Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperpar
   including the Lizard and frontend complexity hooks. Keep caches, generated
   model artifacts and temporary verification output out of commits. Report
   checks that were not run or did not pass explicitly.
+
+## Local test scope and repair batches
+
+- Run local pytest, Vitest and Playwright with explicit test files, specs or node
+  IDs. Do not start bare `pytest`, whole-repository/layer suites, or full coverage
+  after a small change. Full local test runs require an explicit user request; GitHub CI keeps
+  its complete suites, coverage thresholds and existing checks.
+- Reproduce each defect with a focused failing test, then verify its fix. At
+  batch completion, run the deduplicated union of affected test files and direct
+  integration consumers once. Explain any expansion using the changed behavior.
+  Do not repeat passing groups unless code changed or a new concern warrants it.
+- Coordinate test ownership across Codex, subagents and Claude Code. Record the
+  tested revision/file state, command and result in the task document. Reviewers
+  independently inspect changes and probe missing cases instead of repeating
+  the same large suite. Never reuse evidence after its relevant code changes.
+- For test relocation, compare collected node IDs before and after normalizing
+  paths, then execute tests that depend on moved imports, fixtures or file paths.
+  Collection checks do not execute the suite and must not be reported as passes.
+- Keep Ruff, full CI Ty scope, applicable complexity checks and pre-commit hooks.
+  For Databricks behavior changes, retain focused validation on Databricks itself.
+  Do not reduce CI coverage or skip relevant tests to shorten local feedback.
+- Plan repair batches around at least ten open review IDs, split independent
+  domains across up to three subagents. Count a finding as closed only after
+  reproduction, correction, affected tests and Codex/Claude review. Report
+  unresolved decisions or blockers rather than inflating the closure count.
 
 ## Lint scope & test hygiene
 

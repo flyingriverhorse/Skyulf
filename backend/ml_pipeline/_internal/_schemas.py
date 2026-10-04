@@ -12,6 +12,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ValidationError, model_validator
 
 from backend.ml_pipeline._internal._advisor import Recommendation
+from backend.ml_pipeline._internal._code_only_nodes import reject_code_only_steps
 from backend.ml_pipeline._internal._numeric_validation import validate_node_numbers
 
 
@@ -45,8 +46,9 @@ class NodeConfigModel(BaseModel):
 
     @model_validator(mode="after")
     def validate_numeric_controls(self) -> "NodeConfigModel":
-        """Reject invalid explicit numeric controls before a job can be queued."""
+        """Reject code-only steps and invalid numeric controls before a job can be queued."""
         try:
+            reject_code_only_steps(self.step_type, self.params)
             validate_node_numbers(self.step_type, self.params)
         except ValueError as exc:
             # Echoing NaN/Infinity in a validation error breaks JSON responses.

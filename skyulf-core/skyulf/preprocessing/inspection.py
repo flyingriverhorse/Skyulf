@@ -42,6 +42,7 @@ def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> dict[str, dict[
 
 def _profile_fit_polars(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
     """Describe every supported numeric dtype, independent of observed cardinality."""
+    X = X.fill_nan(None)
     profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),

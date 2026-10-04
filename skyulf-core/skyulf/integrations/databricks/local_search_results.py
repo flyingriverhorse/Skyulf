@@ -1,8 +1,7 @@
 """Admit actual search folds and report bounded local tuning results."""
 
-from __future__ import annotations
-
 import hashlib
+import json
 import math
 from dataclasses import replace
 from typing import Any
@@ -13,9 +12,9 @@ import polars as pl
 from sklearn.model_selection import ShuffleSplit
 
 from ...inference.local_pipeline import LocalPipelineArtifact
-from ...modeling._tuning.schemas import TuningResult
+from ...modeling._tuning.schemas import TuningConfig, TuningResult
 from ...registry import NodeRegistry
-from .local_cv import LocalCVSpec, _validate_fold_membership, evaluate_training_cv
+from .local_cv import LocalCVSpec, evaluate_training_cv, validate_fold_membership
 
 
 def validate_search_membership(
@@ -43,7 +42,7 @@ def validate_search_membership(
                     "Each search fold needs at least two training and validation rows."
                 )
         return
-    _validate_fold_membership(frame, cv, target_column, problem_type, event_column)
+    validate_fold_membership(frame, cv, target_column, problem_type, event_column)
 
 
 def _json_value(value: Any) -> Any:
@@ -104,6 +103,8 @@ def tuning_evidence(artifact: LocalPipelineArtifact) -> dict[str, Any] | None:
         "best_score": result.best_score,
         "best_params": _json_value(result.best_params),
         "n_trials": result.n_trials,
+        "decision_thresholds": _json_value(result.decision_thresholds),
+        "decision_threshold_metric": result.decision_threshold_metric,
         "trials": trials,
     }
     if getattr(result, "nested_cv", None) is not None:
@@ -116,6 +117,46 @@ def tuning_evidence(artifact: LocalPipelineArtifact) -> dict[str, Any] | None:
     return evidence
 
 
+def parameter_preview(value: Any, section: str, *, artifact_file: str = "tuning.json") -> str:
+    """Keep parameter previews small while pointing to their complete artifact."""
+    encoded = json.dumps(value, sort_keys=True, ensure_ascii=False, allow_nan=False)
+    if len(encoded.encode("utf-8")) > 500:
+        return f"See {artifact_file}: {section} (value exceeds parameter preview limit)"
+    return encoded
+
+
+def tuning_run_params(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Expose effective search settings and final selected parameters in Experiments.
+
+    Requested trials are a configured budget; tuning_trials is the actual count
+    reported by Core. For nested CV, best_params belongs to the final search on
+    all training rows, while outer-fold selections remain in tuning.json.
+    """
+    modeling = evidence["modeling"]
+    defaults = TuningConfig()
+    params = {
+        "tuning_strategy": modeling["strategy"],
+        "tuning_metric": evidence["scoring_metric"],
+        "tuning_trials": evidence["n_trials"],
+        "tuning_model_type": modeling["base_model"]["type"],
+        "tuning_requested_metric": evidence["requested_metric"],
+        "tuning_requested_trials": modeling.get("n_trials", defaults.n_trials),
+    }
+    for name in ("timeout", "random_state", "n_jobs", "parallel_backend", "tune_threshold"):
+        params[f"tuning_{name}"] = modeling.get(name, getattr(defaults, name))
+    if "max_candidates" in modeling:
+        params["tuning_max_candidates"] = modeling["max_candidates"]
+    for name in ("strategy_params", "search_space"):
+        params[f"tuning_{name}"] = parameter_preview(modeling.get(name, {}), f"modeling.{name}")
+    params["tuning_best_params"] = parameter_preview(evidence["best_params"], "best_params")
+    for name, value in evidence["best_params"].items():
+        key = f"tuning_best_params.{name}"
+        # Long names remain available in the complete artifact and summary above.
+        if len(key) <= 250:
+            params[key] = parameter_preview(value, f"best_params.{name}")
+    return params
+
+
 def post_selection_cv(
     frame: pd.DataFrame | pl.DataFrame,
     artifact: LocalPipelineArtifact,
@@ -123,6 +164,7 @@ def post_selection_cv(
     *,
     target_column: str,
     event_column: str | None = None,
+    sample_weight: Any = None,
 ) -> dict[str, Any] | None:
     """Return stored nested search scores, retaining diagnostics for legacy artifacts."""
     modeling = artifact.pipeline.config.get("modeling", {})
@@ -132,6 +174,8 @@ def post_selection_cv(
     assert evidence is not None
     if evidence.get("nested_cv") is not None:
         return evidence["nested_cv"]
+    if cv.nested_type != "auto":
+        raise ValueError("Fitted search lacks evidence for the requested nested split policy.")
     selected = dict(modeling["base_model"])
     selected["params"] = {**selected.get("params", {}), **evidence["best_params"]}
     selected["params"].pop("tune_base_models", None)
@@ -149,7 +193,11 @@ def post_selection_cv(
         else frame.loc[:, input_columns]
     )
     report = evaluate_training_cv(
-        training_features, fixed_pipeline, fixed_cv, target_column=target_column
+        training_features,
+        fixed_pipeline,
+        fixed_cv,
+        target_column=target_column,
+        sample_weight=sample_weight,
     )
     assert report is not None
     return {

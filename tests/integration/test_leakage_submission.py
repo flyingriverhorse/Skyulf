@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.database.engine import get_async_session
+from backend.ml_pipeline._internal._code_only_nodes import code_only_step_types
 from backend.ml_pipeline._internal._routers import run_pipeline as run_pipeline_mod
 from skyulf.registry import NodeRegistry
 
@@ -196,6 +197,12 @@ def test_json_transformer_submission_matrix(
 
     response = client.post("/pipeline/run", json=payload)
 
+    if node_type in code_only_step_types():
+        # Function nodes run project Python; the API rejects them in any placement.
+        assert response.status_code == 422
+        assert node_type in str(response.json()["detail"])
+        submit.assert_not_awaited()
+        return
     blocked = learned and placement != "after_split" and mode == "raise"
     assert response.status_code == (400 if blocked else 200)
     if blocked:

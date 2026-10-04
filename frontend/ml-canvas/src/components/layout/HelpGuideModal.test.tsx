@@ -73,7 +73,7 @@ describe('HelpGuideModal', () => {
   it('keeps split diagrams and selection guidance in their own tab', () => {
     render(<HelpGuideModal isOpen onClose={() => {}} initialTab="leakage" />);
     const leakagePanel = screen.getByRole('tabpanel', { name: 'Preprocessing & Leakage' });
-    expect(within(leakagePanel).getAllByRole('article')).toHaveLength(62);
+    expect(within(leakagePanel).getAllByRole('article')).toHaveLength(64);
     expect(within(leakagePanel).queryByRole('table')).not.toBeInTheDocument();
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Split & Merge' }), { button: 0, ctrlKey: false });
@@ -85,6 +85,6 @@ describe('HelpGuideModal', () => {
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Preprocessing & Leakage' }), { button: 0, ctrlKey: false });
     expect(screen.getByRole('searchbox', { name: 'Search preprocessing nodes' })).toBeInTheDocument();
-    expect(screen.getAllByRole('article')).toHaveLength(62);
+    expect(screen.getAllByRole('article')).toHaveLength(64);
   });
 });

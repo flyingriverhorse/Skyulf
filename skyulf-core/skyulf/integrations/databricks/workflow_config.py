@@ -12,16 +12,25 @@ from ...modeling.base import BaseModelCalculator
 from ...registry import NodeRegistry
 from ..mlflow.validation import validate_quality_policy
 from ._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
+from .decision_thresholds import threshold_policy
+from .evaluation_chart_data import chart_settings
 from .local_cv import CV_FIELDS, LocalCVSpec
 from .local_explanations import validate_explanation_config
 from .local_sdk import ModelSelection
 from .local_search import base_model_config, prepare_search_pipeline
-from .local_workflow import _training_settings, _training_spec, _training_window_mode
-from .prediction_output import _IDENTIFIER, _TABLE_NAME
+from .local_workflow import training_settings, training_spec, training_window_mode
+from .prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
 from .training_dates import training_date_spec
+from .weight_config import WEIGHT_FIELDS, validate_weight_roles
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
-_FIELDS = {
+WORKFLOW_FIELDS = {
+    *WEIGHT_FIELDS,
+    "evaluation_charts",
+    "training_layout",
+    "competition",
+    "competition_max_trials",
+    "competition_max_candidates",
     "pre_split_steps",
     *CV_FIELDS,
     "training_sample_rows",
@@ -37,6 +46,7 @@ _FIELDS = {
     "model_name",
     "model_version",
     "model_change_mode",
+    "auto_rebuild_on_cdf_expiry",
     "score_model_selection",
     "promotion_policy",
     "score_handoff",
@@ -61,6 +71,8 @@ _FIELDS = {
     "cutoff",
     "monthly_lookback_months",
     "holdout_months",
+    "lookback_days",
+    "holdout_days",
     "result_availability_lag_hours",
     "max_rows",
     "max_input_mb",
@@ -100,17 +112,18 @@ def _columns(config: dict[str, Any]) -> None:
     names.append(config.get("target_column"))
     names.extend(
         config[key]
-        for key in ("event_column", "result_available_at_column")
+        for key in ("event_column", "result_available_at_column", "cv_group_column")
         if config.get(key) is not None
     )
     _validate_column_roles(names, config["record_key_columns"])
+    validate_weight_roles(config)
 
 
 def _validate_column_roles(names: list[Any], record_key_columns: list[str]) -> None:
     """Reject ambiguous or reserved source column roles in their declared order."""
     checked: list[str] = []
     for name in names:
-        if not isinstance(name, str) or not _IDENTIFIER.fullmatch(name):
+        if not isinstance(name, str) or not IDENTIFIER_PATTERN.fullmatch(name):
             raise ValueError("Source columns must be simple column identifiers.")
         checked.append(name)
     if len({name.casefold() for name in checked}) != len(checked):
@@ -127,11 +140,11 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
     """Validate training selection offline, allowing unset versions to resolve at invocation."""
     settings = dict(config)
     strategy = config.get("split_strategy", "random")
-    mode = _training_window_mode(config)
+    mode = training_window_mode(config)
     if config.get("stratify") is True and config["task"] != "classification":
         raise ValueError("stratify requires a classification task.")
     if action == "train":
-        settings = _training_settings(config, datetime(2000, 3, 1, tzinfo=UTC))
+        settings = training_settings(config, datetime(2000, 3, 1, tzinfo=UTC))
     else:
         settings["training_version"] = 0
         # These actions use saved evidence or derive fresh boundaries at invocation.
@@ -143,7 +156,7 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
                 settings[key] = datetime(2000, month, 1, tzinfo=UTC).isoformat()
         if config.get("filter_unavailable_results") is True:
             settings["result_cutoff"] = datetime(2000, 3, 1, tzinfo=UTC).isoformat()
-    _training_spec(settings)
+    training_spec(settings)
 
 
 def _validate_workflow_fields(config: dict[str, Any], action: str) -> None:
@@ -158,18 +171,20 @@ def _validate_workflow_fields(config: dict[str, Any], action: str) -> None:
         raise ValueError(
             "config_version must be 1; migrate the project and regenerate/redeploy its jobs."
         )
-    unknown = set(config) - _FIELDS
+    unknown = set(config) - WORKFLOW_FIELDS
     if unknown:
         raise ValueError(f"Unknown workflow settings: {', '.join(sorted(unknown))}.")
     if action not in _ACTIONS:
         raise ValueError("Unknown workflow action.")
+    if type(config.get("auto_rebuild_on_cdf_expiry", False)) is not bool:
+        raise ValueError("auto_rebuild_on_cdf_expiry must be a boolean.")
 
 
 def _validate_workflow_sources(config: dict[str, Any]) -> None:
     """Validate source names, input limits and column roles before any reader opens."""
     for key in ("training_table", "score_source_table", "prediction_table", "model_name"):
         value = config.get(key)
-        if not isinstance(value, str) or not _TABLE_NAME.fullmatch(value):
+        if not isinstance(value, str) or not TABLE_NAME_PATTERN.fullmatch(value):
             raise ValueError(f"{key} must be a resolved three-part Unity Catalog name.")
     if config["prediction_table"].casefold() in {
         config[key].casefold() for key in ("training_table", "score_source_table")
@@ -229,22 +244,35 @@ def _validate_workflow_quality(config: dict[str, Any], task: str, policy: str) -
         raise ValueError("Automatic promotion requires quality_threshold.")
 
 
-def _validate_workflow_pipeline(config: dict[str, Any], task: str) -> None:
+def validate_workflow_pipeline(
+    config: dict[str, Any], task: str, *, allow_empty_model: bool = False
+) -> None:
     """Check the model task and preprocessing types against the Core registry."""
     pipeline = config.get("pipeline")
     if not isinstance(pipeline, dict):
         raise ValueError("pipeline must be a Core pipeline configuration object.")
     validate_pipeline_config(pipeline)
+    _validate_pipeline_model(pipeline, task, allow_empty_model=allow_empty_model)
+    if pipeline.get("modeling"):
+        threshold_policy(pipeline)
+    for step in pipeline.get("preprocessing", []):
+        if issubclass(NodeRegistry.get_calculator(step["transformer"]), BaseModelCalculator):
+            raise ValueError("pipeline.preprocessing cannot contain a model calculator.")
+    validate_explanation_config(pipeline)
+
+
+def _validate_pipeline_model(
+    pipeline: dict[str, Any], task: str, *, allow_empty_model: bool
+) -> None:
+    """Validate declared models, permitting only an explicit empty saved-model declaration."""
     model = pipeline.get("modeling")
+    if allow_empty_model and type(model) is dict and not model:
+        return
     if not isinstance(model, dict) or not isinstance(model.get("type"), str):
         raise ValueError("pipeline.modeling.type must identify a registered Core model.")
     calculator = NodeRegistry.get_calculator(base_model_config(pipeline)["type"])
     if not issubclass(calculator, BaseModelCalculator) or calculator().problem_type != task:
         raise ValueError("Configured model does not match the declared task.")
-    for step in pipeline.get("preprocessing", []):
-        if issubclass(NodeRegistry.get_calculator(step["transformer"]), BaseModelCalculator):
-            raise ValueError("pipeline.preprocessing cannot contain a model calculator.")
-    validate_explanation_config(pipeline)
 
 
 def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str, Any]:
@@ -255,6 +283,8 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     actions use their own pinned data.
     """
     _validate_workflow_fields(config, action)
+    chart_settings(config.get("evaluation_charts"))
+    _validate_layout(config, action)
     task = _choice(config, "task", {"regression", "classification"})
     _choice(config, "engine", {"pandas", "polars"})
     selection = _choice(config, "score_model_selection", {"champion", "pinned_version"})
@@ -264,10 +294,17 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     _validate_workflow_sources(config)
     _validate_workflow_model_selection(config, selection)
     _validate_workflow_quality(config, task, policy)
-    _validate_workflow_pipeline(config, task)
+    validate_workflow_pipeline(
+        config,
+        task,
+        allow_empty_model=(
+            action != "train" and config.get("training_layout", "single_model") == "single_model"
+        ),
+    )
     _training_contract(config, action)
     cv = LocalCVSpec.from_workflow(config)
     if action == "train":
+        _validate_bundle_cv_holdout(config, cv)
         # Saved-model actions never execute the editable project training hooks.
         cv.validate_pipeline(
             config["pipeline"],
@@ -277,9 +314,50 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     return deepcopy(config)
 
 
+def validate_project_settings(config: dict[str, Any]) -> dict[str, Any]:
+    """Check shared training/scoring settings without executing editable model hooks.
+
+    Generated single-model settings intentionally leave modeling empty until the
+    Python recipe is loaded. Shared training dates and CV holdout rules still
+    need their actual configured values checked during static smoke validation.
+    """
+    checked = validate_workflow_config(config, action="score")
+    _training_contract(checked, "train")
+    _validate_bundle_cv_holdout(checked, LocalCVSpec.from_workflow(checked))
+    return checked
+
+
+def _validate_layout(config: dict[str, Any], action: str) -> None:
+    """Admit explicit layouts and verify resolved competition before remote work."""
+    layout = config.get("training_layout", "single_model")
+    if layout not in {"single_model", "multi_target", "model_competition"}:
+        raise ValueError("Unknown training_layout.")
+    if "competition" in config and layout != "model_competition":
+        raise ValueError("Competition candidates require training_layout=model_competition.")
+    if layout == "model_competition" and action == "train":
+        from .competition_project import validate_competition_config  # noqa: PLC0415
+        from .local_competition import validate_competition_budget  # noqa: PLC0415
+
+        validate_competition_config(config)
+        validate_competition_budget(config)
+
+
+def _validate_bundle_cv_holdout(config: dict[str, Any], cv: LocalCVSpec) -> None:
+    """Check policy isolation without resolving source versions or runtime dates."""
+    if (
+        cv.enabled
+        and cv.method == "nested_cv"
+        and cv.temporal
+        and config.get("split_strategy") != "temporal"
+    ):
+        raise ValueError("Nested temporal CV requires a temporal final holdout.")
+    if cv.group_column and config.get("stratify", False):
+        raise ValueError("Group holdout uses whole groups; set stratify=false.")
+
+
 def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
     """Describe runtime and explicit time boundaries without reading source data."""
-    window = _training_window_mode(checked)
+    window = training_window_mode(checked)
     observation_window = f"[{checked.get('start')}, {checked.get('cutoff')})"
     holdout_start = checked.get("holdout_start")
     result_cutoff = checked.get("result_cutoff")
@@ -292,6 +370,12 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
                 if months == 1
                 else f"last {months} completed calendar months"
             )
+    elif window == "rolling_days":
+        observation_window = (
+            f"last {checked['lookback_days']} elapsed UTC days before invocation (exclusive)"
+        )
+        if checked.get("split_strategy") == "temporal":
+            holdout_start = f"invocation time UTC minus {checked['holdout_days']} elapsed days"
     if checked.get("filter_unavailable_results") and result_cutoff is None:
         result_cutoff = (
             f"invocation time UTC minus {checked.get('result_availability_lag_hours', 0)} "
@@ -303,7 +387,7 @@ def _preview_window(checked: dict[str, Any]) -> tuple[str, Any, Any]:
 def _preview_training_source(checked: dict[str, Any], training_status: str) -> list[str]:
     """Describe source selection, resource bounds and the final holdout."""
     sample = checked.get("training_sample_rows")
-    window = _training_window_mode(checked)
+    window = training_window_mode(checked)
     version = checked.get("training_version")
     if version is None:
         version = "latest snapshot at invocation"
@@ -371,6 +455,7 @@ def _preview_model_and_scoring(checked: dict[str, Any], cv: LocalCVSpec) -> list
     return [
         *model_lines,
         *_preview_explanations(checked["pipeline"]),
+        *_preview_scoring_rules(checked["pipeline"]),
         f"Promotion: {checked['promotion_policy']} | Metric: {checked['metric']} | "
         f"Threshold: {checked.get('quality_threshold')} | "
         f"Minimum improvement (absolute): {checked['min_improvement']}",
@@ -415,6 +500,10 @@ def _preview_search(checked: dict[str, Any], cv: LocalCVSpec) -> list[str]:
         f"cv_random_state={cv.random_state} (independent seeds).",
     ]
     _append_search_cv_preview(lines, cv)
+    if effective.get("tune_threshold"):
+        lines.append(
+            "Decision threshold: binary inner out-of-fold selection; outer and final holdout labels stay untouched."
+        )
     if strategy == "optuna" and effective.get("timeout") is not None:
         lines.append(
             f"Optuna timeout: {effective['timeout']} seconds is a soft study limit; "
@@ -433,7 +522,16 @@ def _append_search_cv_preview(lines: list[str], cv: LocalCVSpec) -> None:
         inner = cv.inner_folds or (min(3, cv.folds - 1) if cv.folds > 2 else 2)
         lines.append(
             f"Nested CV: independent {inner}-fold inner search inside each of {cv.folds} outer folds, "
-            "then a separate final training search. Search budgets apply to each search."
+            f"then a separate final training search; policy={cv.nested_type}. Search budgets apply to each search."
+        )
+
+    if cv.temporal:
+        lines.append(
+            f"Temporal CV: gap={cv.gap} rows, test_size={cv.test_size}, max_train_size={cv.max_train_size}; stable event ordering."
+        )
+    if cv.group_column:
+        lines.append(
+            f"Group CV: {cv.group_column} is split metadata; final holdout isolates whole groups."
         )
 
 
@@ -520,10 +618,27 @@ def _migrate_selection_policy(migrated: dict[str, Any]) -> None:
 
 
 def validate_deployed_contract(config: dict[str, Any], parameters: dict[str, str]) -> None:
-    """Require notebook/job generation to agree with the project's handoff contract."""
-    if parameters.get("workflow_contract") != "2" or parameters.get(
+    """Require notebook/job generation to agree with handoff and recovery policy."""
+    if parameters.get("workflow_contract") not in {"2", "3"} or parameters.get(
         "deployed_score_handoff"
     ) != config.get("score_handoff"):
         raise ValueError(
             "Project and job definitions disagree; regenerate/redeploy the Bundle together."
         )
+    recovery = str(config.get("auto_rebuild_on_cdf_expiry", False)).lower()
+    if parameters.get("deployed_auto_rebuild_on_cdf_expiry", "false") != recovery:
+        raise ValueError(
+            "Project and recovery tasks disagree; regenerate/redeploy the Bundle together."
+        )
+
+
+def _preview_scoring_rules(pipeline: dict[str, Any]) -> list[str]:
+    """Show saved policy declarations without executing eligibility or output callbacks."""
+    config = pipeline.get("project_scoring")
+    if config is None:
+        return ["Project scoring rules: disabled (ordinary prediction schema)."]
+    return [
+        "Project scoring rules: " + json.dumps(config, sort_keys=True),
+        "Every input key receives predicted/excluded status; exclusions carry reasons.",
+        "Rules affect scoring only; training filters and holdout metrics remain independent.",
+    ]

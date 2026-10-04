@@ -1,8 +1,7 @@
 """Optional, bounded SHAP explanations for fitted local training artifacts."""
 
-from __future__ import annotations
-
 import json
+import logging
 from typing import Any, cast
 
 import numpy as np
@@ -11,6 +10,7 @@ import polars as pl
 
 from ...inference.local_pipeline import LocalPipelineArtifact
 from ...modeling._explainability.shap_explanation import compute_shap_explanation
+from .explanation_report import render_explanation_report
 
 _DEFAULTS = {"max_samples": 100, "max_features": 30, "max_display_samples": 10}
 _LIMITS = {"max_samples": (1, 200), "max_features": (1, 50), "max_display_samples": (0, 50)}
@@ -175,3 +175,30 @@ def explain_training_artifact(
     sampled = _sample_training_inputs(artifact, training_frame, limits["max_samples"])
     evidence["sample_count"] = len(sampled)
     return _explain_sample(artifact, sampled, evidence)
+
+
+def log_training_explanations(
+    run: Any, artifact: LocalPipelineArtifact, training_frame: Any
+) -> None:
+    """Persist bounded evidence and a portable report under the exact fitted model run."""
+    evidence = explain_training_artifact(artifact, training_frame)
+    if evidence is None:
+        return
+    evidence |= {
+        "run_id": run.run_id,
+        "experiment_id": run.client.get_run(run.run_id).info.experiment_id,
+        "model_uri": f"runs:/{run.run_id}/model",
+    }
+    try:
+        report = render_explanation_report(evidence)
+    except Exception as exc:  # noqa: BLE001 - optional visualization cannot invalidate a fitted model
+        logging.getLogger(__name__).warning("SHAP report rendering failed: %s", exc)
+        evidence["report_status"] = "unavailable"
+        evidence["report_reason"] = f"Chart rendering unavailable: {type(exc).__name__}: {exc}"
+        report = render_explanation_report(
+            {"status": "unavailable", "reason": evidence["report_reason"]}
+        )
+    else:
+        evidence["report_status"] = evidence["status"]
+    run.client.log_dict(run.run_id, evidence, "explanations.json")
+    run.client.log_text(run.run_id, report, "explanations.html")

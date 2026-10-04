@@ -1,10 +1,13 @@
 export interface ImputationConfig {
   columns: string[];
-  method: 'simple' | 'knn' | 'iterative';
+  method: 'simple' | 'knn' | 'iterative' | 'group';
 
   // Simple Imputer
   strategy: 'mean' | 'median' | 'most_frequent' | 'constant';
   fill_value?: string | number | undefined;
+
+  // Group Imputer: fill each row from the statistic of its own group.
+  group_by?: string | undefined;
 
   // KNN Imputer
   n_neighbors?: number | undefined;

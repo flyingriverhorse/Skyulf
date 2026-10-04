@@ -1,0 +1,138 @@
+{
+  "model_set_name": {
+    "order": 739,
+    "type": "string",
+    "default": "",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "description": "6. Multi-model outputs | Registered MODEL SET name (not a table). Blank = <project_name>_set; enter your own name to override. Target catalog/metadata schema and dev suffix are added automatically",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  },
+  "model_set_promotion_policy": {
+    "order": 745,
+    "type": "string",
+    "default": "manual_approval",
+    "enum": [
+      "manual_approval",
+      "automatic"
+    ],
+    "description": "6. Model set lifecycle | manual_approval = review then approve; automatic = activate the complete set only when EVERY branch passes its saved quality_threshold, additional quality_gates and improvement over its counterpart in the current champion set. Configure metrics in multi_model.py. First sets require absolute thresholds. Score runs separately",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  },
+  "model_set_output_mode": {
+    "order": 740,
+    "type": "string",
+    "default": "all",
+    "enum": [
+      "all",
+      "combined_only",
+      "separate_views"
+    ],
+    "description": "6. Multi-model outputs | all = save every model prediction and business result together; combined_only = run the models but save only combined business results plus keys/status/version (requires rules); separate_views = save all results once and expose model/business columns through separately named views, without duplicate tables",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  },
+  "model_set_table_name": {
+    "order": 741,
+    "type": "string",
+    "default": "",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "description": "6. Multi-model outputs | Physical result table name. Blank = <project_name>_set_scores. Target catalog/schema and dev suffix are added automatically",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  },
+  "model_view_prefix": {
+    "order": 742,
+    "type": "string",
+    "default": "",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "description": "6. Multi-model outputs | Prefix for each model view: <prefix>_<branch>. Blank = <project_name>_predictions. Customize individual names or select models in src/modeling/model_set.py",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "single_model"
+            }
+          }
+        },
+        {
+          "properties": {
+            "model_set_output_mode": {
+              "enum": [
+                "all",
+                "combined_only"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "combined_view_name": {
+    "order": 743,
+    "type": "string",
+    "default": "",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "description": "6. Multi-model outputs | Combined business result view name. Blank = <project_name>_business_results. Created only when the saved set has combined rules",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "single_model"
+            }
+          }
+        },
+        {
+          "properties": {
+            "model_set_output_mode": {
+              "enum": [
+                "all",
+                "combined_only"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "source_change_policy": {
+    "order": 744,
+    "type": "string",
+    "default": "reject",
+    "enum": [
+      "reject",
+      "rebuild_on_change"
+    ],
+    "description": "6. Multi-model outputs | If existing source rows are updated/deleted: reject = stop and keep previous results; rebuild_on_change = rescore the full current snapshot with the selected model set, rebuilding lag/rolling history. New inserts still append. Full data must fit row/byte limits. Independent of the model-change setting",
+    "skip_prompt_if": {
+      "properties": {
+        "training_layout": {
+          "const": "single_model"
+        }
+      }
+    }
+  }
+}

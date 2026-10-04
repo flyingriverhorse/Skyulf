@@ -1,6 +1,6 @@
 # Cross-Validation
 
-Skyulf supports five cross-validation strategies out of the box. CV can be used standalone via `StatefulEstimator.cross_validate()` or inside the hyperparameter tuning pipeline.
+Skyulf supports random, chronological and group-aware cross-validation. CV can be used standalone via `StatefulEstimator.cross_validate()` or inside the hyperparameter tuning pipeline.
 
 ## Supported methods
 
@@ -10,24 +10,31 @@ Skyulf supports five cross-validation strategies out of the box. CV can be used 
 | Stratified K-Fold | `stratified_k_fold` | `sklearn.model_selection.StratifiedKFold` | Classification with imbalanced classes |
 | Shuffle Split | `shuffle_split` | `sklearn.model_selection.ShuffleSplit` | Random repeated train/test splits |
 | Time Series Split | `time_series_split` | `sklearn.model_selection.TimeSeriesSplit` | Temporal data (no future leakage) |
-| Nested CV | `nested_cv` | Dual-loop (outer KFold/Stratified + inner KFold/Stratified) | Unbiased generalization estimate |
+| Group K-Fold | `group_k_fold` | Whole groups stay together | Repeated customers, patients or devices |
+| Stratified Group K-Fold | `stratified_group_k_fold` | Group isolation with class balancing | Grouped classification |
+| Nested CV | `nested_cv` | Separate inner selection and outer evaluation | Evaluate the tuning procedure |
 
 ## Quick example (standalone)
 
 ```python
+from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import StatefulEstimator
+from skyulf.registry import NodeRegistry
 
-estimator = StatefulEstimator(model_type="random_forest_classifier")
-estimator.fit(X_train, y_train)
-
+# training_frame contains features and the target column "label".
+estimator = StatefulEstimator(
+    calculator=NodeRegistry.get_calculator("random_forest_classifier")(),
+    applier=NodeRegistry.get_applier("random_forest_classifier")(),
+    node_id="classifier",
+)
 cv_results = estimator.cross_validate(
-    X_train, y_train,
+    SplitDataset(train=training_frame, test=training_frame.iloc[:0]),
+    target_column="label",
+    config={"params": {"n_estimators": 50}},
     n_folds=5,
     cv_type="stratified_k_fold",
 )
-
 print(cv_results["aggregated_metrics"])
-# {'accuracy': {'mean': 0.92, 'std': 0.01, 'min': 0.90, 'max': 0.94}, ...}
 ```
 
 ## Quick example (pipeline config)
@@ -92,71 +99,108 @@ such inputs explicitly before temporal CV. Sorting remains stable, places
 missing dates last and keeps targets aligned. Rerun temporal CV on affected
 native pandas date inputs; previous scores may have used nonchronological folds.
 
+### Group policies
+
+Choose `group_k_fold` or, for classification, `stratified_group_k_fold` and
+provide `cv_group_column`. Each entity stays on one side of every split. The
+column is excluded from learned features. Missing group identifiers,
+insufficient groups and incomplete class coverage fail before fitting.
+Reserved test/validation partitions must also have groups absent from training.
+
 ### Nested CV
 
-Runs a dual-loop cross-validation:
+With tuning enabled, `cv_type="nested_cv"` runs these stages:
 
-- **Outer loop** (K-Fold or Stratified): evaluates generalization on held-out data.
-- **Inner loop** (3-fold, capped at `n_folds - 1`): trains within each outer training set to check hyperparameter stability.
+1. Reserve one outer fold for evaluation.
+2. Search candidate parameters using only inner folds of the outer training rows.
+   Every learned preprocessing step is fitted again inside each training fold.
+3. Refit that fold's winning recipe and score the untouched outer fold.
+4. Repeat for every outer fold; report the mean and spread of outer scores.
+5. Run a separate search on all training rows and fit the deployable model.
+   The final test/validation holdout does not choose parameters or thresholds.
 
-This prevents the optimistic bias that occurs when the same data is used for both tuning and evaluation.
+`cv_folds` sets the outer count. `cv_inner_folds` sets the inner count; when
+omitted it is `min(3, cv_folds - 1)`, with two inner folds for two outer folds.
+Trial limits and timeouts apply to each search, including the final search.
 
-```python
-cv_type="nested_cv", n_folds=5
-```
+`cv_nested_type="auto"` uses stratified folds for classification and K-Fold for
+regression. Explicit options are `k_fold`, `stratified_k_fold`,
+`time_series_split`, `group_k_fold` and `stratified_group_k_fold`.
 
-Each fold result includes an `inner_cv_mean` score for diagnostics.
+#### Temporal nested CV
 
-## Return structure
+Set `cv_nested_type="time_series_split"`, `cv_time_column` and
+`cv_shuffle=False`. Both levels sort stably by the clock and train before their
+validation rows. The final reserved holdout must follow all training timestamps.
+Missing timestamps and equal timestamps crossing a fold boundary are rejected.
+The clock is excluded from model features; prediction requests retain their row order.
 
-All CV methods return the same dictionary shape:
+- `cv_gap`: excluded rows between each training and validation partition (default 0).
+- `cv_test_size`: validation rows per fold; `None` selects automatic sizing.
+- `cv_max_train_size`: maximum training rows; `None` expands the window, a positive
+  value creates a rolling window.
 
-```python
-{
-    "aggregated_metrics": {
-        "accuracy": {"mean": 0.92, "std": 0.01, "min": 0.90, "max": 0.94},
-        # ... other metrics
-    },
-    "folds": [
-        {"fold": 1, "metrics": {...}},
-        {"fold": 2, "metrics": {...}},
-        # ...
-    ],
-    "cv_config": {
-        "n_folds": 5,
-        "cv_type": "k_fold",
-        "shuffle": True,
-        "random_state": 42,
-    },
-}
-```
+These settings use row counts, not durations. They apply to both nested levels
+and the separate final search. The earliest outer training partition must be
+large enough for the requested inner windows. Ordinary temporal CV with explicit
+window settings uses the same strict metadata checks.
 
-Nested CV adds `inner_cv_mean` to each fold entry and `inner_folds` to `cv_config`.
+#### Threshold selection
 
-## Configuration reference
+For binary classification, `tune_threshold=True` collects fresh inner
+out-of-fold probabilities for the selected recipe. The threshold is chosen from
+those training-only predictions and applied to the outer fold's hard decisions.
+ROC-AUC and other probability/ranking metrics retain the original probabilities.
+A separate threshold is selected from final-search OOF predictions for the saved
+model. Temporal warmup rows without OOF predictions are excluded and counted.
 
-| Parameter | Type | Default | Description |
+This also works with eligible voting/stacking classifiers. The estimator must
+expose `predict_proba`; regression, multiclass and hard-voting thresholds are
+rejected. Target encoding must preserve an identifiable raw-to-model class mapping.
+
+## Results
+
+Ordinary fixed-model CV returns `aggregated_metrics`, `folds` and `cv_config`.
+Tuning stores its nested report under `TuningResult.nested_cv`, including:
+
+- `mean_score` / `std_score`: outer evaluation scores, separate from final search score.
+- `folds`: selected parameters, inner best score and outer score for each fold.
+- `split_policy`, `split`, `inner_splits`, `final_splits`: effective settings and
+  timestamp boundaries or group counts/membership hashes.
+- `threshold_selection`: per-outer-fold and final OOF threshold evidence when enabled.
+
+Search scores use sklearn's higher-is-better convention; losses remain negative.
+A fixed-model evaluation does not invent a search space: explicit nested policies
+use a single candidate, while the legacy standalone automatic nested method
+retains its fixed-parameter inner diagnostic.
+
+## Configuration across interfaces
+
+| Concept | Core tuning / Canvas payload | Standalone `cross_validate` | Databricks workflow |
 |---|---|---|---|
-| `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
-| `n_folds` / `cv_folds` | `int` | `5` | Number of CV folds |
-| `shuffle` | `bool` | `True` | Shuffle data before splitting (K-Fold / Stratified only) |
-| `random_state` | `int` | `42` | Random seed |
-| `time_column` / `cv_time_column` | `str\|null` | `null` | Column for chronological sorting (Time Series Split) |
+| Method | `cv_type` | `cv_type` | `cv_type` |
+| Outer folds | `cv_folds` | `n_folds` | `cv_folds` |
+| Inner folds | `cv_inner_folds` | `inner_folds` | `cv_inner_folds` |
+| Nested policy | `cv_nested_type` | `cv_nested_type` | `cv_nested_type` |
+| Group identifier | `cv_group_column` | `group_column` | `cv_group_column` |
+| Clock | `cv_time_column` | `time_column` | `event_column` |
+| Gap / test / window | `cv_gap`, `cv_test_size`, `cv_max_train_size` | `gap`, `test_size`, `max_train_size` | Same `cv_*` fields |
+| Shuffle / seed | `cv_shuffle`, `cv_random_state` | `shuffle`, `random_state` | Same `cv_*` fields |
 
-## ML Canvas UI
+## ML Canvas and Databricks
 
-Every training node (Classification, Regression, Text Classification, Segmentation) exposes a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.
+Classification, regression and ensemble settings expose **Method**, with
+**Outer folds**, **Inner folds** and **Nested split policy** for Nested CV.
+Temporal policies show clock/gap/window controls; group policies require an
+identifier column. Shuffle is disabled for chronological splits. For K-Fold,
+stratified and group policies, **Fold Split Seed** controls reproducible shuffling
+when shuffle is enabled. The seed is not specific to nested CV.
 
-## Integration with tuning
+The backend carries raw split metadata through preprocessing and checks reserved
+holdout isolation. Basic mode evaluates fixed parameters; Advanced mode searches
+inside each outer fold. Results display the saved policy and threshold evidence.
 
-When a training node's `run_mode` is set to `"advanced"`, cross-validation plays two distinct roles:
-
-1. **During the search:** The CV splitter is passed directly to the search strategy (GridSearchCV, OptunaSearchCV, etc.). Each candidate hyperparameter set is scored using inner CV folds. For `nested_cv`, the inner splitter uses fewer folds (3 or `cv_folds - 1`, whichever is smaller) to keep the search fast.
-
-2. **After the search (post-tuning evaluation):** A separate `cross_validate()` call runs with the `best_params` found by tuning. This gives you the unbiased `cv_*_mean` / `cv_*_std` metrics shown in Experiments.
-
-> **Important:** When `nested_cv` is selected with `run_mode: "advanced"`, the post-tuning evaluation automatically downgrades to `stratified_k_fold` (classification) or `k_fold` (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.
-
-For `run_mode: "basic"` (no tuning), `nested_cv` runs the full dual-loop as described above.
-
-See [Hyperparameter Tuning](hyperparameter_tuning.md) for tuning-specific configuration.
+Databricks uses the same Core search and split policies. Configure group-isolated
+or temporal final holdouts in the workflow. See [Databricks Bundle](databricks_bundle.md)
+for generated settings and examples, and [Hyperparameter Tuning](hyperparameter_tuning.md)
+for strategy controls.

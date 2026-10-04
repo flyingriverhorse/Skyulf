@@ -1,0 +1,78 @@
+{
+  "compute_mode": {
+    "order": 733,
+    "type": "string",
+    "default": "serverless",
+    "description": "5. Compute | Job compute mode for this project",
+    "enum": [
+      "serverless",
+      "policy_cluster"
+    ]
+  },
+  "cluster_policy_name": {
+    "order": 734,
+    "type": "string",
+    "default": "REPLACE_WITH_APPROVED_POLICY",
+    "description": "5. Compute | Approved job-cluster policy name",
+    "skip_prompt_if": {
+      "properties": {
+        "compute_mode": {
+          "const": "serverless"
+        }
+      }
+    }
+  },
+  "spark_version": {
+    "order": 735,
+    "type": "string",
+    "default": "17.3.x-cpu-ml-scala2.13",
+    "description": "5. Compute | Approved Databricks ML Runtime for the job cluster",
+    "skip_prompt_if": {
+      "properties": {
+        "compute_mode": {
+          "const": "serverless"
+        }
+      }
+    }
+  },
+  "node_type_id": {
+    "order": 736,
+    "type": "string",
+    "default": "REPLACE_WITH_NODE_TYPE",
+    "description": "5. Compute | Approved job-cluster node type",
+    "skip_prompt_if": {
+      "properties": {
+        "compute_mode": {
+          "const": "serverless"
+        }
+      }
+    }
+  },
+  "cost_tag_key": {
+    "order": 737,
+    "type": "string",
+    "default": "CostCenter",
+    "description": "5. Compute | Approved cluster cost tag key, for example CostCenter or PayingRegNo",
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "skip_prompt_if": {
+      "properties": {
+        "compute_mode": {
+          "const": "serverless"
+        }
+      }
+    }
+  },
+  "cost_tag_value": {
+    "order": 738,
+    "type": "string",
+    "default": "REPLACE_WITH_COST_TAG",
+    "description": "5. Compute | Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
+    "skip_prompt_if": {
+      "properties": {
+        "compute_mode": {
+          "const": "serverless"
+        }
+      }
+    }
+  }
+}

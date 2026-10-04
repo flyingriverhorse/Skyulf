@@ -82,7 +82,7 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
     if is_polars:
         X_subset = X.select(cols)
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        X_transformed = imputer.transform(X_np)
+        X_transformed = _transform_imputer(imputer, X_np)
         if hasattr(X_transformed, "to_numpy"):
             X_transformed = X_transformed.to_numpy()
         new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
@@ -98,9 +98,17 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
         X_subset[ext_cols] = X_subset[ext_cols].astype("float64")
         X_out[ext_cols] = X_out[ext_cols].astype("float64")
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    X_transformed = imputer.transform(X_input)
+    X_transformed = _transform_imputer(imputer, X_input)
     X_out[cols] = X_transformed
     return X_out
+
+
+def _transform_imputer(imputer: Any, values: np.ndarray) -> Any:
+    """Preserve numeric output dtypes for empty partitions unsupported by sklearn."""
+    if len(values) == 0:
+        dtype = values.dtype if np.issubdtype(values.dtype, np.floating) else np.float64
+        return np.empty(values.shape, dtype=dtype)
+    return imputer.transform(values)
 
 
 def drop_all_missing_columns(

@@ -28,6 +28,7 @@ interface CanvasRoute {
 const routes: Record<string, CanvasRoute> = {
   AliasReplacement: { definition: 'AliasReplacement', emitted: 'AliasReplacement' },
   Casting: { definition: 'casting', emitted: 'Casting' },
+  ClipValues: { definition: 'outlier', emitted: 'ClipValues', overrides: { method: 'clip', columns: ['num_a'], bounds: { num_a: { upper: 10 } } } },
   DateFeatures: { definition: 'TimeSeriesNode', emitted: 'DateFeatures', overrides: { method: 'date' } },
   Deduplicate: { definition: 'deduplicate', emitted: 'Deduplicate' },
   DropMissingColumns: { definition: 'drop_missing_columns', emitted: 'DropMissingColumns' },
@@ -40,6 +41,7 @@ const routes: Record<string, CanvasRoute> = {
   GeneralBinning: { definition: 'BinningNode', emitted: 'GeneralBinning' },
   GeneralTransformation: { definition: 'TransformationNode', emitted: 'GeneralTransformation' },
   GeoDistance: { definition: 'GeoDistance', emitted: 'GeoDistance' },
+  GroupImputer: { definition: 'imputation_node', emitted: 'GroupImputer', overrides: { method: 'group', columns: ['num_a'], group_by: 'cat_a', strategy: 'mean' } },
   HashEncoder: { definition: 'encoding', emitted: 'HashEncoder', overrides: { method: 'hash' } },
   IQR: { definition: 'outlier', emitted: 'IQR', overrides: { method: 'iqr' } },
   InvalidValueReplacement: { definition: 'InvalidValueReplacement', emitted: 'InvalidValueReplacement' },
@@ -124,8 +126,8 @@ describe.each(['bundled', 'registry'])('preprocessing serializer audit with %s m
   });
 
   /** The inventory must account for every registration without silently dropping core-only IDs. */
-  it('covers all 62 registered IDs', () => {
-    expect(new Set(registeredCases.map(testCase => testCase.id)).size).toBe(62);
+  it('covers all 67 registered IDs', () => {
+    expect(new Set(registeredCases.map(testCase => testCase.id)).size).toBe(67);
   });
 
   /** Inspect emitted steps and gate decisions, including unsupported canvas spellings explicitly. */

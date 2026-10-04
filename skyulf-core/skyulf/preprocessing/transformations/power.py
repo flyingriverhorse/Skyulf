@@ -49,7 +49,10 @@ def _filter_power_columns(X_pd: pd.DataFrame, cols: list[str], method: str) -> l
     if not cols:
         return []
     if method == "box-cox":
-        return [c for c in cols if not (X_pd[c] <= 0).any()]
+        invalid = [c for c in cols if (X_pd[c] <= 0).any()]
+        if invalid:
+            logger.warning("Box-Cox excludes columns containing non-positive values: %s", invalid)
+        return [c for c in cols if c not in invalid]
     return cols
 
 

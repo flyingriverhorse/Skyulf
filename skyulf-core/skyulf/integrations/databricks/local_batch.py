@@ -4,8 +4,6 @@ Spark only selects a pinned, filtered source snapshot. Fitted feature
 engineering and model prediction stay on the recorded local engine.
 """
 
-from __future__ import annotations
-
 import pickle
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -16,6 +14,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import pandas as pd
 import polars as pl
 
+from skyulf.integrations.databricks._local_frames import frame_bytes
+
 from ...data.dataset import SplitDataset
 from ...inference.local_evaluation import evaluate_local_holdout as evaluate_local_holdout
 from ...inference.local_pipeline import (
@@ -23,9 +23,11 @@ from ...inference.local_pipeline import (
     load_local_pipeline,
     save_local_pipeline,
 )
-from ...pipeline import SkyulfPipeline
+from ...inference.local_scoring import scoring_counts
 from ._contracts import column_name, table_name
+from .decision_thresholds import threshold_policy
 from .local_sdk import PreparedLocalWorkflow
+from .threshold_training import fit_threshold_pipeline
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -68,13 +70,6 @@ class LocalScoreResult:
     diagnostics: dict[str, str | int]
 
 
-def _frame_bytes(frame: pd.DataFrame | pl.DataFrame) -> int:
-    """Count the actual local frame allocation used for the memory guard."""
-    if isinstance(frame, pd.DataFrame):
-        return int(frame.memory_usage(index=True, deep=True).sum())
-    return int(frame.estimated_size())
-
-
 def fit_local_workflow(
     config: dict[str, Any],
     data: SplitDataset,
@@ -94,9 +89,15 @@ def fit_local_workflow(
     if type(max_bytes) is not int or max_bytes <= 0:
         raise ValueError("max_bytes must be positive.")
     _validate_training_frames(data, max_rows, max_bytes)
-    pipeline = SkyulfPipeline(config)
-    pipeline.fit(data, target_column=target_column)
-    save_local_pipeline(pipeline, artifact_path)
+    pipeline = fit_threshold_pipeline(config, data, target_column)
+    save_local_pipeline(
+        pipeline,
+        artifact_path,
+        use_tuned_thresholds=(
+            threshold_policy(config)["mode"] != "off"
+            or bool(config.get("modeling", {}).get("tune_threshold", False))
+        ),
+    )
     return load_local_pipeline(artifact_path)
 
 
@@ -125,7 +126,7 @@ def read_local_source(spark: Any, spec: LocalSourceSpec) -> pd.DataFrame:
             raise ValueError("Source exceeds max_bytes.")
         records.append(record)
     frame = pd.DataFrame.from_records(records, columns=names)
-    if _frame_bytes(frame) > spec.max_bytes:
+    if frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
     if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
         raise ValueError("Source row keys must not be null.")
@@ -154,7 +155,7 @@ def score_local_source(
         ],
         axis=1,
     )
-    if _frame_bytes(result) > spec.max_bytes:
+    if frame_bytes(result) > spec.max_bytes:
         raise ValueError("Prediction result exceeds max_bytes.")
     diagnostics: dict[str, str | int] = {
         "source_table": spec.table,
@@ -166,6 +167,7 @@ def score_local_source(
         "model_version": prepared.preflight.model_version or "local_path",
         "row_count": len(result),
     }
+    diagnostics |= scoring_counts(predictions)
     return LocalScoreResult(result, diagnostics)
 
 
@@ -193,7 +195,7 @@ def _validate_training_frames(data: SplitDataset, max_rows: int, max_bytes: int)
     present = [frame for frame in frames if isinstance(frame, pd.DataFrame | pl.DataFrame)]
     if sum(len(frame) for frame in present) > max_rows:
         raise ValueError("Training input exceeds max_rows.")
-    if sum(_frame_bytes(frame) for frame in present) > max_bytes:
+    if sum(frame_bytes(frame) for frame in present) > max_bytes:
         raise ValueError("Training input exceeds max_bytes.")
 
 

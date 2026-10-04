@@ -10,10 +10,13 @@ import logging
 import math
 import warnings
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, cast
 
 from joblib import parallel_backend
 
+from ..._sample_weights import SampleWeightError
+from ..fold_pipeline import FatalSampleWeightError
 from ..schemas import TuningConfig
 from .optuna import _ensure_optuna_loaded
 
@@ -46,6 +49,7 @@ def execute_search(
     y_arr: Any,
     config: TuningConfig,
     log_callback: Callable[[str], None] | None = None,
+    sample_weight: Any = None,
 ) -> list[str]:
     """Fits the searcher, mapping known sklearn/optuna failures to ``ValueError``s.
 
@@ -55,6 +59,7 @@ def execute_search(
     on its own logger — without capturing them the only visible symptom is the
     generic "no trials completed" error, with the real cause stuck in stderr.
     """
+    fit_kwargs = _weight_fit_kwargs(searcher, sample_weight)
     captured: list[str] = []
     optuna_logger: logging.Logger | None = None
     handler: logging.Handler | None = None
@@ -88,9 +93,11 @@ def execute_search(
             )
             if config.parallel_backend:
                 with parallel_backend(config.parallel_backend):
-                    searcher.fit(X_arr, y_arr)
+                    searcher.fit(X_arr, y_arr, **fit_kwargs)
             else:
-                searcher.fit(X_arr, y_arr)
+                searcher.fit(X_arr, y_arr, **fit_kwargs)
+    except FatalSampleWeightError as exc:
+        raise SampleWeightError(str(exc)) from exc
     except Exception as e:
         logger.exception("Hyperparameter tuning failed")
         _raise_search_failure(e)
@@ -131,6 +138,7 @@ def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> 
     for a search that scored nothing — while the grid strategy fails on the
     identical folds.
     """
+    first_trial_error = first_trial_error or _empty_evaluation_error(searcher)
     try:
         # Accessing best_params_ raises ValueError if no trials completed successfully
         best_params = searcher.best_params_
@@ -144,6 +152,15 @@ def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> 
     return best_params, best_score
 
 
+def _empty_evaluation_error(searcher: Any) -> str | None:
+    """Recover fully excluded halving folds from worker coverage, including parallel runs."""
+    results = getattr(searcher, "cv_results_", {})
+    for name, counts in results.items():
+        if name.endswith("_test_scored_rows") and any(count == 0 for count in counts):
+            return "No eligible rows remain for evaluation after configured preprocessing."
+    return None
+
+
 def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
     """Extracts per-trial params/scores from a fitted searcher (Optuna study or cv_results_)."""
     trials: list[dict[str, Any]] = []
@@ -151,7 +168,11 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
     if config.strategy == "optuna" and hasattr(searcher, "study_"):
         # Only include completed trials
         trials.extend(
-            {"params": trial.params, "score": trial.value}
+            {
+                "params": trial.params,
+                "score": trial.value,
+                "evaluation_coverage": deepcopy(trial.user_attrs.get("evaluation_coverage", [])),
+            }
             for trial in cast(Any, searcher).study_.trials
             if trial.state.name == "COMPLETE"
         )
@@ -163,10 +184,25 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
                 {
                     "params": results["params"][i],
                     "score": results["mean_test_score"][i],
+                    "evaluation_coverage": _searcher_coverage(results, i),
                 }
                 for i in range(n_candidates)
             )
     return trials
+
+
+def _searcher_coverage(results: dict[str, Any], candidate: int) -> list[dict[str, Any]]:
+    """Read held-out counts transported by the halving scorer without refitting any model."""
+    folds = []
+    fold = 0
+    while f"split{fold}_test_input_rows" in results:
+        entry: dict[str, Any] = {"fold": fold + 1}
+        for key in ("input_rows", "scored_rows", "excluded_rows"):
+            value = results[f"split{fold}_test_{key}"][candidate]
+            entry[key] = int(value) if math.isfinite(value) else None
+        folds.append(entry)
+        fold += 1
+    return folds
 
 
 def strip_model_prefix(params: Any) -> Any:
@@ -205,3 +241,13 @@ def log_final_completion(
             f"Trials evaluated: {len(trials)}. Best Score: {best_score:.4f}"
         )
         log_callback(f"Best Params: {best_params}")
+
+
+def _weight_fit_kwargs(searcher: Any, sample_weight: Any) -> dict[str, Any]:
+    """Route complete vectors so each searcher slices its actual resource subsets."""
+    if sample_weight is None:
+        return {}
+    if hasattr(searcher, "error_score"):
+        searcher.estimator.set_params(model__propagate_weight_errors=True)
+    key = "sample_weight" if hasattr(searcher, "mode") else "model__sample_weight"
+    return {key: sample_weight}

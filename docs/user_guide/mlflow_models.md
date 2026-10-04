@@ -53,6 +53,64 @@ learned preprocessing and model. MLflow may align named columns and cast values
 according to its signature before that conversion. Check parity for each input
 dtype you intend to serve, especially nullable or categorical dtypes.
 
+### Nullable integers and Boolean inputs
+
+MLflow validates its input signature **before** calling the saved pipeline.
+A nullable integer or Boolean column can therefore be rejected before its
+fitted imputer runs. Newly logged local pipelines and model sets declare these
+columns as strings at the MLflow boundary and restore their recorded dtype
+before applying feature engineering. Nulls remain nulls until the saved
+preprocessing handles them; the adapter does not fill them or retrain an imputer.
+`ColSpec(required=False)` makes a column optional; it does not make nullable
+integer or Boolean values pass their primitive signature. Floating-point
+columns keep numeric signatures and do not need this string transport.
+
+Use the public helper with a loaded model:
+
+```python
+from skyulf.integrations.mlflow.local_model import prepare_pyfunc_input
+
+loaded = mlflow.pyfunc.load_model(model_uri)
+# raw_frame contains the original, typed values expected by this artifact.
+request = prepare_pyfunc_input(raw_frame, loaded)
+predictions = loaded.predict(request)
+```
+
+For example, an `Int64` column `[25, None, 40]` travels as
+`["25", None, "40"]`, becomes `Int64` again inside the adapter, and then enters
+the fitted cleaning steps. A pipeline with no suitable missing-value handler
+can still fail in its model. The helper preserves input order and index and
+does not mutate the caller's frame. It is needed only at the MLflow boundary;
+direct `predict_local_pipeline` calls continue to take native values.
+Call the helper once: it accepts native values and deliberately rejects
+already encoded strings. REST/JSON clients can send the declared strings and
+nulls directly; they do not call this Python helper.
+
+The transport covers pandas extension `Int32`, `Int64`, and `boolean`, and
+Polars `Int32`, `Int64`, and `Boolean`. Polars does not record column
+nullability separately, so newly logged models use this transport for all
+columns of those three Polars types. Ordinary pandas NumPy `int32`, `int64`,
+and `bool` signatures stay native. Other unsupported dtypes still fail at
+packaging time; portable `InferenceBundle` signatures are unchanged.
+
+The package records `skyulf_input_transport` metadata with codec
+`nullable_primitives_v1` and its column-to-dtype mapping. The helper checks
+this mapping against the loaded artifact. Integer strings must be canonical
+decimal values within the fitted signed integer range; Boolean strings must
+be `"true"` or `"false"`. Invalid strings and floating-point integer inputs
+are rejected instead of rounded. This preserves integers above `2**53`.
+Existing logged packages keep their previous contract; log a new version to
+use the nullable transport.
+
+For a separately verified batch-safe pipeline, Spark callers must cast the
+listed integer and Boolean columns to strings **in Spark before** passing
+them to `mlflow.pyfunc.spark_udf`. Casting after conversion to pandas can be
+too late: Arrow may already have represented nullable integers as floats.
+Other feature columns keep their declared types. This transport does not
+make arbitrary preprocessing safe across Spark batches or change nullable
+prediction-output limitations. See
+[MLflow signature validation](https://mlflow.org/docs/latest/model/signatures/).
+
 For classifiers, the output is `prediction` followed by
 `probability_0`, `probability_1`, and so on in the saved model class order. Pass
 `use_tuned_thresholds=True` to `save_local_pipeline` only when the fitted

@@ -66,6 +66,25 @@ async function loadReport(loaded: DriftReport) {
 }
 
 describe('useDriftReport threshold re-evaluation', () => {
+    it('requires saved statistical support even when effect thresholds are lowered', async () => {
+        /** Sliders cannot turn sampling noise or insufficient samples into confirmed drift. */
+        const noisy = {
+            ...column('noisy', [{ metric: 'psi', value: 0.9, threshold: 0.2, has_drift: true }]),
+            evidence: { status: 'insufficient_data' as const, reference_count: 3, current_count: 3 },
+        };
+        const supported = {
+            ...column('supported', [{ metric: 'psi', value: 0.3, threshold: 0.2, has_drift: true }]),
+            evidence: { status: 'supported' as const, reference_count: 300, current_count: 300 },
+        };
+        const { result, rerender } = await loadReport(report({ noisy, supported }));
+        expect(result.current.evaluatedReport!.column_drifts.noisy!.drift_detected).toBe(false);
+        expect(result.current.evaluatedReport!.column_drifts.supported!.drift_detected).toBe(true);
+        rerender({ thresholds: { psi: 0 } });
+        expect(result.current.evaluatedReport!.drifted_columns_count).toBe(1);
+        rerender({ thresholds: { psi: 1 } });
+        expect(result.current.evaluatedReport!.drifted_columns_count).toBe(0);
+    });
+
     it('exposes the effective PSI threshold alongside the recalculated verdict', async () => {
         /** Table sparklines must use the same override or saved fallback as metric cells. */
         const loaded = report({ category: column('category', [

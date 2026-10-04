@@ -7,6 +7,7 @@ function getTargetExplanation(config: OutlierConfig) {
     case 'winsorize': return "Clips extreme values";
     case 'elliptic_envelope': return "Detects multivariate anomalies";
     case 'manual_bounds': return "Filters rows using configured bounds";
+    case 'clip': return "Caps values at configured bounds";
     default: return "";
   }
 }
@@ -78,7 +79,7 @@ function OutlierColumnStatistics({ config, metrics }: { config: OutlierConfig; m
   return <>
     {bounds && (
       <div>
-        <div className="font-medium text-muted-foreground mb-1">{config.method === 'manual_bounds' ? 'Configured Bounds' : 'Calculated Bounds'}</div>
+        <div className="font-medium text-muted-foreground mb-1">{config.method === 'manual_bounds' || config.method === 'clip' ? 'Configured Bounds' : 'Calculated Bounds'}</div>
         <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
           {Object.entries(bounds).map(([col, bound]) => (
             <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">

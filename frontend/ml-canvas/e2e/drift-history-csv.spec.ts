@@ -34,7 +34,8 @@ test('keeps real producer PSI aligned across table, sparse history and CSV', asy
 
   await page.getByTitle('Drift thresholds', { exact: true }).click();
   await page.getByRole('spinbutton', { name: 'PSI', exact: true }).fill('0.5');
-  await expect(category.getByText('Stable', { exact: true })).toBeVisible();
+  // The fixture carries statistical evidence, so a row below the threshold reads "No supported drift".
+  await expect(category.getByText('No supported drift', { exact: true })).toBeVisible();
   await expect(sparkline.locator('circle').last()).toHaveAttribute('fill', '#22c55e');
   await expect(sparkline).toHaveAccessibleName(new RegExp('threshold 0.5$'));
 

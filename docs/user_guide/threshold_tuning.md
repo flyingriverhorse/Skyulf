@@ -15,8 +15,9 @@ The functionality is available at three levels:
   `apply_thresholds()` — plain NumPy in/out, for use outside a pipeline (e.g.
   with a raw sklearn estimator).
 - **Tuning-engine integration:** `TuningConfig(tune_threshold=True)` — after
-  hyperparameter tuning, the engine selects the threshold on the validation
-  split and applies it in every subsequent prediction automatically (binary
+  hyperparameter tuning, the engine selects the threshold from validation data
+  (ordinary CV) or training-only inner OOF predictions (nested CV), then applies
+  it in every subsequent prediction automatically (binary
   classifiers only). See [Integrated with hyperparameter tuning](#integrated-with-hyperparameter-tuning).
 
 ## After training in the canvas
@@ -165,9 +166,9 @@ apply_thresholds(
 When a classifier is trained through the tuning engine — a canvas Training node
 in Advanced mode, the `"hyperparameter_tuner"` pipeline model type, or
 `TuningCalculator` directly — set `tune_threshold: true` to have the engine
-pick the decision threshold right after the final refit. It grid-searches the
-positive-class cutoff that maximises your tuning metric on the validation
-split, and every subsequent prediction uses that cutoff instead of the default
+pick the decision threshold. Ordinary tuning uses the validation split after
+final refit; nested tuning uses the training-only OOF procedure below. Subsequent
+predictions use that cutoff instead of the default
 `0.5`:
 
 ```python
@@ -203,7 +204,7 @@ panel controls apply: toggle it off, replace it with a manual preview, or
 clear it. Predict-time precedence is unchanged: request-level override >
 saved + enabled thresholds > default decision rule.
 
-**Gates** — the engine logs a skip in the job log and predictions keep the
+**Ordinary tuning gates** — the engine logs a skip in the job log and predictions keep the
 default decision rule when any of these don't hold:
 
 - the model is a **classifier** exposing `predict_proba`;
@@ -216,8 +217,29 @@ default decision rule when any of these don't hold:
 Probability-only metrics (`roc_auc`, `log_loss`, `pr_auc`, …) cannot be
 computed from hard labels, so the cutoff sweep maximises `balanced_accuracy`
 instead — the log says so, and `decision_threshold_metric` records it.
-Threshold tuning is best-effort: an error during the sweep never aborts the
-tuning run.
+Ordinary validation-based threshold tuning is best-effort: an error during the
+sweep never aborts the tuning run.
+
+### Nested training-only threshold selection
+
+With `cv_type="nested_cv"` and `tune_threshold=True`, each outer training
+partition runs its own parameter search. The winning recipe is then fitted on
+fresh inner training folds to collect out-of-fold probabilities. The threshold
+is selected only from those probabilities and their training labels, then used
+for hard-label evaluation of that outer fold. Probability/ranking metrics are
+unchanged by threshold selection.
+
+A separate final search and OOF sweep produce the deployable model's threshold.
+The final holdout never selects it. The stored provenance is `inner_oof`, and the
+nested report records coverage, per-fold thresholds and the independent final
+threshold. Temporal warmup rows without OOF predictions are excluded from the
+sweep. Group policies retain whole-group isolation.
+
+Nested threshold selection requires binary classification and `predict_proba`.
+Invalid probabilities, unsupported targets or failed fold evidence fail the run;
+a partial nested evaluation cannot become a successful report. Saved local
+Databricks artifacts retain the threshold and apply it when replayed. Direct
+pipeline callers can select it with `predict(use_tuned_thresholds=True)`.
 
 ## How the search works
 
@@ -240,8 +262,9 @@ tuning run.
   Equal thresholds across all classes reduce to plain `argmax`, so the tuned
   result can only match or beat the default rule on the tuning metric.
 
-Pass `strategy="grid"` or `strategy="nelder-mead"` explicitly to override the
-auto-selection.
+Pass `strategy="grid"` for binary classification or `strategy="nelder-mead"`
+explicitly to override the auto-selection. Grid search requires exactly two
+classes; requesting it for multiclass probabilities raises `ValueError`.
 
 ## Notes
 

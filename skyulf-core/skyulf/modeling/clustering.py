@@ -132,7 +132,10 @@ class _NumericOnlyClusteringCalculatorMixin:
         log_callback=None,
         validation_data=None,
         iteration_callback=None,
+        *,
+        sample_weight: Any = None,
     ) -> Any:
+        """Select numeric features and preserve the shared fit weight policy."""
         reference_column = (config or {}).get("reference_column") or ""
         working_X = _drop_reference_column(X, reference_column)
         numeric_X, dropped = _select_numeric_features(working_X)
@@ -149,6 +152,7 @@ class _NumericOnlyClusteringCalculatorMixin:
             log_callback=log_callback,
             validation_data=validation_data,
             iteration_callback=iteration_callback,
+            sample_weight=sample_weight,
         )
         if reference_column:
             # Stashed on the fitted estimator (plain attribute, pickles fine)

@@ -53,6 +53,8 @@ class PredictionRequest(BaseModel):
     # Ad-hoc per-class decision thresholds applied to THIS request only,
     # overriding any saved/enabled tuned thresholds on the deployed job.
     override_thresholds: dict[str, float] | None = None
+    continue_history: bool = False
+    history_state: dict[str, Any] | None = None
 
 
 class PredictionResponse(BaseModel):
@@ -63,3 +65,4 @@ class PredictionResponse(BaseModel):
     # The per-class thresholds actually applied (override or saved+enabled),
     # or None when the model's default decision rule (argmax/0.5) was used.
     thresholds_applied: dict[str, float] | None = None
+    history_state: dict[str, Any] | None = None

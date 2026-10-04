@@ -24,6 +24,7 @@ from backend.utils import sanitize_for_log
 from skyulf.core.validation import prediction_row_count, validate_prediction_rows
 from skyulf.engines.sklearn_bridge import SklearnBridge
 from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.preprocessing.time_series.history import TemporalHistorySession
 
 logger = logging.getLogger(__name__)
 
@@ -577,6 +578,8 @@ class DeploymentService:
         session: AsyncSession,
         data: list[dict],
         override_thresholds: dict[str, float] | None = None,
+        *,
+        history: TemporalHistorySession | None = None,
     ) -> tuple[list, dict[str, float] | None]:
         """Scores ``data`` with the active deployment's model.
 
@@ -593,6 +596,7 @@ class DeploymentService:
             session: Async database session, used to find the deployment and its job.
             data: Rows to score, one dict per record.
             override_thresholds: Per-class thresholds for this call only.
+            history: Optional caller-owned temporal continuation session.
 
         Returns:
             Tuple of the predictions and the thresholds applied (``None`` when the
@@ -608,6 +612,8 @@ class DeploymentService:
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:
             raise ValueError("No active model deployed")
+        if history is not None and history.model_id != deployment.job_id:
+            raise ValueError("Active deployment changed; restart prediction with its history.")
 
         # 2. Load Artifact
         artifact = await run_in_threadpool(DeploymentService._load_predict_artifact, deployment)
@@ -627,13 +633,18 @@ class DeploymentService:
                 override_thresholds, job, getattr(estimator, "classes_", None)
             )
             return await run_in_threadpool(
-                DeploymentService._predict_with_bundled_artifact,
+                DeploymentService._predict_with_history,
                 artifact,
                 df,
                 thresholds=thresholds,
+                history=history,
             )
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
+            if history is not None:
+                raise ValueError(
+                    "Temporal continuation requires a bundled feature engineer and model."
+                )
             if override_thresholds is not None:
                 raise OverrideThresholdMismatch(
                     "override_thresholds is not supported for this deployed model "
@@ -647,6 +658,25 @@ class DeploymentService:
             raise ValueError(
                 "Loaded artifact is not a valid predictor or recognized pipeline format"
             )
+
+    @staticmethod
+    def _predict_with_history(
+        artifact: dict[str, Any],
+        df: pd.DataFrame,
+        *,
+        thresholds: dict[str, float] | None,
+        history: TemporalHistorySession | None,
+    ) -> tuple[list, dict[str, float] | None]:
+        """Propose continuation only after feature engineering and prediction both succeed."""
+        if history is None:
+            return DeploymentService._predict_with_bundled_artifact(
+                artifact, df, thresholds=thresholds
+            )
+        with history:
+            result = DeploymentService._predict_with_bundled_artifact(
+                artifact, df, thresholds=thresholds
+            )
+        return result
 
     @staticmethod
     async def _get_job_for_deployment(session: AsyncSession, job_id: str) -> TrainingJob | None:

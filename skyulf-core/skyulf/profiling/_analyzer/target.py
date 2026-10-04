@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 from scipy import stats as scipy_stats
 
+from ..correlations import MIN_PAIRWISE_OVERLAP
 from ..schemas import BoxPlotStats, CategoryBoxPlot, TargetInteraction
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState, _collect
 
@@ -17,13 +18,35 @@ class TargetMixin(_AnalyzerState):
     """Target-relationship helpers for :class:`EDAAnalyzer`."""
 
     def _collect_target_correlations(self, target_col: str, features: list[str]) -> pl.DataFrame:
-        """Collect per-feature Pearson correlation with the target, suppressing constant-column warnings."""
-        exprs = [pl.corr(col, target_col).alias(col) for col in features]
+        """Require three finite shared observations, matching the correlation matrix policy."""
+        columns = [*features, target_col]
+        finite = self.lazy_df.select(
+            [
+                pl.col(col).cast(pl.Float64) if self.df.schema[col].is_decimal() else pl.col(col)
+                for col in columns
+            ]
+        ).with_columns(
+            [
+                pl.when(pl.col(col).is_finite()).then(pl.col(col)).otherwise(None).alias(col)
+                for col in columns
+                if self.df.schema[col].is_float() or self.df.schema[col].is_decimal()
+            ]
+        )
+        exprs = [
+            pl.when(
+                (pl.col(col).is_not_null() & pl.col(target_col).is_not_null()).sum()
+                >= MIN_PAIRWISE_OVERLAP
+            )
+            .then(pl.corr(col, target_col))
+            .otherwise(None)
+            .alias(col)
+            for col in features
+        ]
 
         # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            return _collect(self.lazy_df.select(exprs))  # type: ignore[attr-defined]
+            return _collect(finite.select(exprs))
 
     def _calculate_target_correlations(
         self, target_col: str, numeric_cols: list[str]
@@ -214,9 +237,12 @@ class TargetMixin(_AnalyzerState):
 
     def _collect_anova_groups(self, group_col: str, value_col: str) -> list[list]:
         """Collect per-group value lists (with at least 2 non-null values) for ANOVA."""
+        value = pl.col(value_col)
+        if self.df.schema[value_col].is_decimal():
+            value = value.cast(pl.Float64)
         anova_data = _collect(
             self.lazy_df.select(  # type: ignore[attr-defined]
-                [pl.col(group_col), pl.col(value_col)]
+                [pl.col(group_col), value]
             )
             .group_by(group_col)
             .agg(pl.col(value_col))

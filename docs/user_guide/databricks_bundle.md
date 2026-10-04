@@ -3,6 +3,9 @@
 For job-screen instructions and lifecycle diagrams, use the
 [operator walkthrough](databricks_bundle_walkthrough.md).
 
+For optional weight columns, class weights, SMOTE settings and supported models,
+see [Weighted Training & Support](weighted_training.md).
+
 The custom Skyulf template generates one editable Bundle with `dev`, `test`,
 `syst` and `prod` targets. It fits and predicts with pandas or Polars. Spark
 reads bounded Unity Catalog Delta rows and publishes predictions; local
@@ -20,6 +23,34 @@ composite keys), source columns, split strategy, applicable date parsing,
 scoring/promotion policies and job settings. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
+
+Choose the training layout, then edit its generated model file:
+
+| Layout | Model settings |
+| --- | --- |
+| `single_model` | `src/modeling/single_model.py`: `MODELING` owns model parameters and tuning/search space |
+| `model_competition` | `src/modeling/model_competition.py`: `MODELS` compares candidates for one shared target |
+| `multi_target` | `src/modeling/multi_model.py`: `MODELS` defines independent targets, models, training/CV, preprocessing and quality limits |
+
+For multiple targets, `src/modeling/model_set.py` separately defines the coherent
+release: registered set name, promotion policy and scoring table/view destinations.
+For example, define revenue and cost models in `multi_model.py`, then configure
+`model_set.py` to approve them together and publish their predictions under one
+set version. Define the profit calculation (`revenue - cost`) in
+`src/features/scoring.py`.
+
+The model files contain plain editable Python dictionaries. Library helpers run
+at initialization to populate settings from your choices; afterward edit the
+generated values directly using Python `True`, `False` and `None`. Keep
+`config/workflow.json` for shared data, validation/CV, size limits and lifecycle
+settings. For `single_model`, its `pipeline.modeling` stays empty; the loader
+supplies the selected model definition. Other layouts retain an internal task
+placeholder there and load the actual model definitions from their Python file.
+
+Legacy compatibility: existing projects can retain inline `pipeline.modeling`
+in `workflow.json`, `src/modeling/candidates.py` or `src/modeling/branches.py`.
+When migrating, remove the old definition: both old and new filenames, or a
+single-model file alongside a nonempty inline model, fail validation.
 
 Regression starts with Core `linear_regression` and `heldout_rmse`;
 classification starts with `logistic_regression` and `heldout_accuracy`.
@@ -72,7 +103,7 @@ databricks bundle init skyulf-core/templates/databricks --config-file skyulf-cor
 
 Review table and feature names in the example first. If editing generated JSON,
 use `full_snapshot`, `fixed_window` or `rolling_calendar` for the window mode;
-`auto` is resolved during initialization. Run `python src/preview.py --action train`
+`auto` is resolved during initialization. Run `python src/tools/preview.py --action train`
 from the generated project to validate the resulting combination.
 
 For each date column you actually use, declare how it is stored:
@@ -126,9 +157,11 @@ months of data a rolling window reads. Independent score scheduling is SM-34.
 | Lifecycle | Metric/gates, manual/automatic promotion, score selector/handoff and enabled retraining cron |
 | Compute | Serverless or approved policy cluster and cost tags |
 
-Preprocessing is edited in the generated **`src/preprocessing.py`** file, not in
-the initializer or JSON. `build_preprocessing()` returns normal Core steps in
+Preprocessing is edited in **`src/features/preprocessing.py`**.
+`build_preprocessing()` returns normal Core steps in
 execution order. Keep the JSON `pipeline.preprocessing` list empty.
+Use **`src/features/pre_split.py`** for `build_pre_split_steps()` and keep the
+JSON `pre_split_steps` list empty. The package exports both builders separately.
 
 ```python
 def build_preprocessing():
@@ -143,37 +176,175 @@ def build_preprocessing():
 
 ### Custom preprocessing recipes
 
-Select per-step columns when mixing numeric and categorical features. For your
-own logic, define top-level Calculator/Applier classes in the same file and add
-`custom_step("my_step", MyCalculator, MyApplier, params={...})` to this list.
-The self-contained
-[custom recipe example](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/preprocessing_custom.py)
-in `skyulf-core/templates/databricks/examples/preprocessing_custom.py` provides
-mean-centering and fixed eligibility examples for pandas/Polars. Copy the needed
-imports, classes and helper functions into your generated `src/preprocessing.py`;
-keep your two recipe builders and add `example_custom_step("income")` to
-`build_preprocessing()` to enable centering. Do not import the example as a
-sibling module: training snapshots only `src/preprocessing.py`. Fit returns learned state;
-apply uses it without learning again. Preserve row count/order and implement
-the engines your project uses. CV refits the custom step within every fold.
+Select per-step columns when mixing numeric and categorical features. Generated
+projects contain small, domain-independent custom examples written as plain
+pandas functions:
+
+| Custom module | Examples | Configuration location |
+| --- | --- | --- |
+| `src/features/custom/pre_split_custom.py` | `minimum_completeness`, `value_range`, `allowed_values` row filters | `src/features/pre_split.py` |
+| `src/features/custom/preprocessing_custom.py` | `log_feature` (new column), `frequency_encoding` and `rare_categories` (learned per fold) | `src/features/preprocessing.py` |
+| `src/features/custom/advanced_class_step.py` | The same `rare_categories` written as a Calculator/Applier pair, to compare | — |
+
+Each example is a pair of functions plus a factory that wraps them with one
+helper from `skyulf.preprocessing`. Each factory returns a normal Core step
+dictionary. Both recipe files also have an `example_all` recipe that runs them
+together. Each custom file ends with an inactive Example 4 that reads a small
+data file (asset); `src/features/assets.json` explains the three steps to enable it. The parent recipe files show
+these calls directly beside the built-in steps in the returned list. Uncomment
+the matching import and step, then adapt the columns:
+
+```python
+# src/features/pre_split.py
+from .custom.pre_split_custom import minimum_completeness
+
+
+def build_pre_split_steps():
+    return [
+        minimum_completeness(columns=["field_a", "field_b", "field_c"], min_present=2),
+    ]
+```
+
+```python
+# src/features/preprocessing.py
+from .custom.preprocessing_custom import frequency_encoding
+
+
+def build_preprocessing():
+    return [
+        frequency_encoding(columns=["category"]),
+    ]
+```
+
+The list order is the execution order. Add Core operations to the same list.
+The template starts with commented steps because source column names vary across
+projects. There are no separate column-selection variables or enable switches.
+Keep both JSON recipe lists empty.
+
+Completeness treats null/NaN as missing; blank strings and infinity count as
+values. With three selected fields and `min_present=2`, rows with two or three
+observed values survive without any value or order changes. Required filter
+columns are read automatically and need not be model inputs. Use only data known
+at the observation cutoff; do not make eligibility depend on future information.
+
+Frequency encoding learns `count / training_rows` per observed string category.
+For training values `["A", "A", "B", null]`, scoring `["A", "B", "NEW", null]`
+produces `[0.5, 0.25, 0.0, 0.0]`. It replaces selected columns in place, preserving
+other columns and row order. Each CV fold learns its own mapping; saved-model
+inference never recomputes frequencies on the score batch. Missing/unseen values
+map to zero. Cast numeric category identifiers to strings upstream if needed.
+Select these columns in workflow `input_columns`, excluding target/record keys.
+
+```bash
+python src/tools/preview.py --action train
+```
+
+The tests configure these actual parent builders, then run filtering, training,
+CV and fresh-process model reload on pandas and Polars. No separate demonstration
+files need to be copied into a project.
+
+#### Writing your own step
+
+Write top-level pandas functions and wrap them with one of three helpers:
+
+| Helper | Your functions | Use for |
+| --- | --- | --- |
+| `column_step(name, fn, output=...)` | `fn(df)` returns the new column(s) | Row-by-row calculations; nothing is learned |
+| `fitted_step(name, learn, apply, output=...)` | `learn(df, y)` returns a small dict; `apply(df, state)` returns column(s) | Anything learned from training rows (means, bounds, mappings) |
+| `filter_step(name, fn, columns=[...])` | `fn(df)` returns True for rows to keep | Pre-split row filters |
+
+```python
+# src/features/custom/preprocessing_custom.py
+from skyulf.preprocessing import fitted_step
+
+
+def learn_bounds(df, y, params):
+    """Learn clip limits from the training fold only."""
+    values = df[params["column"]]
+    return {"low": float(values.quantile(0.01)), "high": float(values.quantile(0.99))}
+
+
+def clip_values(df, state, params):
+    """Clip every later batch with the saved training limits."""
+    return df[params["column"]].clip(state["low"], state["high"])
+
+
+def clip_outliers(column):
+    """Replace column with its value clipped to training 1%-99% quantiles."""
+    params = {"column": column}
+    return fitted_step(f"clip_{column}", learn_bounds, clip_values,
+                       output=column, replace=True, params=params)
+```
+
+`learn` runs on the training rows of every CV fold and of the final fit; its
+dict is saved with the model and `apply` reuses it for validation and scoring
+rows, so there is no leakage. `y` is the training target; the target column is
+removed from `df` in both functions, so `apply` can never depend on it. Rules:
+
+- Use top-level `def` functions, not lambdas or nested functions.
+- `df` is a pandas copy, also for Polars models; changing it has no effect.
+- Return one value per row in the same order. Filters return True/False per
+  row; decide missing values explicitly, e.g. `(df["x"] > 0).fillna(False)`.
+- Learned dicts must be JSON-like: string keys and no NaN. NumPy numbers are
+  converted automatically.
+- `params={...}` is passed to every function as its last argument.
+- Use `replace=True` to overwrite existing columns; otherwise outputs must be new.
+
+Errors name the failing function, e.g. `Project function ...:learn_bounds failed:
+KeyError: 'income'`.
+
+Most former Calculator/Applier pairs fit in these helpers. Keep a class pair
+(see `advanced_class_step.py`) only when the learned state is not a small dict
+(for example a fitted scikit-learn object), the step changes the number of rows
+during preprocessing, or it needs native Polars/Spark code for performance.
+These helper steps are project code only: the web canvas and backend API reject
+them, because a graph must never name an arbitrary server function.
+
+Custom pre-split steps remain declared fixed filters: they must preserve survivor
+values/order and cannot learn statistics. They do not run on unlabeled score
+input. Custom value transformations belong in preprocessing; its learn function
+runs inside each CV training fold and its apply function reuses that state during
+inference.
 
 Training saves the exact Python source with the fitted artifact. Both local
 and MLflow loading restore this saved source, including custom classes. Changing
 the project file affects future training; score, approve and rollback continue
-using saved model code/state. Different source versions use distinct module
-identities. This supports a self-contained file up to 64 KiB, with imports from
-installed packages. Sibling files and new package dependencies are not packaged
-automatically. Only load trusted code/models, as with existing pickle artifacts.
-Broader project packaging, row filtering/output rules, Optuna and multiple model
-branches remain later tasks.
+using saved model code/state. Different source versions use distinct package
+identities. All Python files under `src/features/` are captured in a bounded
+64 KiB snapshot. Use relative imports and an `__init__.py` in every subpackage.
+Non-Python assets and third-party dependencies are not embedded; install external
+dependencies explicitly in both training and scoring environments. Keep jobs and
+modeling hooks outside the feature package. Only load trusted code/models, as
+with existing pickle artifacts. Scoring exclusions, historical feature context
+and post-prediction business rules remain separate work.
+
+### Source layout and existing projects
+
+| Directory | Responsibility |
+| --- | --- |
+| `src/jobs/` | Databricks notebook entrypoints, referenced by the two job YAMLs |
+| `src/features/` | Saved pre-split and preprocessing recipes, custom pairs/helpers |
+| `src/modeling/` | Generated single-model, competition and multi-model settings plus model-set policies |
+| `src/tools/` | Offline `preview.py` CLI |
+
+Existing single-file projects and their saved models remain supported. To migrate,
+move your builders into the two feature recipe files, move custom pairs into
+`features/custom/`, and add relative imports. Pass the `src/features` directory
+to `load_project_workflow`; update `initialize_run.py` to use
+`preprocessing_path="../src/features"` (relative to the configuration directory).
+If retaining legacy tuning/ensemble hooks, move them into `src/modeling/`. New
+projects keep those settings in each model definition. Update YAML notebook paths to
+`../src/jobs/<name>.py` and sync the new directories. Run the new preview command
+before deploying. Keep only one active copy of each builder. Newly trained models
+capture the new package; older model versions retain their original snapshot.
 
 From the generated project, with the matching Core wheel installed locally:
 
 ```powershell
-python src/preview.py
-python src/preview.py --list-models
-python src/preview.py --list-preprocessors
-python src/preview.py --action train
+python src/tools/preview.py
+python src/tools/preview.py --list-models
+python src/tools/preview.py --list-preprocessors
+python src/tools/preview.py --action train
 ```
 
 Preview executes the trusted Python recipe to resolve its steps. Keep data access
@@ -346,7 +517,7 @@ strings; generated workflow JSON stores numbers and booleans.
 
 The initializer selects a task, its model (including voting/stacking ensembles),
 then a tuning strategy and default or custom strategy settings. There is no
-Basic/Advanced mode flag. The generated `config/workflow.json` uses Core's
+Basic/Advanced mode flag. The generated model definition uses Core's
 `hyperparameter_tuner` with the selected `base_model`.
 
 | Strategy | Budget and custom settings |
@@ -357,12 +528,20 @@ Basic/Advanced mode flag. The generated `config/workflow.json` uses Core's
 | `halving_random` | Sampled candidate limit and the same halving controls |
 | `optuna` | Trial limit, sampler, pruner, pruning and optional soft timeout |
 
-Search spaces come from Core's model/strategy catalog or ensemble builder.
-Override them in `src/tuning.py::build_search_space(model_type, strategy, params)`;
-return `None` to preserve an explicit JSON space or use Core defaults. A returned
-dictionary of finite candidate lists takes precedence over the JSON space.
-The resolved space and exact Python source are saved with the trained artifact.
-Changing the file affects future training; scoring uses the saved fitted model.
+Search spaces come from Core's model/strategy catalog or ensemble builder. Bundle
+initialization writes editable finite lists into each model's `search_space`.
+For a single model, edit `MODELING` in `src/modeling/single_model.py`; for competition,
+edit the candidate's `modeling` in `MODELS` in `src/modeling/model_competition.py`;
+for multiple targets, edit the branch's `workflow.pipeline.modeling` in `MODELS`
+in `src/modeling/multi_model.py`. Each definition owns its model params, strategy,
+trial budget and search space. The generated lists are editable snapshots of
+initialization defaults. Set `search_space` to `{}` to use the installed Core's
+current automatic defaults. Changing the definition affects future training;
+scoring uses the saved fitted model and captured recipe.
+
+Legacy `src/modeling/tuning.py::build_search_space(model_type, strategy, params)`
+hooks remain supported: `None` preserves the configured space, while returned finite
+lists override it. New projects do not generate this hook.
 Fixed scalar model parameters remain fixed during search. Ensemble structural
 settings stay on the base model. Estimator-specific value compatibility is checked
 when Core fits the model; offline preview validates structure and budgets.
@@ -370,7 +549,112 @@ when Core fits the model; offline preview validates structure and budgets.
 Training is sequential (`n_jobs=1`). Grid admission fails if the full space exceeds
 the configured limit; it does not truncate it. Optuna requires its optional sklearn
 integration. Its timeout is a soft search deadline and cannot interrupt an active
-model fit. Decision-threshold tuning is not enabled by this adapter.
+model fit. Nested binary search can select a decision threshold from training-only
+inner out-of-fold predictions with `"tune_threshold": True` in the model definition.
+
+### Optional classification decision thresholds
+
+New projects keep decision thresholds **off**. Edit `DECISION_THRESHOLD` in
+`src/modeling/single_model.py`. In a competition, edit each candidate's
+`decision_threshold` in `MODELS`; for independent targets, edit each branch's
+`workflow.pipeline.decision_threshold` in `src/modeling/multi_model.py`.
+These are model settings; the Bundle initialization wizard does not ask for them.
+SDK configurations use `pipeline.decision_threshold` directly.
+
+```python
+# Native classifier decisions; no calibration partition is reserved.
+DECISION_THRESHOLD = {"mode": "off"}
+
+# Binary: predict "churn" when its probability is >= 0.7, including exact ties.
+DECISION_THRESHOLD = {"mode": "manual", "positive_class": "churn", "value": 0.7}
+
+# Multiclass: exactly one class wins argmax(probability / class value).
+DECISION_THRESHOLD = {
+    "mode": "manual",
+    "thresholds": [
+        {"class": "low", "value": 0.5},
+        {"class": "medium", "value": 0.3},
+        {"class": "high", "value": 0.2},
+    ],
+}
+
+# Binary or multiclass: select thresholds on a reserved part of training data.
+DECISION_THRESHOLD = {
+    "mode": "auto",
+    "metric": "balanced_accuracy",
+    "validation_fraction": 0.2,
+    "random_state": 42,
+}
+```
+
+Use original target labels, preserving their types (e.g. integer `1` versus
+string `"1"`), even when preprocessing encodes the target. The fitted encoder
+chain maps these labels to the model's probability columns. Saved local models
+return original labels and record them in `manifest.classes`; evaluation uses
+the same mapping. This covers LabelEncoder and OrdinalEncoder, including explicit
+category order and repeated encoding around resampling. Feature-only encoders
+do not change target labels. Multiclass entries must cover every class exactly once, with
+positive finite values; they are relative decision weights, not minimum confidence
+requirements. The result always has one class, even if all probabilities are low.
+Binary manual cutoffs permit both endpoints, zero and one.
+
+Automatic mode reserves 20% of the training partition by default, **before fitting
+preprocessing or selecting model parameters**. It fits the model on the remaining
+rows, selects thresholds on calibration rows, and saves that fitted model without
+refitting on the calibration population. Final holdout labels never select an
+estimator, preprocessing state or threshold. Random calibration is stratified;
+group CV keeps groups separate; temporal workflows use a chronological calibration
+tail and honor the configured CV gap. Every class must occur in both partitions,
+otherwise training fails with an actionable error. Small datasets can therefore
+require a different split or manual mode.
+
+For random row splitting, `validation_fraction: 0.25` fits the saved model on
+approximately 75% of the training rows and uses the remainder only to choose
+its decision threshold. With group splitting, the fraction selects **groups**,
+not rows: unequal group sizes can produce very different row proportions.
+Whole groups stay together; inspect `fitting_rows` and `calibration_rows` in
+the threshold evidence for the actual populations.
+There is no final full-training refit in this mode. `off` and `manual` do not
+reserve this extra calibration population. Full-data refitting is a different
+policy and can change the probabilities to which a selected threshold applies.
+
+Supported automatic objectives are `balanced_accuracy`, binary `f1`, `f1_macro`,
+`f1_weighted`, and `matthews_corrcoef`. For binary selection, `positive_class` is
+optional and defaults to the fitted model's second class. The existing heldout
+binary precision/recall/F1 and probability metrics retain that second-class
+reporting convention, even when a different label owns the decision cutoff.
+Sample weights affect estimator fitting, but calibration objectives and their
+reported scores remain **unweighted**, as do the other evaluation metrics.
+`f1_weighted` means class-support averaging, not row-weighted scoring. Automatic
+threshold selection currently has no row-cost/sample-weight objective option;
+it should not be interpreted as optimizing weighted business costs.
+Thresholds change class predictions; they do not calibrate or alter probabilities.
+An improved calibration score does not guarantee a better independent holdout score.
+
+CV and competition independently refit the complete model-and-threshold policy
+inside every outer training fold. Parameter searches also run inside those folds;
+their extra work counts toward `competition_max_trials`. The original model-search
+scores in `tuning.json` describe base-model selection, while `cross_validation.json`
+and `competition_evaluation.json` evaluate the final decision policy.
+`decision_threshold.json` records fitting/calibration counts, selected values,
+the positive class and calibration scores. Model reload, registry evaluation,
+batch prediction preserve the saved decision rule. For an additional standalone
+inference bundle export, pass `use_tuned_thresholds=True` to `build_bundle`.
+That separate portable format retains its existing supported-node restrictions;
+target-encoder pipelines use the full local artifact saved by the Bundle.
+
+Prediction columns retain stable positional names: `probability_0` belongs to
+`manifest.classes[0]`, `probability_1` to `manifest.classes[1]`, and so on.
+For example, `manifest.classes = ["no", "yes"]` maps `probability_1` to `"yes"`.
+This mapping uses the original labels even when the target was encoded. Do not
+infer a class from its spelling or assume the positive class always has index 1
+when explicitly configuring a different `positive_class`.
+
+Regression and classifiers without `predict_proba` cannot enable thresholds.
+Legacy nested binary `modeling.tune_threshold` remains supported; do not enable it
+alongside `manual` or `auto`. An explicit `off` policy leaves that independently
+requested legacy behavior intact. Promotion `quality_threshold` remains a separate
+acceptance gate.
 
 Edit shared CV settings in the generated configuration:
 
@@ -394,7 +678,8 @@ supported; their CV evaluates independent fixed-parameter models.
 - `cv_folds` supports 2 through 20; each fold needs at least two training and
   validation rows. Stratified CV requires classification and at least as many
   training rows per class as folds.
-- Methods: `k_fold`, `stratified_k_fold`, `shuffle_split`, `time_series_split`, `nested_cv`.
+- Methods: `k_fold`, `stratified_k_fold`, `shuffle_split`, `time_series_split`,
+  `group_k_fold`, `stratified_group_k_fold`, `nested_cv`.
   Shuffle Split uses Core's 20% validation proportion and requires shuffle.
 - Time-series CV requires an explicit selected window with `event_column` and
   `cv_shuffle: false`. Its normalized timestamps order the folds and are removed
@@ -412,10 +697,41 @@ supported; their CV evaluates independent fixed-parameter models.
   selected parameters and aggregate mean/std separately from the final search
   score. Ordinary fixed-model configurations retain Core's stability diagnostics;
   historical artifacts without nested search evidence remain labeled diagnostic.
-  Nested tuning uses stratified folds for classification and K-fold for regression;
-  temporal/group nested splitters are not included. Combining it with
-  `tune_threshold: true` fails explicitly because threshold selection is not yet
-  evaluated independently within the outer folds.
+  `cv_nested_type: "auto"` uses stratified classification folds and regression
+  K-fold. Explicit policies are `k_fold`, `stratified_k_fold`, `time_series_split`,
+  `group_k_fold` and `stratified_group_k_fold`.
+- Temporal policies use `cv_gap` (default 0), `cv_test_size` and
+  `cv_max_train_size` (both default null) as **row counts** at both nested levels
+  and the separate final search. Null maximum training size expands the window;
+  an integer rolls it. Nested temporal CV requires a temporal final holdout.
+  Events are stable-sorted; missing times and ties across fold boundaries fail.
+- Group policies require `cv_group_column`, excluded from model inputs. The
+  final random holdout selects whole groups using the saved split seed;
+  `test_size` is the held-out proportion of groups. Set `stratify: false` for
+  this final split. A temporal final holdout must also have disjoint groups.
+  Missing group identities, insufficient groups and missing classes fail before
+  fitting. Row filtering and staged Parquet retain aligned group/time metadata.
+- Nested binary classification supports `"tune_threshold": True` in the model definition
+  (initializer: `search_tune_threshold: "true"`). Each selected recipe generates
+  inner out-of-fold probabilities for its threshold. Outer labels and final
+  holdout labels never select thresholds. Ranking/probability scores still use
+  probabilities. Multiclass and models without probabilities fail explicitly.
+  `tuning.json` saves fold thresholds, provenance and the independent final
+  threshold; saved artifact predictions apply that threshold by default.
+  This decision threshold is distinct from the promotion quality threshold.
+
+During initialization, CV method/policy questions precede the data-window questions.
+Choosing ordinary or nested temporal CV fixes the generated final split to
+`temporal`, hides the random split and shuffle/seed questions, and opens the
+clock/window questions. With the default window mode, this produces a rolling
+calendar holdout. Explicit fixed-window settings still retain their date pins.
+Group and non-temporal CV preserve the chosen final split. These initializer
+rules do not rewrite an existing `config/workflow.json`.
+
+Initializer examples: `templates/databricks/examples/nested-temporal-init.example.json`
+and `templates/databricks/examples/nested-group-threshold-init.example.json`.
+These settings keep the existing two jobs and graph contract 3. Local tests do
+not establish cloud acceptance; record actual Databricks run evidence separately.
 
 MLflow stores `cross_validation.json` with fold results, aggregate metrics,
 source/split dataset identity and engine. Ordinary CV includes fold-refit counts
@@ -426,7 +742,7 @@ scores remain negative, with larger scores better. The
 With CV disabled, search uses one training-only 80/20 validation split; an ordinary
 model adds no fold fits. Search runs save `tuning.json` with effective settings,
 trials, best parameters and the actual scorer. Negative loss scores remain negative
-and higher is better. `train_and_register` displays a compact search summary.
+and higher is better. `train_and_tune` displays a compact search summary.
 
 Optional `pipeline.explainability` accepts `{"method": "shap", "max_samples": 100,
 "max_features": 30, "max_display_samples": 10}`. It uses bounded training rows and
@@ -435,8 +751,8 @@ results or an explicit unavailable reason. Limits are 200 samples, 50 transforme
 features and 50 displayed samples; explanations are disabled when this field is absent.
 
 To enable SHAP in a generated project, add this entry inside the existing
-`pipeline` object in `config/workflow.json` (alongside `modeling` and
-`preprocessing`):
+`pipeline` object in `config/workflow.json` (alongside the empty `modeling` and
+`preprocessing` entries):
 
 ```json
 "explainability": {
@@ -450,11 +766,11 @@ To enable SHAP in a generated project, add this entry inside the existing
 The training runtime also needs the optional `shap>=0.46.0,<1.0.0` dependency
 declared by Core's `explainability` extra. The generated wheel/MLflow dependency
 list does not install this extra automatically. For serverless training, add SHAP
-to the training environment's `dependencies` in `resources/workflow.jobs.yml`;
+to the training environment's `dependencies` in `resources/train.job.yml`;
 for classic compute, include it in the training task's PyPI libraries.
 
 Run the normal training job; do not execute `local_explanations.py` directly.
-`train_and_register` reports the explanation status, sample count and artifact name.
+`train_and_tune` reports the explanation status, sample count and artifact name.
 Open that training run in MLflow and read **Artifacts > explanations.json** for
 global feature importance and the bounded per-row explanations. The Bundle
 currently publishes JSON evidence and a status summary, not SHAP charts.
@@ -465,12 +781,11 @@ explicit `unavailable` reason.
 ### Ensemble recipes
 
 Select `voting_classifier`, `stacking_classifier`, `voting_regressor` or
-`stacking_regressor` for your task. Edit the generated **`src/ensemble.py`** to
-choose the component models and their settings. Set `USE_EXAMPLES = True` to
-activate its four example recipes, then edit the recipe for your selected model.
-Returning `None` keeps the parameters already configured in JSON and Core defaults.
-Returned keys override matching `pipeline.modeling.base_model.params` keys before
-`src/tuning.py` resolves the search space. Both recipes are pinned for future replay.
+`stacking_regressor` for your task. Bundle asks for that ensemble's base models,
+weights, stacking and calibration settings and writes them to its own
+`modeling.base_model.params`. Competition candidates and model-set branches each
+receive independent settings. No separate `ensemble.py` or activation flag is needed.
+Legacy ensemble hooks remain supported for existing projects.
 
 | Setting from Canvas | Bundle ensemble recipe |
 | --- | --- |
@@ -481,8 +796,8 @@ Returned keys override matching `pipeline.modeling.base_model.params` keys befor
 | Calibrate base models | Classification `calibrate_base_models`, `calibration_method`, `calibration_cv` |
 | Stacking meta-learner | `final_estimator`, `final_estimator_params`, `passthrough` |
 | Stacking OOF folds | Ensemble `cv`, independent of the shared search `cv_*` settings |
-| Tune component hyperparameters | Defaults to `true` for all four ensembles in Bundle search; `false` opts out of automatic component spaces |
-| Search strategy / search CV | Existing workflow settings and optional `src/tuning.py`; no second tuning engine |
+| Tune component hyperparameters | `tune_base_models` defaults to `True` for all four ensembles in Bundle search; `False` opts out of automatic component spaces |
+| Search strategy / search CV | Each model's tuning definition and its workflow's `cv_*` settings |
 
 Use task-compatible member keys from Core; optional XGBoost/LightGBM require the
 corresponding runtime dependency. Invalid members, duplicates, weights, parameter
@@ -490,10 +805,11 @@ names and inapplicable family settings fail explicitly. Fixed component paramete
 remain fixed even with automatic component tuning. Conflicting manual search axes
 are rejected. Search and estimator workers remain sequential.
 
-With an empty `search_space`, the selected component models determine the automatic
-search axes, including when `USE_EXAMPLES = False`. That flag only controls the
-example overrides. Explicit nonempty search spaces remain user-owned. Grid searches
-still enforce the configured candidate limit when combining component spaces.
+Generated search spaces contain the selected components' nested parameter keys.
+After changing component models or calibration, update those keys or clear
+`search_space` to `{}` to rebuild automatic axes from the new composition.
+Explicit nonempty search spaces remain user-owned. Grid searches still enforce
+the configured candidate limit when combining component spaces.
 
 Soft voting predicts probabilities. Hard voting predicts class labels only;
 use label-based metrics such as accuracy/F1. Probability metrics and probability
@@ -735,21 +1051,30 @@ versions; it does not change promotion gates or relabel existing versions.
 
 ## Where the workflow lives
 
-The generated notebooks are small entrypoints with fixed lifecycle steps or
-the score role. `src/workflow.py` prepares a request; `train_and_register`
-fits, evaluates and registers it, then `compare_and_decide` compares models
-and applies the promotion policy. The shared `finalize_and_report` task closes
-training even on failure and publishes only a verified successful result.
-Approve/reject/rollback use a separate branch without training. The installed
-`job_runtime` adapter reads configuration once and exchanges durable MLflow
-references between phases. Computation and lifecycle changes reuse existing
-Core services; no extra control tables or jobs are introduced. See the
-[task graph and operator walkthrough](databricks_bundle_walkthrough.md#the-two-jobs-and-their-tasks).
-`prediction_output` creates output tables and safely switches full-rebuild
-views. Imports do not create a Spark session or cloud resource.
+The generated notebooks have fixed lifecycle steps or the score role.
+`initialize_run` freezes the request; `load_data` reads bounded pinned data;
+`prepare_dataset` applies fixed cleanup and saves the split. `train_and_tune`
+fits learned preprocessing within training folds and runs configured CV/search.
+`select_best_model` currently verifies a single candidate; multiple candidates
+in one run are not implemented yet. `register_model` evaluates the fitted
+artifact before registration; `evaluate_model` compares registered versions.
+`model_decision` applies the saved policy or an explicit approve/reject/rollback
+request. Manual actions skip the data and training stages. `training_report`
+closes training even on failure and publishes only a verified successful result.
 
-Regenerate and deploy the notebook files and job graph together with the
-matching wheel; graph contract 2 deliberately rejects older generated graphs.
+Tasks exchange durable MLflow references. Source and split datasets are bounded
+Parquet artifacts under `lifecycle/data/`, with digests and membership metadata
+checked before reuse. The experiment therefore stores training rows as well as
+model evidence; its access and retention policies apply to those rows.
+Computation and lifecycle changes reuse existing Core services; no additional
+control tables or jobs are introduced. See the
+[task graph and operator walkthrough](databricks_bundle_walkthrough.md#the-two-jobs-and-their-tasks).
+`prediction_output` creates output tables and switches full-rebuild views.
+Imports do not create a Spark session or cloud resource.
+
+Regenerate and deploy notebooks, graph and wheel together for graph contract 3.
+Existing graph-2 bundles retain their legacy runtime path; changing only a
+contract marker does not migrate a bundle.
 The workflow configuration schema remains version 1.
 
 Notebook entrypoints are explicit: generated `src/score.py` calls
@@ -760,9 +1085,10 @@ remain supported: score delegates to the score entrypoint, while lifecycle keeps
 its sequential behavior and does not acquire durable phase/retry semantics.
 `run_bundle_action`, `run_action` and `train_local_candidate` retain their APIs.
 
-Edit preprocessing in `src/preprocessing.py` and model/workflow settings in
-`config/workflow.json`. These remain project choices; common workflow fixes ship in the
-Skyulf wheel instead of requiring edits to every generated notebook.
+Edit preprocessing in `src/features/preprocessing.py`, model settings in the
+selected `src/modeling/` file, and shared workflow settings in `config/workflow.json`.
+These remain project choices; common workflow fixes ship in the Skyulf wheel
+instead of requiring edits to every generated notebook.
 
 ### Independent scoring and promotion policies
 
@@ -1124,17 +1450,36 @@ WHERE customer_id = 'C123';
 
 ## First run
 
-Build and place the matching Skyulf wheel in the generated project's `dist/`,
-then edit `config/workflow.json` for real source columns, model, split policy
-and size limits, and `src/preprocessing.py` for feature engineering.
+Set `deployment/artifact.json` to the Core source directory or release wheel and
+the expected Core version. The Bundle artifact build prepares the wheel, checks
+its identity and records its SHA-256 in `dist/skyulf/build.json`.
+The wheel filename includes its content digest as a build tag: changed bytes get
+a distinct deployment/cache identity while the release version stays compatible
+with existing saved model requirements. The receipt matches the uploaded bytes.
+Edit `config/workflow.json` for real source columns, split policy and size
+limits, the selected `src/modeling/` file for model settings, and
+`src/features/preprocessing.py` for feature engineering.
 The JSON values are an example, not a dataset.
 Enable Change Data Feed on the scoring source before later inserts arrive.
 
 ```powershell
-databricks bundle validate --strict -t dev --profile <profile>
-databricks bundle deploy -t dev --profile <profile>
-databricks bundle run train -t dev --profile <profile>
+uv run --no-project python src/tools/build_wheel.py
+databricks bundle validate --strict -t test_development --profile <profile>
+databricks bundle deploy -t test_development --profile <profile>
+databricks bundle run train -t test_development --profile <profile>
 ```
+
+Use `test` instead if personal development targets were not generated.
+`deployment/requirements.txt` supplies the shared train/score runtime, including
+initial Optuna and optional model/ensemble choices. Update these exact pins when
+editing model choices later. Custom preprocessing/scoring requirements from
+`src/features/requirements.txt` are installed in both jobs. Training-only report
+packages live in `deployment/train-requirements.txt`. These direct pins do not
+freeze all transitive dependencies.
+
+Compute settings are target variables: serverless environment version and optional
+budget policy, or policy-cluster runtime, node type and worker bounds. `job_tags`
+applies in both modes. Validate company policy compatibility in the actual target.
 
 For pinned scoring, inspect the registered version, put that concrete value
 in `model_version`, redeploy the changed JSON, then run `score`. For champion
@@ -1199,3 +1544,17 @@ retries independently. A training retry can register another candidate version.
 Inspect failed run evidence and registry state before rerunning; retry score
 separately after an already-committed approval. This is not an exactly-once
 training guarantee. See the [Databricks serverless retry behavior](https://docs.databricks.com/aws/en/jobs/run-serverless-jobs).
+
+
+### Job resource files
+
+Generated projects keep training/lifecycle tasks in `resources/train.job.yml`
+and batch scoring in `resources/score.job.yml`. The root `databricks.yml`
+includes both through `resources/*.yml`. Each job retains its own schedule and
+compute settings; training calls scoring through `${resources.jobs.score.id}`.
+
+When upgrading a project generated with `resources/workflow.jobs.yml`, replace
+that file with the two new files rather than keeping all three. Preserve the
+resource keys `train` and `score`, the bundle identity, target and workspace
+root so a redeploy continues to address the existing jobs. Preview and validate
+before deploying; splitting these files alone does not change task behavior.

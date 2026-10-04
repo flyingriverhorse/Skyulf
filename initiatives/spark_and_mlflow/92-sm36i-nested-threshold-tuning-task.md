@@ -1,6 +1,6 @@
 # SM-36i: threshold selection within nested tuning
 
-Date: 2026-09-27. Status: READY; requested, not implemented.
+Date: 2026-09-27. Completed: 2026-09-28. Status: DONE for documented scope.
 Dependency: SM-36f true nested tuning. Independent of SM-36g and SM-36h initially;
 their combinations require explicit integration tests before claiming support.
 
@@ -38,3 +38,12 @@ selected without access to that outer test fold.
   reload and prediction parity with threshold application enabled/disabled.
 - Run bounded pandas/Polars Databricks cases and verify persisted thresholds and
   readable results before recording DONE.
+
+## Completion evidence
+
+Implemented across Core/backend/Canvas/Bundle, with real nested selection and
+saved evidence. Final changed-feature suite: 291 passed; frontend: 134 passed;
+three generated bundles passed strict CLI validation. Databricks: 16/16 cases,
+384 replay predictions and independent persisted SHA verification.
+See [combined acceptance and limitations](101-sm36ghi-nested-policy-acceptance.md).
+Nested changes are included in the delivery commit; baseline graph commit is 42bc0d37.

@@ -18,6 +18,7 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 
 import logging
 from collections.abc import Callable
+from dataclasses import fields
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -26,13 +27,16 @@ import pandas as pd
 import polars as pl
 
 from backend.config import get_settings
+from backend.ml_pipeline._internal._code_only_nodes import reject_code_only_steps
 from backend.realtime.events import JobEvent, publish_job_event
 from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineName, EngineRegistry
 from skyulf.engines.sklearn_bridge import SklearnBridge
+from skyulf.modeling._tuning.cv_policy import validate_holdout_metadata
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.clustering import _select_numeric_features
 from skyulf.modeling.cross_validation import _detect_datetime_columns
@@ -321,10 +325,15 @@ class NodeRunnersMixin:
         frame: Any, target_col: str, tuning_params: dict[str, Any]
     ) -> set[str]:
         """Exclude legitimate label and time-series columns from numeric feature checks."""
-        excluded: set[str] = set()
-        if target_col and target_col in frame.columns:
-            excluded.add(target_col)
-        if tuning_params.get("cv_type") == "time_series_split":
+        excluded = {
+            str(column)
+            for column in (target_col, tuning_params.get("cv_group_column"))
+            if column in frame.columns
+        }
+        policy = tuning_params.get("cv_type")
+        if policy == "nested_cv":
+            policy = tuning_params.get("cv_nested_type", "auto")
+        if policy == "time_series_split":
             time_col = tuning_params.get("cv_time_column")
             if not time_col:
                 is_polars = EngineRegistry.resolve(frame).name == EngineName.POLARS
@@ -689,9 +698,22 @@ class NodeRunnersMixin:
             "cv_shuffle": node.params.get("cv_shuffle", True),
             "cv_random_state": node.params.get("cv_random_state", DEFAULT_RANDOM_STATE),
             "cv_time_column": node.params.get("cv_time_column") or None,
+            **self._split_policy_params(node.params),
             "random_state": node.params.get("random_state", DEFAULT_RANDOM_STATE),
             "tune_threshold": node.params.get("tune_threshold", False),
         }
+
+    @staticmethod
+    def _split_policy_params(params: dict[str, Any]) -> dict[str, Any]:
+        """Preserve explicit CV policies while leaving absent fields at Core defaults."""
+        fields = (
+            "cv_nested_type",
+            "cv_group_column",
+            "cv_gap",
+            "cv_test_size",
+            "cv_max_train_size",
+        )
+        return {field: params[field] for field in fields if field in params}
 
     def _run_training(
         self, node: NodeConfig, job_id: str = "unknown"
@@ -942,6 +964,10 @@ class NodeRunnersMixin:
             shuffle=tuning_params.get("cv_shuffle", True),
             random_state=tuning_params.get("cv_random_state", DEFAULT_RANDOM_STATE),
             time_column=tuning_params.get("cv_time_column") or None,
+            group_column=tuning_params.get("cv_group_column") or None,
+            gap=tuning_params.get("cv_gap", 0),
+            test_size=tuning_params.get("cv_test_size"),
+            max_train_size=tuning_params.get("cv_max_train_size"),
             log_callback=self.log,
             preprocessing=preprocessing,
         )
@@ -973,6 +999,24 @@ class NodeRunnersMixin:
             raise ValueError(
                 f"Nested CV requires fold-local preprocessing; cannot use {refit_fallback}."
             )
+
+    def _validate_policy_holdouts(
+        self, data: Any, tuning_params: dict[str, Any], problem_type: str
+    ) -> None:
+        """Check original split membership before any tuning or preprocessing fit."""
+        raw = getattr(self, "_fold_policy_dataset", None)
+        dataset = raw if isinstance(raw, SplitDataset) else data
+        names = {field.name for field in fields(TuningConfig)}
+        config = TuningConfig(
+            **{key: value for key, value in tuning_params.items() if key in names}
+        )
+        train = self._resolve_train_frame(dataset.train)
+        for split in (dataset.validation, dataset.test):
+            if split is None:
+                continue
+            frame = self._resolve_train_frame(split)
+            if frame_rows(frame):
+                validate_holdout_metadata(train, frame, config, problem_type)
 
     def _run_training_tuned(
         self,
@@ -1031,6 +1075,7 @@ class NodeRunnersMixin:
         # permits fallback, recorded by the stable reason code in the metrics.
         fold_preprocessing, refit_fallback = self._resolve_fold_preprocessing(node, target_col)
         self._require_nested_fold_preprocessing(tuning_params, refit_fallback)
+        self._validate_policy_holdouts(data, tuning_params, calculator.problem_type)
 
         # Audit telemetry (findings 2026-08-26 §3/B): record the input row
         # count of every per-fold fit/transform so the run can be audited
@@ -1174,6 +1219,7 @@ class NodeRunnersMixin:
             self.artifact_store.save(f"exec_{node.node_id}_input", data)
 
         # Wrap the single node as a 1-step feature engineering pipeline
+        reject_code_only_steps(node.step_type, node.params)
         step_config = {
             "name": "step",  # Generic name, the artifact will be saved by engine anyway
             "transformer": node.step_type,

@@ -42,6 +42,7 @@ shapely>=2.0.2,<2.2.0                # Geometric operations
 
 # === HTTP CLIENT (ASYNC) ===
 httpx>=0.25.0,<1.0.0
+urllib3>=2.8.0,<3.0.0               # Security floor for transitive HTTP clients
 
 # === RATE LIMITING ===
 slowapi>=0.1.9                       # Per-endpoint rate limiting for FastAPI
@@ -71,6 +72,7 @@ optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter se
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
 cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
 imbalanced-learn>=0.14.1,<1.0.0     # Sampling strategies for imbalanced datasets
+sklearn-compat==0.1.5               # 0.1.6 breaks imbalanced-learn's g_score target unpacking
 rapidfuzz>=3.6.1,<4.0.0             # String similarity metrics for feature engineering
 
 # === NLP ANALYTICS ===
