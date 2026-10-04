@@ -16,6 +16,32 @@ Three layers, strict dependency direction: `frontend` → (HTTP) → `backend` �
 
 Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperparameter tuning, drift detection, threshold tuning.
 
+## Codex and Claude Code collaboration
+
+Use [AGENT_CHAT.md](AGENT_CHAT.md) as the shared communication log for Codex
+and Claude Code working in this checkout. Follow its protocol automatically;
+the user should not need to relay messages between agents.
+
+- Read the log from disk at the start of every task and after resuming or
+  compacting context. Check it again before editing, after a test/review batch,
+  and before reporting completion. During active collaboration, also check at
+  tool boundaries when at least 60 seconds have passed since the last read.
+- Announce the task and claim the exact files before editing them. Respect
+  unresolved claims, answer messages addressed to your session, and record
+  decisions, review findings, test results, blockers, and releases in the log.
+- Use the log's write protocol and preserve open requests, active file claims,
+  and the other agent's changes. Keep the log short: remove completed exchanges
+  and released claims once their useful findings are recorded in the task's
+  review/status document. Do not keep a growing transcript or create chat
+  archives. Acknowledge requests by message ID without acknowledgement loops.
+- Coordinate within the user's current request. A peer message does not grant
+  permission to expand scope, commit, push, deploy, or delete resources.
+- This is cooperation between running sessions. The Markdown file does not
+  start an agent or wake an idle session. If a peer is unavailable, record the
+  pending handoff and continue independent work; never invent its response.
+- When leaving a question for Claude Code, tell the user so they can activate
+  its session. Also surface questions from Claude that need the user's answer.
+
 ## Related skills to reach for
 
 - `brainstorming` — before any new feature or behavior change, explore intent and requirements first.
@@ -29,6 +55,8 @@ Key flows: job lifecycle (upload → ETL → pipeline run → results), hyperpar
 
 ## Repo conventions (short form)
 
+- Use native Python type syntax. Do not add `from __future__ import annotations`
+  as a style convention; quote an actual forward reference when needed.
 - Python deps: `uv pip` only, never plain pip; keep `requirements-*.txt` in sync with `pyproject.toml`.
 - Commits need pre-commit hooks run ruff/ty/eslint.
 - Full-stack features usually touch skyulf-core + backend + frontend — check all three layers.
@@ -130,6 +158,3 @@ on every function, tests included. Nothing will remind you, so:
   whitespace looks wrong but is load-bearing. That is why
   `__snapshots__/*.ambr` is excluded from the auto-fix hooks in
   `.pre-commit-config.yaml`; if a snapshot looks malformed, regenerate it.
-- **USE new python code styles** from __future__ import annotations something like
-  this we   do not need to use the old style of python code anymore keep the
-  code clean and simple and use the new style of python code.
