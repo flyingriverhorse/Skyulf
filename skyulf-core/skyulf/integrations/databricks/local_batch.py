@@ -26,9 +26,10 @@ from ...inference.local_pipeline import (
     save_local_pipeline,
 )
 from ...inference.local_scoring import scoring_counts
-from ...pipeline import SkyulfPipeline
 from ._contracts import column_name, table_name
+from .decision_thresholds import threshold_policy
 from .local_sdk import PreparedLocalWorkflow
+from .threshold_training import fit_threshold_pipeline
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -90,12 +91,14 @@ def fit_local_workflow(
     if type(max_bytes) is not int or max_bytes <= 0:
         raise ValueError("max_bytes must be positive.")
     _validate_training_frames(data, max_rows, max_bytes)
-    pipeline = SkyulfPipeline(config)
-    pipeline.fit(data, target_column=target_column)
+    pipeline = fit_threshold_pipeline(config, data, target_column)
     save_local_pipeline(
         pipeline,
         artifact_path,
-        use_tuned_thresholds=bool(config.get("modeling", {}).get("tune_threshold", False)),
+        use_tuned_thresholds=(
+            threshold_policy(config)["mode"] != "off"
+            or bool(config.get("modeling", {}).get("tune_threshold", False))
+        ),
     )
     return load_local_pipeline(artifact_path)
 

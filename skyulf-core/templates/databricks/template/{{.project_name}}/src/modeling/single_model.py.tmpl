@@ -29,6 +29,18 @@ from copy import deepcopy
 
 WEIGHT_COLUMN = {{if eq .sample_weight_enabled "true"}}"{{.weight_column}}"{{else}}None{{end}}
 
+# Classification only. Off keeps native model decisions.
+# Binary manual: {"mode": "manual", "positive_class": 1, "value": 0.7}
+# Multiclass manual: {"mode": "manual", "thresholds": [
+#     {"class": "a", "value": 0.4}, {"class": "b", "value": 0.3},
+#     {"class": "c", "value": 0.3}]}
+# Auto: {"mode": "auto", "metric": "balanced_accuracy",
+#        "validation_fraction": 0.2, "random_state": 42}
+# Use original typed target labels, even when preprocessing encodes the target.
+# Auto reserves training rows; it never uses final holdout.
+# Do not also enable the legacy modeling.tune_threshold setting.
+DECISION_THRESHOLD = {"mode": "off"}
+
 {{ $model := index . (printf "%s_model" .task) }}
 {{ if eq .sample_weight_enabled "true" }}{{ $model = index . (printf "%s_model_weighted" .task) }}{{ end }}
 MODELING = {{if eq .training_layout "single_model"}}{{template "modeling" (map (pair "values" .) (pair "prefix" "") (pair "model" $model) (pair "task" .task) (pair "ensemble_prefix" "single_ensemble_"))}}{{else}}{}{{end}}

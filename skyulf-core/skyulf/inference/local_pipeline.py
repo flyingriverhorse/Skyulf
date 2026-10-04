@@ -21,6 +21,7 @@ from sklearn.base import is_classifier
 from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
+from ..preprocessing._target_labels import original_labels
 from ._manifest import checksum, runtime_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
 from .project_dependencies import source_project_requirements, verify_project_requirements
@@ -83,7 +84,7 @@ def _manifest(
     if fitted_engine not in ("pandas", "polars"):
         raise ValueError("Local artifact requires a recorded pandas or Polars fit engine.")
     classification = is_classifier(model)
-    classes = tuple(np.asarray(model.classes_).tolist()) if classification else ()
+    classes = tuple(original_labels(pipeline, model.classes_).tolist()) if classification else ()
     classification_probabilities = not classification or callable(
         getattr(model, "predict_proba", None)
     )
@@ -243,6 +244,8 @@ def predict_local_pipeline(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
         )
     )
+    if artifact.manifest.task == "classification":
+        prediction = original_labels(artifact.pipeline, prediction)
     if prediction.shape != (len(frame),):
         raise ValueError("Local pipeline prediction shape disagrees with input rows.")
     index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))

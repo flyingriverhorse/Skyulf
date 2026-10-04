@@ -15,7 +15,7 @@ from .._artifacts import LabelEncoderArtifact
 from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine, fit_dual_engine
+from ._target import apply_target_encoder, fit_target_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
         y_out = (
-            pl.Series(getattr(y, "name", "target"), _y_to_str_array(y))
+            pl.Series(getattr(y, "name", "target"), _y_to_str_array(y), dtype=pl.String)
             .replace_strict(mapping, default=missing_code)
             .cast(pl.Int64)
         )
@@ -137,8 +137,9 @@ class LabelEncoderApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch to the engine-specific encode, forwarding ``(X, y)`` only when ``y`` exists."""
-        return apply_dual_engine(
-            (X, y) if y is not None else X,
+        return apply_target_encoder(
+            X,
+            y,
             params,
             {"polars": _label_apply_polars, "pandas": _label_apply_pandas},
         )
@@ -339,8 +340,9 @@ class LabelEncoderCalculator(BaseCalculator):
         """Fit the encoders on the frame's own engine, forwarding ``y`` when present."""
         return cast(
             LabelEncoderArtifact,
-            fit_dual_engine(
-                (X, y) if y is not None else X,
+            fit_target_encoder(
+                X,
+                y,
                 config,
                 {"polars": _label_fit_polars, "pandas": _label_fit_pandas},
             ),

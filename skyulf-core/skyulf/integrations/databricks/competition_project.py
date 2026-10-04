@@ -54,7 +54,7 @@ def _candidate_definition(value: Any) -> dict[str, Any]:
     """Keep candidate overrides limited to the model and a preprocessing recipe."""
     if type(value) is not dict or "modeling" not in value:
         raise ValueError("Each candidate must define modeling.")
-    if set(value) - {"modeling", "preprocessing_recipe"}:
+    if set(value) - {"modeling", "preprocessing_recipe", "decision_threshold"}:
         raise ValueError(
             "Unknown candidate setting; shared workflow settings cannot be overridden."
         )
@@ -141,6 +141,8 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
         local = deepcopy(config)
         local["training_layout"] = "single_model"
         local["pipeline"]["modeling"] = deepcopy(candidate["modeling"])
+        if "decision_threshold" in candidate:
+            local["pipeline"]["decision_threshold"] = deepcopy(candidate["decision_threshold"])
         _bind_candidate_metric(local["pipeline"], metric)
         loaded = resolve_project_workflow(
             local,

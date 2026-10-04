@@ -349,6 +349,7 @@ def _add_roc_pr_auc_metrics(
             proba[:, 1],
             pos_label=pos_label,
         )
+        _add_binary_probability_aliases(metrics)
         return
     # Explicitly pass the full label set the model was trained on
     # (`classes`, resolved below) so a CV fold whose validation
@@ -360,6 +361,21 @@ def _add_roc_pr_auc_metrics(
         classes = np.arange(class_count)
 
     _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count)
+
+
+def _add_binary_probability_aliases(metrics: dict[str, float]) -> None:
+    """Expose admitted binary AUC names with the same positive-class score semantics."""
+    if "roc_auc" in metrics:
+        for name in (
+            "roc_auc_weighted",
+            "roc_auc_ovr",
+            "roc_auc_ovo",
+            "roc_auc_ovr_weighted",
+            "roc_auc_ovo_weighted",
+        ):
+            metrics[name] = metrics["roc_auc"]
+    if "pr_auc" in metrics:
+        metrics["pr_auc_weighted"] = metrics["pr_auc"]
 
 
 def _add_probability_based_metrics(

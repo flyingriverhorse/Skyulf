@@ -34,6 +34,8 @@ MODELS = {
 {{$model := index $ (printf "competition_%s_model_%s" $.task $slot)}}
 {{if eq $.sample_weight_enabled "true"}}{{$model = index $ (printf "competition_%s_model_%s_weighted" $.task $slot)}}{{end}}
     "{{$model}}_{{$slot}}": {
+        # Optional classification policy per candidate; see single_model.py examples.
+        "decision_threshold": {"mode": "off"},
         "preprocessing_recipe": "{{$.competition_preprocessing_recipe}}",
         "modeling": {{template "modeling" (map (pair "indent" "        ") (pair "values" $) (pair "prefix" "") (pair "model" $model) (pair "task" $.task) (pair "ensemble_prefix" (printf "competition_ensemble_%s_" $slot)))}},
     },

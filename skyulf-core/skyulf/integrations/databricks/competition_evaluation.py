@@ -33,9 +33,11 @@ from ...preprocessing.fold_adapter import (
     merged_branch_step_unsafe_reason,
 )
 from ...registry import NodeRegistry
+from .decision_thresholds import threshold_policy
 from .local_cv import CV_FIELDS, LocalCVSpec
 from .local_search import base_model_config, validate_metric
 from .local_search_results import tuning_evidence
+from .threshold_cv import evaluate_threshold_cv
 
 _MINIMIZE = {"mae", "mse", "rmse", "log_loss"}
 _BINARY_METRICS = {"f1", "precision", "recall", "roc_auc", "pr_auc"}
@@ -78,7 +80,7 @@ def validate_competition_preprocessing(pipeline: dict[str, Any]) -> None:
             )
 
 
-def _policy(cv: LocalCVSpec, metric: str, event_column: str | None) -> TuningConfig:
+def build_cv_policy(cv: LocalCVSpec, metric: str, event_column: str | None) -> TuningConfig:
     """Translate the shared workflow controls without introducing splitter defaults."""
     fields = {name: getattr(cv, field) for name, field in CV_FIELDS.items()}
     return TuningConfig(
@@ -115,7 +117,7 @@ def _validate_bounds(frame: Any, max_rows: int, max_bytes: int) -> None:
         raise ValueError("Competition training data exceeds max_rows or max_bytes.")
 
 
-def _split_plan(policy: TuningConfig, task: str, y: Any, metadata: dict) -> FrozenSplit:
+def build_fold_plan(policy: TuningConfig, task: str, y: Any, metadata: dict) -> FrozenSplit:
     """Use Core policies, including the actual repeated 20-percent shuffle split."""
     if policy.cv_type != "shuffle_split":
         return policy_splitter(policy, task, y, metadata)
@@ -128,7 +130,7 @@ def _split_plan(policy: TuningConfig, task: str, y: Any, metadata: dict) -> Froz
     return FrozenSplit(parts, [fold_evidence(train, test, metadata) for train, test in parts])
 
 
-def _membership_digest(frame: Any, policy: TuningConfig, plan: FrozenSplit) -> str:
+def fold_membership_digest(frame: Any, policy: TuningConfig, plan: FrozenSplit) -> str:
     """Bind positional membership to the original training order, including time sorting."""
     order = np.arange(len(frame))
     if policy_description(policy, "regression")["method"] == "time_series_split":
@@ -318,12 +320,24 @@ def evaluate_competition_candidate(
     _validate_input(frame, artifact, cv, target_column, max_rows, max_bytes)
     task = artifact.manifest.task
     native_metric = competition_metric(metric, task)
-    policy = _policy(cv, native_metric, event_column)
+    policy = build_cv_policy(cv, native_metric, event_column)
     pipeline: dict[str, Any] = dict(artifact.pipeline.config)
     validate_competition_preprocessing(pipeline)
     cv.validate_pipeline(pipeline, target_column=target_column, event_column=event_column)
     y = frame[target_column]
     scorer = _validate_objective(policy, task, y, pipeline["modeling"])
+    if threshold_policy(pipeline)["mode"] != "off":
+        return _threshold_competition(
+            frame,
+            pipeline,
+            cv,
+            target_column,
+            metric,
+            scorer,
+            event_column,
+            sample_weight,
+        )
+    frame = _native_competition_frame(frame, artifact, cv, target_column, event_column)
     X = (
         frame.drop(target_column)
         if isinstance(frame, pl.DataFrame)
@@ -335,7 +349,7 @@ def evaluate_competition_candidate(
         X, y, policy, task, adapter, return_positions=True
     )
     ordered_weight = None if sample_weight is None else sample_weight[positions]
-    plan = _split_plan(policy, task, prepared_y, metadata)
+    plan = build_fold_plan(policy, task, prepared_y, metadata)
     calculator, params, evidence = _candidate_recipe(artifact)
     if cv.method == "nested_cv":
         report = _nested_report(X, y, calculator, params, policy, adapter, evidence, sample_weight)
@@ -354,9 +368,63 @@ def evaluate_competition_candidate(
         "direction": "minimize" if minimize else "maximize",
         **_score_summary(values),
         "fold_scores": values,
-        "fold_membership_sha256": _membership_digest(frame, policy, plan),
+        "fold_membership_sha256": fold_membership_digest(frame, policy, plan),
         "evaluation_mode": mode,
         "unbiased_estimate": mode != "post_selection_cv",
         "split_policy": policy_description(policy, task),
         "folds": plan.evidence,
     }
+
+
+def _native_competition_frame(
+    frame: Any, artifact: LocalPipelineArtifact, cv: LocalCVSpec, target: str, event: str | None
+) -> Any:
+    """Exclude metadata retained solely for another candidate's calibration policy."""
+    columns = [*artifact.manifest.input_columns, target]
+    for column in (cv.group_column, event if cv.temporal else None):
+        if column and column not in columns:
+            columns.append(column)
+    return frame.select(columns) if isinstance(frame, pl.DataFrame) else frame.loc[:, columns]
+
+
+def _threshold_competition(
+    frame: Any,
+    pipeline: dict,
+    cv: LocalCVSpec,
+    target: str,
+    metric: str,
+    scorer: str,
+    event: str | None,
+    sample_weight: Any,
+) -> dict:
+    """Compare fully refitted decision policies on the same untouched outer folds."""
+    report = evaluate_threshold_cv(
+        frame, pipeline, cv, target_column=target, event_column=event, sample_weight=sample_weight
+    )
+    native = metric.removeprefix("heldout_")
+    scores = _threshold_fold_scores(report["fold_results"], native)
+    return {
+        "metric": metric,
+        "scoring_metric": scorer,
+        "direction": "minimize" if native in _MINIMIZE else "maximize",
+        **_score_summary(scores),
+        "fold_scores": scores,
+        "fold_membership_sha256": report["fold_membership_sha256"],
+        "evaluation_mode": "nested_threshold_cv" if cv.method == "nested_cv" else "threshold_cv",
+        "unbiased_estimate": True,
+        "split_policy": report["split_policy"],
+        "folds": [fold["split"] for fold in report["folds"]],
+        "decision_threshold_folds": report["decision_threshold_folds"],
+    }
+
+
+def _threshold_fold_scores(folds: list[dict], metric: str) -> list[float]:
+    """Reject incomplete requested metric evidence instead of leaking a missing-key error."""
+    scores = []
+    for index, fold in enumerate(folds, start=1):
+        if metric not in fold:
+            raise ValueError(
+                f"Competition metric {metric} is unavailable in threshold fold {index}."
+            )
+        scores.append(_finite_score(fold[metric]))
+    return scores

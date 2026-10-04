@@ -14,6 +14,7 @@ from ...inference.project_code import (
 from ...inference.project_scoring import validate_scoring_config
 from ._project_files import modeling_hook, project_source, read_source
 from ._project_recipes import bind_recipe_source, recipe_label, recipe_steps
+from .decision_thresholds import threshold_policy
 from .local_ensemble import ENSEMBLE_MODELS
 from .local_search import bounded_space
 from .weight_config import capture_model_weights, validate_weight_roles
@@ -60,6 +61,11 @@ def _load_single_model(config: dict[str, Any], path: Path) -> dict[str, Any]:
         raise ValueError("single_model.py returned more than 64 KiB of parameters.")
     result = deepcopy(config)
     result["pipeline"]["modeling"] = modeling
+    if hasattr(module, "DECISION_THRESHOLD"):
+        result["pipeline"]["decision_threshold"] = strict_json_value(
+            module.DECISION_THRESHOLD, hook.name
+        )
+        threshold_policy(result["pipeline"])
     if hasattr(module, "WEIGHT_COLUMN"):
         result.update(capture_model_weights(source, {"weight_column": module.WEIGHT_COLUMN}))
     return result

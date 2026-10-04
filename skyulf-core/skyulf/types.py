@@ -40,6 +40,8 @@ class PipelineConfig(TypedDict, total=False):
     preprocessing: list[PreprocessingStepConfig]
     modeling: ModelConfig
     project_python_source: str
+    decision_threshold: dict[str, Any]
+    decision_threshold_context: dict[str, Any]
 
 
 class NodeMetadataDict(TypedDict, total=False):

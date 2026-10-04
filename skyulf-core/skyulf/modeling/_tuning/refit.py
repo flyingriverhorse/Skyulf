@@ -131,6 +131,7 @@ def resolve_threshold_metric(
         "balanced_accuracy": balanced_accuracy_score,
         "f1": lambda yt, yp: f1_score(yt, yp, zero_division=0, **pos_kwargs),
         "f1_weighted": lambda yt, yp: f1_score(yt, yp, average="weighted", zero_division=0),
+        "f1_macro": lambda yt, yp: f1_score(yt, yp, average="macro", zero_division=0),
         "precision": lambda yt, yp: precision_score(yt, yp, zero_division=0, **pos_kwargs),
         "precision_weighted": lambda yt, yp: precision_score(
             yt, yp, average="weighted", zero_division=0

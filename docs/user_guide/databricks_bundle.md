@@ -552,6 +552,88 @@ integration. Its timeout is a soft search deadline and cannot interrupt an activ
 model fit. Nested binary search can select a decision threshold from training-only
 inner out-of-fold predictions with `"tune_threshold": True` in the model definition.
 
+### Optional classification decision thresholds
+
+New projects keep decision thresholds **off**. Edit `DECISION_THRESHOLD` in
+`src/modeling/single_model.py`. In a competition, edit each candidate's
+`decision_threshold` in `MODELS`; for independent targets, edit each branch's
+`workflow.pipeline.decision_threshold` in `src/modeling/multi_model.py`.
+These are model settings; the Bundle initialization wizard does not ask for them.
+SDK configurations use `pipeline.decision_threshold` directly.
+
+```python
+# Native classifier decisions; no calibration partition is reserved.
+DECISION_THRESHOLD = {"mode": "off"}
+
+# Binary: predict "churn" when its probability is >= 0.7, including exact ties.
+DECISION_THRESHOLD = {"mode": "manual", "positive_class": "churn", "value": 0.7}
+
+# Multiclass: exactly one class wins argmax(probability / class value).
+DECISION_THRESHOLD = {
+    "mode": "manual",
+    "thresholds": [
+        {"class": "low", "value": 0.5},
+        {"class": "medium", "value": 0.3},
+        {"class": "high", "value": 0.2},
+    ],
+}
+
+# Binary or multiclass: select thresholds on a reserved part of training data.
+DECISION_THRESHOLD = {
+    "mode": "auto",
+    "metric": "balanced_accuracy",
+    "validation_fraction": 0.2,
+    "random_state": 42,
+}
+```
+
+Use original target labels, preserving their types (e.g. integer `1` versus
+string `"1"`), even when preprocessing encodes the target. The fitted encoder
+chain maps these labels to the model's probability columns. Saved local models
+return original labels and record them in `manifest.classes`; evaluation uses
+the same mapping. This covers LabelEncoder and OrdinalEncoder, including explicit
+category order and repeated encoding around resampling. Feature-only encoders
+do not change target labels. Multiclass entries must cover every class exactly once, with
+positive finite values; they are relative decision weights, not minimum confidence
+requirements. The result always has one class, even if all probabilities are low.
+Binary manual cutoffs permit both endpoints, zero and one.
+
+Automatic mode reserves 20% of the training partition by default, **before fitting
+preprocessing or selecting model parameters**. It fits the model on the remaining
+rows, selects thresholds on calibration rows, and saves that fitted model without
+refitting on the calibration population. Final holdout labels never select an
+estimator, preprocessing state or threshold. Random calibration is stratified;
+group CV keeps groups separate; temporal workflows use a chronological calibration
+tail and honor the configured CV gap. Every class must occur in both partitions,
+otherwise training fails with an actionable error. Small datasets can therefore
+require a different split or manual mode.
+
+Supported automatic objectives are `balanced_accuracy`, binary `f1`, `f1_macro`,
+`f1_weighted`, and `matthews_corrcoef`. For binary selection, `positive_class` is
+optional and defaults to the fitted model's second class. The existing heldout
+binary precision/recall/F1 and probability metrics retain that second-class
+reporting convention, even when a different label owns the decision cutoff.
+Thresholds change class predictions; they do not calibrate or alter probabilities.
+An improved calibration score does not guarantee a better independent holdout score.
+
+CV and competition independently refit the complete model-and-threshold policy
+inside every outer training fold. Parameter searches also run inside those folds;
+their extra work counts toward `competition_max_trials`. The original model-search
+scores in `tuning.json` describe base-model selection, while `cross_validation.json`
+and `competition_evaluation.json` evaluate the final decision policy.
+`decision_threshold.json` records fitting/calibration counts, selected values,
+the positive class and calibration scores. Model reload, registry evaluation,
+batch prediction preserve the saved decision rule. For an additional standalone
+inference bundle export, pass `use_tuned_thresholds=True` to `build_bundle`.
+That separate portable format retains its existing supported-node restrictions;
+target-encoder pipelines use the full local artifact saved by the Bundle.
+
+Regression and classifiers without `predict_proba` cannot enable thresholds.
+Legacy nested binary `modeling.tune_threshold` remains supported; do not enable it
+alongside `manual` or `auto`. An explicit `off` policy leaves that independently
+requested legacy behavior intact. Promotion `quality_threshold` remains a separate
+acceptance gate.
+
 Edit shared CV settings in the generated configuration:
 
 ```json

@@ -61,6 +61,8 @@ def apply_thresholds(
     y_proba: Any,
     thresholds: dict[Any, float] | float,
     classes: Any = None,
+    *,
+    positive_class: Any = None,
 ) -> np.ndarray:
     """Convert predicted probabilities into class predictions using per-class thresholds.
 
@@ -85,6 +87,7 @@ def apply_thresholds(
         classes: Explicit class label order matching ``y_proba``'s columns.
             Required when ``y_proba`` has more than 2 columns and
             ``thresholds`` is a dict (to know column-to-class mapping).
+        positive_class: Optional binary positive label; it wins exact cutoff ties.
 
     Returns:
         1D numpy array of predicted class labels, length n_samples.
@@ -93,16 +96,10 @@ def apply_thresholds(
         ValueError: If ``y_proba`` isn't 2D, or ``thresholds`` doesn't cover
             every class implied by ``y_proba``'s column count.
     """
-    y_proba = np.asarray(y_proba, dtype=float)
-    if y_proba.ndim != 2:
-        raise ValueError(f"y_proba must be 2D (n_samples, n_classes); got shape {y_proba.shape}")
-
+    y_proba, classes = _probability_columns(y_proba, classes)
     n_classes = y_proba.shape[1]
-    if classes is None:
-        classes = np.arange(n_classes)
-    classes = np.asarray(classes)
-    if len(classes) != n_classes:
-        raise ValueError(f"classes has {len(classes)} entries but y_proba has {n_classes} columns")
+    if positive_class is not None:
+        return _apply_named_binary(y_proba, thresholds, classes, positive_class)
 
     if n_classes == 2 and not isinstance(thresholds, dict):
         threshold = float(thresholds)
@@ -124,6 +121,29 @@ def apply_thresholds(
         return _apply_binary_weights(y_proba, thresholds_array, classes)
     scaled = y_proba / thresholds_array
     return classes[np.argmax(scaled, axis=1)]
+
+
+def _probability_columns(y_proba: Any, classes: Any) -> tuple[np.ndarray, np.ndarray]:
+    """Validate the probability matrix and retain its explicit class-column order."""
+    y_proba = np.asarray(y_proba, dtype=float)
+    if y_proba.ndim != 2:
+        raise ValueError(f"y_proba must be 2D (n_samples, n_classes); got shape {y_proba.shape}")
+    n_classes = y_proba.shape[1]
+    classes = np.arange(n_classes) if classes is None else np.asarray(classes)
+    if len(classes) != n_classes:
+        raise ValueError(f"classes has {len(classes)} entries but y_proba has {n_classes} columns")
+    return y_proba, classes
+
+
+def _apply_named_binary(y_proba: Any, thresholds: Any, classes: Any, positive: Any) -> np.ndarray:
+    """Apply an explicit probability cutoff with inclusive ties for either binary label."""
+    if len(classes) != 2 or positive not in classes:
+        raise ValueError("positive_class must match a binary probability column.")
+    position = int(np.flatnonzero(classes == positive)[0])
+    cutoff = thresholds[positive] if isinstance(thresholds, dict) else thresholds
+    if not np.isfinite(cutoff) or not 0 <= cutoff <= 1:
+        raise ValueError("Named binary threshold must be finite and between zero and one.")
+    return np.where(y_proba[:, position] >= cutoff, classes[position], classes[1 - position])
 
 
 def _grid_search_binary(

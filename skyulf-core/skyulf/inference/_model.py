@@ -98,6 +98,7 @@ def threshold_provenance(
         tuning_values=tuning_values,
         pipeline_values=pipeline_values,
         metric=getattr(tuning, "decision_threshold_metric", None),
+        positive_class=(pipeline._decision_positive_class() if enabled else None),
     )
 
 

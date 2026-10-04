@@ -9,6 +9,7 @@ import pandas as pd
 
 from . import local_retraining as training
 from ._lifecycle_state import PhaseStore
+from .decision_thresholds import needs_threshold_time
 from .local_cv import LocalCVSpec
 
 
@@ -59,7 +60,7 @@ def prepare_dataset(store: PhaseStore, spec: training.LocalTrainingSpec) -> dict
         frame,
         spec,
         engine=config["engine"],
-        keep_training_event=cv.enabled and cv.temporal,
+        keep_training_event=(cv.enabled and cv.temporal) or needs_threshold_time(config),
     )
     return {
         "split_strategy": spec.split_strategy,

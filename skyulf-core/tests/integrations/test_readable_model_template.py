@@ -43,10 +43,19 @@ def test_generated_settings_are_python_dicts(tmp_path, layout, name):
         config = json.loads((project / "config/workflow.json").read_text())
         assert config["pipeline"]["modeling"] == {}
         assert module["build_modeling"]()["type"] == "hyperparameter_tuner"
+        assert module["DECISION_THRESHOLD"] == {"mode": "off"}
     elif layout == "model_competition":
         assert len(module["build_candidates"](task="regression")) == 2
+        assert all(
+            model["decision_threshold"] == {"mode": "off"}
+            for model in module["build_candidates"](task="regression").values()
+        )
     else:
         assert len(module["build_training_branches"]()) == 2
+        assert all(
+            model["workflow"]["pipeline"]["decision_threshold"] == {"mode": "off"}
+            for model in module["build_training_branches"]().values()
+        )
 
 
 @pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")

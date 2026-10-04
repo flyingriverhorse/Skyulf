@@ -21,7 +21,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 import polars as pl
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from sklearn.utils.validation import check_consistent_length
 
 from ..core.meta.decorators import node_meta
@@ -287,6 +287,26 @@ class DataSplitter:
         self.stratify_col = stratify_col
 
     # ---- public API ---------------------------------------------------------
+
+    def split_indices(self, n: int, stratify: Any = None, *, groups: Any = None) -> tuple[Any, Any]:
+        """Split row positions for an initial train/test or calibration partition.
+
+        Callers gather features, targets and weights with these same positions.
+        Optional groups remain whole; group splits require shuffle and cannot
+        simultaneously stratify. This method does not create a third validation
+        partition; ``split`` and ``split_xy`` own that optional second split.
+        """
+        if groups is not None:
+            if stratify is not None or not self.shuffle:
+                raise ValueError("Group splitting requires shuffle=True and stratify=None.")
+            check_consistent_length(np.arange(n), groups)
+            if pd.isna(np.asarray(groups)).any():
+                raise ValueError("Group metadata must be nonnull.")
+            splitter = GroupShuffleSplit(
+                n_splits=1, test_size=self.test_size, random_state=self.random_state
+            )
+            return next(splitter.split(np.arange(n), groups=groups))
+        return self._split_indices(n, stratify)
 
     def split_xy(
         self,

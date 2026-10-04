@@ -21,7 +21,6 @@ from typing import Any, Literal, cast
 
 import pandas as pd
 import polars as pl
-from sklearn.model_selection import GroupShuffleSplit
 
 from skyulf.integrations.databricks._local_frames import frame_bytes
 
@@ -42,6 +41,7 @@ from ..mlflow.validation import (
     validate_quality_policy,
 )
 from ._contracts import column_name, table_name
+from .decision_thresholds import threshold_policy
 from .evaluation_chart_data import chart_recorder, chart_settings
 from .local_batch import fit_local_workflow
 from .local_cv import CV_FIELDS, LocalCVSpec, evaluate_training_cv
@@ -849,6 +849,14 @@ def candidate_config(
         config, cv, target_column=spec.target_column, event_column=spec.event_column
     )
     feature_prefix = projected_fixed_steps(spec.pre_split_steps, spec.input_columns)
+    if threshold_policy(pipeline_config)["mode"] != "off":
+        pipeline_config["decision_threshold_context"] = {
+            "split_strategy": spec.split_strategy,
+            "event_column": spec.event_column,
+            "group_column": spec.group_column,
+            "input_columns": list(spec.input_columns),
+            "gap": cv.gap,
+        }
     pipeline_config["preprocessing"] = [*feature_prefix, *pipeline_config.get("preprocessing", [])]
     contract = target_contract(spec.pre_split_steps, spec.target_column)
     pipeline_config.pop("pre_split_target_contract", None)
@@ -892,7 +900,8 @@ def _candidate_cv(
         validate_search_membership(
             frame, pipeline, cv, target_column=spec.target_column, event_column=spec.event_column
         )
-        return None
+        if threshold_policy(pipeline)["mode"] == "off":
+            return None
     if evaluate_cv:
         return evaluate_training_cv(
             frame,
@@ -903,6 +912,28 @@ def _candidate_cv(
             sample_weight=sample_weight,
         )
     return None
+
+
+def _keep_fit_time(cv: LocalCVSpec, spec: LocalTrainingSpec, automatic: bool) -> bool:
+    """Retain event metadata for temporal CV or training-only calibration."""
+    return (cv.enabled and cv.temporal) or (automatic and spec.split_strategy == "temporal")
+
+
+def _native_search_cv(search: bool, evaluate_cv: bool, config: dict) -> bool:
+    """Avoid replacing complete decision-policy CV with native search scores."""
+    return search and evaluate_cv and threshold_policy(config)["mode"] == "off"
+
+
+def _candidate_training_frame(
+    frame: pd.DataFrame, spec: LocalTrainingSpec, keep_time: bool
+) -> pd.DataFrame:
+    """Project shared prepared rows to only this candidate's feature and split roles."""
+    columns = [*spec.input_columns, spec.target_column]
+    if spec.group_column:
+        columns.append(spec.group_column)
+    if keep_time and spec.event_column:
+        columns.append(spec.event_column)
+    return frame.loc[:, columns]
 
 
 def fit_candidate(
@@ -924,7 +955,8 @@ def fit_candidate(
     run.client.log_dict(run.run_id, config, "training_pipeline_config.json")
     run.log_params({key: getattr(cv, field) for key, field in CV_FIELDS.items()})
     run.client.log_dict(run.run_id, training_spec_payload(spec, engine), "training_snapshot.json")
-    temporal_cv = cv.enabled and cv.temporal
+    automatic = threshold_policy(pipeline_config)["mode"] == "auto"
+    temporal_cv = _keep_fit_time(cv, spec, automatic)
     frame, train_frame, holdout, unavailable = prepared_data or read_training_partitions(
         spark, spec, temporal_cv=temporal_cv, engine=engine
     )
@@ -934,6 +966,7 @@ def fit_candidate(
         sample_key_sha256=holdout.attrs["sample_key_sha256"],
     )
     train_frame, sample_weight = extract_training_weights(train_frame, spec.weight_column)
+    train_frame = _candidate_training_frame(train_frame, spec, temporal_cv)
     if "training_weights" in holdout.attrs:
         pipeline_config = {**pipeline_config, "training_weights": holdout.attrs["training_weights"]}
     native_train = pl.from_pandas(train_frame) if engine == "polars" else train_frame
@@ -948,7 +981,7 @@ def fit_candidate(
         evaluate_cv=evaluate_cv,
         sample_weight=sample_weight,
     )
-    native_train = _final_fit_frame(native_train, spec, temporal_cv, search)
+    native_train = _final_fit_frame(native_train, spec, temporal_cv, search or automatic)
     artifact = fit_local_workflow(
         pipeline_config,
         SplitDataset(
@@ -959,7 +992,7 @@ def fit_candidate(
         max_rows=spec.max_rows,
         max_bytes=spec.max_bytes,
     )
-    if search and evaluate_cv:
+    if _native_search_cv(search, evaluate_cv, pipeline_config):
         cv_results = post_selection_cv(
             native_train,
             artifact,
@@ -1018,6 +1051,15 @@ def log_fitted_candidate(
     cv_results, evidence = fitted.cv_results, fitted.evidence
     unavailable = fitted.unavailable_labels
     _log_tuning_evidence(run, artifact, config)
+    threshold_evidence = getattr(artifact.pipeline, "_decision_threshold_evidence", None)
+    if threshold_evidence is not None:
+        run.client.log_dict(run.run_id, threshold_evidence, "decision_threshold.json")
+        run.log_params(
+            {
+                "decision_threshold_mode": threshold_evidence["mode"],
+                "decision_threshold_fitting_rows": threshold_evidence["fitting_rows"],
+            }
+        )
     log_training_parameters(run, artifact, spec, config)
     if cv_results is not None:
         cv_results.update(
@@ -1672,10 +1714,9 @@ def _partition_group_rows(
         return train, heldout
     if groups.nunique() < 2:
         raise ValueError("Group holdout requires at least two distinct groups.")
-    splitter = GroupShuffleSplit(
-        n_splits=1, test_size=spec.test_size, random_state=spec.random_state
-    )
-    train, heldout = next(splitter.split(selected, groups=groups))
+    assert spec.test_size is not None and spec.random_state is not None
+    splitter = DataSplitter(test_size=spec.test_size, random_state=spec.random_state)
+    train, heldout = splitter.split_indices(len(selected), groups=groups)
     return selected.iloc[train], selected.iloc[heldout]
 
 
@@ -1785,7 +1826,7 @@ def _final_fit_frame(
     search: bool,
 ) -> pd.DataFrame | pl.DataFrame:
     """Remove CV-only split metadata before fitting a fixed final model."""
-    if (temporal_cv or spec.group_column) and not search:
+    if not search:
         model_columns = [*spec.input_columns, spec.target_column]
         native_train = (
             native_train.select(model_columns)

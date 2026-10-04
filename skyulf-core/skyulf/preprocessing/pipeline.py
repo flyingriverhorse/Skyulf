@@ -20,6 +20,7 @@ from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._feature_state import export_feature_state, restore_feature_state
 from ._spark import fit_spark, transform_spark, use_spark
+from ._target_labels import record_target_labels
 from ._weight_policy import prepare_pipeline_weights
 from .base import StatefulTransformer
 from .dispatcher import _check_xy_engine_parity
@@ -297,6 +298,9 @@ class FeatureEngineer:
             )
 
             raw_weights = _step_weights(current_data, transformer_inst, raw_weights)
+            record_target_labels(
+                data_before, current_data, target_column, transformer_type, fitted_params
+            )
 
             if (
                 on_split is not None

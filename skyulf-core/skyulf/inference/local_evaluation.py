@@ -12,6 +12,7 @@ from ..modeling._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+from ..preprocessing._target_labels import encoded_labels
 from .local_pipeline import LocalPipelineArtifact, predict_local_pipeline
 
 
@@ -85,6 +86,13 @@ def _holdout_metrics(
             model, features, heldout[target_column], **scoring_args
         )
     else:
+        # Score on the fitted class axis: custom ordinal orders need not match
+        # sklearn's sorted original labels. Observers still receive raw labels.
+        classes = model.classes_
+        scoring_args["y_np"] = encoded_labels(artifact.pipeline, actual, classes)
+        scoring_args["predictions"] = encoded_labels(
+            artifact.pipeline, scoring_args["predictions"], classes
+        )
         probability_columns = (
             [f"probability_{position}" for position in range(len(artifact.manifest.classes))]
             if artifact.manifest.classification_probabilities

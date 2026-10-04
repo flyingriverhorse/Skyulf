@@ -10,6 +10,7 @@ from ...inference.project_code import load_project_module
 from ..mlflow.tracking import TrackingRun
 from . import local_retraining as training
 from .competition_evaluation import evaluate_competition_candidate
+from .decision_thresholds import needs_threshold_time
 from .explanation_report import copy_winner_explanations
 from .local_competition import choose_winner
 from .local_cv import LocalCVSpec
@@ -31,7 +32,10 @@ def fit_competition(
     config = request["config"]
     cv = LocalCVSpec.from_workflow(config)
     partitions = prepared_data or training.read_training_partitions(
-        spark, spec, temporal_cv=cv.temporal, engine=config["engine"]
+        spark,
+        spec,
+        temporal_cv=cv.temporal or needs_threshold_time(config),
+        engine=config["engine"],
     )
     rows: list[dict[str, Any]] = []
     best = None

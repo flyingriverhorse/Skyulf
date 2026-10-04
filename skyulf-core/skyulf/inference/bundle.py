@@ -273,7 +273,12 @@ def _predict_features(
             raise ValueError("Model probability shape violates the bundle contract.")
     if manifest.thresholds.values:
         thresholds = dict(zip(manifest.classes, manifest.thresholds.values, strict=True))
-        predictions = apply_thresholds(probabilities, thresholds, classes=manifest.classes)
+        predictions = apply_thresholds(
+            probabilities,
+            thresholds,
+            classes=manifest.classes,
+            positive_class=manifest.thresholds.positive_class,
+        )
     else:
         predictions = np.asarray(model.predict(values))
     if predictions.shape != (len(features),):

@@ -12,6 +12,7 @@ from ...modeling.base import BaseModelCalculator
 from ...registry import NodeRegistry
 from ..mlflow.validation import validate_quality_policy
 from ._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
+from .decision_thresholds import threshold_policy
 from .evaluation_chart_data import chart_settings
 from .local_cv import CV_FIELDS, LocalCVSpec
 from .local_explanations import validate_explanation_config
@@ -252,6 +253,8 @@ def validate_workflow_pipeline(
         raise ValueError("pipeline must be a Core pipeline configuration object.")
     validate_pipeline_config(pipeline)
     _validate_pipeline_model(pipeline, task, allow_empty_model=allow_empty_model)
+    if pipeline.get("modeling"):
+        threshold_policy(pipeline)
     for step in pipeline.get("preprocessing", []):
         if issubclass(NodeRegistry.get_calculator(step["transformer"]), BaseModelCalculator):
             raise ValueError("pipeline.preprocessing cannot contain a model calculator.")

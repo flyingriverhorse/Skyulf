@@ -24,7 +24,9 @@ from ...preprocessing.fold_adapter import (
     FeatureEngineerFoldAdapter,
 )
 from ...registry import NodeRegistry
+from .decision_thresholds import threshold_policy
 from .local_search import base_model_config, prepare_search_pipeline
+from .threshold_cv import evaluate_threshold_cv
 
 CV_FIELDS = {
     "cv_enabled": "enabled",
@@ -175,6 +177,15 @@ def evaluate_training_cv(
     if not spec.enabled:
         return None
     spec.validate_pipeline(config, target_column=target_column, event_column=event_column)
+    if threshold_policy(config)["mode"] != "off":
+        return evaluate_threshold_cv(
+            frame,
+            config,
+            spec,
+            target_column=target_column,
+            event_column=event_column,
+            sample_weight=sample_weight,
+        )
     model = config["modeling"]
     calculator = NodeRegistry.get_calculator(model["type"])()
     applier = NodeRegistry.get_applier(model["type"])()

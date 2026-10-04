@@ -111,6 +111,8 @@ MODELS = _unique_object([
             "cv_inner_folds": {{if and (eq (index $ (print $prefix "cv_type")) "nested_cv") (index $ (print $prefix "cv_inner_folds"))}}{{template "python_value" (index $ (print $prefix "cv_inner_folds"))}}{{else}}None{{end}},
             "quality_gates": {{template "python_value" (index $ (print $prefix "quality_gates"))}},
             "pipeline": {
+                # Optional classification policy per target; see single_model.py examples.
+                "decision_threshold": {"mode": "off"},
                 "preprocessing": [],
 {{if eq $.shap_enabled "true"}}                "explainability": {
                     "method": "shap",

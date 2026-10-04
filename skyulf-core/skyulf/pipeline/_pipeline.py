@@ -188,6 +188,7 @@ class SkyulfPipeline:
         self._fit_metrics: dict[str, Any] | None = None
         self._target_column: str | None = None
         self._tuned_thresholds: dict[Any, float] | None = None
+        self._decision_threshold_evidence: dict[str, Any] | None = None
         self._inference_schemas: tuple[SkyulfSchema, SkyulfSchema] | None = None
         self._fitted_engine: str | None = None
 
@@ -399,6 +400,7 @@ class SkyulfPipeline:
         self._fit_metrics = None
         self._target_column = None
         self._tuned_thresholds = None
+        self._decision_threshold_evidence = None
         self._inference_schemas = None
         self._fitted_engine = None
         if self.model_estimator is not None:
@@ -699,6 +701,15 @@ class SkyulfPipeline:
         proba_df = self._predict_proba_transformed(transformed_val)
         classes = np.asarray(model_classes)
         y_proba = np.asarray(proba_df)[:, : len(classes)]
+        positive = self._decision_positive_class()
+        if positive is not None:
+            if len(classes) != 2 or positive not in classes:
+                raise ValueError("positive_class must match a fitted binary class.")
+            order = [
+                int(np.flatnonzero(classes != positive)[0]),
+                int(np.flatnonzero(classes == positive)[0]),
+            ]
+            classes, y_proba = classes[order], y_proba[:, order]
 
         thresholds = optimize_thresholds(
             transformed_y,
@@ -709,6 +720,7 @@ class SkyulfPipeline:
             grid_points=grid_points,
         )
         self._tuned_thresholds = thresholds
+        self._decision_threshold_evidence = None
         return thresholds
 
     def predict(
@@ -773,7 +785,12 @@ class SkyulfPipeline:
         model = self.model_estimator._unwrap_tuned_model()
         classes = np.asarray(model.classes_)
         y_proba = np.asarray(proba_df)[:, : len(classes)]
-        return apply_thresholds(y_proba, self._tuned_thresholds, classes=classes)
+        return apply_thresholds(
+            y_proba,
+            self._tuned_thresholds,
+            classes=classes,
+            positive_class=self._decision_positive_class(),
+        )
 
     def describe(self) -> str:
         """Return a human-readable, multi-line summary of the pipeline.
@@ -873,8 +890,20 @@ class SkyulfPipeline:
         thresholds = getattr(self, "_tuned_thresholds", None)
         if thresholds is not None:
             hasher.update(artifact_digest({"tuned_thresholds": thresholds}))
+            positive = self._decision_positive_class()
+            if positive is not None:
+                hasher.update(artifact_digest({"threshold_positive_class": positive}))
 
         return hasher.hexdigest()
+
+    def _decision_positive_class(self) -> Any:
+        """Read the persisted binary policy without changing a frozen training recipe."""
+        evidence = getattr(self, "_decision_threshold_evidence", None) or {}
+        if "model_positive_class" in evidence:
+            return evidence["model_positive_class"]
+        return evidence.get(
+            "positive_class", self.config.get("decision_threshold", {}).get("positive_class")
+        )
 
     def export_model_card(self) -> dict[str, Any]:
         """Return a structured, JSON-friendly summary of the pipeline.

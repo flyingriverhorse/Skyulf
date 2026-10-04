@@ -3,9 +3,11 @@
 import math
 import statistics
 from copy import deepcopy
+from dataclasses import replace
 from typing import Any
 
 from . import local_retraining as training
+from .decision_thresholds import threshold_policy
 from .local_cv import LocalCVSpec
 from .local_training_evidence import evidence_digest
 
@@ -35,7 +37,7 @@ def validate_competition_budget(config: dict[str, Any]) -> None:
             target_column=config["target_column"],
             event_column=config.get("event_column"),
         )
-        total += _trial_bound(effective["modeling"], cv)
+        total += _pipeline_trial_bound(effective, cv)
     if total > config.get("competition_max_trials", 100):
         raise ValueError(f"Competition search budget exceeds competition_max_trials: {total}.")
 
@@ -61,7 +63,7 @@ def prepare_competition(
             quality_gates=config.get("quality_gates"),
             risk_category=config.get("risk_category"),
         )
-        bound = _trial_bound(effective["modeling"], cv)
+        bound = _pipeline_trial_bound(effective, cv)
         total += bound
         candidates[name] = {
             "pipeline": pipeline,
@@ -91,6 +93,27 @@ def _trial_bound(model: dict[str, Any], cv: LocalCVSpec) -> int:
             count += remaining
             remaining = math.ceil(remaining / factor)
     return count * (cv.folds + 1 if cv.method == "nested_cv" else 1)
+
+
+def _pipeline_trial_bound(pipeline: dict[str, Any], cv: LocalCVSpec) -> int:
+    """Include independent outer policy searches in the admitted competition budget."""
+    model = pipeline["modeling"]
+    bound = _trial_bound(model, cv)
+    if threshold_policy(pipeline)["mode"] == "off":
+        return bound
+    if model["type"] != "hyperparameter_tuner":
+        return cv.folds + 1
+    ordinary = replace(
+        cv,
+        method="k_fold",
+        nested_type="auto",
+        inner_folds=None,
+        group_column=None,
+        gap=0,
+        test_size=None,
+        max_train_size=None,
+    )
+    return bound + cv.folds * _trial_bound(model, ordinary)
 
 
 def choose_winner(rows: list[dict[str, Any]], names: set[str]) -> dict[str, Any]:
@@ -126,7 +149,13 @@ def _validate_score_row(row: dict[str, Any], first: dict[str, Any]) -> None:
 
 def _evaluation_family(row: dict[str, Any]) -> str:
     """Keep bias disclosures while admitting fixed and tuned ordinary CV together."""
-    modes = {"fixed_cv": "ordinary", "post_selection_cv": "ordinary", "nested_cv": "nested"}
+    modes = {
+        "fixed_cv": "ordinary",
+        "post_selection_cv": "ordinary",
+        "nested_cv": "nested",
+        "threshold_cv": "ordinary",
+        "nested_threshold_cv": "nested",
+    }
     if row["evaluation_mode"] not in modes:
         raise ValueError("Competition evaluation mode is invalid.")
     return modes[row["evaluation_mode"]]
