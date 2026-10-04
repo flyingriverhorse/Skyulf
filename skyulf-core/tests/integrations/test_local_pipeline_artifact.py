@@ -80,7 +80,7 @@ def test_local_artifact_preserves_fitted_categorical_predictions(engine: str, tm
     result = predict_local_pipeline(query, restored)
     polars_result = predict_local_pipeline(pl.from_pandas(query), restored)
 
-    assert manifest["format_version"] == 1
+    assert manifest["format_version"] == 2
     assert manifest["fitted_engine"] == engine
     assert manifest["input_columns"] == ["city", "amount"]
     assert list(result.columns) == ["prediction"]

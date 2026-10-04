@@ -996,7 +996,7 @@ class TuningCalculator(BaseModelCalculator):
             sample_weight, len(X), preprocessing, self.problem_type
         )
         X, y, validation_data, validation_frames, preprocessing_frames, sample_weight = (
-            _direct_weighted_time_data(
+            _direct_time_data(
                 X,
                 y,
                 config,
@@ -1284,7 +1284,7 @@ def _prepare_tuning_weights(values: Any, rows: int, preprocessing: Any, problem_
     return prepare_weights(values, rows, preprocessing)
 
 
-def _direct_weighted_time_data(
+def _direct_time_data(
     X: Any,
     y: Any,
     config: TuningConfig,
@@ -1296,11 +1296,12 @@ def _direct_weighted_time_data(
     metadata: Any,
     weights: Any,
 ) -> tuple:
-    """Apply legacy temporal ordering once for direct weighted tune calls on named frames."""
+    """Apply legacy temporal ordering once for direct tune calls on named frames."""
     if (
-        weights is None
+        config.cv_type != "time_series_split"
         or metadata is not None
         or uses_explicit_policy(config)
+        or uses_history_policy(config, preprocessing)
         or not hasattr(X, "columns")
     ):
         return X, y, validation, validation_frames, frames, weights

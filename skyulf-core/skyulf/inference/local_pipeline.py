@@ -33,7 +33,7 @@ class LocalPipelineManifest(BaseModel):
     """Record the fit engine, raw schema, runtime and serialized pipeline identity."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-    format_version: Literal[1] = 1
+    format_version: Literal[1, 2] = 2
     fitted_engine: Literal["pandas", "polars"]
     input_columns: tuple[str, ...] = Field(min_length=1)
     input_dtypes: tuple[str, ...]
@@ -70,7 +70,11 @@ def _recorded_schemas(pipeline: SkyulfPipeline) -> tuple[SkyulfSchema, SkyulfSch
 
 
 def _manifest(
-    pipeline: SkyulfPipeline, payload: bytes, use_tuned_thresholds: bool
+    pipeline: SkyulfPipeline,
+    payload: bytes,
+    use_tuned_thresholds: bool,
+    *,
+    format_version: Literal[1, 2] = 2,
 ) -> LocalPipelineManifest:
     """Derive metadata from the successful fit rather than caller-supplied labels."""
     raw, features = _recorded_schemas(pipeline)
@@ -90,6 +94,7 @@ def _manifest(
         pipeline, use_tuned_thresholds, classification, classification_probabilities
     )
     return LocalPipelineManifest(
+        format_version=format_version,
         fitted_engine=fitted_engine,
         input_columns=raw.columns,
         input_dtypes=tuple(raw.dtypes.get(name, "unknown") for name in raw.columns),
@@ -144,11 +149,14 @@ def _check_runtime(manifest: LocalPipelineManifest) -> None:
 def save_local_pipeline(
     pipeline: SkyulfPipeline, path: str | Path, *, use_tuned_thresholds: bool = False
 ) -> None:
-    """Write a fitted pipeline and its manifest to a new directory."""
+    """Write version 2 with the decision policy inside the checksummed pickle payload."""
     if type(pipeline) is not SkyulfPipeline:
         raise TypeError("Expected a fitted SkyulfPipeline.")
     _recorded_schemas(pipeline)
-    payload = pickle.dumps(pipeline, protocol=pickle.HIGHEST_PROTOCOL)
+    payload = pickle.dumps(
+        {"pipeline": pipeline, "use_tuned_thresholds": use_tuned_thresholds},
+        protocol=pickle.HIGHEST_PROTOCOL,
+    )
     if len(payload) > _MAX_PIPELINE_BYTES:
         raise ValueError("Local pipeline payload exceeds the size limit.")
     manifest = _manifest(pipeline, payload, use_tuned_thresholds)
@@ -175,7 +183,13 @@ def read_bounded_artifact(path: Path, limit: int) -> bytes:
 
 
 def load_local_pipeline(path: str | Path) -> LocalPipelineArtifact:
-    """Validate and load a trusted producer's local pipeline artifact."""
+    """Validate and load a trusted producer's local pipeline artifact.
+
+    Version 1 remains readable only without fitted thresholds, because its
+    payload cannot establish the saved decision policy. Re-export those older
+    threshold-bearing pipelines with an explicit ``use_tuned_thresholds`` choice.
+    Checksums establish integrity, not producer authenticity.
+    """
     source = Path(path)
     metadata = read_bounded_artifact(source / "manifest.json", _MAX_MANIFEST_BYTES)
     document = json.loads(
@@ -196,12 +210,42 @@ def load_local_pipeline(path: str | Path) -> LocalPipelineArtifact:
         if project_source_digest(code) != manifest.project_source_sha256:
             raise ValueError("Project preprocessing source checksum mismatch.")
         load_project_module(code)
-    pipeline = pickle.loads(payload)  # nosec B301 -- trusted producer only, after size/runtime/checksum checks
-    if type(pipeline) is not SkyulfPipeline:
-        raise ValueError("Local artifact payload is not a SkyulfPipeline.")
-    if _manifest(pipeline, payload, manifest.use_tuned_thresholds) != manifest:
+    pipeline = _load_pipeline_payload(payload, manifest)
+    if (
+        _manifest(
+            pipeline,
+            payload,
+            manifest.use_tuned_thresholds,
+            format_version=manifest.format_version,
+        )
+        != manifest
+    ):
         raise ValueError("Local artifact manifest disagrees with its fitted pipeline.")
     return LocalPipelineArtifact(manifest, pipeline)
+
+
+def _load_pipeline_payload(payload: bytes, manifest: LocalPipelineManifest) -> SkyulfPipeline:
+    """Restore the versioned payload only after transport and runtime validation."""
+    saved = pickle.loads(payload)  # nosec B301 -- trusted producer only, after size/runtime/checksum checks
+    if manifest.format_version == 2:
+        if type(saved) is not dict or set(saved) != {"pipeline", "use_tuned_thresholds"}:
+            raise ValueError("Invalid local artifact payload envelope.")
+        policy = saved["use_tuned_thresholds"]
+        if type(policy) is not bool:
+            raise ValueError("Local artifact payload threshold policy must be a boolean.")
+        if policy != manifest.use_tuned_thresholds:
+            raise ValueError("Local artifact manifest threshold policy disagrees with its payload.")
+        pipeline = saved["pipeline"]
+    else:
+        pipeline = saved
+    if type(pipeline) is not SkyulfPipeline:
+        raise ValueError("Local artifact payload is not a SkyulfPipeline.")
+    if manifest.format_version == 1 and getattr(pipeline, "_tuned_thresholds", None) is not None:
+        raise ValueError(
+            "Local artifact version 1 cannot bind fitted threshold policy; re-export the "
+            "trusted fitted pipeline with an explicit use_tuned_thresholds choice."
+        )
+    return pipeline
 
 
 def _validate_manifest_schema(manifest: LocalPipelineManifest) -> None:

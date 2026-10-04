@@ -9,6 +9,7 @@ import importlib
 import json
 import sys
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -142,11 +143,11 @@ def _without_target(frame: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame
 
 
 def _pandas_target(y: Any) -> Any:
-    """Expose the target to learn functions as pandas, or None when absent."""
+    """Expose a private writable target to learn functions, or None when absent."""
     if y is None:
         return None
     native = y.to_native() if hasattr(y, "to_native") else y
-    return native.to_pandas() if isinstance(native, pl.Series) else native
+    return deepcopy(native.to_pandas() if isinstance(native, pl.Series) else native)
 
 
 def _call(ref: str, *args: Any, params: dict[str, Any]) -> Any:
@@ -158,25 +159,30 @@ def _call(ref: str, *args: Any, params: dict[str, Any]) -> Any:
         raise ValueError(f"Project function {ref} failed: {type(exc).__name__}: {exc}") from exc
 
 
-def _as_frame(values: Any, frame: pd.DataFrame, outputs: list[str]) -> pd.DataFrame:
-    """Validate the function result keeps every row in order and name its columns."""
-    if isinstance(values, (np.ndarray, list)):
-        # Plain arrays such as np.where(...) carry no index; they follow df row order.
-        values = pd.DataFrame(np.asarray(values), index=frame.index)
-    if isinstance(values, pd.Series):
-        values = values.to_frame()
-    if not isinstance(values, pd.DataFrame):
-        raise ValueError("Step function must return a pandas Series, DataFrame or NumPy array.")
-    if len(values) != len(frame):
-        raise ValueError(
-            f"Step function returned {len(values)} rows for {len(frame)} input rows; "
-            "column steps must keep every row in the same order."
-        )
-    if not values.index.equals(frame.index):
+def _require_row_index(actual: pd.Index, expected: pd.Index) -> None:
+    """Check row labels against the snapshot taken before calling project code."""
+    if not actual.equals(expected):
         raise ValueError(
             "Step function returned rows with a different index or order than df "
             "(e.g. after sort_values or reset_index); return values aligned to df.index."
         )
+
+
+def _as_frame(values: Any, index: pd.Index, outputs: list[str]) -> pd.DataFrame:
+    """Validate the function result keeps every row in order and name its columns."""
+    if isinstance(values, (np.ndarray, list)):
+        # Plain arrays such as np.where(...) carry no index; they follow df row order.
+        values = pd.DataFrame(np.asarray(values), index=index)
+    if isinstance(values, pd.Series):
+        values = values.to_frame()
+    if not isinstance(values, pd.DataFrame):
+        raise ValueError("Step function must return a pandas Series, DataFrame or NumPy array.")
+    if len(values) != len(index):
+        raise ValueError(
+            f"Step function returned {len(values)} rows for {len(index)} input rows; "
+            "column steps must keep every row in the same order."
+        )
+    _require_row_index(values.index, index)
     if values.shape[1] != len(outputs):
         raise ValueError(
             f"Step function returned {values.shape[1]} columns; output names {outputs}."
@@ -184,6 +190,19 @@ def _as_frame(values: Any, frame: pd.DataFrame, outputs: list[str]) -> pd.DataFr
     values = values.copy()
     values.columns = outputs
     return values
+
+
+def _computed_columns(
+    frame: pd.DataFrame, params: dict[str, Any], computed: Callable[[pd.DataFrame], Any]
+) -> pd.DataFrame:
+    """Validate results against input rows even if project code mutates its frame."""
+    index = frame.index.copy(deep=True)
+    features = _without_target(frame, params)
+    values = computed(features)
+    if isinstance(values, (np.ndarray, list)):
+        # Unindexed results follow the callback frame, whose order must stay intact.
+        _require_row_index(features.index, index)
+    return _as_frame(values, index, params["output"])
 
 
 def _assign(X: Any, params: dict[str, Any], computed: Callable[[pd.DataFrame], Any]) -> Any:
@@ -196,7 +215,7 @@ def _assign(X: Any, params: dict[str, Any], computed: Callable[[pd.DataFrame], A
         clash = [name for name in outputs if name in frame.columns]
         if clash:
             raise ValueError(f"Columns {clash} already exist; pass replace=True to overwrite them.")
-    values = _as_frame(computed(_without_target(frame, params)), frame, outputs)
+    values = _computed_columns(frame, params, computed)
     if isinstance(native, pl.DataFrame):
         return native.with_columns(pl.from_pandas(values).get_columns())
     return native.assign(**{name: values[name] for name in outputs})
@@ -297,8 +316,9 @@ class RowFilterFunctionApplier(BaseApplier):
             raise ValueError(
                 f"Filter columns {missing} are missing; available: {list(frame.columns)}."
             )
+        index = frame.index.copy(deep=True)
         mask = _call(params["function"], frame, params=params["params"])
-        keep = _mask(mask, frame)
+        keep = _mask(mask, index)
         kept = (
             native.filter(pl.Series(keep)) if isinstance(native, pl.DataFrame) else native.loc[keep]
         )
@@ -307,13 +327,9 @@ class RowFilterFunctionApplier(BaseApplier):
         return kept, _filter_target(y, keep)
 
 
-def _mask(mask: Any, frame: pd.DataFrame) -> list[bool]:
+def _mask(mask: Any, index: pd.Index) -> list[bool]:
     """Require one non-null boolean per input row."""
-    if (
-        not isinstance(mask, pd.Series)
-        or len(mask) != len(frame)
-        or not mask.index.equals(frame.index)
-    ):
+    if not isinstance(mask, pd.Series) or len(mask) != len(index) or not mask.index.equals(index):
         raise ValueError("Filter function must return a boolean Series with one value per row.")
     if not pd.api.types.is_bool_dtype(mask):
         raise ValueError(
