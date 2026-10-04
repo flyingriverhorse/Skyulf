@@ -1743,6 +1743,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Custom preprocessing recipes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#writing-your-own-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing your own step
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-layout-and-existing-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Source layout and existing projects
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1783,6 +1811,17 @@
     <span class="md-ellipsis">
       
         Search and cross-validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optional-classification-decision-thresholds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional classification decision thresholds
       
     </span>
   </a>
@@ -1961,6 +2000,17 @@
     <span class="md-ellipsis">
       
         Explicit retry policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-resource-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Job resource files
       
     </span>
   </a>
@@ -2192,6 +2242,62 @@
     
   
     skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
   
 
     
@@ -3720,6 +3826,8 @@
 <h1 id="local-engine-databricks-bundle">Local-engine Databricks Bundle</h1>
 <p>For job-screen instructions and lifecycle diagrams, use the
 <a href="databricks_bundle_walkthrough.html">operator walkthrough</a>.</p>
+<p>For optional weight columns, class weights, SMOTE settings and supported models,
+see <a href="weighted_training.html">Weighted Training &amp; Support</a>.</p>
 <p>The custom Skyulf template generates one editable Bundle with <code>dev</code>, <code>test</code>,
 <code>syst</code> and <code>prod</code> targets. It fits and predicts with pandas or Polars. Spark
 reads bounded Unity Catalog Delta rows and publishes predictions; local
@@ -3733,6 +3841,46 @@ composite keys), source columns, split strategy, applicable date parsing,
 scoring/promotion policies and job settings. Serverless is the default. Reviewable
 noninteractive examples are in <code>skyulf-core/templates/databricks/examples/</code>. The generated
 project has its own <code>databricks.yml</code>; Skyulf's root has no Bundle config.</p>
+<p>Choose the training layout, then edit its generated model file:</p>
+<table>
+<thead>
+<tr>
+<th>Layout</th>
+<th>Model settings</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>single_model</code></td>
+<td><code>src/modeling/single_model.py</code>: <code>MODELING</code> owns model parameters and tuning/search space</td>
+</tr>
+<tr>
+<td><code>model_competition</code></td>
+<td><code>src/modeling/model_competition.py</code>: <code>MODELS</code> compares candidates for one shared target</td>
+</tr>
+<tr>
+<td><code>multi_target</code></td>
+<td><code>src/modeling/multi_model.py</code>: <code>MODELS</code> defines independent targets, models, training/CV, preprocessing and quality limits</td>
+</tr>
+</tbody>
+</table>
+<p>For multiple targets, <code>src/modeling/model_set.py</code> separately defines the coherent
+release: registered set name, promotion policy and scoring table/view destinations.
+For example, define revenue and cost models in <code>multi_model.py</code>, then configure
+<code>model_set.py</code> to approve them together and publish their predictions under one
+set version. Define the profit calculation (<code>revenue - cost</code>) in
+<code>src/features/scoring.py</code>.</p>
+<p>The model files contain plain editable Python dictionaries. Library helpers run
+at initialization to populate settings from your choices; afterward edit the
+generated values directly using Python <code>True</code>, <code>False</code> and <code>None</code>. Keep
+<code>config/workflow.json</code> for shared data, validation/CV, size limits and lifecycle
+settings. For <code>single_model</code>, its <code>pipeline.modeling</code> stays empty; the loader
+supplies the selected model definition. Other layouts retain an internal task
+placeholder there and load the actual model definitions from their Python file.</p>
+<p>Legacy compatibility: existing projects can retain inline <code>pipeline.modeling</code>
+in <code>workflow.json</code>, <code>src/modeling/candidates.py</code> or <code>src/modeling/branches.py</code>.
+When migrating, remove the old definition: both old and new filenames, or a
+single-model file alongside a nonempty inline model, fail validation.</p>
 <p>Regression starts with Core <code>linear_regression</code> and <code>heldout_rmse</code>;
 classification starts with <code>logistic_regression</code> and <code>heldout_accuracy</code>.
 The pipeline remains editable: add registered Core preprocessing nodes and
@@ -3801,7 +3949,7 @@ From the Skyulf checkout, for example:</p>
 </code></pre></div>
 <p>Review table and feature names in the example first. If editing generated JSON,
 use <code>full_snapshot</code>, <code>fixed_window</code> or <code>rolling_calendar</code> for the window mode;
-<code>auto</code> is resolved during initialization. Run <code>python src/preview.py --action train</code>
+<code>auto</code> is resolved during initialization. Run <code>python src/tools/preview.py --action train</code>
 from the generated project to validate the resulting combination.</p>
 <p>For each date column you actually use, declare how it is stored:</p>
 <table>
@@ -3928,9 +4076,11 @@ months of data a rolling window reads. Independent score scheduling is SM-34.</p
 </tr>
 </tbody>
 </table>
-<p>Preprocessing is edited in the generated <strong><code>src/preprocessing.py</code></strong> file, not in
-the initializer or JSON. <code>build_preprocessing()</code> returns normal Core steps in
-execution order. Keep the JSON <code>pipeline.preprocessing</code> list empty.</p>
+<p>Preprocessing is edited in <strong><code>src/features/preprocessing.py</code></strong>.
+<code>build_preprocessing()</code> returns normal Core steps in
+execution order. Keep the JSON <code>pipeline.preprocessing</code> list empty.
+Use <strong><code>src/features/pre_split.py</code></strong> for <code>build_pre_split_steps()</code> and keep the
+JSON <code>pre_split_steps</code> list empty. The package exports both builders separately.</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_preprocessing</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">"""Fit numeric cleanup and scaling with the selected Core engine."""</span>
     <span class="k">return</span> <span class="p">[</span>
@@ -3941,33 +4091,210 @@ execution order. Keep the JSON <code>pipeline.preprocessing</code> list empty.</
     <span class="p">]</span>
 </code></pre></div>
 <h3 id="custom-preprocessing-recipes">Custom preprocessing recipes</h3>
-<p>Select per-step columns when mixing numeric and categorical features. For your
-own logic, define top-level Calculator/Applier classes in the same file and add
-<code>custom_step("my_step", MyCalculator, MyApplier, params={...})</code> to this list.
-The self-contained
-<a href="https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/preprocessing_custom.py">custom recipe example</a>
-in <code>skyulf-core/templates/databricks/examples/preprocessing_custom.py</code> provides
-mean-centering and fixed eligibility examples for pandas/Polars. Copy the needed
-imports, classes and helper functions into your generated <code>src/preprocessing.py</code>;
-keep your two recipe builders and add <code>example_custom_step("income")</code> to
-<code>build_preprocessing()</code> to enable centering. Do not import the example as a
-sibling module: training snapshots only <code>src/preprocessing.py</code>. Fit returns learned state;
-apply uses it without learning again. Preserve row count/order and implement
-the engines your project uses. CV refits the custom step within every fold.</p>
+<p>Select per-step columns when mixing numeric and categorical features. Generated
+projects contain small, domain-independent custom examples written as plain
+pandas functions:</p>
+<table>
+<thead>
+<tr>
+<th>Custom module</th>
+<th>Examples</th>
+<th>Configuration location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/features/custom/pre_split_custom.py</code></td>
+<td><code>minimum_completeness</code>, <code>value_range</code>, <code>allowed_values</code> row filters</td>
+<td><code>src/features/pre_split.py</code></td>
+</tr>
+<tr>
+<td><code>src/features/custom/preprocessing_custom.py</code></td>
+<td><code>log_feature</code> (new column), <code>frequency_encoding</code> and <code>rare_categories</code> (learned per fold)</td>
+<td><code>src/features/preprocessing.py</code></td>
+</tr>
+<tr>
+<td><code>src/features/custom/advanced_class_step.py</code></td>
+<td>The same <code>rare_categories</code> written as a Calculator/Applier pair, to compare</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Each example is a pair of functions plus a factory that wraps them with one
+helper from <code>skyulf.preprocessing</code>. Each factory returns a normal Core step
+dictionary. Both recipe files also have an <code>example_all</code> recipe that runs them
+together. Each custom file ends with an inactive Example 4 that reads a small
+data file (asset); <code>src/features/assets.json</code> explains the three steps to enable it. The parent recipe files show
+these calls directly beside the built-in steps in the returned list. Uncomment
+the matching import and step, then adapt the columns:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/pre_split.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.custom.pre_split_custom</span><span class="w"> </span><span class="kn">import</span> <span class="n">minimum_completeness</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_pre_split_steps</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">minimum_completeness</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"field_a"</span><span class="p">,</span> <span class="s2">"field_b"</span><span class="p">,</span> <span class="s2">"field_c"</span><span class="p">],</span> <span class="n">min_present</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+    <span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/preprocessing.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.custom.preprocessing_custom</span><span class="w"> </span><span class="kn">import</span> <span class="n">frequency_encoding</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_preprocessing</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">frequency_encoding</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"category"</span><span class="p">]),</span>
+    <span class="p">]</span>
+</code></pre></div>
+<p>The list order is the execution order. Add Core operations to the same list.
+The template starts with commented steps because source column names vary across
+projects. There are no separate column-selection variables or enable switches.
+Keep both JSON recipe lists empty.</p>
+<p>Completeness treats null/NaN as missing; blank strings and infinity count as
+values. With three selected fields and <code>min_present=2</code>, rows with two or three
+observed values survive without any value or order changes. Required filter
+columns are read automatically and need not be model inputs. Use only data known
+at the observation cutoff; do not make eligibility depend on future information.</p>
+<p>Frequency encoding learns <code>count / training_rows</code> per observed string category.
+For training values <code>["A", "A", "B", null]</code>, scoring <code>["A", "B", "NEW", null]</code>
+produces <code>[0.5, 0.25, 0.0, 0.0]</code>. It replaces selected columns in place, preserving
+other columns and row order. Each CV fold learns its own mapping; saved-model
+inference never recomputes frequencies on the score batch. Missing/unseen values
+map to zero. Cast numeric category identifiers to strings upstream if needed.
+Select these columns in workflow <code>input_columns</code>, excluding target/record keys.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>src/tools/preview.py<span class="w"> </span>--action<span class="w"> </span>train
+</code></pre></div>
+<p>The tests configure these actual parent builders, then run filtering, training,
+CV and fresh-process model reload on pandas and Polars. No separate demonstration
+files need to be copied into a project.</p>
+<h4 id="writing-your-own-step">Writing your own step</h4>
+<p>Write top-level pandas functions and wrap them with one of three helpers:</p>
+<table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>Your functions</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>column_step(name, fn, output=...)</code></td>
+<td><code>fn(df)</code> returns the new column(s)</td>
+<td>Row-by-row calculations; nothing is learned</td>
+</tr>
+<tr>
+<td><code>fitted_step(name, learn, apply, output=...)</code></td>
+<td><code>learn(df, y)</code> returns a small dict; <code>apply(df, state)</code> returns column(s)</td>
+<td>Anything learned from training rows (means, bounds, mappings)</td>
+</tr>
+<tr>
+<td><code>filter_step(name, fn, columns=[...])</code></td>
+<td><code>fn(df)</code> returns True for rows to keep</td>
+<td>Pre-split row filters</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/custom/preprocessing_custom.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.preprocessing</span><span class="w"> </span><span class="kn">import</span> <span class="n">fitted_step</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">learn_bounds</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Learn clip limits from the training fold only."""</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">params</span><span class="p">[</span><span class="s2">"column"</span><span class="p">]]</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"low"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)),</span> <span class="s2">"high"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">values</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.99</span><span class="p">))}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">clip_values</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Clip every later batch with the saved training limits."""</span>
+    <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">params</span><span class="p">[</span><span class="s2">"column"</span><span class="p">]]</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"low"</span><span class="p">],</span> <span class="n">state</span><span class="p">[</span><span class="s2">"high"</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">clip_outliers</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Replace column with its value clipped to training 1%-99% quantiles."""</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="n">column</span><span class="p">}</span>
+    <span class="k">return</span> <span class="n">fitted_step</span><span class="p">(</span><span class="sa">f</span><span class="s2">"clip_</span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">learn_bounds</span><span class="p">,</span> <span class="n">clip_values</span><span class="p">,</span>
+                       <span class="n">output</span><span class="o">=</span><span class="n">column</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">)</span>
+</code></pre></div>
+<p><code>learn</code> runs on the training rows of every CV fold and of the final fit; its
+dict is saved with the model and <code>apply</code> reuses it for validation and scoring
+rows, so there is no leakage. <code>y</code> is the training target; the target column is
+removed from <code>df</code> in both functions, so <code>apply</code> can never depend on it. Rules:</p>
+<ul>
+<li>Use top-level <code>def</code> functions, not lambdas or nested functions.</li>
+<li><code>df</code> is a pandas copy, also for Polars models; changing it has no effect.</li>
+<li>Return one value per row in the same order. Filters return True/False per
+  row; decide missing values explicitly, e.g. <code>(df["x"] &gt; 0).fillna(False)</code>.</li>
+<li>Learned dicts must be JSON-like: string keys and no NaN. NumPy numbers are
+  converted automatically.</li>
+<li><code>params={...}</code> is passed to every function as its last argument.</li>
+<li>Use <code>replace=True</code> to overwrite existing columns; otherwise outputs must be new.</li>
+</ul>
+<p>Errors name the failing function, e.g. <code>Project function ...:learn_bounds failed:
+KeyError: 'income'</code>.</p>
+<p>Most former Calculator/Applier pairs fit in these helpers. Keep a class pair
+(see <code>advanced_class_step.py</code>) only when the learned state is not a small dict
+(for example a fitted scikit-learn object), the step changes the number of rows
+during preprocessing, or it needs native Polars/Spark code for performance.
+These helper steps are project code only: the web canvas and backend API reject
+them, because a graph must never name an arbitrary server function.</p>
+<p>Custom pre-split steps remain declared fixed filters: they must preserve survivor
+values/order and cannot learn statistics. They do not run on unlabeled score
+input. Custom value transformations belong in preprocessing; its learn function
+runs inside each CV training fold and its apply function reuses that state during
+inference.</p>
 <p>Training saves the exact Python source with the fitted artifact. Both local
 and MLflow loading restore this saved source, including custom classes. Changing
 the project file affects future training; score, approve and rollback continue
-using saved model code/state. Different source versions use distinct module
-identities. This supports a self-contained file up to 64 KiB, with imports from
-installed packages. Sibling files and new package dependencies are not packaged
-automatically. Only load trusted code/models, as with existing pickle artifacts.
-Broader project packaging, row filtering/output rules, Optuna and multiple model
-branches remain later tasks.</p>
+using saved model code/state. Different source versions use distinct package
+identities. All Python files under <code>src/features/</code> are captured in a bounded
+64 KiB snapshot. Use relative imports and an <code>__init__.py</code> in every subpackage.
+Non-Python assets and third-party dependencies are not embedded; install external
+dependencies explicitly in both training and scoring environments. Keep jobs and
+modeling hooks outside the feature package. Only load trusted code/models, as
+with existing pickle artifacts. Scoring exclusions, historical feature context
+and post-prediction business rules remain separate work.</p>
+<h3 id="source-layout-and-existing-projects">Source layout and existing projects</h3>
+<table>
+<thead>
+<tr>
+<th>Directory</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/jobs/</code></td>
+<td>Databricks notebook entrypoints, referenced by the two job YAMLs</td>
+</tr>
+<tr>
+<td><code>src/features/</code></td>
+<td>Saved pre-split and preprocessing recipes, custom pairs/helpers</td>
+</tr>
+<tr>
+<td><code>src/modeling/</code></td>
+<td>Generated single-model, competition and multi-model settings plus model-set policies</td>
+</tr>
+<tr>
+<td><code>src/tools/</code></td>
+<td>Offline <code>preview.py</code> CLI</td>
+</tr>
+</tbody>
+</table>
+<p>Existing single-file projects and their saved models remain supported. To migrate,
+move your builders into the two feature recipe files, move custom pairs into
+<code>features/custom/</code>, and add relative imports. Pass the <code>src/features</code> directory
+to <code>load_project_workflow</code>; update <code>initialize_run.py</code> to use
+<code>preprocessing_path="../src/features"</code> (relative to the configuration directory).
+If retaining legacy tuning/ensemble hooks, move them into <code>src/modeling/</code>. New
+projects keep those settings in each model definition. Update YAML notebook paths to
+<code>../src/jobs/&lt;name&gt;.py</code> and sync the new directories. Run the new preview command
+before deploying. Keep only one active copy of each builder. Newly trained models
+capture the new package; older model versions retain their original snapshot.</p>
 <p>From the generated project, with the matching Core wheel installed locally:</p>
-<div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span>
-<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-models</span>
-<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-preprocessors</span>
-<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">train</span>
+<div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-models</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-preprocessors</span>
+<span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-action</span> <span class="n">train</span>
 </code></pre></div>
 <p>Preview executes the trusted Python recipe to resolve its steps. Keep data access
 and training out of module-level code and <code>build_preprocessing()</code>. The preview
@@ -4134,7 +4461,7 @@ strings; generated workflow JSON stores numbers and booleans.</p>
 <h3 id="search-and-cross-validation">Search and cross-validation</h3>
 <p>The initializer selects a task, its model (including voting/stacking ensembles),
 then a tuning strategy and default or custom strategy settings. There is no
-Basic/Advanced mode flag. The generated <code>config/workflow.json</code> uses Core's
+Basic/Advanced mode flag. The generated model definition uses Core's
 <code>hyperparameter_tuner</code> with the selected <code>base_model</code>.</p>
 <table>
 <thead>
@@ -4166,19 +4493,120 @@ Basic/Advanced mode flag. The generated <code>config/workflow.json</code> uses C
 </tr>
 </tbody>
 </table>
-<p>Search spaces come from Core's model/strategy catalog or ensemble builder.
-Override them in <code>src/tuning.py::build_search_space(model_type, strategy, params)</code>;
-return <code>None</code> to preserve an explicit JSON space or use Core defaults. A returned
-dictionary of finite candidate lists takes precedence over the JSON space.
-The resolved space and exact Python source are saved with the trained artifact.
-Changing the file affects future training; scoring uses the saved fitted model.
+<p>Search spaces come from Core's model/strategy catalog or ensemble builder. Bundle
+initialization writes editable finite lists into each model's <code>search_space</code>.
+For a single model, edit <code>MODELING</code> in <code>src/modeling/single_model.py</code>; for competition,
+edit the candidate's <code>modeling</code> in <code>MODELS</code> in <code>src/modeling/model_competition.py</code>;
+for multiple targets, edit the branch's <code>workflow.pipeline.modeling</code> in <code>MODELS</code>
+in <code>src/modeling/multi_model.py</code>. Each definition owns its model params, strategy,
+trial budget and search space. The generated lists are editable snapshots of
+initialization defaults. Set <code>search_space</code> to <code>{}</code> to use the installed Core's
+current automatic defaults. Changing the definition affects future training;
+scoring uses the saved fitted model and captured recipe.</p>
+<p>Legacy <code>src/modeling/tuning.py::build_search_space(model_type, strategy, params)</code>
+hooks remain supported: <code>None</code> preserves the configured space, while returned finite
+lists override it. New projects do not generate this hook.
 Fixed scalar model parameters remain fixed during search. Ensemble structural
 settings stay on the base model. Estimator-specific value compatibility is checked
 when Core fits the model; offline preview validates structure and budgets.</p>
 <p>Training is sequential (<code>n_jobs=1</code>). Grid admission fails if the full space exceeds
 the configured limit; it does not truncate it. Optuna requires its optional sklearn
 integration. Its timeout is a soft search deadline and cannot interrupt an active
-model fit. Decision-threshold tuning is not enabled by this adapter.</p>
+model fit. Nested binary search can select a decision threshold from training-only
+inner out-of-fold predictions with <code>"tune_threshold": True</code> in the model definition.</p>
+<h3 id="optional-classification-decision-thresholds">Optional classification decision thresholds</h3>
+<p>New projects keep decision thresholds <strong>off</strong>. Edit <code>DECISION_THRESHOLD</code> in
+<code>src/modeling/single_model.py</code>. In a competition, edit each candidate's
+<code>decision_threshold</code> in <code>MODELS</code>; for independent targets, edit each branch's
+<code>workflow.pipeline.decision_threshold</code> in <code>src/modeling/multi_model.py</code>.
+These are model settings; the Bundle initialization wizard does not ask for them.
+SDK configurations use <code>pipeline.decision_threshold</code> directly.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Native classifier decisions; no calibration partition is reserved.</span>
+<span class="n">DECISION_THRESHOLD</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"off"</span><span class="p">}</span>
+
+<span class="c1"># Binary: predict "churn" when its probability is &gt;= 0.7, including exact ties.</span>
+<span class="n">DECISION_THRESHOLD</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"manual"</span><span class="p">,</span> <span class="s2">"positive_class"</span><span class="p">:</span> <span class="s2">"churn"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="mf">0.7</span><span class="p">}</span>
+
+<span class="c1"># Multiclass: exactly one class wins argmax(probability / class value).</span>
+<span class="n">DECISION_THRESHOLD</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"manual"</span><span class="p">,</span>
+    <span class="s2">"thresholds"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"class"</span><span class="p">:</span> <span class="s2">"low"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">},</span>
+        <span class="p">{</span><span class="s2">"class"</span><span class="p">:</span> <span class="s2">"medium"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="mf">0.3</span><span class="p">},</span>
+        <span class="p">{</span><span class="s2">"class"</span><span class="p">:</span> <span class="s2">"high"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">},</span>
+    <span class="p">],</span>
+<span class="p">}</span>
+
+<span class="c1"># Binary or multiclass: select thresholds on a reserved part of training data.</span>
+<span class="n">DECISION_THRESHOLD</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"balanced_accuracy"</span><span class="p">,</span>
+    <span class="s2">"validation_fraction"</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+    <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Use original target labels, preserving their types (e.g. integer <code>1</code> versus
+string <code>"1"</code>), even when preprocessing encodes the target. The fitted encoder
+chain maps these labels to the model's probability columns. Saved local models
+return original labels and record them in <code>manifest.classes</code>; evaluation uses
+the same mapping. This covers LabelEncoder and OrdinalEncoder, including explicit
+category order and repeated encoding around resampling. Feature-only encoders
+do not change target labels. Multiclass entries must cover every class exactly once, with
+positive finite values; they are relative decision weights, not minimum confidence
+requirements. The result always has one class, even if all probabilities are low.
+Binary manual cutoffs permit both endpoints, zero and one.</p>
+<p>Automatic mode reserves 20% of the training partition by default, <strong>before fitting
+preprocessing or selecting model parameters</strong>. It fits the model on the remaining
+rows, selects thresholds on calibration rows, and saves that fitted model without
+refitting on the calibration population. Final holdout labels never select an
+estimator, preprocessing state or threshold. Random calibration is stratified;
+group CV keeps groups separate; temporal workflows use a chronological calibration
+tail and honor the configured CV gap. Every class must occur in both partitions,
+otherwise training fails with an actionable error. Small datasets can therefore
+require a different split or manual mode.</p>
+<p>For random row splitting, <code>validation_fraction: 0.25</code> fits the saved model on
+approximately 75% of the training rows and uses the remainder only to choose
+its decision threshold. With group splitting, the fraction selects <strong>groups</strong>,
+not rows: unequal group sizes can produce very different row proportions.
+Whole groups stay together; inspect <code>fitting_rows</code> and <code>calibration_rows</code> in
+the threshold evidence for the actual populations.
+There is no final full-training refit in this mode. <code>off</code> and <code>manual</code> do not
+reserve this extra calibration population. Full-data refitting is a different
+policy and can change the probabilities to which a selected threshold applies.</p>
+<p>Supported automatic objectives are <code>balanced_accuracy</code>, binary <code>f1</code>, <code>f1_macro</code>,
+<code>f1_weighted</code>, and <code>matthews_corrcoef</code>. For binary selection, <code>positive_class</code> is
+optional and defaults to the fitted model's second class. The existing heldout
+binary precision/recall/F1 and probability metrics retain that second-class
+reporting convention, even when a different label owns the decision cutoff.
+Sample weights affect estimator fitting, but calibration objectives and their
+reported scores remain <strong>unweighted</strong>, as do the other evaluation metrics.
+<code>f1_weighted</code> means class-support averaging, not row-weighted scoring. Automatic
+threshold selection currently has no row-cost/sample-weight objective option;
+it should not be interpreted as optimizing weighted business costs.
+Thresholds change class predictions; they do not calibrate or alter probabilities.
+An improved calibration score does not guarantee a better independent holdout score.</p>
+<p>CV and competition independently refit the complete model-and-threshold policy
+inside every outer training fold. Parameter searches also run inside those folds;
+their extra work counts toward <code>competition_max_trials</code>. The original model-search
+scores in <code>tuning.json</code> describe base-model selection, while <code>cross_validation.json</code>
+and <code>competition_evaluation.json</code> evaluate the final decision policy.
+<code>decision_threshold.json</code> records fitting/calibration counts, selected values,
+the positive class and calibration scores. Model reload, registry evaluation,
+batch prediction preserve the saved decision rule. For an additional standalone
+inference bundle export, pass <code>use_tuned_thresholds=True</code> to <code>build_bundle</code>.
+That separate portable format retains its existing supported-node restrictions;
+target-encoder pipelines use the full local artifact saved by the Bundle.</p>
+<p>Prediction columns retain stable positional names: <code>probability_0</code> belongs to
+<code>manifest.classes[0]</code>, <code>probability_1</code> to <code>manifest.classes[1]</code>, and so on.
+For example, <code>manifest.classes = ["no", "yes"]</code> maps <code>probability_1</code> to <code>"yes"</code>.
+This mapping uses the original labels even when the target was encoded. Do not
+infer a class from its spelling or assume the positive class always has index 1
+when explicitly configuring a different <code>positive_class</code>.</p>
+<p>Regression and classifiers without <code>predict_proba</code> cannot enable thresholds.
+Legacy nested binary <code>modeling.tune_threshold</code> remains supported; do not enable it
+alongside <code>manual</code> or <code>auto</code>. An explicit <code>off</code> policy leaves that independently
+requested legacy behavior intact. Promotion <code>quality_threshold</code> remains a separate
+acceptance gate.</p>
 <p>Edit shared CV settings in the generated configuration:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"cv_enabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
@@ -4198,7 +4626,8 @@ supported; their CV evaluates independent fixed-parameter models.</p>
 <li><code>cv_folds</code> supports 2 through 20; each fold needs at least two training and
   validation rows. Stratified CV requires classification and at least as many
   training rows per class as folds.</li>
-<li>Methods: <code>k_fold</code>, <code>stratified_k_fold</code>, <code>shuffle_split</code>, <code>time_series_split</code>, <code>nested_cv</code>.
+<li>Methods: <code>k_fold</code>, <code>stratified_k_fold</code>, <code>shuffle_split</code>, <code>time_series_split</code>,
+  <code>group_k_fold</code>, <code>stratified_group_k_fold</code>, <code>nested_cv</code>.
   Shuffle Split uses Core's 20% validation proportion and requires shuffle.</li>
 <li>Time-series CV requires an explicit selected window with <code>event_column</code> and
   <code>cv_shuffle: false</code>. Its normalized timestamps order the folds and are removed
@@ -4216,11 +4645,40 @@ supported; their CV evaluates independent fixed-parameter models.</p>
   selected parameters and aggregate mean/std separately from the final search
   score. Ordinary fixed-model configurations retain Core's stability diagnostics;
   historical artifacts without nested search evidence remain labeled diagnostic.
-  Nested tuning uses stratified folds for classification and K-fold for regression;
-  temporal/group nested splitters are not included. Combining it with
-  <code>tune_threshold: true</code> fails explicitly because threshold selection is not yet
-  evaluated independently within the outer folds.</li>
+  <code>cv_nested_type: "auto"</code> uses stratified classification folds and regression
+  K-fold. Explicit policies are <code>k_fold</code>, <code>stratified_k_fold</code>, <code>time_series_split</code>,
+  <code>group_k_fold</code> and <code>stratified_group_k_fold</code>.</li>
+<li>Temporal policies use <code>cv_gap</code> (default 0), <code>cv_test_size</code> and
+  <code>cv_max_train_size</code> (both default null) as <strong>row counts</strong> at both nested levels
+  and the separate final search. Null maximum training size expands the window;
+  an integer rolls it. Nested temporal CV requires a temporal final holdout.
+  Events are stable-sorted; missing times and ties across fold boundaries fail.</li>
+<li>Group policies require <code>cv_group_column</code>, excluded from model inputs. The
+  final random holdout selects whole groups using the saved split seed;
+  <code>test_size</code> is the held-out proportion of groups. Set <code>stratify: false</code> for
+  this final split. A temporal final holdout must also have disjoint groups.
+  Missing group identities, insufficient groups and missing classes fail before
+  fitting. Row filtering and staged Parquet retain aligned group/time metadata.</li>
+<li>Nested binary classification supports <code>"tune_threshold": True</code> in the model definition
+  (initializer: <code>search_tune_threshold: "true"</code>). Each selected recipe generates
+  inner out-of-fold probabilities for its threshold. Outer labels and final
+  holdout labels never select thresholds. Ranking/probability scores still use
+  probabilities. Multiclass and models without probabilities fail explicitly.
+  <code>tuning.json</code> saves fold thresholds, provenance and the independent final
+  threshold; saved artifact predictions apply that threshold by default.
+  This decision threshold is distinct from the promotion quality threshold.</li>
 </ul>
+<p>During initialization, CV method/policy questions precede the data-window questions.
+Choosing ordinary or nested temporal CV fixes the generated final split to
+<code>temporal</code>, hides the random split and shuffle/seed questions, and opens the
+clock/window questions. With the default window mode, this produces a rolling
+calendar holdout. Explicit fixed-window settings still retain their date pins.
+Group and non-temporal CV preserve the chosen final split. These initializer
+rules do not rewrite an existing <code>config/workflow.json</code>.</p>
+<p>Initializer examples: <code>templates/databricks/examples/nested-temporal-init.example.json</code>
+and <code>templates/databricks/examples/nested-group-threshold-init.example.json</code>.
+These settings keep the existing two jobs and graph contract 3. Local tests do
+not establish cloud acceptance; record actual Databricks run evidence separately.</p>
 <p>MLflow stores <code>cross_validation.json</code> with fold results, aggregate metrics,
 source/split dataset identity and engine. Ordinary CV includes fold-refit counts
 and metrics such as <code>cv_rmse_mean</code> and <code>cv_rmse_std</code>. Nested search reports its
@@ -4230,15 +4688,15 @@ scores remain negative, with larger scores better. The
 With CV disabled, search uses one training-only 80/20 validation split; an ordinary
 model adds no fold fits. Search runs save <code>tuning.json</code> with effective settings,
 trials, best parameters and the actual scorer. Negative loss scores remain negative
-and higher is better. <code>train_and_register</code> displays a compact search summary.</p>
+and higher is better. <code>train_and_tune</code> displays a compact search summary.</p>
 <p>Optional <code>pipeline.explainability</code> accepts <code>{"method": "shap", "max_samples": 100,
 "max_features": 30, "max_display_samples": 10}</code>. It uses bounded training rows and
 already fitted preprocessing, without fitting again. <code>explanations.json</code> records
 results or an explicit unavailable reason. Limits are 200 samples, 50 transformed
 features and 50 displayed samples; explanations are disabled when this field is absent.</p>
 <p>To enable SHAP in a generated project, add this entry inside the existing
-<code>pipeline</code> object in <code>config/workflow.json</code> (alongside <code>modeling</code> and
-<code>preprocessing</code>):</p>
+<code>pipeline</code> object in <code>config/workflow.json</code> (alongside the empty <code>modeling</code> and
+<code>preprocessing</code> entries):</p>
 <div class="highlight"><pre><span></span><code><span class="nt">"explainability"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shap"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"max_samples"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
@@ -4249,10 +4707,10 @@ features and 50 displayed samples; explanations are disabled when this field is 
 <p>The training runtime also needs the optional <code>shap&gt;=0.46.0,&lt;1.0.0</code> dependency
 declared by Core's <code>explainability</code> extra. The generated wheel/MLflow dependency
 list does not install this extra automatically. For serverless training, add SHAP
-to the training environment's <code>dependencies</code> in <code>resources/workflow.jobs.yml</code>;
+to the training environment's <code>dependencies</code> in <code>resources/train.job.yml</code>;
 for classic compute, include it in the training task's PyPI libraries.</p>
 <p>Run the normal training job; do not execute <code>local_explanations.py</code> directly.
-<code>train_and_register</code> reports the explanation status, sample count and artifact name.
+<code>train_and_tune</code> reports the explanation status, sample count and artifact name.
 Open that training run in MLflow and read <strong>Artifacts &gt; explanations.json</strong> for
 global feature importance and the bounded per-row explanations. The Bundle
 currently publishes JSON evidence and a status summary, not SHAP charts.
@@ -4261,12 +4719,11 @@ selector. Exceeding it, missing SHAP or an unsupported explanation returns an
 explicit <code>unavailable</code> reason.</p>
 <h3 id="ensemble-recipes">Ensemble recipes</h3>
 <p>Select <code>voting_classifier</code>, <code>stacking_classifier</code>, <code>voting_regressor</code> or
-<code>stacking_regressor</code> for your task. Edit the generated <strong><code>src/ensemble.py</code></strong> to
-choose the component models and their settings. Set <code>USE_EXAMPLES = True</code> to
-activate its four example recipes, then edit the recipe for your selected model.
-Returning <code>None</code> keeps the parameters already configured in JSON and Core defaults.
-Returned keys override matching <code>pipeline.modeling.base_model.params</code> keys before
-<code>src/tuning.py</code> resolves the search space. Both recipes are pinned for future replay.</p>
+<code>stacking_regressor</code> for your task. Bundle asks for that ensemble's base models,
+weights, stacking and calibration settings and writes them to its own
+<code>modeling.base_model.params</code>. Competition candidates and model-set branches each
+receive independent settings. No separate <code>ensemble.py</code> or activation flag is needed.
+Legacy ensemble hooks remain supported for existing projects.</p>
 <table>
 <thead>
 <tr>
@@ -4305,11 +4762,11 @@ Returned keys override matching <code>pipeline.modeling.base_model.params</code>
 </tr>
 <tr>
 <td>Tune component hyperparameters</td>
-<td>Defaults to <code>true</code> for all four ensembles in Bundle search; <code>false</code> opts out of automatic component spaces</td>
+<td><code>tune_base_models</code> defaults to <code>True</code> for all four ensembles in Bundle search; <code>False</code> opts out of automatic component spaces</td>
 </tr>
 <tr>
 <td>Search strategy / search CV</td>
-<td>Existing workflow settings and optional <code>src/tuning.py</code>; no second tuning engine</td>
+<td>Each model's tuning definition and its workflow's <code>cv_*</code> settings</td>
 </tr>
 </tbody>
 </table>
@@ -4318,10 +4775,11 @@ corresponding runtime dependency. Invalid members, duplicates, weights, paramete
 names and inapplicable family settings fail explicitly. Fixed component parameters
 remain fixed even with automatic component tuning. Conflicting manual search axes
 are rejected. Search and estimator workers remain sequential.</p>
-<p>With an empty <code>search_space</code>, the selected component models determine the automatic
-search axes, including when <code>USE_EXAMPLES = False</code>. That flag only controls the
-example overrides. Explicit nonempty search spaces remain user-owned. Grid searches
-still enforce the configured candidate limit when combining component spaces.</p>
+<p>Generated search spaces contain the selected components' nested parameter keys.
+After changing component models or calibration, update those keys or clear
+<code>search_space</code> to <code>{}</code> to rebuild automatic axes from the new composition.
+Explicit nonempty search spaces remain user-owned. Grid searches still enforce
+the configured candidate limit when combining component spaces.</p>
 <p>Soft voting predicts probabilities. Hard voting predicts class labels only;
 use label-based metrics such as accuracy/F1. Probability metrics and probability
 thresholds are unavailable for hard voting. Artifact metadata, MLflow signatures
@@ -4565,20 +5023,28 @@ compute. Selecting it does not assign a model risk category.</p>
 in <code>config/workflow.json</code> and is recorded on future training runs and model
 versions; it does not change promotion gates or relabel existing versions.</p>
 <h2 id="where-the-workflow-lives">Where the workflow lives</h2>
-<p>The generated notebooks are small entrypoints with fixed lifecycle steps or
-the score role. <code>src/workflow.py</code> prepares a request; <code>train_and_register</code>
-fits, evaluates and registers it, then <code>compare_and_decide</code> compares models
-and applies the promotion policy. The shared <code>finalize_and_report</code> task closes
-training even on failure and publishes only a verified successful result.
-Approve/reject/rollback use a separate branch without training. The installed
-<code>job_runtime</code> adapter reads configuration once and exchanges durable MLflow
-references between phases. Computation and lifecycle changes reuse existing
-Core services; no extra control tables or jobs are introduced. See the
+<p>The generated notebooks have fixed lifecycle steps or the score role.
+<code>initialize_run</code> freezes the request; <code>load_data</code> reads bounded pinned data;
+<code>prepare_dataset</code> applies fixed cleanup and saves the split. <code>train_and_tune</code>
+fits learned preprocessing within training folds and runs configured CV/search.
+<code>select_best_model</code> currently verifies a single candidate; multiple candidates
+in one run are not implemented yet. <code>register_model</code> evaluates the fitted
+artifact before registration; <code>evaluate_model</code> compares registered versions.
+<code>model_decision</code> applies the saved policy or an explicit approve/reject/rollback
+request. Manual actions skip the data and training stages. <code>training_report</code>
+closes training even on failure and publishes only a verified successful result.</p>
+<p>Tasks exchange durable MLflow references. Source and split datasets are bounded
+Parquet artifacts under <code>lifecycle/data/</code>, with digests and membership metadata
+checked before reuse. The experiment therefore stores training rows as well as
+model evidence; its access and retention policies apply to those rows.
+Computation and lifecycle changes reuse existing Core services; no additional
+control tables or jobs are introduced. See the
 <a href="databricks_bundle_walkthrough.html#the-two-jobs-and-their-tasks">task graph and operator walkthrough</a>.
-<code>prediction_output</code> creates output tables and safely switches full-rebuild
-views. Imports do not create a Spark session or cloud resource.</p>
-<p>Regenerate and deploy the notebook files and job graph together with the
-matching wheel; graph contract 2 deliberately rejects older generated graphs.
+<code>prediction_output</code> creates output tables and switches full-rebuild views.
+Imports do not create a Spark session or cloud resource.</p>
+<p>Regenerate and deploy notebooks, graph and wheel together for graph contract 3.
+Existing graph-2 bundles retain their legacy runtime path; changing only a
+contract marker does not migrate a bundle.
 The workflow configuration schema remains version 1.</p>
 <p>Notebook entrypoints are explicit: generated <code>src/score.py</code> calls
 <code>job_runtime.run_score_notebook</code>; lifecycle notebooks call
@@ -4587,9 +5053,10 @@ with the matching wheel. Existing direct <code>run_notebook(task_role=...)</code
 remain supported: score delegates to the score entrypoint, while lifecycle keeps
 its sequential behavior and does not acquire durable phase/retry semantics.
 <code>run_bundle_action</code>, <code>run_action</code> and <code>train_local_candidate</code> retain their APIs.</p>
-<p>Edit preprocessing in <code>src/preprocessing.py</code> and model/workflow settings in
-<code>config/workflow.json</code>. These remain project choices; common workflow fixes ship in the
-Skyulf wheel instead of requiring edits to every generated notebook.</p>
+<p>Edit preprocessing in <code>src/features/preprocessing.py</code>, model settings in the
+selected <code>src/modeling/</code> file, and shared workflow settings in <code>config/workflow.json</code>.
+These remain project choices; common workflow fixes ship in the Skyulf wheel
+instead of requiring edits to every generated notebook.</p>
 <h3 id="independent-scoring-and-promotion-policies">Independent scoring and promotion policies</h3>
 <p>Generated Bundles and direct <code>run_action</code> callers separate these decisions:</p>
 <table>
@@ -5000,15 +5467,32 @@ can find a customer's predictions:</p>
 <span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'C123'</span><span class="p">;</span>
 </code></pre></div>
 <h2 id="first-run">First run</h2>
-<p>Build and place the matching Skyulf wheel in the generated project's <code>dist/</code>,
-then edit <code>config/workflow.json</code> for real source columns, model, split policy
-and size limits, and <code>src/preprocessing.py</code> for feature engineering.
+<p>Set <code>deployment/artifact.json</code> to the Core source directory or release wheel and
+the expected Core version. The Bundle artifact build prepares the wheel, checks
+its identity and records its SHA-256 in <code>dist/skyulf/build.json</code>.
+The wheel filename includes its content digest as a build tag: changed bytes get
+a distinct deployment/cache identity while the release version stays compatible
+with existing saved model requirements. The receipt matches the uploaded bytes.
+Edit <code>config/workflow.json</code> for real source columns, split policy and size
+limits, the selected <code>src/modeling/</code> file for model settings, and
+<code>src/features/preprocessing.py</code> for feature engineering.
 The JSON values are an example, not a dataset.
 Enable Change Data Feed on the scoring source before later inserts arrive.</p>
-<div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
-<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
-<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">train</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<div class="highlight"><pre><span></span><code><span class="n">uv</span> <span class="n">run</span> <span class="p">-</span><span class="n">-no-project</span> <span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">build_wheel</span><span class="p">.</span><span class="n">py</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">train</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
 </code></pre></div>
+<p>Use <code>test</code> instead if personal development targets were not generated.
+<code>deployment/requirements.txt</code> supplies the shared train/score runtime, including
+initial Optuna and optional model/ensemble choices. Update these exact pins when
+editing model choices later. Custom preprocessing/scoring requirements from
+<code>src/features/requirements.txt</code> are installed in both jobs. Training-only report
+packages live in <code>deployment/train-requirements.txt</code>. These direct pins do not
+freeze all transitive dependencies.</p>
+<p>Compute settings are target variables: serverless environment version and optional
+budget policy, or policy-cluster runtime, node type and worker bounds. <code>job_tags</code>
+applies in both modes. Validate company policy compatibility in the actual target.</p>
 <p>For pinned scoring, inspect the registered version, put that concrete value
 in <code>model_version</code>, redeploy the changed JSON, then run <code>score</code>. For champion
 scoring, approve manually or use automatic promotion gates, then run score or
@@ -5067,6 +5551,16 @@ retries independently. A training retry can register another candidate version.
 Inspect failed run evidence and registry state before rerunning; retry score
 separately after an already-committed approval. This is not an exactly-once
 training guarantee. See the <a href="https://docs.databricks.com/aws/en/jobs/run-serverless-jobs">Databricks serverless retry behavior</a>.</p>
+<h3 id="job-resource-files">Job resource files</h3>
+<p>Generated projects keep training/lifecycle tasks in <code>resources/train.job.yml</code>
+and batch scoring in <code>resources/score.job.yml</code>. The root <code>databricks.yml</code>
+includes both through <code>resources/*.yml</code>. Each job retains its own schedule and
+compute settings; training calls scoring through <code>${resources.jobs.score.id}</code>.</p>
+<p>When upgrading a project generated with <code>resources/workflow.jobs.yml</code>, replace
+that file with the two new files rather than keeping all three. Preserve the
+resource keys <code>train</code> and <code>score</code>, the bundle identity, target and workspace
+root so a redeploy continues to address the existing jobs. Preview and validate
+before deploying; splitting these files alone does not change task behavior.</p>
 
 
 

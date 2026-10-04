@@ -1996,6 +1996,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -3794,7 +3850,8 @@ expire; clear it only after proving the original job cannot publish.</p>
 digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later
 alias move does not redirect the pinned reference.</p>
-<p>The <code>databricks_batch_smoke.py</code> example logs a uniquely named test model, loads
+<p>The <code>skyulf-core/tests/fixtures/databricks_batch_smoke.py</code> fixture logs a uniquely
+named test model, loads
 its concrete registry version, and compares known gold predictions through both
 Spark inference modes. It accepts pandas or Polars training and emits a partial
 validation report. Local SQLite/Spark evidence does not certify live Unity Catalog,

@@ -1620,6 +1620,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Fitted local pipelines (pandas or Polars)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nullable-integers-and-boolean-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nullable integers and Boolean inputs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1965,6 +1982,62 @@
     
   
     skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
   
 
     
@@ -3539,6 +3612,55 @@ trained on Polars is explicitly converted back to Polars before applying its
 learned preprocessing and model. MLflow may align named columns and cast values
 according to its signature before that conversion. Check parity for each input
 dtype you intend to serve, especially nullable or categorical dtypes.</p>
+<h3 id="nullable-integers-and-boolean-inputs">Nullable integers and Boolean inputs</h3>
+<p>MLflow validates its input signature <strong>before</strong> calling the saved pipeline.
+A nullable integer or Boolean column can therefore be rejected before its
+fitted imputer runs. Newly logged local pipelines and model sets declare these
+columns as strings at the MLflow boundary and restore their recorded dtype
+before applying feature engineering. Nulls remain nulls until the saved
+preprocessing handles them; the adapter does not fill them or retrain an imputer.
+<code>ColSpec(required=False)</code> makes a column optional; it does not make nullable
+integer or Boolean values pass their primitive signature. Floating-point
+columns keep numeric signatures and do not need this string transport.</p>
+<p>Use the public helper with a loaded model:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_pyfunc_input</span>
+
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">pyfunc</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_uri</span><span class="p">)</span>
+<span class="c1"># raw_frame contains the original, typed values expected by this artifact.</span>
+<span class="n">request</span> <span class="o">=</span> <span class="n">prepare_pyfunc_input</span><span class="p">(</span><span class="n">raw_frame</span><span class="p">,</span> <span class="n">loaded</span><span class="p">)</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">loaded</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+</code></pre></div>
+<p>For example, an <code>Int64</code> column <code>[25, None, 40]</code> travels as
+<code>["25", None, "40"]</code>, becomes <code>Int64</code> again inside the adapter, and then enters
+the fitted cleaning steps. A pipeline with no suitable missing-value handler
+can still fail in its model. The helper preserves input order and index and
+does not mutate the caller's frame. It is needed only at the MLflow boundary;
+direct <code>predict_local_pipeline</code> calls continue to take native values.
+Call the helper once: it accepts native values and deliberately rejects
+already encoded strings. REST/JSON clients can send the declared strings and
+nulls directly; they do not call this Python helper.</p>
+<p>The transport covers pandas extension <code>Int32</code>, <code>Int64</code>, and <code>boolean</code>, and
+Polars <code>Int32</code>, <code>Int64</code>, and <code>Boolean</code>. Polars does not record column
+nullability separately, so newly logged models use this transport for all
+columns of those three Polars types. Ordinary pandas NumPy <code>int32</code>, <code>int64</code>,
+and <code>bool</code> signatures stay native. Other unsupported dtypes still fail at
+packaging time; portable <code>InferenceBundle</code> signatures are unchanged.</p>
+<p>The package records <code>skyulf_input_transport</code> metadata with codec
+<code>nullable_primitives_v1</code> and its column-to-dtype mapping. The helper checks
+this mapping against the loaded artifact. Integer strings must be canonical
+decimal values within the fitted signed integer range; Boolean strings must
+be <code>"true"</code> or <code>"false"</code>. Invalid strings and floating-point integer inputs
+are rejected instead of rounded. This preserves integers above <code>2**53</code>.
+Existing logged packages keep their previous contract; log a new version to
+use the nullable transport.</p>
+<p>For a separately verified batch-safe pipeline, Spark callers must cast the
+listed integer and Boolean columns to strings <strong>in Spark before</strong> passing
+them to <code>mlflow.pyfunc.spark_udf</code>. Casting after conversion to pandas can be
+too late: Arrow may already have represented nullable integers as floats.
+Other feature columns keep their declared types. This transport does not
+make arbitrary preprocessing safe across Spark batches or change nullable
+prediction-output limitations. See
+<a href="https://mlflow.org/docs/latest/model/signatures/">MLflow signature validation</a>.</p>
 <p>For classifiers, the output is <code>prediction</code> followed by
 <code>probability_0</code>, <code>probability_1</code>, and so on in the saved model class order. Pass
 <code>use_tuned_thresholds=True</code> to <code>save_local_pipeline</code> only when the fitted

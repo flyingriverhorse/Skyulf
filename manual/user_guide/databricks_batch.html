@@ -2035,6 +2035,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -3753,7 +3809,7 @@ evolution, streaming and endpoint deployment remain unsupported here. The sink
 helper is lower-level: direct callers must supply output and a manifest with
 the same provenance guarantees as <code>run_batch</code>.</p>
 <h2 id="local-verification">Local verification</h2>
-<p>The repository's <code>skyulf-core/examples/databricks_delta_smoke.py</code> accepts an
+<p>The test fixture <code>skyulf-core/tests/fixtures/databricks_delta_smoke.py</code> accepts an
 existing Spark session, a pinned raw <code>y=2*x</code> regression bundle and an existing
 test namespace. Its <code>run_smoke(...)</code> creates and prints three unique Delta table
 names, verifies monthly publication/replay and explicit empty replacement, and
@@ -3768,9 +3824,9 @@ Keep this test environment separate from Databricks Runtime's bundled packages.<
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>.venv-delta
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv-delta/bin/python<span class="w"> </span>-r<span class="w"> </span>requirements-delta.txt
 <span class="nv">SKYULF_REQUIRE_DELTA</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>.venv-delta/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integrations/test_batch_contract.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integrations/test_batch_admission.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integrations/test_delta_publish.py<span class="w"> </span>-q<span class="w"> </span>-o<span class="w"> </span><span class="nv">addopts</span><span class="o">=</span>
+<span class="w">  </span>skyulf-core/tests/integration/platforms/test_batch_contract.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>skyulf-core/tests/integration/platforms/test_batch_admission.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>skyulf-core/tests/integration/platforms/test_delta_publish.py<span class="w"> </span>-q<span class="w"> </span>-o<span class="w"> </span><span class="nv">addopts</span><span class="o">=</span>
 </code></pre></div>
 <p>The fixture configures the Delta extension/catalog and creates only temporary
 test tables. Its first launch downloads the matching Maven jars. For an offline

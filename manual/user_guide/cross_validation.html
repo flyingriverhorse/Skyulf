@@ -1916,6 +1916,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2121,10 +2177,44 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#group-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Group policies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nested-cv" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nested CV
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nested CV">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#temporal-nested-cv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Temporal nested CV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threshold-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threshold selection
       
     </span>
   </a>
@@ -2135,12 +2225,17 @@
     </nav>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#return-structure" class="md-nav__link">
+  <a href="#results" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Return structure
+        Results
       
     </span>
   </a>
@@ -2148,10 +2243,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
+  <a href="#configuration-across-interfaces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration reference
+        Configuration across interfaces
       
     </span>
   </a>
@@ -2159,21 +2254,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#ml-canvas-ui" class="md-nav__link">
+  <a href="#ml-canvas-and-databricks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ML Canvas UI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#integration-with-tuning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Integration with tuning
+        ML Canvas and Databricks
       
     </span>
   </a>
@@ -3618,7 +3702,7 @@
 
 
 <h1 id="cross-validation">Cross-Validation</h1>
-<p>Skyulf supports five cross-validation strategies out of the box. CV can be used standalone via <code>StatefulEstimator.cross_validate()</code> or inside the hyperparameter tuning pipeline.</p>
+<p>Skyulf supports random, chronological and group-aware cross-validation. CV can be used standalone via <code>StatefulEstimator.cross_validate()</code> or inside the hyperparameter tuning pipeline.</p>
 <h2 id="supported-methods">Supported methods</h2>
 <table>
 <thead>
@@ -3655,27 +3739,44 @@
 <td>Temporal data (no future leakage)</td>
 </tr>
 <tr>
+<td>Group K-Fold</td>
+<td><code>group_k_fold</code></td>
+<td>Whole groups stay together</td>
+<td>Repeated customers, patients or devices</td>
+</tr>
+<tr>
+<td>Stratified Group K-Fold</td>
+<td><code>stratified_group_k_fold</code></td>
+<td>Group isolation with class balancing</td>
+<td>Grouped classification</td>
+</tr>
+<tr>
 <td>Nested CV</td>
 <td><code>nested_cv</code></td>
-<td>Dual-loop (outer KFold/Stratified + inner KFold/Stratified)</td>
-<td>Unbiased generalization estimate</td>
+<td>Separate inner selection and outer evaluation</td>
+<td>Evaluate the tuning procedure</td>
 </tr>
 </tbody>
 </table>
 <h2 id="quick-example-standalone">Quick example (standalone)</h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.modeling.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatefulEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodeRegistry</span>
 
-<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span><span class="n">model_type</span><span class="o">=</span><span class="s2">"random_forest_classifier"</span><span class="p">)</span>
-<span class="n">estimator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
-
+<span class="c1"># training_frame contains features and the target column "label".</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">StatefulEstimator</span><span class="p">(</span>
+    <span class="n">calculator</span><span class="o">=</span><span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_calculator</span><span class="p">(</span><span class="s2">"random_forest_classifier"</span><span class="p">)(),</span>
+    <span class="n">applier</span><span class="o">=</span><span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_applier</span><span class="p">(</span><span class="s2">"random_forest_classifier"</span><span class="p">)(),</span>
+    <span class="n">node_id</span><span class="o">=</span><span class="s2">"classifier"</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="n">cv_results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">cross_validate</span><span class="p">(</span>
-    <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">training_frame</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">training_frame</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">0</span><span class="p">]),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"label"</span><span class="p">,</span>
+    <span class="n">config</span><span class="o">=</span><span class="p">{</span><span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"n_estimators"</span><span class="p">:</span> <span class="mi">50</span><span class="p">}},</span>
     <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
     <span class="n">cv_type</span><span class="o">=</span><span class="s2">"stratified_k_fold"</span><span class="p">,</span>
 <span class="p">)</span>
-
 <span class="nb">print</span><span class="p">(</span><span class="n">cv_results</span><span class="p">[</span><span class="s2">"aggregated_metrics"</span><span class="p">])</span>
-<span class="c1"># {'accuracy': {'mean': 0.92, 'std': 0.01, 'min': 0.90, 'max': 0.94}, ...}</span>
 </code></pre></div>
 <h2 id="quick-example-pipeline-config">Quick example (pipeline config)</h2>
 <div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
@@ -3718,97 +3819,144 @@ mixed date/datetime object columns, or entirely missing object columns. Normaliz
 such inputs explicitly before temporal CV. Sorting remains stable, places
 missing dates last and keeps targets aligned. Rerun temporal CV on affected
 native pandas date inputs; previous scores may have used nonchronological folds.</p>
+<h3 id="group-policies">Group policies</h3>
+<p>Choose <code>group_k_fold</code> or, for classification, <code>stratified_group_k_fold</code> and
+provide <code>cv_group_column</code>. Each entity stays on one side of every split. The
+column is excluded from learned features. Missing group identifiers,
+insufficient groups and incomplete class coverage fail before fitting.
+Reserved test/validation partitions must also have groups absent from training.</p>
 <h3 id="nested-cv">Nested CV</h3>
-<p>Runs a dual-loop cross-validation:</p>
+<p>With tuning enabled, <code>cv_type="nested_cv"</code> runs these stages:</p>
+<ol>
+<li>Reserve one outer fold for evaluation.</li>
+<li>Search candidate parameters using only inner folds of the outer training rows.
+   Every learned preprocessing step is fitted again inside each training fold.</li>
+<li>Refit that fold's winning recipe and score the untouched outer fold.</li>
+<li>Repeat for every outer fold; report the mean and spread of outer scores.</li>
+<li>Run a separate search on all training rows and fit the deployable model.
+   The final test/validation holdout does not choose parameters or thresholds.</li>
+</ol>
+<p><code>cv_folds</code> sets the outer count. <code>cv_inner_folds</code> sets the inner count; when
+omitted it is <code>min(3, cv_folds - 1)</code>, with two inner folds for two outer folds.
+Trial limits and timeouts apply to each search, including the final search.</p>
+<p><code>cv_nested_type="auto"</code> uses stratified folds for classification and K-Fold for
+regression. Explicit options are <code>k_fold</code>, <code>stratified_k_fold</code>,
+<code>time_series_split</code>, <code>group_k_fold</code> and <code>stratified_group_k_fold</code>.</p>
+<h4 id="temporal-nested-cv">Temporal nested CV</h4>
+<p>Set <code>cv_nested_type="time_series_split"</code>, <code>cv_time_column</code> and
+<code>cv_shuffle=False</code>. Both levels sort stably by the clock and train before their
+validation rows. The final reserved holdout must follow all training timestamps.
+Missing timestamps and equal timestamps crossing a fold boundary are rejected.
+The clock is excluded from model features; prediction requests retain their row order.</p>
 <ul>
-<li><strong>Outer loop</strong> (K-Fold or Stratified): evaluates generalization on held-out data.</li>
-<li><strong>Inner loop</strong> (3-fold, capped at <code>n_folds - 1</code>): trains within each outer training set to check hyperparameter stability.</li>
+<li><code>cv_gap</code>: excluded rows between each training and validation partition (default 0).</li>
+<li><code>cv_test_size</code>: validation rows per fold; <code>None</code> selects automatic sizing.</li>
+<li><code>cv_max_train_size</code>: maximum training rows; <code>None</code> expands the window, a positive
+  value creates a rolling window.</li>
 </ul>
-<p>This prevents the optimistic bias that occurs when the same data is used for both tuning and evaluation.</p>
-<div class="highlight"><pre><span></span><code><span class="n">cv_type</span><span class="o">=</span><span class="s2">"nested_cv"</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span>
-</code></pre></div>
-<p>Each fold result includes an <code>inner_cv_mean</code> score for diagnostics.</p>
-<h2 id="return-structure">Return structure</h2>
-<p>All CV methods return the same dictionary shape:</p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-    <span class="s2">"aggregated_metrics"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"accuracy"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="mf">0.92</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">:</span> <span class="mf">0.01</span><span class="p">,</span> <span class="s2">"min"</span><span class="p">:</span> <span class="mf">0.90</span><span class="p">,</span> <span class="s2">"max"</span><span class="p">:</span> <span class="mf">0.94</span><span class="p">},</span>
-        <span class="c1"># ... other metrics</span>
-    <span class="p">},</span>
-    <span class="s2">"folds"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">{</span><span class="s2">"fold"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"metrics"</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}},</span>
-        <span class="p">{</span><span class="s2">"fold"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"metrics"</span><span class="p">:</span> <span class="p">{</span><span class="o">...</span><span class="p">}},</span>
-        <span class="c1"># ...</span>
-    <span class="p">],</span>
-    <span class="s2">"cv_config"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"n_folds"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
-        <span class="s2">"cv_type"</span><span class="p">:</span> <span class="s2">"k_fold"</span><span class="p">,</span>
-        <span class="s2">"shuffle"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="s2">"random_state"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
-    <span class="p">},</span>
-<span class="p">}</span>
-</code></pre></div>
-<p>Nested CV adds <code>inner_cv_mean</code> to each fold entry and <code>inner_folds</code> to <code>cv_config</code>.</p>
-<h2 id="configuration-reference">Configuration reference</h2>
+<p>These settings use row counts, not durations. They apply to both nested levels
+and the separate final search. The earliest outer training partition must be
+large enough for the requested inner windows. Ordinary temporal CV with explicit
+window settings uses the same strict metadata checks.</p>
+<h4 id="threshold-selection">Threshold selection</h4>
+<p>For binary classification, <code>tune_threshold=True</code> collects fresh inner
+out-of-fold probabilities for the selected recipe. The threshold is chosen from
+those training-only predictions and applied to the outer fold's hard decisions.
+ROC-AUC and other probability/ranking metrics retain the original probabilities.
+A separate threshold is selected from final-search OOF predictions for the saved
+model. Temporal warmup rows without OOF predictions are excluded and counted.</p>
+<p>This also works with eligible voting/stacking classifiers. The estimator must
+expose <code>predict_proba</code>; regression, multiclass and hard-voting thresholds are
+rejected. Target encoding must preserve an identifiable raw-to-model class mapping.</p>
+<h2 id="results">Results</h2>
+<p>Ordinary fixed-model CV returns <code>aggregated_metrics</code>, <code>folds</code> and <code>cv_config</code>.
+Tuning stores its nested report under <code>TuningResult.nested_cv</code>, including:</p>
+<ul>
+<li><code>mean_score</code> / <code>std_score</code>: outer evaluation scores, separate from final search score.</li>
+<li><code>folds</code>: selected parameters, inner best score and outer score for each fold.</li>
+<li><code>split_policy</code>, <code>split</code>, <code>inner_splits</code>, <code>final_splits</code>: effective settings and
+  timestamp boundaries or group counts/membership hashes.</li>
+<li><code>threshold_selection</code>: per-outer-fold and final OOF threshold evidence when enabled.</li>
+</ul>
+<p>Search scores use sklearn's higher-is-better convention; losses remain negative.
+A fixed-model evaluation does not invent a search space: explicit nested policies
+use a single candidate, while the legacy standalone automatic nested method
+retains its fixed-parameter inner diagnostic.</p>
+<h2 id="configuration-across-interfaces">Configuration across interfaces</h2>
 <table>
 <thead>
 <tr>
-<th>Parameter</th>
-<th>Type</th>
-<th>Default</th>
-<th>Description</th>
+<th>Concept</th>
+<th>Core tuning / Canvas payload</th>
+<th>Standalone <code>cross_validate</code></th>
+<th>Databricks workflow</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td>Method</td>
 <td><code>cv_type</code></td>
-<td><code>str</code></td>
-<td><code>"k_fold"</code></td>
-<td>One of <code>k_fold</code>, <code>stratified_k_fold</code>, <code>time_series_split</code>, <code>shuffle_split</code>, <code>nested_cv</code></td>
+<td><code>cv_type</code></td>
+<td><code>cv_type</code></td>
 </tr>
 <tr>
-<td><code>n_folds</code> / <code>cv_folds</code></td>
-<td><code>int</code></td>
-<td><code>5</code></td>
-<td>Number of CV folds</td>
+<td>Outer folds</td>
+<td><code>cv_folds</code></td>
+<td><code>n_folds</code></td>
+<td><code>cv_folds</code></td>
 </tr>
 <tr>
-<td><code>shuffle</code></td>
-<td><code>bool</code></td>
-<td><code>True</code></td>
-<td>Shuffle data before splitting (K-Fold / Stratified only)</td>
+<td>Inner folds</td>
+<td><code>cv_inner_folds</code></td>
+<td><code>inner_folds</code></td>
+<td><code>cv_inner_folds</code></td>
 </tr>
 <tr>
-<td><code>random_state</code></td>
-<td><code>int</code></td>
-<td><code>42</code></td>
-<td>Random seed</td>
+<td>Nested policy</td>
+<td><code>cv_nested_type</code></td>
+<td><code>cv_nested_type</code></td>
+<td><code>cv_nested_type</code></td>
 </tr>
 <tr>
-<td><code>time_column</code> / <code>cv_time_column</code></td>
-<td><code>str\|null</code></td>
-<td><code>null</code></td>
-<td>Column for chronological sorting (Time Series Split)</td>
+<td>Group identifier</td>
+<td><code>cv_group_column</code></td>
+<td><code>group_column</code></td>
+<td><code>cv_group_column</code></td>
+</tr>
+<tr>
+<td>Clock</td>
+<td><code>cv_time_column</code></td>
+<td><code>time_column</code></td>
+<td><code>event_column</code></td>
+</tr>
+<tr>
+<td>Gap / test / window</td>
+<td><code>cv_gap</code>, <code>cv_test_size</code>, <code>cv_max_train_size</code></td>
+<td><code>gap</code>, <code>test_size</code>, <code>max_train_size</code></td>
+<td>Same <code>cv_*</code> fields</td>
+</tr>
+<tr>
+<td>Shuffle / seed</td>
+<td><code>cv_shuffle</code>, <code>cv_random_state</code></td>
+<td><code>shuffle</code>, <code>random_state</code></td>
+<td>Same <code>cv_*</code> fields</td>
 </tr>
 </tbody>
 </table>
-<h2 id="ml-canvas-ui">ML Canvas UI</h2>
-<p>Every training node (Classification, Regression, Text Classification, Segmentation) exposes a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.</p>
-<h2 id="integration-with-tuning">Integration with tuning</h2>
-<p>When a training node's <code>run_mode</code> is set to <code>"advanced"</code>, cross-validation plays two distinct roles:</p>
-<ol>
-<li>
-<p><strong>During the search:</strong> The CV splitter is passed directly to the search strategy (GridSearchCV, OptunaSearchCV, etc.). Each candidate hyperparameter set is scored using inner CV folds. For <code>nested_cv</code>, the inner splitter uses fewer folds (3 or <code>cv_folds - 1</code>, whichever is smaller) to keep the search fast.</p>
-</li>
-<li>
-<p><strong>After the search (post-tuning evaluation):</strong> A separate <code>cross_validate()</code> call runs with the <code>best_params</code> found by tuning. This gives you the unbiased <code>cv_*_mean</code> / <code>cv_*_std</code> metrics shown in Experiments.</p>
-</li>
-</ol>
-<blockquote>
-<p><strong>Important:</strong> When <code>nested_cv</code> is selected with <code>run_mode: "advanced"</code>, the post-tuning evaluation automatically downgrades to <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.</p>
-</blockquote>
-<p>For <code>run_mode: "basic"</code> (no tuning), <code>nested_cv</code> runs the full dual-loop as described above.</p>
-<p>See <a href="hyperparameter_tuning.html">Hyperparameter Tuning</a> for tuning-specific configuration.</p>
+<h2 id="ml-canvas-and-databricks">ML Canvas and Databricks</h2>
+<p>Classification, regression and ensemble settings expose <strong>Method</strong>, with
+<strong>Outer folds</strong>, <strong>Inner folds</strong> and <strong>Nested split policy</strong> for Nested CV.
+Temporal policies show clock/gap/window controls; group policies require an
+identifier column. Shuffle is disabled for chronological splits. For K-Fold,
+stratified and group policies, <strong>Fold Split Seed</strong> controls reproducible shuffling
+when shuffle is enabled. The seed is not specific to nested CV.</p>
+<p>The backend carries raw split metadata through preprocessing and checks reserved
+holdout isolation. Basic mode evaluates fixed parameters; Advanced mode searches
+inside each outer fold. Results display the saved policy and threshold evidence.</p>
+<p>Databricks uses the same Core search and split policies. Configure group-isolated
+or temporal final holdouts in the workflow. See <a href="databricks_bundle.html">Databricks Bundle</a>
+for generated settings and examples, and <a href="hyperparameter_tuning.html">Hyperparameter Tuning</a>
+for strategy controls.</p>
 
 
 

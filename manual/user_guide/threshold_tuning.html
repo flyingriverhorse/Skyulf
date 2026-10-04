@@ -1916,6 +1916,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2145,6 +2201,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Integrated with hyperparameter tuning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nested-training-only-threshold-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nested training-only threshold selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3594,8 +3667,9 @@ you supply, evaluated on held-out validation data.</p>
   <code>apply_thresholds()</code> — plain NumPy in/out, for use outside a pipeline (e.g.
   with a raw sklearn estimator).</li>
 <li><strong>Tuning-engine integration:</strong> <code>TuningConfig(tune_threshold=True)</code> — after
-  hyperparameter tuning, the engine selects the threshold on the validation
-  split and applies it in every subsequent prediction automatically (binary
+  hyperparameter tuning, the engine selects the threshold from validation data
+  (ordinary CV) or training-only inner OOF predictions (nested CV), then applies
+  it in every subsequent prediction automatically (binary
   classifiers only). See <a href="#integrated-with-hyperparameter-tuning">Integrated with hyperparameter tuning</a>.</li>
 </ul>
 <h2 id="after-training-in-the-canvas">After training in the canvas</h2>
@@ -3719,9 +3793,9 @@ example, tuning a raw sklearn estimator's thresholds:</p>
 <p>When a classifier is trained through the tuning engine — a canvas Training node
 in Advanced mode, the <code>"hyperparameter_tuner"</code> pipeline model type, or
 <code>TuningCalculator</code> directly — set <code>tune_threshold: true</code> to have the engine
-pick the decision threshold right after the final refit. It grid-searches the
-positive-class cutoff that maximises your tuning metric on the validation
-split, and every subsequent prediction uses that cutoff instead of the default
+pick the decision threshold. Ordinary tuning uses the validation split after
+final refit; nested tuning uses the training-only OOF procedure below. Subsequent
+predictions use that cutoff instead of the default
 <code>0.5</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span>
@@ -3751,7 +3825,7 @@ training</em>) and is active for deployed predictions immediately, and the usual
 panel controls apply: toggle it off, replace it with a manual preview, or
 clear it. Predict-time precedence is unchanged: request-level override &gt;
 saved + enabled thresholds &gt; default decision rule.</p>
-<p><strong>Gates</strong> — the engine logs a skip in the job log and predictions keep the
+<p><strong>Ordinary tuning gates</strong> — the engine logs a skip in the job log and predictions keep the
 default decision rule when any of these don't hold:</p>
 <ul>
 <li>the model is a <strong>classifier</strong> exposing <code>predict_proba</code>;</li>
@@ -3764,8 +3838,25 @@ default decision rule when any of these don't hold:</p>
 <p>Probability-only metrics (<code>roc_auc</code>, <code>log_loss</code>, <code>pr_auc</code>, …) cannot be
 computed from hard labels, so the cutoff sweep maximises <code>balanced_accuracy</code>
 instead — the log says so, and <code>decision_threshold_metric</code> records it.
-Threshold tuning is best-effort: an error during the sweep never aborts the
-tuning run.</p>
+Ordinary validation-based threshold tuning is best-effort: an error during the
+sweep never aborts the tuning run.</p>
+<h3 id="nested-training-only-threshold-selection">Nested training-only threshold selection</h3>
+<p>With <code>cv_type="nested_cv"</code> and <code>tune_threshold=True</code>, each outer training
+partition runs its own parameter search. The winning recipe is then fitted on
+fresh inner training folds to collect out-of-fold probabilities. The threshold
+is selected only from those probabilities and their training labels, then used
+for hard-label evaluation of that outer fold. Probability/ranking metrics are
+unchanged by threshold selection.</p>
+<p>A separate final search and OOF sweep produce the deployable model's threshold.
+The final holdout never selects it. The stored provenance is <code>inner_oof</code>, and the
+nested report records coverage, per-fold thresholds and the independent final
+threshold. Temporal warmup rows without OOF predictions are excluded from the
+sweep. Group policies retain whole-group isolation.</p>
+<p>Nested threshold selection requires binary classification and <code>predict_proba</code>.
+Invalid probabilities, unsupported targets or failed fold evidence fail the run;
+a partial nested evaluation cannot become a successful report. Saved local
+Databricks artifacts retain the threshold and apply it when replayed. Direct
+pipeline callers can select it with <code>predict(use_tuned_thresholds=True)</code>.</p>
 <h2 id="how-the-search-works">How the search works</h2>
 <table>
 <thead>
@@ -3803,8 +3894,9 @@ tuning run.</p>
   Equal thresholds across all classes reduce to plain <code>argmax</code>, so the tuned
   result can only match or beat the default rule on the tuning metric.</li>
 </ul>
-<p>Pass <code>strategy="grid"</code> or <code>strategy="nelder-mead"</code> explicitly to override the
-auto-selection.</p>
+<p>Pass <code>strategy="grid"</code> for binary classification or <code>strategy="nelder-mead"</code>
+explicitly to override the auto-selection. Grid search requires exactly two
+classes; requesting it for multiclass probabilities raises <code>ValueError</code>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
 <li>The <code>metric</code> is fully caller-supplied — Skyulf ships <strong>no</strong> default metric.

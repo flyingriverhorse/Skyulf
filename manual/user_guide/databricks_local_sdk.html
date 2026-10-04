@@ -1773,13 +1773,113 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#real-data-end-to-end-example" class="md-nav__link">
+  <a href="#lag-and-rolling-history-across-batches" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Real-data end-to-end example
+        Lag and rolling history across batches
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#historical-real-data-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical real-data validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saved-scoring-policies-and-project-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved scoring policies and project assets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Saved scoring policies and project assets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deliver-lookup-files-and-external-python-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deliver lookup files and external Python dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#train-independent-target-models-in-one-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train independent target models in one job
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Train independent target models in one job">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activate-and-score-a-coherent-model-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activate and score a coherent model set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-output-storage-and-consumer-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose output storage and consumer views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-component-quality-gates-and-automatic-set-activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-component quality gates and automatic set activation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select-preprocessing-and-pre-split-recipes-independently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select preprocessing and pre-split recipes independently
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2031,6 +2131,62 @@
     
   
     skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
   
 
     
@@ -4018,22 +4174,429 @@ budget deliberately or handle such a source with a separate distributed path.
 The target receipt is in the same Delta commit as the predictions. This
 protects participating writers only; changes outside the admission protocol
 must be handled explicitly.</p>
-<h2 id="real-data-end-to-end-example">Real-data end-to-end example</h2>
-<p><code>skyulf-core/examples/databricks_local_real_taxi_job.py</code> is a one-time
-Databricks notebook using the public <code>samples.nyctaxi.trips</code> dataset. It
-materializes a bounded copy in an isolated Unity Catalog schema, trains a
+<h2 id="lag-and-rolling-history-across-batches">Lag and rolling history across batches</h2>
+<p><code>LagFeatures</code> and <code>RollingAggregate</code> default to <code>history_mode="batch"</code>: only
+the supplied frame participates. Set <code>history_mode="carry"</code> in a preprocessing
+step to save a bounded training tail per entity. Put this step <strong>after splitting</strong>.
+For example:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"recent_value"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"RollingAggregate"</span><span class="p">,</span>
+ <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"value"</span><span class="p">],</span> <span class="s2">"window"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+            <span class="s2">"sort_by"</span><span class="p">:</span> <span class="s2">"observation_time"</span><span class="p">,</span> <span class="s2">"group_by"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"entity"</span><span class="p">],</span>
+            <span class="s2">"history_mode"</span><span class="p">:</span> <span class="s2">"carry"</span><span class="p">,</span>
+            <span class="s2">"history_max_rows"</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">"history_max_bytes"</span><span class="p">:</span> <span class="mi">48000</span><span class="p">}}</span>
+</code></pre></div>
+<p>Declare the observed value, clock and entity in <code>input_columns</code>. For the
+Databricks source contract, this clock must be distinct from the job's
+<code>event_column</code> and record keys. Drop or encode non-model columns after the
+temporal step. Inputs must be available at prediction time; target-history
+forecasting is not supported.
+The clock must be numeric or a typed datetime; parse JSON/string timestamps in
+an earlier preprocessing step before using them as temporal ordering keys.</p>
+<ul>
+<li>The artifact seed stays fixed. Lag 3 retains three prior rows per entity;
+  rolling window 5 retains four. Window 1 retains one ordering marker.</li>
+<li>Training never reads its own saved tail. Temporal holdout and each CV fold
+  use only their own training history. Carry mode requires Time Series CV
+  (or nested Time Series); skipped gap rows do not enter history.</li>
+<li>Missing or tied entity/time keys and observations at or before the saved
+  entity time are rejected. New entities start with empty history. Returned
+  rows keep request order. <code>drop_na</code> is disallowed; use an imputer instead.</li>
+<li>Each chained temporal step stores its own input context. Context rows do
+  not enter subsequent imputer/scaler/model fitting or returned predictions.</li>
+<li>Limits apply across all entities per step: by default 10,000 rows and 1 MiB.
+  Exceeding a limit fails explicitly; inactive entities are not silently evicted.</li>
+</ul>
+<p><strong>Incremental Databricks scoring:</strong> the initial complete source snapshot
+reconstructs history from that snapshot, without prepending the training seed.
+Later increments read <code>temporal_history</code> from the last prediction receipt.
+The new context, source watermark and predictions share one Delta commit.
+A failed write leaves the prior committed context; a retry reads the actual
+receipt, and a no-op makes no write. Receipts have a 64 KiB history budget.
+A changed model or a prior receipt without history requires a fresh target;
+contexts are never silently mixed across models. This is bounded local batch
+execution, not Spark worker or streaming state.</p>
+<p><strong>Period scoring:</strong> <code>run_local_batch(..., history_state=...)</code> accepts an explicit
+earlier context. A successful result's manifest contains the next context.
+Period replacement does not automatically choose another period's history.
+Retry identity includes the supplied context, so conflicting retries fail.</p>
+<p><strong>Core and backend:</strong> ordinary prediction uses the immutable artifact seed.
+For successive Core calls, wrap prediction in
+<code>TemporalHistorySession(immutable_model_id, previous_state)</code> from
+<code>skyulf.preprocessing.time_series.history</code>, then persist <code>session.state</code>
+alongside successful predictions. The backend <code>/deployment/predict</code> accepts
+<code>continue_history=true</code> for the first request and <code>history_state</code> thereafter;
+its response returns the next state. The caller owns durable storage and
+serialization of those requests. The backend does not keep a hidden mutable
+history in its model cache. Repeating a request with the same input state is
+deterministic. An HTTP error returns no next state.</p>
+<h2 id="historical-real-data-validation">Historical real-data validation</h2>
+<p>The retired <code>databricks_local_real_taxi_job.py</code> notebook was a one-time
+Databricks validation using the public <code>samples.nyctaxi.trips</code> dataset. It
+materialized a bounded copy in an isolated Unity Catalog schema and trained a
 Skyulf <code>SimpleImputer</code> -&gt; <code>StandardScaler</code> -&gt; <code>OneHotEncoder</code> -&gt;
-<code>random_forest_regressor</code> pipeline, saves its full artifact, logs held-out
-MAE/RMSE/R2 in MLflow and registers a concrete UC model version. Separate
-<code>score_initial</code> and <code>score_append</code> jobs then call the incremental runner on
-200 existing and 100 subsequently inserted trips. Both persist keyed Delta
-predictions; the second job checks prior rows and a no-op replay. See the
+<code>random_forest_regressor</code> pipeline, saved its full artifact, logged held-out
+MAE/RMSE/R2 in MLflow and registered a concrete UC model version. Separate
+<code>score_initial</code> and <code>score_append</code> jobs called the incremental runner on
+200 existing and 100 subsequently inserted trips. Both persisted keyed Delta
+predictions; the second job checked prior rows and a no-op replay. See the
 SM-15I real NYC taxi live report under <code>initiatives/spark_and_mlflow/</code> for
 run IDs and measured results.</p>
-<p>The example's trip duration and dropoff ZIP are known only after a trip, so
-it demonstrates retrospective batch fare estimation. Its hard-coded schema,
-experiment and workspace folder are test resources; select your own names
-before using it elsewhere. The example is not a scheduled Bundle job.</p>
+<p>Trip duration and dropoff ZIP are known only after a trip, so this validated
+retrospective batch fare estimation. The notebook and its test resources were
+removed during cleanup on 2026-10-04. Use the reusable SDK and generated Bundle
+for new workflows; the historical run is not a current deployment.</p>
+<h2 id="saved-scoring-policies-and-project-assets">Saved scoring policies and project assets</h2>
+<p>Generated projects separate <code>src/features/pre_split.py</code>, <code>preprocessing.py</code>
+and <code>scoring.py</code>. Preprocessing fits transformations inside each training fold.
+Scoring has a three-way mode and an independent target-filter switch:</p>
+<div class="highlight"><pre><span></span><code><span class="n">SCORING_MODE</span> <span class="o">=</span> <span class="s2">"pre_split"</span>           <span class="c1"># "pre_split", "custom", or "combined"</span>
+<span class="n">SKIP_TARGET_PRE_SPLIT_STEPS</span> <span class="o">=</span> <span class="kc">False</span> <span class="c1"># fail if reuse requires the actual target</span>
+</code></pre></div>
+<p>In <code>pre_split</code> or <code>combined</code>, set the second switch to <code>True</code> to skip target-reading filters while keeping
+other pre-split steps. This never changes the predicted target. For example,
+"price is present" is a training-label check; "floor_area is present" can also
+be useful when predicting an unknown price. A mixed target/feature filter is
+skipped whole, because deleting one field would change its meaning. Fixed edits
+are projected onto feature columns. Preview records skipped names and reused steps.</p>
+<p>Reused rules use existing Core implementations and survivor guards on a copy.
+Accepted original rows go to the model, so its saved normalization runs once.
+Filter dependencies must exist in scoring <code>input_columns</code>; include a field there
+and remove it from model features in preprocessing if necessary. Deduplication
+checks the current batch only. Empty recipes in pre_split mode preserve ordinary output.
+These choices are saved per model version; changing a local switch does not
+change the behavior of an already registered model.</p>
+<p>Use <code>SCORING_MODE="custom"</code> for custom rules alone, or <code>"combined"</code> to run
+pre-split first and custom eligibility only on its survivors. First pre-split
+exclusion reasons are retained. Custom callbacks receive original accepted inputs;
+fixed model transformations still run once. All-excluded batches skip custom
+callbacks and the model; combined mode with no pre-split steps still uses custom
+rules. Both modes expose the same separate custom sections:</p>
+<ul>
+<li><code>eligibility</code>: checks <strong>before prediction</strong>. A null reason accepts a row;
+  a text reason excludes it. The template shows both required-field and finite
+  inclusive numeric-range checks, using <code>feature_value</code> as an editable example.</li>
+<li><code>outputs</code>: rules <strong>after prediction</strong>. Add fields such as a prediction band.
+  They do not change model predictions or select training data.</li>
+</ul>
+<p><code>build_eligibility_rules()</code> and <code>build_output_rules()</code> configure the callable
+paths and parameters; <code>custom/scoring_custom.py</code> implements the functions under
+BEFORE/AFTER headings. Both lists start empty; the sample dictionaries in
+<code>scoring.py</code> are commented out. Uncomment and adapt a desired example explicitly.
+Selecting custom or combined mode alone does not activate sample rules.
+The complete dictionary form
+below is also supported (returning <code>None</code> explicitly disables all scoring rules):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/scoring.py</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_scoring</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"eligibility"</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"observed_fields"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
+            <span class="s2">"function"</span><span class="p">:</span> <span class="s2">"custom.scoring_custom.require_observed_values"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"feature_value"</span><span class="p">]},</span>
+        <span class="p">}],</span>
+        <span class="s2">"outputs"</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"risk_band"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
+            <span class="s2">"function"</span><span class="p">:</span> <span class="s2">"custom.scoring_custom.prediction_band"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="s2">"prediction"</span><span class="p">,</span> <span class="s2">"thresholds"</span><span class="p">:</span> <span class="p">[</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">],</span>
+                       <span class="s2">"labels"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"low"</span><span class="p">,</span> <span class="s2">"medium"</span><span class="p">,</span> <span class="s2">"high"</span><span class="p">],</span> <span class="s2">"output"</span><span class="p">:</span> <span class="s2">"band"</span><span class="p">},</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"band"</span><span class="p">,</span> <span class="s2">"dtype"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">}],</span>
+        <span class="p">}],</span>
+    <span class="p">}</span>
+</code></pre></div>
+<p>For classification, the band rule can use <code>probability_0</code>, <code>probability_1</code>, etc.;
+class order comes from the saved artifact manifest. Callbacks are ordinary trusted
+project functions saved with the model. Eligibility receives <code>(frame, params)</code>
+and returns a Series of nullable reason strings: null means eligible. The first
+non-null reason wins in configured order. Output callbacks receive
+<code>(frame, predictions, params)</code> and return exactly their declared columns, types,
+rows and index. Supported output types: <code>float64</code>, <code>int64</code>, <code>string</code>, <code>bool</code>.
+Callbacks receive defensive pandas frames with a RangeIndex for both engines;
+Core preprocessing and model prediction retain the recorded engine. Rules cannot
+overwrite raw inputs, estimates, keys or publication metadata. Keep callbacks
+deterministic; use saved assets instead of mutable files, clocks or network data.</p>
+<p>Every source key has an output row. With a scoring policy enabled, that row has
+<code>scoring_status</code> (<code>predicted</code>/<code>excluded</code>) and nullable <code>exclusion_reason</code>.
+Excluded rows have null predictions and business outputs. Receipts include
+<code>predicted_count</code> and <code>excluded_count</code>; <code>output_count</code> counts all outcome rows.
+An all-excluded increment is a successful atomic publication that advances the
+source watermark. Failed callbacks/writes advance nothing. Replays cannot publish
+duplicate keys. Existing targets require the exact output schema, so introduce a
+new scoring schema using a fresh target. Training, CV and holdout comparison still
+use the raw predictor and their independently defined population.</p>
+<p>Eligibility precedes lag/rolling processing. Excluded observations never enter
+continuation history. All-excluded batches retain the previous history unchanged.
+The saved input schema still applies to excluded rows; normalize input types before
+scoring rather than relying on eligibility to reinterpret an incompatible schema.</p>
+<h3 id="deliver-lookup-files-and-external-python-dependencies">Deliver lookup files and external Python dependencies</h3>
+<p><code>src/features/assets.json</code> includes detailed <code>_help</code> instructions and a <code>files</code>
+list, initially empty. Create your data file and add its feature-root-relative
+path, for example <code>"files": ["assets/bands.json"]</code>. The original plain-list format
+<code>["assets/bands.json"]</code> also works. Help text is never embedded as model data.
+Assets can support pre-split, preprocessing or scoring; they do not automatically
+add a pipeline step. Inside saved code, read a declared file as bytes:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.project_package</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_project_asset</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">read_project_asset</span><span class="p">(</span><span class="n">__package__</span><span class="p">,</span> <span class="s2">"assets/bands.json"</span><span class="p">)</span>
+</code></pre></div>
+<p>Code, encoded file contents and pins share the bounded 64 KiB source snapshot.
+Paths must remain inside the feature package and asset symlinks are rejected.
+Undeclared assets, large external model downloads and files outside the package
+are not embedded. Replacing a local lookup file cannot change an existing model.</p>
+<p>Declare exact <code>distribution==version</code> pins in <code>src/features/requirements.txt</code>.
+Training/load verifies installed versions before executing package code or
+unpickling the model. The artifact manifest records the pins; MLflow includes them
+in its saved environment. Provision the same dependencies in the training and
+scoring job environments; prediction never installs packages. Ranges, URLs,
+recursive requirement files, options, extras and environment markers are rejected.</p>
+<h2 id="train-independent-target-models-in-one-job">Train independent target models in one job</h2>
+<p>Choose <code>training_layout=multi_target</code> when generating a project to use the existing
+<code>train</code> job for several named training branches. Configure branches in
+<code>src/modeling/branches.py</code>. The default <code>single_model</code> layout retains the ordinary
+training and lifecycle graph. Multi-target setup asks shared source, key, limit,
+compute and training schedule questions; target/model/search/CV/split/quality
+settings belong in branches.py.</p>
+<p>A branch has its own target, input columns, preprocessing package, estimator,
+tuning/CV settings, quality metric and registered model name. For example, a
+customer dataset can train a purchase classifier, a spending regressor and a
+visit-count ensemble. Each model remains useful independently. Different targets
+have different metrics; their scores are not ranked against each other.</p>
+<p>The coordinator resolves one Delta table version before training starts. Branches
+read that same immutable snapshot sequentially within their individual row/byte
+budgets. Missing labels are excluded separately per target before sampling and
+splitting. A missing spending label cannot remove an otherwise labeled purchase
+example. All target columns are forbidden as model inputs to prevent cross-target
+leakage. The existing training service fits learned preprocessing inside training
+folds and keeps the final holdout separate.</p>
+<p>MLflow records a parent run and a linked run for each trained branch. The parent
+saves the exact branch plan and progress; child runs retain their fitted pipeline,
+CV/tuning evidence, holdout metrics, dependency pins and immutable model version.
+With a model set enabled, every candidate is compared with its corresponding
+component in the one champion set pinned before training. Independent component
+aliases cannot change that baseline. Train-only branches retain their own pinned champions.</p>
+<p>All branches are required. If one fails, execution stops and the parent is failed;
+earlier immutable candidate versions remain available for inspection. A complete
+result is written only after all branches succeed. Replaying a saved plan keeps
+the source version and split/sample settings; it is a new attempt and can create
+new model versions. It is not an exactly-once registration retry.</p>
+<p>Individual branches require <code>promotion_policy=manual_approval</code> and
+<code>score_handoff=disabled</code>; activation is controlled by the complete set's separate
+<code>promotion_policy</code>. Newly generated projects enable
+<code>src/modeling/model_set.py</code>: its <code>build_model_set()</code> factory declares the set's
+registered model name, prediction table, publication settings and shared rule path. Returning
+<code>None</code> disables set packaging; older projects without this file remain train only.
+The project still has two jobs. Training registers the complete set candidate;
+training nominates the complete set as <code>challenger</code>. Automatic set activation can
+move the set champion, while component aliases stay unchanged. A later candidate
+moves the displaced contender to <code>previous_challenger</code>. The multi-target score job uses
+<code>score_models.py</code> to select one complete saved set.</p>
+<h3 id="activate-and-score-a-coherent-model-set">Activate and score a coherent model set</h3>
+<p>The set copies each component's exact fitted artifact and records its concrete
+model name, version and digest. It also captures <code>src/features/</code>, the combined rule
+configuration and typed record keys. Scoring and approval load these saved assets;
+editing project files cannot change an existing set. Packaging changed rules
+creates a new set candidate and preserves earlier registered packages.</p>
+<p>Each newly registered Bundle set version exposes <code>model_set_model_count</code> and
+<code>model_set_&lt;branch&gt;_name</code>, <code>model_set_&lt;branch&gt;_version</code>, <code>model_set_&lt;branch&gt;_type</code>
+tags for quick inspection. The type identifies the selected estimator or ensemble,
+including when tuning was used. Long qualified names continue in <code>_name_2</code>,
+<code>_name_3</code>, etc. These tags are display metadata; the saved manifest remains the
+execution authority. Existing registered versions are not automatically backfilled.</p>
+<p>In <code>features/scoring.py</code>, <code>build_model_rules()</code> configures each model's eligibility
+and output rules, while <code>build_combined_rules()</code> configures calculations across
+model results. Both stages execute during multi-model scoring. The latter's
+default empty list adds no combined business rules. Each
+component retains its namespaced predictions and exclusion outcomes. Optional
+rules declare a named function, rule version, parameters, output column types and
+<code>required_components</code>. Functions receive <code>(inputs, predictions, params)</code> and
+return a pandas DataFrame containing exactly their declared output columns. A
+profit rule can require revenue and cost without depending on an unrelated churn
+component. Excluded required predictions make that rule ineligible; missing
+predictions are never substituted with zero.</p>
+<p><code>inputs</code> contains only the set's declared keys and component input columns.
+Declare rule Python dependencies as exact pins in
+<code>src/features/requirements.txt</code>; the saved set includes them in its MLflow
+requirements and rejects pins that conflict with a component.
+Legacy projects using <code>composition_config</code> and <code>src/composition/</code> remain readable;
+existing saved artifacts keep their original source without migration.</p>
+<h3 id="choose-output-storage-and-consumer-views">Choose output storage and consumer views</h3>
+<p>Multi-target initialization asks <code>model_set_name</code>, <code>model_set_output_mode</code> and a custom physical
+table name. The generated <code>modeling/model_set.py</code> contains the editable
+<code>publication</code> settings. Modes are:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Stored values</th>
+<th>Consumer access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>all</code></td>
+<td>Every model output and combined rule result</td>
+<td>One prediction table</td>
+</tr>
+<tr>
+<td><code>combined_only</code></td>
+<td>Combined results, keys, rule outcomes and set provenance</td>
+<td>One prediction table</td>
+</tr>
+<tr>
+<td><code>separate_views</code></td>
+<td>All results, written once</td>
+<td>Selected model views and a combined-result view</td>
+</tr>
+</tbody>
+</table>
+<p>Leaving names blank uses <code>&lt;project_name&gt;_set</code> for the registered model set,
+<code>&lt;project_name&gt;_set_scores</code> for the physical result table,
+<code>&lt;project_name&gt;_predictions_&lt;branch&gt;</code> for model views, and
+<code>&lt;project_name&gt;_business_results</code> for the combined view. Custom names replace
+these defaults. Registry names use the metadata schema; tables/views use the
+output schema. The deployment suffix is added to both.</p>
+<p><code>combined_only</code> still computes all models and their scoring policies. It requires
+saved combined rules; an empty rule list fails explicitly. Changing this storage
+schema requires a new compatible table. Model output values are not stored in
+this mode, even though needed for the combined calculations.</p>
+<p>Only <code>separate_views</code> asks for <code>model_view_prefix</code> and <code>combined_view_name</code>.
+Blank names use project defaults. Explicit names gain the active target catalog,
+output schema and resource suffix. Fine-tune names and selection in the factory:</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"publication"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"separate_views"</span><span class="p">,</span>
+    <span class="s2">"model_views"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"revenue"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.revenue_predictions</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="s2">"cost"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.cost_predictions</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="s2">"combined_view"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.profit_results</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>model_views=None</code> selects every saved branch using <code>model_view_template</code>;
+an explicit mapping selects only listed branches; <code>{}</code> selects none.
+Combined views exist only if the saved set has combined rules. Every view keeps
+record keys, relevant output/status fields and set provenance. Branch output
+names retain their prefix. These are views of one Delta table, not independently
+written prediction copies. Setup verifies or creates all views before the data
+write. A setup failure can leave views of empty/previous data, but no new subset
+of predictions is published. Unrelated objects are never overwritten. Existing
+view definitions must match their recorded projection; use new names to change
+the source or columns. Removing configuration does not delete catalog objects.</p>
+<h3 id="per-component-quality-gates-and-automatic-set-activation">Per-component quality gates and automatic set activation</h3>
+<p>Bundle initialization asks <code>model_set_promotion_policy</code> for multi-target projects.
+The default is <code>manual_approval</code>; <code>automatic</code> validates and activates a passing
+complete set after training. Existing projects can select this in the dictionary
+returned by <code>src/modeling/model_set.py</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"promotion_policy"</span><span class="p">:</span> <span class="s2">"automatic"</span><span class="p">,</span>
+</code></pre></div>
+<p>In each branch's <code>workflow</code> dictionary in <code>src/modeling/branches.py</code>, define its
+own task-appropriate metric and limits. For example, a revenue regressor can use:</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"heldout_rmse"</span><span class="p">,</span>
+<span class="s2">"quality_threshold"</span><span class="p">:</span> <span class="mf">10.0</span><span class="p">,</span>       <span class="c1"># RMSE must be &lt;= 10.</span>
+<span class="s2">"quality_gates"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"heldout_r2"</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">},</span>  <span class="c1"># R2 must also be &gt;= 0.8.</span>
+<span class="s2">"min_improvement"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>          <span class="c1"># Replacements must strictly improve RMSE.</span>
+</code></pre></div>
+<p>A classifier can instead use <code>metric="heldout_f1"</code> and <code>quality_threshold=0.8</code>.
+Ensembles use the same task-specific policy. These are illustrative limits, not
+recommended thresholds for every dataset. Every branch must have a primary
+<code>quality_threshold</code> for activation; automatic mode checks its presence before training.</p>
+<p>The first set must pass all absolute gates. A replacement must additionally
+improve <strong>every</strong> component over its counterpart in the pinned champion set by
+<code>min_improvement</code>; ties fail even when that value is zero. All models are
+evaluated on their saved heldout rows, separately for each target. Policies,
+comparison digests and the expected set champion are frozen into the package.
+Changing project files cannot relax an existing candidate's gates. Changed
+policies require training a new candidate. Set replacements require the same
+branch names and registered component names; use a new set for a changed layout.</p>
+<p>An automatic quality failure leaves the candidate available and the champion
+unchanged. The notebook result and <code>model_set_quality/.../decision.json</code> identify
+every failed component and its metrics. Execution, missing evidence and stale
+champion errors fail the job. Successful approval also requires each saved model
+and business rule to execute on representative scoring input. Scoring remains a
+separate job after activation.</p>
+<p>Manual approval enforces the same gates. After reviewing evidence, run the training job with
+<code>lifecycle_action=approve</code>, the set's <code>candidate_version</code>, and
+<code>expected_champion_version</code> (<code>none</code> for first activation). Approval runs every
+saved component and rule against one bounded scoring-source snapshot and requires
+each to produce at least one result, then rechecks saved holdout quality under the
+same alias admission. Save the returned promotion receipt. To restore its complete prior set,
+use <code>lifecycle_action=rollback</code>, <code>promotion_receipt_json</code> and the expected current
+champion version. Approval clears the promoted set's <code>challenger</code> alias and saves
+the former champion as <code>previous_champion</code>. <code>previous_challenger</code> records displaced
+candidates, not the former champion.</p>
+<p>To explicitly reject the current candidate, run the same training job with
+<code>lifecycle_action=reject</code>, <code>candidate_version</code>, <code>expected_champion_version</code>, and a
+nonempty <code>rejection_reason</code> (at most 256 UTF-8 bytes). Rejection uses the frozen set
+identity and controlled nomination receipt; it does not run training, scoring, or
+require passing quality gates. The rejected version remains <code>challenger</code> for
+inspection until a newer candidate replaces it. Its <code>approval_status=rejected</code>
+and <code>approval_reason</code> tags block later approval. An identical repeat returns the
+original rejection receipt; changed candidates, champions or reasons fail.</p>
+<p>Rollback restores the whole previous set while preserving an unrelated current
+challenger and its history. A stale or manually changed alias blocks the operation.</p>
+<p>Previously saved sets remain scoreable. Sets without saved quality evidence must
+be retrained and packaged before approval through this updated Bundle flow.
+The low-level SDK retains explicit functional-only approval for legacy packages;
+new quality-bound packages require controlled nomination and the quality validator.
+Rollback verifies the
+recorded successful evidence and restores the complete prior set.</p>
+<p>Run the score job after approval. It resolves the set champion once, or uses an
+explicit <code>score_model_version</code>, and joins component outcomes by unique non-null
+integer, string or boolean keys. One final Delta publication contains the complete
+selected result and set provenance. A component or rule exception fails the job
+before a new data commit; previous successful output remains intact.
+Repeated committed source versions are no-ops; model changes follow the configured
+append or full rebuild policy. Both jobs use <code>max_concurrent_runs=1</code> and require
+exclusive ownership of set alias changes and prediction-table writes.</p>
+<p>Append mode preserves older rows and their original set identities. Full rebuild
+atomically replaces the compatible output table when the selected set changes,
+even without new input. A transition involving temporal carry history requires
+full rebuild so lag/rolling state is reconstructed from the complete snapshot.
+Schema changes require a separate compatible output table. Source updates and
+deletes cannot be consumed as incremental inserts.</p>
+<p>For example, inserting a new <code>id=102</code> after scoring <code>id=101</code> appends a new
+prediction. Updating a feature or deleting the already-scored <code>id=101</code> instead
+fails the next incremental batch: there is no update/delete reconciliation of
+previous predictions under the default <code>source_change_policy="reject"</code>.
+For model-set scoring, select <code>rebuild_on_change</code> in Bundle setup or the
+<code>modeling/model_set.py</code> factory to reuse the complete snapshot rebuild when
+updates/deletes are observed, even without a model-set change. The selected set
+rescores ALL current rows, recomputes model/combined rules and resets temporal
+history. Deleted records disappear. This can replace earlier predictions from
+older sets; new inserts alone still append. No model training is involved.</p>
+<p><code>model_change_mode</code> independently controls what happens when the model selection
+changes. Source-triggered rebuilding respects the full snapshot row/byte limits
+and commits results/history once after successful computation. Empty snapshots
+clear the table and history. A failed calculation, exceeded budget, missing CDF
+history or permission error preserves prior output. Only recognized readable
+source changes trigger recovery. Receipts record <code>source_change_policy</code>,
+<code>source_rebuilt</code> (source-triggered rebuild) and <code>write_mode</code>.
+This setting applies to the model-set adapter; the standalone single-model
+incremental scorer still rejects source updates/deletes.</p>
+<h3 id="select-preprocessing-and-pre-split-recipes-independently">Select preprocessing and pre-split recipes independently</h3>
+<p>Keep custom implementations in <code>src/features/custom/</code>. In <code>preprocessing.py</code>,
+<code>build_preprocessing(recipe="default")</code> selects an ordered Core/custom step list.
+<code>pre_split.py</code> independently exposes <code>build_pre_split_steps(recipe="default")</code>.
+Select the two names at branch level (beside its <code>workflow</code> overlay):</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"preprocessing_recipe"</span><span class="p">:</span> <span class="s2">"example_frequency"</span><span class="p">,</span>
+<span class="s2">"pre_split_recipe"</span><span class="p">:</span> <span class="s2">"example_complete_inputs"</span><span class="p">,</span>
+</code></pre></div>
+<p>Another branch can select <code>example_imputer</code> with <code>none</code>, while a third selects
+<code>example_imputer_frequency</code> with the same <code>example_complete_inputs</code>. No feature-package copy is needed.
+The shipped starters use <code>feature_value</code> and <code>category</code>; adapt their columns or
+add your own recipe function to the relevant builder's mapping. <code>example_frequency</code>
+uses only the custom encoder, <code>example_imputer</code> uses only the Core mean imputer, and
+<code>example_imputer_frequency</code> runs imputation before encoding. <code>example_complete_inputs</code> requires at least
+one of those inputs; <code>none</code> produces an empty list. Both default recipes remain
+empty until explicitly configured.</p>
+<p>Keep <code>workflow.pipeline.preprocessing</code> empty in branches.py: the selected Python
+builder supplies the steps. <code>features_path</code> still selects the whole package and
+defaults to <code>../features</code>. All branches may share it while selecting different
+recipes. Learned values remain separate per model/fold. Pre-split scoring reuse
+uses the selected filter list; target-dependent skip policy still applies.</p>
+<p>Selectors are optional. Omitting one calls that builder without arguments,
+preserving older project factories. An explicit name requires a builder accepting
+<code>recipe=...</code>; missing or misspelled names fail before data reads. The saved code
+binds selected names so fresh-process model loading and training-plan replay use
+the exact original recipe even after the editable files change.</p>
 
 
 

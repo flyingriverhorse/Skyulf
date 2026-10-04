@@ -1916,6 +1916,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -3619,8 +3675,8 @@
 
 <h1 id="preprocessing-placement-and-leakage">Preprocessing placement and leakage</h1>
 <p>Use this guide to decide where a preprocessing node belongs relative to the
-<strong>Train-Test Split</strong> node. It covers <strong>62 registered preprocessing IDs</strong>:
-60 transformations and two row-split registrations. Aliases have separate entries
+<strong>Train-Test Split</strong> node. It covers <strong>64 registered preprocessing IDs</strong>:
+62 transformations and two row-split registrations. Aliases have separate entries
 because older saved pipelines can contain either spelling.</p>
 <p>Placement depends on the configured operation, not just the node's display name.
 The same node can apply a fixed formula in one configuration and learn a statistic
@@ -3929,6 +3985,11 @@ explicit-empty and target-only exceptions above still apply. Aliases remain sepa
 <td>Fixed casts may precede split; categorical vocabularies fit on train. Resolve per-column overrides.</td>
 </tr>
 <tr>
+<td><code>ClipValues</code></td>
+<td>Before split (fixed)</td>
+<td>Cap values at supplied bounds and keep every row; do not choose bounds by inspecting test outcomes.</td>
+</tr>
+<tr>
 <td><code>CorrelationThreshold</code></td>
 <td>After split</td>
 <td>Learn retained columns from training correlations; empty selection still invokes discovery.</td>
@@ -4012,6 +4073,11 @@ explicit-empty and target-only exceptions above still apply. Aliases remain sepa
 <td><code>GeoDistance</code></td>
 <td>Before split (fixed)</td>
 <td>Compute configured distances from each row's coordinates.</td>
+</tr>
+<tr>
+<td><code>GroupImputer</code></td>
+<td>After split</td>
+<td>Learn per-group fill values on training rows; unseen groups use the overall training value.</td>
 </tr>
 <tr>
 <td><code>H3Index</code></td>

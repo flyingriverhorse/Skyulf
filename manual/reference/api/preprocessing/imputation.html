@@ -1913,6 +1913,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2894,6 +2950,73 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.imputation.GroupImputerApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupImputerApplier
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GroupImputerApplier">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.imputation.GroupImputerApplier.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.imputation.GroupImputerCalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupImputerCalculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GroupImputerCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.imputation.GroupImputerCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.imputation.GroupImputerCalculator.infer_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        infer_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#skyulf.preprocessing.imputation.IterativeImputerApplier" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3711,6 +3834,7 @@
   <summary>Split from a single 416-LOC module into per-imputer files</summary>
   <p>_common.py    — shared helpers (column resolution, polars fill values, sklearn transform)
 simple.py     — SimpleImputer
+group.py      — GroupImputer (per-group statistic with global fallback)
 knn.py        — KNNImputer
 iterative.py  — IterativeImputer (MICE)</p>
 </details>        <p>All public names are re-exported here so existing imports such as
@@ -3735,6 +3859,486 @@ continue to work unchanged.</p>
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.imputation.GroupImputerApplier" class="doc doc-heading">
+            <code>GroupImputerApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+        <p>Fill gaps with the training value of each row's group, then with the global value.</p>
+<p>Rows whose group was unseen in training, whose group key is null, or whose
+group had no observed value fall back to the column's global training
+value. The scoring batch's own values are never used to compute fills.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/group.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GroupImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Fill gaps with the training value of each row's group, then with the global value.</span>
+
+<span class="sd">    Rows whose group was unseen in training, whose group key is null, or whose</span>
+<span class="sd">    group had no observed value fall back to the column's global training</span>
+<span class="sd">    value. The scoring batch's own values are never used to compute fills.</span>
+<span class="sd">    """</span>
+
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Fill the learned columns on the active engine; ``y`` passes through."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">X</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">_require_group_column</span><span class="p">(</span><span class="n">_native</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s2">"group_by"</span><span class="p">])</span>
+        <span class="n">input_data</span> <span class="o">=</span> <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+            <span class="n">input_data</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">out</span><span class="p">[</span><span class="n">params</span><span class="p">[</span><span class="s2">"group_by"</span><span class="p">]]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">object</span><span class="p">)</span>
+        <span class="n">numeric</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s2">"columns"</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">out</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">series</span> <span class="o">=</span> <span class="n">out</span><span class="p">[</span><span class="n">column</span><span class="p">]</span>
+            <span class="n">group_fill</span> <span class="o">=</span> <span class="n">keys</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s2">"group_values"</span><span class="p">][</span><span class="n">column</span><span class="p">])))</span>
+            <span class="n">fallback</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">"fill_values"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">fallback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">group_fill</span> <span class="o">=</span> <span class="n">group_fill</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="n">fallback</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">numeric</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_float_dtype</span><span class="p">(</span><span class="n">series</span><span class="p">)</span> <span class="ow">or</span> <span class="n">is_decimal_series</span><span class="p">(</span><span class="n">series</span><span class="p">):</span>
+                    <span class="n">series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">series</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"float64"</span><span class="p">)</span>
+                <span class="n">group_fill</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">group_fill</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"float64"</span><span class="p">)</span>
+            <span class="n">series</span> <span class="o">=</span> <span class="n">_extend_categories</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">group_fill</span><span class="p">)</span>
+            <span class="n">out</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">notna</span><span class="p">(),</span> <span class="n">group_fill</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">out</span><span class="p">,</span> <span class="n">y</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">numeric</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"group_by"</span><span class="p">])</span>
+        <span class="n">key_dtype</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">schema</span><span class="p">[</span><span class="n">params</span><span class="p">[</span><span class="s2">"group_by"</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key_dtype</span><span class="p">,</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Categorical</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Enum</span><span class="p">)):</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="n">keys</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Utf8</span><span class="p">)</span>
+            <span class="n">key_dtype</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">String</span>
+        <span class="n">exprs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">_polars_fill</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">schema</span><span class="p">[</span><span class="n">column</span><span class="p">],</span> <span class="n">column</span><span class="p">,</span> <span class="n">keys</span><span class="p">,</span> <span class="n">key_dtype</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">numeric</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s2">"columns"</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">X</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">),</span> <span class="n">y</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.imputation.GroupImputerApplier.apply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Fill the learned columns on the active engine; <code>y</code> passes through.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/group.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Fill the learned columns on the active engine; ``y`` passes through."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">X</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">_require_group_column</span><span class="p">(</span><span class="n">_native</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="s2">"group_by"</span><span class="p">])</span>
+    <span class="n">input_data</span> <span class="o">=</span> <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span>
+    <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+        <span class="n">input_data</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.imputation.GroupImputerCalculator" class="doc doc-heading">
+            <code>GroupImputerCalculator</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseCalculator (skyulf.preprocessing.base.BaseCalculator)" href="base.html#skyulf.preprocessing.base.BaseCalculator">BaseCalculator</a></code></p>
+
+
+
+        <p>Learn per-group and global fill values from training rows.</p>
+<p><code>group_by</code> names the column that defines the groups. <code>strategy</code> is
+<code>mean</code>, <code>median</code> or <code>most_frequent</code> (<code>mode</code> is an alias). Leave
+<code>columns</code> empty to fill every numeric column (mean/median) or every
+column (most_frequent), excluding the group key and the target.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/group.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GroupImputer"</span><span class="p">,</span> <span class="n">GroupImputerApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">"GroupImputer"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"Group Imputer"</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">"Preprocessing"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">"Fills missing values with the mean, median or most frequent value of each row's "</span>
+        <span class="s2">"group (for example per industry), falling back to the overall value."</span>
+    <span class="p">),</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"group_by"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[]},</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GroupImputerCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Learn per-group and global fill values from training rows.</span>
+
+<span class="sd">    ``group_by`` names the column that defines the groups. ``strategy`` is</span>
+<span class="sd">    ``mean``, ``median`` or ``most_frequent`` (``mode`` is an alias). Leave</span>
+<span class="sd">    ``columns`` empty to fill every numeric column (mean/median) or every</span>
+<span class="sd">    column (most_frequent), excluding the group key and the target.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Promote filled columns to ``float64`` for mean/median; keep the schema otherwise."""</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">input_schema</span>
+        <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+
+    <span class="nd">@fit_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GroupImputerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Compute ``[group, value]`` pairs and a global fallback for every filled column."""</span>
+        <span class="n">group_by</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"group_by"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">group_by</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"GroupImputer needs group_by: the column whose groups get their own fill value."</span>
+            <span class="p">)</span>
+        <span class="n">strategy</span> <span class="o">=</span> <span class="n">_strategy</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">_native</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="n">_require_group_column</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">group_by</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">_fill_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">group_by</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">_training_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">group_by</span><span class="p">)</span>
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="n">column</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span><span class="p">:</span>
+                <span class="n">values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+            <span class="n">fill_values</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">_statistic</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"group_imputer"</span><span class="p">,</span>
+            <span class="s2">"group_by"</span><span class="p">:</span> <span class="n">group_by</span><span class="p">,</span>
+            <span class="s2">"strategy"</span><span class="p">:</span> <span class="n">strategy</span><span class="p">,</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="n">columns</span><span class="p">,</span>
+            <span class="s2">"group_values"</span><span class="p">:</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="n">_group_values</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">group_by</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">},</span>
+            <span class="s2">"fill_values"</span><span class="p">:</span> <span class="n">fill_values</span><span class="p">,</span>
+        <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.imputation.GroupImputerCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute <code>[group, value]</code> pairs and a global fallback for every filled column.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/group.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GroupImputerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Compute ``[group, value]`` pairs and a global fallback for every filled column."""</span>
+    <span class="n">group_by</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"group_by"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">group_by</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"GroupImputer needs group_by: the column whose groups get their own fill value."</span>
+        <span class="p">)</span>
+    <span class="n">strategy</span> <span class="o">=</span> <span class="n">_strategy</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">_native</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="n">_require_group_column</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">group_by</span><span class="p">)</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">_fill_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">group_by</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+    <span class="n">frame</span> <span class="o">=</span> <span class="n">_training_frame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">group_by</span><span class="p">)</span>
+    <span class="n">fill_values</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="n">column</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span><span class="p">:</span>
+            <span class="n">values</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">fill_values</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">_statistic</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"group_imputer"</span><span class="p">,</span>
+        <span class="s2">"group_by"</span><span class="p">:</span> <span class="n">group_by</span><span class="p">,</span>
+        <span class="s2">"strategy"</span><span class="p">:</span> <span class="n">strategy</span><span class="p">,</span>
+        <span class="s2">"columns"</span><span class="p">:</span> <span class="n">columns</span><span class="p">,</span>
+        <span class="s2">"group_values"</span><span class="p">:</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="n">_group_values</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">group_by</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">},</span>
+        <span class="s2">"fill_values"</span><span class="p">:</span> <span class="n">fill_values</span><span class="p">,</span>
+    <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.imputation.GroupImputerCalculator.infer_output_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">infer_output_schema</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Promote filled columns to <code>float64</code> for mean/median; keep the schema otherwise.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/group.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Promote filled columns to ``float64`` for mean/median; keep the schema otherwise."""</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_NUMERIC_STRATEGIES</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+    <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -4575,26 +5179,7 @@ with native expressions. All-missing means leave existing columns untouched.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
-<span class="normal"> 31</span>
-<span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
-<span class="normal"> 37</span>
-<span class="normal"> 38</span>
-<span class="normal"> 39</span>
-<span class="normal"> 40</span>
-<span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 49</span>
 <span class="normal"> 50</span>
 <span class="normal"> 51</span>
 <span class="normal"> 52</span>
@@ -4659,7 +5244,15 @@ with native expressions. All-missing means leave existing columns untouched.</p>
 <span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
-<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Apply fitted Simple Imputer fill values to missing values in selected columns.</span>
 
 <span class="sd">    The calculator artifact records per-column values for ``mean``, ``median``,</span>
@@ -4731,18 +5324,7 @@ with native expressions. All-missing means leave existing columns untouched.</p>
             <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">X_out</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
                 <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">series</span> <span class="o">=</span> <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">is_decimal_series</span><span class="p">(</span><span class="n">series</span><span class="p">)</span> <span class="ow">and</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">)</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">}:</span>
-                    <span class="n">series</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">series</span><span class="p">)</span>
-                <span class="c1"># Nullable numeric extension dtypes (Int64...) refuse a float</span>
-                <span class="c1"># fill value; upcast like the Polars fill does (F-10).</span>
-                <span class="k">if</span> <span class="p">(</span>
-                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
-                    <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">ExtensionDtype</span><span class="p">)</span>
-                    <span class="ow">and</span> <span class="n">pd</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">is_numeric_dtype</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-                <span class="p">):</span>
-                    <span class="n">series</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"float64"</span><span class="p">)</span>
-                <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">series</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+                <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">_fill_pandas_series</span><span class="p">(</span><span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">val</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"strategy"</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">X_out</span><span class="p">,</span> <span class="n">_y</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -4776,18 +5358,18 @@ with native expressions. All-missing means leave existing columns untouched.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Fill nulls and NaNs with the fitted per-column values; ``y`` passes through."""</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
@@ -4848,15 +5430,7 @@ string and boolean constants require explicit compatible fill values.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
@@ -5020,7 +5594,19 @@ string and boolean constants require explicit compatible fill values.</p>
 <span class="normal">286</span>
 <span class="normal">287</span>
 <span class="normal">288</span>
-<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
     <span class="s2">"SimpleImputer"</span><span class="p">,</span>
     <span class="n">SimpleImputerApplier</span><span class="p">,</span>
     <span class="n">execution_capabilities</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span>
@@ -5173,6 +5759,10 @@ string and boolean constants require explicit compatible fill values.</p>
         <span class="n">fit_data</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">decimal_columns_to_float</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">],</span> <span class="n">cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">}</span> <span class="k">else</span> <span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span>
         <span class="p">)</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">"most_frequent"</span><span class="p">:</span>
+            <span class="c1"># Preserve nullable integers/booleans as scalar values and normalize</span>
+            <span class="c1"># pd.NA, which sklearn's object-array missing mask cannot compare.</span>
+            <span class="n">fit_data</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">,</span> <span class="n">na_value</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">))</span>
         <span class="n">imputer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">fit_data</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">"constant"</span> <span class="ow">and</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -5227,15 +5817,7 @@ restricted to numeric columns.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
 <span class="normal">176</span>
@@ -5245,7 +5827,15 @@ restricted to numeric columns.</p>
 <span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
-<span class="normal">183</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SimpleImputerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Resolve strategy and columns, then fit fill values on the active engine.</span>
 
@@ -5286,16 +5876,16 @@ restricted to numeric columns.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return ``input_schema`` and promote float-only imputation targets to ``float64``."""</span>

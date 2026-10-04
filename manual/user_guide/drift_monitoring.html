@@ -1916,6 +1916,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2240,6 +2296,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Drift metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#statistical-evidence-and-small-samples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistical evidence and small samples
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3636,10 +3709,10 @@ same preprocessing stage.</p>
 <p>String, Categorical, Enum and Boolean columns receive categorical drift metrics,
 including <code>psi_categorical</code>. They do not need encoding first. Rerun saved drift
 checks that previously omitted Enum columns to populate those measurements.</p>
-<p>The page's <strong>Avg PSI</strong> and <strong>Most Drifted</strong> cards include both numeric <code>psi</code>
+<p>The page's <strong>Avg PSI</strong> and <strong>Highest PSI</strong> cards include both numeric <code>psi</code>
 and categorical <code>psi_categorical</code>, with one finite PSI measurement per column.
 For example, numeric PSI <code>0.01</code> and categorical PSI <code>5</code> produce average
-<code>2.5050</code>, with the categorical feature shown as most drifted. A measured zero
+<code>2.5050</code>, with the categorical feature shown as having the highest PSI. A measured zero
 is included; unavailable measurements are excluded. If none are available,
 the cards show <code>—</code> and <strong>No PSI available</strong> rather than claiming stability.</p>
 <p>The <code>DriftCalculator</code> computes these metrics for each numeric column:</p>
@@ -3674,19 +3747,61 @@ the cards show <code>—</code> and <strong>No PSI available</strong> rather tha
 </tr>
 </tbody>
 </table>
-<p>A column is flagged as "drifted" if <strong>any</strong> metric exceeds its threshold.</p>
+<p>A distribution is flagged as drifted when <strong>both</strong> conditions hold:</p>
+<ol>
+<li>At least one effect-size metric exceeds its configured threshold.</li>
+<li>A statistical test supports a difference after correction for the number
+   of tested features.</li>
+</ol>
+<p>This prevents a noisy small sample from triggering retraining on its effect
+size alone, and a tiny difference in a huge sample from triggering it on its
+p-value alone. Threshold sliders change the first condition; they do not
+remove the evidence requirement. Schema changes are handled separately.</p>
 <p>Each metric's <code>value</code> is reported on the same scale as its <code>threshold</code>, so
-<code>value &gt; threshold</code> reproduces <code>has_drift</code>. Two caveats:</p>
+<code>value &gt; threshold</code> reproduces its effect-size <code>has_drift</code> flag. That flag alone
+is not the column verdict. Two caveats:</p>
 <ul>
 <li>The Wasserstein <code>value</code> is the <strong>normalized</strong> distance — the raw distance is
   in the column's own units, so a single threshold could not mean the same
   thing for a column measured in cents and one measured in kilometres. The
   untransformed distance is kept in <code>raw_value</code> for display.</li>
-<li>The KS <strong>p-value</strong> is reported alongside the statistic as <code>ks_test_p_value</code>
-  but never decides drift: it shrinks with sample size, so an identical tiny
-  shift looks significant at n=100k and not at n=100. It carries the KS
-  statistic's threshold rather than one of its own.</li>
+<li>The KS <strong>p-value</strong> is reported as diagnostic <code>ks_test_p_value</code>, with no
+  effect-size threshold. The column's structured <code>evidence</code> determines
+  statistical support; the diagnostic metric is never an independent alarm.</li>
 </ul>
+<h3 id="statistical-evidence-and-small-samples">Statistical evidence and small samples</h3>
+<p>Numeric and temporal features use the two-sample KS test. Binary categories
+use Fisher's exact test. Larger categorical tables use chi-square when every
+observed and expected cell has at least five observations; sparse tables use
+per-category Fisher tests with a correction within the feature.</p>
+<p>The significance level is 0.05, with Bonferroni correction across features
+having at least two valid values on each side and a finite test p-value.
+This family includes tests that cannot reach significance at their current
+sample size, which makes the correction conservative. Each column reports
+valid counts, the test, raw and adjusted p-values, and an evidence status:</p>
+<ul>
+<li><code>supported</code>: the corrected test supports a difference; an effect-size
+  threshold must still be exceeded to declare drift.</li>
+<li><code>not_detected</code>: the test did not support a difference.</li>
+<li><code>insufficient_data</code>: there are too few observations, or the test cannot
+  reach the corrected significance level with these sample counts.</li>
+<li><code>unavailable</code>: the statistical evidence could not be measured.</li>
+</ul>
+<p>There is no universal 100-row minimum. Feasibility uses the test's attainable
+p-value bound. The KS bound assumes a continuous distribution; ties can make
+the actual minimum larger, so a tied small sample can read <code>not_detected</code>
+instead of <code>insufficient_data</code>. These tests also assume independent samples;
+they do not correct for time-series dependence or repeated monitoring windows.
+See SciPy's <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html">KS</a>,
+<a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.fisher_exact.html">Fisher</a>
+and <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chi2_contingency.html">chi-square</a>
+test contracts.</p>
+<p>Databricks monitoring persists this evidence with its report. A report with
+insufficient or unavailable measurements is <code>degraded</code> unless another finding
+already establishes drift. Automatic retraining refuses incomplete evidence
+and older saved reports that lack the new evidence fields; rerun monitoring
+to obtain a current decision. The drift page labels older distributions as
+legacy and shows unknown risk for unmeasured evidence.</p>
 <h2 id="custom-thresholds">Custom thresholds</h2>
 <div class="highlight"><pre><span></span><code><span class="n">report</span> <span class="o">=</span> <span class="n">calc</span><span class="o">.</span><span class="n">calculate_drift</span><span class="p">(</span><span class="n">thresholds</span><span class="o">=</span><span class="p">{</span>
     <span class="s2">"psi"</span><span class="p">:</span> <span class="mf">0.15</span><span class="p">,</span>

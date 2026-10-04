@@ -1810,6 +1810,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Inspecting a pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#evaluation-population-after-filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation population after filtering
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-description-and-diagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline description and diagram
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1976,6 +2004,62 @@
     
   
     skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
   
 
     
@@ -3605,6 +3689,28 @@
 <span class="nb">print</span><span class="p">(</span><span class="n">preds2</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="inspecting-a-pipeline">Inspecting a pipeline</h2>
+<h3 id="evaluation-population-after-filtering">Evaluation population after filtering</h3>
+<p>Explicit row filters, such as dropping missing rows, select the eligible
+population for both ordinary evaluation and tuning/CV. Fitted cleaning bounds
+come from training data. Serving preserves the requested row alignment.</p>
+<p>Held-out reports record <code>input_rows</code>, <code>scored_rows</code>, and <code>excluded_rows</code>.
+The denominator begins when that test or validation split exists. For example,
+filtering 12 rows out of a 120-row test split reports 120 input, 108 scored,
+and 12 excluded. Filtering before splitting changes the source population;
+those earlier exclusions are not counted again as test exclusions. Training
+coverage describes the final training frame, not all rows loaded upstream.
+Consequently, the displayed metrics describe eligible observations and should
+not be interpreted as accuracy on the original unfiltered dataset.</p>
+<p>A split with no eligible rows has no evaluation metrics and an explicit
+unavailable reason. Missing original counts remain unknown rather than zero.
+In Canvas, merging nonempty filtered evaluation branches without shared row
+lineage is rejected: equal counts do not establish that both branches contain
+the same rows. Merge branches before applying row filters. All-empty branches
+retain their coverage and remain visible in the report.
+This also rejects branches that inherit the same earlier filter: the recorded
+counts do not establish shared row identity, even when both branches happen
+to contain identical rows.</p>
+<h3 id="pipeline-description-and-diagram">Pipeline description and diagram</h3>
 <p>A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
 docs, PR descriptions, and model registries:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">print</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">describe</span><span class="p">())</span>

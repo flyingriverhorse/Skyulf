@@ -2190,6 +2190,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -3739,8 +3795,9 @@ training excluded. Shared prediction eligibility needs a separate opt-in rule.
 Model/node listings come from the Core registry.
 See <a href="databricks_bundle.html#guided-setup-and-offline-preview">guided setup</a>.</p>
 <h3 id="inspect-failures-and-replay-a-pinned-training-input">Inspect failures and replay a pinned training input</h3>
-<p>The MLflow training run begins after argument validation and saves its inputs
-before source read, split, CV, fit or heldout evaluation. <code>training_snapshot.json</code>
+<p>The MLflow training run begins after argument validation. Initialization saves
+its complete pinned request in <code>lifecycle/request.json</code> before source read or
+splitting. The training task also writes <code>training_snapshot.json</code>, which
 records the concrete Delta table/version, input/target/key columns, ISO window
 and result cutoffs, parsing rules, split/sample/filter settings, budgets and
 engine. <code>training_pipeline_config.json</code> saves the original pipeline input with
@@ -4036,81 +4093,105 @@ for each action. It does not train or create prediction tables by itself.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>prepare_request</code></td>
-<td>Validates the action and freezes configuration; training also pins Delta data, dates and the expected champion</td>
+<td><code>initialize_run</code></td>
+<td>Validate settings and pin source version, recipe and expected champion</td>
 </tr>
 <tr>
-<td><code>training_requested</code></td>
-<td>Routes train to training, and approve/reject/rollback to the operator branch</td>
+<td><code>choose_action</code></td>
+<td>Select training or an explicit approve/reject/rollback action</td>
 </tr>
 <tr>
-<td><code>train_and_register</code></td>
-<td>Reads pinned data, runs the saved split/CV recipe and fits the pipeline; evaluates the saved artifact on the verified holdout before registering and nominating it</td>
+<td><code>load_data</code></td>
+<td>Read the bounded pinned source and save its verified dataset</td>
 </tr>
 <tr>
-<td><code>compare_and_decide</code></td>
-<td>Compares the candidate with the pinned champion on the same holdout; checks saved evidence and quality gates, then promotes automatically or leaves it for manual review</td>
+<td><code>prepare_dataset</code></td>
+<td>Apply fixed cleanup and eligibility rules, then save training/holdout partitions</td>
 </tr>
 <tr>
-<td><code>apply_operator_action</code></td>
-<td>Approves, rejects or rolls back saved model evidence without training another model</td>
+<td><code>train_and_tune</code></td>
+<td>Fit preprocessing inside training folds, run configured CV/tuning, and save the fitted pipeline</td>
 </tr>
 <tr>
-<td><code>finalize_and_report</code></td>
-<td>Runs after either branch, including failures; closes training in MLflow and publishes a report and score request only for a verified successful result</td>
+<td><code>select_best_model</code></td>
+<td>Verify the candidate; currently reports one candidate, without multi-model competition</td>
+</tr>
+<tr>
+<td><code>register_model</code></td>
+<td>Check heldout evaluation before registering and nominating the candidate</td>
+</tr>
+<tr>
+<td><code>evaluate_model</code></td>
+<td>Compare the registered candidate with the pinned champion on the same holdout</td>
+</tr>
+<tr>
+<td><code>model_decision</code></td>
+<td>Apply promotion policy or execute an explicit approve/reject/rollback action</td>
+</tr>
+<tr>
+<td><code>training_report</code></td>
+<td>Finalize the run and publish verified results and next actions</td>
 </tr>
 <tr>
 <td><code>scoring_requested</code></td>
-<td>Reads <code>finalize_and_report</code>'s boolean <code>score_requested</code> value</td>
+<td>Check whether scoring was requested</td>
 </tr>
 <tr>
 <td><code>run_batch_scoring</code></td>
-<td>Calls the existing score job when scoring was requested</td>
+<td>Invoke the existing score job</td>
 </tr>
 <tr>
 <td><code>score</code> job, <code>score</code> task</td>
-<td>Loads the selected model/artifact, predicts and publishes rows</td>
+<td>Load the selected model and publish predictions</td>
 </tr>
 </tbody>
 </table>
-<p>All rows except the last are tasks inside the <strong>same train job</strong>. These
-eight tasks represent business steps; their internal phase evidence remains in
-MLflow. They do not create extra jobs or control tables.</p>
+<p>All rows except the last are tasks inside the <strong>same train job</strong>. Their phase
+evidence stays in MLflow; no additional jobs or control tables are created.</p>
 <pre class="mermaid"><code>flowchart TD
-    A["prepare_request: validate and pin"] --&gt; B{"training_requested?"}
-    B --&gt;|"Yes"| C["train_and_register"]
-    C --&gt; D["compare_and_decide"]
-    B --&gt;|"No: approve, reject or rollback"| E["apply_operator_action"]
-    D --&gt; F["finalize_and_report: runs even on failure"]
-    E --&gt; F
-    F --&gt; G{"scoring_requested?"}
-    G --&gt;|"Yes"| H["run_batch_scoring"]
-    H --&gt; I["Existing score job"]</code></pre>
-<p>The inactive branch is excluded. The shared <code>finalize_and_report</code> task uses
-<code>ALL_DONE</code> to wait for both branch tails, including failed or upstream-failed
-tasks. It closes failed training in MLflow and raises when the saved result is
-unsuccessful; no score request is published in that case. A failed evaluation
-cannot register a model or request scoring. A comparison failure after
-registration retains the candidate with error evidence. A failed score run
-does not undo an already committed promotion or change training's status.</p>
-<p>Completion also checks the actual Databricks task states: the active branch
-must succeed and the inactive branch must be excluded. A notebook output error
-after a saved promotion therefore blocks scoring while preserving that promotion.</p>
-<p>In the run graph, <code>EXCLUDED</code> means a branch was not selected; it is expected
-for <code>apply_operator_action</code> during training, and for the training tasks during
-approval or rollback. With manual approval, the training run also excludes
-<code>run_batch_scoring</code> until a later approval requests scoring. After a successful
-active branch, <code>finalize_and_report</code> must run and show the verified decision.
-Its result checks block scoring after an unsuccessful branch. A completed
-evaluation that fails the quality gate is successful training with no promotion.
-Check the exact run ID: an earlier run keeps its original graph and result even
-after a fix is deployed. Overall job <code>SUCCESS</code> alone does not prove scoring ran;
-also inspect <code>finalize_and_report</code>, the child score run and the prediction table.</p>
-<p>Tasks exchange small MLflow references, not DataFrames or temporary local
-paths. Editing the source table or project files after <code>prepare_request</code> does
-not change this invocation's pinned input. The run stores phase evidence in
-MLflow alongside its model artifacts; no additional Delta table is needed.
-For the platform branch and cleanup rules, see
+    A[initialize_run] --&gt; B{choose_action}
+    B --&gt;|train| C[load_data]
+    C --&gt; D[prepare_dataset]
+    D --&gt; E[train_and_tune]
+    E --&gt; F[select_best_model]
+    F --&gt; G[register_model]
+    G --&gt; H[evaluate_model]
+    H --&gt; I[model_decision]
+    B --&gt;|approve / reject / rollback| I
+    I --&gt; J[training_report]
+    J --&gt; K{scoring_requested}
+    K --&gt;|yes| L[run_batch_scoring]
+    L --&gt; M[Existing score job]</code></pre>
+<p>The resource YAML follows these routes: <code>model_decision</code> joins the <strong>false</strong>
+branch of <code>choose_action</code> and <code>evaluate_model</code> with <code>NONE_FAILED</code>. Training
+reaches the decision through evaluation; approve/reject/rollback reach it
+through the condition's false branch. There is no direct initialization-to-decision edge.
+<code>training_report</code> uses <code>ALL_DONE</code> so it also closes failed training. It requires
+a successful decision task and verified saved result before publishing a score
+request. A notebook output failure after a committed promotion blocks scoring
+while preserving that promotion.</p>
+<p><code>prepare_dataset</code> applies only fixed cleanup and eligibility rules; learned
+preprocessing/feature engineering remains inside each training fold in
+<code>train_and_tune</code>. When tuning is disabled, the same task fits the fixed model.
+<code>select_best_model</code> explicitly reports a single candidate today. It does not
+perform the planned multi-model tournament.</p>
+<p>Registration keeps the initial heldout-evaluation check before mutation. An
+error in that evaluation prevents registration. A subsequent comparison failure
+retains the registered candidate and error evidence. A completed comparison
+that fails quality gates is successful training without promotion. Failure in
+the child score job does not undo a committed promotion.</p>
+<p>During approve/reject/rollback, training tasks are <code>EXCLUDED</code>; the decision
+and report still run. Manual-approval training does not request scoring until a
+later approval changes the alias. Inspect <code>training_report</code>, any child score
+run and the prediction table; overall job success alone does not prove scoring
+ran. Earlier runs keep their original graph after redeployment.</p>
+<p>Tasks exchange small MLflow references, not local paths. Bounded source and
+split datasets are Parquet artifacts under <code>lifecycle/data/</code>; their digests and
+membership metadata are verified before training. MLflow experiment access and
+retention policies also apply to these training rows. Editing project files or
+the source table after initialization does not replace the pinned recipe or
+source version. Registration and approval continue replaying source evidence.
+For platform branch and cleanup rules, see
 <a href="https://docs.databricks.com/aws/en/jobs/run-if">Databricks task dependencies</a>.</p>
 <p>Each job queues runs and permits one active run. The lifecycle job is the
 single writer for aliases. The fixed score notebook ignores inherited lifecycle parameters and never
@@ -4196,8 +4277,8 @@ redeployment. Do not switch shared configuration while jobs are running.</p>
 <li>Choose <strong>Run with different settings</strong> (also called <strong>Run now with different
    parameters</strong> in some UI versions).</li>
 <li>Set <code>lifecycle_action=train</code>. Leave all operator-evidence fields empty.</li>
-<li>Open the completed run, then <strong>finalize_and_report</strong> for the final decision.
-   Open <strong>train_and_register</strong> or <strong>compare_and_decide</strong>
+<li>Open the completed run, then <strong>training_report</strong> for the final decision.
+   Open <strong>train_and_tune</strong> or <strong>evaluate_model</strong>
    to inspect the corresponding work separately.</li>
 <li>Read <code>result</code>: model version, MLflow run and comparison. Follow the MLflow
    experiment to inspect metrics, artifacts and input provenance.</li>
@@ -4272,7 +4353,7 @@ as the lifecycle workflow. It removes manual hash copying, not the full proof
 check. Direct Core approval/rejection APIs still require their explicit digest.</p>
 <h2 id="reading-the-notebook-result">Reading the notebook result</h2>
 <p>The phase notebooks show their own counts, metrics or status. The
-<strong>finalize_and_report</strong> and <strong>score</strong> notebooks use the shared final output renderer.
+<strong>training_report</strong> and <strong>score</strong> notebooks use the shared final output renderer.
 Their executed cell shows an operation summary, champion version change when relevant, metric
 comparison for training, prediction counts for scoring, and <strong>Available action</strong>
 parameter tables. Expand <strong>Technical details (JSON)</strong> for the full result.
@@ -4288,13 +4369,13 @@ Check that child run for success. For a no-op, the manifest in the technical
 result describes the <strong>previous prediction write</strong>; its model version can be
 older than today's champion. No new rows or model provenance were written.</p>
 <h2 id="where-to-find-next_actions">Where to find <code>next_actions</code></h2>
-<p><code>next_actions</code> is a key in the completed <strong>finalize_and_report task's JSON output</strong>. It is not
+<p><code>next_actions</code> is a key in the completed <strong>training_report task's JSON output</strong>. It is not
 a menu, a Catalog alias, an MLflow tag or an extra field in the run settings
 form. You do not need another training run to retrieve it.</p>
 <ol>
 <li>Close the new-run settings dialog and open the train job's <strong>Runs</strong> tab.</li>
 <li>Open the completed training run you want to review.</li>
-<li>In that run's task graph/list, click <strong>finalize_and_report</strong>. The condition and
+<li>In that run's task graph/list, click <strong>training_report</strong>. The condition and
    score-handoff tasks do not contain the operator parameter tables.</li>
 <li>Open the task's executed notebook/output and inspect the <strong>first cell's report</strong>.
    Use the <strong>Available action: approve/reject</strong> parameter table. The equivalent
@@ -4364,7 +4445,7 @@ form. You do not need another training run to retrieve it.</p>
 </tr>
 </tbody>
 </table>
-<p>For a CLI fallback, use the <strong>finalize_and_report task run ID</strong>, not the multi-task parent run
+<p>For a CLI fallback, use the <strong>training_report task run ID</strong>, not the multi-task parent run
 ID:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">jobs</span> <span class="nb">get-run</span><span class="n">-output</span> <span class="p">&lt;</span><span class="nb">publish-result</span><span class="n">-task-run-id</span><span class="p">&gt;</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
 </code></pre></div>

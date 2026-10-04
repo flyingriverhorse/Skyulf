@@ -1913,6 +1913,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2634,6 +2690,17 @@
   
     <nav class="md-nav" aria-label="SplitDataset">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.data.dataset.SplitDataset.__setstate__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __setstate__
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#skyulf.data.dataset.SplitDataset.copy" class="md-nav__link">
@@ -3521,7 +3588,11 @@
 
 
 
-        <p>The train/test (and optional validation) slots a splitter node produces.</p>
+        <p>Hold train/test slots and optional positional training-only sample weights.</p>
+<p><code>train_sample_weight</code> follows the row order of <code>train</code>. Test and
+validation metrics remain unweighted.
+<code>evaluation_coverage</code> carries held-out input and retained row counts
+through preprocessing, without storing row identifiers or observations.</p>
 
 
 
@@ -3532,9 +3603,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/data/dataset.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
@@ -3578,15 +3647,45 @@
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
-<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SplitDataset</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""The train/test (and optional validation) slots a splitter node produces."""</span>
+<span class="w">    </span><span class="sd">"""Hold train/test slots and optional positional training-only sample weights.</span>
+
+<span class="sd">    ``train_sample_weight`` follows the row order of ``train``. Test and</span>
+<span class="sd">    validation metrics remain unweighted.</span>
+<span class="sd">    ``evaluation_coverage`` carries held-out input and retained row counts</span>
+<span class="sd">    through preprocessing, without storing row identifiers or observations.</span>
+<span class="sd">    """</span>
 
     <span class="n">train</span><span class="p">:</span> <span class="n">SplitPayload</span>
     <span class="n">test</span><span class="p">:</span> <span class="n">SplitPayload</span>
     <span class="n">validation</span><span class="p">:</span> <span class="n">SplitPayload</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">train_sample_weight</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">evaluation_coverage</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SplitDataset"</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Load older saved split containers without inventing missing coverage evidence."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"evaluation_coverage"</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Return a ``SplitDataset`` whose slots are copies, not shared references.</span>
 
 <span class="sd">        Each leaf is copied through its own ``copy()``/``clone()`` so pandas and</span>
@@ -3622,8 +3721,10 @@
 
         <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span>
             <span class="n">train</span><span class="o">=</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">),</span>
+            <span class="n">train_sample_weight</span><span class="o">=</span><span class="n">copy_leaf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_sample_weight</span><span class="p">),</span>
             <span class="n">test</span><span class="o">=</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">),</span>
             <span class="n">validation</span><span class="o">=</span><span class="p">(</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">evaluation_coverage</span><span class="o">=</span><span class="n">_copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evaluation_coverage</span><span class="p">),</span>
         <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -3640,6 +3741,35 @@
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="skyulf.data.dataset.SplitDataset.__setstate__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">__setstate__</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load older saved split containers without inventing missing coverage evidence.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/data/dataset.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Load older saved split containers without inventing missing coverage evidence."""</span>
+    <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"evaluation_coverage"</span><span class="p">,</span> <span class="p">{})</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 
@@ -3662,22 +3792,7 @@ mutable contents inside such a leaf are still shared.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/data/dataset.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
@@ -3700,7 +3815,24 @@ mutable contents inside such a leaf are still shared.</p>
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
-<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SplitDataset"</span><span class="p">:</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a ``SplitDataset`` whose slots are copies, not shared references.</span>
 
 <span class="sd">    Each leaf is copied through its own ``copy()``/``clone()`` so pandas and</span>
@@ -3736,8 +3868,10 @@ mutable contents inside such a leaf are still shared.</p>
 
     <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span>
         <span class="n">train</span><span class="o">=</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">),</span>
+        <span class="n">train_sample_weight</span><span class="o">=</span><span class="n">copy_leaf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train_sample_weight</span><span class="p">),</span>
         <span class="n">test</span><span class="o">=</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">test</span><span class="p">),</span>
         <span class="n">validation</span><span class="o">=</span><span class="p">(</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">evaluation_coverage</span><span class="o">=</span><span class="n">_copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">evaluation_coverage</span><span class="p">),</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>

@@ -1916,6 +1916,62 @@
   
   
     <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -3585,7 +3641,7 @@
 
 
 <h1 id="preprocessing-leakage-audit">Preprocessing leakage audit</h1>
-<p>This audit covers <strong>62 registered preprocessing types: 60 transformations and
+<p>This audit covers <strong>64 registered preprocessing types: 62 transformations and
 the two train/test splitter registrations, <code>TrainTestSplitter</code> and <code>Split</code></strong>.
 Aliases have separate rows because saved pipelines can contain either spelling.
 The four stacking/voting ensemble registrations are models and are outside this
@@ -3639,360 +3695,372 @@ table still apply.</p>
 </tr>
 <tr>
 <td>3</td>
+<td><code>ClipValues</code></td>
+<td>False</td>
+<td>Caps values at user-supplied bounds and keeps every row. Limits are not estimated from the current batch, so the same caps also run at prediction time.</td>
+</tr>
+<tr>
+<td>4</td>
 <td><code>CorrelationThreshold</code></td>
 <td>True</td>
 <td>Learns which features to retain from training correlations. Replays the selected columns; an empty selection still invokes automatic selection.</td>
 </tr>
 <tr>
-<td>4</td>
+<td>5</td>
 <td><code>CustomBinning</code></td>
 <td>True</td>
 <td>Bin edges are configured. With an explicit column list, including <code>[]</code>, the operation is fixed. Omitted/null columns invoke value-based column discovery and remain learned.</td>
 </tr>
 <tr>
-<td>5</td>
+<td>6</td>
 <td><code>DataSnapshot</code></td>
 <td>False</td>
 <td>Reports a snapshot/statistics while preserving the modeling data. Reporting is not fitting a model feature.</td>
 </tr>
 <tr>
-<td>6</td>
+<td>7</td>
 <td><code>DatasetProfile</code></td>
 <td>False</td>
 <td>Reports dataset statistics while preserving the modeling data. Using held-out reports to make modeling decisions can still contaminate an evaluation.</td>
 </tr>
 <tr>
-<td>7</td>
+<td>8</td>
 <td><code>DateFeatures</code></td>
 <td>False</td>
 <td>Extracts configured calendar features from each value. No training distribution is learned.</td>
 </tr>
 <tr>
-<td>8</td>
+<td>9</td>
 <td><code>Deduplicate</code></td>
 <td>True</td>
 <td>Filters across rows. Conservatively gated because duplicate relationships affect the retained dataset, even without a numerical fitted statistic.</td>
 </tr>
 <tr>
-<td>9</td>
+<td>10</td>
 <td><code>DropMissingColumns</code></td>
 <td>True</td>
 <td>A positive <code>missing_threshold</code> learns which columns to drop, including when candidate columns are explicit. Otherwise the drop list is configured and fixed.</td>
 </tr>
 <tr>
-<td>10</td>
+<td>11</td>
 <td><code>DropMissingRows</code></td>
 <td>False</td>
 <td>Applies configured missingness rules to each row. It does not estimate a training statistic; removing evaluation rows still changes the evaluated population.</td>
 </tr>
 <tr>
-<td>11</td>
+<td>12</td>
 <td><code>DummyEncoder</code></td>
 <td>True</td>
 <td>Learns training categories and emits that fixed indicator schema. Unknown categories give zeros; <code>drop_first</code> drops the training vocabulary's first category.</td>
 </tr>
 <tr>
-<td>12</td>
+<td>13</td>
 <td><code>EllipticEnvelope</code></td>
 <td>True</td>
 <td>Fits the training outlier estimator and reuses it. Finite rows are filtered even when another row is invalid; invalid rows are preserved rather than disabling filtering for the batch.</td>
 </tr>
 <tr>
-<td>13</td>
+<td>14</td>
 <td><code>FeatureGeneration</code></td>
 <td>True</td>
 <td><code>group_agg</code> learns training group tables and replays them. Arithmetic, ratio, similarity, and datetime extraction use fixed rules. Mixed lists are learned if any operation is learned.</td>
 </tr>
 <tr>
-<td>14</td>
+<td>15</td>
 <td><code>FeatureGenerationNode</code></td>
 <td>True</td>
 <td>Alias of feature generation, with the same group-aggregation versus fixed-operation distinction.</td>
 </tr>
 <tr>
-<td>15</td>
+<td>16</td>
 <td><code>FeatureInteraction</code></td>
 <td>False</td>
 <td>Builds a polynomial interaction basis from configured degree/options and input schema. The basis is not a statistic of the feature values.</td>
 </tr>
 <tr>
-<td>16</td>
+<td>17</td>
 <td><code>FeatureMath</code></td>
 <td>True</td>
 <td>Alias of feature generation. Group aggregation learns state; arithmetic, ratio, similarity, and datetime extraction are fixed.</td>
 </tr>
 <tr>
-<td>17</td>
+<td>18</td>
 <td><code>GeneralBinning</code></td>
 <td>True</td>
 <td>Learns data-derived bin edges or discretization state from training values and reuses them. Changing the held-out distribution must not refit edges.</td>
 </tr>
 <tr>
-<td>18</td>
+<td>19</td>
 <td><code>GeneralTransformation</code></td>
 <td>True</td>
 <td>Yeo-Johnson and Box-Cox learn parameters. The eight fixed math method names listed below are row-local. Every rule in a mixed list matters.</td>
 </tr>
 <tr>
-<td>19</td>
+<td>20</td>
 <td><code>GeoDistance</code></td>
 <td>False</td>
 <td>Computes configured distances from each row's coordinates. No training distribution is fitted.</td>
 </tr>
 <tr>
-<td>20</td>
+<td>21</td>
+<td><code>GroupImputer</code></td>
+<td>True</td>
+<td>Learns one fill value per group (mean, median or most frequent) from training rows, with an overall fallback for groups unseen in training. Held-out rows must not shape the group statistics.</td>
+</tr>
+<tr>
+<td>22</td>
 <td><code>H3Index</code></td>
 <td>False</td>
 <td>Maps each coordinate pair to an H3 cell using configured resolution. Optional dependency availability does not make the operation learned.</td>
 </tr>
 <tr>
-<td>21</td>
+<td>23</td>
 <td><code>HashEncoder</code></td>
 <td>True</td>
 <td>Hashes values into configured buckets. Explicit columns, including <code>[]</code>, are exempt. Automatic selection is conservatively gated, although its categorical detector inspects dtypes rather than category counts.</td>
 </tr>
 <tr>
-<td>22</td>
+<td>24</td>
 <td><code>IQR</code></td>
 <td>True</td>
 <td>Learns training quartiles/bounds and applies the stored bounds. Held-out outliers cannot move them.</td>
 </tr>
 <tr>
-<td>23</td>
+<td>25</td>
 <td><code>InvalidValueReplacement</code></td>
 <td>False</td>
 <td>Replaces values according to configured invalid-value rules. No distribution or category vocabulary is fitted.</td>
 </tr>
 <tr>
-<td>24</td>
+<td>26</td>
 <td><code>IterativeImputer</code></td>
 <td>True</td>
 <td>Fits imputation models on training data and reuses those models for other splits.</td>
 </tr>
 <tr>
-<td>25</td>
+<td>27</td>
 <td><code>KBinsDiscretizer</code></td>
 <td>True</td>
 <td>Registered binning alias. Its active data-derived binning modes learn training edges/state and replay them.</td>
 </tr>
 <tr>
-<td>26</td>
+<td>28</td>
 <td><code>KNNImputer</code></td>
 <td>True</td>
 <td>Stores/fits the training reference data used to impute missing features. Held-out rows must not become fitting references.</td>
 </tr>
 <tr>
-<td>27</td>
+<td>29</td>
 <td><code>LabelEncoder</code></td>
 <td>True</td>
 <td>Omitted/null/empty columns encode only the available target or do nothing. Explicit feature columns learn category mappings. An exact known-target selection is target-only.</td>
 </tr>
 <tr>
-<td>28</td>
+<td>30</td>
 <td><code>LagFeatures</code></td>
 <td>False</td>
 <td>Uses positive lags within the configured ordering/groups. Depends on other rows even though no fitted distribution is stored; requires a valid temporal/history protocol.</td>
 </tr>
 <tr>
-<td>29</td>
+<td>31</td>
 <td><code>ManualBounds</code></td>
 <td>False</td>
 <td>Applies user-supplied bounds. Limits are not estimated from the current batch.</td>
 </tr>
 <tr>
-<td>30</td>
+<td>32</td>
 <td><code>MaxAbsScaler</code></td>
 <td>True</td>
 <td>Learns training maximum absolute values and applies the stored scale.</td>
 </tr>
 <tr>
-<td>31</td>
+<td>33</td>
 <td><code>MinMaxScaler</code></td>
 <td>True</td>
 <td>Learns training extrema and applies the stored scaling parameters. Held-out extrema cannot redefine the scale.</td>
 </tr>
 <tr>
-<td>32</td>
+<td>34</td>
 <td><code>MissingIndicator</code></td>
 <td>True</td>
 <td>Omitted/null/<code>[]</code> discovers which columns contain missing values. A nonempty explicit list fixes the indicator columns and is exempt.</td>
 </tr>
 <tr>
-<td>33</td>
+<td>35</td>
 <td><code>ModelBasedSelection</code></td>
 <td>True</td>
 <td>Fits a selector/model on training features and, where required, training targets. Replays the selected feature set.</td>
 </tr>
 <tr>
-<td>34</td>
+<td>36</td>
 <td><code>OneHotEncoder</code></td>
 <td>True</td>
 <td>Learns categories and optional frequency-based grouping. Replay retains the training schema; unknowns follow the configured ignore/error policy.</td>
 </tr>
 <tr>
-<td>35</td>
+<td>37</td>
 <td><code>OrdinalEncoder</code></td>
 <td>True</td>
 <td>Omitted/null columns auto-detect and learn feature categories. Explicit <code>[]</code> is target-only/no-op; an exact known-target selection is also exempt. Explicit feature selections remain conservatively learned, including configured category orders.</td>
 </tr>
 <tr>
-<td>36</td>
+<td>38</td>
 <td><code>Oversampling</code></td>
 <td>True</td>
 <td>Learns/changes the training sample distribution. Resampling belongs only on training data, never validation or test rows.</td>
 </tr>
 <tr>
-<td>37</td>
+<td>39</td>
 <td><code>PolynomialFeatures</code></td>
 <td>True</td>
 <td>Automatic selection learns eligible columns when <code>auto_detect</code> is enabled and columns are omitted/empty. Explicit nonempty columns or disabled/omitted <code>auto_detect</code> remain fixed; the polynomial basis itself fits no feature-value statistics.</td>
 </tr>
 <tr>
-<td>38</td>
+<td>40</td>
 <td><code>PolynomialFeaturesNode</code></td>
 <td>True</td>
 <td>Polynomial-feature alias with the same operation-dependent automatic-selection rule and fixed explicit-column mode.</td>
 </tr>
 <tr>
-<td>39</td>
+<td>41</td>
 <td><code>PowerTransformer</code></td>
 <td>True</td>
 <td>Fits Yeo-Johnson or Box-Cox parameters on training values. Disabling standardization does not make the fitted power parameter fixed.</td>
 </tr>
 <tr>
-<td>40</td>
+<td>42</td>
 <td><code>RobustScaler</code></td>
 <td>True</td>
 <td>Learns training robust location/scale statistics and reuses them.</td>
 </tr>
 <tr>
-<td>41</td>
+<td>43</td>
 <td><code>RollingAggregate</code></td>
 <td>False</td>
 <td>Computes ordered/grouped rolling features and includes the current row. Sequence-dependent; a current-target input can leak the answer directly.</td>
 </tr>
 <tr>
-<td>42</td>
+<td>44</td>
 <td><code>SimpleImputer</code></td>
 <td>True</td>
 <td>Mean, median, and most-frequent strategies learn training statistics. Constant filling uses a configured value and is exempt.</td>
 </tr>
 <tr>
-<td>43</td>
+<td>45</td>
 <td><code>SimpleTransformation</code></td>
 <td>False</td>
 <td>Applies the configured simple mathematical function to individual values. No fitted power-transform parameter is learned.</td>
 </tr>
 <tr>
-<td>44</td>
+<td>46</td>
 <td><code>Split</code></td>
 <td>False</td>
 <td>Deprecated alias of <code>TrainTestSplitter</code>. Establishes the same train/test boundary.</td>
 </tr>
 <tr>
-<td>45</td>
+<td>47</td>
 <td><code>StandardScaler</code></td>
 <td>True</td>
 <td>Learns training centering/scaling statistics and reuses them for held-out rows.</td>
 </tr>
 <tr>
-<td>46</td>
+<td>48</td>
 <td><code>TargetEncoder</code></td>
 <td>True</td>
 <td>Learns target statistics. Pipeline training receives out-of-fold encodings; held-out/inference rows use the full-training artifact. Unknown categories use the training prior.</td>
 </tr>
 <tr>
-<td>47</td>
+<td>49</td>
 <td><code>TextCleaning</code></td>
 <td>False</td>
 <td>Trim, case, special-character, and regex operations act on individual values. Omitted/null columns use text-dtype discovery; explicit <code>[]</code> does nothing.</td>
 </tr>
 <tr>
-<td>48</td>
+<td>50</td>
 <td><code>TrainTestSplitter</code></td>
 <td>False</td>
 <td>Creates the train/test boundary. Splitting features from the target alone is not an equivalent boundary.</td>
 </tr>
 <tr>
-<td>49</td>
+<td>51</td>
 <td><code>Undersampling</code></td>
 <td>True</td>
 <td>Learns/changes the training sample distribution. Validation and test populations must remain outside resampling.</td>
 </tr>
 <tr>
-<td>50</td>
+<td>52</td>
 <td><code>UnivariateSelection</code></td>
 <td>True</td>
 <td>Fits feature scores/selection on training data and training targets when the method needs them. Replays the selected columns.</td>
 </tr>
 <tr>
-<td>51</td>
+<td>53</td>
 <td><code>ValueReplacement</code></td>
 <td>False</td>
 <td>Applies explicitly configured value replacements. It does not learn the replacement mapping from the batch.</td>
 </tr>
 <tr>
-<td>52</td>
+<td>54</td>
 <td><code>VarianceThreshold</code></td>
 <td>True</td>
 <td>Learns feature variances and the retained feature set from training rows. An empty configured list does not establish a no-op exemption.</td>
 </tr>
 <tr>
-<td>53</td>
+<td>55</td>
 <td><code>WOEEncoder</code></td>
 <td>True</td>
 <td>Learns binary-target log-odds. Training rows receive complement-fold mappings; held-out rows use the full-training artifact. Unknown categories receive the configured fallback, currently zero.</td>
 </tr>
 <tr>
-<td>54</td>
+<td>56</td>
 <td><code>Winsorize</code></td>
 <td>True</td>
 <td>Learns training clipping limits and reuses them. Held-out extreme values cannot change fitted limits.</td>
 </tr>
 <tr>
-<td>55</td>
+<td>57</td>
 <td><code>ZScore</code></td>
 <td>True</td>
 <td>Learns training location/scale and applies the stored outlier rule.</td>
 </tr>
 <tr>
-<td>56</td>
+<td>58</td>
 <td><code>count_vectorizer</code></td>
 <td>True</td>
 <td>A nonempty explicit feature-column list fits vocabulary and document-frequency restrictions. Omitted/null/empty or target-only selections do nothing. Apply only transforms with the training vocabulary.</td>
 </tr>
 <tr>
-<td>57</td>
+<td>59</td>
 <td><code>feature_selection</code></td>
 <td>True</td>
 <td>Generic feature-selection registration. Its active selector learns training-dependent state; an empty list is not a blanket no-op exemption.</td>
 </tr>
 <tr>
-<td>58</td>
+<td>60</td>
 <td><code>feature_target_split</code></td>
 <td>False</td>
 <td>Separates <code>X</code> from <code>y</code>. Does not create independent training and evaluation row sets.</td>
 </tr>
 <tr>
-<td>59</td>
+<td>61</td>
 <td><code>hashing_vectorizer</code></td>
 <td>False</td>
 <td>Requires explicit text columns and constructs configured token hashes with rowwise normalization. No vocabulary is learned; omitted/null/empty selections do nothing.</td>
 </tr>
 <tr>
-<td>60</td>
+<td>62</td>
 <td><code>sentence_embedder</code></td>
 <td>False</td>
 <td>Requires explicit text columns and applies pretrained weights without fitting the corpus. Empty/target-only selections avoid model loading. The optional model boundary is tested with a deterministic substitute.</td>
 </tr>
 <tr>
-<td>61</td>
+<td>63</td>
 <td><code>tfidf_vectorizer</code></td>
 <td>True</td>
 <td>A nonempty explicit feature-column list fits vocabulary and IDF. Omitted/null/empty or target-only selections do nothing. Held-out text reuses training vocabulary and weights.</td>
 </tr>
 <tr>
-<td>62</td>
+<td>64</td>
 <td><code>tokenizer</code></td>
 <td>False</td>
 <td>Requires explicit text columns. Word/character analyzers and token counts are rowwise; omitted/null/empty selections do nothing.</td>
@@ -4112,10 +4180,10 @@ reason so the user can correct the pipeline after a toast disappears.</p>
   and optional embedding dependency behavior.</li>
 <li><code>skyulf-core/tests/unit/test_feature_operation_leakage.py</code>: feature
   operations, fitted group state, and row/sequence behavior.</li>
-<li><code>skyulf-core/tests/integration/test_leakage_fixture_contract.py</code> and
-  <code>skyulf-core/tests/integration/test_leakage_operation_contract.py</code>: shared
+<li><code>skyulf-core/tests/integration/core/test_leakage_fixture_contract.py</code> and
+  <code>skyulf-core/tests/integration/core/test_leakage_operation_contract.py</code>: shared
   inventory and operation contracts exercised through core integration paths.</li>
-<li><code>skyulf-core/tests/integration/test_core_pipeline_tuning_leakage.py</code>: actual
+<li><code>skyulf-core/tests/integration/core/test_core_pipeline_tuning_leakage.py</code>: actual
   preprocessing fits within tuning folds.</li>
 <li><code>tests/integration/test_leakage_submission.py</code>,
   <code>tests/integration/test_leakage_operation_contract.py</code>, and

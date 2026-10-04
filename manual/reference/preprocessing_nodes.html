@@ -1913,6 +1913,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../user_guide/weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
@@ -2596,6 +2652,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#groupimputer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupImputer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iterativeimputer" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2805,6 +2872,17 @@
     <span class="md-ellipsis">
       
         ManualBounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clipvalues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ClipValues
       
     </span>
   </a>
@@ -4534,6 +4612,27 @@ Decimal numeric selections remain supported; automatic selection is unchanged.</
 <li><code>imputer_object</code> (sklearn object; pickled in pipeline)</li>
 <li><code>n_neighbors</code>, <code>weights</code></li>
 </ul>
+<h3 id="groupimputer">GroupImputer</h3>
+<p>Fills missing values from the statistic of the row's own group, for example the
+median employee count of the same industry. Statistics are learned on training
+rows only; a group that was not seen in training (or had no observed value) uses
+the overall training value. The group column itself is never filled.</p>
+<p>Config:</p>
+<ul>
+<li><code>group_by</code>: str (required; the column that defines the groups)</li>
+<li><code>strategy</code>: <code>mean</code> | <code>median</code> | <code>most_frequent</code> (also accepts <code>mode</code>; <code>constant</code> is rejected — use <code>SimpleImputer</code>)</li>
+<li><code>columns</code>: list[str] (optional; numeric auto-detection for mean/median, all other columns for most_frequent)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>group_by</code>, <code>strategy</code>, <code>columns</code></li>
+<li><code>group_values</code>: dict[col -&gt; list of [group, value]]</li>
+<li><code>fill_values</code>: dict[col -&gt; overall value]</li>
+</ul>
+<p>Example step:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fill_employees"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"GroupImputer"</span><span class="p">,</span>
+ <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"employees"</span><span class="p">],</span> <span class="s2">"group_by"</span><span class="p">:</span> <span class="s2">"industry"</span><span class="p">,</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"median"</span><span class="p">}}</span>
+</code></pre></div>
 <h3 id="iterativeimputer">IterativeImputer</h3>
 <p>Config:</p>
 <ul>
@@ -4760,6 +4859,22 @@ continue to replace their selected source columns.</p>
 <ul>
 <li><code>bounds</code></li>
 </ul>
+<h3 id="clipvalues">ClipValues</h3>
+<p>Caps values at fixed, user-provided bounds and keeps every row. Unlike
+<code>Winsorize</code>, the limits are not learned from data; unlike <code>ManualBounds</code>, rows
+are not dropped, so the step also runs at prediction time.</p>
+<p>Config:</p>
+<ul>
+<li><code>bounds</code>: dict[col -&gt; {lower?, upper?}] (at least one side per column; finite numbers; numeric columns only)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>bounds</code></li>
+</ul>
+<p>Example step:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"cap_revenue"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"ClipValues"</span><span class="p">,</span>
+ <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"bounds"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"revenue"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lower"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"upper"</span><span class="p">:</span> <span class="mi">1_000_000</span><span class="p">}}}}</span>
+</code></pre></div>
 <h3 id="ellipticenvelope">EllipticEnvelope</h3>
 <p>Learns a per-column EllipticEnvelope model and filters outliers.</p>
 <p>Config:</p>

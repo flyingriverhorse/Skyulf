@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/hyperparameter_tuning.html">
       
       
-        <link rel="prev" href="configuration.html">
+        <link rel="prev" href="sampling_weight_acceptance.html">
       
       
         <link rel="next" href="shap_explainability.html">
@@ -1896,6 +1896,62 @@
     
   
     skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling Weight Acceptance
   
 
     
@@ -3816,7 +3872,7 @@ infinity remain errors.</p>
 <td><code>tune_threshold</code></td>
 <td><code>bool</code></td>
 <td><code>false</code></td>
-<td>After tuning a binary classifier, select the decision threshold that maximises <code>metric</code> on the validation split and apply it in predictions. See <a href="threshold_tuning.html#integrated-with-hyperparameter-tuning">Threshold Tuning</a></td>
+<td>Select a binary decision threshold using validation data for ordinary tuning, or inner OOF predictions for nested tuning, and apply it in predictions. See <a href="threshold_tuning.html#integrated-with-hyperparameter-tuning">Threshold Tuning</a></td>
 </tr>
 <tr>
 <td><code>progress</code></td>
@@ -3896,8 +3952,15 @@ ordinary fitting between folds. Gaussian Naive Bayes also fits each fold once;
 it never repeats observations through an artificial epoch loop.</p>
 <p>A single validation holdout has no remaining fold to skip. Such searches need
 an eligible iteration hook; otherwise pruning is disabled with a reason.
-An explicitly supplied validation split takes precedence over tuning CV,
-including when a later evaluation is configured to use cross-validation.
+For ordinary KFold/stratified KFold/ShuffleSplit tuning, an explicitly supplied
+validation split takes precedence over tuning CV. Explicit group policies and
+temporal policies with configured gap/window sizes retain their training-only
+CV boundaries; the separate validation split does not select their parameters.
+Carry-history preprocessing also retains its required temporal split policy.
+Nested tuning reserves the separate split and uses training-only inner CV.
+When enabled, ordinary post-fit threshold tuning can still use validation data;
+that population is therefore not an untouched final test set. Keep final test
+rows separate from parameter and threshold selection.
 <code>none</code> or <code>pruning=false</code> retains ordinary fitting. Only fully evaluated,
 finite-scoring trials are eligible for best parameters and final refit. Pruned
 trial scores are not shown as completed CV means; if none completes, tuning
@@ -3970,10 +4033,16 @@ unconfirmed because support cannot be established without executing that graph.<
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p><strong>Nested CV</strong> runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at <code>n_folds - 1</code>) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.</p>
-<p><strong>With tuning enabled (<code>run_mode: "advanced"</code>):</strong> When <code>nested_cv</code> is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.</p>
-</blockquote>
+<p><strong>Nested CV</strong> repeats the selected tuning strategy inside each outer training
+partition, refitting preprocessing inside every inner fold. The outer fold only
+evaluates its independently selected recipe. A separate search over all training
+rows selects the deployable model. Search budgets apply separately to each search.</p>
+<p>Use <code>cv_inner_folds</code> for the inner count and <code>cv_nested_type</code> for task-automatic,
+K-Fold, stratified, temporal, group or stratified-group policies. Temporal/group
+metadata is excluded from model features and checked at both levels. Binary
+<code>tune_threshold=True</code> selects thresholds from inner OOF predictions, with an
+independent final threshold; final holdout labels cannot select it.
+See <a href="cross_validation.html#nested-cv">Cross-Validation</a> for boundaries and controls.</p>
 <h3 id="time-column-for-time-series-split">Time column for Time Series Split</h3>
 <p>When using <code>time_series_split</code>, Skyulf auto-sorts your data chronologically:</p>
 <ol>
