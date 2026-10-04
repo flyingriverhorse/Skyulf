@@ -157,17 +157,50 @@ class GroupImputerApplier(BaseApplier):
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         numeric = params["strategy"] in _NUMERIC_STRATEGIES
         keys = pl.col(params["group_by"])
-        if isinstance(X.schema[params["group_by"]], (pl.Categorical, pl.Enum)):
+        key_dtype = X.schema[params["group_by"]]
+        if isinstance(key_dtype, (pl.Categorical, pl.Enum)):
             keys = keys.cast(pl.Utf8)
+            key_dtype = pl.String
         exprs = [
-            _polars_fill(X.schema[column], column, keys, params, numeric)
+            _polars_fill(X.schema[column], column, keys, key_dtype, params, numeric)
             for column in params["columns"]
             if column in X.columns
         ]
         return X.with_columns(exprs), y
 
 
-def _polars_fill(dtype: Any, column: str, keys: Any, params: dict[str, Any], numeric: bool) -> Any:
+def _polars_group_mapping(pairs: list[list], key_dtype: Any) -> tuple[Any, list[Any]]:
+    """Keep only exact key conversions before a native lookup can coerce identities.
+
+    Compare learned scalars in Python so numeric equality (including booleans)
+    survives, while text conversion, truncation and rounding cannot invent a
+    match. Only learned groups cross Python; inference rows stay in Polars.
+    """
+    old, new = zip(*pairs, strict=True)
+    if not (
+        key_dtype.is_integer()
+        or key_dtype.is_float()
+        or key_dtype in (pl.String, pl.Boolean, pl.Null)
+    ):
+        return list(old), list(new)
+    converted = pl.Series("group_keys", old, dtype=key_dtype, strict=False)
+    keep = [
+        actual is not None and original == actual
+        for original, actual in zip(old, converted.to_list(), strict=True)
+    ]
+    return converted.filter(pl.Series(keep)), [
+        value for value, match in zip(new, keep, strict=True) if match
+    ]
+
+
+def _polars_fill(
+    dtype: Any,
+    column: str,
+    keys: Any,
+    key_dtype: Any,
+    params: dict[str, Any],
+    numeric: bool,
+) -> Any:
     """Build the expression that fills one column from its group value, then the global one."""
     out_dtype = pl.Float64 if numeric else dtype
     values = pl.col(column).cast(out_dtype)
@@ -175,9 +208,9 @@ def _polars_fill(dtype: Any, column: str, keys: Any, params: dict[str, Any], num
         values = values.fill_nan(None)
     pairs = params["group_values"][column]
     if pairs:
-        old, new = zip(*pairs, strict=True)
+        old, new = _polars_group_mapping(pairs, key_dtype)
         values = values.fill_null(
-            keys.replace_strict(list(old), list(new), default=None, return_dtype=out_dtype)
+            keys.replace_strict(old, new, default=None, return_dtype=out_dtype)
         )
     fallback = params["fill_values"].get(column)
     if fallback is not None:

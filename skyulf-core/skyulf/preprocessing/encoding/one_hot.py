@@ -22,6 +22,64 @@ from ._common import _exclude_target_column, detect_categorical_columns
 logger = logging.getLogger(__name__)
 
 _MISSING_TOKEN = "__mlops_missing__"  # nosec B105 - sentinel value, not a credential
+_ESCAPE_PREFIX = "__mlops_literal__:"
+
+
+def _uses_missing_encoding(params: dict[str, Any]) -> bool:
+    """Validate the fitted policy while leaving unversioned artifacts on legacy replay."""
+    if not params or "missing_encoding_version" not in params:
+        return False
+    version = params["missing_encoding_version"]
+    if type(version) is not int or version != 1:
+        raise ValueError(
+            f"Unsupported OneHotEncoder missing encoding version {version!r}; refit the encoder."
+        )
+    return True
+
+
+def _escape_literal(value: Any) -> Any:
+    """Keep literal missing tokens and escape-prefixed strings distinct from missing values."""
+    if isinstance(value, str) and (value == _MISSING_TOKEN or value.startswith(_ESCAPE_PREFIX)):
+        return _ESCAPE_PREFIX + value
+    return value
+
+
+def _prepare_missing_pandas(subset: pd.DataFrame, escape_literals: bool) -> pd.DataFrame:
+    """Escape reserved text before replacing nulls without coercing numeric categories."""
+    prepared = subset.astype(object)
+    if escape_literals:
+        for column in prepared.columns:
+            prepared[column] = pd.Series(
+                [_escape_literal(value) for value in prepared[column]],
+                index=prepared.index,
+                dtype=object,
+            )
+    return prepared.where(prepared.notna(), _MISSING_TOKEN)
+
+
+def _escape_literal_expr(column: str) -> pl.Expr:
+    """Express the string escape policy natively for Polars string and categorical columns."""
+    values = pl.col(column).cast(pl.String)
+    reserved = (values == _MISSING_TOKEN) | values.str.starts_with(_ESCAPE_PREFIX)
+    return (
+        pl.when(reserved)
+        .then(pl.concat_str(pl.lit(_ESCAPE_PREFIX), values))
+        .otherwise(values)
+        .alias(column)
+    )
+
+
+def _prepare_missing_polars(subset: pl.DataFrame, escape_literals: bool) -> pl.DataFrame:
+    """Escape only textual categories and retain the legacy fill policy for other dtypes."""
+    if escape_literals:
+        subset = subset.with_columns(
+            [
+                _escape_literal_expr(column)
+                for column, dtype in subset.schema.items()
+                if dtype.base_type() in (pl.String, pl.Categorical, pl.Enum)
+            ]
+        )
+    return subset.fill_null(_MISSING_TOKEN)
 
 
 # -----------------------------------------------------------------------------
@@ -65,6 +123,7 @@ def _transform_partition(encoder: Any, values: Any, feature_names: list[str]) ->
 
 
 def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    escape_literals = _uses_missing_encoding(params)
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
     if not valid_cols:
         return X, y
@@ -74,7 +133,7 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
     X_subset = X.select(valid_cols)
     if include_missing:
-        X_subset = X_subset.fill_null(_MISSING_TOKEN)
+        X_subset = _prepare_missing_polars(X_subset, escape_literals)
 
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoded = _transform_partition(encoder, X_np, feature_names)
@@ -86,6 +145,7 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
 
 def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    escape_literals = _uses_missing_encoding(params)
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
     if not valid_cols:
         return X, y
@@ -95,7 +155,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     X_out = X.copy()
     X_subset = X_out[valid_cols]
     if include_missing:
-        X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
+        X_subset = _prepare_missing_pandas(X_subset, escape_literals)
 
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = _transform_partition(encoder, X_input, feature_names)
@@ -117,6 +177,8 @@ class OneHotEncoderApplier(BaseApplier):
     columns are concatenated on and the originals dropped unless
     ``drop_original`` is false. Generated names must be unique and must not
     collide with retained input columns; conflicts raise ``ValueError``.
+    New artifacts escape literal missing tokens and escape-prefixed strings;
+    unversioned artifacts retain their original missing-value transformation.
     """
 
     @apply_method
@@ -193,7 +255,7 @@ def _build_onehot_artifact(
         dropped_columns=cols if opts["drop_original"] else (),
         node_name="OneHotEncoder",
     )
-    return {
+    artifact = {
         "type": "onehot",
         "columns": cols,
         "encoder_object": encoder,
@@ -202,6 +264,9 @@ def _build_onehot_artifact(
         "drop_original": opts["drop_original"],
         "include_missing": opts["include_missing"],
     }
+    if opts["include_missing"]:
+        artifact["missing_encoding_version"] = 1
+    return artifact
 
 
 def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
@@ -213,7 +278,7 @@ def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     opts = _resolve_fit_options(config)
     X_subset = X.select(cols)
     if opts["include_missing"]:
-        X_subset = X_subset.fill_null(_MISSING_TOKEN)
+        X_subset = _prepare_missing_polars(X_subset, escape_literals=True)
 
     encoder = _fit_sklearn_onehot(X_subset, opts, cols)
     return _build_onehot_artifact(X, encoder, cols, opts)
@@ -228,7 +293,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     opts = _resolve_fit_options(config)
     X_subset = X[cols]
     if opts["include_missing"]:
-        X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
+        X_subset = _prepare_missing_pandas(X_subset, escape_literals=True)
 
     encoder = _fit_sklearn_onehot(X_subset, opts, cols)
     return _build_onehot_artifact(X, encoder, cols, opts)

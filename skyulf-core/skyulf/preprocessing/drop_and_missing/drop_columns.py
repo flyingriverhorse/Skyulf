@@ -5,6 +5,7 @@ from typing import Any, cast
 import polars as pl
 
 from ...core.meta.decorators import node_meta
+from ...engines import PolarsEngine
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingColumnsArtifact
 from .._schema import SkyulfSchema
@@ -14,7 +15,7 @@ from ..dispatcher import apply_dual_engine, fit_dual_engine
 
 def _drop_missing_cols_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
-    return (X.drop(cols) if cols else X), y
+    return (PolarsEngine.wrap(X).drop(cols).to_native() if cols else X), y
 
 
 def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

@@ -115,15 +115,16 @@ def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
 
 
 def _apply_target_pandas(y: Any, enc: OrdinalEncoder) -> Any:
+    index = getattr(y, "index", None)
+    if callable(index):
+        index = None
     if len(y) == 0:
-        return pd.Series(
-            index=getattr(y, "index", None), name=getattr(y, "name", None), dtype="float32"
-        )
+        return pd.Series(index=index, name=getattr(y, "name", None), dtype="float32")
     y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     return pd.Series(
         encoded,
-        index=y.index if hasattr(y, "index") else None,
+        index=index,
         name=y.name if hasattr(y, "name") else None,
     )
 

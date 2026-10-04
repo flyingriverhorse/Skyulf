@@ -27,6 +27,7 @@ from sklearn.feature_selection import (
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import MinMaxScaler
 
+from ...engines import PolarsEngine
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import UnivariateSelectionArtifact
 
@@ -120,7 +121,7 @@ def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
         return X, y
     to_drop = _resolve_drop_list(params, list(X.columns))
     if to_drop:
-        X = X.drop(to_drop)
+        X = PolarsEngine.wrap(X).drop(to_drop).to_native()
     return X, y
 
 

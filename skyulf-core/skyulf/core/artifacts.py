@@ -561,6 +561,7 @@ class OneHotArtifact(TypedDict, total=False):
     prefix_separator: str
     drop_original: bool
     include_missing: bool
+    missing_encoding_version: int
 
 
 class OrdinalArtifact(TypedDict, total=False):
