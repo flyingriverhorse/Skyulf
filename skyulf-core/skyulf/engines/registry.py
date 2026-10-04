@@ -144,7 +144,8 @@ class EngineRegistry:
         bare substring check) to identify the library, avoiding false
         positives from unrelated modules that merely contain "pandas"/
         "polars" in their name, e.g. a third-party "fake_polars_stub" or
-        "my_pandas_wrapper" module.
+        "my_pandas_wrapper" module. Frame subclasses inherit their engine
+        identity from recognized base classes.
 
         Our own engine wrappers (SkyulfPandasWrapper/SkyulfPolarsWrapper,
         under `skyulf.engines.*`) hold the real dataframe behind a public
@@ -158,9 +159,13 @@ class EngineRegistry:
         if top_level == "skyulf" and hasattr(data, "to_native"):
             data = data.to_native()
             top_level = type(data).__module__.split(".", 1)[0]
-        if any(base.__module__.split(".", 1)[0] == "pyspark" for base in type(data).__mro__):
+        packages = [base.__module__.split(".", 1)[0] for base in type(data).__mro__]
+        if "pyspark" in packages:
             return "pyspark"
-        return top_level
+        return next(
+            (package for package in packages if package in EngineRegistry._TOP_LEVEL_TO_ENGINE),
+            top_level,
+        )
 
     @classmethod
     def _warn_unknown_data_type(cls, data: Any) -> None:

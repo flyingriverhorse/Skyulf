@@ -195,3 +195,14 @@ def _resolve_group_agg_cols(op: dict[str, Any], existing: list[str]) -> tuple[st
     if not group_cols or not target_cols:
         return None
     return group_cols[0], target_cols[0], op.get("method") or "mean"
+
+
+def _validate_generated_names(names: list[str], existing: list[str], node: str) -> None:
+    """Reject ambiguous generated names before appending or replacing any caller column."""
+    if len(names) != len(set(names)):
+        raise ValueError(f"{node}: generated feature names must be unique.")
+    collisions = sorted(set(names).intersection(existing))
+    if collisions:
+        raise ValueError(
+            f"{node}: generated feature names collide with existing columns: {collisions}"
+        )

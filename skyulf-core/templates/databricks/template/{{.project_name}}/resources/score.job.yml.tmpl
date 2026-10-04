@@ -367,7 +367,7 @@ resources:
             node_type_id: ${var.node_type_id}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              {{.cost_tag_key}}: ${var.cost_tag_value}
+              {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: ${var.min_workers}
               max_workers: ${var.max_workers}

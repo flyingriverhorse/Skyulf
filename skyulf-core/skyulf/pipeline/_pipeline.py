@@ -914,8 +914,9 @@ class SkyulfPipeline:
         evidence = getattr(self, "_decision_threshold_evidence", None) or {}
         if "model_positive_class" in evidence:
             return evidence["model_positive_class"]
+        policy = self.config.get("decision_threshold")
         return evidence.get(
-            "positive_class", self.config.get("decision_threshold", {}).get("positive_class")
+            "positive_class", policy.get("positive_class") if policy is not None else None
         )
 
     def export_model_card(self) -> dict[str, Any]:

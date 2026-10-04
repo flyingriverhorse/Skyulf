@@ -147,10 +147,10 @@ variables:
   cluster_policy_id:
     description: Approved policy looked up in the active workspace
     lookup:
-      cluster_policy: "{{.cluster_policy_name}}"
+      cluster_policy: {{printf "%q" .cluster_policy_name}}
   cost_tag_value:
     description: Approved cluster cost allocation tag value
-    default: "{{.cost_tag_value}}"
+    default: {{printf "%q" .cost_tag_value}}
 {{end}}
   test_catalog:
     description: "test catalog; shared and personal targets use the same environment binding"

@@ -139,6 +139,13 @@ if LIGHTGBM_AVAILABLE:
     ).set_params(subsample_freq=None)
 
 
+def _boolean_option(value: Any, name: str) -> bool:
+    """Require explicit booleans, matching the public ensemble configuration contract."""
+    if type(value) is not bool:
+        raise ValueError(f"{name} must be boolean.")
+    return value
+
+
 class _BaseEnsembleCalculator(SklearnCalculator):
     """Shared resolver: string keys → ``estimators=[(name, instance), ...]``.
 
@@ -263,7 +270,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             final_estimator=final_est if self.IS_STACKING else "",
             strategy=strategy,
             problem_type=self.problem_type,
-            calibrate_base_models=bool(src.get("calibrate_base_models")),
+            calibrate_base_models=_boolean_option(
+                src.get("calibrate_base_models", False), "calibrate_base_models"
+            ),
         )
 
     def _inject_tuning_base_config(self, config: dict[str, Any]) -> dict[str, Any]:
@@ -426,9 +435,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         bucket.pop("voting", None)
         bucket.pop("weights", None)
         # ``passthrough`` (let the meta-learner also see the raw features) is
-        # a valid Stacking-only param; coerce to bool and keep it.
+        # a valid Stacking-only param; require a boolean and keep it.
         if "passthrough" in bucket:
-            bucket["passthrough"] = bool(bucket["passthrough"])
+            bucket["passthrough"] = _boolean_option(bucket["passthrough"], "passthrough")
 
     def _clean_voting_meta_keys(self, bucket: dict[str, Any]) -> None:
         """Keeps/normalizes the meta-keys valid for Voting (voting, weights)."""
@@ -517,11 +526,13 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     def _extract_calibration(bucket: dict[str, Any]) -> dict[str, Any] | None:
         """Pop and normalise calibration settings from *bucket*.
 
-        Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is truthy,
+        Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is True,
         else ``None``. The transport keys are always removed so they cannot leak
         into the sklearn meta-estimator constructor.
         """
-        enabled = bool(bucket.pop("calibrate_base_models", False))
+        enabled = _boolean_option(
+            bucket.pop("calibrate_base_models", False), "calibrate_base_models"
+        )
         method = bucket.pop("calibration_method", "sigmoid")
         cv = bucket.pop("calibration_cv", 3)
         if not enabled:

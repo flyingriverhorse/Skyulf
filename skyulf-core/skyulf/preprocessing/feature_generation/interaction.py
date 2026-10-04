@@ -19,6 +19,7 @@ from ...registry import NodeRegistry
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._common import _validate_generated_names
 
 # Separator used between column names in generated interaction names. Avoids
 # ``*``/spaces/other characters that break patsy/statsmodels formula parsing
@@ -152,8 +153,19 @@ class FeatureInteractionApplier(BaseApplier):
         A combination whose columns are absent from ``X`` is skipped rather than
         raising, so the node survives an upstream column drop; ``include_bias``
         adds a constant 1.0 ``interaction_bias`` column. When no column is
-        generated the frame is returned unchanged.
+        generated the frame is returned unchanged. Generated product names must
+        be unique and must not collide with existing columns. An existing bias
+        column retains its established passthrough behavior.
         """
+        combos = [
+            tuple(combo)
+            for combo in params.get("combinations", [])
+            if all(col in X.columns for col in combo)
+        ]
+        names = _build_interaction_feature_names(
+            combos, params.get("include_bias", False) and _BIAS_COLUMN not in X.columns
+        )
+        _validate_generated_names(names, list(X.columns), "FeatureInteraction")
         return apply_dual_engine(
             X, params, {"polars": _interaction_apply_polars, "pandas": _interaction_apply_pandas}
         )
@@ -186,7 +198,8 @@ class FeatureInteractionCalculator(BaseCalculator):
 
         Raises:
             ValueError: If a configured column is missing or non-numeric, or if
-                ``degree`` falls outside the supported ``(2, 3, 4)``.
+                ``degree`` falls outside the supported ``(2, 3, 4)``. Generated
+                product names must also be unique and absent from the input.
         """
         cols = list(config.get("columns", []))
         X_pd = select_then_to_pandas(X, cols)
@@ -200,6 +213,10 @@ class FeatureInteractionCalculator(BaseCalculator):
 
         combos = _resolve_combinations(cols, degree, interaction_only)
         feature_names = _build_interaction_feature_names(combos, include_bias)
+        generated = [
+            name for name in feature_names if name != _BIAS_COLUMN or name not in X.columns
+        ]
+        _validate_generated_names(generated, list(X.columns), "FeatureInteraction")
 
         return cast(
             FeatureInteractionArtifact,

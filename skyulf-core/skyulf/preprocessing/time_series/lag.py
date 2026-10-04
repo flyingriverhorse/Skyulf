@@ -74,15 +74,18 @@ def _drop_missing_polars(X_out: Any, _y: Any) -> tuple[Any, Any]:
     return X_out, _y
 
 
-def _pandas_lag_column(df: Any, col: str, lags: list[int], group_by: list[str] | None) -> None:
+def _pandas_lag_column(
+    df: Any, source: Any, col: str, lags: list[int], group_by: list[str] | None
+) -> None:
+    """Assign one source column's lags without reading previously generated values."""
     # `dropna=False` matches Polars' `.over(group_by)` semantics, where a null
     # group key is treated as a normal (self-equal) group rather than
     # excluded. Pandas' `groupby` defaults to `dropna=True`, which would
     # otherwise force every null-group row's lag to NaN regardless of what
     # preceded it, diverging from the Polars apply path on the same data.
-    source = df.groupby(group_by, dropna=False)[col] if group_by else df[col]
+    values = source.groupby(group_by, dropna=False)[col] if group_by else source[col]
     for lag in lags:
-        df[_lag_name(col, lag)] = source.shift(lag)
+        df[_lag_name(col, lag)] = values.shift(lag)
 
 
 def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -96,9 +99,10 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
     df, sort_positions = sort_with_positions_pandas(X.copy(), params.get("sort_by"))
     _y = select_rows_by_position(_y, sort_positions)
+    source = df.copy(deep=False)
     for col in columns:
-        if col in df.columns:
-            _pandas_lag_column(df, col, lags, group_by)
+        if col in source.columns:
+            _pandas_lag_column(df, source, col, lags, group_by)
     if params.get("drop_na"):
         keep = np.flatnonzero(df.notna().to_numpy().all(axis=1))
         df = df.iloc[keep]

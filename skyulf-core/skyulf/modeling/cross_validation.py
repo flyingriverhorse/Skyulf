@@ -78,6 +78,11 @@ def _aggregate_metrics(
     return aggregated
 
 
+def _indexable_target(y: Any) -> Any:
+    """Convert Python targets once before positional indexing, retaining native series types."""
+    return np.asarray(y) if isinstance(y, (list, tuple)) else y
+
+
 def perform_cross_validation(
     calculator: BaseModelCalculator,
     applier: BaseModelApplier,
@@ -168,6 +173,7 @@ def perform_cross_validation(
             progress_callback,
             sample_weight,
         )
+    y = _indexable_target(y)
     problem_type = calculator.problem_type
 
     if log_callback:

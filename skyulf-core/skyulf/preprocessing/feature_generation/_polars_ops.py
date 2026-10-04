@@ -79,7 +79,8 @@ def _polars_divide(col_exprs: list[Any], const_vals: list[float], epsilon: float
     for e in others:
         expr = expr / safe_denom(e)
     for c in const_vals:
-        expr = expr / (c if abs(c) > epsilon else epsilon)
+        denom = c if abs(c) >= epsilon else -epsilon if c < 0 else epsilon
+        expr = expr / denom
     return expr
 
 

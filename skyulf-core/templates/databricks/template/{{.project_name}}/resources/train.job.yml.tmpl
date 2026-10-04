@@ -1,3 +1,5 @@
+{{$modelSuffix := "" -}}
+{{if eq .sample_weight_enabled "true"}}{{$modelSuffix = "_weighted"}}{{end -}}
 resources:
   jobs:
     train:
@@ -188,7 +190,7 @@ resources:
             notebook_path: ../src/jobs/initialize_run.py
             base_parameters: &lifecycle_parameters
 {{if eq .training_layout "model_competition"}}
-              model_keys_json: '[{{$comma := ""}}{{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.competition_candidate_count}}{{$comma}}{{printf "%q" (printf "%s_%s" (index $ (printf "competition_%s_model_%s" $.task $slot)) $slot)}}{{$comma = ", "}}{{end}}{{end}}]'
+              model_keys_json: '[{{$comma := ""}}{{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.competition_candidate_count}}{{$comma}}{{printf "%q" (printf "%s_%s" (index $ (printf "competition_%s_model_%s%s" $.task $slot $modelSuffix)) $slot)}}{{$comma = ", "}}{{end}}{{end}}]'
 {{end}}
               workflow_contract: "3"
               job_id: '{{"{{job.id}}"}}'
@@ -260,7 +262,7 @@ resources:
 {{if eq .training_layout "model_competition"}}
         # BEGIN MODEL TASKS
 {{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.competition_candidate_count}}
-{{$name := printf "%s_%s" (index $ (printf "competition_%s_model_%s" $.task $slot)) $slot}}
+{{$name := printf "%s_%s" (index $ (printf "competition_%s_model_%s%s" $.task $slot $modelSuffix)) $slot}}
         - <<: *lifecycle_task
           task_key: train_{{$name}}
           depends_on:
@@ -290,7 +292,7 @@ resources:
           depends_on:
             # BEGIN MODEL DEPENDENCIES
 {{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.competition_candidate_count}}
-            - task_key: train_{{index $ (printf "competition_%s_model_%s" $.task $slot)}}_{{$slot}}
+            - task_key: train_{{index $ (printf "competition_%s_model_%s%s" $.task $slot $modelSuffix)}}_{{$slot}}
 {{end}}{{end}}
             # END MODEL DEPENDENCIES
           notebook_task:
@@ -462,7 +464,7 @@ resources:
             node_type_id: ${var.node_type_id}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              {{.cost_tag_key}}: ${var.cost_tag_value}
+              {{printf "%q" .cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: ${var.min_workers}
               max_workers: ${var.max_workers}

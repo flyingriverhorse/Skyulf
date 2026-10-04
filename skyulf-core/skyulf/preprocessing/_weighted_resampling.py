@@ -8,7 +8,7 @@ import polars as pl
 
 from ..engines import SkyulfPolarsWrapper
 from ..modeling._sample_weights import SampleWeightError, validate_sample_weight
-from ..utils import unpack_pipeline_input
+from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 
 def _synthetic_weights(y: Any, weights: np.ndarray, labels: Any, policy: str) -> np.ndarray:
@@ -87,7 +87,7 @@ def fit_resample_weighted(
     ``class_mean`` uses the input training class's arithmetic mean; ``uniform``
     assigns one. Neither policy affects sampling probabilities or distances.
     """
-    X, y, wrapped = _prepare_inputs(data, config)
+    X, y, wrapped, return_tuple = _prepare_inputs(data, config)
     validated = validate_sample_weight(weights, len(X))
     if validated is None:
         raise SampleWeightError("Weighted resampling requires sample_weight.")
@@ -103,12 +103,13 @@ def fit_resample_weighted(
         X_res, y_res = pl.from_pandas(X_res), pl.from_pandas(y_res)
     if wrapped:
         X_res = SkyulfPolarsWrapper(X_res)
-    return params, (X_res, y_res), result_weights
+    return params, pack_pipeline_output(X_res, y_res, return_tuple), result_weights
 
 
-def _prepare_inputs(data: Any, config: dict[str, Any]) -> tuple[Any, Any, bool]:
-    """Unwrap native features before target extraction and preserve Polars wrapping."""
-    X, y, _ = unpack_pipeline_input(data)
+def _prepare_inputs(data: Any, config: dict[str, Any]) -> tuple[Any, Any, bool, bool]:
+    """Retain the ordinary sampler's output shape before extracting embedded targets."""
+    X, y, was_tuple = unpack_pipeline_input(data)
+    return_tuple = was_tuple and y is not None
     wrapped = isinstance(X, SkyulfPolarsWrapper)
     X = X.to_native() if hasattr(X, "to_native") else X
     if y is None:
@@ -117,4 +118,4 @@ def _prepare_inputs(data: Any, config: dict[str, Any]) -> tuple[Any, Any, bool]:
             raise SampleWeightError("Weighted resampling requires a target.")
         y = X[target]
         X = X.drop(target) if isinstance(X, pl.DataFrame) else X.drop(columns=[target])
-    return X, y, wrapped
+    return X, y, wrapped, return_tuple

@@ -50,7 +50,7 @@ def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
             scaler_params=item.get("scaler_params"),
         )
         vals = X_out[col].to_numpy().reshape(-1, 1)
-        flat = pt.transform(vals).ravel()
+        flat = np.asarray(pt.transform(vals)).ravel()
         return X_out.with_columns(pl.Series(flat).alias(col))
     except Exception as e:  # noqa: BLE001 - per-column transform failure is logged; column left unchanged
         logger.warning(f"Failed to apply {method} for column {col}: {e}")

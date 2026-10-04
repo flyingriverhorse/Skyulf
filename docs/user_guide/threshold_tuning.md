@@ -262,8 +262,9 @@ pipeline callers can select it with `predict(use_tuned_thresholds=True)`.
   Equal thresholds across all classes reduce to plain `argmax`, so the tuned
   result can only match or beat the default rule on the tuning metric.
 
-Pass `strategy="grid"` or `strategy="nelder-mead"` explicitly to override the
-auto-selection.
+Pass `strategy="grid"` for binary classification or `strategy="nelder-mead"`
+explicitly to override the auto-selection. Grid search requires exactly two
+classes; requesting it for multiclass probabilities raises `ValueError`.
 
 ## Notes
 

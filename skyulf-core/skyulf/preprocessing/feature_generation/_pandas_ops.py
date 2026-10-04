@@ -90,7 +90,7 @@ def _pandas_divide(
     for s in others:
         res = _safe_divide(res, s, epsilon)
     for c in const_vals:
-        denom = c if abs(c) > epsilon else epsilon
+        denom = c if abs(c) >= epsilon else -epsilon if c < 0 else epsilon
         res = res.div(denom)
     return res
 
