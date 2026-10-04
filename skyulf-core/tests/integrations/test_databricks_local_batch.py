@@ -1,5 +1,6 @@
 """Bounded local-engine training and monthly scoring on pinned UC snapshots."""
 
+import os
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -300,14 +301,18 @@ def test_source_spec_rejects_ambiguous_identity_before_spark() -> None:
 def test_real_spark_iterator_filters_requested_month(monkeypatch) -> None:
     """The real Spark API must apply the month predicate before local scoring."""
     spark_sql = pytest.importorskip("pyspark.sql")
-    monkeypatch.setenv("SPARK_LOCAL_IP", "127.0.0.1")
-    spark = (
-        spark_sql.SparkSession.builder.master("local[1]")
-        .appName("skyulf-sm24a-local-read")
-        .config("spark.ui.enabled", "false")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+    remote = bool(os.environ.get("SPARK_REMOTE"))
+    if remote:
+        spark = spark_sql.SparkSession.builder.getOrCreate()
+    else:
+        monkeypatch.setenv("SPARK_LOCAL_IP", "127.0.0.1")
+        spark = (
+            spark_sql.SparkSession.builder.master("local[1]")
+            .appName("skyulf-sm24a-local-read")
+            .config("spark.ui.enabled", "false")
+            .config("spark.sql.session.timeZone", "UTC")
+            .getOrCreate()
+        )
     try:
         frame = spark.createDataFrame(
             [
@@ -338,7 +343,8 @@ def test_real_spark_iterator_filters_requested_month(monkeypatch) -> None:
         result = read_local_source(SimpleNamespace(read=Reader()), _spec())
         assert result.to_dict("records") == [{"entity_id": "jan", "x": 1.0}]
     finally:
-        spark.stop()
+        if not remote:
+            spark.stop()
 
 
 def test_reader_rejects_null_record_key_columns_before_scoring() -> None:

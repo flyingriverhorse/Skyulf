@@ -7,8 +7,10 @@ node must accept the wrapper for fit and apply and produce the same values as
 the raw Polars path.
 """
 
+import sys
 from typing import Any
 
+import numpy as np
 import polars as pl
 import pytest
 
@@ -98,18 +100,39 @@ def test_vectorizers_accept_wrapped_polars_frame(calculator_cls: type, applier_c
     assert actual.equals(expected)
 
 
-def test_sentence_embedder_accepts_wrapped_polars_frame() -> None:
-    try:
-        # The module imports sentence_transformers lazily inside _load_model,
-        # so probe the optional extra here or fit() would raise ImportError.
-        import sentence_transformers  # ty: ignore[unresolved-import]  # noqa: F401 - probe only
+class _SentenceEncoder:
+    """Produce small text-dependent embeddings without model files or network access."""
 
-        from skyulf.preprocessing.vectorization.sentence_embedder import (
-            SentenceEmbedderApplier,
-            SentenceEmbedderCalculator,
-        )
-    except Exception as exc:  # noqa: BLE001 - optional NLP extra (sentence-transformers/torch)
-        pytest.skip(f"sentence_embedder unavailable: {exc}")
+    def get_sentence_embedding_dimension(self) -> int:
+        """Declare the two columns emitted by the deterministic encoder."""
+        return 2
+
+    def encode(self, texts, *, normalize_embeddings, show_progress_bar):
+        """Use text length and letter count so row and text changes affect the output."""
+        assert show_progress_bar is False
+        values = np.array([[len(text), text.count("a")] for text in texts], dtype=np.float32)
+        if normalize_embeddings:
+            values /= np.linalg.norm(values, axis=1, keepdims=True)
+        return values
+
+
+@pytest.fixture
+def sentence_encoder(monkeypatch):
+    """Keep wrapper parity independent of optional NLP imports and downloaded weights."""
+    from skyulf.preprocessing.vectorization import sentence_embedder
+
+    encoder = _SentenceEncoder()
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
+    monkeypatch.setattr(sentence_embedder, "_load_model", lambda model_name: encoder)
+    return encoder
+
+
+def test_sentence_embedder_accepts_wrapped_polars_frame(sentence_encoder) -> None:
+    """Wrapped input must retain the same text-derived embedding values as native Polars."""
+    from skyulf.preprocessing.vectorization.sentence_embedder import (
+        SentenceEmbedderApplier,
+        SentenceEmbedderCalculator,
+    )
 
     raw = pl.DataFrame({"text": ["the cat sat", "the dog ran"]})
     config = {"columns": ["text"]}
@@ -126,3 +149,7 @@ def test_sentence_embedder_accepts_wrapped_polars_frame() -> None:
         )
     )
     assert actual.equals(expected)
+    assert actual["text"].to_list() == raw["text"].to_list()
+    values = np.array([[11, 2], [11, 1]], dtype=np.float32)
+    values /= np.linalg.norm(values, axis=1, keepdims=True)
+    np.testing.assert_allclose(actual.select("text__emb__0", "text__emb__1").to_numpy(), values)
