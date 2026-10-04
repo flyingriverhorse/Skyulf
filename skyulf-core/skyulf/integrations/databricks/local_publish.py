@@ -1,7 +1,5 @@
 """Publish bounded local predictions through the existing guarded Delta writer."""
 
-from __future__ import annotations
-
 import importlib
 from importlib.metadata import version
 from typing import Any

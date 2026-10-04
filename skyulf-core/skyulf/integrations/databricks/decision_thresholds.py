@@ -1,7 +1,5 @@
 """Validate explicit, default-disabled classification decision policies."""
 
-from __future__ import annotations
-
 import math
 from copy import deepcopy
 from typing import Any

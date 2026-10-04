@@ -1,7 +1,5 @@
 """Shared class-weight policy for direct fits and tuning folds."""
 
-from __future__ import annotations
-
 import inspect
 from typing import Any
 

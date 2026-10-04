@@ -1,7 +1,5 @@
 """Fit an optional decision policy without exposing final holdout labels."""
 
-from __future__ import annotations
-
 from copy import deepcopy
 from dataclasses import replace
 from typing import Any

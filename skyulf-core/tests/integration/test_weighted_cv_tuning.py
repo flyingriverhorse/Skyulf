@@ -1,7 +1,5 @@
 """Pin positional training weights across CV, search and final refits."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np

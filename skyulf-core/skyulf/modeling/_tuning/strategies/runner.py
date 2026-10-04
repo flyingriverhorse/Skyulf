@@ -5,8 +5,6 @@ the best result and per-trial records, and translates known sklearn/optuna
 failure messages into actionable errors.
 """
 
-from __future__ import annotations
-
 import contextlib
 import logging
 import math

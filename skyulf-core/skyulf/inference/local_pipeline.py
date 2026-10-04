@@ -4,8 +4,6 @@ The payload is pickle: only load artifacts from a trusted producer. The
 checksum detects damaged bytes but does not authenticate their origin.
 """
 
-from __future__ import annotations
-
 import json
 import pickle
 from dataclasses import dataclass

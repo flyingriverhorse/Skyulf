@@ -1,7 +1,5 @@
 """Compare pinned local MLflow model versions without changing registry state."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import asdict, replace
 from importlib.metadata import version

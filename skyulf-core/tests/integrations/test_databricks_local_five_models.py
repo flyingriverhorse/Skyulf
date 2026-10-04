@@ -1,7 +1,5 @@
 """Five realistic pandas/Polars pipelines intended for the SM-24a cloud probe."""
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import polars as pl

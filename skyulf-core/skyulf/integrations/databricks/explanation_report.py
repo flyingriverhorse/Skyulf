@@ -1,7 +1,5 @@
 """Self-contained, bounded SHAP charts for MLflow and Databricks notebooks."""
 
-from __future__ import annotations
-
 import base64
 import io
 import logging

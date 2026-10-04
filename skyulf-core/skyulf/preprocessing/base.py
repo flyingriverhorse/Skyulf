@@ -1,7 +1,5 @@
 """Base classes and ``(X, y)`` unpack/pack decorators shared by every preprocessing node."""
 
-from __future__ import annotations
-
 import functools
 import time
 import tracemalloc

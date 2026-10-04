@@ -1,7 +1,5 @@
 """Successive halving honors bounded estimator resources through fold wrappers."""
 
-from __future__ import annotations
-
 from typing import Literal
 
 import numpy as np

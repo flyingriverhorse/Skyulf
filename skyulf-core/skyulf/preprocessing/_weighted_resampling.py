@@ -1,7 +1,5 @@
 """Transport selected weights and assign explicit weights to synthetic training rows."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np

@@ -6,8 +6,6 @@ code; accepting them from an HTTP graph would let a request choose which
 server-side function runs.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from typing import Any
 

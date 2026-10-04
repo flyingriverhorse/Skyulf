@@ -5,8 +5,6 @@ Functions are saved by reference (``module:qualname``), so they must be
 top-level ``def`` definitions in an importable or loaded project module.
 """
 
-from __future__ import annotations
-
 import importlib
 import json
 import sys

@@ -1,7 +1,5 @@
 """Prepare and verify the declared Core wheel before Bundle deployment."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import shutil

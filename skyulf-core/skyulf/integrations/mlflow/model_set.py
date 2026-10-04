@@ -1,7 +1,5 @@
 """Optional MLflow packaging for a complete pinned, locally executable model set."""
 
-from __future__ import annotations
-
 import inspect
 import tempfile
 from collections.abc import Iterable

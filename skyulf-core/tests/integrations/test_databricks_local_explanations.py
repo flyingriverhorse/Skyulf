@@ -1,7 +1,5 @@
 """Bounded explanations use only fitted local training features."""
 
-from __future__ import annotations
-
 from typing import Any, cast
 
 import pandas as pd

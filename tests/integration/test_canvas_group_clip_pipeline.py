@@ -1,7 +1,5 @@
 """Run Canvas GroupImputer and ClipValues nodes through the real backend engine."""
 
-from __future__ import annotations
-
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch

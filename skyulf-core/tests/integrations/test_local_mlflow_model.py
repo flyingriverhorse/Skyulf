@@ -1,7 +1,5 @@
 """MLflow transport tests for whole-frame local pandas/Polars pipelines."""
 
-from __future__ import annotations
-
 import json
 import subprocess
 import sys

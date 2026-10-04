@@ -1,7 +1,5 @@
 """Optional, bounded SHAP explanations for fitted local training artifacts."""
 
-from __future__ import annotations
-
 import json
 import logging
 from typing import Any, cast

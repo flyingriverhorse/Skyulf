@@ -1,7 +1,5 @@
 """Admit actual search folds and report bounded local tuning results."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import math

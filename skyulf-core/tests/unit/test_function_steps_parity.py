@@ -6,8 +6,6 @@ StandardScaler, MinMaxScaler, DropMissingRows and ManualBounds on the same data,
 then pin the edge cases where plain functions are most likely to go wrong.
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 
 import numpy as np

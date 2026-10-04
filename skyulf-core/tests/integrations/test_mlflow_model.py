@@ -1,7 +1,5 @@
 """Contract tests for the optional MLflow pyfunc bundle adapter."""
 
-from __future__ import annotations
-
 import json
 import os
 import subprocess

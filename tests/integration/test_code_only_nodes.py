@@ -4,8 +4,6 @@ They call a Python function named in their parameters, so accepting them over
 HTTP would let a request choose which server function runs.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 import pytest
 from pydantic import ValidationError

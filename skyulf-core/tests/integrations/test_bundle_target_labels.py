@@ -1,7 +1,5 @@
 """Original target labels must survive encoding, decisions and persisted evaluation."""
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import polars as pl

@@ -1,7 +1,5 @@
 """Route an embedded target through the same encoder as an explicit target Series."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import polars as pl

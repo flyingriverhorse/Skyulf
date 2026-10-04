@@ -5,8 +5,6 @@ Replaying a plan starts fresh runs and registrations; it never retries a possibl
 completed registration or promises exactly-once publication. No aliases change.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import re

@@ -1,7 +1,5 @@
 """Bounded local-engine training and monthly scoring on pinned UC snapshots."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any

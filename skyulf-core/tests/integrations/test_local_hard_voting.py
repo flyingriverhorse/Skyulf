@@ -1,7 +1,5 @@
 """Hard voting artifacts expose labels without invented probabilities."""
 
-from __future__ import annotations
-
 import json
 
 import pandas as pd

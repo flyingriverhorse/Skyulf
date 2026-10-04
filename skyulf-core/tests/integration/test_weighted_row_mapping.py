@@ -1,7 +1,5 @@
 """Weights follow explicit row provenance through cleaning and fold fitting."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np

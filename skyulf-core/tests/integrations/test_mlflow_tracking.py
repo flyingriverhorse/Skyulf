@@ -1,7 +1,5 @@
 """Contract tests for the optional MLflow tracking adapter."""
 
-from __future__ import annotations
-
 import importlib.util
 import threading
 from concurrent.futures import ThreadPoolExecutor

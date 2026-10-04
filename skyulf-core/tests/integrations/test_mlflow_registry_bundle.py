@@ -1,7 +1,5 @@
 """Local SQLite coverage for loading pinned registered inference bundles."""
 
-from __future__ import annotations
-
 import shutil
 from dataclasses import replace
 from pathlib import Path

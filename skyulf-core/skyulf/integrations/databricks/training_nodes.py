@@ -1,7 +1,5 @@
 """Independent competition fits joined through the existing durable lifecycle."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any

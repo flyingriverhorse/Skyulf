@@ -1,7 +1,5 @@
 """Preflight for the first bounded pandas/Polars Databricks workflow."""
 
-from __future__ import annotations
-
 from dataclasses import replace
 
 import numpy as np

@@ -4,8 +4,6 @@ Spark only selects a pinned, filtered source snapshot. Fitted feature
 engineering and model prediction stay on the recorded local engine.
 """
 
-from __future__ import annotations
-
 import pickle
 from dataclasses import dataclass
 from datetime import UTC, datetime

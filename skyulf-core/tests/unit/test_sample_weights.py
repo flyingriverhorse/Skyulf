@@ -1,7 +1,5 @@
 """Pin direct model weighting, validation, and native class-weight composition."""
 
-from __future__ import annotations
-
 from decimal import Decimal
 
 import numpy as np

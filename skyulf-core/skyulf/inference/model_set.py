@@ -5,8 +5,6 @@ detect changed bytes; they do not authenticate the producer. Saved composition
 source is imported when validating its declared callback contract.
 """
 
-from __future__ import annotations
-
 import json
 import shutil
 from dataclasses import dataclass

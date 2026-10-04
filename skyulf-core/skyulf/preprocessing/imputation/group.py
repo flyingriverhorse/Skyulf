@@ -1,7 +1,5 @@
 """Group imputer node: fill gaps with a statistic learned per group on training rows."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np

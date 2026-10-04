@@ -1,7 +1,5 @@
 """A fitted local pipeline keeps its execution semantics when transported."""
 
-from __future__ import annotations
-
 import json
 
 import numpy as np

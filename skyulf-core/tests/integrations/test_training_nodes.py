@@ -1,7 +1,5 @@
 """Independent training tasks retain the existing lifecycle integrity contracts."""
 
-from __future__ import annotations
-
 from copy import deepcopy
 from typing import Any
 

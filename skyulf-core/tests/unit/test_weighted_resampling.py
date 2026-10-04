@@ -1,7 +1,5 @@
 """Keep sampling geometry independent of row weights and preserve sampled weights."""
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import polars as pl

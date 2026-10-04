@@ -1,7 +1,5 @@
 """Bundle decision policies must survive persistence and keep selection data separate."""
 
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 import polars as pl

@@ -1,7 +1,5 @@
 """Contract tests for the optional MLflow model registry adapter."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock

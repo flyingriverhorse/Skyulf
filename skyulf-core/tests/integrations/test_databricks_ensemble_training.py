@@ -1,7 +1,5 @@
 """Selected Core ensembles fit through the bounded Databricks search route."""
 
-from __future__ import annotations
-
 import itertools
 import json
 import math

@@ -7,8 +7,6 @@ These are trusted executable model contents, not a sandbox or a purity proof.
 Training and evaluation filters are intentionally outside this contract.
 """
 
-from __future__ import annotations
-
 import importlib
 import json
 import re

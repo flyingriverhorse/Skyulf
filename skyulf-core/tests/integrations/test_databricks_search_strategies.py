@@ -1,7 +1,5 @@
 """Generated local search strategies must fit actual Core artifacts."""
 
-from __future__ import annotations
-
 import math
 
 import pandas as pd

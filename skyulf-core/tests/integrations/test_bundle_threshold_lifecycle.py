@@ -1,7 +1,5 @@
 """Decision policies must survive complete durable training and registry replay."""
 
-from __future__ import annotations
-
 from copy import deepcopy
 
 import numpy as np

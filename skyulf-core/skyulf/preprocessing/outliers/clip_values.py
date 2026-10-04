@@ -1,7 +1,5 @@
 """Clip-values node: limit columns to fixed lower/upper bounds without removing rows."""
 
-from __future__ import annotations
-
 import math
 from typing import Any
 
