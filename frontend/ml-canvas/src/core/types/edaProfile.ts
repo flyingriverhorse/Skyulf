@@ -196,7 +196,7 @@ export interface EDAProfile {
   sample_data?: Array<Record<string, unknown>>;
   /** Aggregate dataset-level health metrics surfaced in the Overview tab. */
   missing_cells_percentage?: number;
-  duplicate_rows?: number;
+  duplicate_rows?: number | null;
   /** Per-column VIF scores. */
   vif?: Record<string, number> | null;
   /** Names of columns the user explicitly excluded from the analysis. */

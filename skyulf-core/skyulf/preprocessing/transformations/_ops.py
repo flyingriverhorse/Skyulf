@@ -12,6 +12,14 @@ import pandas as pd
 import polars as pl
 
 
+def _apply_polars_op(X: Any, item: dict[str, Any], op: Callable[[dict[str, Any]], Any]) -> Any:
+    """Coerce numeric text like pandas while retaining native numeric dtypes."""
+    col = item["column"]
+    if X.schema[col] == pl.String:
+        X = X.with_columns(pl.col(col).str.strip_chars().cast(pl.Float64, strict=False))
+    return X.with_columns(op(item).alias(col))
+
+
 def _polars_log(item: dict[str, Any]) -> Any:
     col = item["column"]
     return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()

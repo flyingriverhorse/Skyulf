@@ -15,7 +15,7 @@ from .._artifacts import GeneralTransformationArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._ops import _PANDAS_OPS, _POLARS_OPS
+from ._ops import _PANDAS_OPS, _POLARS_OPS, _apply_polars_op
 from ._power_common import build_pretrained_power_transformer
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ class GeneralTransformationApplier(BaseApplier):
             op = _POLARS_OPS.get(method)
             if op is None:
                 continue
-            X_out = X_out.with_columns(op(item).alias(col))
+            X_out = _apply_polars_op(X_out, item, op)
         return X_out, _y
 
     @staticmethod

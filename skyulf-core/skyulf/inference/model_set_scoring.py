@@ -231,6 +231,8 @@ def _pandas_input(frame: pd.DataFrame | pl.DataFrame) -> pd.DataFrame:
     for column, dtype in frame.schema.items():
         if dtype.is_integer() and frame[column].null_count():
             raw[column] = pd.Series(frame[column].to_list(), dtype=str(dtype))
+        elif dtype == pl.Date:
+            raw[column] = frame[column].to_pandas(use_pyarrow_extension_array=True)
     return raw
 
 

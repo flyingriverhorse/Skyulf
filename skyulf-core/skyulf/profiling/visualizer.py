@@ -68,7 +68,10 @@ class EDAVisualizer:
         dq_table.add_row("Rows", str(self.profile.row_count))
         dq_table.add_row("Columns", str(self.profile.column_count))
         dq_table.add_row("Missing Cells", f"{self.profile.missing_cells_percentage}%")
-        dq_table.add_row("Duplicate Rows", str(self.profile.duplicate_rows))
+        duplicate_rows = self.profile.duplicate_rows
+        dq_table.add_row(
+            "Duplicate Rows", str(duplicate_rows) if duplicate_rows is not None else "Unavailable"
+        )
         if self.profile.target_col:
             dq_table.add_row("Target Column", self.profile.target_col)
             if self.profile.task_type:

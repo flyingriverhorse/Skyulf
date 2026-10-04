@@ -11,7 +11,7 @@ from .._artifacts import SimpleTransformationArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._ops import _PANDAS_OPS, _POLARS_OPS
+from ._ops import _PANDAS_OPS, _POLARS_OPS, _apply_polars_op
 
 
 class SimpleTransformationApplier(BaseApplier):
@@ -39,7 +39,7 @@ class SimpleTransformationApplier(BaseApplier):
             op = _POLARS_OPS.get(method)
             if op is None:
                 continue
-            X_out = X_out.with_columns(op(item).alias(col))
+            X_out = _apply_polars_op(X_out, item, op)
         return X_out, _y
 
     @staticmethod

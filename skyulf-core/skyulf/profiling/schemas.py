@@ -410,7 +410,7 @@ class DatasetProfile(_ProfileModel):
 
     row_count: int
     column_count: int
-    duplicate_rows: int
+    duplicate_rows: int | None  # None means row equality could not be determined.
     missing_cells_percentage: float
     memory_usage_mb: float
 

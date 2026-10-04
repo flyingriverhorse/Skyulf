@@ -1,6 +1,7 @@
 """Decomposition-tree split: filter → group-by → measure aggregation."""
 
 import contextlib
+from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
 import polars as pl
@@ -34,11 +35,11 @@ class DecompositionMixin(_AnalyzerState):
     def _coerce_filter_value(self, dtype: pl.DataType, val: Any) -> Any:
         """Coerce a string filter value to numeric when the target column is numeric.
 
-        Tolerates "1.0" strings for int cols; on failure, leaves ``val`` as-is so
+        Parses integer labels exactly, including "1.0"; on failure leaves ``val`` as-is so
         the caller falls through to casting the column to string instead.
         """
-        with contextlib.suppress(ValueError):
-            val = float(val) if dtype in (pl.Float32, pl.Float64) else int(float(val))
+        with contextlib.suppress(ValueError, InvalidOperation):
+            val = float(val) if dtype in (pl.Float32, pl.Float64) else int(Decimal(val))
         return val
 
     def _apply_filter_operator(

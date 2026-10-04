@@ -318,7 +318,14 @@ def _mask_out_of_range_or_raise(
         # than fail the cast outright.
         return numeric
     valid = numeric.notna()
-    out_of_range_mask = valid & ((numeric < info.min) | (numeric > info.max))
+    # A float comparison rounds int64/uint64 max up to the exclusive boundary.
+    # That power-of-two boundary is exact, so compare floats against it directly.
+    above_max = (
+        numeric >= info.max + 1
+        if pd.api.types.is_float_dtype(numeric.dtype)
+        else numeric > info.max
+    )
+    out_of_range_mask = valid & ((numeric < info.min) | above_max)
     if not out_of_range_mask.any():
         return numeric
     if not coerce_on_error:

@@ -184,7 +184,61 @@ class EDAAnalyzer(
             self.columns = [c for c in self.columns if c not in exclude_cols]
         return [c for c in self.df.columns if c not in self.columns]
 
-    def _compute_frame_stats(self, stats_df: pl.DataFrame) -> tuple[float, int, float]:
+    def _empty_selection_profile(
+        self,
+        target_col: str | None,
+        task_type: str | None,
+        active_filters: list[Filter],
+        excluded_columns: list[str],
+    ) -> DatasetProfile:
+        """Retain row metadata when no columns remain available for analysis."""
+        return DatasetProfile(
+            row_count=self.row_count,
+            column_count=0,
+            duplicate_rows=None,
+            missing_cells_percentage=0.0,
+            memory_usage_mb=self.df.estimated_size("mb"),
+            columns={},
+            alerts=[
+                Alert(
+                    type="No Columns",
+                    message="No columns remain selected. Column and duplicate statistics are unavailable.",
+                    severity="warning",
+                )
+            ],
+            sample_data=[],
+            excluded_columns=excluded_columns,
+            active_filters=active_filters,
+            target_col=target_col,
+            task_type=task_type,
+            causal_target_exclusion_reason=self._numeric_target_exclusion_reason(
+                target_col, {}, task_type
+            ),
+        )
+
+    @staticmethod
+    def _compute_duplicate_rows(stats_df: pl.DataFrame) -> int | None:
+        """Keep native duplicate counts, marking unsupported Object equality as unknown."""
+        try:
+            return int(stats_df.is_duplicated().sum())
+        except (pl.exceptions.InvalidOperationError, pl.exceptions.PanicException):
+            if pl.Object not in stats_df.schema.values():
+                raise
+            return None
+
+    @staticmethod
+    def _add_duplicate_count_alert(duplicate_rows: int | None, alerts: list[Alert]) -> None:
+        """Explain why an Object-containing frame has no reliable duplicate count."""
+        if duplicate_rows is None:
+            alerts.append(
+                Alert(
+                    type="Duplicate Count Unavailable",
+                    message="Duplicate rows could not be determined for the selected Object columns.",
+                    severity="warning",
+                )
+            )
+
+    def _compute_frame_stats(self, stats_df: pl.DataFrame) -> tuple[float, int | None, float]:
         """Compute missing-cell percentage, duplicate row count, and memory usage (MB)."""
         # pandas' isna() counts NaN as missing; polars' null_count() does not,
         # so float columns need an explicit NaN count — otherwise a NaN-bearing
@@ -198,12 +252,12 @@ class EDAAnalyzer(
         missing_cells = stats_df.select(missing_exprs).sum_horizontal()[0] if missing_exprs else 0
         total_cells = self.row_count * len(self.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0.0
-        duplicate_rows = int(stats_df.is_duplicated().sum())
+        duplicate_rows = self._compute_duplicate_rows(stats_df)
         memory_usage = self.df.estimated_size("mb")
         return missing_pct, duplicate_rows, memory_usage
 
     def _compute_basic_stats(self) -> dict:
-        """Batched query 1: null_count + n_unique for every column (A3 optimization)."""
+        """Batch null counts and supported cardinalities without hashing Object values."""
         basic_aggs = []
         for col in self.columns:
             # Float columns: count NaN as missing too (pandas isna() parity, F-20).
@@ -212,12 +266,10 @@ class EDAAnalyzer(
                 if self.df.schema[col].is_float()
                 else pl.col(col).null_count()
             )
-            basic_aggs.extend(
-                [
-                    null_agg.alias(f"{col}__null"),
-                    pl.col(col).n_unique().alias(f"{col}__unique"),
-                ]
-            )
+            basic_aggs.append(null_agg.alias(f"{col}__null"))
+            # Object values may be unhashable; unavailable cardinality is not zero.
+            if self.df.schema[col] != pl.Object:
+                basic_aggs.append(pl.col(col).n_unique().alias(f"{col}__unique"))
         basic_stats_df = _collect(self.lazy_df.select(basic_aggs))
         return basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
 
@@ -387,7 +439,7 @@ class EDAAnalyzer(
         if target_col is not None and target_col in numeric_cols:
             target_corr_cols = feature_cols + [target_col]
         if len(target_corr_cols) >= 2:
-            return calculate_correlations(self.lazy_df, target_corr_cols)
+            return calculate_correlations(self.lazy_df, target_corr_cols, target_col=target_col)
         return None
 
     def _add_leakage_alerts(
@@ -573,10 +625,14 @@ class EDAAnalyzer(
             return self._empty_profile(target_col, active_filters)
 
         excluded_columns = self._apply_column_exclusions(exclude_cols)
+        if not self.columns:
+            return self._empty_selection_profile(
+                target_col, task_type, active_filters, excluded_columns
+            )
 
         # Narrowed view used for frame-level stats/sample so excluded columns
         # (e.g. PII) never leak into missing/duplicate counts or sample_data.
-        stats_df = self.df.select(self.columns) if excluded_columns else self.df
+        stats_df = self.df.select(self.columns)
 
         # 2. Frame-level stats.
         missing_pct, duplicate_rows, memory_usage = self._compute_frame_stats(stats_df)
@@ -593,6 +649,7 @@ class EDAAnalyzer(
         col_profiles, alerts, numeric_cols = self._build_column_profiles(
             basic_stats, advanced_stats, semantic_types
         )
+        self._add_duplicate_count_alert(duplicate_rows, alerts)
 
         target_exclusion_reason = self._numeric_target_exclusion_reason(
             target_col, semantic_types, task_type

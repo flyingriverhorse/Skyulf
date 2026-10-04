@@ -11,6 +11,7 @@ import json
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Literal
 
 from skyulf.integrations.mlflow._client import get_or_create_experiment, make_tracking_client
@@ -82,6 +83,7 @@ class TrackingRun:
             raise TypeError("config must be a mapping.")
         if type(artifact_file) is not str or not artifact_file.strip():
             raise ValueError("artifact_file must be a non-empty string.")
+        _validate_artifact_file(artifact_file)
         try:
             payload = json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         except (TypeError, ValueError) as exc:
@@ -95,7 +97,11 @@ class TrackingRun:
         if not self.enabled:
             return None
         try:
-            return operation(*args, **kwargs)
+            result = operation(*args, **kwargs)
+            wait = getattr(result, "wait", None)
+            if callable(wait):
+                wait()
+            return result
         except Exception as exc:  # noqa: BLE001 - tracking policy must contain client failures
             self.tracking_error = str(exc) or type(exc).__name__
             if self.failure_policy == "raise":
@@ -159,3 +165,10 @@ def _items(values: Mapping[str, Any], label: str) -> list[tuple[str, Any]]:
             raise TypeError(f"{label} keys must be non-empty strings.")
         result.append((key, value))
     return result
+
+
+def _validate_artifact_file(artifact_file: str) -> None:
+    """Reject path escapes under both platform grammars before any artifact write."""
+    for path in (PurePosixPath(artifact_file), PureWindowsPath(artifact_file)):
+        if path.anchor or ".." in path.parts:
+            raise ValueError("artifact_file must be a relative path without parent traversal.")

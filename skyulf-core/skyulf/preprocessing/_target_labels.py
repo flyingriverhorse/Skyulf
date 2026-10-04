@@ -13,6 +13,14 @@ def _target_values(data: Any, target: str) -> Any:
     return payload[1] if isinstance(payload, tuple) else payload[target]
 
 
+def _comparable_labels(values: np.ndarray) -> list[Any]:
+    """Give repeated floating NaNs one identity without changing other class labels."""
+    return [
+        np.nan if isinstance(value, float | np.floating) and np.isnan(value) else value
+        for value in values.tolist()
+    ]
+
+
 def record_target_labels(
     before: Any, after: Any, target: str | None, kind: str, artifact: dict
 ) -> None:
@@ -23,9 +31,11 @@ def record_target_labels(
     encoded = np.asarray(_target_values(after, target))
     if original.shape != encoded.shape:
         raise ValueError("Target encoding must preserve row identity.")
-    if original.dtype.kind == encoded.dtype.kind and np.array_equal(original, encoded):
+    original_values = _comparable_labels(original)
+    encoded_values = _comparable_labels(encoded)
+    if original.dtype.kind == encoded.dtype.kind and original_values == encoded_values:
         return
-    pairs = set(zip(encoded.tolist(), original.tolist(), strict=True))
+    pairs = set(zip(encoded_values, original_values, strict=True))
     mapping = dict(pairs)
     if len(mapping) != len(pairs) or len(set(mapping.values())) != len(mapping):
         raise ValueError("Target encoding must preserve a one-to-one class mapping.")

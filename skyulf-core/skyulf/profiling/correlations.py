@@ -3,8 +3,9 @@
 polars' ``DataFrame.corr()`` is listwise: it returns NaN for *every* cell when
 any column holds a null. This module instead scores each coefficient over just
 the rows where that pair is observed — pandas ``.corr()`` semantics — and caps
-the matrix at the first 20 numeric columns, a hard limit introduced after
-larger matrices crashed both the backend and the frontend.
+the matrix at 20 numeric columns, retaining a requested target within that
+limit. The cap was introduced after larger matrices crashed both the backend
+and the frontend.
 """
 
 import logging
@@ -28,20 +29,28 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
-def _cap_numeric_columns(numeric_cols: list[str]) -> list[str]:
-    """Truncate to the first 20 numeric columns, logging a warning if any were dropped."""
+def _cap_numeric_columns(numeric_cols: list[str], target_col: str | None = None) -> list[str]:
+    """Cap at 20 columns, reserving one slot for a requested target when necessary."""
     # HARD LIMIT: Top 20 numeric columns to prevent backend/frontend crash
     # Reduced from 50 to 20 as per user report of crashes
     if len(numeric_cols) > 20:
-        dropped_cols = numeric_cols[20:]
+        selected_cols = numeric_cols[:20]
+        if (
+            target_col is not None
+            and target_col in numeric_cols
+            and target_col not in selected_cols
+        ):
+            selected_cols[-1] = target_col
+        dropped_cols = [col for col in numeric_cols if col not in selected_cols]
         logger.warning(
             "calculate_correlations: %d numeric columns exceeds the 20-column "
             "cap; truncating to the first 20 by column order (not variance or "
-            "relevance) and dropping %s from the correlation matrix.",
+            "relevance), retaining the selected target when requested, and "
+            "dropping %s from the correlation matrix.",
             len(numeric_cols),
             dropped_cols,
         )
-        numeric_cols = numeric_cols[:20]
+        numeric_cols = selected_cols
     return numeric_cols
 
 
@@ -137,7 +146,9 @@ def _pairwise_correlation_matrix(subset: pl.DataFrame, cols: list[str]) -> list[
     return matrix
 
 
-def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> CorrelationMatrix | None:
+def calculate_correlations(
+    df: pl.LazyFrame, numeric_cols: list[str], *, target_col: str | None = None
+) -> CorrelationMatrix | None:
     """Calculates Pearson correlation matrix for numeric columns.
 
     Missing values use **pairwise deletion** (pandas ``.corr()`` semantics):
@@ -146,6 +157,8 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
     than :data:`MIN_PAIRWISE_OVERLAP` observations are reported as ``0.0`` with
     a warning, since a 2-point coefficient is degenerate. Columns with no
     variance (constant, or entirely missing) are excluded from the matrix.
+    A requested ``target_col`` reserves a slot within the 20-column cap when
+    it is present in ``numeric_cols``; feature-only calls retain column order.
     """
     if len(numeric_cols) < 2:
         return None
@@ -155,7 +168,7 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
         # pairwise pass below needs the values materialized anyway.
 
         requested_cols = numeric_cols
-        numeric_cols = _cap_numeric_columns(requested_cols)
+        numeric_cols = _cap_numeric_columns(requested_cols, target_col)
 
         subset = _nan_to_null(_collect(df.select(numeric_cols)))
 
@@ -176,7 +189,7 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
             columns=valid_cols,
             values=matrix,
             total_columns=len(requested_cols),
-            omitted_columns=requested_cols[len(numeric_cols) :],
+            omitted_columns=[col for col in requested_cols if col not in numeric_cols],
         )
 
     except Exception:

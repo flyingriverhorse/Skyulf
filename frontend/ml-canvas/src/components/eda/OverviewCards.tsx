@@ -9,7 +9,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({ profile }) => {
     if (!profile) return null;
 
     const missingPct = profile.missing_cells_percentage ?? 0;
-    const duplicates = profile.duplicate_rows ?? 0;
+    const duplicates = profile.duplicate_rows ?? 'Unavailable';
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

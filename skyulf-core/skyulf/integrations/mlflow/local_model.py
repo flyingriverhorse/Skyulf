@@ -53,6 +53,7 @@ class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf local pyfunc requires a pandas DataFrame.")
+        model_input = _restore_nullable_dtypes(model_input, self._artifact)
         return score_local_pipeline(model_input, self._artifact)
 
 
@@ -176,3 +177,23 @@ def validate_local_destination(run_id: str, artifact_path: str, tracking_uri: st
         raise ValueError("artifact_path cannot contain URI delimiters.")
     if tracking_uri is not None and (type(tracking_uri) is not str or not tracking_uri.strip()):
         raise ValueError("tracking_uri must be a non-empty string or None.")
+
+
+def _restore_nullable_dtypes(frame: pd.DataFrame, artifact: LocalPipelineArtifact) -> pd.DataFrame:
+    """Restore exact pandas extension types erased by MLflow scalar signatures.
+
+    Only the matching NumPy storage type is accepted; integer inputs never
+    pass through a float conversion. MLflow can reject nullable integer or
+    boolean nulls before this adapter is reached.
+    """
+    if artifact.manifest.fitted_engine != "pandas":
+        return frame
+    storage = {"Int64": "int64", "Float64": "float64", "boolean": "bool"}
+    replacements = {
+        name: dtype
+        for name, dtype in zip(
+            artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True
+        )
+        if dtype in storage and name in frame and str(frame[name].dtype) == storage[dtype]
+    }
+    return frame.astype(replacements) if replacements else frame

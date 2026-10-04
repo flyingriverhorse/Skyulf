@@ -476,6 +476,16 @@ class DriftCalculator:
                 )
         return suggestions
 
+    @staticmethod
+    def _categorical_values(series: pl.Series, boolean_labels: bool) -> pl.Series | None:
+        """Normalize boolean serialization while keeping ordinary category labels exact."""
+        values = series.cast(pl.String, strict=False).drop_nulls()
+        if boolean_labels:
+            values = values.str.to_lowercase()
+            if not values.is_in(["true", "false"]).all():
+                return None
+        return values
+
     def _calculate_categorical_drift(
         self, col: str, thresholds: dict[str, float]
     ) -> "ColumnDrift | None":
@@ -486,8 +496,12 @@ class DriftCalculator:
         or a high-cardinality identifier (not a meaningful categorical
         distribution), or if either side has no non-null values.
         """
-        ref_data = self.reference_df[col].cast(pl.Utf8, strict=False).drop_nulls()
-        curr_data = self.current_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+        reference, current = self.reference_df[col], self.current_df[col]
+        boolean_labels = pl.Boolean in (reference.dtype, current.dtype)
+        ref_data = self._categorical_values(reference, boolean_labels)
+        curr_data = self._categorical_values(current, boolean_labels)
+        if ref_data is None or curr_data is None:
+            return self._type_drift(col)
 
         if len(ref_data) == 0 or len(curr_data) == 0:
             return None
