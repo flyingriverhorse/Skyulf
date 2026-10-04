@@ -2,12 +2,14 @@
 
 import math
 from datetime import datetime, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import polars as pl
+from scipy.stats import fisher_exact
 
 from skyulf.modeling._evaluation.metrics import (
     calculate_classification_metrics,
@@ -166,8 +168,10 @@ def _validate_probability_row(row: tuple) -> None:
         raise ValueError("Prediction probabilities must be in [0, 1] and sum to one.")
 
 
-def _feature_quality(frame: pl.DataFrame, column: str) -> list[dict[str, Any]]:
-    """Measure missing and nonfinite fractions even when drift is unavailable."""
+def _feature_quality(
+    frame: pl.DataFrame, column: str, reference: pl.DataFrame | None = None
+) -> list[dict[str, Any]]:
+    """Flag significant missingness increases and infinity, keeping raw fractions."""
     if column not in frame.columns or not len(frame):
         return [
             _metric("quality", column, name) for name in ("missing_fraction", "nonfinite_fraction")
@@ -176,12 +180,68 @@ def _feature_quality(frame: pl.DataFrame, column: str) -> list[dict[str, Any]]:
     numeric = frame[column].dtype.is_numeric()
     missing = sum(_is_missing(value, numeric) for value in values)
     nonfinite = sum(numeric and _not_finite_number(value) for value in values)
+    baseline = _reference_missing_fraction(reference, column)
     return [
-        _metric("quality", column, "missing_fraction", missing / len(values), issue=missing > 0),
         _metric(
-            "quality", column, "nonfinite_fraction", nonfinite / len(values), issue=nonfinite > 0
+            "quality",
+            column,
+            "missing_fraction",
+            missing / len(values),
+            baseline,
+            issue=_missingness_increased(missing, len(values), reference, column),
+        ),
+        _metric(
+            "quality",
+            column,
+            "nonfinite_fraction",
+            nonfinite / len(values),
+            issue=_has_infinite(frame[column]),
         ),
     ]
+
+
+def _missingness_increased(
+    missing: int, total: int, reference: pl.DataFrame | None, column: str
+) -> bool:
+    """Test a one-sided increase at 1%; previously absent missingness remains an issue.
+
+    Fisher's exact test accounts for the sizes of both independent samples.
+    Successful saved predictions are still required separately for missing rows.
+    """
+    baseline = _reference_missing_fraction(reference, column)
+    if missing / total <= baseline:
+        return False
+    if baseline == 0 or reference is None:
+        return True
+    observed = round(baseline * len(reference))
+    result = fisher_exact(
+        [[missing, total - missing], [observed, len(reference) - observed]], alternative="greater"
+    )
+    return bool(result.pvalue <= 0.01)
+
+
+def _reference_missing_fraction(reference: pl.DataFrame | None, column: str) -> float:
+    """Use only a present, populated training column as the missingness baseline."""
+    if reference is None or column not in reference.columns or not len(reference):
+        return 0.0
+    series = reference[column]
+    return sum(_is_missing(value, series.dtype.is_numeric()) for value in series) / len(series)
+
+
+def _mark_unhandled_missing(
+    metrics: list[dict], current: pl.DataFrame, current_rows: dict, scored: dict
+) -> None:
+    """Require valid saved predictions for missing inputs before accepting the baseline."""
+    unscored = [row for key, row in current_rows.items() if key not in scored]
+    for item in metrics:
+        if item["category"] != "quality" or item["metric_name"] != "missing_fraction":
+            continue
+        column = item["column_name"]
+        if column not in current.columns:
+            continue
+        numeric = current[column].dtype.is_numeric()
+        if any(_is_missing(row[column], numeric) for row in unscored):
+            item["has_issue"] = True
 
 
 def _is_missing(value: Any, numeric: bool) -> bool:
@@ -249,7 +309,7 @@ def _common_evidence(
     notes = []
     unmeasured = False
     for column in common:
-        metrics.extend(_feature_quality(current, column))
+        metrics.extend(_feature_quality(current, column, reference))
         result = core_report.column_drifts.get(column) if core_report is not None else None
         evidence = _column_drift_evidence(column, result)
         metrics.extend(evidence)
@@ -290,6 +350,8 @@ def _performance_values(
     guesses = np.asarray([pair[1] for pair in pairs])
     features = np.empty((len(pairs), 0))
     if task == "regression":
+        truth = truth.astype(float)
+        guesses = guesses.astype(float)
         return calculate_regression_metrics(
             None,
             pd.DataFrame(),
@@ -371,7 +433,8 @@ def _labeled_pairs(
 def _finite_pair(actual: Any, guess: Any) -> bool:
     """Only measured numeric outcomes count toward regression coverage."""
     return all(
-        isinstance(value, (int, float)) and math.isfinite(value) for value in (actual, guess)
+        isinstance(value, (int, float, Decimal)) and math.isfinite(value)
+        for value in (actual, guess)
     )
 
 
@@ -456,7 +519,14 @@ def build_monitoring_report(
     classes: tuple = (),
     thresholds: dict | None = None,
 ) -> dict:
-    """Compare declared features and saved outcomes at one UTC observation time."""
+    """Compare declared features and saved outcomes at one UTC observation time.
+
+    Existing missingness, including sampling variation, is accepted only when
+    affected current rows have valid saved predictions. A one-sided Fisher test
+    at 1% flags significant increases; missingness absent from training, unprocessed
+    missing inputs and infinity remain quality issues. The raw nonfinite fraction
+    still counts NaN, whose quality verdict comes from the missingness check.
+    """
     _validate_inputs(as_of, task, classes, thresholds)
     reference = _frame(reference, "reference")
     current = _frame(current, "current")
@@ -480,6 +550,7 @@ def build_monitoring_report(
     metrics, drifted, feature_notes, unmeasured = _feature_report(
         reference, current, feature_columns, thresholds
     )
+    _mark_unhandled_missing(metrics, current, current_rows, scored)
     notes.extend(feature_notes)
     performance, labeled, performance_notes, bad_performance = _performance_evidence(
         task, classes, target_column, scored, eligible, probabilities

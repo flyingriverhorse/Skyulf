@@ -1,5 +1,6 @@
 """Drift retraining requires changed eligible training values, not another split."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -45,6 +46,7 @@ def freshness(monkeypatch):
         spec = local_workflow.training_spec(
             local_workflow.training_settings({**saved, "training_version": 0}, now)
         )
+        spec = replace(spec, **state.get("saved_spec_overrides", {}))
         train, _, _ = local_retraining.split_labeled_snapshot(
             snapshot(None, spec), spec, engine=saved["engine"]
         )
@@ -182,6 +184,35 @@ def test_incompatible_source_contract_is_rejected(freshness):
     freshness["saved_config"] = freshness["config"].copy()
     freshness["config"]["training_table"] = "workspace.other.training"
     with pytest.raises(ValueError, match="training source"):
+        _assess(freshness)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("available", [False, True])
+def test_multi_target_freshness_preserves_branch_label_eligibility(freshness, engine, available):
+    """Partial labels must follow the same per-target population during training and retraining."""
+    freshness["config"].update(training_layout="multi_target", engine=engine)
+    freshness["saved_spec_overrides"] = {"drop_missing_labels": True}
+    freshness["old"].loc[:3, "y"] = None
+    extra = pd.DataFrame(
+        {"id": range(20, 40), "x": range(20, 40), "y": range(20, 40) if available else [None] * 20}
+    )
+    freshness["current"] = pd.concat([freshness["old"], extra], ignore_index=True)
+
+    result = _assess(freshness)
+
+    assert result["status"] == ("ready" if available else "no_new_training_data")
+    if available:
+        assert 0 < result["changed_rows"] < 20
+    else:
+        assert result["changed_rows"] == 0
+        assert result["training_rows"] == 12
+
+
+def test_changed_missing_label_policy_requires_explicit_training(freshness):
+    """Automatic freshness comparisons must reject a different label eligibility contract."""
+    freshness["saved_spec_overrides"] = {"drop_missing_labels": True}
+    with pytest.raises(ValueError, match="training source and split contract"):
         _assess(freshness)
 
 

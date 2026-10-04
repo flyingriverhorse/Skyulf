@@ -77,6 +77,7 @@ def _compatible_specs(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> N
         "event_time_parsing",
         "result_available_at_column",
         "result_time_parsing",
+        "drop_missing_labels",
     )
     if any(getattr(saved, field) != getattr(current, field) for field in fields):
         raise ValueError(

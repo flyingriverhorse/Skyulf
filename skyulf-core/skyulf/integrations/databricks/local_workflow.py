@@ -250,6 +250,11 @@ def training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         weights_python_source=config.get("weights_python_source"),
         weights_python_sha256=config.get("weights_python_sha256"),
         filter_unavailable_results=config.get("filter_unavailable_results", False),
+        drop_missing_labels=(
+            True
+            if config.get("training_layout") == "multi_target"
+            else config.get("drop_missing_labels", False)
+        ),
         result_available_at_column=config.get("result_available_at_column"),
         result_cutoff=_optional_boundary(config, "result_cutoff"),
         record_key_columns=tuple(config["record_key_columns"]),

@@ -173,6 +173,72 @@ def test_fitted_mixed_engine_set_preserves_independent_outcomes(fitted_set, engi
     assert scored.history == {}
 
 
+@pytest.mark.parametrize("dtype", [pl.Int8, pl.Int32, pl.Int64, pl.UInt64])
+def test_nullable_polars_integer_input_matches_component_prediction(tmp_path, dtype):
+    """The model-set pandas boundary must preserve a nullable fitted integer contract."""
+    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.model_set import ComponentReference, save_model_set
+    from skyulf.pipeline import SkyulfPipeline
+
+    train = pl.DataFrame(
+        {"x": pl.Series([1, 2, 3, 4, 5, 6], dtype=dtype), "target": [2, 4, 6, 8, 10, 12]}
+    )
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {"name": "fill", "transformer": "SimpleImputer", "params": {"columns": ["x"]}}
+            ],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    pipeline.fit(train, target_column="target")
+    path = tmp_path / "component"
+    save_local_pipeline(pipeline, path)
+    local = load_local_pipeline(path)
+    artifact = save_model_set(
+        tmp_path / "set",
+        {
+            "a": (
+                ComponentReference(
+                    name="model_a", version="1", digest=local.manifest.pipeline_sha256
+                ),
+                path,
+            )
+        },
+        record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+    )
+    frame = pl.DataFrame({"id": [3, 1, 2], "x": pl.Series([None, 7, 8], dtype=dtype)})
+    expected = score_local_pipeline(frame.select("x"), local)
+
+    actual = _api().score_model_set(frame, artifact).frame
+
+    assert actual["id"].tolist() == [3, 1, 2]
+    np.testing.assert_allclose(actual["a__prediction"].astype(float), expected["prediction"])
+
+
+@pytest.mark.parametrize("dtype,value", [(pl.Int64, 2**53 + 1), (pl.UInt64, 2**64 - 1)])
+def test_model_set_input_keeps_large_nullable_integers_exact(dtype, value):
+    """Restoring an integer dtype after float conversion must not retain rounded values."""
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            record_key_columns=("id",),
+            record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+            input_schema=(
+                ColumnSpec(name="id", dtype="int64"),
+                ColumnSpec(name="x", dtype="int64"),
+            ),
+        )
+    )
+    frame = pl.DataFrame({"id": [1, 2], "x": pl.Series([None, value], dtype=dtype)})
+
+    raw = _api()._raw_input(frame, artifact, max_rows=10, max_bytes=10000)
+    restored = pl.from_pandas(raw)
+
+    assert restored["x"].to_list() == [None, value]
+    assert restored.schema["x"] == dtype
+
+
 @pytest.mark.parametrize(
     "column", ["ID", "A__prediction", "a_rule__scoring_status", "b_rule__exclusion_reason"]
 )

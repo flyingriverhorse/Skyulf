@@ -223,6 +223,17 @@ def _bounded(frame: pd.DataFrame | pl.DataFrame, max_rows: int, max_bytes: int) 
         raise ValueError("Model-set frame exceeds max_rows or max_bytes.")
 
 
+def _pandas_input(frame: pd.DataFrame | pl.DataFrame) -> pd.DataFrame:
+    """Preserve nullable integer widths and values while assembling keyed outputs."""
+    if isinstance(frame, pd.DataFrame):
+        return frame.copy(deep=True)
+    raw = frame.to_pandas()
+    for column, dtype in frame.schema.items():
+        if dtype.is_integer() and frame[column].null_count():
+            raw[column] = pd.Series(frame[column].to_list(), dtype=str(dtype))
+    return raw
+
+
 def _raw_input(
     frame: Any, artifact: ModelSetArtifact, max_rows: int, max_bytes: int
 ) -> pd.DataFrame:
@@ -230,7 +241,7 @@ def _raw_input(
     if not isinstance(frame, (pd.DataFrame, pl.DataFrame)):
         raise TypeError("Model-set scoring requires a pandas or Polars DataFrame.")
     _bounded(frame, max_rows, max_bytes)
-    raw = frame.to_pandas() if isinstance(frame, pl.DataFrame) else frame.copy(deep=True)
+    raw = _pandas_input(frame)
     raw = raw.reset_index(drop=True)
     _bounded(raw, max_rows, max_bytes)
     if not all(isinstance(name, str) for name in raw.columns) or len(

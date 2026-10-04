@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import pandas as pd
 import polars as pl
@@ -14,7 +15,9 @@ AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 
 def frame(engine: str, rows: list[dict]) -> pd.DataFrame | pl.DataFrame:
     """Keep the same input records for both supported frame engines."""
-    return pd.DataFrame(rows) if engine == "pandas" else pl.DataFrame(rows)
+    return (
+        pd.DataFrame(rows) if engine == "pandas" else pl.DataFrame(rows, infer_schema_length=None)
+    )
 
 
 def report(engine: str, *, reference=None, current=None, predictions=None, labels=None, **kwargs):
@@ -401,3 +404,141 @@ def test_extended_regression_metrics_use_saved_predictions(engine):
     assert metric(result, "performance", "mse")["value"] == 0.5
     assert metric(result, "performance", "mape")["value"] == 0.25
     assert metric(result, "performance", "explained_variance")["value"] == 0.0
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("decimal_columns", ["labels", "predictions", "both"])
+def test_decimal_regression_outcomes_match_float_metrics(engine, decimal_columns):
+    """Spark Decimal outcomes must count toward coverage and match the numeric metric oracle."""
+    truth = [1.0, 2.0]
+    predictions = [1.5, 2.5]
+    if decimal_columns in {"labels", "both"}:
+        truth = [Decimal(str(value)) for value in truth]
+    if decimal_columns in {"predictions", "both"}:
+        predictions = [Decimal(str(value)) for value in predictions]
+    result = report(
+        engine,
+        task="regression",
+        classes=(),
+        predictions=[
+            {"id": key, "prediction": value}
+            for key, value in zip(("one", "two"), predictions, strict=True)
+        ],
+        labels=[
+            {"id": key, "outcome": value, "available_at": AS_OF}
+            for key, value in zip(("one", "two"), truth, strict=True)
+        ],
+    )
+    assert result["labeled_rows"] == 2
+    assert result["label_coverage"] == 1
+    assert metric(result, "performance", "mae")["value"] == pytest.approx(0.5)
+    assert metric(result, "performance", "mse")["value"] == pytest.approx(0.25)
+    assert metric(result, "performance", "rmse")["value"] == pytest.approx(0.5)
+    assert metric(result, "performance", "r2")["value"] == pytest.approx(0.0)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("missing", [None, float("nan")])
+@pytest.mark.parametrize("current_missing", [5, 10])
+@pytest.mark.parametrize("shift", [0, 10])
+def test_processed_baseline_missingness_allows_other_feature_drift(
+    engine, missing, current_missing, shift
+):
+    """Missingness already handled by the model must not suppress valid drift decisions."""
+    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+
+    reference = [{"value": missing if i < 10 else i % 10, "kind": i % 10} for i in range(100)]
+    current = [
+        {
+            "id": str(i),
+            "value": missing if i < current_missing else i % 10,
+            "kind": i % 10 + shift,
+        }
+        for i in range(100)
+    ]
+    result = report(
+        engine,
+        reference=reference,
+        current=current,
+        predictions=[{"id": str(i), "prediction": "yes"} for i in reversed(range(100))],
+    )
+    assert metric(result, "quality", "missing_fraction", "value")["value"] == current_missing / 100
+    assert metric(result, "quality", "missing_fraction", "value")["threshold"] == 0.1
+    assert not any(item["has_issue"] for item in result["metrics"] if item["category"] == "quality")
+    assert result["status"] == ("drift" if shift else "healthy")
+    assert _drift_metrics_decision(result["metrics"]) == ("ready" if shift else "no_drift")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("case", ["increased", "new", "excluded", "unpredicted", "infinity"])
+def test_missingness_policy_retains_input_quality_guards(engine, case):
+    """New or significantly increased missingness and unhandled rows still block training."""
+    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+
+    reference_missing = 0 if case == "new" else 10
+    current_missing = 30 if case == "increased" else 10
+    reference = [
+        {"value": None if i < reference_missing else float(i % 10), "kind": i % 10}
+        for i in range(100)
+    ]
+    current = [
+        {
+            "id": str(i),
+            "value": None if i < current_missing else float(i % 10),
+            "kind": i % 10 + 10,
+        }
+        for i in range(100)
+    ]
+    predictions = [
+        {"id": str(i), "prediction": "yes", "scoring_status": "predicted"} for i in range(100)
+    ]
+    if case == "excluded":
+        predictions[0]["scoring_status"] = "excluded"
+    elif case == "unpredicted":
+        predictions.pop(0)
+    elif case == "infinity":
+        reference[20]["value"] = current[20]["value"] = float("inf")
+    result = report(engine, reference=reference, current=current, predictions=predictions)
+    assert result["status"] == "drift"
+    assert _drift_metrics_decision(result["metrics"]) == "quality_issue"
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("current_missing,expected", [(204, "ready"), (500, "quality_issue")])
+def test_missingness_distinguishes_sampling_variation_from_increase(
+    engine, current_missing, expected
+):
+    """A 10% to 10.2% sampling change must not block drift, but 10% to 25% must."""
+    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+
+    reference = [{"value": None if i < 200 else i % 10, "kind": i % 10} for i in range(2000)]
+    current = [
+        {"id": str(i), "value": None if i < current_missing else i % 10, "kind": i % 10 + 10}
+        for i in range(2000)
+    ]
+    result = report(
+        engine,
+        reference=reference,
+        current=current,
+        predictions=[{"id": str(i), "prediction": "yes"} for i in range(2000)],
+    )
+
+    assert result["status"] == "drift"
+    assert _drift_metrics_decision(result["metrics"]) == expected
+
+
+def test_same_missingness_process_rarely_flags_sampling_noise():
+    """Independent samples from the same process must not systematically block retraining."""
+    import numpy as np
+
+    from skyulf.integrations.databricks.monitoring_metrics import _feature_quality
+
+    rng = np.random.default_rng(42)
+    flagged = 0
+    for _ in range(100):
+        baseline, current = rng.binomial(2000, 0.1, size=2)
+        reference = pl.DataFrame({"value": [None] * baseline + [1.0] * (2000 - baseline)})
+        frame = pl.DataFrame({"value": [None] * current + [1.0] * (2000 - current)})
+        flagged += _feature_quality(frame, "value", reference)[0]["has_issue"]
+
+    assert flagged <= 3
