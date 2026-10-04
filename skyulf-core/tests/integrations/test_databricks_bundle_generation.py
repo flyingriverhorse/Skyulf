@@ -43,11 +43,7 @@ def test_evaluation_charts_are_an_optional_independent_leaf(
         for task in tasks.values()
         for dependency in task.get("depends_on", [])
     )
-    dependencies = (
-        jobs["train"].get("environments", [{}])[0].get("spec", {}).get("dependencies", [])
-        if compute == "serverless"
-        else [item.get("pypi", {}).get("package") for item in tasks["initialize_run"]["libraries"]]
-    )
+    dependencies = (project / "deployment/train-requirements.txt").read_text().splitlines()
     assert dependencies.count("matplotlib==3.10.0") == int(enabled == "true" or shap == "true")
     if enabled == "true":
         predecessor = "evaluate_model_set" if layout == "multi_target" else "evaluate_model"
@@ -352,11 +348,10 @@ def test_shap_generation_matches_training_dependencies(tmp_path, layout, compute
             }
         else:
             assert "explainability" not in pipeline
-    job = yaml.safe_load((project / "resources/train.job.yml").read_text())
-    serialized = json.dumps(job)
-    assert ("shap==0.49.1" in serialized) == (enabled == "true")
-    assert ("matplotlib==3.10.0" in serialized) == (enabled == "true")
-    assert "shap==" not in (project / "resources/score.job.yml").read_text()
+    requirements = (project / "deployment/train-requirements.txt").read_text()
+    assert ("shap==0.49.1" in requirements) == (enabled == "true")
+    assert ("matplotlib==3.10.0" in requirements) == (enabled == "true")
+    assert "shap==" not in (project / "deployment/requirements.txt").read_text()
 
 
 @pytest.mark.parametrize("mode", ["all", "combined_only", "separate_views"])

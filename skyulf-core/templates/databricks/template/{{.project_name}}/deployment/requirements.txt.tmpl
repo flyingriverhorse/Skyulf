@@ -1,0 +1,9 @@
+# Shared training and scoring environment. Keep exact pins here.
+# Initial model/ensemble selections are included automatically. After editing
+# model Python files, update their optional packages here before redeploying.
+mlflow==3.16.1
+imbalanced-learn==0.14.1
+sklearn-compat==0.1.5
+{{template "runtime_packages" .}}
+# Custom preprocessing and scoring dependencies are installed in both jobs.
+-r ../src/features/requirements.txt

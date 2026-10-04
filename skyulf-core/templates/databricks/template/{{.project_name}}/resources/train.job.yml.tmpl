@@ -2,6 +2,10 @@ resources:
   jobs:
     train:
       name: ${bundle.name}_train
+      tags: ${var.job_tags}
+{{if eq .compute_mode "serverless"}}
+      budget_policy_id: ${var.serverless_budget_policy_id}
+{{end}}
       timeout_seconds: ${var.train_timeout_seconds}
       health:
         rules: ${var.train_health_rules}
@@ -73,15 +77,8 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
-            - pypi:
-                package: mlflow==3.16.1
-{{if eq .shap_enabled "true"}}            - pypi:
-                package: shap==0.49.1
-{{end}}
-{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}            - pypi:
-                package: matplotlib==3.10.0
-{{end}}
+            - whl: ../dist/skyulf/*.whl
+            - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
           depends_on:
@@ -228,15 +225,8 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
-            - pypi:
-                package: mlflow==3.16.1
-{{if eq .shap_enabled "true"}}            - pypi:
-                package: shap==0.49.1
-{{end}}
-{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}            - pypi:
-                package: matplotlib==3.10.0
-{{end}}
+            - whl: ../dist/skyulf/*.whl
+            - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
           depends_on:
@@ -460,24 +450,20 @@ resources:
       environments:
         - environment_key: skyulf
           spec:
-            client: "4"
+            client: ${var.serverless_environment_version}
             dependencies:
-              - ${workspace.file_path}/dist/skyulf_core-0.9.1-py3-none-any.whl
-              - mlflow==3.16.1
-{{if eq .shap_enabled "true"}}              - shap==0.49.1
-{{end}}
-{{if or (eq .shap_enabled "true") (eq .evaluation_charts_enabled "true")}}              - matplotlib==3.10.0
-{{end}}
+              - ../dist/skyulf/*.whl
+              - -r ${workspace.file_path}/deployment/train-requirements.txt
 {{else}}
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: {{.spark_version}}
-            node_type_id: {{.node_type_id}}
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type_id}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
               {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
-              min_workers: 2
-              max_workers: 4
+              min_workers: ${var.min_workers}
+              max_workers: ${var.max_workers}
 {{end}}

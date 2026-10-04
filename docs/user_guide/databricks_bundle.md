@@ -608,11 +608,22 @@ tail and honor the configured CV gap. Every class must occur in both partitions,
 otherwise training fails with an actionable error. Small datasets can therefore
 require a different split or manual mode.
 
+For example, `validation_fraction: 0.25` fits the saved model on 75% of the
+training partition and uses the other 25% only to choose its decision threshold.
+There is no final full-training refit in this mode. `off` and `manual` do not
+reserve this extra calibration population. Full-data refitting is a different
+policy and can change the probabilities to which a selected threshold applies.
+
 Supported automatic objectives are `balanced_accuracy`, binary `f1`, `f1_macro`,
 `f1_weighted`, and `matthews_corrcoef`. For binary selection, `positive_class` is
 optional and defaults to the fitted model's second class. The existing heldout
 binary precision/recall/F1 and probability metrics retain that second-class
 reporting convention, even when a different label owns the decision cutoff.
+Sample weights affect estimator fitting, but calibration objectives and their
+reported scores remain **unweighted**, as do the other evaluation metrics.
+`f1_weighted` means class-support averaging, not row-weighted scoring. Automatic
+threshold selection currently has no row-cost/sample-weight objective option;
+it should not be interpreted as optimizing weighted business costs.
 Thresholds change class predictions; they do not calibrate or alter probabilities.
 An improved calibration score does not guarantee a better independent holdout score.
 
@@ -627,6 +638,13 @@ batch prediction preserve the saved decision rule. For an additional standalone
 inference bundle export, pass `use_tuned_thresholds=True` to `build_bundle`.
 That separate portable format retains its existing supported-node restrictions;
 target-encoder pipelines use the full local artifact saved by the Bundle.
+
+Prediction columns retain stable positional names: `probability_0` belongs to
+`manifest.classes[0]`, `probability_1` to `manifest.classes[1]`, and so on.
+For example, `manifest.classes = ["no", "yes"]` maps `probability_1` to `"yes"`.
+This mapping uses the original labels even when the target was encoded. Do not
+infer a class from its spelling or assume the positive class always has index 1
+when explicitly configuring a different `positive_class`.
 
 Regression and classifiers without `predict_proba` cannot enable thresholds.
 Legacy nested binary `modeling.tune_threshold` remains supported; do not enable it
@@ -1428,18 +1446,36 @@ WHERE customer_id = 'C123';
 
 ## First run
 
-Build and place the matching Skyulf wheel in the generated project's `dist/`,
-then edit `config/workflow.json` for real source columns, split policy and size
+Set `deployment/artifact.json` to the Core source directory or release wheel and
+the expected Core version. The Bundle artifact build prepares the wheel, checks
+its identity and records its SHA-256 in `dist/skyulf/build.json`.
+The wheel filename includes its content digest as a build tag: changed bytes get
+a distinct deployment/cache identity while the release version stays compatible
+with existing saved model requirements. The receipt matches the uploaded bytes.
+Edit `config/workflow.json` for real source columns, split policy and size
 limits, the selected `src/modeling/` file for model settings, and
 `src/features/preprocessing.py` for feature engineering.
 The JSON values are an example, not a dataset.
 Enable Change Data Feed on the scoring source before later inserts arrive.
 
 ```powershell
-databricks bundle validate --strict -t dev --profile <profile>
-databricks bundle deploy -t dev --profile <profile>
-databricks bundle run train -t dev --profile <profile>
+uv run --no-project python src/tools/build_wheel.py
+databricks bundle validate --strict -t test_development --profile <profile>
+databricks bundle deploy -t test_development --profile <profile>
+databricks bundle run train -t test_development --profile <profile>
 ```
+
+Use `test` instead if personal development targets were not generated.
+`deployment/requirements.txt` supplies the shared train/score runtime, including
+initial Optuna and optional model/ensemble choices. Update these exact pins when
+editing model choices later. Custom preprocessing/scoring requirements from
+`src/features/requirements.txt` are installed in both jobs. Training-only report
+packages live in `deployment/train-requirements.txt`. These direct pins do not
+freeze all transitive dependencies.
+
+Compute settings are target variables: serverless environment version and optional
+budget policy, or policy-cluster runtime, node type and worker bounds. `job_tags`
+applies in both modes. Validate company policy compatibility in the actual target.
 
 For pinned scoring, inspect the registered version, put that concrete value
 in `model_version`, redeploy the changed JSON, then run `score`. For champion

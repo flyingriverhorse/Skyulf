@@ -1,6 +1,31 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
 # Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
 variables:
+  job_tags:
+    description: Optional job attribution tags for either compute mode
+    type: complex
+    default: {}
+{{if eq .compute_mode "serverless"}}
+  serverless_environment_version:
+    description: Compatible serverless environment version for both jobs
+    default: "4"
+  serverless_budget_policy_id:
+    description: Optional existing serverless budget policy; blank uses workspace defaults
+    default: ""
+{{else}}
+  spark_version:
+    description: Approved Databricks runtime for this target
+    default: "{{.spark_version}}"
+  node_type_id:
+    description: Approved worker node type for this target
+    default: "{{.node_type_id}}"
+  min_workers:
+    description: Policy cluster autoscaling minimum
+    default: 2
+  max_workers:
+    description: Policy cluster autoscaling maximum
+    default: 4
+{{end}}
   on_drift:
     description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
     default: "disabled"

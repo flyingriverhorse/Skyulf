@@ -68,8 +68,8 @@ def _resolve(project, target, state):
     state["config"].write_text(
         f"[offline]\nhost={state['host']}\ntoken=local-test-{state['id']}\n", encoding="utf-8"
     )
-    dist = project / "dist"
-    dist.mkdir(exist_ok=True)
+    dist = project / "dist/skyulf"
+    dist.mkdir(parents=True, exist_ok=True)
     (dist / "skyulf_core-0.9.1-py3-none-any.whl").write_text(
         "Path resolution fixture only; no wheel is installed or executed.", encoding="utf-8"
     )
@@ -224,6 +224,20 @@ def test_resolved_shared_targets_preserve_identity_and_acl_choices(
     assert bundle["variables"]["resource_suffix"]["value"] == ""
 
 
+def test_serverless_runtime_and_budget_overrides_reach_both_jobs(tmp_path, offline_workspace):
+    """Target runtime and budget choices must apply consistently to training and scoring."""
+    project = _generate_project(tmp_path, compute_mode="serverless")
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    contents["variables"]["serverless_environment_version"]["default"] = "3"
+    contents["variables"]["serverless_budget_policy_id"]["default"] = "approved-budget-policy"
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    bundle = _resolve(project, "test", offline_workspace)
+    for job in bundle["resources"]["jobs"].values():
+        assert job["budget_policy_id"] == "approved-budget-policy"
+        assert job["environments"][0]["spec"]["client"] == "3"
+
+
 def test_external_identity_and_acl_management_remain_optional(tmp_path, offline_workspace):
     """An existing service account deployment must not require new identity or ACL variables."""
     project = _generate_project(tmp_path)
@@ -243,9 +257,20 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
         compute_mode="policy_cluster",
         cluster_policy_name="local-policy",
     )
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    contents["variables"]["min_workers"]["default"] = 1
+    contents["variables"]["max_workers"]["default"] = 3
+    contents["variables"]["job_tags"]["default"] = {"cost_center": "ml-test"}
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     result = _resolve(project, "test_development", offline_workspace)
     for job in result["resources"]["jobs"].values():
         assert job["job_clusters"][0]["new_cluster"]["policy_id"] == "local-policy-id"
+        assert job["job_clusters"][0]["new_cluster"]["autoscale"] == {
+            "min_workers": 1,
+            "max_workers": 3,
+        }
+        assert job["tags"]["cost_center"] == "ml-test"
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])

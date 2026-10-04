@@ -16,8 +16,6 @@ particular cloud comparison.
 - [Databricks acceptance run](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/282657934122811/run/184285607434457): `SUCCESS`.
 - [Weighted MLflow run](https://dbc-45604623-c18b.cloud.databricks.com/ml/experiments/1521897804897496/runs/1d50b15930a4451fac7613c6d3cb061f).
 - [Unweighted MLflow run](https://dbc-45604623-c18b.cloud.databricks.com/ml/experiments/1521897804897496/runs/0a8f777371c84da99f383af13c213d84).
-- [Captured result JSON](../examples/sampling_weight_comparison_result.json).
-- [Independent check of downloaded artifacts](../examples/sampling_weight_download_check.json).
 
 These workspace links require access to the user's Databricks workspace.
 
@@ -163,8 +161,9 @@ The [final numerical verification run](https://dbc-45604623-c18b.cloud.databrick
 saved source/prediction CSVs and per-engine evidence in MLflow run
 `6941e36d0c0742bbbb46fc37e124356e`. Downloaded CSVs were recomputed locally without
 importing Skyulf. Exact run URLs, task states, numerical errors, Delta receipts,
-local verification results and scope limits are saved in
-[`full_pipeline_unweighted_result.json`](../examples/full_pipeline_unweighted_result.json).
+local verification results and scope limits were captured in
+`full_pipeline_unweighted_result.json`. That historical JSON capture was removed
+with the examples and is no longer distributed with these docs.
 
 The first test deployment stopped at monitoring registration because its new
 test namespace lacked the required central monitoring tables. After initializing

@@ -181,7 +181,9 @@ Ruff, format, tüm CI Ty kapsamı, CCN ve Bundle şema güncelliği de geçti.
 ve benchmark'ları içerir; bunlar geçmiş sayılmaz. Sonuç yerel Windows ortamında
 CI Core kapsamına aittir; tüm depo CI işleri veya bütün optional ortamlar
 çalıştırılmış değildir.
-[Komut, sürümler ve kanıt hash'leri](../../../docs/examples/core_weight_regression_result.json).
+Tarihsel `core_weight_regression_result.json` kaydı örneklerle birlikte kaldırıldı.
+Doğrulama kapsamı [ağırlıklı eğitim kılavuzunda](../../../docs/user_guide/weighted_training.md)
+özetlenir; JSON kaydı artık dokümantasyonla dağıtılmıyor.
 Log/XML: `.superpowers/sdd/WEIGHT_COLUMN_SIMPLE_V1_PLAN/core-clean-20261003/`.
 
 Önceki %89,02 sonucu tarihsel kayıttır. O koşuda bulunan boosting `get_params()`

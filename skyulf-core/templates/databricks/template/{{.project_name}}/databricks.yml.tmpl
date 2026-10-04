@@ -6,11 +6,21 @@ include:
   - deployment/targets.yml
   - resources/*.yml
 
+artifacts:
+  skyulf:
+    type: whl
+    path: .
+    build: uv run --no-project python src/tools/build_wheel.py
+    files:
+      - source: dist/skyulf/*.whl
+
 sync:
   include:
     - src/jobs/**/*.py
     - src/features/**/*.py
     - src/modeling/**/*.py
     - src/tools/*.py
-    - dist/*.whl
+    - dist/skyulf/*.whl
+    - deployment/*requirements.txt
+    - src/features/requirements.txt
     - config/workflow.json

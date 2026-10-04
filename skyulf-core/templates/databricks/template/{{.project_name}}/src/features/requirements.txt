@@ -1,3 +1,3 @@
 # Optional exact project dependency pins: distribution==installed.version
 # Installed versions are verified at training and loading; MLflow records these pins.
-# Also provision these dependencies in your training job environment.
+# deployment/requirements.txt installs these pins in both train and score jobs.

@@ -310,3 +310,23 @@ namespaces, paused personal schedules and identity/ACL wiring. They do not prove
 real workspace grants, source access, job ownership, model alias denial or queue
 behavior. Verify those with the intended accounts before treating writer
 separation as enforced in production.
+
+## Runtime packaging
+
+Set the Core source directory or release wheel and expected version in
+`artifact.json`. Bundle deploy runs `src/tools/build_wheel.py`; its verified
+output and SHA-256 receipt live in `dist/skyulf/`. Do not edit wheel paths in job
+resources. Run the build command once before strict validation of a fresh project.
+The wheel filename includes its content digest as a build tag. Changed bytes
+therefore get a distinct deployment/cache identity without changing the release
+version required by existing models. The receipt matches the uploaded bytes.
+
+`requirements.txt` is shared by both jobs and includes exact project pins from
+`src/features/requirements.txt`. `train-requirements.txt` adds optional report
+packages. Initial model choices populate optional dependencies; update this file
+when changing Python model declarations later. Transitive dependencies are not
+fully locked by these direct pins.
+
+Override `job_tags`, `serverless_environment_version`, `serverless_budget_policy_id`,
+or policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`
+through target variables. A blank budget policy uses the workspace defaults.

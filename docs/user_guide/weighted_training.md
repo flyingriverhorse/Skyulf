@@ -329,7 +329,4 @@ passed. No production code or tests needed changes during this verification.
 Skipped tests include optional Spark/Delta runtimes, opt-in Databricks CLI
 checks and benchmarks; they are not counted as passes. This was a local Windows
 run with the CI Core scope, not execution of every repository CI job or every
-optional-runtime lane. See the [machine-readable verification record](../examples/core_weight_regression_result.json)
-for commands, versions, skip counts by file and evidence hashes. The detailed
-local log and coverage XML are under
-`.superpowers/sdd/WEIGHT_COLUMN_SIMPLE_V1_PLAN/core-clean-20261003/`.
+optional-runtime lane.

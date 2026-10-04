@@ -134,6 +134,65 @@ def test_auto_fits_scaler_and_model_without_calibration_rows(tmp_path, engine):
     assert artifact.pipeline._tuned_thresholds["class_1"] == pytest.approx(best)
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_auto_threshold_objective_stays_unweighted_when_only_calibration_weights_change(engine):
+    """Training weights must not silently change the documented unweighted selection objective."""
+    from skyulf.integrations.databricks.threshold_training import fit_threshold_pipeline
+
+    frame = fixture_frame()
+    frame.loc[::7, "target"] = np.where(frame.loc[::7, "target"] == "class_0", "class_1", "class_0")
+    policy = {
+        "mode": "auto",
+        "metric": "balanced_accuracy",
+        "validation_fraction": 0.25,
+        "random_state": 42,
+    }
+    fitting, calibration = train_test_split(
+        np.arange(len(frame)), test_size=0.25, random_state=42, stratify=frame.target
+    )
+    weights = np.linspace(0.1, 3, len(frame))
+    scaler = StandardScaler().fit(frame.iloc[fitting][list("abcd")])
+    reference = LogisticRegression(max_iter=500).fit(
+        scaler.transform(frame.iloc[fitting][list("abcd")]),
+        frame.iloc[fitting].target,
+        sample_weight=weights[fitting],
+    )
+    labels = frame.iloc[calibration].target.to_numpy()
+    proba = reference.predict_proba(scaler.transform(frame.iloc[calibration][list("abcd")]))
+    candidates = np.linspace(0, 1, 103)[1:-1]
+    expected = max(
+        candidates,
+        key=lambda cutoff: (
+            balanced_accuracy_score(labels, np.where(proba[:, 1] >= cutoff, "class_1", "class_0")),
+            -abs(cutoff - 0.5),
+        ),
+    )
+    predicted = np.where(proba[:, 1] >= expected, "class_1", "class_0")
+    changed_weights = weights.copy()
+    changed_weights[calibration] = np.where(predicted != labels, 1000.0, 1.0)
+    expected_score = balanced_accuracy_score(labels, predicted)
+    weighted_score = balanced_accuracy_score(
+        labels, predicted, sample_weight=changed_weights[calibration]
+    )
+    assert abs(expected_score - weighted_score) > 0.1
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    for selected_weights in (weights, changed_weights):
+        pipeline = fit_threshold_pipeline(
+            recipe(policy),
+            SplitDataset(train=native, test=native.head(0), train_sample_weight=selected_weights),
+            "target",
+        )
+        assert pipeline.model_estimator is not None
+        fitted = pipeline.model_estimator._unwrap_tuned_model()
+        np.testing.assert_allclose(fitted.coef_, reference.coef_, rtol=0, atol=1e-10)
+        assert pipeline._tuned_thresholds is not None
+        assert pipeline._tuned_thresholds["class_1"] == pytest.approx(expected)
+        evidence = pipeline._decision_threshold_evidence
+        assert evidence is not None
+        assert evidence["fitting_rows"] == 180 and evidence["calibration_rows"] == 60
+        assert evidence["selected_score"] == pytest.approx(expected_score)
+
+
 @pytest.mark.parametrize(
     "policy",
     [

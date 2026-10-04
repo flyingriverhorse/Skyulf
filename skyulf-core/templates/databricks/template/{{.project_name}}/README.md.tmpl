@@ -503,6 +503,25 @@ compatible estimator and numeric resource limits. The resource cannot also be a
 searched parameter; generated spaces exclude it. Optuna requires optuna and
 optuna-integration; its timeout stops between fits, not during a running fit.
 
+### Optional decision thresholds
+
+Classifier recipes accept `decision_threshold` with `off` (default), `manual`
+or `auto`. Automatic mode reserves `validation_fraction` of the training
+partition before fitting preprocessing or selecting model parameters. With
+`validation_fraction: 0.25`, the saved model fits 75% and thresholds use the
+other 25%; there is no full-training refit afterward. Off/manual modes do not
+reserve these calibration rows. Final holdout rows remain independent.
+
+Threshold objectives and reported metrics are unweighted even when estimator
+fitting uses sample weights. `f1_weighted` averages classes by support; it does
+not apply row weights or optimize weighted business costs. The saved
+`decision_threshold.json` records fit/calibration counts and selection scores.
+
+Outputs use `probability_0`, `probability_1`, etc., in saved `manifest.classes`
+order. These classes retain original target labels after target encoding.
+See the [decision-threshold guide](https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle/#optional-classification-decision-thresholds)
+for policy examples and multiclass semantics.
+
 ### Optional evaluation charts
 
 Bundle initialization asks `evaluation_charts_enabled` (default: `false`). Choosing
@@ -770,10 +789,18 @@ builders. For another target, pass `--catalog`, `--input-schema`, `--output-sche
 
 ## 2. Build and deploy
 
-From the Skyulf checkout, build into this project's `dist` directory:
+Set `deployment/artifact.json` once: `source` is the path to a Skyulf Core source
+checkout or a release wheel, and `version` is the required Core release. Relative
+paths resolve from this project; keep the source outside generated `dist/skyulf/`.
+Bundle deployment prepares the wheel automatically,
+checks its package name and version, and records its SHA-256 in
+`dist/skyulf/build.json`. A content digest in the wheel's build tag gives changed
+bytes a distinct deployment/cache identity while preserving the release version
+required by existing saved models. The receipt matches the uploaded wheel bytes.
+To prepare it before strict validation:
 
 ```powershell
-uv build --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core
+uv run --no-project python src/tools/build_wheel.py
 ```
 
 From this generated project, with your authenticated CLI profile:
@@ -782,6 +809,14 @@ From this generated project, with your authenticated CLI profile:
 databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
 databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile <profile>
 ```
+
+Both jobs install `deployment/requirements.txt`. Initial Optuna and optional
+model/ensemble choices populate their exact package pins automatically. Update
+this file when changing those choices in Python later. Custom preprocessing and
+scoring pins in `src/features/requirements.txt` are included in both jobs.
+`deployment/train-requirements.txt` adds only the requested SHAP/chart packages.
+These are direct dependency pins, not a lock of every transitive dependency;
+validate a changed environment before deploying it over an existing model.
 
 Targets are paired by environment: `test/test_development`,
 `syst/syst_development` and `prod/prod_development`. Personal targets are optional,

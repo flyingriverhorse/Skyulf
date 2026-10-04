@@ -2,6 +2,13 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> SM-39 delivered (2026-10-04): centralized runtime requirements,
+> automatic optional model/Optuna dependencies, checked wheel build and target
+> compute overrides. Two clean installations and two real train-to-score jobs
+> passed; 360 cloud predictions matched independent sklearn calculations.
+> Content-tagged wheel redeployment preserved existing models and invalidated
+> stale package cache identity. Company policy acceptance remains SM-43b;
+> separate identities/concurrency remain SM-37. [Delivery157](157-sm39-runtime-packaging-delivery.md).
 > Development monitoring isolation (2026-10-02): personal development
 > targets bypass enrollment and the full monitoring/drift/retraining branch.
 > Real temporal model-set train/scoring passed in both modes: dev automatic scoring
@@ -378,7 +385,7 @@ on an existing candidate without retraining or reuploading the model.
 | SM-54 | Single-job candidate competition and one champion | SM-35, SM-36f | DONE | Single target only; shared snapshot/folds, candidate tuning/recipes/runs, deterministic CV winner, winner-only registration and existing lifecycle. Guided model-owned Python settings verified on both engines: 419 local + 511 final-wheel cloud tests and real single/competition/multi-model lifecycle/scoring acceptance. Signed delivery includes reports115-119. [Final evidence119](119-model-layout-live-delivery.md), [Delivery116](116-sm54-model-competition-delivery.md), [Plan115](115-sm54-model-competition-plan.md). |
 | SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | PARTIAL | Modular deployment files, optional environment development pairs, same/separate run identities and opt-in job ACLs delivered; every target has an editable permissions list. Current paired layout passed 119 CLI cases locally. Earlier live personal deployment passed train, automatic child score (120 predictions) and unchanged no-op; its seven-target layout validated in one workspace. Current paired layout subsequently deployed for six isolated test_development scoring projects ([Live136](136-sm41-live-cdf-recovery.md)). Separate-identity grants/alias-denial and concurrent lifecycle queue evidence remain open. UC/experiment grants remain external prerequisites, not provisioned resources. [Delivery131](131-sm37-local-deployment-delivery.md), [Live132](132-sm37-live-deployment-verification.md); original scope [report93](93-dbml-reference-recomparison.md). |
 | SM-38 | Operational limits, retry/recovery and run summaries | SM-34, SM-37 | PARTIAL | Operational variables and summaries delivered. Live 30-second task/job timeouts, bounded retry, post-commit score recovery, unchanged 120-row/Delta-v1 readback and user-confirmed email passed. Visible generated score HTML fixed and verified in exported run output. Lifecycle retry guards preserved; test jobs PAUSED/idle, normal score restored. Optional webhook delivery remains open; model-set HTML summaries passed live in [Live136](136-sm41-live-cdf-recovery.md). [Delivery133](133-sm38-operational-controls.md), [Live134](134-sm38-live-operations-verification.md); original scope [report93](93-dbml-reference-recomparison.md). |
-| SM-39 | Reproducible packaging and per-target compute | SM-33 | WAIT | Central compatible wheel/runtime pins, clean install/load, configurable policy/worker/cost settings and strict target validation; report93 additions: DAB `artifacts:` wheel build, one Skyulf/MLflow version variable, automatic Optuna dependencies, serverless `budget_policy_id` and job tags ([report93](93-dbml-reference-recomparison.md)) |
+| SM-39 | Reproducible packaging and per-target compute | SM-33 | DONE | Checked DAB wheel build with content-specific cache identity, centralized direct runtime pins, automatic selected Optuna/model dependencies, custom feature requirements and per-target compute/tags/budget settings delivered. Two clean installs, two real train/registry/score flows and 360 independent prediction comparisons passed; existing models survived changed-wheel and restored-wheel redeployments. 263 distinct affected cases passed. Pins are not a full transitive lock; company policy execution remains SM-43b. [Delivery157](157-sm39-runtime-packaging-delivery.md), original scope [report93](93-dbml-reference-recomparison.md). |
 | SM-40 | Generated-project tests and generic CI/CD | SM-37, SM-38, SM-39 | PARTIAL | Standalone project tests/build/validate and optional company adapter; explicit deployment approvals; no default chargeable PR runs; report93 additions: `ci` target, generated recipe/preflight tests and lint config, credential-free render of every init example checked against the Bundle schema in repository CI; per-project working directory for several generated projects in one repository ([report93](93-dbml-reference-recomparison.md)); static smoke delivered locally; isolated CI runner removed/deferred by user, remaining CI/CD scope open ([report129](129-reference-followups-delivery.md)) |
 | SM-41 | CDF recovery, full refresh and generation retention | SM-31, SM-33, SM-38 | PARTIAL | Optional default-off CDF recovery verified live: six pandas/Polars single/competition/model-set jobs passed actual retention expiry, separate recovery branch, 123-row replacement, one-row incremental continuation and no-op. Exact model/source/target pins, table IDs, nonempty grants, prior Delta history and HTML reports verified. 20 real-Delta state cases plus four full-rebuild empty/view cases passed (CDF boundary injected in those harnesses); 364 local tests and analysis gates passed. Test retention restored, temporary grants removed, 12 jobs PAUSED/idle. Explicit source-replacement recovery and generation retention remain open. [Delivery135](135-sm41-cdf-recovery-plan.md), [Live136](136-sm41-live-cdf-recovery.md). |
 | SM-42 | Complete modular setup, scenario examples and operator guide | SM-30 through SM-41 | WAIT | Progressive setup sections with optional custom/multi-model scenarios; registry-backed parameters, editable config, execution preview and both-engine lifecycle/recovery examples; report93 additions: optional demo source setup so a first deploy runs end to end; generated README links pinned to the docs version matching the wheel ([report93](93-dbml-reference-recomparison.md)) |
@@ -470,7 +477,7 @@ Acceptance additions (details in report93):
 | SM-45 | WAIT | SM-37, SM-40; suffix-scoped dev/CI cleanup job, dry-run default, production targets refused; separate from SM-41 retention |
 | SM-46 | WAIT | SM-34, SM-38; optional `scoring_mode: on_table_update` via Jobs table-update trigger, reusing CDF/queue/no-op |
 | SM-47 | WAIT | SM-38; MLflow dataset input for UC lineage, model-version card, optional experiment resource; MLflow 3 deployment jobs investigated without a second alias writer |
-| SM-23c | PARTIAL | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; never approves |
+| SM-23c | PARTIAL | SM-23a, SM-37; drift-triggered retraining delivered. Performance measurement exists; degradation policy/retraining remains open with metric, baseline, minimum labeled coverage and consecutive-window acceptance below. Never approves. |
 | SM-48 | PARTIAL | Local split complete; live redeploy ID/history check pending. None; split `resources/workflow.jobs.yml` into `train.job.yml`/`score.job.yml` and optionally clearer job display names; keep job keys `train`/`score` (renaming recreates jobs and loses IDs/history) |
 | SM-49 | WAIT | SM-39, SM-48; upgrade path for generated projects: regenerate from saved answers into a temporary directory, review the diff, run config migration and deployed-contract checks |
 | SM-50 | WAIT | SM-41; optional explicit period backfill operator action reusing `publish_replace_period`, separate from incremental and full rebuild |
@@ -514,10 +521,64 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
 | SM-23a | PARTIAL | Batch quality/drift/delayed-label reporting and central AI/BI dashboard delivered after user resumed scope (2026-10-01). Reuses Core `DriftCalculator`, explicit cross-namespace enrollment, original scoring snapshots and keyed available labels. Two-schema pandas/Polars live acceptance, final Bundle job, dashboard SQL/publish/readback and stable-ID redeploy passed ([delivery142](142-sm23a-monitoring-delivery.md)). Optional native `quality_monitors` InferenceLog, slices and infrastructure cost reports remain deferred; prior removal history remains in [report129](129-reference-followups-delivery.md). |
 | SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
-| SM-23c | PARTIAL | SM-23a, SM-37; optional drift/performance-triggered retraining through the existing train job; gates unchanged, never approves ([report93](93-dbml-reference-recomparison.md)) |
+| SM-23c | PARTIAL | SM-23a, SM-37; drift trigger delivered; separate opt-in performance-degradation policy remains open. Use the acceptance below, preserve training/approval gates, never approves ([report93](93-dbml-reference-recomparison.md)). |
 | SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
+
+### SM-23c performance policy acceptance - clarified 2026-10-04
+
+The user explicitly requested this remaining policy. It is planned, not implemented.
+Current code measures prediction performance against eligible actual outcomes;
+`on_drift` only reacts to usable distribution drift. These are separate signals.
+
+- Add an independent, default-disabled performance policy with off/report/retrain
+  behavior; retain independent drift controls. Reuse existing Core metric
+  calculations rather than implementing a second metric engine.
+- Configure the metric, its improvement direction, an explicit version-bound
+  baseline, absolute or relative degradation tolerance, observation window,
+  minimum labeled sample count/coverage and consecutive failing windows.
+  Example only, not defaults: F1 falls by at least 0.05 absolute for three windows.
+- Compare matching metric definitions, class conventions and eligible populations.
+  Distinguish a training holdout reference from a production reference window;
+  changing the concrete model version requires a matching baseline and resets
+  the consecutive-window state.
+- Join original predictions to actual outcomes by stable keys. Respect outcome
+  availability and maturity; absent, stale, insufficient or nonfinite evidence
+  means unavailable, never an inferred degradation or improvement.
+- Count distinct completed observation windows. Replays must not advance the
+  failure streak; gaps and invalid windows must not silently satisfy a consecutive
+  failure requirement. Report baseline/current values, direction, degradation,
+  coverage, evaluated windows and the exact action/skip reason.
+- Show performance degradation explicitly in the existing monitoring report and
+  dashboard, separately from drift. Display model/version, metric, reference and
+  current values, absolute/relative change, tolerance, labeled coverage, window
+  timestamps, consecutive failure count and resulting action. Distinguish
+  disabled, insufficient/stale evidence, healthy, degraded and retraining
+  requested/skipped states; missing labels must never appear green/healthy.
+  Provide a time-series view of metric versus baseline/tolerance and drill-down
+  to the observation and training request. Verify dashboard values against the
+  stored evidence for both drift-only and performance-only failures.
+- Retraining reuses the existing request gate, cooldown, active/queued-run checks
+  and fresh labeled training-data guard. Concurrent drift/performance signals
+  must not create duplicate requests. Monitoring labels are not implicitly merged
+  into the upstream-owned training table. Existing evaluation/promotion rules remain.
+- Prove degradation without drift, drift without degradation, higher/lower-is-better
+  metrics, threshold boundaries, delayed/missing labels, repeated windows, model
+  changes and combined triggers. Recalculate metrics independently and verify a
+  real Databricks request, unchanged-data skip and replay without duplicate runs.
+
+### SM-39 wheel setup simplification - proposed 2026-10-04
+
+The user requested an easier alternative to manually maintaining `artifact.json`.
+Proposed normal path: place one `skyulf_core-*.whl` in a project-owned input
+`wheels/` directory, read its distribution/version from wheel metadata, and keep
+the content-tagged prepared output in `dist/skyulf/`. Missing or multiple input
+wheels must fail clearly rather than silently selecting the newest file. Retain
+source-checkout builds as an explicit advanced path. No mandatory duplicate
+version field in the ordinary workflow. This is a UX proposal; current runtime
+still reads `deployment/artifact.json`, and the SM-39 delivered evidence above
+describes that current implementation.
 
 ## Earlier implementation and live evidence
 
@@ -563,7 +624,7 @@ SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
 | SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
-| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Optional `on_drift` mode runs the existing train job; gates unchanged, never approves, no stacked runs; [report93](93-dbml-reference-recomparison.md) |
+| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Optional `on_drift` mode delivered. Separate default-disabled performance-degradation policy remains open: explicit metric/baseline/tolerance, label coverage, consecutive completed windows and shared retraining guards; see clarified acceptance above. Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 | SM-45 | Suffix-scoped dev/CI resource cleanup | SM-37, SM-40 | WAIT | Dry-run default, confirmation, production targets refused; deleted set equals preview; other suffixes untouched; [report93](93-dbml-reference-recomparison.md) |

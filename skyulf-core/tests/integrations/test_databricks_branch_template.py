@@ -30,10 +30,19 @@ def test_bundle_wheel_references_match_core_build_version():
         and node.func.id == "setup"
     )
     version = ast.literal_eval(next(item.value for item in setup.keywords if item.arg == "version"))
-    expected = f"skyulf_core-{version}-py3-none-any.whl"
+    declared = json.loads((TEMPLATE / "deployment/artifact.json").read_text())
+    assert declared["version"] == version
+    bundle = yaml.safe_load(
+        (TEMPLATE / "databricks.yml.tmpl").read_text().replace("{{.project_name}}", "wheel_check")
+    )
+    artifact = bundle["artifacts"]["skyulf"]
+    assert artifact["type"] == "whl"
+    assert artifact["files"] == [{"source": "dist/skyulf/*.whl"}]
+    assert artifact["build"] == "uv run --no-project python src/tools/build_wheel.py"
     for filename in ("train.job.yml.tmpl", "score.job.yml.tmpl"):
         source = (TEMPLATE / "resources" / filename).read_text()
-        assert set(re.findall(r"skyulf_core-[A-Za-z0-9_.+-]+\.whl", source)) == {expected}
+        references = re.findall(r"(?m)^\s*-\s*(?:whl:\s*)?(\S+\.whl)\s*$", source)
+        assert references and set(references) == {"../dist/skyulf/*.whl"}
     assert f"Skyulf {version} Bundle:" in (TEMPLATE / "README.md.tmpl").read_text()
 
 
@@ -166,9 +175,26 @@ def test_multi_target_cli_graph_has_same_two_jobs(tmp_path, compute, policy, han
     assert set(jobs) == {"train", "score"}
     train = jobs["train"]
     assert train["max_concurrent_runs"] == 1
-    assert len(train["tasks"]) == 10
+    assert len(train["tasks"]) == 12
     tasks = {item["task_key"]: item for item in train["tasks"]}
-    assert tasks["scoring_requested"]["depends_on"] == [{"task_key": "training_report"}]
+    assert tasks["monitoring_allowed"]["depends_on"] == [{"task_key": "training_report"}]
+    assert tasks["monitoring_allowed"]["condition_task"] == {
+        "op": "EQUAL_TO",
+        "left": "${bundle.mode}",
+        "right": "production",
+    }
+    assert tasks["register_monitor"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "true"}
+    ]
+    assert (
+        tasks["register_monitor"]["notebook_task"]["notebook_path"]
+        == "../src/jobs/register_set_monitor.py"
+    )
+    assert tasks["scoring_requested"]["run_if"] == "NONE_FAILED"
+    assert tasks["scoring_requested"]["depends_on"] == [
+        {"task_key": "monitoring_allowed", "outcome": "false"},
+        {"task_key": "register_monitor"},
+    ]
     assert tasks["run_batch_scoring"]["depends_on"] == [
         {"task_key": "scoring_requested", "outcome": "true"}
     ]
