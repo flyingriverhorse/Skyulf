@@ -526,6 +526,29 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
+### SM-23d — Distributed monitoring (LATER, user approved 2026-10-04)
+
+Training/scoring capacity and monitoring capacity are separate budgets. Batch15
+addresses producer enrollment within today's bounded monitoring implementation;
+it does not implement distributed monitoring.
+
+- Evaluate quality, drift and delayed-label metrics on Spark without collecting
+  the complete observation into driver memory. Keep local pandas/Polars support.
+- Define exact versus approximate metrics explicitly before implementation;
+  document sampling, approximation error and coverage if any approximation is used.
+- Preserve snapshot/version identity, record-key joins, label availability,
+  duplicate detection, model-set semantics and retraining quality gates.
+- Give monitoring its own resource and execution budgets, visible failure state
+  and retry behavior; large training allowances must not determine these budgets.
+- Acceptance: compare distributed results with existing bounded reference cases,
+  verify real Databricks/Delta observations beyond current local materialization
+  limits, and record memory/runtime evidence. Do not silently truncate input or
+  raise the local safety caps to call the task complete.
+
+Status: **LATER — scope recorded, design and implementation pending**. Dependencies:
+SM-23a monitoring contracts and the current review's d10-6 capacity separation.
+This is a future task, not an additional closure in the 138-item defect audit.
+
 ### SM-23c performance policy acceptance - clarified 2026-10-04
 
 The user explicitly requested this remaining policy. It is planned, not implemented.

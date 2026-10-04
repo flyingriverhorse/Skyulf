@@ -237,6 +237,26 @@ _POLARS_AGG_BUILDERS: dict[str, Callable[[Any], Any]] = {
 }
 
 
+def _polars_fitted_group_values(group_expr: Any, fitted: dict[str, Any], group_dtype: Any) -> Any:
+    """Map only keys whose conversion preserves their value and boolean identity."""
+    keys = pl.Series("group_keys", fitted["keys"], dtype=group_dtype, strict=False)
+    retained = [
+        index
+        for index, (original, converted) in enumerate(zip(fitted["keys"], keys, strict=True))
+        if converted is not None
+        and isinstance(original, bool) == isinstance(converted, bool)
+        and original == converted
+    ]
+    if not retained:
+        return pl.lit(None, dtype=pl.Float64)
+    return group_expr.replace_strict(
+        keys.gather(retained),
+        [fitted["values"][index] for index in retained],
+        default=None,
+        return_dtype=pl.Float64,
+    )
+
+
 def _polars_group_agg(
     op: dict[str, Any], existing: list[str], _epsilon: float, group_dtype: Any = None
 ) -> Any | None:
@@ -249,13 +269,7 @@ def _polars_group_agg(
         group_expr = pl.col(group_col)
         if group_dtype in (pl.Float32, pl.Float64):
             group_expr = group_expr.fill_nan(None)
-        mapped = (
-            group_expr.replace_strict(
-                fitted["keys"], fitted["values"], default=None, return_dtype=pl.Float64
-            )
-            if fitted["keys"]
-            else pl.lit(None, dtype=pl.Float64)
-        )
+        mapped = _polars_fitted_group_values(group_expr, fitted, group_dtype)
         return (
             pl.when(group_expr.is_null())
             .then(pl.lit(fitted.get("null_value"), dtype=pl.Float64))

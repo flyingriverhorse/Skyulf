@@ -3,7 +3,13 @@
 from typing import Any
 
 from ._contracts import input_budget_bytes
-from .monitoring_config import MonitorConfig, parse_drift_thresholds, store_namespace
+from .monitoring_config import (
+    MAX_MONITOR_BYTES,
+    MAX_MONITOR_ROWS,
+    MonitorConfig,
+    parse_drift_thresholds,
+    store_namespace,
+)
 from .monitoring_store import enroll_monitor
 from .prediction_output import scoring_target
 
@@ -24,6 +30,11 @@ def monitoring_destination(values: dict[str, str]) -> str | None:
     return store_namespace(catalog, schema)
 
 
+def _monitor_budget(value: Any, maximum: int) -> Any:
+    """Cap producer allowances while leaving invalid values for contract validation."""
+    return min(value, maximum) if type(value) is int else value
+
+
 def build_monitor_enrollment_config(
     workflow: dict[str, Any], values: dict[str, str], version: str
 ) -> MonitorConfig:
@@ -38,8 +49,11 @@ def build_monitor_enrollment_config(
         label_table=values.get("monitoring_label_table") or None,
         result_available_at_column=values.get("monitoring_result_available_at_column") or None,
         expected_interval_hours=float(values.get("monitoring_expected_interval_hours", "24")),
-        max_rows=workflow.get("max_rows", 10000),
-        max_bytes=workflow.get("max_bytes", input_budget_bytes(workflow.get("max_input_mb", 64))),
+        max_rows=_monitor_budget(workflow.get("max_rows", 10000), MAX_MONITOR_ROWS),
+        max_bytes=_monitor_budget(
+            workflow.get("max_bytes", input_budget_bytes(workflow.get("max_input_mb", 64))),
+            MAX_MONITOR_BYTES,
+        ),
         enabled=values.get("monitoring_enabled", "true") == "true",
         thresholds=parse_drift_thresholds(values.get("monitoring_drift_thresholds", "{}")),
     )

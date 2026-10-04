@@ -293,19 +293,20 @@ class EDAAnalyzer(
         biased skew/kurtosis, and ``recommendations.py`` compares skewness
         against a hardcoded threshold calibrated on the bias-corrected value.
         """
+        values = pl.col(col).filter(pl.col(col).is_finite())
         return [
-            pl.col(col).mean().alias(f"{col}__mean"),
-            pl.col(col).median().alias(f"{col}__median"),
-            pl.col(col).std().alias(f"{col}__std"),
-            pl.col(col).var().alias(f"{col}__var"),
-            pl.col(col).min().alias(f"{col}__min"),
-            pl.col(col).max().alias(f"{col}__max"),
-            pl.col(col).quantile(0.25, interpolation="linear").alias(f"{col}__q25"),
-            pl.col(col).quantile(0.75, interpolation="linear").alias(f"{col}__q75"),
-            pl.col(col).skew(bias=False).alias(f"{col}__skew"),
-            pl.col(col).kurtosis(fisher=True, bias=False).alias(f"{col}__kurt"),
-            (pl.col(col) == 0).sum().alias(f"{col}__zeros"),
-            (pl.col(col) < 0).sum().alias(f"{col}__negatives"),
+            values.mean().alias(f"{col}__mean"),
+            values.median().alias(f"{col}__median"),
+            values.std().alias(f"{col}__std"),
+            values.var().alias(f"{col}__var"),
+            values.min().alias(f"{col}__min"),
+            values.max().alias(f"{col}__max"),
+            values.quantile(0.25, interpolation="linear").alias(f"{col}__q25"),
+            values.quantile(0.75, interpolation="linear").alias(f"{col}__q75"),
+            values.skew(bias=False).alias(f"{col}__skew"),
+            values.kurtosis(fisher=True, bias=False).alias(f"{col}__kurt"),
+            (values == 0).sum().alias(f"{col}__zeros"),
+            (values < 0).sum().alias(f"{col}__negatives"),
         ]
 
     def _categorical_advanced_aggs(self, col: str) -> list[pl.Expr]:

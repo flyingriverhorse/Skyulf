@@ -465,15 +465,15 @@ def test_impute_matrix_keeps_all_missing_column_zero_filled() -> None:
     np.testing.assert_allclose(result[:, 1], [0.0, 0.0, 0.0])
 
 
-def test_detect_outliers_infinite_value_returns_none() -> None:
-    """Infinite values are not finite-safe under either the fast or fallback path,
-    so `_detect_outliers` must catch the error and return `None` rather than crash.
-    """
+def test_detect_outliers_excludes_infinite_rows() -> None:
+    """Finite rows remain usable and outlier indices retain their original positions."""
     analyzer = EDAAnalyzer(
         pl.DataFrame({"x": [1.0, float("inf"), 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]})
     )
     result = analyzer._detect_outliers(["x", "y"])
-    assert result is None
+    assert result is not None and result.analyzed_rows == 3
+    assert result.total_rows == 4
+    assert all(point.index != 1 for point in result.top_outliers)
 
 
 class TestRealShapedDataset:

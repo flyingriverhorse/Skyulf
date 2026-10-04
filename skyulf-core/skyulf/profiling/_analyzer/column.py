@@ -78,7 +78,8 @@ class ColumnMixin(_AnalyzerState):
         ):
             return
         try:
-            sample_data = self.df[col].drop_nulls().head(5000).to_numpy()  # type: ignore[attr-defined]
+            series = self.df[col]  # type: ignore[attr-defined]
+            sample_data = series.filter(series.is_finite()).head(5000).to_numpy()
             result = self._run_normality_test(sample_data)
             if result is not None:
                 profile.normality_test = result
@@ -149,6 +150,20 @@ class ColumnMixin(_AnalyzerState):
 
         self._add_normality_test(col, profile)
         self._add_outlier_alert(col, profile, alerts)
+        invalid_count = self.df[col].is_infinite().sum()
+        if invalid_count:
+            alerts.append(
+                Alert(
+                    column=col,
+                    type="Non-finite Values",
+                    message=(
+                        f"Column '{col}' contains {invalid_count} infinite values. "
+                        "Statistics and correlations use finite observations; affected "
+                        "rows are excluded from VIF and outlier detection."
+                    ),
+                    severity="warning",
+                )
+            )
 
     def _add_cardinality_alerts(
         self,

@@ -345,7 +345,7 @@ class StatefulTransformer:
     ) -> SplitDataset:
         """Apply the applier to each split (train/test/validation) of a SplitDataset."""
         validate_weighted_transformer(dataset, self.calculator, self.applier)
-        if dataset.train_sample_weight is not None and is_sampling_applier(self.applier):
+        if is_sampling_applier(self.applier):
             return dataset
         if dataset.train_sample_weight is None:
             new_train, train_weight = self._apply_guarded(dataset.train, params), None
@@ -378,7 +378,9 @@ class StatefulTransformer:
         Input detection mirrors :meth:`_fit_transform_inner` so a bare frame or
         an ``(X, y)`` tuple goes straight to the applier, while a
         ``SplitDataset`` is applied split-by-split honouring
-        ``apply_on_test``/``apply_on_validation``. Calling this before any
+        ``apply_on_test``/``apply_on_validation``. Built-in resamplers leave
+        ``SplitDataset`` unchanged during replay, with or without weights.
+        Calling this before any
         :meth:`fit_transform` hands the applier an empty params dict rather
         than raising.
         """

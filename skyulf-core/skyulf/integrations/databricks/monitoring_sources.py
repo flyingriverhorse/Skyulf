@@ -317,7 +317,9 @@ def read_labels(
         selected = selected.withColumn(
             available, functions.expr(f"unix_micros({column_name(available)})")
         )
-    native = bounded_frame(selected, columns, keys, config.max_rows, config.max_bytes)
+    native = bounded_frame(
+        selected, columns, keys, config.max_rows, config.max_bytes, require_unique_keys=False
+    )
     if timestamp == "timestamp":
         native[available] = pd.to_datetime(native[available], unit="us", utc=True)
     return native, {"label_table": config.label_table, "label_version": version}

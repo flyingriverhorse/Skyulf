@@ -9,6 +9,7 @@ the p-value, which shrinks with sample size.
 """
 
 import logging
+from collections import Counter
 
 import numpy as np
 import polars as pl
@@ -187,6 +188,10 @@ class DriftCalculator:
     @staticmethod
     def _numeric_values(series: pl.Series) -> np.ndarray:
         """Remove missing observations while preserving native numeric precision where possible."""
+        if series.dtype == pl.Int128:
+            # Polars' native NumPy conversion panics for Int128. Python integers
+            # preserve all 128 bits without invoking that unsupported native path.
+            return np.array(series.drop_nulls().to_list(), dtype=object)
         # Decimal arrays use Python objects, which cannot mix with scipy's float
         # distances. Integer/float arrays retain their own widths and fractions.
         if series.dtype.is_decimal():
@@ -260,6 +265,69 @@ class DriftCalculator:
             distribution=distribution,
         )
 
+    @staticmethod
+    def _is_integer_array(values: np.ndarray) -> bool:
+        """Recognize native integer arrays and our Python-integer Int128 representation."""
+        return values.dtype.kind in "iuO"
+
+    @staticmethod
+    def _integer_wasserstein(reference: np.ndarray, current: np.ndarray) -> float:
+        """Integrate empirical CDF gaps with exact integer coordinates and population counts.
+
+        scipy converts coordinates to float before subtraction, erasing unit
+        shifts beyond 2**53. Subtract coordinates and accumulate transport in
+        Python integers, then convert only the final distance to float.
+        """
+        ref_counts = Counter(map(int, reference))
+        curr_counts = Counter(map(int, current))
+        points = sorted(ref_counts.keys() | curr_counts.keys())
+        ref_total, curr_total = len(reference), len(current)
+        ref_count = curr_count = transport = 0
+        previous = points[0]
+        for point in points:
+            cdf_gap = abs(ref_count * curr_total - curr_count * ref_total)
+            transport += (point - previous) * cdf_gap
+            ref_count += ref_counts[point]
+            curr_count += curr_counts[point]
+            previous = point
+        return transport / (ref_total * curr_total)
+
+    def _wasserstein_statistics(
+        self, reference: np.ndarray, current: np.ndarray
+    ) -> tuple[float, float]:
+        """Keep exact integer transport and center integer values before reference scaling."""
+        if self._is_integer_array(reference):
+            origin = int(reference[0])
+            centered = np.array([int(value) - origin for value in reference], dtype=np.float64)
+            std_ref = float(np.std(centered))
+        else:
+            std_ref = float(np.std(reference))
+        if self._is_integer_array(reference) and self._is_integer_array(current):
+            distance = self._integer_wasserstein(reference, current)
+        else:
+            distance = float(wasserstein_distance(reference, current))
+        return distance, std_ref
+
+    @staticmethod
+    def _ks_values(reference: np.ndarray, current: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Encode exact ordering when scipy cannot safely combine integer representations.
+
+        Int128 objects exceed scipy's native-width NaN checks, while some
+        signed/unsigned pairs concatenate as floats. The two-sample KS statistic
+        and p-value depend only on shared ordering and ties, so joint integer
+        ranks preserve both without rounding values.
+        """
+        kinds = {reference.dtype.kind, current.dtype.kind}
+        float_promotion = kinds == {"i", "u"} and np.result_type(reference, current).kind == "f"
+        if "O" not in kinds and not float_promotion:
+            return reference, current
+        ref_values, curr_values = reference.tolist(), current.tolist()
+        ranks = {value: rank for rank, value in enumerate(sorted(set(ref_values + curr_values)))}
+        return (
+            np.array([ranks[value] for value in ref_values]),
+            np.array([ranks[value] for value in curr_values]),
+        )
+
     def _compute_numeric_metrics(
         self, ref_data: np.ndarray, curr_data: np.ndarray, thresholds: dict[str, float]
     ) -> tuple[list[DriftMetric], bool, dict[str, float | bool]]:
@@ -273,13 +341,12 @@ class DriftCalculator:
         is_drifted = False
 
         # 1. Wasserstein Distance
-        wd = wasserstein_distance(ref_data, curr_data)
+        wd, std_ref = self._wasserstein_statistics(ref_data, curr_data)
         # WD is in data units, so a fixed threshold cannot mean the same thing
         # for a column measured in cents and one measured in kilometres. The
         # reported value is the distance normalized by the reference std, which
         # is what `threshold` applies to. A constant reference has no scale to
         # normalize by — fall back to the raw distance rather than emit inf.
-        std_ref = np.std(ref_data)
         norm_wd = wd / std_ref if std_ref > 0 else wd
 
         wd_drift = norm_wd > thresholds["wasserstein"]
@@ -300,7 +367,7 @@ class DriftCalculator:
         # the p-value: the p-value shrinks with sample size, so an identical
         # tiny shift looks significant at n=100k but not at n=100. The p-value
         # is kept in the report for diagnostics.
-        ks_stat, ks_p = ks_2samp(ref_data, curr_data)
+        ks_stat, ks_p = ks_2samp(*self._ks_values(ref_data, curr_data))
         ks_drift = ks_stat > thresholds["ks_statistic"]
         metrics.append(
             DriftMetric(
@@ -410,6 +477,10 @@ class DriftCalculator:
             ref_hist, bin_edges = np.histogram(ref_data, bins=bins, range=(min_val, max_val))
             curr_hist, _ = np.histogram(curr_data, bins=bins, range=(min_val, max_val))
 
+            if not np.isfinite(bin_edges).all() or np.any(np.diff(bin_edges) <= 0):
+                # Float-valued histogram bounds cannot describe distinct bins at
+                # some integer magnitudes. An empty plot is preferable to false bins.
+                return DriftDistribution(bins=[])
             drift_bins = [
                 DriftBin(
                     bin_start=float(bin_edges[i]),

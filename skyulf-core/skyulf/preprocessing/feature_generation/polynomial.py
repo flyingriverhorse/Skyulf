@@ -64,7 +64,7 @@ def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
     transformed, new_names = result
     _validate_generated_names(new_names, list(X.columns), "PolynomialFeatures")
     df_poly = pl.DataFrame(transformed, schema=new_names)
-    return pl.concat([X, df_poly], how="horizontal"), _y
+    return X.hstack(df_poly), _y
 
 
 def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

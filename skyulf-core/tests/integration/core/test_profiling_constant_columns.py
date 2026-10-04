@@ -147,18 +147,16 @@ def test_causal_constant_target_uses_variance_selection() -> None:
     assert "target" not in {node.id for node in graph.nodes}
 
 
-def test_vif_explains_nonfinite_correlations() -> None:
-    """An infinite observation must produce an explicit omission instead of invalid VIF."""
+def test_vif_uses_finite_observations() -> None:
+    """An infinite observation must not discard the remaining valid collinearity evidence."""
     frame = pl.DataFrame({"x": np.arange(20.0), "y": [float("inf")] + list(range(1, 20))})
     alerts: list[Alert] = []
 
     with np.errstate(invalid="ignore"):
         result = EDAAnalyzer(frame)._calculate_vif(frame.columns, alerts=alerts)
 
-    assert result is None
-    assert len(alerts) == 1
-    assert alerts[0].type == "VIF Unavailable"
-    assert "do not have finite correlations" in alerts[0].message
+    assert result == {"x": 999.0, "y": 999.0}
+    assert alerts == []
 
 
 def test_vif_inversion_error_retains_residual_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -55,23 +55,21 @@ def _cap_numeric_columns(numeric_cols: list[str], target_col: str | None = None)
 
 
 def _nan_to_null(subset: pl.DataFrame) -> pl.DataFrame:
-    """Rewrite NaN to null in every float column.
+    """Represent non-finite float observations as null for pairwise deletion.
 
-    polars keeps NaN distinct from null, and both consumers below are
-    NaN-blind in a damaging way: ``std()`` of a NaN-bearing column is NaN,
-    which :func:`_filter_constant_columns` rejects as "not > 1e-9" and so
-    silently discards a perfectly usable column (and drops the *whole* matrix
-    when fewer than two columns survive); and ``drop_nulls()`` keeps NaN rows,
-    which then poison every coefficient. ``EDAAnalyzer`` normalizes at
-    construction, but ``calculate_correlations`` is public API and can be
-    handed any frame. Duplicated from the analyzer deliberately: importing
-    ``_analyzer._utils`` would execute that package's ``__init__`` and pull the
-    sklearn/scipy/statsmodels mixins into this leaf module.
+    Filtering each column separately would shift row alignment. Nulling only
+    the invalid cell lets each pair use its own finite shared observations.
+    This public helper also handles frames not normalized by EDAAnalyzer.
     """
     float_cols = [name for name, dtype in subset.schema.items() if dtype.is_float()]
     if not float_cols:
         return subset
-    return subset.with_columns([pl.col(c).fill_nan(None) for c in float_cols])
+    return subset.with_columns(
+        [
+            pl.when(pl.col(c).is_finite()).then(pl.col(c)).otherwise(None).alias(c)
+            for c in float_cols
+        ]
+    )
 
 
 def _filter_constant_columns(subset: pl.DataFrame, numeric_cols: list[str]) -> list[str]:

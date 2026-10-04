@@ -57,7 +57,10 @@ class NumericMixin(_AnalyzerState):
 
     def _prepare_vif_frame(self, numeric_cols: list[str], alerts: list[Alert]) -> pl.DataFrame:
         """Drop constants before complete-case filtering, then recheck retained observations."""
-        frame = self._exclude_constant_vif_columns(self.df.select(numeric_cols), alerts)
+        frame = self.df.select(numeric_cols).filter(
+            pl.all_horizontal(pl.all().is_finite().fill_null(True))
+        )
+        frame = self._exclude_constant_vif_columns(frame, alerts)
         frame = frame.drop_nulls()
         if frame.height:
             frame = self._exclude_constant_vif_columns(frame, alerts)

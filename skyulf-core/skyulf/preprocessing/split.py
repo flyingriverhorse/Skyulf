@@ -451,10 +451,8 @@ class DataSplitter:
         train_idx = tv_idx
         if self.validation_size > 0:
             relative_val_size = self.validation_size / (1 - self.test_size)
-            stratify_val = (
-                self._target_stratify(_take_weighted_rows(y, tv_idx), "Stratified validation split")
-                if stratify is not None and y is not None
-                else None
+            stratify_val = self._target_stratify(
+                _take_weighted_rows(y, tv_idx), "Stratified validation split"
             )
             train_idx, val_idx = train_test_split(
                 tv_idx,
@@ -480,12 +478,8 @@ class DataSplitter:
         train_idx = tv_idx
         if self.validation_size > 0:
             relative_val_size = self.validation_size / (1 - self.test_size)
-            stratify_val = (
-                _safe_stratify_polars(
-                    df.get_column(self.stratify_col).gather(tv_idx), "Stratified validation split"
-                )
-                if stratify is not None
-                else None
+            stratify_val = self._frame_stratify_polars(
+                df.gather(tv_idx), label="Stratified validation split"
             )
             train_idx, val_idx = train_test_split(
                 tv_idx,

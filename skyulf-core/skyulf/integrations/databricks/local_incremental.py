@@ -117,8 +117,15 @@ def bounded_frame(
     record_key_columns: tuple[str, ...],
     max_rows: int,
     max_bytes: int,
+    *,
+    require_unique_keys: bool = True,
 ) -> pd.DataFrame:
-    """Move only a bounded, projected set of source rows to the local model."""
+    """Read bounded rows, optionally deferring key uniqueness until label eligibility.
+
+    Features and predictions require unique keys by default. Label readers can
+    defer that check until future revisions are excluded; null keys and transfer
+    limits remain invalid in either mode.
+    """
     records: list[dict[str, Any]] = []
     decoded_bytes = 0
     for row in (
@@ -136,7 +143,7 @@ def bounded_frame(
         raise ValueError("Source local frame exceeds max_bytes.")
     if frame.loc[:, list(record_key_columns)].isna().any().any():
         raise ValueError("Source row keys must not be null.")
-    if frame.duplicated(subset=list(record_key_columns)).any():
+    if require_unique_keys and frame.duplicated(subset=list(record_key_columns)).any():
         raise ValueError("Source row keys must be globally unique within this increment.")
     return frame
 

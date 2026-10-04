@@ -39,17 +39,25 @@ def validate_sample_weight(values: Any, expected_rows: int) -> NDArray[np.float6
     return weights
 
 
+def _weight_array(values: Any) -> np.ndarray:
+    """Avoid scalar boxing when a native numeric dtype already excludes booleans."""
+    dtype = getattr(values, "dtype", None)
+    if isinstance(dtype, np.dtype) and dtype.kind in "iuf":
+        return np.asarray(values)
+    return np.asarray(values, dtype=object)
+
+
 def _numeric_weight_vector(values: Any, expected_rows: int) -> NDArray[np.float64]:
     """Preserve scalar types until booleans and nonnumeric values are rejected."""
     try:
-        raw = np.asarray(values, dtype=object)
+        raw = _weight_array(values)
     except (TypeError, ValueError) as exc:
         raise SampleWeightError("sample_weight must be a one-dimensional numeric vector.") from exc
     if raw.ndim != 1 or len(raw) != expected_rows:
         raise SampleWeightError(
             f"sample_weight must be one-dimensional with {expected_rows} values."
         )
-    if any(
+    if raw.dtype.kind not in "iuf" and any(
         isinstance(value, (bool, np.bool_)) or not isinstance(value, (Real, Decimal))
         for value in raw
     ):

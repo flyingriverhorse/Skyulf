@@ -24,8 +24,8 @@ def _append_weights(
     X: pd.DataFrame, y: Any, weights: np.ndarray, X_res: Any, y_res: Any, policy: str
 ) -> np.ndarray:
     """Verify the original prefix before assigning weights to appended synthetic rows."""
-    prefix = pd.DataFrame(np.asarray(X_res)[: len(X)], dtype=object)
-    original = pd.DataFrame(np.asarray(X), dtype=object)
+    prefix = pd.DataFrame(pd.DataFrame(X_res).to_numpy(dtype=object)[: len(X)])
+    original = pd.DataFrame(X.to_numpy(dtype=object))
     if not prefix.equals(original):
         raise SampleWeightError("Synthetic sampler did not preserve the original feature rows.")
     if not np.array_equal(np.asarray(y_res)[: len(y)], np.asarray(y)):
@@ -64,6 +64,7 @@ def _resample(
     from .resampling import (  # noqa: PLC0415 - avoid initialization cycle
         _build_oversampler,
         _build_undersampler,
+        _restore_selected_rows,
         _validate_numeric,
     )
 
@@ -74,6 +75,7 @@ def _resample(
     if over and params["method"] != "random_over":
         return _sample_synthetic(sampler, X, y, weights, params)
     X_res, y_res = sampler.fit_resample(X, y)
+    X_res, y_res = _restore_selected_rows(sampler, X, y, X_res, y_res)
     return X_res, y_res, weights[sampler.sample_indices_]
 
 

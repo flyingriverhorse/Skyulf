@@ -329,7 +329,12 @@ class MultivariateMixin(_AnalyzerState):
             # so ordering (e.g. by date) doesn't bias which rows get analyzed.
             row_positions = row_positions.sample(n=limit, with_replacement=False, seed=42)
             df_numeric = df_numeric[row_positions]
-        return df_numeric, row_positions
+        # Missing cells retain the established mean-imputation policy. Infinite
+        # observations are excluded with the same mask on their original indices.
+        valid_rows = df_numeric.select(
+            pl.all_horizontal(pl.all().is_finite().fill_null(True))
+        ).to_series()
+        return df_numeric.filter(valid_rows), row_positions.filter(valid_rows)
 
     @staticmethod
     def _outlier_row_explanation(row_values, medians) -> list[dict]:

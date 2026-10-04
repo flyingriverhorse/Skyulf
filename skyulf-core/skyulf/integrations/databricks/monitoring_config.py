@@ -9,6 +9,9 @@ from typing import Any, Self
 
 from ._contracts import column_name, table_name
 
+MAX_MONITOR_ROWS = 1_000_000
+MAX_MONITOR_BYTES = 1024**3
+
 
 def qualified_name(value: str) -> str:
     """Require a concrete Unity Catalog object rather than a session default."""
@@ -111,7 +114,11 @@ def _validate_label_source(table: str | None, available: str | None) -> None:
 
 def _validate_budgets(config: MonitorConfig) -> None:
     """Cap driver materialization and the number of scoring snapshots replayed."""
-    for name, maximum in (("max_rows", 1000000), ("max_bytes", 1073741824), ("max_batches", 1000)):
+    for name, maximum in (
+        ("max_rows", MAX_MONITOR_ROWS),
+        ("max_bytes", MAX_MONITOR_BYTES),
+        ("max_batches", 1000),
+    ):
         value = getattr(config, name)
         if type(value) is not int or not 1 <= value <= maximum:
             raise ValueError(f"{name} must be a positive integer at most {maximum}.")
