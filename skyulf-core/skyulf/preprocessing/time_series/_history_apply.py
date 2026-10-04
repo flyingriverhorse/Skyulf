@@ -24,13 +24,25 @@ def _validate_forward(previous: list[dict], incoming: list[dict], params: dict) 
 
 
 def _combined_frame(frame: Any, previous: list[dict], params: dict) -> Any:
-    """Match context to the current native schema before calling the existing calculator."""
+    """Promote context and incoming values together without narrowing saved history."""
     columns = history_columns(params)
     if isinstance(frame, pl.DataFrame):
+        if not previous:
+            return frame.select(columns)
         context = pl.from_pandas(pd.DataFrame(previous, columns=columns))
-        context = context.cast({name: frame.schema[name] for name in columns})
-        return pl.concat([context, frame.select(columns)])
-    context = pd.DataFrame(previous, columns=columns).astype(frame[columns].dtypes)
+        context = context.with_columns(
+            pl.col(name).cast(frame.schema[name])
+            for name in columns
+            if context[name].null_count() == len(context)
+        )
+        return pl.concat([context, frame.select(columns)], how="vertical_relaxed")
+    if not previous:
+        return frame[columns].copy()
+    context = pd.DataFrame(previous, columns=columns)
+    for name in columns:
+        if context[name].isna().all():
+            dtype = frame[name].convert_dtypes().dtype
+            context[name] = context[name].astype(dtype)
     return pd.concat([context, frame[columns]], ignore_index=True)
 
 
@@ -46,7 +58,7 @@ def _restore_output(
     result = transformed.iloc[order].iloc[offset:]
     output = frame.copy()
     for name in added:
-        output[name] = result[name].to_numpy()
+        output[name] = result[name].array
     return output
 
 

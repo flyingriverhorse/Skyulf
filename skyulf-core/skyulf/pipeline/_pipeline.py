@@ -15,7 +15,7 @@ import pandas as pd
 import polars as pl
 
 from ..config_validation import validate_pipeline_config
-from ..core.schema import SkyulfSchema
+from ..core.schema import SkyulfSchema, validate_schema
 from ..core.validation import prediction_row_count, validate_prediction_rows
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, get_engine
@@ -103,6 +103,16 @@ def _record_tuning_column_drops(
                 "artifact": {"columns": removed_columns},
             },
         )
+
+
+def _tuning_ordering_columns(engineer: FeatureEngineer) -> list[str]:
+    """Return fit-time ordering metadata explicitly excluded from model features."""
+    return [
+        column
+        for step in engineer.fitted_steps
+        if isinstance(step.get("applier"), _TuningColumnDropApplier)
+        for column in step["artifact"]["columns"]
+    ]
 
 
 def _merge_preprocessing_metrics(
@@ -441,13 +451,7 @@ class SkyulfPipeline:
                 data, target_column, sample_weight
             )
             if input_schema is not None:
-                ordering_columns = (
-                    column
-                    for step in self.feature_engineer.fitted_steps
-                    if isinstance(step.get("applier"), _TuningColumnDropApplier)
-                    for column in step["artifact"]["columns"]
-                )
-                input_schema = input_schema.drop(ordering_columns)
+                input_schema = input_schema.drop(_tuning_ordering_columns(self.feature_engineer))
         else:
             transformed_data, fe_metrics = self.feature_engineer.fit_transform(
                 data, target_column=target_column, sample_weight=sample_weight
@@ -760,7 +764,16 @@ class SkyulfPipeline:
             )
 
         # 1. Feature Engineering (Transform only)
+        if self._inference_schemas is not None:
+            input_schema = SkyulfSchema.from_dataframe(data).drop(
+                _tuning_ordering_columns(self.feature_engineer)
+            )
+            validate_schema(self._inference_schemas[0], input_schema, check_order=True)
         transformed_data = self.feature_engineer.transform(data, preserve_rows=True)
+        if self._inference_schemas is not None:
+            validate_schema(
+                self._inference_schemas[1], transformed_data, check_order=True, where="model input"
+            )
 
         # 2. Modeling
         if not use_tuned_thresholds:

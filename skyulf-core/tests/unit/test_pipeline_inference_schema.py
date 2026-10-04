@@ -11,7 +11,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.core.schema import SkyulfSchema
+from skyulf.core.schema import SchemaMismatchError, SkyulfSchema
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines import get_engine
 from skyulf.pipeline import SkyulfPipeline
@@ -59,6 +59,27 @@ def _pipeline(tuning: bool = False) -> SkyulfPipeline:
             "modeling": modeling,
         }
     )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("tuning", [False, True])
+@pytest.mark.parametrize("change", ["reorder", "rename"])
+def test_predict_rejects_changed_input_columns(engine, tuning, change):
+    """Named preprocessing must not hide a broken raw inference column contract."""
+    frame = _frame()
+    pipeline = _pipeline(tuning)
+    training = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(training, target_column="target")
+    features = frame.drop(columns="target")
+    if change == "reorder":
+        features = features[["alpha", "category", "zeta"]]
+    else:
+        features = features.rename(columns={"alpha": "unknown"})
+    if engine == "polars":
+        features = pl.from_pandas(features)
+
+    with pytest.raises(SchemaMismatchError):
+        pipeline.predict(features)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

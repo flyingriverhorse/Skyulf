@@ -190,6 +190,7 @@ def _tree_children(h: Any, obj: Any) -> Iterator[Any]:
         "impurity",
         "n_node_samples",
         "weighted_n_node_samples",
+        "missing_go_to_left",
         "value",
     ):
         yield np.asarray(getattr(obj, attr))

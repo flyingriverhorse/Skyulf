@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import ConvergenceWarning
 
+from ..core.schema import SkyulfSchema, validate_schema
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
@@ -20,6 +21,13 @@ from ._sample_weights import SampleWeightError
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_feature_schema(data: Any, model: Any) -> None:
+    """Check a named fit contract before NumPy conversion discards feature names."""
+    schema = getattr(model, "_skyulf_input_schema", None)
+    if schema is not None:
+        validate_schema(schema, data, check_order=True, where="model input")
 
 
 class SklearnCalculator(BaseModelCalculator):
@@ -112,6 +120,8 @@ class SklearnCalculator(BaseModelCalculator):
         # get pickled for storage/serving.
         if detach_callbacks:
             model.callbacks = None
+        if hasattr(X, "columns"):
+            model._skyulf_input_schema = SkyulfSchema.from_dataframe(X)
         for w in caught:
             if issubclass(w.category, ConvergenceWarning):
                 conv_msg = f"{self.model_class.__name__} did not fully converge: {w.message}"
@@ -228,6 +238,7 @@ class SklearnApplier(BaseModelApplier):
         inputs fall back to a default index.
         """
         # Convert to Numpy
+        _validate_feature_schema(df, model_artifact)
         X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
 
         preds = model_artifact.predict(X_np)
@@ -253,6 +264,7 @@ class SklearnApplier(BaseModelApplier):
         if not hasattr(model_artifact, "predict_proba"):
             return None
 
+        _validate_feature_schema(df, model_artifact)
         X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
         probs = model_artifact.predict_proba(X_np)
 

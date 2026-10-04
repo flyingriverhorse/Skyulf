@@ -45,6 +45,53 @@ def _engineer(kind):
 @pytest.mark.parametrize(
     "kind, column, expected",
     [
+        ("LagFeatures", "v_lag_1", 2.5),
+        ("RollingAggregate", "v_roll_mean_2", 3.25),
+    ],
+)
+def test_integer_incoming_values_do_not_truncate_float_history(engine, kind, column, expected):
+    """Batch dtype inference must not round the saved temporal context."""
+    engineer = _engineer(kind)
+    engineer.fit_transform(_frame(engine, [1, 2], [1.5, 2.5]))
+
+    result = engineer.transform(_frame(engine, [3], [4]), preserve_rows=True)
+
+    assert result[column].to_list() == [expected]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_integer_incoming_values_accept_missing_history(engine):
+    """Missing historical values must survive a later integer-valued batch."""
+    engineer = _engineer("LagFeatures")
+    engineer.fit_transform(_frame(engine, [1, 2], [1.5, None]))
+
+    result = engineer.transform(_frame(engine, [3], [4]), preserve_rows=True)
+
+    assert pd.isna(result["v_lag_1"].to_list()[0])
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_null_only_history_keeps_lag_values_numeric(engine):
+    """A null-only saved tail must not coerce the next batch's numeric lags to text."""
+    engineer = _engineer("LagFeatures")
+    engineer.steps_config[0]["params"]["lags"] = [1]
+    engineer.fit_transform(_frame(engine, [1, 2], [1.0, np.nan]))
+
+    result = engineer.transform(_frame(engine, [4, 5], [5, 6]), preserve_rows=True)
+
+    values = result["v_lag_1"].to_list()
+    assert pd.isna(values[0])
+    assert values[1] == 5
+    if engine == "polars":
+        assert result.schema["v_lag_1"].is_numeric()
+    else:
+        assert pd.api.types.is_numeric_dtype(result["v_lag_1"].dtype)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "kind, column, expected",
+    [
         ("LagFeatures", "v_lag_1", [30.0, 40.0]),
         ("RollingAggregate", "v_roll_mean_2", [35.0, 45.0]),
     ],
