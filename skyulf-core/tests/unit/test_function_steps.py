@@ -249,7 +249,7 @@ def test_filter_step_keeps_rows_values_and_target_aligned(engine):
 def test_filter_step_is_skipped_at_inference_like_other_row_droppers():
     """Inference must never silently drop requested rows."""
     engineer, _ = _fit([filter_step("adult_only", adult, columns=["age"])], _frame("pandas"))
-    assert len(engineer.transform(_frame("pandas"))) == 4
+    assert len(engineer.transform(_frame("pandas"), preserve_rows=True)) == 4
 
 
 def test_filter_step_requires_boolean_mask():

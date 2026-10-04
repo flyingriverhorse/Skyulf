@@ -277,7 +277,7 @@ def test_transform_skips_row_dropping_steps() -> None:
     assert len(out_fit) < len(train)  # the steps genuinely drop rows at fit time
 
     new = pd.DataFrame({"a": [5.0, 5.0, None, 7.0], "b": [0, 1, 0, 1]})
-    result = fe.transform(new)
+    result = fe.transform(new, preserve_rows=True)
     assert len(result) == 4
 
 

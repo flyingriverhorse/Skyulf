@@ -17,6 +17,7 @@ from sklearn.model_selection import (
     TimeSeriesSplit,
 )
 
+from ..data.coverage import transform_evaluation
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
@@ -291,17 +292,19 @@ def _apply_fold_preprocessing(
     X_val: Any,
     y_val: Any,
     sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> tuple[Any, Any, Any, Any, Any]:
     """Re-fit preprocessing on this fold's training rows and apply it to the held-out rows.
 
     No-op when ``preprocessing`` is None (data already transformed by caller).
     """
-    if preprocessing is None:
-        return X_train, y_train, X_val, y_val, sample_weight
-    X_train, y_train, sample_weight = fit_preprocessor(
-        preprocessing, X_train, y_train, sample_weight
+    if preprocessing is not None:
+        X_train, y_train, sample_weight = fit_preprocessor(
+            preprocessing, X_train, y_train, sample_weight
+        )
+    X_val, y_val, _coverage = transform_evaluation(
+        preprocessing, X_val, y_val, coverage_out=evaluation_coverage
     )
-    X_val, y_val = preprocessing.transform(X_val, y_val)
     return X_train, y_train, X_val, y_val, sample_weight
 
 
@@ -328,9 +331,16 @@ def _run_cv_fold(
         log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
 
     sample_weight = take_weights(sample_weight, train_idx)
+    coverage: dict[str, Any] = {}
     X_train_fold, X_val_fold, y_train_fold, y_val_fold = _slice_fold_data(X, y, train_idx, val_idx)
     X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight = _apply_fold_preprocessing(
-        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight
+        preprocessing,
+        X_train_fold,
+        y_train_fold,
+        X_val_fold,
+        y_val_fold,
+        sample_weight,
+        evaluation_coverage=coverage,
     )
 
     # Fit
@@ -353,6 +363,7 @@ def _run_cv_fold(
     return {
         "fold": fold_idx + 1,
         "metrics": sanitize_metrics(metrics),
+        "evaluation_coverage": coverage,
         # We could store predictions here if needed, but might be too heavy
     }
 
@@ -664,8 +675,15 @@ def _evaluate_outer_fold(
     sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Fit on the outer training fold, evaluate on the outer validation fold, and log."""
+    coverage: dict[str, Any] = {}
     X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight = _apply_fold_preprocessing(
-        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold, sample_weight
+        preprocessing,
+        X_train_fold,
+        y_train_fold,
+        X_val_fold,
+        y_val_fold,
+        sample_weight,
+        evaluation_coverage=coverage,
     )
     model_artifact = calculator.fit(
         X_train_fold, y_train_fold, config, **weight_kwargs(sample_weight)
@@ -685,6 +703,7 @@ def _evaluate_outer_fold(
         # None (not NaN) when every inner fold failed, for JSON-safety
         # parity with sanitize_metrics' non-finite-value handling.
         "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
+        "evaluation_coverage": coverage,
     }
 
 

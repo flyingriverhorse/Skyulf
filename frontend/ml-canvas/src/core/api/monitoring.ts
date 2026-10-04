@@ -37,6 +37,16 @@ export interface ColumnDrift {
     drift_detected: boolean;
     suggestions: string[];
     distribution?: DriftDistribution;
+    evidence?: {
+        status: 'supported' | 'not_detected' | 'insufficient_data' | 'unavailable';
+        test?: string | null;
+        p_value?: number | null;
+        adjusted_p_value?: number | null;
+        significance_level?: number;
+        reference_count: number;
+        current_count: number;
+        reason?: string | null;
+    } | null;
 }
 
 export interface DriftReport {

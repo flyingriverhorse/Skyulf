@@ -23,6 +23,19 @@ function fixture(): DriftReport {
 }
 
 describe('DriftTable public evidence', () => {
+    it('labels insufficient observations separately from stable data', () => {
+        // An absent drift verdict must not reassure users that a tiny sample is stable.
+        const report = fixture();
+        report.column_drifts.alpha!.evidence = {
+            status: 'insufficient_data', reference_count: 3, current_count: 3,
+            reason: 'More observations are needed.',
+        };
+        render(<DriftTable report={report} showOnlyDrifted={false} sortConfig={null} onSort={vi.fn()} columnSparklines={{}} />);
+        expect(screen.getByText('Insufficient data')).toBeInTheDocument();
+        expect(screen.getByText('Unknown')).toBeInTheDocument();
+        expect(screen.queryByText('Stable')).not.toBeInTheDocument();
+    });
+
     it('preserves ordering, special values, metric tooltips, details and report reset', () => {
         /** Sorting and expansion must preserve metric evidence and collapse for a new report. */
         const onSort = vi.fn();
@@ -38,6 +51,7 @@ describe('DriftTable public evidence', () => {
         fireEvent.click(within(rows[2]!).getByRole('button', { name: 'Details' }));
         expect(screen.getByText('< 0.001')).toBeInTheDocument();
         expect(screen.getByText('Check source')).toBeInTheDocument();
+        expect(screen.getByText(/legacy report: effect thresholds/)).toBeInTheDocument();
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByText('Check source')).not.toBeInTheDocument();
         fireEvent.click(within(rows[2]!).getByRole('button', { name: 'Details' }));
@@ -54,6 +68,6 @@ describe('DriftTable public evidence', () => {
         const { rerender } = render(<DriftTable {...props} />);
         expect(screen.getByText(/see the schema drift above/)).toBeInTheDocument();
         rerender(<DriftTable {...props} report={{ ...report, missing_columns: [] }} />);
-        expect(screen.getByText(/all features are stable/)).toBeInTheDocument();
+        expect(screen.getByText(/No supported distribution drift/)).toBeInTheDocument();
     });
 });

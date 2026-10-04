@@ -5,6 +5,7 @@ import time
 import tracemalloc
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from importlib import import_module
 from typing import Any, Protocol, cast, runtime_checkable
 
@@ -12,6 +13,7 @@ import pandas as pd
 import polars as pl
 
 from ..core.protocols import ApplierProtocol, CalculatorProtocol
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..modeling._sample_weights import validate_sample_weight
@@ -329,7 +331,34 @@ class StatefulTransformer:
             test=new_test,
             validation=new_val,
             train_sample_weight=train_weight,
+            evaluation_coverage=self._evaluation_coverage(dataset, new_test, new_val),
         )
+
+    def _evaluation_coverage(
+        self, dataset: SplitDataset, new_test: Any, new_val: Any
+    ) -> dict[str, dict[str, Any]]:
+        """Carry held-out denominators across nodes without storing row-level data."""
+        coverage = deepcopy(dataset.evaluation_coverage)
+        for name, result in (("test", new_test), ("validation", new_val)):
+            original = getattr(dataset, name)
+            if original is None or result is None:
+                continue
+            before = len(unpack_pipeline_input(original)[0])
+            after = len(unpack_pipeline_input(result)[0])
+            previous = coverage.get(name, record_coverage(before, before))
+            steps = list(previous.get("steps", []))
+            if before != after:
+                steps.append(
+                    {"name": self.node_id, **record_coverage(before, after, step_name=self.node_id)}
+                )
+            coverage[name] = record_coverage(
+                previous["input_rows"],
+                after,
+                steps,
+                reason=previous.get("reason"),
+                step_name=self.node_id,
+            )
+        return coverage
 
     def _apply_guarded(self, data: Any, params: dict[str, Any]) -> Any:
         """Apply the applier to `data` and raise if it produces a nested SplitDataset."""
@@ -368,6 +397,7 @@ class StatefulTransformer:
             test=new_test,
             validation=new_val,
             train_sample_weight=train_weight,
+            evaluation_coverage=self._evaluation_coverage(dataset, new_test, new_val),
         )
 
     def transform(

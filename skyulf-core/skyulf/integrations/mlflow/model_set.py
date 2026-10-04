@@ -3,6 +3,7 @@
 import inspect
 import tempfile
 from collections.abc import Iterable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,13 @@ from ...inference.project_dependencies import (
     parse_project_requirements,
     source_project_requirements,
 )
+from ._nullable_transport import (
+    TRANSPORT_KEY,
+    decode_frame,
+    restore_nullable_dtypes,
+    transport_spec,
+    validated_transport,
+)
 from .local_model import normalized_dtype, pip_requirements, validate_local_destination
 from .registry import (
     ResolvedModel,
@@ -38,9 +46,10 @@ from .registry import (
 class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
     """Execute the frozen components and composition shipped in one package."""
 
-    def __init__(self) -> None:
+    def __init__(self, input_transport: dict[str, Any] | None = None) -> None:
         """Defer loading fitted assets until MLflow supplies package context."""
         self._artifact: ModelSetArtifact | None = None
+        self._input_transport = deepcopy(input_transport)
 
     def __getstate__(self) -> dict[str, Any]:
         """Exclude process-local artifact paths and cached fitted objects."""
@@ -53,6 +62,16 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
         except (AttributeError, KeyError) as exc:
             raise ValueError("MLflow model is missing its model set artifact.") from exc
         self._artifact = load_model_set(path)
+        self.input_transport()
+
+    def input_transport(self) -> dict[str, Any] | None:
+        """Return the artifact-validated nullable input contract without mutable aliases."""
+        if self._artifact is None:
+            raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
+        return validated_transport(
+            getattr(self, "_input_transport", None),
+            ((column.name, column.dtype) for column in self._artifact.manifest.input_schema),
+        )
 
     def predict(
         self, context: Any, model_input: pd.DataFrame, params: dict[str, Any] | None = None
@@ -63,6 +82,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf model set pyfunc requires a pandas DataFrame.")
+        model_input = decode_frame(model_input, self.input_transport())
+        model_input = restore_nullable_dtypes(
+            model_input,
+            ((column.name, column.dtype) for column in self._artifact.manifest.input_schema),
+        )
         return predict_model_set(model_input, self._artifact)
 
 
@@ -76,6 +100,9 @@ def log_model_set(
     """Log a complete model set without selecting aliases or retaining producer paths."""
     validate_local_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
     signature = _signature(artifact)
     requirements = _set_requirements(artifact)
     client = make_tracking_client(tracking_uri)
@@ -87,7 +114,7 @@ def log_model_set(
             options["uv_project_path"] = directory
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfModelSetPythonModel(),
+            python_model=SkyulfModelSetPythonModel(transport),
             artifacts={"model_set": str(artifact.directory)},
             signature=signature,
             pip_requirements=requirements,
@@ -95,6 +122,7 @@ def log_model_set(
                 "skyulf_artifact_kind": "model_set",
                 "skyulf_execution_scope": "whole_frame_local",
                 "model_set_digest": artifact.manifest.set_sha256,
+                **({TRANSPORT_KEY: transport} if transport else {}),
             },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
             **options,
@@ -109,14 +137,27 @@ def _signature(artifact: ModelSetArtifact) -> Any:
     from mlflow.models import ModelSignature  # noqa: PLC0415  # ty: ignore[unresolved-import]
     from mlflow.types import ColSpec, Schema  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
-    def schema(columns: Any) -> Any:
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
+    encoded = transport["columns"] if transport else {}
+
+    def schema(columns: Any, encode: bool = False) -> Any:
         """Preserve names and order while rejecting lossy unsupported scalar types."""
         return Schema(
-            [ColSpec(mlflow_dtype(normalized_dtype(c.dtype)), name=c.name) for c in columns]
+            [
+                ColSpec(
+                    mlflow_dtype(
+                        "string" if encode and c.name in encoded else normalized_dtype(c.dtype)
+                    ),
+                    name=c.name,
+                )
+                for c in columns
+            ]
         )
 
     return ModelSignature(
-        inputs=schema(artifact.manifest.input_schema),
+        inputs=schema(artifact.manifest.input_schema, encode=True),
         outputs=schema(model_set_output_schema(artifact)),
     )
 

@@ -84,6 +84,7 @@ class ModelEvaluationReport(BaseModel):
     dataset_name: str
     metrics: dict[str, float]
     omitted_metrics: dict[str, str] = Field(default_factory=dict)
+    coverage: dict[str, Any] | None = None
     classification: ClassificationEvaluation | None = None
     regression: RegressionEvaluation | None = None
     clustering: ClusteringEvaluation | None = None

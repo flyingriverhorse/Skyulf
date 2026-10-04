@@ -104,6 +104,33 @@ print(preds2)
 
 ## Inspecting a pipeline
 
+### Evaluation population after filtering
+
+Explicit row filters, such as dropping missing rows, select the eligible
+population for both ordinary evaluation and tuning/CV. Fitted cleaning bounds
+come from training data. Serving preserves the requested row alignment.
+
+Held-out reports record `input_rows`, `scored_rows`, and `excluded_rows`.
+The denominator begins when that test or validation split exists. For example,
+filtering 12 rows out of a 120-row test split reports 120 input, 108 scored,
+and 12 excluded. Filtering before splitting changes the source population;
+those earlier exclusions are not counted again as test exclusions. Training
+coverage describes the final training frame, not all rows loaded upstream.
+Consequently, the displayed metrics describe eligible observations and should
+not be interpreted as accuracy on the original unfiltered dataset.
+
+A split with no eligible rows has no evaluation metrics and an explicit
+unavailable reason. Missing original counts remain unknown rather than zero.
+In Canvas, merging nonempty filtered evaluation branches without shared row
+lineage is rejected: equal counts do not establish that both branches contain
+the same rows. Merge branches before applying row filters. All-empty branches
+retain their coverage and remain visible in the report.
+This also rejects branches that inherit the same earlier filter: the recorded
+counts do not establish shared row identity, even when both branches happen
+to contain identical rows.
+
+### Pipeline description and diagram
+
 A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
 docs, PR descriptions, and model registries:
 

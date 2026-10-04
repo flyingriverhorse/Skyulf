@@ -4,10 +4,12 @@ from typing import Any
 
 import numpy as np
 
+from ...data.coverage import record_coverage
 from .._class_weights import split_class_weight_params
 from .._cv_weights import preflight_weights, take_weights, weight_kwargs
 from .._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .fold_pipeline import FoldAwareModelStep
+from .fold_scoring import prepare_fold_evaluation
 from .grid_random import _slice_fold_rows
 from .metrics import resolve_metric, resolve_scorer
 from .params import instantiate_model, seed_params
@@ -103,7 +105,9 @@ def select_nested_threshold(
     classes = _binary_classes(tuner, y)
     partitions = list(cv.split(X, y) if hasattr(cv, "split") else cv)
     covered = np.zeros(len(y), dtype=bool)
-    probabilities = np.empty((len(y), 2), dtype=float)
+    probability_blocks = []
+    target_blocks = []
+    fold_coverage = []
     for train, test in partitions:
         _validate_partition(train, test, covered)
         step = _fit_step(
@@ -115,9 +119,18 @@ def select_nested_threshold(
             preprocessing,
             **weight_kwargs(take_weights(sample_weight, train)),
         )
-        probabilities[test] = _probabilities(step, _slice_fold_rows(X, test), classes)
+        view, X_test, y_test, coverage = prepare_fold_evaluation(
+            step, _slice_fold_rows(X, test), _slice_fold_rows(y, test)
+        )
+        probability_blocks.append(_probabilities(view, X_test, classes))
+        target_blocks.append(np.asarray(y_test))
+        fold_coverage.append(coverage)
         covered[test] = True
-    if not np.any(covered) or len(np.unique(np.asarray(y)[covered])) != 2:
+    if not target_blocks:
+        raise ValueError("Nested threshold selection requires OOF observations of both classes.")
+    observed_y = np.concatenate(target_blocks)
+    probabilities = np.concatenate(probability_blocks)
+    if len(np.unique(observed_y)) != 2:
         raise ValueError("Nested threshold selection requires OOF observations of both classes.")
     metric, metric_name = resolve_threshold_metric(config.metric, None, pos_label=classes[1])
 
@@ -128,17 +141,17 @@ def select_nested_threshold(
             raise ValueError("Nested threshold selection requires finite candidate scores.")
         return value
 
-    thresholds = optimize_thresholds(
-        np.asarray(y)[covered], probabilities[covered], finite_metric, classes=classes
-    )
+    thresholds = optimize_thresholds(observed_y, probabilities, finite_metric, classes=classes)
     return {
         "decision_thresholds": {label: float(thresholds[label]) for label in classes.tolist()},
         "decision_threshold_metric": metric_name,
         "selection": "inner_oof",
-        "oof_rows": int(covered.sum()),
+        "oof_rows": len(observed_y),
         "training_rows": len(y),
         "inner_folds": len(partitions),
         "positive_class": classes.tolist()[1],
+        "evaluation_coverage": record_coverage(int(covered.sum()), len(observed_y)),
+        "fold_evaluation_coverage": fold_coverage,
     }
 
 
@@ -153,16 +166,20 @@ def score_nested_threshold(
     selection: dict[str, Any],
     preprocessing: Any = None,
     sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> float:
-    """Refit on outer training rows and evaluate the selected threshold on untouched rows."""
+    """Refit on outer training rows and evaluate the selected threshold on eligible held-out rows."""
     classes = _binary_classes(tuner, y_train)
+    step = _fit_step(tuner, X_train, y_train, config, best_params, preprocessing, sample_weight)
+    step.decision_thresholds = selection["decision_thresholds"]
+    view, X_test, y_test, coverage = prepare_fold_evaluation(step, X_test, y_test)
+    if evaluation_coverage is not None:
+        evaluation_coverage.update(coverage)
     if not set(np.unique(np.asarray(y_test))).issubset(set(classes)):
         raise ValueError("Nested threshold outer labels do not match training classes.")
-    step = _fit_step(tuner, X_train, y_train, config, best_params, preprocessing, sample_weight)
-    _probabilities(step, X_test, classes)
-    step.decision_thresholds = selection["decision_thresholds"]
+    _probabilities(view, X_test, classes)
     metric = resolve_metric(config, y_train, tuner.problem_type)
-    score = float(resolve_scorer(metric, y_train, tuner.problem_type)(step, X_test, y_test))
+    score = float(resolve_scorer(metric, y_train, tuner.problem_type)(view, X_test, y_test))
     if not np.isfinite(score):
         raise ValueError("Nested threshold outer evaluation must produce a finite score.")
     return score

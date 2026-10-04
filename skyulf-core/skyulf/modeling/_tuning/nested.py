@@ -56,6 +56,7 @@ def _outer_score(
     fold: int,
     preprocessing: Any,
     sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> tuple[float, dict[str, float]]:
     """Refit the selected recipe on outer training rows and reject incomplete evaluations."""
     errors: list[str] = []
@@ -79,6 +80,7 @@ def _outer_score(
         seed_params_overlay=seed_params(config),
         model_calculator=tuner.model_calculator,
         evaluation_metrics=metrics,
+        evaluation_coverage=evaluation_coverage,
         **weight_kwargs(sample_weight),
     )
     if not np.isfinite(score):
@@ -122,11 +124,23 @@ def _evaluate_selected(
     sample_weight: Any = None,
 ) -> tuple[float, dict[str, Any]]:
     """Evaluate selected parameters, with a training-only threshold when requested."""
+    coverage: dict[str, Any] = {}
     if not config.tune_threshold:
         score, metrics = _outer_score(
-            tuner, X, y, train, test, outer, config, result, index, preprocessing, sample_weight
+            tuner,
+            X,
+            y,
+            train,
+            test,
+            outer,
+            config,
+            result,
+            index,
+            preprocessing,
+            sample_weight,
+            evaluation_coverage=coverage,
         )
-        return score, {"metrics": metrics}
+        return score, {"metrics": metrics, "evaluation_coverage": coverage}
     train_x, train_y = _slice_fold_rows(X, train), _slice_fold_rows(y, train)
     selection = select_nested_threshold(
         tuner,
@@ -148,9 +162,10 @@ def _evaluate_selected(
         result.best_params,
         selection,
         preprocessing,
+        evaluation_coverage=coverage,
         **weight_kwargs(take_weights(sample_weight, train)),
     )
-    return score, {"threshold_selection": selection}
+    return score, {"threshold_selection": selection, "evaluation_coverage": coverage}
 
 
 def _final_threshold(

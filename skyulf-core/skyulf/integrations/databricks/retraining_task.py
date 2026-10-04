@@ -8,6 +8,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Any
 
+from ...profiling._drift_evidence import SIGNIFICANCE_LEVEL, DriftEvidence
 from .job_output import output_table
 from .job_runtime import read_notebook_config
 from .monitoring_config import MonitorConfig, json_digest
@@ -38,12 +39,81 @@ def _broken_input(item: dict) -> bool:
     )
 
 
+def _evidence_probabilities_match(evidence: DriftEvidence, family_size: int) -> bool:
+    """Require finite probabilities and the current report's declared correction semantics."""
+    probabilities = (evidence.p_value, evidence.adjusted_p_value)
+    if any(
+        value is None or not math.isfinite(value) or not 0 <= value <= 1 for value in probabilities
+    ):
+        return False
+    assert evidence.p_value is not None and evidence.adjusted_p_value is not None
+    expected = min(1.0, evidence.p_value * family_size)
+    return (
+        evidence.significance_level == SIGNIFICANCE_LEVEL
+        and math.isclose(evidence.adjusted_p_value, expected, rel_tol=1e-12, abs_tol=0.0)
+        and (evidence.status == "supported") == (evidence.adjusted_p_value <= SIGNIFICANCE_LEVEL)
+    )
+
+
+def _valid_statistical_evidence(row: dict, family_size: int) -> bool:
+    """Validate complete known evidence rather than accepting an old OR-only issue flag."""
+    try:
+        evidence = DriftEvidence.model_validate(row.get("evidence"), strict=True)
+    except ValueError:
+        return False
+    tests = {
+        "ks_2samp",
+        "fisher_exact",
+        "fisher_category_bonferroni",
+        "chi_square",
+        "constant_categories",
+    }
+    if evidence.test not in tests or evidence.status not in {"supported", "not_detected"}:
+        return False
+    return (
+        min(evidence.reference_count, evidence.current_count) >= 2
+        and _evidence_probabilities_match(evidence, family_size)
+        and row.get("value") == evidence.adjusted_p_value
+        and row.get("threshold") == SIGNIFICANCE_LEVEL
+        and row.get("has_issue") is False
+    )
+
+
+def _statistical_rows(checks: list[dict]) -> dict[str, dict] | None:
+    """Match exactly one statistical result to each feature without accepting duplicate rows."""
+    names = [item.get("column_name") for item in checks]
+    if any(not isinstance(column, str) or not column for column in names):
+        return None
+    columns = set(names)
+    rows = [item for item in checks if item.get("metric_name") == "statistical_evidence"]
+    evidence = {item["column_name"]: item for item in rows}
+    if len(rows) != len(columns) or set(evidence) != columns:
+        return None
+    return evidence
+
+
+def _complete_statistical_evidence(checks: list[dict]) -> bool:
+    """Require one supported or explicitly nonsignificant test for every measured feature."""
+    if not checks or any(item.get("status") != "measured" for item in checks):
+        return False
+    evidence = _statistical_rows(checks)
+    if not evidence:
+        return False
+    if not all(_valid_statistical_evidence(item, len(evidence)) for item in evidence.values()):
+        return False
+    return all(
+        not item.get("has_issue")
+        or evidence[item["column_name"]]["evidence"]["status"] == "supported"
+        for item in checks
+    )
+
+
 def _drift_metrics_decision(metrics: list[dict]) -> str:
     """Separate distribution changes from broken or unmeasured feature inputs."""
     if any(_broken_input(item) for item in metrics):
         return "quality_issue"
     checks = [item for item in metrics if item.get("category") == "drift"]
-    if not checks or any(item.get("status") != "measured" for item in checks):
+    if not _complete_statistical_evidence(checks):
         return "incomplete_drift"
     return "ready" if any(item.get("has_issue") for item in checks) else "no_drift"
 
@@ -67,7 +137,7 @@ def observation_decision(row: dict, config: MonitorConfig, now: datetime) -> str
     if age < 0 or age > config.expected_interval_hours * 3600:
         return "stale_observation"
     if row["status"] != "drift":
-        return "no_drift"
+        return {"degraded": "incomplete_drift"}.get(row["status"], "no_drift")
     return _drift_metrics_decision(json.loads(row["report_json"])["metrics"])
 
 

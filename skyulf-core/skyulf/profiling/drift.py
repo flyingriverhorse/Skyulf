@@ -4,8 +4,8 @@ Every column shared by the two datasets is scored with distribution metrics —
 PSI, Wasserstein distance, KS and KL divergence for numeric columns, PSI over
 the category frequencies for categorical ones — and columns present on only
 one side are reported separately as schema drift. Thresholds are per-metric
-and caller-overridable; the KS verdict is taken on the statistic rather than
-the p-value, which shrinks with sample size.
+and caller-overridable. A distribution verdict also requires statistical
+support after Bonferroni correction across the tested feature family.
 """
 
 import logging
@@ -14,6 +14,8 @@ from collections import Counter
 import numpy as np
 import polars as pl
 from pydantic import BaseModel
+
+from ._drift_evidence import DriftEvidence, categorical_evidence, correct_evidence, numeric_evidence
 
 try:
     from scipy.stats import entropy, ks_2samp, wasserstein_distance
@@ -33,13 +35,12 @@ PSI_MODERATE = 0.1
 class DriftMetric(BaseModel):
     """One drift statistic for one column.
 
-    ``value`` is reported on the same scale as ``threshold`` whenever ``value``
-    is what the verdict was made on, so ``value > threshold`` reproduces
-    ``has_drift`` and consumers that re-derive the verdict (the UI's threshold
-    sliders do) need no metric-specific knowledge. The one exception is
-    ``ks_test_p_value``: it rides along for diagnostics, never decides drift
-    (the p-value shrinks with sample size), and carries the KS statistic's
-    threshold rather than one of its own.
+    ``value > threshold`` reproduces the effect-size diagnostic ``has_drift``.
+    A final column verdict additionally requires ``evidence.status ==
+    "supported"``; threshold sliders must preserve that statistical guard.
+    The exception is ``ks_test_p_value``: this raw diagnostic carries the KS
+    statistic's effect flag and threshold for compatibility. The separate
+    evidence record applies feature-family correction to its probability.
 
     ``raw_value`` is set only where ``value`` is a transform of a more familiar
     quantity — the Wasserstein distance is reported normalized by the reference
@@ -78,6 +79,7 @@ class ColumnDrift(BaseModel):
     drift_detected: bool
     suggestions: list[str] = []
     distribution: DriftDistribution | None = None
+    evidence: DriftEvidence | None = None
 
 
 class DriftReport(BaseModel):
@@ -117,10 +119,10 @@ class DriftCalculator:
         """Calculates drift for all common columns.
 
         ``drifted_columns_count`` covers both kinds of drift: columns whose
-        value distribution moved past a threshold, and columns that appeared or
-        disappeared between the two schemas. A vanished column used to leave the
-        count at 0, so the report claimed no drift while the backend classified
-        that same structural change as critical.
+        value distribution moved past an effect threshold with statistical
+        support, and columns that appeared or disappeared between the schemas.
+        A vanished column used to leave the count at 0, so the report claimed no
+        drift while the backend classified that same structural change as critical.
         """
         if not SCIPY_AVAILABLE:
             raise ImportError("scipy is required for drift calculation")
@@ -129,7 +131,6 @@ class DriftCalculator:
         missing_columns, new_columns = self._detect_schema_drift()
 
         column_drifts = {}
-        drifted_count = 0
 
         for col in self.common_columns:
             col_drift = self._calculate_column_drift(col, thresholds)
@@ -137,8 +138,8 @@ class DriftCalculator:
                 continue
 
             column_drifts[col] = col_drift
-            if col_drift.drift_detected:
-                drifted_count += 1
+        self._apply_statistical_evidence(column_drifts)
+        drifted_count = sum(column.drift_detected for column in column_drifts.values())
 
         return DriftReport(
             reference_rows=len(self.reference_df),
@@ -148,6 +149,28 @@ class DriftCalculator:
             missing_columns=missing_columns,
             new_columns=new_columns,
         )
+
+    @staticmethod
+    def _apply_statistical_evidence(columns: dict[str, ColumnDrift]) -> None:
+        """Require both practical effect and statistical support, preserving schema alerts."""
+        correct_evidence(
+            [column.evidence for column in columns.values() if column.evidence is not None]
+        )
+        for column in columns.values():
+            evidence = column.evidence
+            if evidence is None:
+                continue
+            column.drift_detected = column.drift_detected and evidence.status == "supported"
+            if not column.drift_detected:
+                column.suggestions = [evidence.reason] if evidence.reason else []
+
+    @staticmethod
+    def _numeric_evidence(
+        metrics: list[DriftMetric], reference_count: int, current_count: int
+    ) -> DriftEvidence:
+        """Use the already measured KS result without rerunning or changing its exact ordering."""
+        probability = next(metric.value for metric in metrics if metric.metric == "ks_test_p_value")
+        return numeric_evidence(probability, reference_count, current_count)
 
     def _calculate_column_drift(self, col: str, thresholds: dict[str, float]) -> ColumnDrift | None:
         """Compare compatible representations and report incompatible column types explicitly."""
@@ -218,6 +241,7 @@ class DriftCalculator:
             metrics=metrics,
             drift_detected=drifted,
             suggestions=self._numeric_drift_suggestions(drifted, flags),
+            evidence=self._numeric_evidence(metrics, len(ref_data), len(curr_data)),
         )
 
     def _type_drift(self, col: str) -> ColumnDrift:
@@ -256,7 +280,7 @@ class DriftCalculator:
         """Merge user-supplied drift thresholds over the defaults."""
         default_thresholds = {
             "psi": 0.2,
-            "ks_statistic": 0.1,  # max CDF distance, sample-size robust (unlike the p-value)
+            "ks_statistic": 0.1,  # practical maximum CDF-distance threshold
             "wasserstein": 0.1,  # applied to the std-normalized distance, so it is scale-free
             "kl_divergence": 0.1,
         }
@@ -311,6 +335,7 @@ class DriftCalculator:
             drift_detected=is_drifted,
             suggestions=suggestions,
             distribution=distribution,
+            evidence=self._numeric_evidence(metrics, len(ref_data), len(curr_data)),
         )
 
     @staticmethod
@@ -417,10 +442,9 @@ class DriftCalculator:
             is_drifted = True
 
         # 2. KS Test
-        # The drift decision is made on the statistic (max CDF distance), not
-        # the p-value: the p-value shrinks with sample size, so an identical
-        # tiny shift looks significant at n=100k but not at n=100. The p-value
-        # is kept in the report for diagnostics.
+        # The statistic is a practical-effect diagnostic. The independent
+        # evidence record uses this p-value only after feature-family correction;
+        # both effect and statistical support are required for a final verdict.
         ks_stat, ks_p = ks_2samp(*self._ks_values(ref_data, curr_data))
         ks_drift = ks_stat > thresholds["ks_statistic"]
         metrics.append(
@@ -614,7 +638,7 @@ class DriftCalculator:
     def _calculate_categorical_drift(
         self, col: str, thresholds: dict[str, float]
     ) -> "ColumnDrift | None":
-        """Calculates PSI-based drift for a categorical/text/boolean column.
+        """Calculate categorical PSI with separate unsmoothed count-test evidence.
 
         Uses the category frequency distribution — the union of categories seen
         in either dataset. Returns ``None`` if the column looks like free-text
@@ -636,15 +660,15 @@ class DriftCalculator:
             return None
 
         percents = self._categorical_percent_arrays(ref_data, curr_data, col)
-        if percents is None:
-            return None
-        _categories, expected_percents, actual_percents = percents
-
-        psi_val = float(
-            np.sum(
-                (actual_percents - expected_percents) * np.log(actual_percents / expected_percents)
+        psi_val = 0.0
+        if percents is not None:
+            _categories, expected_percents, actual_percents = percents
+            psi_val = float(
+                np.sum(
+                    (actual_percents - expected_percents)
+                    * np.log(actual_percents / expected_percents)
+                )
             )
-        )
         psi_drift = psi_val > thresholds["psi"]
 
         metrics = [
@@ -663,6 +687,7 @@ class DriftCalculator:
             metrics=metrics,
             drift_detected=psi_drift,
             suggestions=suggestions,
+            evidence=categorical_evidence(ref_data.to_list(), curr_data.to_list()),
             distribution=None,
         )
 

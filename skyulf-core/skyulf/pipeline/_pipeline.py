@@ -7,6 +7,7 @@ import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import replace
 from typing import Any, cast
 
@@ -17,6 +18,7 @@ import polars as pl
 from ..config_validation import validate_pipeline_config
 from ..core.schema import SkyulfSchema, validate_schema
 from ..core.validation import prediction_row_count, validate_prediction_rows
+from ..data.coverage import record_coverage, transform_evaluation
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, get_engine
 from ..leakage import OnLeakage, validate_leakage_safety
@@ -349,10 +351,16 @@ class SkyulfPipeline:
         self.feature_engineer._portable_fitted = True
         # This post-fit dataset is used only for unweighted evaluation.
         # The tuner already consumed aligned weights in each actual model fit.
+        coverage = deepcopy(raw_dataset.evaluation_coverage)
         transformed = SplitDataset(
             train=adapter.training_payload,
-            test=self._transform_tuning_split(adapter, raw_dataset.test, target_column),
-            validation=self._transform_tuning_split(adapter, raw_dataset.validation, target_column),
+            test=self._transform_tuning_split(
+                adapter, raw_dataset.test, target_column, coverage, "test"
+            ),
+            validation=self._transform_tuning_split(
+                adapter, raw_dataset.validation, target_column, coverage, "validation"
+            ),
+            evaluation_coverage=coverage,
         )
         _tune_pipeline_holdout_threshold(
             calculator, estimator.model, tuning_config, transformed.validation, target_column
@@ -363,13 +371,27 @@ class SkyulfPipeline:
 
     @staticmethod
     def _transform_tuning_split(
-        adapter: _PipelineTuningPreprocessor, payload: Any, target_column: str
+        adapter: _PipelineTuningPreprocessor,
+        payload: Any,
+        target_column: str,
+        coverage: dict[str, dict[str, Any]],
+        split_name: str,
     ) -> Any:
         """Transform one raw held-out partition with the final fitted fold chain."""
         if not StatefulEstimator._is_non_empty_split(payload):
             return None if payload is None else payload
         X, y = extract_xy(payload, target_column)
-        return adapter.transform(X, y)
+        transformed_x, transformed_y, observed = transform_evaluation(
+            adapter, X, y, allow_empty=True
+        )
+        previous = coverage.get(split_name, {})
+        coverage[split_name] = record_coverage(
+            previous.get("input_rows", observed["input_rows"]),
+            observed["scored_rows"],
+            previous.get("steps", []) + observed.get("steps", []),
+            reason=previous.get("reason"),
+        )
+        return transformed_x, transformed_y
 
     def fit(
         self,

@@ -57,9 +57,29 @@ def observation(config, now):
                 "metrics": [
                     {
                         "category": "drift",
+                        "column_name": "x",
                         "metric_name": "psi",
                         "has_issue": True,
                         "status": "measured",
+                    },
+                    {
+                        "category": "drift",
+                        "column_name": "x",
+                        "metric_name": "statistical_evidence",
+                        "value": 0.01,
+                        "threshold": 0.05,
+                        "has_issue": False,
+                        "status": "measured",
+                        "evidence": {
+                            "status": "supported",
+                            "test": "ks_2samp",
+                            "p_value": 0.01,
+                            "adjusted_p_value": 0.01,
+                            "significance_level": 0.05,
+                            "reference_count": 100,
+                            "current_count": 100,
+                            "reason": None,
+                        },
                     },
                 ]
             }
@@ -93,6 +113,7 @@ def test_policy_defaults_disabled():
         ("stale", "stale_observation"),
         ("old_version", "superseded"),
         ("healthy", "no_drift"),
+        ("degraded", "incomplete_drift"),
         ("quality", "quality_issue"),
         ("schema", "quality_issue"),
         ("unavailable", "incomplete_drift"),
@@ -110,8 +131,8 @@ def test_observation_requires_current_clean_distribution_drift(case, expected):
         row["observed_at"] = now - timedelta(hours=25)
     elif case == "old_version":
         row["model_version"] = "1"
-    elif case == "healthy":
-        row["status"] = "healthy"
+    elif case in {"healthy", "degraded"}:
+        row["status"] = case
     elif case == "disabled":
         config = replace(config, enabled=False)
     elif case in {"quality", "schema", "unavailable"}:

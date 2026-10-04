@@ -32,11 +32,20 @@ function evaluateMetric(metric: DriftMetric, column: ColumnDrift, thresholds: Dr
     let hasDrift = metric.has_drift;
     const threshold = metricThreshold(metric.metric, thresholds);
     if (threshold != null) hasDrift = metric.value > threshold;
-    if (metric.metric === 'ks_test_p_value') {
+    if (metric.metric === 'ks_test_p_value' && column.evidence != null) {
+        hasDrift = false;
+    } else if (metric.metric === 'ks_test_p_value') {
         const statistic = column.metrics.find(item => item.metric === 'ks_statistic');
         if (statistic != null) hasDrift = statistic.value > (thresholds.ks ?? statistic.threshold);
     }
     return { ...metric, threshold: threshold ?? metric.threshold, has_drift: hasDrift };
+}
+
+/** Effect-size sliders retain the sample-size and multiple-comparison evidence. */
+function columnVerdict(column: ColumnDrift, metrics: DriftMetric[]): boolean {
+    if (metrics.some(metric => metric.metric === 'type_drift' && metric.has_drift)) return true;
+    const supported = column.evidence == null || column.evidence.status === 'supported';
+    return supported && metrics.some(metric => metric.has_drift);
 }
 
 /**
@@ -87,7 +96,7 @@ export function useDriftReport(thresholds: DriftThresholds) {
         let driftedCount = 0;
         for (const [colName, col] of Object.entries(report.column_drifts)) {
             const newMetrics = col.metrics.map(m => evaluateMetric(m, col, t));
-            const drifted = newMetrics.some(m => m.has_drift);
+            const drifted = columnVerdict(col, newMetrics);
             if (drifted) driftedCount++;
             newDrifts[colName] = { ...col, metrics: newMetrics, drift_detected: drifted };
         }

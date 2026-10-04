@@ -317,7 +317,13 @@ def _common_evidence(
             notes.append(f"Feature {column} could not be measured for drift.")
             unmeasured = True
         else:
-            drifted += int(any(item["has_issue"] for item in evidence))
+            drifted += int(result.drift_detected)
+            if result.evidence is not None and result.evidence.status in {
+                "insufficient_data",
+                "unavailable",
+            }:
+                notes.append(f"Feature {column}: {result.evidence.reason}")
+                unmeasured = True
     return metrics, drifted, notes, unmeasured
 
 
@@ -325,17 +331,27 @@ def _column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
     """Retain Core's per-statistic verdict or an explicit unavailable row."""
     if result is None:
         return [_metric("drift", column, "unavailable")]
-    return [
+    metrics = [
         _metric(
             "drift",
             column,
             item.metric,
             item.value,
             None if item.metric == "ks_test_p_value" else item.threshold,
-            item.has_drift and item.metric != "ks_test_p_value",
+            result.drift_detected and item.has_drift and item.metric != "ks_test_p_value",
         )
         for item in result.metrics
     ]
+    if result.evidence is not None:
+        evidence = result.evidence
+        value = (
+            evidence.adjusted_p_value if evidence.status in {"supported", "not_detected"} else None
+        )
+        metrics.append(
+            _metric("drift", column, "statistical_evidence", value, evidence.significance_level)
+            | {"evidence": evidence.model_dump()}
+        )
+    return metrics
 
 
 def _has_infinite(series: pl.Series) -> bool:

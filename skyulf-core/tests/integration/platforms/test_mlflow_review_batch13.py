@@ -87,22 +87,23 @@ def test_nullable_pyfunc_preserves_declared_input(
     query = pd.DataFrame({"x": pd.array(values, dtype=dtype)}, index=[19, 3, 19])
     before = query.copy(deep=True)
     expected = predict_local_pipeline(query, local)
-    if missing and dtype in {"Int64", "boolean"}:
-        # Scalar MLflow signatures reject these nulls before calling the adapter.
+    if dtype in {"Int64", "boolean"}:
+        # New packages explicitly require lossless string transport at this boundary.
         with pytest.raises(mlflow.exceptions.MlflowException, match="Failed to enforce schema"):
             model.predict(query)
         pd.testing.assert_frame_equal(query, before)
-        return
     observer = Mock(wraps=local_model.score_local_pipeline)
     monkeypatch.setattr(local_model, "score_local_pipeline", observer)
-    actual = model.predict(query)
+    actual = model.predict(local_model.prepare_pyfunc_input(query, model))
     pd.testing.assert_frame_equal(actual, expected)
     pd.testing.assert_frame_equal(observer.call_args.args[0], query)
     if not missing:
         numpy_query = query.astype(
             {"x": {"Int64": "int64", "Float64": "float64", "boolean": "bool"}[dtype]}
         )
-        pd.testing.assert_frame_equal(model.predict(numpy_query), expected)
+        pd.testing.assert_frame_equal(
+            model.predict(local_model.prepare_pyfunc_input(numpy_query, model)), expected
+        )
         pd.testing.assert_frame_equal(observer.call_args.args[0], query)
     pd.testing.assert_frame_equal(query, before)
 
@@ -208,7 +209,7 @@ def test_nullable_pyfunc_does_not_cast_incompatible_transport(tmp_path, tracking
     _, config = tracking_store
     model, local = _nullable_model(tmp_path, config, dtype)
     query = pd.DataFrame({"x": bad})
-    with pytest.raises((mlflow.exceptions.MlflowException, ValueError)):
+    with pytest.raises((mlflow.exceptions.MlflowException, ValueError, TypeError)):
         model.predict(query)
     with pytest.raises(ValueError, match="dtype"):
         predict_local_pipeline(query, local)

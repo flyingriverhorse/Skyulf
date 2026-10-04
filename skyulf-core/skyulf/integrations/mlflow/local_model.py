@@ -6,6 +6,7 @@ certify row-local HTTP serving or Spark partition safety.
 
 import inspect
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -23,14 +24,24 @@ from ...inference.local_pipeline import (
     load_local_pipeline,
 )
 from ...inference.local_scoring import score_local_pipeline, scoring_output_schema
+from ._nullable_transport import (
+    TRANSPORT_KEY,
+    decode_frame,
+    encode_frame,
+    restore_nullable_dtypes,
+    transport_spec,
+    validated_transport,
+)
+from ._nullable_transport import prepare_pyfunc_input as prepare_pyfunc_input
 
 
 class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
     """Load one fitted local pipeline and retain its recorded execution engine."""
 
-    def __init__(self) -> None:
+    def __init__(self, input_transport: dict[str, Any] | None = None) -> None:
         """Start unloaded until MLflow provides the saved artifact path."""
         self._artifact: LocalPipelineArtifact | None = None
+        self._input_transport = deepcopy(input_transport)
 
     def __getstate__(self) -> dict[str, Any]:
         """Reload saved project classes through context in each fresh process."""
@@ -43,6 +54,17 @@ class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
         except (AttributeError, KeyError) as exc:
             raise ValueError("MLflow model is missing the local pipeline artifact.") from exc
         self._artifact = load_local_pipeline(artifact_path)
+        self.input_transport()
+
+    def input_transport(self) -> dict[str, Any] | None:
+        """Return a detached transport contract checked against the loaded artifact."""
+        if self._artifact is None:
+            raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
+        manifest = self._artifact.manifest
+        return validated_transport(
+            getattr(self, "_input_transport", None),
+            zip(manifest.input_columns, manifest.input_dtypes, strict=True),
+        )
 
     def predict(
         self, context: Any, model_input: pd.DataFrame, params: dict[str, Any] | None = None
@@ -53,6 +75,7 @@ class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf local pyfunc requires a pandas DataFrame.")
+        model_input = decode_frame(model_input, self.input_transport())
         model_input = _restore_nullable_dtypes(model_input, self._artifact)
         return score_local_pipeline(model_input, self._artifact)
 
@@ -68,6 +91,9 @@ def log_local_model(
     validate_local_destination(run_id, artifact_path, tracking_uri)
     local_path = Path(local_artifact_path).resolve()
     artifact = load_local_pipeline(local_path)
+    transport = transport_spec(
+        zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
+    )
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-local-mlflow-") as directory:
@@ -77,7 +103,7 @@ def log_local_model(
             save_options["uv_project_path"] = directory
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfLocalPythonModel(),
+            python_model=SkyulfLocalPythonModel(transport),
             artifacts={"local_pipeline": str(local_path)},
             signature=_signature(artifact),
             input_example=_input_example(artifact),
@@ -87,6 +113,7 @@ def log_local_model(
                 "skyulf_fitted_engine": artifact.manifest.fitted_engine,
                 "skyulf_execution_scope": "whole_frame_local",
                 "local_pipeline_digest": artifact.manifest.pipeline_sha256,
+                **({TRANSPORT_KEY: transport} if transport else {}),
             },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
             **save_options,
@@ -115,9 +142,13 @@ def _signature(artifact: LocalPipelineArtifact) -> Any:
     )
 
     manifest = artifact.manifest
+    transport = transport_spec(zip(manifest.input_columns, manifest.input_dtypes, strict=True))
+    encoded = transport["columns"] if transport else {}
     inputs = Schema(
         [
-            ColSpec(mlflow_dtype(normalized_dtype(dtype)), name=name)
+            ColSpec(
+                mlflow_dtype("string" if name in encoded else normalized_dtype(dtype)), name=name
+            )
             for name, dtype in zip(manifest.input_columns, manifest.input_dtypes, strict=True)
         ]
     )
@@ -147,7 +178,10 @@ def _input_example(artifact: LocalPipelineArtifact) -> pd.DataFrame:
             values[name] = pd.Series([0.0], dtype=normalized)
         else:
             raise ValueError(f"Unsupported MLflow local input dtype: {dtype}.")
-    return pd.DataFrame(values)
+    transport = transport_spec(
+        zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
+    )
+    return encode_frame(pd.DataFrame(values), transport)
 
 
 def pip_requirements(artifact: LocalPipelineArtifact) -> list[str]:
@@ -184,16 +218,11 @@ def _restore_nullable_dtypes(frame: pd.DataFrame, artifact: LocalPipelineArtifac
 
     Only the matching NumPy storage type is accepted; integer inputs never
     pass through a float conversion. MLflow can reject nullable integer or
-    boolean nulls before this adapter is reached.
+    boolean nulls in legacy packages before this adapter is reached. New
+    packages use the explicit nullable transport before this restoration.
     """
     if artifact.manifest.fitted_engine != "pandas":
         return frame
-    storage = {"Int64": "int64", "Float64": "float64", "boolean": "bool"}
-    replacements = {
-        name: dtype
-        for name, dtype in zip(
-            artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True
-        )
-        if dtype in storage and name in frame and str(frame[name].dtype) == storage[dtype]
-    }
-    return frame.astype(replacements) if replacements else frame
+    return restore_nullable_dtypes(
+        frame, zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
+    )

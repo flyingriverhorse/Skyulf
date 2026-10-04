@@ -22,6 +22,7 @@ import pytest
 
 from backend.config import get_settings
 from backend.ml_pipeline._execution.engine._merge import MergeMixin
+from backend.ml_pipeline._execution.schemas import NodeConfig
 from skyulf.data.dataset import SplitDataset
 
 
@@ -154,3 +155,184 @@ def test_merge_fallback_frames_raises_on_empty_input(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="empty DataFrame"):
         _Merger()._merge_fallback_frames(node, [pl.DataFrame()], target_col="")
+
+
+def _coverage_dataset(engine, *, rows=2, original_rows=3):
+    """Represent an already filtered split without sharing caller-owned metadata."""
+    frame = pl.DataFrame if engine == "polars" else pd.DataFrame
+    return SplitDataset(
+        train=frame({"x": [0.0, 1.0, 2.0, 3.0], "target": [0.0, 2.0, 4.0, 6.0]}),
+        test=frame(
+            {"x": [float(n) for n in range(rows)], "target": [float(2 * n) for n in range(rows)]}
+        ),
+        evaluation_coverage={
+            "test": {
+                "input_rows": original_rows,
+                "scored_rows": rows,
+                "excluded_rows": original_rows - rows,
+                "steps": [
+                    {
+                        "name": "eligible",
+                        "input_rows": original_rows,
+                        "scored_rows": rows,
+                        "excluded_rows": original_rows - rows,
+                    }
+                ],
+            }
+        },
+    )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("population", ["matching", "divergent", "rowwise"])
+def test_filtered_branch_merge_requires_shared_row_lineage(engine, population):
+    """Equal counts cannot certify row identity, and unknown populations cannot be merged safely."""
+    first = _coverage_dataset(engine)
+    second = _coverage_dataset(
+        engine,
+        rows=3 if population == "rowwise" else 2,
+        original_rows=3 if population == "matching" else 4,
+    )
+    merger = _Merger()
+    merger.merge_warnings = []
+    with pytest.raises(ValueError, match="shared row lineage"):
+        merger._merge_split_datasets(
+            NodeConfig(node_id="merge", step_type="merge", inputs=["left", "right"]),
+            [first, second],
+            "target",
+        )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_later_filter_preserves_unknown_merge_denominator(engine):
+    """A subsequent row filter may measure its own loss but cannot reconstruct original coverage."""
+    from skyulf.preprocessing.pipeline import FeatureEngineer
+
+    merged = _coverage_dataset(engine)
+    merged.evaluation_coverage["test"].update(
+        input_rows=None, excluded_rows=None, reason="Original evaluation population unavailable."
+    )
+    frame = pl.DataFrame if engine == "polars" else pd.DataFrame
+    merged.test = frame({"x": [None, 1.0], "target": [0.0, 2.0]})
+    filtered, _ = FeatureEngineer(
+        [
+            {"name": "null_filter", "transformer": "DropMissingRows", "params": {"subset": ["x"]}},
+        ]
+    ).fit_transform(merged)
+    coverage = filtered.evaluation_coverage["test"]
+    assert coverage["input_rows"] is None and coverage["excluded_rows"] is None
+    assert coverage["scored_rows"] == 1
+    assert coverage["reason"] == merged.evaluation_coverage["test"]["reason"]
+    assert coverage["steps"][-1]["excluded_rows"] == 1
+
+
+def _empty_validation_dataset(engine, paired, population):
+    """Keep an explicitly present empty validation payload distinct from an absent split."""
+    dataset = _coverage_dataset(engine, rows=0)
+    dataset.validation = dataset.test
+    dataset.test = dataset.train.clone() if engine == "polars" else dataset.train.copy()
+    coverage = dataset.evaluation_coverage.pop("test")
+    if population == "unknown":
+        coverage.update(input_rows=None, excluded_rows=None, reason="Unknown merged population.")
+    if population != "originally_empty":
+        dataset.evaluation_coverage["validation"] = coverage
+    if paired:
+        for name in ("train", "test", "validation"):
+            frame = getattr(dataset, name)
+            X = frame.drop("target") if engine == "polars" else frame.drop(columns=["target"])
+            setattr(dataset, name, (X, frame["target"]))
+    return dataset
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("paired", [False, True])
+@pytest.mark.parametrize("population", ["excluded", "unknown", "originally_empty"])
+def test_empty_validation_merge_retains_population_evidence(
+    engine, paired, population, monkeypatch
+):
+    """Fully excluded validation must survive fan-in and remain visible in the public model report."""
+    from skyulf.pipeline import SkyulfPipeline
+
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", engine)
+    first = _empty_validation_dataset(engine, paired, population)
+    merged = _Merger()._merge_split_datasets(
+        NodeConfig(node_id="merge", step_type="merge", inputs=["left", "right"]),
+        [first, first.copy()],
+        "target",
+    )
+    assert merged.validation is not None
+    assert isinstance(merged.validation, tuple) is paired
+    frame = merged.validation[0] if paired else merged.validation
+    assert isinstance(frame, pl.DataFrame if engine == "polars" else pd.DataFrame)
+    assert len(frame) == 0
+    report = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "linear_regression"}}).fit(
+        merged, "target"
+    )["modeling"]
+    if population == "originally_empty":
+        assert "validation" not in report["splits"]
+    else:
+        coverage = report["splits"]["validation"].coverage
+        assert coverage == first.evaluation_coverage["validation"]
+        assert report["splits"]["validation"].metrics == {}
+        assert report["raw_data"]["splits"]["validation"]["coverage"] == coverage
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("paired", [False, True])
+def test_empty_training_merge_remains_invalid(engine, paired):
+    """Retaining empty evaluation payloads must never admit an empty fitting population."""
+    first = _empty_validation_dataset(engine, paired, "excluded")
+    first.train = first.validation
+    with pytest.raises(ValueError, match="empty train splits"):
+        _Merger()._merge_split_datasets(
+            NodeConfig(node_id="merge", step_type="merge", inputs=["left", "right"]),
+            [first, first.copy()],
+            "target",
+        )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("paired", [False, True])
+@pytest.mark.parametrize("split", ["test", "validation"])
+def test_different_retained_rows_cannot_merge_with_identical_counts(engine, paired, split):
+    """Reset indexes and identical4-to3 counts must not pair unrelated feature and target rows."""
+    factory = pd.DataFrame if engine == "pandas" else pl.DataFrame
+    first = _coverage_dataset(engine, rows=3, original_rows=4)
+    second = first.copy()
+    for dataset, column, retained in ((first, "a", [0, 1, 2]), (second, "b", [1, 2, 3])):
+        frame = factory({column: retained, "target": [10 * row for row in retained]})
+        payload = frame
+        if paired:
+            X = frame.drop(columns="target") if engine == "pandas" else frame.drop("target")
+            payload = (X, frame["target"])
+        setattr(dataset, split, payload)
+        if split == "validation":
+            dataset.evaluation_coverage[split] = dataset.evaluation_coverage.pop("test")
+            dataset.test = dataset.train
+    assert first.evaluation_coverage == second.evaluation_coverage
+    with pytest.raises(ValueError, match=f"filtered {split} branches.*shared row lineage"):
+        _Merger()._merge_split_datasets(
+            NodeConfig(node_id="merge", step_type="merge", inputs=["left", "right"]),
+            [first, second],
+            "target",
+        )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("population", ["unknown", "complete", "unrecorded"])
+def test_nonempty_branch_merge_requires_known_unfiltered_population(engine, population):
+    """Unknown coverage blocks fan-in while unfiltered and legacy unrecorded inputs keep working."""
+    first = _coverage_dataset(engine, rows=2, original_rows=2)
+    if population == "unknown":
+        first.evaluation_coverage["test"].update(input_rows=None, excluded_rows=None)
+    elif population == "unrecorded":
+        first.evaluation_coverage.clear()
+    merger = _Merger()
+    node = NodeConfig(node_id="merge", step_type="merge", inputs=["left", "right"])
+    if population == "unknown":
+        with pytest.raises(ValueError, match="shared row lineage"):
+            merger._merge_split_datasets(node, [first, first.copy()], "target")
+    else:
+        merged = merger._merge_split_datasets(node, [first, first.copy()], "target")
+        assert len(merged.test) == 2
+        assert merged.evaluation_coverage == first.evaluation_coverage

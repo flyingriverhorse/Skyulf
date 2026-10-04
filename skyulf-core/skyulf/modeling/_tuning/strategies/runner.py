@@ -10,6 +10,7 @@ import logging
 import math
 import warnings
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, cast
 
 from joblib import parallel_backend
@@ -137,6 +138,7 @@ def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> 
     for a search that scored nothing — while the grid strategy fails on the
     identical folds.
     """
+    first_trial_error = first_trial_error or _empty_evaluation_error(searcher)
     try:
         # Accessing best_params_ raises ValueError if no trials completed successfully
         best_params = searcher.best_params_
@@ -150,6 +152,15 @@ def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> 
     return best_params, best_score
 
 
+def _empty_evaluation_error(searcher: Any) -> str | None:
+    """Recover fully excluded halving folds from worker coverage, including parallel runs."""
+    results = getattr(searcher, "cv_results_", {})
+    for name, counts in results.items():
+        if name.endswith("_test_scored_rows") and any(count == 0 for count in counts):
+            return "No eligible rows remain for evaluation after configured preprocessing."
+    return None
+
+
 def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
     """Extracts per-trial params/scores from a fitted searcher (Optuna study or cv_results_)."""
     trials: list[dict[str, Any]] = []
@@ -157,7 +168,11 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
     if config.strategy == "optuna" and hasattr(searcher, "study_"):
         # Only include completed trials
         trials.extend(
-            {"params": trial.params, "score": trial.value}
+            {
+                "params": trial.params,
+                "score": trial.value,
+                "evaluation_coverage": deepcopy(trial.user_attrs.get("evaluation_coverage", [])),
+            }
             for trial in cast(Any, searcher).study_.trials
             if trial.state.name == "COMPLETE"
         )
@@ -169,10 +184,25 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
                 {
                     "params": results["params"][i],
                     "score": results["mean_test_score"][i],
+                    "evaluation_coverage": _searcher_coverage(results, i),
                 }
                 for i in range(n_candidates)
             )
     return trials
+
+
+def _searcher_coverage(results: dict[str, Any], candidate: int) -> list[dict[str, Any]]:
+    """Read held-out counts transported by the halving scorer without refitting any model."""
+    folds = []
+    fold = 0
+    while f"split{fold}_test_input_rows" in results:
+        entry: dict[str, Any] = {"fold": fold + 1}
+        for key in ("input_rows", "scored_rows", "excluded_rows"):
+            value = results[f"split{fold}_test_{key}"][candidate]
+            entry[key] = int(value) if math.isfinite(value) else None
+        folds.append(entry)
+        fold += 1
+    return folds
 
 
 def strip_model_prefix(params: Any) -> Any:

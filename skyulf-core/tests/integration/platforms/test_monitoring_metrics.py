@@ -75,9 +75,14 @@ def metric(result: dict, category: str, name: str, column: str = "outcome") -> d
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_identical_features_are_healthy_without_labels(engine):
     """Missing labels cannot conceal healthy measured feature drift."""
-    result = report(engine)
+    reference = [{"value": index % 2 + 1, "kind": "ab"[index % 2]} for index in range(40)]
+    current = [{"id": str(index), **row} for index, row in enumerate(reference)]
+    predictions = [
+        {"id": str(index), "prediction": "yes" if index % 2 else "no"} for index in range(40)
+    ]
+    result = report(engine, reference=reference, current=current, predictions=predictions)
     assert result["status"] == "healthy"
-    assert (result["reference_rows"], result["current_rows"], result["scored_rows"]) == (2, 2, 2)
+    assert (result["reference_rows"], result["current_rows"], result["scored_rows"]) == (40, 40, 40)
     assert result["labeled_rows"] == 0 and result["label_coverage"] == 0
     assert metric(result, "performance", "accuracy")["status"] == "unavailable"
     json.dumps(result, allow_nan=False)
@@ -87,8 +92,15 @@ def test_identical_features_are_healthy_without_labels(engine):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_numeric_and_categorical_shifts_are_counted(engine):
     """Feature distribution shifts must win over missing performance labels."""
-    changed = [{"id": "one", "value": 100, "kind": "c"}, {"id": "two", "value": 200, "kind": "d"}]
-    result = report(engine, current=changed)
+    reference = [{"value": index % 2 + 1, "kind": "ab"[index % 2]} for index in range(40)]
+    changed = [
+        {"id": str(index), "value": 100 * (index % 2 + 1), "kind": "cd"[index % 2]}
+        for index in range(40)
+    ]
+    predictions = [
+        {"id": str(index), "prediction": "yes" if index % 2 else "no"} for index in range(40)
+    ]
+    result = report(engine, reference=reference, current=changed, predictions=predictions)
     assert result["status"] == "drift" and result["drifted_columns"] == 2
     assert metric(result, "drift", "psi_categorical", "kind")["has_issue"]
     assert any(item["has_issue"] for item in result["metrics"] if item["column_name"] == "value")

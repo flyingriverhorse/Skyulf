@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from sklearn.model_selection import ParameterGrid, ParameterSampler
 
+from ...data.coverage import transform_evaluation
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from .._cv_weights import fit_preprocessor, prepare_weights, take_weights
@@ -61,6 +62,7 @@ def evaluate_candidate_cv(
     *,
     model_calculator: BaseModelCalculator,
     sample_weight: Any = None,
+    evaluation_coverage: list[dict[str, Any]] | None = None,
 ) -> float:
     """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -79,6 +81,7 @@ def evaluate_candidate_cv(
     y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
     for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
+        coverage: dict[str, Any] = {"input_rows": len(val_idx)}
         score = fit_and_score_candidate_fold(
             candidate_idx=candidate_idx,
             fold_idx=fold_idx,
@@ -98,9 +101,19 @@ def evaluate_candidate_cv(
             seed_params_overlay=seed_params_overlay,
             model_calculator=model_calculator,
             sample_weight=sample_weight,
+            evaluation_coverage=coverage,
         )
+        if evaluation_coverage is not None:
+            evaluation_coverage.append({"fold": fold_idx + 1, **coverage})
         fold_scores.append(score)
 
+    return _complete_candidate_score(fold_scores, candidate_idx, log_callback)
+
+
+def _complete_candidate_score(
+    fold_scores: list[float], candidate_idx: int, log_callback: Callable[[str], None] | None
+) -> float:
+    """Reject candidates with failed folds rather than averaging a surviving subset."""
     n_failed = sum(1 for s in fold_scores if s == -float("inf"))
     if n_failed:
         if log_callback and n_failed < len(fold_scores):
@@ -193,6 +206,7 @@ def fit_and_score_candidate_fold(
     model_calculator: BaseModelCalculator,
     sample_weight: Any = None,
     evaluation_metrics: dict[str, float] | None = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> float:
     """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
@@ -221,7 +235,9 @@ def fit_and_score_candidate_fold(
             X_train_fold, y_train_fold, fold_weight = fit_preprocessor(
                 preprocessing, X_train_fold, y_train_fold, fold_weight
             )
-            X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
+        X_val_fold, y_val_fold, _coverage = transform_evaluation(
+            preprocessing, X_val_fold, y_val_fold, coverage_out=evaluation_coverage
+        )
 
         SklearnBridge.validate_features(X_train_fold)
         SklearnBridge.validate_features(X_val_fold)
@@ -308,6 +324,7 @@ def evaluate_search_candidates(
         # Use custom cross-validation loop to enable per-fold logging and progress tracking.
         # We instantiate the model with the current candidate parameters and evaluate it
         # using the configured CV strategy.
+        coverage: list[dict[str, Any]] = []
         mean_score = evaluate_candidate_cv(
             i,
             params,
@@ -322,6 +339,7 @@ def evaluate_search_candidates(
             seed_params_overlay,
             model_calculator=model_calculator,
             sample_weight=sample_weight,
+            evaluation_coverage=coverage,
         )
 
         if log_callback:
@@ -330,7 +348,7 @@ def evaluate_search_candidates(
         if progress_callback:
             progress_callback(i + 1, total_candidates, mean_score, params)
 
-        trials.append({"params": params, "score": mean_score})
+        trials.append({"params": params, "score": mean_score, "evaluation_coverage": coverage})
 
         if mean_score > best_score:
             best_score = mean_score

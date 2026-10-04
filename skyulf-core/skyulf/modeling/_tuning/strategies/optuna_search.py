@@ -147,20 +147,27 @@ class OptunaPruningSearchCV:
     ) -> float:
         """Score complete held-out folds and reject the entire trial if any fold fails."""
         scores: list[float] = []
+        coverage: list[dict[str, Any]] = []
         for fold_index, (train, valid) in enumerate(splits):
             report = None
             if self.mode == "iterations":
                 report = self._iteration_reporter(trial, candidate, scores, fold_index, len(splits))
-            score = fit_and_score_fold(
-                candidate,
-                _safe_indexing(X, train),
-                _safe_indexing(y, train),
-                _safe_indexing(X, valid),
-                _safe_indexing(y, valid),
-                self.scorer_,
-                report=report,
-                sample_weight=take_weights(sample_weight, train),
-            )
+            fold_coverage: dict[str, Any] = {"fold": fold_index + 1, "input_rows": len(valid)}
+            coverage.append(fold_coverage)
+            try:
+                score = fit_and_score_fold(
+                    candidate,
+                    _safe_indexing(X, train),
+                    _safe_indexing(y, train),
+                    _safe_indexing(X, valid),
+                    _safe_indexing(y, valid),
+                    self.scorer_,
+                    report=report,
+                    sample_weight=take_weights(sample_weight, train),
+                    evaluation_coverage=fold_coverage,
+                )
+            finally:
+                trial.set_user_attr("evaluation_coverage", coverage)
             scores.append(_finite_score(score))
             if self.mode == "folds":
                 trial.report(math.fsum(scores) / len(scores), fold_index)

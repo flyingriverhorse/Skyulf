@@ -7,6 +7,7 @@ import { getMetricDirection } from '../../../../core/utils/metricMeta';
 import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 import type { EvaluationData } from '../types';
 import { ArtifactCoverageList, type ArtifactCoverageEntry } from './ArtifactCoverageList';
+import { EvaluationCoverage } from './evaluationView/EvaluationCoverage';
 
 const METRIC_LABELS: Record<string, string> = {
   silhouette_score: 'Silhouette Score',
@@ -95,6 +96,7 @@ export const SegmentationView: React.FC<Props> = ({
       </div>
 
       <ArtifactCoverageList entries={coverageEntries} />
+      <EvaluationCoverage data={evaluationData} />
 
       {/* Job selector if multiple */}
       {selectedJobIds.length > 1 && (

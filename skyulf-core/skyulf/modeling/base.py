@@ -11,6 +11,7 @@ predict, cross-validation and evaluation.
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from copy import deepcopy
 from typing import Any, cast
 
 import pandas as pd
@@ -18,11 +19,13 @@ import polars as pl
 
 # Use relative imports assuming the structure is preserved
 from .._validation import raise_invalid_choice
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 from ._evaluation.classification import evaluate_classification_model
 from ._evaluation.clustering import evaluate_clustering_model
 from ._evaluation.regression import evaluate_regression_model
+from ._evaluation.schemas import ModelEvaluationReport
 from ._sample_weights import validate_sample_weight
 from .cross_validation import perform_cross_validation
 from .fold_preprocessing import FoldPreprocessor
@@ -529,7 +532,7 @@ class StatefulEstimator:
             predictions["test"] = self.applier.predict(X_test, self.model)
 
         # Validation Predictions
-        if dataset.validation is not None:
+        if self._is_non_empty_split(dataset.validation):
             X_val = self._extract_split_features(dataset.validation, target_column)
             predictions["validation"] = self.applier.predict(X_val, self.model)
 
@@ -590,12 +593,44 @@ class StatefulEstimator:
                     reference_column,
                 )
 
+        self._attach_evaluation_coverage(dataset, splits_payload, evaluation_data)
+
         # Return report object (simplified for now, assuming schema matches)
         return {
             "problem_type": problem_type,
             "splits": splits_payload,
             "raw_data": evaluation_data,
         }
+
+    @staticmethod
+    def _attach_evaluation_coverage(
+        dataset: SplitDataset, reports: dict[str, Any], raw_data: dict[str, Any]
+    ) -> None:
+        """Expose eligible-row denominators, including splits completely excluded by filters."""
+        for name in ("train", "test", "validation"):
+            payload = getattr(dataset, name)
+            if payload is None:
+                continue
+            frame = payload[0] if isinstance(payload, tuple) else payload
+            coverage = deepcopy(dataset.evaluation_coverage.get(name))
+            if coverage is None:
+                coverage = record_coverage(len(frame), len(frame))
+            report = reports.get(name)
+            if report is None and coverage["excluded_rows"] != 0 and coverage["scored_rows"] == 0:
+                report = ModelEvaluationReport(
+                    dataset_name=name,
+                    metrics={},
+                    omitted_metrics={"evaluation": "No eligible rows remain after preprocessing."},
+                )
+                reports[name] = report
+                raw_data["splits"][name] = (
+                    {"labels": []}
+                    if raw_data["problem_type"] == "clustering"
+                    else {"y_true": [], "y_pred": []}
+                )
+            if report is not None:
+                report.coverage = coverage
+                raw_data["splits"].setdefault(name, {})["coverage"] = deepcopy(coverage)
 
     def _evaluate_split(
         self,

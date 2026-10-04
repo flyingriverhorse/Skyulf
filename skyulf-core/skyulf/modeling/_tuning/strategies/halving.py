@@ -5,7 +5,7 @@ Leaf module (F-18 split of ``engine.py``).
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -20,6 +20,41 @@ from sklearn.model_selection import (
 from ..fold_scoring import wrap_fold_scorer
 from ..params import clean_search_space
 from ..schemas import TuningConfig
+
+
+class _CoverageResults:
+    """Preserve scalar search selection while collecting fold coverage returned by workers."""
+
+    def _format_results(
+        self, candidate_params: Any, n_splits: int, out: Any, more_results: Any = None
+    ):
+        """Separate diagnostics before sklearn infers whether search scores are multimetric."""
+        for record in out:
+            scores = record["test_scores"]
+            if isinstance(scores, dict):
+                record["evaluation_coverage"] = scores
+                record["test_scores"] = scores["score"]
+            record.setdefault("evaluation_coverage", {})
+            if isinstance(record.get("train_scores"), dict):
+                record["train_scores"] = record["train_scores"]["score"]
+        # sklearn >=1.7 inspects this same `out` after formatting to select its
+        # scalar/multimetric mode. Keep the protected hook confined to this mixin.
+        results = cast(Any, super())._format_results(candidate_params, n_splits, out, more_results)
+        for key in ("input_rows", "scored_rows", "excluded_rows"):
+            counts = np.asarray(
+                [record["evaluation_coverage"].get(key, np.nan) for record in out]
+            ).reshape(-1, n_splits)
+            for fold in range(n_splits):
+                results[f"split{fold}_test_{key}"] = counts[:, fold]
+        return results
+
+
+class _CoverageHalvingGridSearchCV(_CoverageResults, HalvingGridSearchCV):
+    """Halving grid search with diagnostic row counts and unchanged scalar ranking."""
+
+
+class _CoverageHalvingRandomSearchCV(_CoverageResults, HalvingRandomSearchCV):
+    """Halving random search with diagnostic row counts and unchanged scalar ranking."""
 
 
 def bound_sample_resources(config: TuningConfig, row_count: int) -> TuningConfig:
@@ -69,12 +104,12 @@ def build_halving_searcher(
     space = clean_search_space(config.search_space)
     if resource in space or requested_resource in space:
         raise ValueError("Halving resource cannot also appear in search_space.")
-    scoring = wrap_fold_scorer(base_estimator, scoring)
+    scoring = wrap_fold_scorer(base_estimator, scoring, include_coverage=True)
 
     _log_search_start(config, space, factor, resource, min_resources, max_resources, log_callback)
 
     if config.strategy == "halving_grid":
-        return HalvingGridSearchCV(
+        return _CoverageHalvingGridSearchCV(
             estimator=base_estimator,
             param_grid=clean_search_space(config.search_space),
             scoring=scoring,
@@ -88,7 +123,7 @@ def build_halving_searcher(
             min_resources=min_resources,
             max_resources=max_resources,
         )
-    return HalvingRandomSearchCV(
+    return _CoverageHalvingRandomSearchCV(
         estimator=base_estimator,
         param_distributions=clean_search_space(config.search_space),
         n_candidates=config.n_trials,

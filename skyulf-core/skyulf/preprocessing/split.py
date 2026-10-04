@@ -16,6 +16,7 @@ both :class:`DataSplitter` methods and :class:`FeatureTargetSplitApplier`.
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any, cast
 
 import numpy as np
@@ -634,6 +635,7 @@ class FeatureTargetSplitApplier(BaseApplier):
                 test=test,
                 validation=validation,
                 train_sample_weight=df.train_sample_weight,
+                evaluation_coverage=deepcopy(df.evaluation_coverage),
             )
 
         if isinstance(df, tuple):

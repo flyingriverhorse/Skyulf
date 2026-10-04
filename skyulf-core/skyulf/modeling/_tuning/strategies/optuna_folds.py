@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 
+from ....data.coverage import transform_evaluation
 from ....engines.sklearn_bridge import SklearnBridge
 from ..._class_weights import sample_weight_for_fit
 from ..._cv_weights import fit_preprocessor, prepare_weights
@@ -60,11 +61,15 @@ def _prepare_fold(
     X_valid: Any,
     y_valid: Any,
     sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> _PreparedFold:
     """Fit preprocessing on training rows and transform validation X and y together."""
     estimator = clone(estimator)
     step = _fold_step(estimator)
     if step is None:
+        X_valid, y_valid, _coverage = transform_evaluation(
+            None, X_valid, y_valid, coverage_out=evaluation_coverage
+        )
         return _PreparedFold(
             estimator,
             X_train,
@@ -82,7 +87,9 @@ def _prepare_fold(
     original_y = y_train
     if worker is not None:
         X_train, y_train, sample_weight = fit_preprocessor(worker, X_train, y_train, sample_weight)
-        X_valid, y_valid = worker.transform(X_valid, y_valid)
+    X_valid, y_valid, _coverage = transform_evaluation(
+        worker, X_valid, y_valid, coverage_out=evaluation_coverage
+    )
     SklearnBridge.validate_features(X_train)
     SklearnBridge.validate_features(X_valid)
     step.label_map_ = step._build_label_map(original_y, y_train, model, worker)
@@ -182,6 +189,7 @@ def fit_and_score_fold(
     scorer: Callable,
     report: IterationReport | None = None,
     sample_weight: Any = None,
+    evaluation_coverage: dict[str, Any] | None = None,
 ) -> float:
     """Fit an independent fold and return its finite signed validation score.
 
@@ -191,7 +199,9 @@ def fit_and_score_fold(
     when requested. Arbitrary estimators and sklearn pipelines retain their
     ordinary full fitting behavior. Fit, scorer, and pruning errors propagate.
     """
-    fold = _prepare_fold(estimator, X_train, y_train, X_valid, y_valid, sample_weight)
+    fold = _prepare_fold(
+        estimator, X_train, y_train, X_valid, y_valid, sample_weight, evaluation_coverage
+    )
     fit_kwargs = {}
     library = _native_library(fold.model)
     if library is not None:

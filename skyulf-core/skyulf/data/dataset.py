@@ -8,7 +8,7 @@ dispatch on what they are given rather than assume one frame library.
 from __future__ import annotations
 
 import copy as _copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import pandas as pd
@@ -33,12 +33,20 @@ class SplitDataset:
 
     ``train_sample_weight`` follows the row order of ``train``. Test and
     validation metrics remain unweighted.
+    ``evaluation_coverage`` carries held-out input and retained row counts
+    through preprocessing, without storing row identifiers or observations.
     """
 
     train: SplitPayload
     test: SplitPayload
     validation: SplitPayload | None = None
     train_sample_weight: Any = None
+    evaluation_coverage: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Load older saved split containers without inventing missing coverage evidence."""
+        self.__dict__.update(state)
+        self.__dict__.setdefault("evaluation_coverage", {})
 
     def copy(self) -> SplitDataset:
         """Return a ``SplitDataset`` whose slots are copies, not shared references.
@@ -79,4 +87,5 @@ class SplitDataset:
             train_sample_weight=copy_leaf(self.train_sample_weight),
             test=copy_data(self.test),
             validation=(copy_data(self.validation) if self.validation is not None else None),
+            evaluation_coverage=_copy.deepcopy(self.evaluation_coverage),
         )

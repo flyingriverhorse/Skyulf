@@ -337,6 +337,7 @@ class FeatureEngineerFoldAdapter:
         # ``pack_pipeline_output``'s tuple-shape-lost diagnostic on every step.
         payload = (X, y) if y is not None else X
         transformed = self._engineer.transform(payload)
+        self.last_transform_coverage_ = deepcopy(self._engineer.last_transform_coverage_)
         # Some appliers return a bare frame instead of the ``(X, y)`` payload;
         # re-pair so callers always get the FoldPreprocessor protocol shape.
         if not (isinstance(transformed, tuple) and len(transformed) == 2):
@@ -409,7 +410,11 @@ class AuditedFoldPreprocessor:
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Log the transform-time input row count, then delegate to ``inner``."""
         self.transform_rows.append(frame_rows(X))
-        return self._inner.transform(X, y)
+        result = self._inner.transform(X, y)
+        self.last_transform_coverage_ = deepcopy(
+            getattr(self._inner, "last_transform_coverage_", {})
+        )
+        return result
 
     def original_target_labels(self, labels: Any) -> Any:
         """Forward optional fitted target decoding without inferring label identities."""

@@ -146,7 +146,16 @@ def test_public_tuning_prunes_one_candidate_and_refits_only_the_completed_winner
     assert fits[-1][0] is model
     assert result.best_params == {"n_estimators": 2}
     assert result.best_score == pytest.approx(trials[0].value)
-    assert result.trials == [{"params": {"n_estimators": 2}, "score": trials[0].value}]
+    assert result.trials == [
+        {
+            "params": {"n_estimators": 2},
+            "score": trials[0].value,
+            "evaluation_coverage": [
+                {"fold": fold, "input_rows": 18, "scored_rows": 18, "excluded_rows": 0}
+                for fold in (1, 2)
+            ],
+        }
+    ]
     assert result.n_trials == 1
     assert len(progress) == 2
     assert [event[:2] for event in progress] == [(1, 2), (2, 2)]

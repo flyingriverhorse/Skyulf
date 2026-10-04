@@ -139,23 +139,31 @@ const DistributionChart: React.FC<{ distribution: NonNullable<ColumnDrift['distr
     </div>
 );
 
+/** Rank only confirmed drift; absent ranks cannot establish high impact. */
+function importanceRisk(drifted: boolean, rank: number | null): string {
+    if (!drifted || rank == null) return 'Low';
+    if (rank <= 5) return 'High';
+    return rank <= 15 ? 'Medium' : 'Low';
+}
+
 /** Risk badge based on drift × importance rank. */
 const RiskBadge: React.FC<{
     importance: number | undefined;
     rank: number | null;
     drifted: boolean;
     maxImportance: number;
-}> = ({ importance, rank, drifted, maxImportance }) => {
+    evidence: ColumnDrift['evidence'];
+}> = ({ importance, rank, drifted, maxImportance, evidence }) => {
+    if (evidence && ['insufficient_data', 'unavailable'].includes(evidence.status)) return <span className="text-xs text-amber-600 dark:text-amber-400">Unknown</span>;
     if (importance == null) return <span className="text-xs text-gray-400">—</span>;
-    const isHigh = drifted && rank != null && rank <= 5;
-    const isMedium = drifted && rank != null && rank <= 15 && !isHigh;
+    const risk = importanceRisk(drifted, rank);
     return (
         <div className="flex items-center gap-1.5">
-            {isHigh ? (
+            {risk === 'High' ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
                     <ShieldAlert size={12} /> High
                 </span>
-            ) : isMedium ? (
+            ) : risk === 'Medium' ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
                     <ShieldAlert size={12} /> Medium
                 </span>
@@ -219,9 +227,18 @@ function DriftRowDetails({ col, ks, ksPValue }: { col: ColumnDrift; ks: DriftMet
                                     ? '< 0.001'
                                     : ksPValue.value.toFixed(3)}
                             </span>{' '}
-                            (diagnostic only — drift is decided on the statistic)
+                            {col.evidence
+                                ? '(raw test result; the verdict also requires effect size and corrected evidence)'
+                                : '(legacy report: effect thresholds were used without a statistical evidence gate)'}
                         </>
                     )}
+                </div>
+            )}
+            {col.evidence && (
+                <div className="text-xs text-gray-600 dark:text-slate-400">
+                    Observations: {col.evidence.reference_count} reference / {col.evidence.current_count} current.
+                    {' '}Corrected p-value: {col.evidence.adjusted_p_value?.toPrecision(3) ?? 'unavailable'}.
+                    {' '}{col.evidence.reason}
                 </div>
             )}
             {col.suggestions && col.suggestions.length > 0 && (
@@ -242,6 +259,16 @@ function DriftRowDetails({ col, ks, ksPValue }: { col: ColumnDrift; ks: DriftMet
             {col.distribution && <DistributionChart distribution={col.distribution} />}
         </div>
     );
+}
+
+/** Distinguish unsupported or unavailable evidence from a confirmed drift verdict. */
+function DriftStatus({ col }: { col: ColumnDrift }) {
+    const legacy = col.evidence == null && col.metrics.some(metric => metric.metric !== 'type_drift');
+    const suffix = legacy ? ' (legacy)' : '';
+    if (col.drift_detected) return <span className="text-red-600 dark:text-red-400 flex items-center gap-1"><XCircle size={16} /> Drifted{suffix}</span>;
+    if (col.evidence?.status === 'insufficient_data') return <span className="text-amber-600 dark:text-amber-400">Insufficient data</span>;
+    if (col.evidence?.status === 'unavailable') return <span className="text-amber-600 dark:text-amber-400">Evidence unavailable</span>;
+    return <span className="text-green-600 dark:text-green-400 flex items-center gap-1"><CheckCircle size={16} /> {col.evidence ? 'No supported drift' : `Stable${suffix}`}</span>;
 }
 
 /** Render one shared column and the expansion controlled by the parent table. */
@@ -265,15 +292,7 @@ function DriftRow({ col, fi, isExpanded, maxImportance, toggleRow, hasSparklines
             <tr className={col.drift_detected ? 'bg-red-50 dark:bg-red-900/10' : ''}>
                 <td className="px-6 py-4 whitespace-nowrap font-medium">{col.column}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                    {col.drift_detected ? (
-                        <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
-                            <XCircle size={16} /> Drifted
-                        </span>
-                    ) : (
-                        <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                            <CheckCircle size={16} /> Stable
-                        </span>
-                    )}
+                    <DriftStatus col={col} />
                 </td>
                 <MetricCell metric={wasserstein} showRawDistance />
                 <MetricCell metric={psi} />
@@ -282,6 +301,7 @@ function DriftRow({ col, fi, isExpanded, maxImportance, toggleRow, hasSparklines
                 {fi && (
                     <td className="px-6 py-4 whitespace-nowrap">
                         <RiskBadge
+                            evidence={col.evidence}
                             importance={importance}
                             rank={importanceRank}
                             drifted={col.drift_detected}
@@ -437,7 +457,7 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                                 <CheckCircle size={20} className="inline mr-2 text-green-500" />
                                 {hasSchemaDrift
                                     ? 'No distribution drift among shared columns — see the schema drift above.'
-                                    : 'No drifted columns found — all features are stable.'}
+                                    : 'No supported distribution drift. Show all columns to inspect the available evidence.'}
                             </td>
                         </tr>
                     ) : (

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from typing import Any, ClassVar
 
 import numpy as np
@@ -13,6 +14,7 @@ import polars as pl
 from ..config_validation import validate_preprocessing_steps
 from ..core.execution import ExecutionOptions, FrameSpec
 from ..core.validation import prediction_row_count, validate_prediction_rows
+from ..data.coverage import record_coverage
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
@@ -99,8 +101,8 @@ class FeatureEngineer:
     # and `_collect_step_metrics` can't drift out of sync with each other.
     _RESAMPLING_TYPES: ClassVar[set[str]] = {"Oversampling", "Undersampling"}
 
-    # Row-dropping steps are train-time cleaning only (F-18). Running them at
-    # inference would silently vanish requested input rows -- prediction
+    # Explicit filters apply to training and evaluation. Running them at
+    # unkeyed inference would silently vanish requested input rows -- prediction
     # responses carry no row keys, so callers could never tell which inputs
     # lost their prediction. Skipping them means a null row surfaces as a
     # visible model error instead of a silent misalignment.
@@ -202,31 +204,53 @@ class FeatureEngineer:
                 state_max_bytes=self.execution_options.state_max_bytes,
             )
         current_data = data
+        input_rows = prediction_row_count(unpack_pipeline_input(data)[0])
+        coverage_steps: list[dict[str, Any]] = []
 
-        for step in self._transform_steps():
+        for step in self._transform_steps(preserve_rows=preserve_rows):
             name = step["name"]
             transformer_type = step["type"]
             applier = step["applier"]
             artifact = step["artifact"]
 
             logger.debug(f"Applying step: {name} ({transformer_type})")
+            rows_before = prediction_row_count(unpack_pipeline_input(current_data)[0])
             current_data = (
                 _apply_prediction_step(current_data, step)
                 if preserve_rows
                 else applier.apply(current_data, artifact)
             )
+            if not preserve_rows:
+                coverage_steps.append(
+                    {
+                        "name": name,
+                        "transformer": transformer_type,
+                        **record_coverage(
+                            rows_before,
+                            prediction_row_count(unpack_pipeline_input(current_data)[0]),
+                            step_name=f"{name} ({transformer_type})",
+                        ),
+                    }
+                )
 
+        if not preserve_rows:
+            self.last_transform_coverage_ = record_coverage(
+                input_rows,
+                prediction_row_count(unpack_pipeline_input(current_data)[0]),
+                coverage_steps,
+            )
         return current_data
 
-    def _transform_steps(self) -> list[dict[str, Any]]:
-        """Exclude training-only splitters, resampling and row-dropping nodes."""
+    def _transform_steps(self, *, preserve_rows: bool = True) -> list[dict[str, Any]]:
+        """Apply explicit evaluation filters while retaining unkeyed prediction skips."""
         skipped = {
             "TrainTestSplitter",
             "Split",
             "feature_target_split",
             *self._RESAMPLING_TYPES,
-            *self._ROW_DROPPING_TYPES,
         }
+        if preserve_rows:
+            skipped.update(self._ROW_DROPPING_TYPES)
         return [step for step in self.fitted_steps if step["type"] not in skipped]
 
     def transform_tracking_order(self, data: Any) -> tuple[Any, np.ndarray]:
@@ -380,6 +404,7 @@ class FeatureEngineer:
 
         self._portable_fitted = True
         self.train_sample_weight_ = raw_weights
+        self.evaluation_coverage_ = deepcopy(getattr(current_data, "evaluation_coverage", {}))
         return current_data, metrics
 
     def _fit_transform_spark(

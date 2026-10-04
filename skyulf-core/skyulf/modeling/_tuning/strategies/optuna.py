@@ -22,7 +22,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ...pruning import PruningPlan, resolve_pruning_plan
-from ..fold_scoring import wrap_fold_scorer
+from ..fold_scoring import _fold_step, wrap_fold_scorer
 from ..params import clean_search_space
 from ..schemas import TuningConfig
 
@@ -282,14 +282,16 @@ def build_optuna_searcher(
     pruner_name = strategy_params.get("pruner", "median")
     pruner = build_optuna_pruner(pruner_name)
     plan = _pruning_plan(base_estimator, config, cv, pruner_name, log_callback)
-    if weighted and plan.mode == "none":
+    fold_step = _fold_step(base_estimator)
+    fold_preprocessing = fold_step is not None and fold_step.preprocessor is not None
+    if (weighted or fold_preprocessing) and plan.mode == "none":
         pruner = build_optuna_pruner("none")
 
     study = _optuna_state.optuna_module.create_study(
         sampler=sampler, pruner=pruner, direction="maximize"
     )
 
-    if weighted or plan.mode == "folds" or plan.kind in {"xgboost", "lightgbm"}:
+    if _requires_fold_search(plan, weighted or fold_preprocessing):
         from .optuna_search import OptunaPruningSearchCV  # noqa: PLC0415 - optional dependency
 
         return OptunaPruningSearchCV(
@@ -302,7 +304,7 @@ def build_optuna_searcher(
             n_jobs=config.n_jobs,
             callbacks=callbacks,
             study=study,
-            mode="folds" if weighted and plan.kind not in {"xgboost", "lightgbm"} else plan.mode,
+            mode=_fold_search_mode(plan, weighted or fold_preprocessing),
             iteration_budget=plan.iteration_budget,
         )
 
@@ -331,3 +333,15 @@ def build_optuna_searcher(
             max_iter=plan.iteration_budget if enable_pruning else 1000,
             error_score=-float("inf"),
         )
+
+
+def _fold_search_mode(plan: PruningPlan, paired: bool) -> str:
+    """Keep disabled pruning on ordinary complete folds and native iteration plans intact."""
+    if paired and (plan.mode == "none" or plan.kind not in {"xgboost", "lightgbm"}):
+        return "folds"
+    return plan.mode
+
+
+def _requires_fold_search(plan: PruningPlan, paired: bool) -> bool:
+    """Use the owned paired-fold loop when preprocessing or native pruning needs it."""
+    return paired or plan.mode == "folds" or plan.kind in {"xgboost", "lightgbm"}
