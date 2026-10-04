@@ -234,10 +234,10 @@ The paths below are relative to the repository root.
   and optional embedding dependency behavior.
 - `skyulf-core/tests/unit/test_feature_operation_leakage.py`: feature
   operations, fitted group state, and row/sequence behavior.
-- `skyulf-core/tests/integration/test_leakage_fixture_contract.py` and
-  `skyulf-core/tests/integration/test_leakage_operation_contract.py`: shared
+- `skyulf-core/tests/integration/core/test_leakage_fixture_contract.py` and
+  `skyulf-core/tests/integration/core/test_leakage_operation_contract.py`: shared
   inventory and operation contracts exercised through core integration paths.
-- `skyulf-core/tests/integration/test_core_pipeline_tuning_leakage.py`: actual
+- `skyulf-core/tests/integration/core/test_core_pipeline_tuning_leakage.py`: actual
   preprocessing fits within tuning folds.
 - `tests/integration/test_leakage_submission.py`,
   `tests/integration/test_leakage_operation_contract.py`, and

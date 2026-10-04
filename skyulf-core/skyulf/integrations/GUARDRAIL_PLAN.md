@@ -125,7 +125,7 @@ Kararlar:
 ## 5. Doğrulama kapıları
 
 - `ruff check .`, `ruff format --check ...`, tam `ty check` kapsamı (CI ile aynı).
-- Etkilenen pytest: `skyulf-core/tests/integrations` + `test_internal_api_boundary.py`.
+- Etkilenen pytest: `skyulf-core/tests/integration/platforms` + `test_internal_api_boundary.py`.
 - Lizard CCN ≤ 10, pydantic model docstring'i eklenirse OpenAPI snapshot testi.
 - Frontend: vitest, `lint`, `complexity:check`, `build`, `size-check`.
 
