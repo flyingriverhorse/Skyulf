@@ -250,7 +250,7 @@ the same provenance guarantees as `run_batch`.
 
 ## Local verification
 
-The repository's `skyulf-core/examples/databricks_delta_smoke.py` accepts an
+The test fixture `skyulf-core/tests/fixtures/databricks_delta_smoke.py` accepts an
 existing Spark session, a pinned raw `y=2*x` regression bundle and an existing
 test namespace. Its `run_smoke(...)` creates and prints three unique Delta table
 names, verifies monthly publication/replay and explicit empty replacement, and

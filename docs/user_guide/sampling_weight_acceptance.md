@@ -79,27 +79,16 @@ Each MLflow run contains:
 | `sampling_weight_proof/resolved_workflow.json` | Settings resolved by the production project loader |
 | `sampling_weight_project/` | Exact editable feature/model source files used in the case |
 
-Resources are retained for inspection in
-`workspace.skyulf_sampling_ab_20261003_fd9d6ead`:
-`source`, registered `single_model`, and `predictions` (96 rows).
+The run created `source`, registered `single_model`, and `predictions` (96 rows)
+in `workspace.skyulf_sampling_ab_20261003_fd9d6ead`. These test resources were
+removed during the workspace cleanup on 2026-10-04; this is historical evidence.
 
-## Repeat the test
+## Recorded test setup
 
-The notebook source is
-`skyulf-core/examples/databricks_sampling_weight_comparison.py`.
-Import it into your Databricks workspace as a Python source notebook and submit
-a serverless notebook task with these base parameters:
-
-```json
-{
-  "acceptance_id": "YOUR_UNIQUE_ALPHANUMERIC_ID",
-  "experiment": "/Users/YOUR_USER/unique-sampling-weight-experiment"
-}
-```
-
-Use a new ID for each run. The script deliberately creates a fresh schema rather
-than overwriting an earlier test. It requires permission to create test tables,
-an MLflow experiment and registered models in the `workspace` catalog.
+The one-time `databricks_sampling_weight_comparison.py` notebook was removed
+from the examples on 2026-10-04. It used a unique acceptance ID and MLflow
+experiment to create isolated test resources. The recorded versions and digests
+below describe that completed run.
 
 The verified environment used the current Core wheel, `mlflow==3.16.1`,
 `scikit-learn==1.8.0`, `numpy==1.26.4`, `pandas==2.3.2`, and

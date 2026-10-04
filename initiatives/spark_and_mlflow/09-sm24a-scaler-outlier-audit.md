@@ -1,6 +1,6 @@
 # SM-24a scaler and outlier inference audit
 
-Status: completed on 2026-09-23 for the bounded pandas/Polars Databricks workflow. The executable probe is [`databricks_local_sm24a_scaler_outlier_audit.py`](../../skyulf-core/examples/databricks_local_sm24a_scaler_outlier_audit.py). This audit tests the existing implementation; it does not add a new inference endpoint or a Spark-native transform.
+Status: completed on 2026-09-23 for the bounded pandas/Polars Databricks workflow. The one-time probe `databricks_local_sm24a_scaler_outlier_audit.py` was removed during example cleanup on 2026-10-04. This audit tests the existing implementation; it does not add a new inference endpoint or a Spark-native transform.
 
 ## Result
 

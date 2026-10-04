@@ -337,7 +337,8 @@ digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later
 alias move does not redirect the pinned reference.
 
-The `databricks_batch_smoke.py` example logs a uniquely named test model, loads
+The `skyulf-core/tests/fixtures/databricks_batch_smoke.py` fixture logs a uniquely
+named test model, loads
 its concrete registry version, and compares known gold predictions through both
 Spark inference modes. It accepts pandas or Polars training and emits a partial
 validation report. Local SQLite/Spark evidence does not certify live Unity Catalog,

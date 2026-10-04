@@ -10,8 +10,8 @@ import pytest
 
 @pytest.fixture
 def smoke_module():
-    """Load the same script that will be uploaded as a Databricks Python task."""
-    path = Path(__file__).parents[2] / "examples" / "databricks_batch_smoke.py"
+    """Load the platform fixture shared by local parity and Spark integration tests."""
+    path = Path(__file__).parents[1] / "fixtures" / "databricks_batch_smoke.py"
     spec = importlib.util.spec_from_file_location("skyulf_platform_smoke", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

@@ -9,9 +9,9 @@ import pytest
 
 def test_delta_smoke_records_commits_and_retains_only_its_tables(delta_spark, monkeypatch):
     """A known regression bundle must publish, replay and explicitly clear January safely."""
-    examples = Path(__file__).parents[2] / "examples"
-    probe = examples / "databricks_delta_smoke.py"
-    assert probe.is_file(), "The reusable Delta smoke example is missing."
+    fixtures = Path(__file__).parents[1] / "fixtures"
+    probe = fixtures / "databricks_delta_smoke.py"
+    assert probe.is_file(), "The Delta smoke fixture is missing."
     run_smoke = runpy.run_path(str(probe))["run_smoke"]
     identity = uuid4()
     monkeypatch.setitem(run_smoke.__globals__, "uuid4", lambda: identity)
@@ -19,7 +19,7 @@ def test_delta_smoke_records_commits_and_retains_only_its_tables(delta_spark, mo
         f"default.skyulf_delta_smoke_{identity.hex}_{role}"
         for role in ("source", "target", "control")
     ]
-    build_bundle = runpy.run_path(str(examples / "databricks_batch_smoke.py"))["build_gold_bundle"]
+    build_bundle = runpy.run_path(str(fixtures / "databricks_batch_smoke.py"))["build_gold_bundle"]
     bundle, _ = build_bundle("pandas")
     try:
         report = run_smoke(
@@ -76,8 +76,8 @@ def test_delta_smoke_records_commits_and_retains_only_its_tables(delta_spark, mo
 @pytest.mark.parametrize("namespace", ["a.b.c", "default; DROP TABLE x", "", "a..b"])
 def test_delta_smoke_rejects_invalid_namespace_before_io(namespace):
     """Invalid catalog qualification must fail before any Spark table operation."""
-    probe = Path(__file__).parents[2] / "examples" / "databricks_delta_smoke.py"
-    assert probe.is_file(), "The reusable Delta smoke example is missing."
+    probe = Path(__file__).parents[1] / "fixtures" / "databricks_delta_smoke.py"
+    assert probe.is_file(), "The Delta smoke fixture is missing."
     run_smoke = runpy.run_path(str(probe))["run_smoke"]
     with pytest.raises(ValueError, match="namespace"):
         run_smoke(
