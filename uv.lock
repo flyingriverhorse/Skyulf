@@ -5286,7 +5286,7 @@ requires-dist = [
     { name = "rich", marker = "extra == 'all'", specifier = ">=13.0.0" },
     { name = "rich", marker = "extra == 'viz'", specifier = ">=13.0.0" },
     { name = "rtree", marker = "extra == 'geo'", specifier = ">=1.3.0,<2.0.0" },
-    { name = "scikit-learn", specifier = ">=1.4.0,<2.0.0" },
+    { name = "scikit-learn", specifier = ">=1.7.0,<2.0.0" },
     { name = "scipy", specifier = ">=1.10.0" },
     { name = "sentence-transformers", marker = "extra == 'all'", specifier = ">=2.2.0" },
     { name = "sentence-transformers", marker = "extra == 'nlp'", specifier = ">=2.2.0" },

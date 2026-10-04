@@ -32,7 +32,7 @@ setup(
     install_requires=[
         "pandas>=2.0.0,<3.0.0",
         "numpy>=1.24.0",
-        "scikit-learn>=1.4.0,<2.0.0",
+        "scikit-learn>=1.7.0,<2.0.0",
         "joblib>=1.3.0",
         "polars>=1.43.2",
         "pyarrow>=21.0.0",
