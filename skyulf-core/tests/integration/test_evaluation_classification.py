@@ -191,6 +191,19 @@ def test_compute_confusion_matrix_without_label_values_uses_labels_directly():
     assert cm_data.matrix == [[1, 1], [1, 1]]
 
 
+def test_confusion_matrix_appends_observed_classes_without_reordering_trained_axis():
+    """Custom display labels and the trained order must survive new holdout classes."""
+    labels = ["trained two", "trained zero"]
+    values = [2, 0]
+
+    cm_data = _compute_confusion_matrix([2, 0, 1], [2, 1, 0], labels, values)
+
+    assert labels == ["trained two", "trained zero"]
+    assert values == [2, 0]
+    assert cm_data.labels == ["trained two", "trained zero", "1"]
+    assert cm_data.matrix == [[1, 0, 0], [0, 0, 1], [0, 1, 0]]
+
+
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample,
     which has missing values — closer to production data than the small

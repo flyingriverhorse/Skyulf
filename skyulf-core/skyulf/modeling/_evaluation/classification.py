@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 from sklearn.preprocessing import label_binarize
+from sklearn.utils.multiclass import unique_labels
 
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
@@ -166,14 +167,17 @@ def _compute_confusion_matrix(
     produces an all-zero matrix whenever the underlying classes are not
     already strings (e.g. int-encoded targets).
     """
-    cm = confusion_matrix(
-        y_true, y_pred, labels=label_values if label_values is not None else labels
-    )
+    # Preserve the trained order, then include classes seen only at evaluation.
+    # Probability curves retain the model's separate class/probability axis.
+    values = list(label_values if label_values is not None else labels)
+    extra_values = [value for value in unique_labels(y_true, y_pred) if value not in values]
+    cm = confusion_matrix(y_true, y_pred, labels=values + extra_values)
+    display_labels = [*labels, *(str(value) for value in extra_values)]
 
     # Convert to list of lists for JSON serialization
     matrix_data = cm.tolist()
 
-    return ConfusionMatrixData(labels=labels, matrix=matrix_data)
+    return ConfusionMatrixData(labels=display_labels, matrix=matrix_data)
 
 
 def _evaluation_predictions(model: Any, X: Any, predictions: Any | None) -> Any:

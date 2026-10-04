@@ -21,7 +21,10 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 try:
-    from xgboost import XGBClassifier  # ty: ignore[unresolved-import]
+    # Probe the dependency even when the local adapter module is cached.
+    import xgboost  # ty: ignore[unresolved-import]  # noqa: F401 - optional dependency probe
+
+    from ._xgboost import XGBClassifier
 
     XGBOOST_AVAILABLE = True
 except ImportError:

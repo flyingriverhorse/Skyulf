@@ -99,9 +99,20 @@ def _fixed_nested(
     sample_weight: Any = None,
 ) -> dict[str, Any]:
     """Evaluate a singleton recipe at both levels without introducing parameter choices."""
+    calculator = deepcopy(calculator)
+    model_config = deepcopy(model_config)
+    calculator.prepare_tuning_params(model_config)
+    params = calculator._resolve_fit_params(model_config)
+    structural = set(calculator.STRUCTURAL_TUNING_KEYS)
+    configured = model_config.get("params", model_config) or {}
+    # Resolved estimator objects belong to calculator defaults, not reportable
+    # candidate axes. Explicit estimator overrides still follow ordinary fitting.
+    structural.update({"estimators", "estimator"} - configured.keys())
     policy.strategy = "grid"
     policy.metric = "accuracy" if calculator.problem_type == "classification" else "mse"
-    policy.search_space = {name: [value] for name, value in model_config.get("params", {}).items()}
+    policy.search_space = {
+        name: [value] for name, value in params.items() if name not in structural
+    }
     result = TuningCalculator(calculator).tune(
         X,
         y,

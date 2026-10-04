@@ -62,10 +62,10 @@ except ImportError:
     XGBOOST_AVAILABLE = False
 
 try:
-    from lightgbm import (  # ty: ignore[unresolved-import]
-        LGBMClassifier,  # ty: ignore[unresolved-import]
-        LGBMRegressor,  # ty: ignore[unresolved-import]
-    )
+    import lightgbm  # noqa: F401 - availability probe must run even when wrappers are cached
+
+    from .classification import _SamplingLGBMClassifier
+    from .regression import _SamplingLGBMRegressor
 
     LIGHTGBM_AVAILABLE = True
 except ImportError:
@@ -131,12 +131,12 @@ if XGBOOST_AVAILABLE:
     BASE_ESTIMATORS_REG["xgboost"] = lambda: XGBRegressor(random_state=DEFAULT_RANDOM_STATE)
 
 if LIGHTGBM_AVAILABLE:
-    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: LGBMClassifier(
+    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: _SamplingLGBMClassifier(
         random_state=DEFAULT_RANDOM_STATE, verbose=-1
-    )
-    BASE_ESTIMATORS_REG["lightgbm"] = lambda: LGBMRegressor(
+    ).set_params(subsample_freq=None)
+    BASE_ESTIMATORS_REG["lightgbm"] = lambda: _SamplingLGBMRegressor(
         random_state=DEFAULT_RANDOM_STATE, verbose=-1
-    )
+    ).set_params(subsample_freq=None)
 
 
 class _BaseEnsembleCalculator(SklearnCalculator):
@@ -189,7 +189,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     @property
     def default_params(self) -> dict[str, Any]:
-        """Base defaults, plus resolved ``estimators`` while tuning.
+        """Base defaults, plus the selected or default resolved ``estimators``.
 
         The tuner builds the meta-estimator from ``default_params``; without the
         resolved ``estimators`` a bare ``VotingClassifier()`` would raise. When
@@ -197,19 +197,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         is merged in here.
         """
         params = dict(self._default_params)
-        if self._tuning_base_config:
-            resolved = self._resolve_estimators(dict(self._tuning_base_config))
-            for key in (
-                "estimators",
-                "final_estimator",
-                "voting",
-                "cv",
-                "passthrough",
-                "weights",
-                "n_jobs",
-            ):
-                if key in resolved:
-                    params[key] = resolved[key]
+        resolved = self._resolve_estimators(dict(self._tuning_base_config))
+        for key in (
+            "estimators",
+            "final_estimator",
+            "voting",
+            "cv",
+            "passthrough",
+            "weights",
+            "n_jobs",
+        ):
+            if key in resolved:
+                params[key] = resolved[key]
         return params
 
     def fit(

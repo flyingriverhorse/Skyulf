@@ -62,7 +62,7 @@ def _try_add_metric(
     """
     try:
         metrics[key] = float(fn(*args, **kwargs))
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, ZeroDivisionError) as exc:
         logger.warning("Metric '%s' failed and was omitted: %s", key, exc)
 
 
