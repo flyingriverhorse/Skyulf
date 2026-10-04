@@ -351,7 +351,9 @@ class EDAVisualizer:
         self._render_target_interactions_table(console, Table)
 
     def _detect_regression_tree(self) -> bool:
-        """Heuristic: a leaf with a numeric class_name implies regression."""
+        """Prefer explicit task metadata, falling back to numeric leaf labels for old profiles."""
+        if self.profile.task_type in ("Classification", "Regression"):
+            return self.profile.task_type == "Regression"
         if not (self.profile.rule_tree and self.profile.rule_tree.nodes):
             return False
         for node in self.profile.rule_tree.nodes:
@@ -524,21 +526,19 @@ class EDAVisualizer:
         # pyplot's global registry across repeated plot() calls.
         existing_fignums = set(plt.get_fignums())
 
-        self._plot_distributions()
-        self._plot_correlations()
-        self._plot_correlations_with_target()
-        self._plot_target_interactions()
-        self._plot_scatter_matrix()
-        self._plot_pca()
-        self._plot_geospatial()
-        self._plot_timeseries()
-
-        new_fignums = [n for n in plt.get_fignums() if n not in existing_fignums]
         try:
+            self._plot_distributions()
+            self._plot_correlations()
+            self._plot_correlations_with_target()
+            self._plot_target_interactions()
+            self._plot_scatter_matrix()
+            self._plot_pca()
+            self._plot_geospatial()
+            self._plot_timeseries()
             print("Displaying plots...")
             plt.show()
         finally:
-            for fignum in new_fignums:
+            for fignum in set(plt.get_fignums()) - existing_fignums:
                 plt.close(fignum)
 
     @staticmethod
@@ -723,9 +723,12 @@ class EDAVisualizer:
         if pdf.empty:
             return
         colors = self._scatter_matrix_colors(pdf)
+        diagonal = "hist" if (pdf.nunique() < 2).any() else "kde"
 
         plt.figure(figsize=(10, 10))
-        scatter_matrix(pdf, alpha=0.8, figsize=(10, 10), diagonal="kde", c=colors, cmap="viridis")
+        scatter_matrix(
+            pdf, alpha=0.8, figsize=(10, 10), diagonal=diagonal, c=colors, cmap="viridis"
+        )
         plt.suptitle("Scatter Matrix")
 
     @staticmethod

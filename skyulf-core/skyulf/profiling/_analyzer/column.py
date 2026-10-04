@@ -117,10 +117,16 @@ class ColumnMixin(_AnalyzerState):
         )
 
     def _add_constant_alert(
-        self, col: str, profile: ColumnProfile, alerts: list[Alert], numeric_stats: NumericStats
+        self, col: str, profile: ColumnProfile, alerts: list[Alert], basic_stats: dict
     ) -> None:
-        """Flag columns whose numeric std is zero as constant."""
-        if numeric_stats.std == 0:
+        """Flag repeated observed values while preserving numeric std/null conventions."""
+        if profile.numeric_stats is not None:
+            is_constant = profile.numeric_stats.std == 0
+        else:
+            null_count = basic_stats.get(f"{col}__null", 0)
+            observed_unique = basic_stats.get(f"{col}__unique", 0) - int(null_count > 0)
+            is_constant = observed_unique == 1 and self.row_count - null_count > 1
+        if is_constant:
             profile.is_constant = True
             alerts.append(
                 Alert(
@@ -134,7 +140,7 @@ class ColumnMixin(_AnalyzerState):
     def _process_numeric_column(
         self, col: str, profile: ColumnProfile, alerts: list[Alert], advanced_stats: dict
     ) -> None:
-        """Compute numeric stats, histogram, normality test, outlier and constant alerts."""
+        """Compute numeric stats, histogram, normality test and outlier alerts."""
         numeric_stats = self._analyze_numeric(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
             col, advanced_stats
         )
@@ -143,7 +149,6 @@ class ColumnMixin(_AnalyzerState):
 
         self._add_normality_test(col, profile)
         self._add_outlier_alert(col, profile, alerts)
-        self._add_constant_alert(col, profile, alerts, numeric_stats)
 
     def _add_cardinality_alerts(
         self,
@@ -351,6 +356,7 @@ class ColumnMixin(_AnalyzerState):
         elif semantic_type == "Unknown":
             self._add_unsupported_dtype_alert(col, alerts)
 
+        self._add_constant_alert(col, profile, alerts, basic_stats)
         self._add_generic_unique_alert(col, profile, alerts, basic_stats, semantic_type)
 
         return profile, alerts

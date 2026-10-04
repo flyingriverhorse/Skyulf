@@ -143,20 +143,23 @@ def _drop_selected_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: str | None) -> pd.Series | None:
     """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame.
 
-    ``y`` may arrive as a Polars Series when the pipeline runs on the Polars
-    engine; the rest of this module (``_infer_problem_type``, ``pd.factorize``,
-    etc.) assumes a pandas Series, so normalize here rather than in every caller.
+    ``y`` may arrive as a Polars Series, list or numpy array; the rest of this
+    module assumes a pandas Series, so normalize here rather than in every caller.
+    Existing pandas Series retain their dtype, index and name.
     """
     if y is not None:
-        return y.to_pandas() if hasattr(y, "to_pandas") else y
+        y = y.to_pandas() if hasattr(y, "to_pandas") else y
+        return y if isinstance(y, pd.Series) else pd.Series(y)
     if not target_col or target_col not in X_pd.columns:
         return None
     return X_pd[target_col]
 
 
 def _prepare_sklearn_y(y: Any, problem_type: str) -> np.ndarray:
-    """Convert ``y`` to a numpy array, factorising non-numeric classification targets."""
+    """Convert targets to numpy, rejecting missing class labels before factorisation."""
     y_np = y.to_numpy() if hasattr(y, "to_numpy") else np.array(y)
+    if problem_type == "classification" and pd.isna(y_np).any():
+        raise ValueError("Classification target contains missing values.")
     if problem_type == "classification" and not np.issubdtype(y_np.dtype, np.number):
         y_factorized, _ = pd.factorize(y_np)
         return y_factorized

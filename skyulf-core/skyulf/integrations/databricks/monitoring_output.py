@@ -96,6 +96,13 @@ def _feature_result(metrics: dict[str, dict]) -> str:
     return "No drift detected"
 
 
+def _reported_metric(metrics: dict[str, dict], name: str) -> dict:
+    """Display categorical PSI in the shared PSI column using its recorded evidence."""
+    if name == "psi":
+        return metrics.get(name, metrics.get("psi_categorical", {}))
+    return metrics.get(name, {})
+
+
 def render_drift_output(row: dict, dashboard_url: str = "") -> str:
     """Render a compact per-feature table from the persisted report, without recalculation."""
     features: dict[str, dict] = {}
@@ -114,7 +121,7 @@ def render_drift_output(row: dict, dashboard_url: str = "") -> str:
         (
             feature,
             _feature_result(metrics),
-            *(_metric_cell(metrics.get(name, {})) for name in names),
+            *(_metric_cell(_reported_metric(metrics, name)) for name in names),
         )
         for feature, metrics in sorted(features.items())
     ]

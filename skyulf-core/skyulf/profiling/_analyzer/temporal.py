@@ -68,7 +68,9 @@ class TemporalMixin(_AnalyzerState):
     ) -> tuple[pl.DataFrame, list[TimeSeriesPoint]]:
         """Build trend points from raw (unresampled) rows for small datasets."""
         trend_df = _collect(
-            ts_df.select([pl.col(date_col).alias("date"), *cols_to_track]).drop_nulls()
+            ts_df.select([pl.col(date_col).alias("date"), *cols_to_track]).drop_nulls(
+                subset=["date"]
+            )
         )
 
         trend_points = []

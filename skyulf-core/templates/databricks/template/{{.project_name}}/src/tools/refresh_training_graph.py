@@ -57,11 +57,19 @@ def refresh(project):
 
 def _renamed(block, old, new):
     """Change identifiers and task-value references without rewriting unrelated options."""
-    return (
-        block.replace(f"train_{old}", f"train_{new}")
-        .replace(f"shap_{old}", f"shap_{new}")
-        .replace(f'model_key: "{old}"', f'model_key: "{new}"')
-    )
+    for field, before, after in (
+        ("task_key", f"train_{old}", f"train_{new}"),
+        ("task_key", f"shap_{old}", f"shap_{new}"),
+        ("model_key", old, new),
+    ):
+        pattern = (
+            rf"(?m)^([ \t]*(?:-[ \t]+)?{field}:[ \t]*)(['\"]?){re.escape(before)}"
+            rf"\2(?=[ \t]*(?:#.*)?$)"
+        )
+        block = re.sub(pattern, rf"\g<1>\g<2>{after}\g<2>", block)
+    for prefix in ("train", "shap"):
+        block = block.replace(f"{{{{tasks.{prefix}_{old}.", f"{{{{tasks.{prefix}_{new}.")
+    return block
 
 
 if __name__ == "__main__":

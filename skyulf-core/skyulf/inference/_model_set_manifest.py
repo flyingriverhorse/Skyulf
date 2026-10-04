@@ -157,7 +157,18 @@ def combined_schemas(
     for schema in (tuple(inputs.values()), tuple(outputs)):
         if len({column.name.casefold() for column in schema}) != len(schema):
             raise ValueError("Model set schema column collision.")
+    _validate_key_inputs(components, keys)
     return tuple(inputs.values()), tuple(outputs)
+
+
+def _validate_key_inputs(
+    components: tuple[ComponentManifest, ...], keys: tuple[ColumnSpec, ...]
+) -> None:
+    """Keep record keys separate from the component features they accompany."""
+    key_names = {key.name.casefold() for key in keys}
+    for component in components:
+        if key_names.intersection(column.name.casefold() for column in component.input_schema):
+            raise ValueError("Record keys cannot also be component input columns.")
 
 
 def validate_components(components: tuple[ComponentManifest, ...]) -> None:

@@ -153,6 +153,15 @@ def _pandas_time_of_day(d: Any) -> Any:
     return pd.Series(np.select(conditions, choices, default=TIME_OF_DAY_DEFAULT), index=d.index)
 
 
+def _pandas_is_weekend(d: Any) -> Any:
+    """Preserve missing dates while retaining the existing dtype for fully observed batches."""
+    result = (d.dt.dayofweek >= 5).astype(int)
+    missing = d.isna()
+    if missing.any():
+        result = result.astype("Int64").mask(missing)
+    return result
+
+
 _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "year": lambda d: d.dt.year,
     "month": lambda d: d.dt.month,
@@ -162,7 +171,7 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "second": lambda d: d.dt.second,
     "quarter": lambda d: d.dt.quarter,
     "weekday": lambda d: d.dt.dayofweek,
-    "is_weekend": lambda d: (d.dt.dayofweek >= 5).astype(int),
+    "is_weekend": _pandas_is_weekend,
     "week": lambda d: d.dt.isocalendar().week.astype("Int64"),
     "month_name": lambda d: d.dt.month_name(),
     "day_name": lambda d: d.dt.day_name(),

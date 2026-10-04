@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+import re
 from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -207,16 +208,33 @@ def _typed_empty_input(artifact: "ModelSetArtifact") -> Any:
     """Restore declared types that an empty Spark row iterator cannot carry into pandas."""
     import pandas as pd  # noqa: PLC0415
 
-    from ...inference._model_set_manifest import canonical_dtype  # noqa: PLC0415
-
     return pd.DataFrame(
         {
-            column.name: pd.Series(
-                dtype="object" if column.dtype == "object" else canonical_dtype(column.dtype)
-            )
+            column.name: _empty_input_column(column.dtype)
             for column in artifact.manifest.input_schema
         }
     )
+
+
+def _empty_input_column(dtype: str) -> Any:
+    """Preserve pandas and recorded Polars dtypes through an empty pandas bridge."""
+    import pandas as pd  # noqa: PLC0415
+    import polars as pl  # noqa: PLC0415
+
+    if dtype in {"Date", "Categorical"}:
+        polars_dtype = {"Date": pl.Date, "Categorical": pl.Categorical}[dtype]
+        return pl.Series([], dtype=polars_dtype).to_pandas(use_pyarrow_extension_array=True)
+    temporal = re.fullmatch(
+        r"Datetime\(time_unit='(ms|us|ns)', time_zone=(None|'([^']+)')\)", dtype
+    )
+    if temporal:
+        unit, _, timezone = temporal.groups()
+        pandas_dtype = (
+            f"datetime64[{unit}, {timezone}]" if timezone is not None else f"datetime64[{unit}]"
+        )
+        return pd.Series(dtype=pandas_dtype)
+    aliases = {"String": "string", "Utf8": "string", "Boolean": "boolean"}
+    return pd.Series(dtype=aliases.get(dtype, dtype))
 
 
 def _reject_temporal_reset(
