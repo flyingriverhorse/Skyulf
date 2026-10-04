@@ -3,12 +3,11 @@
 from typing import Any
 
 import numpy as np
-from sklearn.utils.metaestimators import available_if
 
 from .._class_weights import split_class_weight_params
 from .._cv_weights import preflight_weights, take_weights, weight_kwargs
 from .._evaluation.thresholds import apply_thresholds, optimize_thresholds
-from .fold_pipeline import FoldAwareModelStep, _fitted_model_has
+from .fold_pipeline import FoldAwareModelStep
 from .grid_random import _slice_fold_rows
 from .metrics import resolve_metric, resolve_scorer
 from .params import instantiate_model, seed_params
@@ -22,23 +21,6 @@ class _ThresholdModelStep(FoldAwareModelStep):
     # sklearn 1.4/1.5 recognize classifiers through this legacy marker.
     _estimator_type = "classifier"
     decision_thresholds: dict[Any, float]
-
-    @property
-    def classes_(self) -> Any:
-        """Expose the canonical raw label order required by probability scorers."""
-        return np.sort(super().classes_)
-
-    def predict_proba(self, X: Any) -> Any:
-        """Reorder probability columns when preprocessing reversed the class order."""
-        original = np.asarray(super().classes_)
-        return np.asarray(super().predict_proba(X))[:, np.argsort(original)]
-
-    @available_if(_fitted_model_has("decision_function"))
-    def decision_function(self, X: Any) -> Any:
-        """Keep decision scores oriented toward the canonical raw positive class."""
-        original = np.asarray(super().classes_)
-        scores = super().decision_function(X)
-        return -scores if original[0] > original[1] else scores
 
     def predict(self, X: Any) -> Any:
         """Apply training-only thresholds in the original target label space."""
@@ -186,12 +168,14 @@ def score_nested_threshold(
     return score
 
 
-def remap_nested_thresholds(result: TuningResult, model: Any, y_raw: Any, y_refit: Any) -> None:
+def remap_nested_thresholds(
+    result: TuningResult, model: Any, y_raw: Any, y_refit: Any, preprocessing: Any = None
+) -> None:
     """Map raw-label selection thresholds onto the final model's encoded class axis."""
     thresholds = result.decision_thresholds
     if thresholds is None:
         raise ValueError("Nested threshold selection did not produce final decision thresholds.")
-    label_map = FoldAwareModelStep._build_label_map(y_raw, y_refit, model)
+    label_map = FoldAwareModelStep._build_label_map(y_raw, y_refit, model, preprocessing)
     classes = np.asarray(model.classes_).tolist()
     raw_classes = [label_map.get(label, label) for label in classes] if label_map else classes
     if len(raw_classes) != 2 or set(raw_classes) != set(thresholds):

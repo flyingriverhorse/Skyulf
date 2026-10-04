@@ -27,6 +27,7 @@ from ..engines import (
     PandasBackedFrame,
     PolarsBackedFrame,
     SkyulfDataFrame,
+    SkyulfPolarsWrapper,
     get_engine,
 )
 from ..utils import is_decimal_series, resolve_columns
@@ -257,13 +258,8 @@ def select_then_to_numpy(X: Any, requested: Iterable[str]) -> tuple[np.ndarray, 
 
 
 def is_polars(X: Any) -> bool:
-    """Return ``True`` when ``X`` is backed by the Polars engine.
-
-    Centralises the ``engine.name == EngineName.POLARS`` check so node modules
-    never branch on the engine inline. Node files should call this (or the
-    dual-engine dispatcher) instead of importing ``EngineName`` themselves.
-    """
-    return get_engine(X).name == EngineName.POLARS
+    """Recognize native Polars frames/series and their wrapper without engine defaults."""
+    return isinstance(X, (pl.DataFrame, pl.Series, SkyulfPolarsWrapper))
 
 
 def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:

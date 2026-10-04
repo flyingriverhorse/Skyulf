@@ -104,6 +104,15 @@ def _group_values(frame: pd.DataFrame, column: str, group_by: str, strategy: str
     return pairs
 
 
+def _extend_categories(series: pd.Series, fills: pd.Series) -> pd.Series:
+    """Allow learned fills absent from a categorical inference batch's vocabulary."""
+    if isinstance(series.dtype, pd.CategoricalDtype):
+        new = [value for value in fills.dropna().unique() if value not in series.cat.categories]
+        if new:
+            return series.cat.add_categories(new)
+    return series
+
+
 class GroupImputerApplier(BaseApplier):
     """Fill gaps with the training value of each row's group, then with the global value.
 
@@ -133,13 +142,15 @@ class GroupImputerApplier(BaseApplier):
                 continue
             series = out[column]
             group_fill = keys.map(dict(map(tuple, params["group_values"][column])))
+            fallback = params["fill_values"].get(column)
+            if fallback is not None:
+                group_fill = group_fill.fillna(fallback)
             if numeric:
                 if not pd.api.types.is_float_dtype(series) or is_decimal_series(series):
                     series = pd.to_numeric(series).astype("float64")
                 group_fill = pd.to_numeric(group_fill).astype("float64")
-            filled = series.where(series.notna(), group_fill.to_numpy())
-            fallback = params["fill_values"].get(column)
-            out[column] = filled if fallback is None else filled.fillna(fallback)
+            series = _extend_categories(series, group_fill)
+            out[column] = series.where(series.notna(), group_fill.to_numpy())
         return out, y
 
     @staticmethod

@@ -85,7 +85,7 @@ def _prepare_fold(
         X_valid, y_valid = worker.transform(X_valid, y_valid)
     SklearnBridge.validate_features(X_train)
     SklearnBridge.validate_features(X_valid)
-    step.label_map_ = step._build_label_map(original_y, y_train, model)
+    step.label_map_ = step._build_label_map(original_y, y_train, model, worker)
     step.preprocessor_ = None  # Scorers receive data already transformed as a pair.
     if step.label_map_ is not None:
         y_valid = pd.Series(np.asarray(y_valid)).map(step.label_map_).to_numpy()

@@ -20,6 +20,7 @@ from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from .._cv_weights import fit_preprocessor, prepare_weights, take_weights
 from .._sample_weights import SampleWeightError
 from ..base import BaseModelCalculator
+from .fold_pipeline import FoldAwareModelStep
 from .metrics import resolve_scorer
 from .params import clean_search_space, instantiate_model, seed_params
 from .schemas import TuningConfig, TuningResult
@@ -114,6 +115,29 @@ def _slice_fold_rows(data: Any, indices: Any) -> Any:
     return data.iloc[indices] if hasattr(data, "iloc") else data[indices]
 
 
+def _score_candidate_fold(
+    model: Any,
+    X_valid: Any,
+    y_valid: Any,
+    y_original: Any,
+    y_encoded: Any,
+    preprocessing: Any,
+    metric: str,
+    problem_type: str | None,
+) -> float:
+    """Score in the original label space, consistently with the other searchers."""
+    scorer = resolve_scorer(metric, y_original, problem_type)
+    mapping = FoldAwareModelStep._build_label_map(y_original, y_encoded, model, preprocessing)
+    if mapping is None:
+        return scorer(model, X_valid, y_valid)
+    view = FoldAwareModelStep(estimator=model)
+    view.model_ = model
+    view.preprocessor_ = None
+    view.label_map_ = mapping
+    original_valid = np.array([mapping[label] for label in np.asarray(y_valid)])
+    return scorer(view, X_valid, original_valid)
+
+
 def fit_and_score_candidate_fold(
     candidate_idx: int,
     fold_idx: int,
@@ -146,6 +170,7 @@ def fit_and_score_candidate_fold(
     y_train_fold = _slice_fold_rows(y_any, train_idx)
     X_val_fold = _slice_fold_rows(X_any, val_idx)
     y_val_fold = _slice_fold_rows(y_any, val_idx)
+    y_original = y_train_fold
 
     fold_weight = prepare_weights(
         take_weights(sample_weight, train_idx), len(train_idx), preprocessing
@@ -174,12 +199,16 @@ def fit_and_score_candidate_fold(
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_train_fold, y_train_fold, **fit_kwargs)
 
-        # Score — resolved against the fold's (post-transform) labels so
-        # binary scorers get a valid pos_label even for string targets.
-        scorer = resolve_scorer(
-            metric, y_train_fold, getattr(model_calculator, "problem_type", None)
+        score = _score_candidate_fold(
+            model,
+            X_val_fold,
+            y_val_fold,
+            y_original,
+            y_train_fold,
+            preprocessing,
+            metric,
+            getattr(model_calculator, "problem_type", None),
         )
-        score = scorer(model, X_val_fold, y_val_fold)
 
         if log_callback:
             n_splits = cv.get_n_splits(X_arr, y_arr)

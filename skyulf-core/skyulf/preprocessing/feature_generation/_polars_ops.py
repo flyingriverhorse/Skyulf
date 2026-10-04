@@ -28,7 +28,10 @@ def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[A
         c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
     ]
     fill_val = op.get("fillna") if op.get("fillna") is not None else 0
-    col_exprs = [pl.col(c).cast(pl.Float64).fill_nan(fill_val).fill_null(fill_val) for c in valid]
+    col_exprs = [
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(fill_val).fill_null(fill_val)
+        for c in valid
+    ]
     const_vals = [float(c) for c in op.get("constants", [])]
     return col_exprs, const_vals
 
@@ -100,12 +103,12 @@ def _polars_arith(op: dict[str, Any], existing: list[str], epsilon: float) -> An
 def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
     """Sum ratio operands with null/NaN as zero and preserve the denominator's sign."""
     nums = [
-        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(0).fill_null(0)
         for c in op.get("input_columns", [])
         if c in existing
     ]
     dens = [
-        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
+        pl.col(c).cast(pl.Float64, strict=False).fill_nan(0).fill_null(0)
         for c in op.get("secondary_columns", [])
         if c in existing
     ]

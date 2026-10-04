@@ -32,7 +32,7 @@ def _polars_reciprocal(item: dict[str, Any]) -> Any:
 
 
 def _polars_square(item: dict[str, Any]) -> Any:
-    return pl.col(item["column"]).pow(2)
+    return pl.col(item["column"]).cast(pl.Float64).pow(2)
 
 
 def _polars_exp(item: dict[str, Any]) -> Any:
@@ -73,7 +73,7 @@ def _pandas_reciprocal(series: pd.Series, _item: dict[str, Any]) -> Any:
 
 
 def _pandas_square(series: pd.Series, _item: dict[str, Any]) -> Any:
-    return np.square(series)
+    return np.square(series.astype("float64"))
 
 
 def _pandas_exp(series: pd.Series, item: dict[str, Any]) -> Any:

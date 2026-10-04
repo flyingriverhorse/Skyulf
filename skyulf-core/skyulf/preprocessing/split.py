@@ -85,7 +85,9 @@ def _safe_stratify(y: Any, label: str) -> Any:
     """Return ``y`` if every class has ≥ 2 members, else ``None`` with a warning."""
     if y is None:
         return None
-    class_counts = cast(Any, y).value_counts()
+    labels = y if hasattr(y, "value_counts") else pd.Series(y)
+    class_counts = labels.value_counts()
+    class_counts = class_counts[class_counts > 0]
     min_count = class_counts.min()
     if min_count < 2:
         logger.warning(
@@ -323,6 +325,7 @@ class DataSplitter:
         unstratified split, with a warning, when the rarest class has fewer than
         two members.
         """
+        check_consistent_length(X, y)
         if sample_weight is not None:
             return self._split_weighted(X, y, sample_weight, paired=True)
         if is_polars(X):
@@ -394,7 +397,7 @@ class DataSplitter:
         weights = validate_sample_weight(weights, len(X))
         assert weights is not None
         labels = y if paired else X[self.stratify_col] if self.stratify_col in X.columns else None
-        stratify = self._weighted_stratify(labels, "Stratified split")
+        stratify = self._target_stratify(labels, "Stratified split")
         train_idx, test_idx = self._split_indices(len(X), stratify)
         val_idx = None
         if self.validation_size > 0:
@@ -404,7 +407,7 @@ class DataSplitter:
                 test_size=self.validation_size / (1 - self.test_size),
                 random_state=self.random_state,
                 shuffle=self.shuffle,
-                stratify=self._weighted_stratify(val_labels, "Stratified validation split"),
+                stratify=self._target_stratify(val_labels, "Stratified validation split"),
             )
 
         def payload(indices: Any) -> Any:
@@ -421,8 +424,8 @@ class DataSplitter:
             train_sample_weight=validate_sample_weight(weights[train_idx], len(train_idx)),
         )
 
-    def _weighted_stratify(self, labels: Any, label: str) -> Any:
-        """Retain the existing rare-class fallback for weighted partitions."""
+    def _target_stratify(self, labels: Any, label: str) -> Any:
+        """Retain the rare-class fallback for each supported target container."""
         if self.stratify_col is None or labels is None:
             return None
         if is_polars(labels):
@@ -440,7 +443,7 @@ class DataSplitter:
         )
 
     def _split_xy_polars(self, X: Any, y: Any) -> SplitDataset:
-        stratify = _safe_stratify_polars(y, "Stratified split") if self.stratify_col else None
+        stratify = self._target_stratify(y, "Stratified split")
 
         tv_idx, test_idx = self._split_indices(X.height, stratify)
 
@@ -449,7 +452,7 @@ class DataSplitter:
         if self.validation_size > 0:
             relative_val_size = self.validation_size / (1 - self.test_size)
             stratify_val = (
-                _safe_stratify_polars(y.gather(tv_idx), "Stratified validation split")
+                self._target_stratify(_take_weighted_rows(y, tv_idx), "Stratified validation split")
                 if stratify is not None and y is not None
                 else None
             )
@@ -460,11 +463,11 @@ class DataSplitter:
                 shuffle=self.shuffle,
                 stratify=stratify_val,
             )
-            validation = (X.gather(val_idx), y.gather(val_idx) if y is not None else None)
+            validation = (X.gather(val_idx), _take_weighted_rows(y, val_idx))
 
         return SplitDataset(
-            train=(X.gather(train_idx), y.gather(train_idx) if y is not None else None),
-            test=(X.gather(test_idx), y.gather(test_idx) if y is not None else None),
+            train=(X.gather(train_idx), _take_weighted_rows(y, train_idx)),
+            test=(X.gather(test_idx), _take_weighted_rows(y, test_idx)),
             validation=validation,
         )
 

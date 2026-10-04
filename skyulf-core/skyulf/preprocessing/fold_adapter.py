@@ -14,6 +14,7 @@ import polars as pl
 
 from ..modeling._cv_weights import fit_preprocessor, prepare_weights
 from ..registry import NodeRegistry
+from ._target_labels import original_target_labels
 from .pipeline import FeatureEngineer
 
 # Splitter steps already ran upstream of the CV/tuning boundary; re-running
@@ -186,7 +187,11 @@ class MergedBranchFoldAdapter:
         if input_y is not None and frame_rows(input_y) != expected_rows:
             raise ValueError("Merged fold features and target have different row counts")
         for engineer in engineers:
-            out = engineer.fit_transform(payload)[0] if fit else engineer.transform(payload)
+            out = (
+                engineer.fit_transform(payload, target_column=self._target_column)[0]
+                if fit
+                else engineer.transform(payload)
+            )
             frame, y_out = self._validated_branch_output(out, input_y, expected_rows)
             frames.append(frame)
             ys.append(y_out)
@@ -224,6 +229,12 @@ class MergedBranchFoldAdapter:
         """Reject targets embedded in the feature columns before branch execution."""
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
+
+    def original_target_labels(self, labels: Any) -> Any:
+        """Decode the first branch, which supplies the merged fold's target."""
+        if self._engineers is None:
+            raise RuntimeError("Target decoding called before fit_transform()")
+        return original_target_labels(self._engineers[0].fitted_steps, labels)
 
 
 class FeatureEngineerFoldAdapter:
@@ -279,7 +290,9 @@ class FeatureEngineerFoldAdapter:
         """
         self._validate_payload(X)
         engineer = FeatureEngineer(self._steps_config)
-        transformed, _metrics = engineer.fit_transform((X, y), sample_weight=sample_weight)
+        transformed, _metrics = engineer.fit_transform(
+            (X, y), sample_weight=sample_weight, target_column=self._target_column
+        )
         self._engineer = engineer
         self.train_sample_weight_ = engineer.train_sample_weight_
         return transformed
@@ -334,6 +347,19 @@ class FeatureEngineerFoldAdapter:
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
 
+    def original_target_labels(self, labels: Any) -> Any:
+        """Decode the recorded fitted target chain independently of row permutations."""
+        if self._engineer is None:
+            raise RuntimeError("Target decoding called before fit_transform()")
+        return original_target_labels(self._engineer.fitted_steps, labels)
+
+    def transform_tracking_order(self, X: Any) -> tuple[Any, Any]:
+        """Expose temporal row lineage for searcher prediction and nested thresholds."""
+        if self._engineer is None:
+            raise RuntimeError("transform() called before fit_transform()")
+        self._validate_payload(X)
+        return self._engineer.transform_tracking_order(X)
+
 
 def frame_rows(frame: Any) -> int:
     """Row count for pandas/polars frames and numpy arrays (-1 if unknowable)."""
@@ -384,6 +410,20 @@ class AuditedFoldPreprocessor:
         """Log the transform-time input row count, then delegate to ``inner``."""
         self.transform_rows.append(frame_rows(X))
         return self._inner.transform(X, y)
+
+    def original_target_labels(self, labels: Any) -> Any:
+        """Forward optional fitted target decoding without inferring label identities."""
+        decode = getattr(self._inner, "original_target_labels", None)
+        return decode(labels) if decode is not None else None
+
+    def transform_tracking_order(self, X: Any) -> tuple[Any, Any]:
+        """Record prediction transforms while retaining optional positional lineage."""
+        self.transform_rows.append(frame_rows(X))
+        transform = getattr(self._inner, "transform_tracking_order", None)
+        if transform is not None:
+            return transform(X)
+        transformed, _ = self._inner.transform(X, None)
+        return transformed, None
 
     def summary(self, train_rows: int | None = None) -> dict[str, Any]:
         """Return per-fold call counts and the largest fit payload seen.

@@ -33,7 +33,37 @@ def _clean_bound(column: str, bound: Any) -> dict[str, float]:
             raise ValueError(f"ClipValues {key} bound for '{column}' must be a finite number.")
     if cleaned.get("lower", -math.inf) > cleaned.get("upper", math.inf):
         raise ValueError(f"ClipValues lower bound for '{column}' must not exceed upper.")
-    return {key: float(value) for key, value in cleaned.items()}
+    return cleaned
+
+
+def _clip_polars_column(frame: Any, column: str, bound: dict[str, float]) -> Any:
+    """Keep integer values exact while retaining floating output for other numeric types."""
+    expression = pl.col(column)
+    dtype = frame.schema[column]
+    if dtype.is_integer() and not _fractional_bound(bound):
+        bound = _integer_clip_bounds(dtype, bound)
+    else:
+        expression = expression.cast(pl.Float64)
+    return expression.clip(bound.get("lower"), bound.get("upper")).alias(column)
+
+
+def _fractional_bound(bound: dict[str, float]) -> bool:
+    """Fractional limits require floating output instead of truncating the boundary."""
+    return any(isinstance(value, float) and not value.is_integer() for value in bound.values())
+
+
+def _integer_clip_bounds(dtype: Any, bound: dict[str, float]) -> dict[str, float]:
+    """Omit bounds that cannot affect an integer value before Polars casts literals."""
+    bits = int(str(dtype).lower().removeprefix("u").removeprefix("int"))
+    signed = dtype.is_signed_integer()
+    minimum = -(1 << (bits - 1)) if signed else 0
+    maximum = (1 << (bits - int(signed))) - 1
+    bounds = bound.copy()
+    if bounds.get("lower", minimum) <= minimum:
+        bounds.pop("lower", None)
+    if bounds.get("upper", maximum) >= maximum:
+        bounds.pop("upper", None)
+    return bounds
 
 
 def _check_columns(X: Any, bounds: dict[str, Any]) -> None:
@@ -66,11 +96,7 @@ class ClipValuesApplier(BaseApplier):
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         exprs = [
-            pl.col(column)
-            .cast(pl.Float64)
-            .clip(bound.get("lower"), bound.get("upper"))
-            .cast(X.schema[column] if X.schema[column].is_integer() else pl.Float64)
-            .alias(column)
+            _clip_polars_column(X, column, bound)
             for column, bound in params.get("bounds", {}).items()
             if column in X.columns
         ]
@@ -83,7 +109,7 @@ class ClipValuesApplier(BaseApplier):
             if column not in out.columns:
                 continue
             series = out[column]
-            if is_decimal_series(series):
+            if is_decimal_series(series) or _fractional_bound(bound):
                 series = pd.to_numeric(series).astype("float64")
             out[column] = series.clip(lower=bound.get("lower"), upper=bound.get("upper"))
         return out, y
@@ -111,8 +137,12 @@ class ClipValuesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: clipping keeps columns and their types."""
-        return input_schema
+        """Promote fractionally bounded columns to match both runtime engines."""
+        schema = input_schema
+        for column, bound in (config.get("bounds") or {}).items():
+            if column in schema.columns and _fractional_bound(bound):
+                schema = schema.with_dtype(column, "float64")
+        return schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> ClipValuesArtifact:  # pylint: disable=arguments-differ

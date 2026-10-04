@@ -1,7 +1,5 @@
 """Preserve original class identities at each row-preserving target encoding step."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np
@@ -36,8 +34,13 @@ def record_target_labels(
 
 def original_labels(pipeline: Any, labels: Any) -> np.ndarray:
     """Decode with the recorded encoder chain, never inferring codes from label order."""
+    return original_target_labels(pipeline.feature_engineer.fitted_steps, labels)
+
+
+def original_target_labels(fitted_steps: list[dict[str, Any]], labels: Any) -> np.ndarray:
+    """Decode fitted target encoders without relying on training row count or order."""
     values = np.asarray(labels)
-    for step in reversed(pipeline.feature_engineer.fitted_steps):
+    for step in reversed(fitted_steps):
         mapping = step["artifact"].get("target_label_map")
         if mapping:
             try:

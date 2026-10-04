@@ -110,3 +110,29 @@ def test_a_partly_failed_candidate_still_loses_to_a_healthy_one():
     assert math.isfinite(result.best_score)
     scores = {t["params"]["n_neighbors"]: t["score"] for t in result.trials}
     assert scores[3] == -float("inf")
+
+
+@pytest.mark.parametrize("strategy_params", [{"pruner": "none"}, {"pruning": False}])
+def test_unpruned_optuna_rejects_partly_failed_candidate(strategy_params):
+    """Disabling pruning must not let a candidate win using only surviving folds."""
+    pytest.importorskip("optuna")
+    pytest.importorskip("optuna_integration")
+    tuner = TuningCalculator(KNeighborsRegressorCalculator())
+    X = pd.DataFrame({"x": range(5)})
+    y = pd.Series([0.0] * 5)
+
+    with pytest.raises(ValueError, match="All trials failed"):
+        tuner.fit(
+            X,
+            y,
+            config=TuningConfig(
+                strategy="optuna",
+                metric="mse",
+                search_space={"n_neighbors": [3]},
+                cv_folds=2,
+                cv_shuffle=False,
+                n_trials=1,
+                n_jobs=1,
+                strategy_params=strategy_params,
+            ),
+        )

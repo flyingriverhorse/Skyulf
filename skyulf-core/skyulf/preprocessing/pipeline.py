@@ -19,6 +19,7 @@ from ..registry import NodeRegistry
 from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._feature_state import export_feature_state, restore_feature_state
+from ._helpers import select_rows_by_position
 from ._spark import fit_spark, transform_spark, use_spark
 from ._target_labels import record_target_labels
 from ._weight_policy import prepare_pipeline_weights
@@ -34,6 +35,18 @@ logger = logging.getLogger(__name__)
 
 def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
     """Apply once, rejecting row-count changes and built-in temporal permutations."""
+    result, positions = _apply_tracked_step(data, step)
+    if positions is not None and not np.array_equal(positions, np.arange(len(positions))):
+        stage = f"Step '{step['name']}' ({step['type']})"
+        raise ValueError(
+            f"{stage} changed row order. Prediction requires results in input-row order. "
+            f"Sort input by {step['artifact'].get('sort_by')!r} before requesting predictions."
+        )
+    return result
+
+
+def _apply_tracked_step(data: Any, step: dict[str, Any]) -> tuple[Any, np.ndarray | None]:
+    """Track built-in temporal permutations locally, keeping IDs away from target encoders."""
     features, target, was_tuple = unpack_pipeline_input(data)
     expected = prediction_row_count(features)
     applier = step["applier"]
@@ -44,7 +57,7 @@ def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
         validate_prediction_rows(
             expected, prediction_row_count(unpack_pipeline_input(result)[0]), stage=stage
         )
-        return result
+        return result, None
 
     # Only these built-ins use y exclusively to follow sorting/filtering.
     # Keep positional IDs local so later target-aware encoders never see them.
@@ -54,12 +67,11 @@ def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
     positions = np.arange(expected)
     transformed, transformed_positions = applier.apply((features, positions), artifact)
     validate_prediction_rows(expected, prediction_row_count(transformed), stage=stage)
-    if not np.array_equal(transformed_positions, positions):
-        raise ValueError(
-            f"{stage} changed row order. Prediction requires results in input-row order. "
-            f"Sort input by {artifact.get('sort_by')!r} before requesting predictions."
-        )
-    return pack_pipeline_output(transformed, target, was_tuple)
+    transformed_positions = np.asarray(transformed_positions)
+    if not np.array_equal(np.sort(transformed_positions), positions):
+        raise ValueError(f"{stage} did not preserve a permutation of the input rows.")
+    target = select_rows_by_position(target, transformed_positions)
+    return pack_pipeline_output(transformed, target, was_tuple), transformed_positions
 
 
 def _step_weights(data: Any, transformer: Any, previous: Any) -> Any:
@@ -191,21 +203,11 @@ class FeatureEngineer:
             )
         current_data = data
 
-        for step in self.fitted_steps:
+        for step in self._transform_steps():
             name = step["name"]
             transformer_type = step["type"]
             applier = step["applier"]
             artifact = step["artifact"]
-
-            # Skip splitters during inference/transform
-            if transformer_type in [
-                "TrainTestSplitter",
-                "Split",
-                "feature_target_split",
-                *self._RESAMPLING_TYPES,
-                *self._ROW_DROPPING_TYPES,
-            ]:
-                continue
 
             logger.debug(f"Applying step: {name} ({transformer_type})")
             current_data = (
@@ -215,6 +217,34 @@ class FeatureEngineer:
             )
 
         return current_data
+
+    def _transform_steps(self) -> list[dict[str, Any]]:
+        """Exclude training-only splitters, resampling and row-dropping nodes."""
+        skipped = {
+            "TrainTestSplitter",
+            "Split",
+            "feature_target_split",
+            *self._RESAMPLING_TYPES,
+            *self._ROW_DROPPING_TYPES,
+        }
+        return [step for step in self.fitted_steps if step["type"] not in skipped]
+
+    def transform_tracking_order(self, data: Any) -> tuple[Any, np.ndarray]:
+        """Transform local features and report each output row's original input position.
+
+        Only built-in temporal permutations are tracked. Row-count changes fail;
+        ordinary serving continues to reject permutations via preserve_rows=True.
+        """
+        if use_spark(
+            data, getattr(self, "execution_options", None), getattr(self, "frame_spec", None)
+        ):
+            raise ValueError("Positional prediction tracking requires a local frame.")
+        positions = np.arange(prediction_row_count(data))
+        for step in self._transform_steps():
+            data, local_positions = _apply_tracked_step(data, step)
+            if local_positions is not None:
+                positions = positions[local_positions]
+        return data, positions
 
     def fit_transform(
         self,

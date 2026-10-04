@@ -155,6 +155,8 @@ def is_multiclass_target(y: Any) -> bool:
     """Returns whether ``y`` (a Series or ndarray) has more than 2 unique classes."""
     if isinstance(y, pd.Series):
         return y.nunique() > 2
+    if hasattr(y, "to_numpy"):
+        y = y.to_numpy()
     if isinstance(y, np.ndarray):
         return len(np.unique(y)) > 2
     return False

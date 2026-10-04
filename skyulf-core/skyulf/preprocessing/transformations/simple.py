@@ -74,6 +74,7 @@ class SimpleTransformationCalculator(BaseCalculator):
     """Package the configured transformations into an artifact without reading the data."""
 
     _FLOAT_METHODS = {
+        "square",
         "log",
         "sqrt",
         "square_root",
@@ -93,8 +94,6 @@ class SimpleTransformationCalculator(BaseCalculator):
             col = item.get("column")
             method = item.get("method")
             if col not in schema.columns or method is None:
-                continue
-            if method == "square":
                 continue
             if method in self._FLOAT_METHODS:
                 touched.add(col)

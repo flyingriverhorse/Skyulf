@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 _POWER_METHODS = {"box-cox", "yeo-johnson"}
 _FLOAT_METHODS = {
+    "square",
     "log",
     "sqrt",
     "square_root",
@@ -170,6 +171,8 @@ def _fit_transformation_rule(
     """Fit one ordered rule, omitting power transforms that cannot fit its current input."""
     method = item.get("method")
     fitted_item: dict[str, Any] = {"column": col, "method": method}
+    if method == "exp" and "clip_threshold" in item:
+        fitted_item["clip_threshold"] = item["clip_threshold"]
     if method not in _POWER_METHODS:
         return fitted_item
 
@@ -215,8 +218,6 @@ class GeneralTransformationCalculator(BaseCalculator):
             col = item.get("column")
             method = item.get("method")
             if col not in schema.columns or method is None:
-                continue
-            if method == "square":
                 continue
             if method in _FLOAT_METHODS:
                 touched.add(col)

@@ -94,5 +94,8 @@ def test_custom_multiresponse_scorer_transforms_once_and_preserves_live_pipeline
         assert 0 <= adapted(estimator, X, y) <= 1
     assert worker.transform_calls == 1
     assert step.preprocessor_ is worker
-    assert estimator.predict(X).shape == (5,)
+    # The paired scorer may filter X and y together. A direct prediction
+    # cannot silently return fewer rows to a caller retaining the original y.
+    with pytest.raises(ValueError, match="changed row count"):
+        estimator.predict(X)
     assert worker.transform_calls == 2

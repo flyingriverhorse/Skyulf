@@ -119,8 +119,10 @@ def test_branch_output_contract_failure_preserves_the_last_fitted_adapter(
     adapter.fit_transform(X, y)
     fitted = adapter._engineers
 
-    def invalid_output(self, payload):
+    def invalid_output(self, payload, *, target_column=None):
         """Model a branch that violates its advertised row-preserving contract."""
+        if stage == "fit":
+            assert target_column == "target"
         frame, labels = payload
         output = (frame.iloc[:-1], labels) if changed == "features" else (frame, labels[:-1])
         return (output, {}) if stage == "fit" else output

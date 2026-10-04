@@ -81,7 +81,9 @@ def _drop_missing_cols_fit_polars(
     cols = {c for c in explicit if c in X.columns}
     threshold = _resolve_threshold(config.get("missing_threshold"))
     if threshold is not None:
-        cols.update(_high_missing_cols_polars(X, threshold))
+        cols.update(
+            c for c in _high_missing_cols_polars(X, threshold) if c != config.get("target_column")
+        )
     return {
         "type": "drop_missing_columns",
         "columns_to_drop": list(cols),
@@ -96,7 +98,9 @@ def _drop_missing_cols_fit_pandas(
     cols = {c for c in explicit if c in X.columns}
     threshold = _resolve_threshold(config.get("missing_threshold"))
     if threshold is not None:
-        cols.update(_high_missing_cols_pandas(X, threshold))
+        cols.update(
+            c for c in _high_missing_cols_pandas(X, threshold) if c != config.get("target_column")
+        )
     return {
         "type": "drop_missing_columns",
         "columns_to_drop": list(cols),

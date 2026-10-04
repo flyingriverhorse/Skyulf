@@ -15,6 +15,7 @@ import with a lock against concurrent tuning runs.
 """
 
 import logging
+import math
 import threading
 import warnings
 from collections.abc import Callable
@@ -226,9 +227,14 @@ def _progress_callbacks(config: TuningConfig, progress_callback: Any, log_callba
         """Report terminal trial state without presenting an unfinished CV mean."""
         complete = trial.state == _optuna_state.optuna_module.trial.TrialState.COMPLETE
         score = trial.value if complete else None
+        invalid_score = complete and (score is None or not math.isfinite(score))
+        if invalid_score:
+            score = None
         if log_callback:
             message = f"Optuna Trial {trial.number + 1}: {trial.state.name.lower()}."
-            if complete:
+            if invalid_score:
+                message = f"Optuna Trial {trial.number + 1}: failed (nonfinite CV score)."
+            elif complete:
                 message += f" Mean CV Score: {score}"
             log_callback(message)
         if progress_callback:
@@ -323,4 +329,5 @@ def build_optuna_searcher(
             study=study,
             enable_pruning=enable_pruning,
             max_iter=plan.iteration_budget if enable_pruning else 1000,
+            error_score=-float("inf"),
         )

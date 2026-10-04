@@ -37,14 +37,13 @@ class IQRApplier(BaseApplier):
         if not bounds:
             return X, y
 
-        mask = pl.lit(True)
+        mask = pl.repeat(True, pl.len())
         for col, bound in bounds.items():
             if col not in X.columns:
                 continue
-            col_mask = (pl.col(col) >= bound["lower"]) & (pl.col(col) <= bound["upper"])
-            missing = pl.col(col).is_null()
-            if X.schema[col].is_float():
-                missing = missing | pl.col(col).is_nan()
+            values = pl.col(col).cast(pl.Float64, strict=False)
+            col_mask = (values >= bound["lower"]) & (values <= bound["upper"])
+            missing = values.is_null() | values.is_nan()
             mask = mask & (col_mask | missing)
 
         mask_series = X.select(mask.alias("mask")).get_column("mask")

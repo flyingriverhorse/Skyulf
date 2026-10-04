@@ -220,12 +220,13 @@ def _finish_threshold_selection(
     log_callback: Any,
     y_raw: Any,
     y_refit: Any,
+    preprocessing: Any = None,
 ) -> None:
     """Keep nested training-only thresholds separate from ordinary validation tuning."""
     if not config.tune_threshold:
         return
     if config.cv_enabled and config.cv_type == "nested_cv":
-        remap_nested_thresholds(result, model, y_raw, y_refit)
+        remap_nested_thresholds(result, model, y_raw, y_refit, preprocessing)
     else:
         tune_decision_thresholds(calculator, model, result, config, validation_data, log_callback)
 
@@ -815,6 +816,7 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             y,
             y_refit,
+            preprocessing,
         )
 
         if reporter is not None:

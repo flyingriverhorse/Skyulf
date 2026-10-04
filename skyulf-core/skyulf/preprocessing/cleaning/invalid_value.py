@@ -27,9 +27,9 @@ def _invalid_rule_polars(
 ) -> Any:
     """Apply a single invalid-value rule to a Polars expression."""
     if rule in ("negative", "negative_to_nan"):
-        return pl.when(expr < 0).then(final_replacement).otherwise(expr)
+        return pl.when(expr < 0).then(pl.lit(final_replacement)).otherwise(expr)
     if rule == "zero":
-        return pl.when(expr == 0).then(final_replacement).otherwise(expr)
+        return pl.when(expr == 0).then(pl.lit(final_replacement)).otherwise(expr)
     if rule == "custom_range":
         if min_value is not None and max_value is not None:
             cond = (expr < min_value) | (expr > max_value)
@@ -39,7 +39,7 @@ def _invalid_rule_polars(
             cond = expr > max_value
         else:
             return expr
-        return pl.when(cond).then(final_replacement).otherwise(expr)
+        return pl.when(cond).then(pl.lit(final_replacement)).otherwise(expr)
     return expr
 
 
@@ -68,9 +68,9 @@ def _invalid_inf_replacement_polars(
     expr: Any, replace_inf: bool, replace_neg_inf: bool, final_replacement: Any
 ) -> Any:
     if replace_inf:
-        expr = pl.when(expr == float("inf")).then(final_replacement).otherwise(expr)
+        expr = pl.when(expr == float("inf")).then(pl.lit(final_replacement)).otherwise(expr)
     if replace_neg_inf:
-        expr = pl.when(expr == float("-inf")).then(final_replacement).otherwise(expr)
+        expr = pl.when(expr == float("-inf")).then(pl.lit(final_replacement)).otherwise(expr)
     return expr
 
 

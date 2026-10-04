@@ -142,6 +142,43 @@ def test_metric_mapping(metric, task, expected):
     assert competition_metric(metric, task) == expected
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_competition_target_encoding_keeps_same_positive_class(tmp_path, engine):
+    """Candidates with the same predictions must receive identical F1 despite target recoding."""
+    from sklearn.datasets import make_classification
+
+    values, labels = make_classification(
+        n_samples=160, n_features=6, n_informative=4, weights=[0.75], random_state=7
+    )
+    frame = pd.DataFrame(values, columns=list("abcdef"))
+    frame["target"] = np.where(labels == 1, 10, 2)
+    if engine == "polars":
+        frame = pl.from_pandas(frame)
+    cv = LocalCVSpec(enabled=True, folds=3, method="stratified_k_fold")
+    reports = []
+    for encoded in (False, True):
+        steps = (
+            [{"name": "labels", "transformer": "LabelEncoder", "params": {"columns": ["target"]}}]
+            if encoded
+            else []
+        )
+        artifact = fit_local_workflow(
+            {
+                "preprocessing": steps,
+                "modeling": {"type": "logistic_regression", "params": {"max_iter": 1000}},
+            },
+            SplitDataset(train=frame, test=frame.head(0)),
+            target_column="target",
+            artifact_path=tmp_path / str(encoded),
+            max_rows=1000,
+            max_bytes=1000000,
+        )
+        reports.append(_evaluate(frame, artifact, cv, "heldout_f1"))
+
+    assert reports[0]["fold_membership_sha256"] == reports[1]["fold_membership_sha256"]
+    assert reports[0]["fold_scores"] == pytest.approx(reports[1]["fold_scores"])
+
+
 @pytest.mark.parametrize(
     "metric,task",
     [

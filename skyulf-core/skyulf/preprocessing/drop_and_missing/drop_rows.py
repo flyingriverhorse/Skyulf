@@ -45,7 +45,7 @@ def _min_non_na_for_percentage(missing_threshold: float, n_cols: int) -> float:
     A row is dropped when its missing share exceeds ``missing_threshold``
     percent, so it is kept when ``non_na_count >= (1 - pct/100) * n_cols``.
     """
-    return (1.0 - missing_threshold / 100.0) * n_cols
+    return (100.0 - missing_threshold) * n_cols / 100.0
 
 
 def _polars_dropna_filter(

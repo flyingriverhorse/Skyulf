@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -38,15 +39,14 @@ class ZScoreApplier(BaseApplier):
         if not stats:
             return X, y
 
-        mask = pl.lit(True)
+        mask = pl.repeat(True, pl.len())
         for col, stat in stats.items():
             if col not in X.columns or stat["std"] == 0:
                 continue
-            z = (pl.col(col) - stat["mean"]) / stat["std"]
+            values = pl.col(col).cast(pl.Float64, strict=False)
+            z = (values - stat["mean"]) / stat["std"]
             col_mask = z.abs() <= threshold
-            missing = pl.col(col).is_null()
-            if X.schema[col].is_float():
-                missing = missing | pl.col(col).is_nan()
+            missing = values.is_null() | values.is_nan()
             mask = mask & (col_mask | missing)
 
         mask_series = X.select(mask.alias("mask")).get_column("mask")
@@ -113,8 +113,9 @@ class ZScoreCalculator(BaseCalculator):
         warnings = []
         for col in cols:
             series = pd.to_numeric(X_pd[col], errors="coerce").dropna()
+            series = series[np.isfinite(series)]
             if series.empty:
-                warnings.append(f"Column '{col}': Empty or non-numeric")
+                warnings.append(f"Column '{col}': Empty, non-numeric or non-finite")
                 continue
             std = series.std(ddof=0)
             if std == 0:
