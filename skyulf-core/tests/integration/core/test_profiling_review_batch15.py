@@ -181,17 +181,17 @@ def test_public_noninteger_drift_preserves_fractional_distance(dtype):
     assert distance.value == pytest.approx(0.5)
 
 
-def test_decimal_eda_retains_explicit_unsupported_contract():
-    """Decimal EDA remains visibly unsupported instead of silently rounding its exact samples."""
+def test_decimal_eda_preserves_precision_when_statistics_are_unavailable():
+    """Decimal support must not silently collapse distinct values in approximate metrics."""
     frame = pl.DataFrame(
         {"value": [Decimal("9007199254740993.01"), None, Decimal("9007199254740993.02")]}
     )
     profile = EDAAnalyzer(frame).analyze()
-    assert profile.columns["value"].dtype == "Unknown"
+    assert profile.columns["value"].dtype == "Numeric"
     assert profile.columns["value"].numeric_stats is None
     assert profile.sample_data == frame.to_dicts()
     assert any(
-        alert.type == "Unsupported Type" and alert.column == "value" for alert in profile.alerts
+        alert.type == "Numeric Precision" and alert.column == "value" for alert in profile.alerts
     )
 
 

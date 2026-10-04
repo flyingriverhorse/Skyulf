@@ -56,6 +56,7 @@ def evaluate_classification_model(
             )
 
     # Calculate scalar metrics, reusing the already-computed conversion/predictions
+    omitted_metrics: dict[str, str] = {}
     metrics = calculate_classification_metrics(
         model,
         X_test,
@@ -64,6 +65,7 @@ def evaluate_classification_model(
         y_np=y_test_np,
         predictions=y_pred,
         proba=y_prob,
+        omitted_metrics=omitted_metrics,
     )
 
     # Determine classes
@@ -150,6 +152,7 @@ def evaluate_classification_model(
     return ModelEvaluationReport(
         dataset_name=dataset_name,
         metrics=sanitize_metrics(metrics),
+        omitted_metrics=omitted_metrics,
         classification=classification_eval,
         regression=None,
     )

@@ -17,6 +17,7 @@ from ...modeling._tuning.cv_policy import (
     take_rows,
 )
 from ...modeling._tuning.schemas import TuningConfig
+from ...modeling._tuning.splitters import build_shuffle_split_cv
 from ...modeling.base import BaseModelCalculator, StatefulEstimator
 from ...preprocessing.fold_adapter import (
     SPLITTER_STEP_TYPES,
@@ -121,7 +122,11 @@ def validate_fold_membership(
     )
     features, labels, metadata = prepare_policy_data(features, labels, config, problem_type)
     _validate_stratified_counts(labels, config, problem_type)
-    splitter = policy_splitter(config, problem_type, labels, metadata)
+    splitter = (
+        build_shuffle_split_cv(config)
+        if spec.method == "shuffle_split"
+        else policy_splitter(config, problem_type, labels, metadata)
+    )
     for train, validation in splitter.split(features, labels):
         _validate_fold_sizes(train, validation)
         if spec.method == "nested_cv":

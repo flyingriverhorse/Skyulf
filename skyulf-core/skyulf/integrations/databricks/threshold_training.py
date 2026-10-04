@@ -183,6 +183,11 @@ def _calibration_data(
             data,
             train=_model_frame(data.train, copied, target),
             test=_model_frame(data.test, copied, target),
+            validation=(
+                _model_frame(data.validation, copied, target)
+                if data.validation is not None
+                else None
+            ),
         )
     if policy["mode"] == "auto":
         frame = data.train
@@ -194,9 +199,15 @@ def _calibration_data(
         weights = validate_sample_weight(data.train_sample_weight, len(frame))
         train_frame = _model_frame(take_rows(frame, train), copied, target)
         validation = _model_frame(take_rows(frame, valid), copied, target)
-        fitting = SplitDataset(
+        fitting = replace(
+            data,
             train=train_frame,
-            test=train_frame.head(0),
+            test=_model_frame(data.test, copied, target),
+            validation=(
+                _model_frame(data.validation, copied, target)
+                if data.validation is not None
+                else None
+            ),
             train_sample_weight=None if weights is None else weights[train],
         )
     return fitting, validation

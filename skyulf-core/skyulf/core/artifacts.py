@@ -682,3 +682,4 @@ class DateFeaturesArtifact(TypedDict, total=False):
     features: list[str]
     drop_original: bool
     timezone: str
+    epoch_unit: str | None

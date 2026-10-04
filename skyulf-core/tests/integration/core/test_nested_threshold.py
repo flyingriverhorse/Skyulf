@@ -317,6 +317,8 @@ def test_pipeline_nested_threshold_ignores_holdout_labels_and_survives_reload(tm
     proba = np.asarray(loaded._predict_proba_transformed(loaded.feature_engineer.transform(raw_X)))
     cutoff = result.decision_thresholds[model.classes_[1]]
     expected = np.where(proba[:, 1] >= cutoff, model.classes_[1], model.classes_[0])
+    if encode:
+        expected = np.where(expected == 1, "yes", "no")
     np.testing.assert_array_equal(loaded.predict(raw_X), expected)
     np.testing.assert_array_equal(loaded.predict(raw_X, use_tuned_thresholds=True), expected)
     np.testing.assert_array_equal(loaded.predict(raw_X), pipelines[0].predict(raw_X))

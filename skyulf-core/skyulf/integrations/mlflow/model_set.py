@@ -27,6 +27,7 @@ from .local_model import normalized_dtype, pip_requirements, validate_local_dest
 from .registry import (
     ResolvedModel,
     digest_metadata,
+    download_registered_package,
     packaged_artifact_path,
     translate_error,
     validate_concrete_version,
@@ -158,11 +159,8 @@ def load_registered_model_set(
         raise ValueError("Resolved model set requires a digest.")
     client = mlflow.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
     try:
-        version = client.get_model_version(resolved.name, resolved.version)
-        local = mlflow.artifacts.download_artifacts(
-            artifact_uri=version.source,
-            tracking_uri=tracking_uri,
-            registry_uri=registry_uri,
+        local = download_registered_package(
+            mlflow, client, resolved.name, resolved.version, tracking_uri
         )
         model = mlflow.models.Model.load(Path(local))
     except Exception as exc:  # noqa: BLE001 - registry artifact transport boundary

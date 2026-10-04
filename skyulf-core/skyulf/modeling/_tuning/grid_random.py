@@ -18,6 +18,8 @@ from sklearn.model_selection import ParameterGrid, ParameterSampler
 from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from .._cv_weights import fit_preprocessor, prepare_weights, take_weights
+from .._evaluation.common import sanitize_metrics
+from .._evaluation.metrics import calculate_classification_metrics, calculate_regression_metrics
 from .._sample_weights import SampleWeightError
 from ..base import BaseModelCalculator
 from .fold_pipeline import FoldAwareModelStep
@@ -127,15 +129,47 @@ def _score_candidate_fold(
 ) -> float:
     """Score in the original label space, consistently with the other searchers."""
     scorer = resolve_scorer(metric, y_original, problem_type)
+    view, original_valid = _candidate_evaluation_view(
+        model, y_valid, y_original, y_encoded, preprocessing
+    )
+    return scorer(view, X_valid, original_valid)
+
+
+def _candidate_evaluation_view(
+    model: Any, y_valid: Any, y_original: Any, y_encoded: Any, preprocessing: Any
+) -> tuple[Any, Any]:
+    """Expose predictions and probability columns in the original target class order."""
     mapping = FoldAwareModelStep._build_label_map(y_original, y_encoded, model, preprocessing)
     if mapping is None:
-        return scorer(model, X_valid, y_valid)
+        return model, y_valid
     view = FoldAwareModelStep(estimator=model)
     view.model_ = model
     view.preprocessor_ = None
     view.label_map_ = mapping
     original_valid = np.array([mapping[label] for label in np.asarray(y_valid)])
-    return scorer(view, X_valid, original_valid)
+    return view, original_valid
+
+
+def _collect_candidate_metrics(
+    metrics: dict[str, float],
+    model: Any,
+    X: Any,
+    y: Any,
+    original_y: Any,
+    encoded_y: Any,
+    preprocessing: Any,
+    problem_type: str,
+) -> None:
+    """Evaluate a fitted outer-fold model without adding another training pass."""
+    view, original_valid = _candidate_evaluation_view(
+        model, y, original_y, encoded_y, preprocessing
+    )
+    calculate = (
+        calculate_classification_metrics
+        if problem_type == "classification"
+        else calculate_regression_metrics
+    )
+    metrics.update(sanitize_metrics(calculate(view, X, original_valid)))
 
 
 def fit_and_score_candidate_fold(
@@ -158,6 +192,7 @@ def fit_and_score_candidate_fold(
     *,
     model_calculator: BaseModelCalculator,
     sample_weight: Any = None,
+    evaluation_metrics: dict[str, float] | None = None,
 ) -> float:
     """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
@@ -209,6 +244,18 @@ def fit_and_score_candidate_fold(
             metric,
             getattr(model_calculator, "problem_type", None),
         )
+
+        if evaluation_metrics is not None:
+            _collect_candidate_metrics(
+                evaluation_metrics,
+                model,
+                X_val_fold,
+                y_val_fold,
+                y_original,
+                y_train_fold,
+                preprocessing,
+                model_calculator.problem_type,
+            )
 
         if log_callback:
             n_splits = cv.get_n_splits(X_arr, y_arr)

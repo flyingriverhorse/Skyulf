@@ -326,7 +326,14 @@ def _column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
     if result is None:
         return [_metric("drift", column, "unavailable")]
     return [
-        _metric("drift", column, item.metric, item.value, item.threshold, item.has_drift)
+        _metric(
+            "drift",
+            column,
+            item.metric,
+            item.value,
+            None if item.metric == "ks_test_p_value" else item.threshold,
+            item.has_drift and item.metric != "ks_test_p_value",
+        )
         for item in result.metrics
     ]
 

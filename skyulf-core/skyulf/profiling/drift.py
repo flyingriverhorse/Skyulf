@@ -164,6 +164,9 @@ class DriftCalculator:
                 return self._type_drift(col)
             return self._calculate_categorical_drift(col, thresholds)
 
+        if dtype in (pl.Date, pl.Datetime):
+            return self._calculate_temporal_column_drift(col, thresholds)
+
         if not dtype.is_numeric():
             if dtype != current.dtype:
                 return self._type_drift(col)
@@ -171,6 +174,51 @@ class DriftCalculator:
             return None
 
         return self._calculate_numeric_column_drift(col, thresholds)
+
+    @staticmethod
+    def _compatible_temporal_types(reference: pl.DataType, current: pl.DataType) -> bool:
+        """Compare aware instants or naive wall times without inventing a timezone."""
+        if reference == pl.Date:
+            return current == pl.Date
+        if isinstance(reference, pl.Datetime) and isinstance(current, pl.Datetime):
+            return (reference.time_zone is None) == (current.time_zone is None)
+        return False
+
+    @staticmethod
+    def _temporal_ticks(series: pl.Series) -> np.ndarray:
+        """Use exact nanoseconds beyond the narrower Int64 nanosecond epoch range."""
+        scale = (
+            {"ms": 1_000_000, "us": 1_000, "ns": 1}[series.dtype.time_unit]
+            if isinstance(series.dtype, pl.Datetime)
+            else 86_400_000_000_000
+        )
+        ticks = series.drop_nulls().to_physical().to_list()
+        return np.array([value * scale for value in ticks], dtype=object)
+
+    def _calculate_temporal_column_drift(
+        self, col: str, thresholds: dict[str, float]
+    ) -> ColumnDrift:
+        """Score Date or Datetime shifts, reporting raw Wasserstein distance in seconds.
+
+        Datetime unit and aware timezone representations share physical instants.
+        Date remains distinct from Datetime, and aware/naive values remain
+        incompatible. Exact common centering keeps sub-microsecond differences;
+        temporal histograms are omitted instead of labeling numeric bins as dates.
+        """
+        reference, current = self.reference_df[col], self.current_df[col]
+        if not self._compatible_temporal_types(reference.dtype, current.dtype):
+            return self._type_drift(col)
+        ref_data, curr_data = self._temporal_ticks(reference), self._temporal_ticks(current)
+        origin = min(min(ref_data), min(curr_data))
+        metrics, drifted, flags = self._compute_numeric_metrics(
+            ref_data - origin, curr_data - origin, thresholds, value_scale=1_000_000_000
+        )
+        return ColumnDrift(
+            column=col,
+            metrics=metrics,
+            drift_detected=drifted,
+            suggestions=self._numeric_drift_suggestions(drifted, flags),
+        )
 
     def _type_drift(self, col: str) -> ColumnDrift:
         """Keep an incompatible common column visible through the existing metric contract."""
@@ -329,7 +377,12 @@ class DriftCalculator:
         )
 
     def _compute_numeric_metrics(
-        self, ref_data: np.ndarray, curr_data: np.ndarray, thresholds: dict[str, float]
+        self,
+        ref_data: np.ndarray,
+        curr_data: np.ndarray,
+        thresholds: dict[str, float],
+        *,
+        value_scale: float = 1.0,
     ) -> tuple[list[DriftMetric], bool, dict[str, float | bool]]:
         """Compute Wasserstein distance, KS test, PSI, and KL divergence for a numeric column.
 
@@ -342,6 +395,7 @@ class DriftCalculator:
 
         # 1. Wasserstein Distance
         wd, std_ref = self._wasserstein_statistics(ref_data, curr_data)
+        wd, std_ref = wd / value_scale, std_ref / value_scale
         # WD is in data units, so a fixed threshold cannot mean the same thing
         # for a column measured in cents and one measured in kilometres. The
         # reported value is the distance normalized by the reference std, which

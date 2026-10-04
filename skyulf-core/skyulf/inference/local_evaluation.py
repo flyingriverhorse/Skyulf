@@ -76,7 +76,7 @@ def _holdout_metrics(
     if estimator is None:
         raise ValueError("Local artifact has no fitted model.")
     model = estimator._unwrap_tuned_model()
-    scoring_args = {
+    scoring_args: dict[str, Any] = {
         "X_np": features.to_numpy(),
         "y_np": actual,
         "predictions": predictions["prediction"].to_numpy(),

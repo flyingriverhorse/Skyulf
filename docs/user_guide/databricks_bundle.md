@@ -608,8 +608,12 @@ tail and honor the configured CV gap. Every class must occur in both partitions,
 otherwise training fails with an actionable error. Small datasets can therefore
 require a different split or manual mode.
 
-For example, `validation_fraction: 0.25` fits the saved model on 75% of the
-training partition and uses the other 25% only to choose its decision threshold.
+For random row splitting, `validation_fraction: 0.25` fits the saved model on
+approximately 75% of the training rows and uses the remainder only to choose
+its decision threshold. With group splitting, the fraction selects **groups**,
+not rows: unequal group sizes can produce very different row proportions.
+Whole groups stay together; inspect `fitting_rows` and `calibration_rows` in
+the threshold evidence for the actual populations.
 There is no final full-training refit in this mode. `off` and `manual` do not
 reserve this extra calibration population. Full-data refitting is a different
 policy and can change the probabilities to which a selected threshold applies.

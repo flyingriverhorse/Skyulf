@@ -23,6 +23,7 @@ from ..engines import SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 from ._evaluation.classification import evaluate_classification_model
 from ._evaluation.clustering import evaluate_clustering_model
 from ._evaluation.regression import evaluate_regression_model
+from ._sample_weights import validate_sample_weight
 from .cross_validation import perform_cross_validation
 from .fold_preprocessing import FoldPreprocessor
 
@@ -207,6 +208,24 @@ class BaseModelApplier(ABC):
         Returns DataFrame where columns are classes.
         """
         return None
+
+
+def _fit_predict_weights(
+    dataset: SplitDataset, preprocessing: Any, raw_train: Any, raw_weights: Any
+) -> Any:
+    """Keep raw preprocessing weights separate from the processed dataset row axis."""
+    if preprocessing is None:
+        if raw_weights is not None:
+            raise ValueError("preprocessing_sample_weight requires preprocessing")
+        return dataset.train_sample_weight
+    if raw_train is None:
+        raise ValueError("preprocessing requires the preprocessing_train (X, y) payload")
+    if raw_weights is None and dataset.train_sample_weight is not None:
+        raise ValueError(
+            "preprocessing_sample_weight must supply original weights aligned with "
+            "preprocessing_train; processed dataset weights cannot be reused"
+        )
+    return validate_sample_weight(raw_weights, len(raw_train[0]))
 
 
 class StatefulEstimator:
@@ -431,6 +450,8 @@ class StatefulEstimator:
         preprocessing_train: tuple[Any, Any] | None = None,
         preprocessing_validation: tuple[Any, Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
+        *,
+        preprocessing_sample_weight: Any = None,
     ) -> dict[str, pd.Series]:
         """Fits the model on training data and returns predictions for all splits.
 
@@ -442,10 +463,17 @@ class StatefulEstimator:
         dataset's (post-transform) splits. ``preprocessing_validation`` is
         the matching pre-transform validation payload for holdout tuning —
         ``dataset.validation`` is post-transform, so the refit cannot score
-        against it directly.
+        against it directly. ``preprocessing_sample_weight`` is the original
+        positional weight vector aligned with ``preprocessing_train``. It is
+        required when the processed dataset carries weights: processed rows may
+        have been reordered or filtered, so their weights cannot be reused.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
         dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
+
+        fit_weight = _fit_predict_weights(
+            dataset, preprocessing, preprocessing_train, preprocessing_sample_weight
+        )
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -472,11 +500,7 @@ class StatefulEstimator:
                 preprocessing=preprocessing,
                 validation_frames=preprocessing_validation,
                 iteration_callback=iteration_callback,
-                **(
-                    {"sample_weight": dataset.train_sample_weight}
-                    if dataset.train_sample_weight is not None
-                    else {}
-                ),
+                **({"sample_weight": fit_weight} if fit_weight is not None else {}),
             )
         else:
             self.model = self.calculator.fit(
@@ -487,11 +511,7 @@ class StatefulEstimator:
                 log_callback=log_callback,
                 validation_data=validation_data,
                 iteration_callback=iteration_callback,
-                **(
-                    {"sample_weight": dataset.train_sample_weight}
-                    if dataset.train_sample_weight is not None
-                    else {}
-                ),
+                **({"sample_weight": fit_weight} if fit_weight is not None else {}),
             )
 
         # 3. Predict on all splits

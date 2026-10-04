@@ -131,7 +131,9 @@ def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> 
     b_empty = pl.col(col_b).is_null() | (pl.col(col_b).cast(pl.String) == "")
 
     def sim_func(struct_val: Any) -> float:
-        return _compute_similarity_score(struct_val.get("a"), struct_val.get("b"), method)
+        return _compute_similarity_score(
+            struct_val.get("a"), struct_val.get("b"), method, op.get("similarity_backend")
+        )
 
     return (
         pl.when(a_empty & b_empty)

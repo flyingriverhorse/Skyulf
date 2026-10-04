@@ -57,9 +57,12 @@ class NumericMixin(_AnalyzerState):
 
     def _prepare_vif_frame(self, numeric_cols: list[str], alerts: list[Alert]) -> pl.DataFrame:
         """Drop constants before complete-case filtering, then recheck retained observations."""
-        frame = self.df.select(numeric_cols).filter(
-            pl.all_horizontal(pl.all().is_finite().fill_null(True))
-        )
+        frame = self.df.select(
+            [
+                pl.col(col).cast(pl.Float64) if self.df.schema[col].is_decimal() else pl.col(col)
+                for col in numeric_cols
+            ]
+        ).filter(pl.all_horizontal(pl.all().is_finite().fill_null(True)))
         frame = self._exclude_constant_vif_columns(frame, alerts)
         frame = frame.drop_nulls()
         if frame.height:
@@ -128,11 +131,15 @@ class NumericMixin(_AnalyzerState):
         standardized = standardized - standardized.mean(axis=0)
         standardized /= np.linalg.norm(standardized, axis=0)
 
+        # The orthonormal QR factor preserves residual norms while reducing
+        # every subsequent regression from n rows to at most p rows.
+        rcond = np.finfo(np.float64).eps * max(standardized.shape)
+        reduced = np.asarray(np.linalg.qr(standardized, mode="r"))
         result = {}
         for i, col in enumerate(numeric_cols):
-            target = standardized[:, i]
-            predictors = np.delete(standardized, i, axis=1)
-            coefficients = np.linalg.lstsq(predictors, target, rcond=None)[0]
+            target = reduced[:, i]
+            predictors = np.delete(reduced, i, axis=1)
+            coefficients = np.linalg.lstsq(predictors, target, rcond=rcond)[0]
             residual = target - predictors @ coefficients
             # Computing 1 - R² would erase tiny residuals through cancellation.
             residual_ratio = float((residual @ residual) / (target @ target))

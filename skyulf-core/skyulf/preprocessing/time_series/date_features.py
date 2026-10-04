@@ -16,6 +16,65 @@ from ._common import DATE_FEATURE_ACCESSORS, filter_existing_columns, parse_date
 
 # Default calendar parts when the user does not specify any.
 DEFAULT_FEATURES: list[str] = ["year", "month", "day", "dayofweek"]
+_EPOCH_NS_MULTIPLIERS = {"s": 1_000_000_000, "ms": 1_000_000, "us": 1_000, "ns": 1}
+
+
+def _epoch_unit(params: dict[str, Any]) -> str | None:
+    """Validate an explicit epoch unit without guessing it from value magnitude."""
+    unit = params.get("epoch_unit")
+    if unit is not None and (type(unit) is not str or unit not in _EPOCH_NS_MULTIPLIERS):
+        raise ValueError("DateFeatures epoch_unit must be one of s, ms, us or ns.")
+    return unit
+
+
+def _require_epoch_unit(unit: str | None) -> str:
+    """Reject numeric timestamps whose artifact does not establish their unit."""
+    if unit is None:
+        raise ValueError(
+            "DateFeatures numeric timestamps require explicit epoch_unit (s, ms, us, ns); "
+            "set the source unit and refit legacy artifacts."
+        )
+    return unit
+
+
+def _epoch_bounds(unit: str, integral: bool) -> tuple[int | float, int | float]:
+    """Bound source values before conversion to the common nanosecond timestamp range."""
+    multiplier = _EPOCH_NS_MULTIPLIERS[unit]
+    maximum = pd.Timestamp.max.value
+    if integral:
+        return -(maximum // multiplier), maximum // multiplier
+    return -maximum / multiplier, maximum / multiplier
+
+
+def _pandas_datetime_series(series: pd.Series, params: dict[str, Any]) -> pd.Series:
+    """Parse numeric epochs with explicit units and coerce invalid magnitudes before pandas."""
+    options: dict[str, Any] = {"format": "mixed"}
+    if pd.api.types.is_numeric_dtype(series):
+        unit = _require_epoch_unit(_epoch_unit(params))
+        lower, upper = _epoch_bounds(unit, pd.api.types.is_integer_dtype(series))
+        if pd.api.types.is_integer_dtype(series):
+            nullable_dtype = "UInt64" if pd.api.types.is_unsigned_integer_dtype(series) else "Int64"
+            series = series.astype(nullable_dtype)
+        series = series.where(series.between(lower, upper))
+        options = {"unit": unit}
+    return pd.to_datetime(series, errors="coerce", utc=params.get("timezone") == "UTC", **options)
+
+
+def _validate_numeric_date_columns(df: Any, columns: list[str], unit: str | None) -> None:
+    """Check native or wrapped fit input before recording ambiguous numeric date features."""
+    frame = df[0] if isinstance(df, tuple) else df
+    frame = frame.to_native() if hasattr(frame, "to_native") else frame
+    for col in columns:
+        if col not in frame.columns:
+            continue
+        dtype = frame[col].dtype
+        numeric = (
+            dtype.is_numeric()
+            if isinstance(frame, pl.DataFrame)
+            else pd.api.types.is_numeric_dtype(dtype)
+        )
+        if numeric:
+            _require_epoch_unit(unit)
 
 
 def _feat_name(col: str, feature: str) -> str:
@@ -58,13 +117,12 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         return X, _y
 
     df = X.copy()
+    _epoch_unit(params)
     for col in columns:
         if col not in df.columns:
             continue
         # Older fitted artifacts keep their original local-calendar semantics.
-        parsed = pd.to_datetime(
-            df[col], errors="coerce", format="mixed", utc=params.get("timezone") == "UTC"
-        )
+        parsed = _pandas_datetime_series(df[col], params)
         is_null = parsed.isna()
         dt = parsed.dt
         for feature in features:
@@ -93,7 +151,7 @@ def _polars_feature(col_expr: Any, feature: str) -> Any:
     return builders[feature]()
 
 
-def _polars_base_expr(col: str, dtype: Any) -> Any:
+def _polars_base_expr(col: str, dtype: Any, epoch_unit: str | None = None) -> Any:
     """Build the datetime expression for ``col``, dispatching on its source dtype.
 
     Plain ``cast(pl.Datetime, strict=False)`` only parses columns that are already
@@ -105,15 +163,29 @@ def _polars_base_expr(col: str, dtype: Any) -> Any:
         return pl.col(col).map_elements(
             parse_datetime_scalar, return_dtype=pl.Datetime(time_zone="UTC")
         )
+    if dtype.is_numeric():
+        unit = _require_epoch_unit(epoch_unit)
+        # Widen integer arithmetic before unit multiplication so overflow becomes
+        # null on the final bounded timestamp cast instead of wrapping a date.
+        values = pl.col(col).cast(pl.Int128) if dtype.is_integer() else pl.col(col)
+        lower, upper = _epoch_bounds(unit, dtype.is_integer())
+        values = pl.when(pl.col(col).is_between(lower, upper)).then(values).otherwise(None)
+        return (
+            (values * _EPOCH_NS_MULTIPLIERS[unit])
+            .cast(pl.Int64, strict=False)
+            .cast(pl.Datetime("ns", "UTC"))
+        )
     return pl.col(col).cast(pl.Datetime, strict=False)
 
 
-def _polars_date_exprs(columns: list[str], schema: dict[str, Any], features: list[str]) -> list:
+def _polars_date_exprs(
+    columns: list[str], schema: dict[str, Any], features: list[str], epoch_unit: str | None = None
+) -> list:
     exprs = []
     for col in columns:
         if col not in schema:
             continue
-        base = _polars_base_expr(col, schema[col])
+        base = _polars_base_expr(col, schema[col], epoch_unit)
         exprs.extend(
             _polars_feature(base, feature).alias(_feat_name(col, feature)) for feature in features
         )
@@ -127,7 +199,7 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         return X, _y
 
     X_out = X
-    exprs = _polars_date_exprs(columns, dict(X_out.schema), features)
+    exprs = _polars_date_exprs(columns, dict(X_out.schema), features, _epoch_unit(params))
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_original"):
@@ -152,7 +224,12 @@ class DateFeaturesApplier(BaseApplier):
     name="Date Features",
     category="Preprocessing",
     description="Extract calendar parts (year, month, day-of-week, ...) from datetime columns.",
-    params={"columns": [], "features": DEFAULT_FEATURES, "drop_original": False},
+    params={
+        "columns": [],
+        "features": DEFAULT_FEATURES,
+        "drop_original": False,
+        "epoch_unit": None,
+    },
     tags=["time-series"],
     learns_from_data=False,
 )
@@ -164,7 +241,9 @@ class DateFeaturesCalculator(BaseCalculator):
     clock time. Unparseable values produce null features. Artifacts fitted
     before this contract retain their original engine-specific interpretation
     so an existing model's input features do not silently change on reload.
-    Refit the complete pipeline to adopt UTC for such models.
+    Refit the complete pipeline to adopt UTC for such models. Numeric epochs
+    require an explicit ``epoch_unit`` (s, ms, us or ns), including on replay
+    of legacy artifacts; units are never inferred from numeric magnitude.
     """
 
     def fit(
@@ -173,12 +252,15 @@ class DateFeaturesCalculator(BaseCalculator):
         config: dict[str, Any],
     ) -> DateFeaturesArtifact:
         """Record the columns and supported features, defaulting to year/month/day/dayofweek."""
+        unit = _epoch_unit(config)
+        _validate_numeric_date_columns(df, config.get("columns", []), unit)
         return {
             "type": "date_features",
             "columns": config.get("columns", []),
             "features": _resolve_features(config),
             "drop_original": bool(config.get("drop_original", False)),
             "timezone": "UTC",
+            "epoch_unit": unit,
         }
 
     def infer_output_schema(

@@ -3,6 +3,8 @@
 import logging
 from typing import Any, cast
 
+from sklearn.utils.multiclass import check_classification_targets
+
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
@@ -28,6 +30,14 @@ from ._common import (
 logger = logging.getLogger(__name__)
 
 
+def _univariate_target(y: Any, problem_type: str) -> Any:
+    """Prepare labels and reject continuous targets for explicitly declared classification."""
+    prepared = _prepare_sklearn_y(y, problem_type)
+    if problem_type == "classification":
+        check_classification_targets(prepared)
+    return prepared
+
+
 class UnivariateSelectionApplier(BaseApplier):
     """Remove the columns a univariate statistical test rejected."""
 
@@ -49,7 +59,7 @@ class UnivariateSelectionApplier(BaseApplier):
     name="Univariate Selection",
     category="Feature Selection",
     description="Select best features based on univariate statistical tests.",
-    params={"method": "SelectKBest", "score_func": "f_classif", "k": 10},
+    params={"method": "SelectKBest", "score_func": "Auto", "k": 10},
     learns_from_data=True,
 )
 class UnivariateSelectionCalculator(BaseCalculator):
@@ -98,7 +108,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
         if y is None:
             return _univariate_no_target_artifact(cols, method, config)
 
-        selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
+        selector.fit(X_np, _univariate_target(y, problem_type))
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
         scores, pvalues = _univariate_score_dicts(selector, cols)

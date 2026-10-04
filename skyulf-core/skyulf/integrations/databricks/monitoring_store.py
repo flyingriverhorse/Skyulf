@@ -287,8 +287,14 @@ def _inventory_update(
         "ELSE concat('{\"_activation_started_ms\":', "
         f"{marker}, ',', substring(s.config_json, 2)) END"
     )
+    parent_match = " AND ".join(
+        f"get_json_object(t.config_json, '$.{field}') "
+        f"<=> get_json_object(s.config_json, '$.{field}')"
+        for field in ("model_set_name", "model_set_version", "model_set_branch")
+    )
     return (
-        f"WHEN MATCHED AND ({marker} IS NULL OR t.selection = s.selection) THEN UPDATE SET "
+        f"WHEN MATCHED AND ({marker} IS NULL OR ({parent_match})) "
+        f"AND ({marker} IS NULL OR t.selection = s.selection) THEN UPDATE SET "
         + ", ".join(assignments)
     )
 

@@ -332,7 +332,12 @@ class MultivariateMixin(_AnalyzerState):
         # Missing cells retain the established mean-imputation policy. Infinite
         # observations are excluded with the same mask on their original indices.
         valid_rows = df_numeric.select(
-            pl.all_horizontal(pl.all().is_finite().fill_null(True))
+            pl.all_horizontal(
+                [
+                    pl.col(col).cast(pl.Float64).is_finite().fill_null(True)
+                    for col in df_numeric.columns
+                ]
+            )
         ).to_series()
         return df_numeric.filter(valid_rows), row_positions.filter(valid_rows)
 

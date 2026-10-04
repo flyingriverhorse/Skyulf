@@ -3,12 +3,13 @@
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 
 from .._cv_weights import preflight_weights, take_weights, weight_kwargs
+from ..cross_validation import _aggregate_metrics
 from .cv_policy import effective_cv_type, policy_description, policy_splitter
 from .grid_random import _slice_fold_rows, fit_and_score_candidate_fold
 from .metrics import resolve_metric
@@ -55,9 +56,10 @@ def _outer_score(
     fold: int,
     preprocessing: Any,
     sample_weight: Any = None,
-) -> float:
+) -> tuple[float, dict[str, float]]:
     """Refit the selected recipe on outer training rows and reject incomplete evaluations."""
     errors: list[str] = []
+    metrics: dict[str, float] = {}
     score = fit_and_score_candidate_fold(
         candidate_idx=0,
         fold_idx=fold,
@@ -76,12 +78,13 @@ def _outer_score(
         fold_errors=errors,
         seed_params_overlay=seed_params(config),
         model_calculator=tuner.model_calculator,
+        evaluation_metrics=metrics,
         **weight_kwargs(sample_weight),
     )
     if not np.isfinite(score):
         detail = errors[0] if errors else "nonfinite outer score"
         raise ValueError(f"Nested CV outer fold {fold + 1} failed: {detail}")
-    return float(score)
+    return float(score), metrics
 
 
 def _nested_partitions(
@@ -120,9 +123,10 @@ def _evaluate_selected(
 ) -> tuple[float, dict[str, Any]]:
     """Evaluate selected parameters, with a training-only threshold when requested."""
     if not config.tune_threshold:
-        return _outer_score(
+        score, metrics = _outer_score(
             tuner, X, y, train, test, outer, config, result, index, preprocessing, sample_weight
-        ), {}
+        )
+        return score, {"metrics": metrics}
     train_x, train_y = _slice_fold_rows(X, train), _slice_fold_rows(y, train)
     selection = select_nested_threshold(
         tuner,
@@ -279,6 +283,13 @@ def _nested_report(
 ) -> dict[str, Any]:
     """Keep outer evaluation evidence separate from final-search selection results."""
     scores = [fold["outer_score"] for fold in folds]
+    aggregated = _aggregate_metrics([fold.get("metrics", {}) for fold in folds])
+    aggregated.setdefault(cast(str, final.scoring_metric), {}).update(
+        mean=float(np.mean(scores)),
+        std=float(np.std(scores)),
+        valid_folds=len(scores),
+        total_folds=len(folds),
+    )
     return {
         "status": "nested_cv",
         "method": "nested_cv",
@@ -293,9 +304,7 @@ def _nested_report(
         "final_search_trials": final.n_trials,
         "split_policy": policy_description(config, problem_type),
         "final_splits": final_cv.evidence,
-        "aggregated_metrics": {
-            final.scoring_metric: {"mean": float(np.mean(scores)), "std": float(np.std(scores))}
-        },
+        "aggregated_metrics": aggregated,
         "cv_config": {
             "method": "nested_cv",
             "n_folds": config.cv_folds,

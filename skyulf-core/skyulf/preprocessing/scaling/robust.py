@@ -47,11 +47,13 @@ class RobustScalerApplier(BaseApplier):
 
         with_centering = params.get("with_centering", True)
         with_scaling = params.get("with_scaling", True)
+        if not any((with_centering, with_scaling)):
+            return X, _y
 
         exprs = []
         for col_name in valid:
             i = cols.index(col_name)
-            e = pl.col(col_name)
+            e = pl.col(col_name).cast(pl.Float64)
             if with_centering and center is not None:
                 e = e - center[i]
             if with_scaling and scale is not None:

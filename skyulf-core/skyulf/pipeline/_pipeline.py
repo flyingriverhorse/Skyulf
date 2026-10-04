@@ -26,6 +26,7 @@ from ..modeling._tuning.engine import TuningApplier, TuningCalculator
 from ..modeling._tuning.refit import tune_decision_thresholds
 from ..modeling._tuning.schemas import TuningConfig
 from ..modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
+from ..preprocessing._target_labels import encoded_label, original_labels
 from ..preprocessing._weight_policy import prepare_pipeline_weights
 from ..preprocessing.base import BaseApplier, apply_method
 from ..preprocessing.fold_adapter import FeatureEngineerFoldAdapter
@@ -724,7 +725,14 @@ class SkyulfPipeline:
             grid_points=grid_points,
         )
         self._tuned_thresholds = thresholds
-        self._decision_threshold_evidence = None
+        self._decision_threshold_evidence = (
+            {
+                "positive_class": original_labels(self, [positive]).tolist()[0],
+                "model_positive_class": positive,
+            }
+            if positive is not None
+            else None
+        )
         return thresholds
 
     def predict(
@@ -783,7 +791,7 @@ class SkyulfPipeline:
             validate_prediction_rows(
                 len(data), prediction_row_count(predictions), stage="Model prediction"
             )
-            return predictions
+            return self._original_predictions(predictions)
 
         if self._tuned_thresholds is None:
             raise ValueError(
@@ -798,12 +806,27 @@ class SkyulfPipeline:
         model = self.model_estimator._unwrap_tuned_model()
         classes = np.asarray(model.classes_)
         y_proba = np.asarray(proba_df)[:, : len(classes)]
-        return apply_thresholds(
+        predictions = apply_thresholds(
             y_proba,
             self._tuned_thresholds,
             classes=classes,
             positive_class=self._decision_positive_class(),
         )
+        return self._original_predictions(predictions)
+
+    def _original_predictions(self, predictions: Any) -> Any:
+        """Decode target classes once while retaining the prediction container and index."""
+        if not any(
+            step.get("artifact", {}).get("target_label_map")
+            for step in self.feature_engineer.fitted_steps
+        ):
+            return predictions
+        decoded = original_labels(self, predictions)
+        if isinstance(predictions, pd.Series):
+            return pd.Series(decoded, index=predictions.index, name=predictions.name)
+        if isinstance(predictions, pl.Series):
+            return pl.Series(predictions.name, decoded)
+        return decoded
 
     def describe(self) -> str:
         """Return a human-readable, multi-line summary of the pipeline.
@@ -915,9 +938,14 @@ class SkyulfPipeline:
         if "model_positive_class" in evidence:
             return evidence["model_positive_class"]
         policy = self.config.get("decision_threshold")
-        return evidence.get(
+        positive = evidence.get(
             "positive_class", policy.get("positive_class") if policy is not None else None
         )
+        if positive is not None and self.model_estimator is not None:
+            model = self.model_estimator._unwrap_tuned_model()
+            if hasattr(model, "classes_"):
+                return encoded_label(self, positive, model.classes_)
+        return positive
 
     def export_model_card(self) -> dict[str, Any]:
         """Return a structured, JSON-friendly summary of the pipeline.

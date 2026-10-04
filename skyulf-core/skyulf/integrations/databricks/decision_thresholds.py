@@ -102,18 +102,23 @@ def needs_threshold_time(config: dict[str, Any]) -> bool:
     )
 
 
+def _typed_classes(classes: Any) -> set[tuple[type, Any]]:
+    """Retain class identity when Python equates boolean and numeric labels."""
+    return {(type(label), label) for label in classes}
+
+
 def manual_thresholds(policy: dict[str, Any], classes: list[Any]) -> dict[Any, float]:
     """Resolve typed declarations against the actual probability-column labels."""
     if "positive_class" in policy:
         positive = policy["positive_class"]
-        if len(classes) != 2 or positive not in classes:
+        if len(classes) != 2 or (type(positive), positive) not in _typed_classes(classes):
             raise ValueError("Binary decision threshold positive_class must match a fitted class.")
         return {
             label: policy["value"] if label == positive else 1 - policy["value"]
             for label in classes
         }
     thresholds = {entry["class"]: entry["value"] for entry in policy["thresholds"]}
-    if set(thresholds) != set(classes):
+    if _typed_classes(thresholds) != _typed_classes(classes):
         raise ValueError("Decision thresholds must cover exactly the fitted classes.")
     return thresholds
 

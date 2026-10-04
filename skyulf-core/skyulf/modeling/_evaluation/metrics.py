@@ -51,7 +51,12 @@ SilhouetteSampleSize = int | np.integer[Any]
 
 
 def _try_add_metric(
-    metrics: dict[str, float], key: str, fn: Callable[..., Any], *args: Any, **kwargs: Any
+    metrics: dict[str, float],
+    key: str,
+    fn: Callable[..., Any],
+    *args: Any,
+    omitted_metrics: dict[str, str] | None = None,
+    **kwargs: Any,
 ) -> None:
     """Compute one metric in isolation and add it to ``metrics``.
 
@@ -63,6 +68,8 @@ def _try_add_metric(
     try:
         metrics[key] = float(fn(*args, **kwargs))
     except (ValueError, TypeError, ZeroDivisionError) as exc:
+        if omitted_metrics is not None:
+            omitted_metrics[key] = str(exc)
         logger.warning("Metric '%s' failed and was omitted: %s", key, exc)
 
 
@@ -163,6 +170,7 @@ def calculate_classification_metrics(
     y_np: Any = None,
     predictions: Any = None,
     proba: Any = None,
+    omitted_metrics: dict[str, str] | None = None,
 ) -> dict[str, float]:
     """Compute classification metrics for predictions.
 
@@ -172,6 +180,8 @@ def calculate_classification_metrics(
     ``evaluate_classification_model``) pass those results straight through,
     avoiding a redundant conversion/inference pass on the same data. When
     omitted, each is (re)computed here exactly as before.
+    ``omitted_metrics``, when supplied, collects failure or non-finite-result
+    reasons for the report without inserting strings into the scalar metrics.
     """
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
@@ -201,20 +211,38 @@ def calculate_classification_metrics(
         "matthews_corrcoef": float(matthews_corrcoef(y_arr, predictions)),
     }
 
-    _add_binary_unweighted_metrics(metrics, model, y_arr, predictions)
+    _add_binary_unweighted_metrics(metrics, model, y_arr, predictions, omitted_metrics)
 
     if geometric_mean_score is not None:
         _try_add_metric(
-            metrics, "g_score", geometric_mean_score, y_arr, predictions, average="weighted"
+            metrics,
+            "g_score",
+            geometric_mean_score,
+            y_arr,
+            predictions,
+            average="weighted",
+            omitted_metrics=omitted_metrics,
         )
 
-    _add_probability_based_metrics(metrics, model, X_np, y_arr, proba=proba)
+    _add_probability_based_metrics(
+        metrics, model, X_np, y_arr, proba=proba, omitted_metrics=omitted_metrics
+    )
+    if omitted_metrics is not None:
+        for key, value in metrics.items():
+            if not np.isfinite(value):
+                omitted_metrics[key] = (
+                    "Metric is undefined for this evaluation split (non-finite result)."
+                )
 
     return metrics
 
 
 def _add_binary_unweighted_metrics(
-    metrics: dict[str, float], model: Any, y_arr: Any, predictions: Any
+    metrics: dict[str, float],
+    model: Any,
+    y_arr: Any,
+    predictions: Any,
+    omitted_metrics: dict[str, str] | None = None,
 ) -> None:
     """Adds unweighted precision/recall/f1 to ``metrics`` in-place for binary classification.
 
@@ -256,6 +284,7 @@ def _add_binary_unweighted_metrics(
             average="binary",
             pos_label=pos_label,
             zero_division=0,
+            omitted_metrics=omitted_metrics,
         )
 
 
@@ -266,7 +295,12 @@ def _weighted_pr_auc(y_arr: Any, proba: Any, classes: Any) -> float:
 
 
 def _add_multiclass_roc_pr_auc_metrics(
-    metrics: dict[str, float], y_arr: Any, proba: Any, classes: Any, class_count: int
+    metrics: dict[str, float],
+    y_arr: Any,
+    proba: Any,
+    classes: Any,
+    class_count: int,
+    omitted_metrics: dict[str, str] | None = None,
 ) -> None:
     """Adds OVR/OVO ROC-AUC variants and weighted PR-AUC to ``metrics`` in-place for multiclass proba.
 
@@ -284,6 +318,7 @@ def _add_multiclass_roc_pr_auc_metrics(
         multi_class="ovr",
         average="weighted",
         labels=classes,
+        omitted_metrics=omitted_metrics,
     )
     if "roc_auc_ovr_weighted" in metrics:
         metrics["roc_auc_weighted"] = metrics["roc_auc_ovr_weighted"]  # kept for backward compat
@@ -296,6 +331,7 @@ def _add_multiclass_roc_pr_auc_metrics(
         multi_class="ovr",
         average="macro",
         labels=classes,
+        omitted_metrics=omitted_metrics,
     )
     # OVO variants
     _try_add_metric(
@@ -307,6 +343,7 @@ def _add_multiclass_roc_pr_auc_metrics(
         multi_class="ovo",
         average="macro",
         labels=classes,
+        omitted_metrics=omitted_metrics,
     )
     _try_add_metric(
         metrics,
@@ -317,12 +354,26 @@ def _add_multiclass_roc_pr_auc_metrics(
         multi_class="ovo",
         average="weighted",
         labels=classes,
+        omitted_metrics=omitted_metrics,
     )
-    _try_add_metric(metrics, "pr_auc_weighted", _weighted_pr_auc, y_arr, proba, classes)
+    _try_add_metric(
+        metrics,
+        "pr_auc_weighted",
+        _weighted_pr_auc,
+        y_arr,
+        proba,
+        classes,
+        omitted_metrics=omitted_metrics,
+    )
 
 
 def _add_roc_pr_auc_metrics(
-    metrics: dict[str, float], model: Any, y_arr: Any, proba: Any, class_count: int
+    metrics: dict[str, float],
+    model: Any,
+    y_arr: Any,
+    proba: Any,
+    class_count: int,
+    omitted_metrics: dict[str, str] | None = None,
 ) -> None:
     """Adds ROC-AUC/PR-AUC metrics (binary or multiclass OVR/OVO) to ``metrics`` in-place.
 
@@ -330,7 +381,9 @@ def _add_roc_pr_auc_metrics(
     metric (with a warning) instead of dropping the others.
     """
     if class_count == 2:
-        _try_add_metric(metrics, "roc_auc", roc_auc_score, y_arr, proba[:, 1])
+        _try_add_metric(
+            metrics, "roc_auc", roc_auc_score, y_arr, proba[:, 1], omitted_metrics=omitted_metrics
+        )
         # `average_precision_score` defaults to pos_label=1 — unlike
         # `roc_auc_score`, which infers the positive class from the sorted
         # uniques. With labels like {1, 2}, `proba[:, 1]` is P(classes_[1]) but
@@ -348,6 +401,7 @@ def _add_roc_pr_auc_metrics(
             y_arr,
             proba[:, 1],
             pos_label=pos_label,
+            omitted_metrics=omitted_metrics,
         )
         _add_binary_probability_aliases(metrics)
         return
@@ -360,7 +414,7 @@ def _add_roc_pr_auc_metrics(
     if classes is None or len(classes) != class_count:
         classes = np.arange(class_count)
 
-    _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count)
+    _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count, omitted_metrics)
 
 
 def _add_binary_probability_aliases(metrics: dict[str, float]) -> None:
@@ -379,7 +433,13 @@ def _add_binary_probability_aliases(metrics: dict[str, float]) -> None:
 
 
 def _add_probability_based_metrics(
-    metrics: dict[str, float], model: Any, X_np: Any, y_arr: Any, *, proba: Any = None
+    metrics: dict[str, float],
+    model: Any,
+    X_np: Any,
+    y_arr: Any,
+    *,
+    proba: Any = None,
+    omitted_metrics: dict[str, str] | None = None,
 ) -> None:
     """Adds log-loss, ROC-AUC and PR-AUC metrics to ``metrics`` in-place, using ``predict_proba``.
 
@@ -406,8 +466,10 @@ def _add_probability_based_metrics(
     classes = getattr(model, "classes_", None)
     if classes is None or len(classes) != class_count:
         classes = np.arange(class_count)
-    _try_add_metric(metrics, "log_loss", log_loss, y_arr, proba, labels=classes)
-    _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
+    _try_add_metric(
+        metrics, "log_loss", log_loss, y_arr, proba, labels=classes, omitted_metrics=omitted_metrics
+    )
+    _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count, omitted_metrics)
 
 
 def calculate_regression_metrics(

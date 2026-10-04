@@ -6,7 +6,7 @@ import numpy as np
 import polars as pl
 from scipy import stats as scipy_stats
 
-from ..distributions import calculate_histogram
+from ..distributions import _decimal_float_projection, calculate_histogram
 from ..schemas import (
     Alert,
     CategoricalStats,
@@ -79,6 +79,8 @@ class ColumnMixin(_AnalyzerState):
             return
         try:
             series = self.df[col]  # type: ignore[attr-defined]
+            if series.dtype.is_decimal():
+                series = series.cast(pl.Float64)
             sample_data = series.filter(series.is_finite()).head(5000).to_numpy()
             result = self._run_normality_test(sample_data)
             if result is not None:
@@ -142,6 +144,8 @@ class ColumnMixin(_AnalyzerState):
         self, col: str, profile: ColumnProfile, alerts: list[Alert], advanced_stats: dict
     ) -> None:
         """Compute numeric stats, histogram, normality test and outlier alerts."""
+        if self.df[col].dtype.is_decimal() and not self._allow_decimal_statistics(col, alerts):
+            return
         numeric_stats = self._analyze_numeric(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
             col, advanced_stats
         )
@@ -150,7 +154,8 @@ class ColumnMixin(_AnalyzerState):
 
         self._add_normality_test(col, profile)
         self._add_outlier_alert(col, profile, alerts)
-        invalid_count = self.df[col].is_infinite().sum()
+        series = self.df[col]
+        invalid_count = series.is_infinite().sum() if series.dtype.is_float() else 0
         if invalid_count:
             alerts.append(
                 Alert(
@@ -164,6 +169,26 @@ class ColumnMixin(_AnalyzerState):
                     severity="warning",
                 )
             )
+
+    def _allow_decimal_statistics(self, col: str, alerts: list[Alert]) -> bool:
+        """Expose approximate Decimal metrics only when conversion retains observed distinctions."""
+        available = _decimal_float_projection(self.df[col]) is not None
+        message = (
+            "Decimal numeric statistics use an approximate Float64 calculation view; "
+            "source values and samples retain their exact precision."
+            if available
+            else "Decimal precision cannot be retained in a finite Float64 calculation view; "
+            "numeric statistics and joint analytics are unavailable for this column."
+        )
+        alerts.append(
+            Alert(
+                column=col,
+                type="Approximate Numeric Statistics" if available else "Numeric Precision",
+                message=message,
+                severity="info" if available else "warning",
+            )
+        )
+        return available
 
     def _add_cardinality_alerts(
         self,

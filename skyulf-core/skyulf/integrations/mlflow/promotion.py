@@ -22,6 +22,7 @@ from skyulf.integrations.mlflow._client import make_registry_client, require_mlf
 from ...integrations.databricks.admission import BatchConflictError, LocalTableLock
 from ...integrations.databricks.delta_admission import DeltaTableAdmission
 from .registry import (
+    RegistryAccessError,
     RegistryError,
     RegistryOperationError,
     error_code,
@@ -326,7 +327,7 @@ def _event_payload(receipt: AliasChangeReceipt, status: str) -> dict[str, str | 
 
 
 def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
-    """Persist a prepared or committed transition on its destination version."""
+    """Persist a prepared, committed or safely aborted transition on its destination."""
     labels = {
         "k": "action",
         "p": "from_version",
@@ -442,24 +443,15 @@ def _apply_alias_updates(
 ) -> None:
     """Verify each write and distinguish a refused first write from uncertain mutation."""
     changed = False
-    for alias, new_version, old_version in updates:
+    for update in updates:
+        alias, new_version = update[:2]
         try:
             if new_version is None:
                 client.delete_registered_model_alias(receipt.model_name, alias)
             else:
                 client.set_registered_model_alias(receipt.model_name, alias, new_version)
         except Exception as exc:  # noqa: BLE001 - alias write can have an unknown outcome
-            try:
-                current = read_optional_alias(client, receipt.model_name, alias)
-            except RegistryError:
-                current = object()
-            if not changed and current == old_version:
-                raise translate_error(
-                    exc, name=receipt.model_name, version=receipt.new_version
-                ) from exc
-            raise AliasOutcomeUnknownError(
-                f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
-            ) from exc
+            _raise_alias_write_error(client, receipt, updates, changed, exc)
         changed = True
         try:
             if read_optional_alias(client, receipt.model_name, alias) != new_version:
@@ -468,6 +460,48 @@ def _apply_alias_updates(
             raise AliasOutcomeUnknownError(
                 f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
             ) from exc
+
+
+def _raise_alias_write_error(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    updates: list[tuple[str, str | None, str | None]],
+    changed: bool,
+    error: Exception,
+) -> None:
+    """Abort only a definite refusal before any mutation, retaining uncertain intent."""
+    translated = translate_error(error, name=receipt.model_name, version=receipt.new_version)
+    if not changed and isinstance(translated, RegistryAccessError):
+        _abort_refused_change(client, receipt, updates)
+        raise translated from error
+    raise AliasOutcomeUnknownError(
+        f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
+    ) from error
+
+
+def _abort_refused_change(
+    client: Any, receipt: AliasChangeReceipt, updates: list[tuple[str, str | None, str | None]]
+) -> None:
+    """Verify unchanged aliases and a durable aborted receipt before releasing our marker."""
+    try:
+        pending = (client.get_registered_model(receipt.model_name).tags or {}).get(_PENDING_TAG)
+        if pending != receipt.event_id or any(
+            read_optional_alias(client, receipt.model_name, alias) != old
+            for alias, _, old in updates
+        ):
+            raise AliasOutcomeUnknownError("Refused alias change no longer matches its intent.")
+        _write_event(client, receipt, "aborted")
+        stored = client.get_model_version(receipt.model_name, receipt.new_version).tags or {}
+        if read_event(stored.get(event_tag(receipt.event_id))) != _event_payload(
+            receipt, "aborted"
+        ):
+            raise AliasOutcomeUnknownError("Aborted alias receipt was not verified.")
+        client.delete_registered_model_tag(receipt.model_name, _PENDING_TAG)
+        assert_no_pending(client, receipt.model_name)
+    except Exception as exc:  # noqa: BLE001 - failed cleanup cannot authorize a retry
+        raise AliasOutcomeUnknownError(
+            f"Refused alias cleanup outcome unknown; inspect event {receipt.event_id}."
+        ) from exc
 
 
 def _write_version_status(

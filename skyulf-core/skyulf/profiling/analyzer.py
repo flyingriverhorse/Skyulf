@@ -30,6 +30,7 @@ from ._analyzer import (
 )
 from ._analyzer._utils import SKLEARN_AVAILABLE, _collect, _dtype_to_semantic_bucket
 from .correlations import calculate_correlations
+from .distributions import _decimal_float_projection
 from .schemas import Alert, DatasetProfile, Filter
 
 __all__ = ["EDAAnalyzer"]
@@ -293,7 +294,12 @@ class EDAAnalyzer(
         biased skew/kurtosis, and ``recommendations.py`` compares skewness
         against a hardcoded threshold calibrated on the bias-corrected value.
         """
-        values = pl.col(col).filter(pl.col(col).is_finite())
+        values = pl.col(col)
+        if self.df[col].dtype.is_decimal():
+            if _decimal_float_projection(self.df[col]) is None:
+                return []
+            values = values.cast(pl.Float64)
+        values = values.filter(values.is_finite())
         return [
             values.mean().alias(f"{col}__mean"),
             values.median().alias(f"{col}__median"),
@@ -374,6 +380,9 @@ class EDAAnalyzer(
             )
             col_profiles[col] = profile
             alerts.extend(col_alerts)
+
+            if self.df[col].dtype.is_decimal() and profile.numeric_stats is None:
+                continue
 
             is_numeric_type = self.df[col].dtype in self._NUMERIC_DTYPES
             if profile.dtype == "Numeric" or profile.dtype == "Categorical" and is_numeric_type:
@@ -590,10 +599,16 @@ class EDAAnalyzer(
                 self.df[target_col]
             )
             if target_type in ["Categorical", "Boolean", "Numeric"]:
-                rule_tree = self._discover_rules(feature_cols, target_col, task_type)
+                if self._rule_target_preserves_precision(target_col):
+                    rule_tree = self._discover_rules(feature_cols, target_col, task_type)
                 if not final_task_type:
                     final_task_type = "Regression" if target_type == "Numeric" else "Classification"
         return rule_tree, final_task_type
+
+    def _rule_target_preserves_precision(self, target_col: str) -> bool:
+        """Keep a Decimal target out of tree calculations if Float64 erases observed variation."""
+        series = self.df[target_col]
+        return not series.dtype.is_decimal() or _decimal_float_projection(series) is not None
 
     def analyze(
         self,

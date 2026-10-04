@@ -6,6 +6,7 @@ checksum detects damaged bytes but does not authenticate their origin.
 
 import json
 import pickle
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -153,8 +154,11 @@ def save_local_pipeline(
     if type(pipeline) is not SkyulfPipeline:
         raise TypeError("Expected a fitted SkyulfPipeline.")
     _recorded_schemas(pipeline)
+    prediction_pipeline = copy(pipeline)
+    prediction_pipeline.feature_engineer = copy(pipeline.feature_engineer)
+    prediction_pipeline.feature_engineer.train_sample_weight_ = None
     payload = pickle.dumps(
-        {"pipeline": pipeline, "use_tuned_thresholds": use_tuned_thresholds},
+        {"pipeline": prediction_pipeline, "use_tuned_thresholds": use_tuned_thresholds},
         protocol=pickle.HIGHEST_PROTOCOL,
     )
     if len(payload) > _MAX_PIPELINE_BYTES:
@@ -286,8 +290,6 @@ def predict_local_pipeline(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
         )
     )
-    if artifact.manifest.task == "classification":
-        prediction = original_labels(artifact.pipeline, prediction)
     if prediction.shape != (len(frame),):
         raise ValueError("Local pipeline prediction shape disagrees with input rows.")
     index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))

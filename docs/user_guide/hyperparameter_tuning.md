@@ -134,8 +134,15 @@ it never repeats observations through an artificial epoch loop.
 
 A single validation holdout has no remaining fold to skip. Such searches need
 an eligible iteration hook; otherwise pruning is disabled with a reason.
-For ordinary tuning, an explicitly supplied validation split takes precedence
-over tuning CV. Nested tuning reserves that split and uses training-only inner CV.
+For ordinary KFold/stratified KFold/ShuffleSplit tuning, an explicitly supplied
+validation split takes precedence over tuning CV. Explicit group policies and
+temporal policies with configured gap/window sizes retain their training-only
+CV boundaries; the separate validation split does not select their parameters.
+Carry-history preprocessing also retains its required temporal split policy.
+Nested tuning reserves the separate split and uses training-only inner CV.
+When enabled, ordinary post-fit threshold tuning can still use validation data;
+that population is therefore not an untouched final test set. Keep final test
+rows separate from parameter and threshold selection.
 `none` or `pruning=false` retains ordinary fitting. Only fully evaluated,
 finite-scoring trials are eligible for best parameters and final refit. Pruned
 trial scores are not shown as completed CV means; if none completes, tuning

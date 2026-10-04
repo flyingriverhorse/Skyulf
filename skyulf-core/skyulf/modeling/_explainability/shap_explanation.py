@@ -81,7 +81,7 @@ def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tupl
     # already chose.
     masker = shap_module.maskers.Independent(sample, max_samples=len(sample))
     try:
-        explainer = shap_module.Explainer(model, masker)
+        explainer = shap_module.Explainer(model, masker, seed=DEFAULT_RANDOM_STATE)
     except TypeError:
         # Non-tree, non-linear estimators (SVC, KNN, GaussianNB, MLP, Voting,
         # Stacking) are not `__call__`-able, so `shap.Explainer(model, masker)`
@@ -89,6 +89,7 @@ def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tupl
         explainer = shap_module.Explainer(
             getattr(model, "predict_proba", None) or model.predict,
             masker,
+            seed=DEFAULT_RANDOM_STATE,
         )
     return explainer, False
 

@@ -65,9 +65,10 @@ def original_target_labels(fitted_steps: list[dict[str, Any]], labels: Any) -> n
 def encoded_label(pipeline: Any, label: Any, classes: Any) -> Any:
     """Resolve a user-facing original label on the actual fitted probability axis."""
     raw = original_labels(pipeline, classes).tolist()
-    if label not in raw:
-        raise ValueError(f"Decision threshold label {label!r} must match an original target class.")
-    return np.asarray(classes).tolist()[raw.index(label)]
+    for position, candidate in enumerate(raw):
+        if type(candidate) is type(label) and candidate == label:
+            return np.asarray(classes).tolist()[position]
+    raise ValueError(f"Decision threshold label {label!r} must match an original target class.")
 
 
 def encoded_labels(pipeline: Any, labels: Any, classes: Any) -> np.ndarray:

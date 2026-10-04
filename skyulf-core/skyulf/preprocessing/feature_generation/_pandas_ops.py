@@ -137,7 +137,9 @@ def _pandas_similarity(op: dict[str, Any], df_out: Any, _eps: float) -> pd.Serie
     if pair is None:
         return None
     col_a, col_b = pair
-    return _vectorised_similarity(df_out[col_a], df_out[col_b], op.get("method") or "ratio")
+    return _vectorised_similarity(
+        df_out[col_a], df_out[col_b], op.get("method") or "ratio", op.get("similarity_backend")
+    )
 
 
 def _pandas_season(d: Any) -> Any:

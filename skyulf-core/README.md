@@ -13,7 +13,7 @@ it: sklearn remains the modeling foundation while Skyulf provides pipeline
 configuration, artifacts, metrics, and safe execution conventions.
 
 <!-- Quick badges + links -->
-[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
 **Website & Documentation**
@@ -73,7 +73,7 @@ pip install skyulf-core[mlflow]
 
 ## Databricks Bundle template
 
-The source checkout includes a [local-engine Databricks Bundle template](templates/databricks/)
+The source checkout includes a [local-engine Databricks Bundle template](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks)
 for bounded pandas or Polars training and scoring with Skyulf Core. From the
 repository root, initialize an editable project with:
 
@@ -82,7 +82,7 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The generated project has `train` and `score` jobs. The first score creates
-its prediction table; see the [Bundle guide](../docs/user_guide/databricks_bundle.md)
+its prediction table; see the [Bundle guide](https://github.com/flyingriverhorse/Skyulf/blob/master/docs/user_guide/databricks_bundle.md)
 for configuration and the single-writer requirement.
 
 ## Compute engines (pandas / Polars)
@@ -438,7 +438,7 @@ mindmap
 ## License
 
 `skyulf-core` — this standalone Python library — is licensed under the
-**Apache License 2.0**; see the [LICENSE](LICENSE) file beside it.
+**Apache License 2.0**; see the [LICENSE](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/LICENSE) file beside it.
 
 That is the permissive half of a split model: the Skyulf **backend and
 frontend are GNU AGPLv3**. You can use `skyulf-core` in proprietary projects

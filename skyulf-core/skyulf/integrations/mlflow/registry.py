@@ -10,6 +10,7 @@ requested.
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from skyulf.integrations.mlflow._client import make_registry_client, require_mlflow
 
@@ -71,6 +72,30 @@ class ResolvedModel:
     digest: str | None
 
 
+def download_registered_package(
+    mlflow: Any, client: Any, name: str, version: str, tracking_uri: str | None
+) -> str:
+    """Download the pinned registry copy using its store's credential transport.
+
+    MLflow exposes no public getter for a client's resolved registry URI. Read
+    its bound value once instead of consulting mutable global defaults. UC and
+    workspace registries require their models transport to obtain scoped tokens;
+    a bare cloud-storage download URI does not carry those credentials. OSS
+    stores need their explicit download URI because MLflow's OSS models resolver
+    can consult the global registry instead of the supplied registry URI.
+    """
+    registry_uri = client._registry_uri
+    scheme = urlparse(registry_uri).scheme or registry_uri
+    artifact_uri = (
+        f"models:/{name}/{version}"
+        if scheme in {"databricks", "databricks-uc"}
+        else client.get_model_version_download_uri(name, version)
+    )
+    return mlflow.artifacts.download_artifacts(
+        artifact_uri=artifact_uri, tracking_uri=tracking_uri, registry_uri=registry_uri
+    )
+
+
 def load_registered_bundle(
     resolved: ResolvedModel,
     *,
@@ -98,13 +123,8 @@ def load_registered_bundle(
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
     try:
-        version = client.get_model_version(resolved.name, resolved.version)
-        source = getattr(version, "source", None)
-        artifact_uri = source if isinstance(source, str) and source else resolved.model_uri
-        local_path = mlflow.artifacts.download_artifacts(
-            artifact_uri=artifact_uri,
-            tracking_uri=tracking_uri,
-            registry_uri=registry_uri,
+        local_path = download_registered_package(
+            mlflow, client, resolved.name, resolved.version, tracking_uri
         )
         model = mlflow.models.Model.load(Path(local_path))
     except Exception as exc:  # noqa: BLE001 - translate registry and artifact transport failures
@@ -145,13 +165,8 @@ def load_registered_local_pipeline(
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
     try:
-        version = client.get_model_version(resolved.name, resolved.version)
-        source = getattr(version, "source", None)
-        artifact_uri = source if isinstance(source, str) and source else resolved.model_uri
-        local_path = mlflow.artifacts.download_artifacts(
-            artifact_uri=artifact_uri,
-            tracking_uri=tracking_uri,
-            registry_uri=registry_uri,
+        local_path = download_registered_package(
+            mlflow, client, resolved.name, resolved.version, tracking_uri
         )
         model = mlflow.models.Model.load(Path(local_path))
     except Exception as exc:  # noqa: BLE001 - translate registry and transport failures
@@ -255,16 +270,9 @@ def resolve_model(
 
     concrete_version = str(model_version.version)
     model_uri = f"models:/{name}/{concrete_version}"
-    # The registry response carries the source URI that was recorded at
-    # publication time.  Resolving that source avoids relying on MLflow's
-    # process-global registry store when a caller supplied explicit stores.
-    source_uri = getattr(model_version, "source", None)
-    artifact_uri = source_uri if isinstance(source_uri, str) and source_uri else model_uri
     try:
-        local_path = mlflow.artifacts.download_artifacts(
-            artifact_uri=artifact_uri,
-            tracking_uri=tracking_uri,
-            registry_uri=registry_uri,
+        local_path = download_registered_package(
+            mlflow, client, name, concrete_version, tracking_uri
         )
         model = mlflow.models.Model.load(Path(local_path))
     except Exception as exc:  # noqa: BLE001 - artifact metadata is another registry boundary

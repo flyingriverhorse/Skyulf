@@ -21,6 +21,25 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
+def _decimal_float_projection(series: pl.Series) -> pl.Series | None:
+    """Return approximate Decimal values only when finite conversion preserves distinct values."""
+    values = series.cast(pl.Float64)
+    if values.is_infinite().any() or values.n_unique() != series.n_unique():
+        return None
+    return values
+
+
+def _histogram_numeric_view(df: pl.LazyFrame, col_name: str) -> pl.LazyFrame | None:
+    """Use a safe Decimal projection without changing the caller's stored column."""
+    if df.collect_schema()[col_name].is_decimal():
+        series = _collect(df.select(col_name)).to_series()
+        values = _decimal_float_projection(series)
+        if values is None:
+            return None
+        return values.to_frame().lazy()
+    return df
+
+
 def _histogram_bin_counts(
     df: pl.LazyFrame, col_name: str, edges: np.ndarray, bins: int
 ) -> dict[int, int]:
@@ -55,10 +74,13 @@ def calculate_histogram(
     df: pl.LazyFrame, col_name: str, bins: int = 20
 ) -> list[HistogramBin] | None:
     """Calculate histogram bins over finite numeric observations using Polars."""
-    df = df.filter(pl.col(col_name).is_finite())
     # We need to execute to get min/max for binning, or use an approximation.
     # For accurate bins, we need min/max.
     try:
+        view = _histogram_numeric_view(df, col_name)
+        if view is None:
+            return None
+        df = view.filter(pl.col(col_name).is_finite())
         stats = _collect(
             df.select([pl.col(col_name).min().alias("min"), pl.col(col_name).max().alias("max")])
         )

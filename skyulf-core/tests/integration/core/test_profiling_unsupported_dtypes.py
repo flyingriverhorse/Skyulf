@@ -1,7 +1,6 @@
 """Native non-text dtypes must retain a usable profile without string aggregation."""
 
 from datetime import time
-from decimal import Decimal
 
 import polars as pl
 import pytest
@@ -13,11 +12,10 @@ from skyulf.profiling.schemas import DatasetProfile
 @pytest.mark.parametrize(
     "series",
     [
-        pl.Series("value", [Decimal("12.34"), None, Decimal("56.78")]),
         pl.Series("value", [time(9, 30), None, time(16, 45)]),
         pl.Series("value", [[1, 2], None, [3]]),
     ],
-    ids=["decimal", "time", "list"],
+    ids=["time", "list"],
 )
 def test_unsupported_native_dtype_retains_data_and_reports_unavailable_stats(series):
     """One unsupported statistics dtype must not abort or mislabel the entire report."""

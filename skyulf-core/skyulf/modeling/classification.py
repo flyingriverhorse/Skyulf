@@ -792,7 +792,7 @@ if LIGHTGBM_AVAILABLE:
         id="lgbm_classifier",
         name="LightGBM Classifier",
         category="Modeling",
-        description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
+        description="LightGBM: leaf-wise gradient boosting for numeric features; encode categorical inputs first.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
         tags=["classification"],
         learns_from_data=True,

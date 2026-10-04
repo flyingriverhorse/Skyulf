@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 def _aggregate_single_metric(
     key: str, fold_metrics: list[dict[str, float]]
 ) -> dict[str, float] | None:
-    """Aggregates one metric's values across folds into mean/std/min/max, dropping non-finite values."""
+    """Aggregate finite values and expose valid versus total fold counts."""
     values = [m.get(key, np.nan) for m in fold_metrics]
     # Filter nans
     values = [v for v in values if np.isfinite(v)]
@@ -52,6 +52,8 @@ def _aggregate_single_metric(
         "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
         "min": float(np.min(values)),
         "max": float(np.max(values)),
+        "valid_folds": len(values),
+        "total_folds": len(fold_metrics),
     }
 
 

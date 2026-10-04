@@ -26,6 +26,7 @@ from sklearn.feature_selection import (
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.utils.multiclass import type_of_target
 
 from ...engines import PolarsEngine
 from ...utils import detect_numeric_columns, resolve_columns
@@ -62,6 +63,8 @@ def _infer_problem_type(series: pd.Series) -> str:
         or pd.api.types.is_string_dtype(series)
     ):
         return "classification"
+    if pd.api.types.is_float_dtype(series) and type_of_target(series.dropna()) == "continuous":
+        return "regression"
     unique_values = series.dropna().unique()
     if len(unique_values) <= _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION:
         logger.debug(
@@ -76,7 +79,12 @@ def _infer_problem_type(series: pd.Series) -> str:
 
 
 def _resolve_score_function(name: str | None, problem_type: str) -> Any:
+    """Select the requested statistic without applying classification tests to regression."""
     if name and name in SCORE_FUNCTIONS:
+        if name in {"f_classif", "chi2", "mutual_info_classif"} and problem_type == "regression":
+            raise ValueError(
+                f"score_func={name!r} requires classification, not a regression target."
+            )
         return SCORE_FUNCTIONS[name]
 
     if problem_type == "classification":

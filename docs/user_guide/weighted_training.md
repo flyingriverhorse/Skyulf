@@ -77,8 +77,13 @@ MODELING["search_space"].pop("class_weight", None)
 Removing the search axis keeps the value fixed. To tune class weights instead,
 keep the search axis and remove the fixed value from `base_model.params`.
 Use `None` to disable class weights. They apply to classification, not regression.
-When both are enabled, sample and class weights are multiplied once. Class
-weights are computed from the labels used by that fit, after any resampling.
+When both are enabled, sample and class weights are combined once, using the
+rows supplied to that fit after any resampling. Native estimators retain their
+own class-weight rules. Since the [scikit-learn 1.7 change](https://scikit-learn.org/1.7/whats_new/v1.7.html#sklearn-linear-model), LogisticRegression with
+`class_weight="balanced"` uses weighted class frequencies when sample weights
+are supplied; it does not multiply a count-only class factor by those weights.
+For estimators without native class-weight support, Skyulf computes class
+factors from label counts and multiplies them by the supplied row weights.
 
 ### Add SMOTE with sample weights
 
