@@ -42,6 +42,7 @@ shapely>=2.0.2,<2.2.0                # Geometric operations
 
 # === HTTP CLIENT (ASYNC) ===
 httpx>=0.25.0,<1.0.0
+urllib3>=2.8.0,<3.0.0               # Security floor for transitive HTTP clients
 
 # === RATE LIMITING ===
 slowapi>=0.1.9                       # Per-endpoint rate limiting for FastAPI

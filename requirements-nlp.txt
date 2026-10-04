@@ -13,4 +13,4 @@
 # NOTE: sentence-transformers pulls in PyTorch, which is a large
 # download (hundreds of MB). Install only when you need embeddings.
 
-sentence-transformers>=2.2.0   # Dense sentence/document embeddings (SentenceEmbedder node)
+sentence-transformers>=6.0.0,<7.0.0  # Enforce trust_remote_code for local models

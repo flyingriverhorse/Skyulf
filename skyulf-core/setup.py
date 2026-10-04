@@ -63,7 +63,7 @@ setup(
             "causal-learn>=0.1.3.0",
         ],
         "text": ["vaderSentiment>=3.3.2"],
-        "nlp": ["sentence-transformers>=2.2.0"],
+        "nlp": ["sentence-transformers>=6.0.0,<7.0.0"],
         "geo": [
             "geopandas>=0.14.0,<1.2.0",
             "shapely>=2.0.2,<2.2.0",
@@ -98,7 +98,7 @@ setup(
             "sklearn-compat==0.1.5",
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
-            "sentence-transformers>=2.2.0",
+            "sentence-transformers>=6.0.0,<7.0.0",
             "shap>=0.46.0,<1.0.0",
             "mlflow>=3.10,<4.0",
         ],
