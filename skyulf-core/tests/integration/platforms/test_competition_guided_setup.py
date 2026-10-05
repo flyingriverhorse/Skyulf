@@ -126,9 +126,9 @@ def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy)
     """Real CLI output must freeze selected models, strategy controls and ensemble composition."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
 
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
@@ -200,14 +200,16 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.competition_evaluation import evaluate_competition_candidate
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_competition import choose_winner
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
-    from skyulf.integrations.databricks.project import load_project_workflow
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.competition.competition_evaluation import (
+        evaluate_competition_candidate,
+    )
+    from skyulf.integrations.databricks.training.competition.local_competition import choose_winner
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
@@ -288,9 +290,9 @@ def test_cli_keeps_each_ensemble_composition_and_controls(tmp_path, task):
     """Two voting and two stacking candidates must not inherit each other's answers."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
 
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")

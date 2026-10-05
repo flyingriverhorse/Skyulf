@@ -19,10 +19,10 @@ import numpy as np
 
 from skyulf.core.execution import ExecutionOptions
 from skyulf.inference.bundle import InferenceBundle
-from skyulf.integrations.databricks.admission import BatchConflictError
-from skyulf.integrations.databricks.batch import BatchResult, BatchSpec, run_batch
-from skyulf.integrations.databricks.delta import table_identity
-from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+from skyulf.integrations.databricks.data.admission import BatchConflictError
+from skyulf.integrations.databricks.data.delta_io.delta import table_identity
+from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
+from skyulf.integrations.databricks.scoring.batch.batch import BatchResult, BatchSpec, run_batch
 
 
 def _receipt(result: BatchResult) -> dict[str, Any]:

@@ -6,10 +6,12 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import monitoring_sources as sources
-from skyulf.integrations.databricks.local_incremental import bounded_frame
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
+from skyulf.integrations.databricks.observability.monitoring import monitoring_sources as sources
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.scoring.incremental.local_incremental import bounded_frame
 
 AS_OF = datetime(2026, 10, 4, 12, tzinfo=UTC)
 
@@ -140,7 +142,7 @@ def test_enrollment_caps_monitor_budgets_without_reducing_producer(changes, rows
 
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
         validate_monitoring_settings,
     )
@@ -170,7 +172,7 @@ def test_enrollment_does_not_hide_invalid_producer_budget_types(changes):
     """Clamping must never convert booleans, floats or invalid bounds into valid integers."""
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
     )
 
@@ -199,7 +201,9 @@ def test_large_producer_can_register_or_pause_monitor(monkeypatch, enabled, acti
     """Both activation and scoring retain explicit enable/disable semantics with large producers."""
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enroll = Mock()
     monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())

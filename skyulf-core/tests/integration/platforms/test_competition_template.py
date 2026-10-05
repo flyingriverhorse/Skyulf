@@ -69,7 +69,7 @@ def test_cli_competition_keeps_three_jobs_and_task_matching_placeholder(
     """Real CLI rendering must enable common CV and retain the existing lifecycle graph."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project, _read_jobs
 
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE to opt into installed CLI generation.")

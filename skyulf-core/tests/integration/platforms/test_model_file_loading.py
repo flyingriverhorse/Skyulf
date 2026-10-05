@@ -5,8 +5,10 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+    load_training_branch_configs,
+)
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 
 
 def _project(tmp_path):
@@ -104,12 +106,12 @@ def test_legacy_json_model_loads_without_single_file(tmp_path):
 
 def test_saved_model_parameters_replay_without_editable_file(tmp_path):
     """Saved training plans must retain resolved parameters after project files change."""
-    from skyulf.integrations.databricks.local_branches import (
+    from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+    from skyulf.integrations.databricks.training.local_branches import (
         TrainingBranch,
         branch_training_payload,
         restore_training_branches,
     )
-    from skyulf.integrations.databricks.local_retraining import LocalTrainingSpec
 
     features, modeling = _project(tmp_path)
     path = modeling / "single_model.py"
@@ -261,7 +263,7 @@ def _operator_values(action, model_name):
 @pytest.mark.parametrize("action", ["train", "approve", "reject", "rollback"])
 def test_notebook_preparation_loads_single_model_only_for_train(tmp_path, workflow_config, action):
     """Saved-model operations must work when editable model and feature files cannot execute."""
-    from skyulf.integrations.databricks.job_runtime import _prepared_notebook_request
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import _prepared_notebook_request
 
     features, modeling = _project(tmp_path)
     model_source = (
@@ -299,7 +301,7 @@ def test_notebook_preparation_loads_single_model_only_for_train(tmp_path, workfl
 @pytest.mark.parametrize("legacy_layout", [False, True])
 def test_score_accepts_empty_single_model_declaration(workflow_config, legacy_layout):
     """Scoring selects a saved model without needing the training-time Python declaration."""
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {**workflow_config, **_single_config()}
     if legacy_layout:
@@ -322,7 +324,7 @@ def test_score_accepts_empty_single_model_declaration(workflow_config, legacy_la
 )
 def test_saved_actions_still_reject_missing_or_invalid_models(workflow_config, pipeline):
     """The empty-declaration exception must not admit malformed or incompatible models."""
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {**workflow_config, "training_layout": "single_model", "pipeline": pipeline}
     with pytest.raises(ValueError):
@@ -346,7 +348,7 @@ def test_saved_actions_still_reject_missing_or_invalid_models(workflow_config, p
 )
 def test_empty_saved_model_keeps_pipeline_validation(workflow_config, changes, error):
     """Saved-artifact actions still validate preprocessing structure, node types and explanations."""
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {**workflow_config, **_single_config()}
     config["pipeline"].update(changes)
@@ -360,7 +362,7 @@ def test_empty_saved_model_keeps_pipeline_validation(workflow_config, changes, e
 )
 def test_empty_model_exception_excludes_training_and_other_layouts(workflow_config, layout, action):
     """Training and other layout contracts must still require a resolved model declaration."""
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {**workflow_config, **_single_config(), "training_layout": layout}
     with pytest.raises(ValueError, match="modeling"):

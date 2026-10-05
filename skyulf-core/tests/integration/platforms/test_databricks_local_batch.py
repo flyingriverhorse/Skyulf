@@ -13,14 +13,14 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline
-from skyulf.integrations.databricks import local_batch
-from skyulf.integrations.databricks.local_batch import (
+from skyulf.integrations.databricks.scoring.batch import local_batch
+from skyulf.integrations.databricks.scoring.batch.local_batch import (
     LocalSourceSpec,
     fit_local_workflow,
     read_local_source,
     score_local_source,
 )
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,

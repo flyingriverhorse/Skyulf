@@ -14,10 +14,12 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.integrations.databricks._contracts import BatchSpec
-from skyulf.integrations.databricks.admission import BatchConflictError, LocalTableLock
-from skyulf.integrations.databricks.local_batch import LocalSourceSpec, fit_local_workflow
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.data.admission import BatchConflictError, LocalTableLock
+from skyulf.integrations.databricks.scoring.batch.local_batch import (
+    LocalSourceSpec,
+    fit_local_workflow,
+)
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -25,6 +27,7 @@ from skyulf.integrations.databricks.local_sdk import (
     PreflightResult,
     PreparedLocalWorkflow,
 )
+from skyulf.integrations.databricks.shared._contracts import BatchSpec
 
 
 @pytest.fixture
@@ -302,7 +305,7 @@ def test_incremental_temporal_history_commits_with_predictions(
     local_delta_case, tmp_path, monkeypatch
 ):
     """Failed publication must leave both predictions and temporal continuation unchanged."""
-    from skyulf.integrations.databricks import local_incremental
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental
 
     spark, source, target, prepared, _, _, admission = local_delta_case
     spark.sql(f"DELETE FROM {target} WHERE id = 9")
@@ -388,7 +391,7 @@ def test_incremental_temporal_history_commits_with_predictions(
 def test_incremental_single_writer_uses_receipts_without_control_table(local_delta_case):
     """A sole writer can replay Delta receipts without provisioning lock state."""
     from skyulf.integrations.databricks import run_incremental_local_batch
-    from skyulf.integrations.databricks.admission import SingleWriterAdmission
+    from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 
     spark, source, target, prepared, _ = _prepared_incremental_case(local_delta_case)
     admission = SingleWriterAdmission()
@@ -413,7 +416,7 @@ def test_incremental_single_writer_uses_receipts_without_control_table(local_del
 def test_new_model_generation_rebuilds_existing_rows_then_scores_new_inserts(local_delta_case):
     """A v2 physical target must rescore all rows without changing v1's receipt."""
     from skyulf.integrations.databricks import run_incremental_local_batch
-    from skyulf.integrations.databricks.admission import SingleWriterAdmission
+    from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 
     spark, source, v1_target, prepared, _ = _prepared_incremental_case(local_delta_case)
     v2_target = f"spark_catalog.default.local_predictions_v2_{uuid4().hex}"
@@ -692,7 +695,7 @@ def test_incremental_local_batch_failed_write_keeps_watermark(local_delta_case, 
     DataFrameWriter = import_module("pyspark.sql.readwriter").DataFrameWriter
 
     from skyulf.integrations.databricks import run_incremental_local_batch
-    from skyulf.integrations.databricks.delta import DeltaPublishError
+    from skyulf.integrations.databricks.data.delta_io.delta import DeltaPublishError
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     first = run_incremental_local_batch(
@@ -729,7 +732,8 @@ def test_incremental_local_batch_failed_write_keeps_watermark(local_delta_case, 
 
 def test_incremental_local_batch_lost_acknowledgement_is_noop(local_delta_case, monkeypatch):
     """A committed append remains visible when the caller loses its response."""
-    from skyulf.integrations.databricks import local_incremental, run_incremental_local_batch
+    from skyulf.integrations.databricks import run_incremental_local_batch
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     run_incremental_local_batch(
@@ -771,7 +775,7 @@ def test_incremental_local_batch_lost_acknowledgement_is_noop(local_delta_case, 
 def test_incremental_local_batch_respects_shared_admission(local_delta_case):
     """A competing publisher must not score or write while the target is owned."""
     from skyulf.integrations.databricks import run_incremental_local_batch
-    from skyulf.integrations.databricks.delta import table_identity
+    from skyulf.integrations.databricks.data.delta_io.delta import table_identity
 
     spark, _, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     before = spark.sql(f"DESCRIBE HISTORY {target}").first().version

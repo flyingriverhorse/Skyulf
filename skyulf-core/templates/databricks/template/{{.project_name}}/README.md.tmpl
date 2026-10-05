@@ -350,10 +350,11 @@ The remaining lifecycle instructions below apply to `training_layout=single_mode
 | `src/features/assets.json` | Relative paths of bounded data files to save with the model |
 | `src/features/requirements.txt` | Exact project dependency pins verified at fit/load and recorded by MLflow |
 | `src/features/custom/` | Your own steps as plain pandas functions (examples inside); use relative imports |
-| `src/modeling/single_model.py` | Single model's parameters and tuning/search space in `MODELING` |
-| `src/modeling/model_competition.py` | Each competition candidate owns its model, tuning/search space and preprocessing recipe in `MODELS` |
-| `src/modeling/multi_model.py` | Each target owns its model, tuning/search space, recipes and validation/quality policy |
+{{if eq .training_layout "single_model"}}| `src/modeling/single_model.py` | Single model's parameters and tuning/search space in `MODELING` |
+{{else if eq .training_layout "model_competition"}}| `src/modeling/model_competition.py` | Each competition candidate owns its model, tuning/search space and preprocessing recipe in `MODELS` |
+{{else}}| `src/modeling/multi_model.py` | Each target owns its model, tuning/search space, recipes and validation/quality policy |
 | `src/modeling/model_set.py` | Whole-set release/promotion policy and scoring table/view destinations |
+{{end -}}
 | `src/jobs/` | Notebook entrypoints referenced by the train, score and monitoring jobs |
 | `src/tools/preview.py` | Offline configuration preview and installed-node discovery |
 | `databricks.yml` | Bundle identity, source sync and included deployment/resource files |
@@ -362,6 +363,19 @@ The remaining lifecycle instructions below apply to `training_layout=single_mode
 | `resources/train.job.yml` | Training, comparison, approval/rollback and optional scoring handoff |
 | `resources/score.job.yml` | Batch scoring job and its independent schedule/compute |
 | `resources/monitoring.job.yml` | Independent serverless monitoring job, paused UTC schedule and retry limits |
+
+Initialization includes only the selected modeling layout and the notebooks
+referenced by its jobs. Disabled SHAP, evaluation charts and CDF recovery do not
+generate their optional notebooks. Unused date/window/CV settings are omitted
+when the loader supplies the same defaults; branch `None` overrides remain
+where they clear inherited shared settings.
+
+To enable an omitted feature or switch layouts later, initialize the template
+into a separate directory with the new answers. Review and copy the required
+modeling files, notebooks, dependencies and job definitions into this project,
+preserving your custom settings before validating and deploying. Editing a flag
+or refreshing the training graph alone does not restore omitted files. Existing
+projects are not cleaned or rewritten automatically.
 
 `databricks.yml` includes all three job files through `resources/*.yml`. Keep the
 resource keys `train` and `score` stable; the training handoff references

@@ -6,9 +6,12 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.decision_thresholds import manual_thresholds
-from skyulf.integrations.databricks.local_cv import LocalCVSpec, validate_fold_membership
-from skyulf.integrations.databricks.threshold_training import _calibration_data
+from skyulf.integrations.databricks.training.thresholds.decision_thresholds import manual_thresholds
+from skyulf.integrations.databricks.training.thresholds.threshold_training import _calibration_data
+from skyulf.integrations.databricks.training.tuning.local_cv import (
+    LocalCVSpec,
+    validate_fold_membership,
+)
 from skyulf.preprocessing._target_labels import encoded_label
 
 
@@ -86,7 +89,9 @@ def test_scoring_enrollment_cannot_replace_another_active_parent(field, value):
     import json
     import sqlite3
 
-    from skyulf.integrations.databricks.monitoring_store import _inventory_update
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        _inventory_update,
+    )
 
     active = {
         "_activation_started_ms": 1000,

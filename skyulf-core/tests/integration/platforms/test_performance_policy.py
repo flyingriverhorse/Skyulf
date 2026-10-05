@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from skyulf.integrations.databricks.performance_policy import (
+from skyulf.integrations.databricks.observability.monitoring.performance.performance_policy import (
     completed_performance_window,
     evaluate_performance,
     validate_performance_policy,

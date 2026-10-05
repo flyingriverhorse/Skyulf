@@ -11,7 +11,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks import local_retraining as retraining
+from skyulf.integrations.databricks.training.fitting import local_retraining as retraining
 
 
 def _spec(**changes):

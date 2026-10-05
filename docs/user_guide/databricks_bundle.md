@@ -1063,8 +1063,8 @@ existing data-read and scoring services against the real data.
 The same check can run locally, without Spark or registry access:
 
 ```python
-from skyulf.integrations.databricks.local_workflow import resolve_target_config
-from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
 resolved = resolve_target_config(config, {
     "catalog": "workspace",
@@ -1079,7 +1079,7 @@ validate_workflow_config(resolved, action="train")  # Or score, approve, etc.
 For an older project's loaded JSON, migrate explicitly:
 
 ```python
-from skyulf.integrations.databricks.workflow_config import migrate_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import migrate_workflow_config
 
 updated = migrate_workflow_config(
     config, task="regression", score_handoff="after_alias_change"
@@ -1236,7 +1236,7 @@ import hashlib
 import json
 from dataclasses import asdict
 
-from skyulf.integrations.databricks.local_workflow import run_action
+from skyulf.integrations.databricks.lifecycle.local_workflow import run_action
 
 # candidate is the result of an earlier training job; no training runs here.
 comparison = asdict(candidate.comparison)
@@ -1410,7 +1410,7 @@ Approval requires the saved policy unchanged and re-evaluates it before changing
 Omitting `quality_gates` preserves the single-gate policy and historical receipt
 digests. SDK callers should use the returned `comparison_sha256`; when explicitly
 serializing a report for evidence, use `comparison_payload`/`comparison_digest`
-from `skyulf.integrations.mlflow.validation` instead of hashing `dataclasses.asdict`.
+from `skyulf.integrations.mlflow.lifecycle.validation` instead of hashing `dataclasses.asdict`.
 
 In both modes, registration nominates `@challenger` before comparison. A tied
 or worse candidate retains that alias with `validation_status=rejected` and
@@ -1435,6 +1435,50 @@ and evidence hashes for rollback/recovery; their JSON fields are `action`,
 identifies the version previously held by the affected alias, not necessarily
 the previous champion. These are audit records,
 not settings to edit. Earlier compact receipts remain supported.
+
+### Reading notebook results and failures
+
+Open **Jobs > your run > the task > Output**. Generated notebooks print
+`STARTED`, then either `COMPLETED` with elapsed time or `FAILED` with the task
+name, exception type, message, source file and line. Available job/run/model
+identifiers appear beside the start message. Failure diagnostics preserve the
+original exception and traceback; they do not convert a failed task to success.
+Inspect the failing task's inputs and saved effects before retrying.
+
+Normal training and scoring output uses labeled text sections. Absent optional
+values are omitted from the visible summary; meaningful `False`, `0`, decisions
+and reasons remain. Long result lists are abbreviated with a notice. The full
+JSON notebook result and task values remain unchanged for automation. SHAP and
+monitoring retain their existing richer reports; the chart task lists artifact
+locations. The notebook exit stays in a separate final cell.
+
+New projects generate only the selected modeling files: `single_model.py`,
+`model_competition.py`, or `multi_model.py` plus `model_set.py`. Job notebooks are
+also limited to the selected graph, including optional SHAP/charts/recovery.
+This affects new generation; it does not delete files from existing projects.
+Reinitialize a separate project when changing layout or enabling a feature whose
+notebook was omitted, then review and merge the required resources and files.
+Do not only toggle a resource flag and reference a missing notebook.
+
+The library's `skyulf.integrations.databricks` modules are grouped under `jobs`,
+`training`, `scoring`, `observability`, `model_sets`, `projects`, `data` and
+`lifecycle`, with cross-domain contracts in `shared`. Crowded groups have smaller
+subpackages: `jobs/{training,monitoring,lifecycle,shared}`,
+`training/{fitting,competition,tuning,thresholds,weights,shared}` and
+`scoring/{batch,incremental,shared}`. Monitoring lives in
+`observability/monitoring`, with `local`, `spark` and `performance` subpackages;
+charts and reports have their own folders. For example, notebook adapters import
+`skyulf.integrations.databricks.jobs.shared.job_runtime`.
+Use these paths for new code. `_compat` preserves old module imports
+and serialized class references; it contains aliases, not a second runtime.
+The generated project's `src/jobs` directory remains unchanged.
+
+The related MLflow library follows the same organization:
+`skyulf.integrations.mlflow.{models,spark,lifecycle,registration,runs,shared}`.
+Its `_compat` aliases preserve existing model class and notebook import paths.
+Package import still leaves MLflow optional; pyfunc adapters load it when selected.
+Worker source snapshots and certificates continue to cover the entire Skyulf
+package after the files move.
 
 With `score_model_selection=champion`, score resolves the alias once to a
 concrete version per run, under either promotion policy. Only the serialized

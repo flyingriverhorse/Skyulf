@@ -12,15 +12,15 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference.bundle import InferenceBundle, build_bundle
 
 mlflow = pytest.importorskip("mlflow")
-from skyulf.integrations.mlflow.model import log_model
-from skyulf.integrations.mlflow.registry import (
+from skyulf.integrations.mlflow.models.model import log_model
+from skyulf.integrations.mlflow.registration.registry import (
     RegistryAccessError,
     RegistryDependencyError,
     RegistryModelNotFoundError,
     register_model,
     resolve_model,
 )
-from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -46,7 +46,7 @@ from skyulf.pipeline import SkyulfPipeline
 )
 def test_invalid_concrete_version_fails_before_mlflow_import(monkeypatch, version: Any) -> None:
     """Invalid selectors must fail locally instead of reaching registry resolution."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     monkeypatch.setattr(registry, "require_mlflow", lambda: pytest.fail("MLflow import"))
     with pytest.raises(ValueError, match="version"):
@@ -56,7 +56,7 @@ def test_invalid_concrete_version_fails_before_mlflow_import(monkeypatch, versio
 @pytest.mark.parametrize("version", [1, "1", "01", 200])
 def test_positive_concrete_version_is_valid(version: str | int) -> None:
     """Positive ASCII selectors retain compatibility with pinned version loaders."""
-    from skyulf.integrations.mlflow.registry import _validate_reference
+    from skyulf.integrations.mlflow.registration.registry import _validate_reference
 
     assert _validate_reference("model", None, version, None, None) is None
 
@@ -64,7 +64,7 @@ def test_positive_concrete_version_is_valid(version: str | int) -> None:
 @pytest.mark.parametrize("uri", [42, False, [], {}])
 def test_invalid_registry_uri_fails_before_mlflow_import(monkeypatch, uri: Any) -> None:
     """Malformed URI types must produce an actionable local validation error."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     monkeypatch.setattr(registry, "require_mlflow", lambda: pytest.fail("MLflow import"))
     with pytest.raises(ValueError, match="registry_uri"):
@@ -73,7 +73,7 @@ def test_invalid_registry_uri_fails_before_mlflow_import(monkeypatch, uri: Any) 
 
 def test_registry_dependency_sentinel_is_the_active_lookup(monkeypatch):
     """The negative-path dependency patch must also intercept a valid request."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     dependency = Mock(side_effect=RuntimeError("dependency sentinel reached"))
     monkeypatch.setattr(registry, "require_mlflow", dependency)
@@ -241,7 +241,7 @@ def test_missing_model_and_permission_are_typed_failures(
             raise error
 
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.registry.make_registry_client",
+        "skyulf.integrations.mlflow.registration.registry.make_registry_client",
         lambda *args, **kwargs: ForbiddenClient(),
     )
     with pytest.raises(RegistryAccessError):
@@ -251,7 +251,7 @@ def test_missing_model_and_permission_are_typed_failures(
 def test_missing_mlflow_is_a_dependency_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """A missing optional package has a different remediation from registry access."""
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.registry.require_mlflow",
+        "skyulf.integrations.mlflow.registration.registry.require_mlflow",
         lambda: (_ for _ in ()).throw(RegistryDependencyError("install mlflow")),
     )
     with pytest.raises(RegistryDependencyError):

@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks.competition_project import validate_competition_config
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.competition_project import validate_competition_config
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 
 
 def _project(tmp_path, candidates=None):

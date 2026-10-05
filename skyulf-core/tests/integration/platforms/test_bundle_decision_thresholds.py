@@ -12,10 +12,15 @@ from sklearn.preprocessing import StandardScaler
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.threshold_training import calibration_partition
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.thresholds.threshold_training import (
+    calibration_partition,
+)
+from skyulf.integrations.databricks.training.tuning.local_cv import (
+    LocalCVSpec,
+    evaluate_training_cv,
+)
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 from skyulf.modeling._evaluation.thresholds import apply_thresholds
 
 
@@ -135,7 +140,9 @@ def test_auto_fits_scaler_and_model_without_calibration_rows(tmp_path, engine):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_auto_threshold_objective_stays_unweighted_when_only_calibration_weights_change(engine):
     """Training weights must not silently change the documented unweighted selection objective."""
-    from skyulf.integrations.databricks.threshold_training import fit_threshold_pipeline
+    from skyulf.integrations.databricks.training.thresholds.threshold_training import (
+        fit_threshold_pipeline,
+    )
 
     frame = fixture_frame()
     frame.loc[::7, "target"] = np.where(frame.loc[::7, "target"] == "class_0", "class_1", "class_0")
@@ -223,7 +230,10 @@ def test_off_preserves_native_classifier(tmp_path):
 
 def test_cv_evaluates_manual_decisions():
     """CV must score the deployed cutoff rather than the classifier's native decisions."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.local_cv import (
+        LocalCVSpec,
+        evaluate_training_cv,
+    )
 
     frame = fixture_frame()
     result = evaluate_training_cv(
@@ -357,7 +367,9 @@ def test_calibration_whole_groups_and_chronological_gap():
 
 def test_competition_scores_saved_decision_policy(tmp_path):
     """Candidate ranking must use threshold decisions on the common outer validation rows."""
-    from skyulf.integrations.databricks.competition_evaluation import evaluate_competition_candidate
+    from skyulf.integrations.databricks.training.competition.competition_evaluation import (
+        evaluate_competition_candidate,
+    )
 
     frame = fixture_frame()
     artifact = fit_artifact(
@@ -375,7 +387,7 @@ def test_competition_scores_saved_decision_policy(tmp_path):
     )
     assert result["mean"] == pytest.approx(0.5)
     assert result["fold_scores"] == pytest.approx([0.5] * 3)
-    from skyulf.integrations.databricks.local_competition import choose_winner
+    from skyulf.integrations.databricks.training.competition.local_competition import choose_winner
 
     result["candidate"] = "threshold_candidate"
     assert choose_winner([result], {"threshold_candidate"})["winner"] == "threshold_candidate"
@@ -384,7 +396,9 @@ def test_competition_scores_saved_decision_policy(tmp_path):
 @pytest.mark.parametrize("nested,expected", [(False, 8), (True, 14)])
 def test_threshold_competition_budget_includes_outer_searches(nested, expected):
     """Repeated threshold-aware fold searches must not bypass the declared search budget."""
-    from skyulf.integrations.databricks.local_competition import _pipeline_trial_bound
+    from skyulf.integrations.databricks.training.competition.local_competition import (
+        _pipeline_trial_bound,
+    )
 
     config = recipe({"mode": "auto"})
     config["modeling"] = {
@@ -419,7 +433,9 @@ def test_frozen_recipe_and_standalone_export_keep_positive_class(tmp_path):
 def test_threshold_cv_chart_contract():
     """Threshold CV must retain the fold metric schema used by optional chart reports."""
     pytest.importorskip("matplotlib")
-    from skyulf.integrations.databricks.evaluation_chart_report import _cv_charts
+    from skyulf.integrations.databricks.observability.charts.evaluation_chart_report import (
+        _cv_charts,
+    )
 
     report = evaluate_training_cv(
         fixture_frame(),
@@ -518,7 +534,9 @@ def test_temporal_calibration_rejects_groups_spanning_boundary():
 )
 def test_binary_competition_probability_metric_aliases(tmp_path, metric):
     """Admitted probability metric aliases must score binary folds without missing-key errors."""
-    from skyulf.integrations.databricks.competition_evaluation import evaluate_competition_candidate
+    from skyulf.integrations.databricks.training.competition.competition_evaluation import (
+        evaluate_competition_candidate,
+    )
 
     frame = fixture_frame()
     artifact = fit_artifact(

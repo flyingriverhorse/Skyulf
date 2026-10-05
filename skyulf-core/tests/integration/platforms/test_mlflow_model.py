@@ -13,12 +13,12 @@ from sklearn.metrics import accuracy_score
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.bundle import build_bundle, predict_local
-from skyulf.integrations.mlflow import tracking
+from skyulf.integrations.mlflow.runs import tracking
 from skyulf.pipeline import SkyulfPipeline
 
 mlflow = pytest.importorskip("mlflow")
-from skyulf.integrations.mlflow.model import log_model  # noqa: E402
-from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run  # noqa: E402
+from skyulf.integrations.mlflow.models.model import log_model  # noqa: E402
+from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -242,7 +242,7 @@ def test_log_model_rejects_uri_delimiters(
     pipeline, _ = _regression_pipeline("pandas")
     bundle = build_bundle(pipeline, input_stage="raw", feature_order=("x", "z"))
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.model.make_tracking_client",
+        "skyulf.integrations.mlflow.models.model.make_tracking_client",
         lambda *args, **kwargs: pytest.fail("invalid artifact path contacted MLflow"),
     )
     with pytest.raises(ValueError, match="URI delimiters"):
@@ -262,7 +262,9 @@ def test_signature_rejects_dtypes_mlflow_cannot_preserve(
     def forbidden_client(*args: object, **kwargs: object) -> object:
         raise AssertionError("unsupported dtype must fail before contacting MLflow")
 
-    monkeypatch.setattr("skyulf.integrations.mlflow.model.make_tracking_client", forbidden_client)
+    monkeypatch.setattr(
+        "skyulf.integrations.mlflow.models.model.make_tracking_client", forbidden_client
+    )
     with pytest.raises(ValueError, match="preserve this bundle dtype exactly"):
         log_model(bundle, run_id="never-contact-store", artifact_path="model")
 

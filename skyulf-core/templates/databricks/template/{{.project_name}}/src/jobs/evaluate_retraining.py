@@ -3,12 +3,14 @@
 
 import json
 
-from skyulf.integrations.databricks.retraining_task import run_retraining_notebook
+from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import run_retraining_notebook
+from skyulf.integrations.databricks.jobs.shared.notebook_diagnostics import notebook_task
 
 if __name__ == "__main__":
-    output = run_retraining_notebook(
-        globals()["spark"], globals()["dbutils"], display_html=globals().get("displayHTML")
-    )
+    with notebook_task("evaluate_retraining", globals()["dbutils"]):
+        output = run_retraining_notebook(
+            globals()["spark"], globals()["dbutils"], display_html=globals().get("displayHTML")
+        )
 
 # COMMAND ----------
 

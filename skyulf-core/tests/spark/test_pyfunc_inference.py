@@ -9,8 +9,8 @@ mlflow = pytest.importorskip("mlflow")
 from skyulf.data.dataset import SplitDataset  # noqa: E402
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
 from skyulf.inference.local_scoring import score_local_pipeline  # noqa: E402
-from skyulf.integrations.mlflow.local_model import log_local_model  # noqa: E402
-from skyulf.integrations.mlflow.spark_model import predict_spark_pyfunc  # noqa: E402
+from skyulf.integrations.mlflow.models.local_model import log_local_model  # noqa: E402
+from skyulf.integrations.mlflow.spark.spark_model import predict_spark_pyfunc  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
 

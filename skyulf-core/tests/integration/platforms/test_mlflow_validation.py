@@ -11,9 +11,9 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import LocalPipelineArtifact
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.mlflow import validation
-from skyulf.integrations.mlflow.registry import ResolvedModel
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.mlflow.lifecycle import validation
+from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
 
 def _fitted(tmp_path, offset: float) -> LocalPipelineArtifact:
@@ -243,9 +243,9 @@ def test_polars_classification_comparison_selects_core_metrics(
 def test_real_local_registry_comparison_keeps_alias_pinned(tmp_path) -> None:
     """Fetching both registered versions must leave the champion alias unchanged."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.registry import register_model, resolve_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.registration.registry import register_model, resolve_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'models.db').as_posix()}"
     tracking = TrackingConfig(enabled=True, tracking_uri=uri, experiment_name="sm22-local")
@@ -491,7 +491,7 @@ def test_malformed_resolved_version_fails_before_registry_load(tmp_path, monkeyp
 
 def test_registry_permission_failure_does_not_yield_a_report(tmp_path, monkeypatch) -> None:
     """A denied candidate load must propagate instead of looking like a failed metric."""
-    from skyulf.integrations.mlflow.registry import RegistryAccessError
+    from skyulf.integrations.mlflow.registration.registry import RegistryAccessError
 
     candidate = _fitted(tmp_path, 0.0)
 

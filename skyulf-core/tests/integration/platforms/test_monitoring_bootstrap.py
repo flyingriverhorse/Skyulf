@@ -8,8 +8,10 @@ import pytest
 from test_monitoring_model_set import component
 from test_monitoring_registration import settings, workflow
 
-from skyulf.integrations.databricks import monitoring_store as store
-from skyulf.integrations.databricks.performance_actions import ACTION_SCHEMA
+from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+from skyulf.integrations.databricks.observability.monitoring.performance.performance_actions import (
+    ACTION_SCHEMA,
+)
 
 
 class StoreSpark:
@@ -146,7 +148,9 @@ def test_concurrent_foreign_creation_is_rejected_before_enrollment():
 @pytest.mark.parametrize("layout", ["single_model", "model_competition"])
 def test_scoring_producer_bootstraps_before_first_inventory_merge(layout):
     """Both producer layouts must work without a separate monitoring deployment."""
-    from skyulf.integrations.databricks.monitoring_registration import register_scoring_monitor
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        register_scoring_monitor,
+    )
 
     spark = StoreSpark()
     payload = {
@@ -161,7 +165,9 @@ def test_scoring_producer_bootstraps_before_first_inventory_merge(layout):
 
 def test_existing_shared_store_accepts_producer_without_creation_or_replacement():
     """A second project needs enrollment write access without becoming the view owner."""
-    from skyulf.integrations.databricks.monitoring_registration import register_scoring_monitor
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        register_scoring_monitor,
+    )
 
     spark = existing_store()
     payload = {
@@ -175,7 +181,9 @@ def test_existing_shared_store_accepts_producer_without_creation_or_replacement(
 @pytest.mark.parametrize("changes", [{"monitoring_deployment_mode": "development"}, {}])
 def test_unconfigured_or_development_producer_never_provisions(changes):
     """An inactive producer must not acquire accidental central storage dependencies."""
-    from skyulf.integrations.databricks.monitoring_registration import register_scoring_monitor
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        register_scoring_monitor,
+    )
 
     spark = StoreSpark()
     assert register_scoring_monitor(spark, {}, changes, {}) is None
@@ -184,7 +192,9 @@ def test_unconfigured_or_development_producer_never_provisions(changes):
 
 def test_activation_bootstraps_before_first_inventory_merge():
     """The activated version must appear before its first scoring run."""
-    from skyulf.integrations.databricks.monitoring_registration import register_deployed_monitor
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        register_deployed_monitor,
+    )
 
     spark = StoreSpark()
     payload = {
@@ -202,7 +212,9 @@ def test_activation_bootstraps_before_first_inventory_merge():
 @pytest.mark.parametrize("invalid", ["activation", "version", "settings", "receipt"])
 def test_invalid_activation_never_bootstraps(invalid):
     """All lifecycle validation must precede provisioning a new central namespace."""
-    from skyulf.integrations.databricks.monitoring_registration import register_deployed_monitor
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        register_deployed_monitor,
+    )
 
     spark = StoreSpark()
     values = (
@@ -227,7 +239,7 @@ def test_invalid_activation_never_bootstraps(invalid):
 @pytest.mark.parametrize("invalid_second", [False, True])
 def test_model_set_validates_all_components_before_shared_bootstrap(invalid_second):
     """A malformed later component cannot leave behind a partially enrolled model set."""
-    from skyulf.integrations.databricks.monitoring_model_set import register_set_monitors
+    from skyulf.integrations.databricks.model_sets.monitoring_model_set import register_set_monitors
 
     spark = StoreSpark()
     parent = {"model_name": "models.risk.set", "prediction_table": "outputs.risk.set_scores"}
@@ -253,7 +265,9 @@ def test_model_set_validates_all_components_before_shared_bootstrap(invalid_seco
 
 def test_fresh_scheduled_project_creates_empty_store_without_models():
     """An enabled schedule must succeed before the first producer activation."""
-    from skyulf.integrations.databricks.spark_monitoring_job import run_project_monitoring_notebook
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+        run_project_monitoring_notebook,
+    )
 
     spark = StoreSpark()
     dbutils = Mock()
@@ -267,7 +281,9 @@ def test_fresh_scheduled_project_creates_empty_store_without_models():
 )
 def test_inactive_schedule_does_not_bootstrap(changes):
     """A paused schedule or development target must never create shared infrastructure."""
-    from skyulf.integrations.databricks.spark_monitoring_job import run_project_monitoring_notebook
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+        run_project_monitoring_notebook,
+    )
 
     spark = StoreSpark()
     dbutils = Mock()
@@ -292,7 +308,9 @@ def test_inactive_schedule_does_not_bootstrap(changes):
 )
 def test_invalid_schedule_or_request_never_bootstraps(changes):
     """Bad schedule settings and foreign scoring receipts cannot provision shared objects."""
-    from skyulf.integrations.databricks.spark_monitoring_job import run_project_monitoring_notebook
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+        run_project_monitoring_notebook,
+    )
 
     spark = StoreSpark()
     dbutils = Mock()
@@ -305,7 +323,9 @@ def test_invalid_schedule_or_request_never_bootstraps(changes):
 @pytest.mark.parametrize("raw", ["null", "[]", '"receipt"', "123", "true"])
 def test_non_object_request_cannot_be_treated_as_scheduled_observation(raw):
     """Only an absent receipt authorizes the scheduled bootstrap path."""
-    from skyulf.integrations.databricks.spark_monitoring_job import run_project_monitoring_notebook
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+        run_project_monitoring_notebook,
+    )
 
     spark = StoreSpark()
     dbutils = Mock()

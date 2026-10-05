@@ -6,12 +6,14 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.monitoring_metrics import build_performance_report
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_performance_report,
+)
 
 
 def test_minimum_long_key_is_finite(spark):
     """Valid minimum signed integer keys must not overflow an absolute-value check."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -24,7 +26,7 @@ def test_minimum_long_key_is_finite(spark):
 
 def test_excluded_null_probabilities_are_not_validated_as_predictions(spark):
     """Excluded rows may have empty outputs and must remain visible as excluded counts."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -41,7 +43,7 @@ def test_excluded_null_probabilities_are_not_validated_as_predictions(spark):
 
 def test_future_labels_do_not_require_eligible_record_keys(spark):
     """An entirely future label population cannot become a malformed current join."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -64,7 +66,9 @@ def test_metric_kernel_available():
     """Distributed monitoring must expose its public entry point without a JVM."""
     import importlib
 
-    module = importlib.import_module("skyulf.integrations.databricks.spark_monitoring_metrics")
+    module = importlib.import_module(
+        "skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics"
+    )
     assert callable(module.build_spark_performance_report)
 
 
@@ -73,7 +77,7 @@ def test_metric_kernel_available():
 )
 def test_regression_parity(spark, truth, guesses):
     """Constant outcomes retain sklearn force-finite explained variance and R2."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -89,7 +93,7 @@ def test_regression_parity(spark, truth, guesses):
 
 def test_class_order_and_eligibility(spark):
     """Future duplicate outcomes and excluded predictions never enter coverage."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -156,7 +160,7 @@ def test_class_order_and_eligibility(spark):
 @pytest.mark.parametrize("availability", ["2026-01-01", "invalid", None])
 def test_naive_or_invalid_availability_rejected(spark, availability):
     """Unavailable timestamps cannot silently remove labels from monitoring."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -177,7 +181,9 @@ def test_confusion_summary_parity(classes, truth, guess):
     """Weighted confusion cells preserve every policy metric without expanding counts."""
     from collections import Counter
 
-    from skyulf.integrations.databricks.spark_monitoring_metrics import _confusion_values
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
+        _confusion_values,
+    )
 
     indexes = {label: index for index, label in enumerate(classes)}
     counts = Counter(zip(truth, guess, strict=True))
@@ -195,7 +201,7 @@ def test_confusion_summary_parity(classes, truth, guess):
 @pytest.mark.parametrize("partitions", [1, 3])
 def test_probability_parity_and_partition_invariance(spark, partitions):
     """Exact score-frequency curves retain binary class order, ties and every AUC alias."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -233,7 +239,7 @@ def test_probability_parity_and_partition_invariance(spark, partitions):
 )
 def test_malformed_saved_outputs_without_labels(spark, rows, message):
     """Malformed saved evidence is rejected even before any real outcomes arrive."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -244,7 +250,7 @@ def test_malformed_saved_outputs_without_labels(spark, rows, message):
 
 def test_probabilities_validated_without_labels(spark):
     """An unnormalized saved vector cannot become acceptable merely because labels are absent."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 
@@ -260,7 +266,7 @@ def test_probabilities_validated_without_labels(spark):
 
 def test_no_label_report(spark):
     """Scored predictions remain observable while real performance is explicitly unavailable."""
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_performance_report,
     )
 

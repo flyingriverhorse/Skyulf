@@ -6,7 +6,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.spark_monitoring_job import dispatch_monitoring_job
+from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+    dispatch_monitoring_job,
+)
 
 
 def test_handoff_is_nonblocking_and_idempotent_for_same_scoring_receipt():
@@ -39,7 +41,9 @@ def test_missing_monitoring_job_fails_before_submission():
 
 def test_databricks_epoch_start_time_keeps_utc_cutoff():
     """Databricks iso_datetime omits timezone; the job must use its UTC epoch timestamp."""
-    from skyulf.integrations.databricks.spark_monitoring_job import _observation_time
+    from skyulf.integrations.databricks.jobs.monitoring.spark_monitoring_job import (
+        _observation_time,
+    )
 
     expected = datetime(2026, 10, 5, 6, 0, tzinfo=UTC)
     result = _observation_time({"as_of_unix_ms": str(int(expected.timestamp() * 1000))})

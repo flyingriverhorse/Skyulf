@@ -11,7 +11,7 @@ mlflow = pytest.importorskip("mlflow")
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
-from skyulf.integrations.mlflow import spark_model  # noqa: E402
+from skyulf.integrations.mlflow.spark import spark_model  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
 
@@ -46,7 +46,7 @@ def test_mutable_or_unregistered_uri_rejected_before_udf(artifact, monkeypatch, 
 
 def test_worker_revalidates_certificate_and_runtime_source(artifact, tmp_path):
     """A certificate is detached evidence, not permission to accept another payload."""
-    from skyulf.integrations.mlflow.local_model import SkyulfLocalPythonModel
+    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel
 
     certificate = spark_model.partition_safety_certificate(artifact)
     model = SkyulfLocalPythonModel(None, certificate, spark_model.runtime_source_digest())
@@ -106,7 +106,7 @@ def test_concrete_package_download_uses_explicit_stores_without_global_mutation(
 
 def test_additive_certificate_cannot_override_original_package_identity(artifact):
     """The certificate supplements the original digest and cannot hide mismatched metadata."""
-    from skyulf.integrations.mlflow.local_model import _signature
+    from skyulf.integrations.mlflow.models.local_model import _signature
 
     metadata = {
         spark_model.SAFETY_KEY: spark_model.partition_safety_certificate(artifact),
@@ -127,7 +127,7 @@ def test_additive_certificate_cannot_override_original_package_identity(artifact
 
 def test_local_logging_adds_certificate_without_changing_scope(artifact, tmp_path, monkeypatch):
     """New inspected packages retain legacy execution scope and bundle worker source."""
-    from skyulf.integrations.mlflow import local_model
+    from skyulf.integrations.mlflow.models import local_model
 
     calls = []
     monkeypatch.setattr(local_model, "make_tracking_client", lambda uri: Mock())
@@ -258,7 +258,7 @@ def test_worker_wheel_carries_exact_source_and_dependency_metadata(tmp_path):
     import zipfile
     from importlib.metadata import distribution
 
-    from skyulf.integrations.mlflow._spark_environment import snapshot_worker_environment
+    from skyulf.integrations.mlflow.spark._spark_environment import snapshot_worker_environment
 
     pins = ["skyulf-core==0.9.1", "numpy==2.2.6", "pandas==2.3.3"]
     paths, requirements, digest = snapshot_worker_environment(tmp_path, pins)
@@ -272,7 +272,7 @@ def test_worker_wheel_carries_exact_source_and_dependency_metadata(tmp_path):
         assert wheel.read(metadata).decode() == (
             package.read_text("METADATA") or package.read_text("PKG-INFO")
         )
-        source = wheel.read("skyulf/integrations/mlflow/spark_model.py")
+        source = wheel.read("skyulf/integrations/mlflow/spark/spark_model.py")
         assert (
             hashlib.sha256(source).hexdigest()
             == hashlib.sha256(
@@ -389,7 +389,7 @@ def test_certified_set_spark_output_preserves_nulls_and_local_dtypes(
     from skyulf.inference._manifest import ColumnSpec
     from skyulf.inference._model_set_manifest import ComponentReference
     from skyulf.inference.model_set import save_model_set
-    from skyulf.integrations.mlflow.model_set import SkyulfModelSetPythonModel, _signature
+    from skyulf.integrations.mlflow.models.model_set import SkyulfModelSetPythonModel, _signature
 
     reference = ComponentReference(
         name="model", version="1", digest=artifact.manifest.pipeline_sha256
@@ -434,7 +434,7 @@ def test_certified_set_spark_output_preserves_nulls_and_local_dtypes(
 
 def test_uncertified_pyfunc_cannot_enable_spark_output(artifact, tmp_path, monkeypatch):
     """The transport flag cannot authorize an uncertified legacy whole-frame artifact."""
-    from skyulf.integrations.mlflow import local_model
+    from skyulf.integrations.mlflow.models import local_model
 
     model = local_model.SkyulfLocalPythonModel()
     model.load_context(SimpleNamespace(artifacts={"local_pipeline": str(tmp_path / "model")}))
@@ -448,7 +448,7 @@ def test_uncertified_pyfunc_cannot_enable_spark_output(artifact, tmp_path, monke
 @pytest.mark.parametrize("certified", [False, True])
 def test_spark_package_requires_exact_output_transport_param_schema(artifact, certified):
     """A worker package that cannot preserve string nulls must fail before UDF creation."""
-    from skyulf.integrations.mlflow.local_model import _signature
+    from skyulf.integrations.mlflow.models.local_model import _signature
 
     certificate = spark_model.partition_safety_certificate(artifact)
     metadata = {
@@ -476,7 +476,7 @@ def test_spark_package_requires_exact_output_transport_param_schema(artifact, ce
 def test_spark_output_rejects_unreviewed_mixed_null_string_semantics():
     """Future exclusions cannot silently stringify missing values inside mixed batches."""
     from skyulf.inference._manifest import ColumnSpec
-    from skyulf.integrations.mlflow._spark_output import prepare_spark_output
+    from skyulf.integrations.mlflow.spark._spark_output import prepare_spark_output
 
     frame = pd.DataFrame({"reason": pd.Series([pd.NA, "excluded"], dtype="string")})
     with pytest.raises(ValueError, match="mixed-null"):
@@ -488,7 +488,7 @@ def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
     artifact, tmp_path, monkeypatch
 ):
     """Serverless model-call bounds cannot rely on an unavailable Spark Arrow setting."""
-    from skyulf.integrations.mlflow import local_model
+    from skyulf.integrations.mlflow.models import local_model
 
     model = local_model.SkyulfLocalPythonModel(
         None,
@@ -543,7 +543,7 @@ def test_set_spark_worker_bounds_calls_preserving_keys_nulls_and_indices(
     from skyulf.inference._manifest import ColumnSpec
     from skyulf.inference._model_set_manifest import ComponentReference
     from skyulf.inference.model_set import save_model_set
-    from skyulf.integrations.mlflow import model_set as adapter
+    from skyulf.integrations.mlflow.models import model_set as adapter
 
     reference = ComponentReference(
         name="model", version="1", digest=artifact.manifest.pipeline_sha256
@@ -590,7 +590,7 @@ def test_set_spark_worker_bounds_calls_preserving_keys_nulls_and_indices(
 
 def test_empty_prediction_chunk_preserves_existing_scorer_behavior():
     """Empty input must not reach an empty concat or fabricate a different output schema."""
-    from skyulf.integrations.mlflow._spark_output import score_prediction_batches
+    from skyulf.integrations.mlflow.spark._spark_output import score_prediction_batches
 
     query = pd.DataFrame({"x": pd.Series(dtype=float)}, index=pd.Index([], name="source_index"))
     expected = pd.DataFrame({"prediction": pd.Series(dtype=float)}, index=query.index)
@@ -602,7 +602,7 @@ def test_empty_prediction_chunk_preserves_existing_scorer_behavior():
 
 def test_prediction_chunk_rejects_changed_row_identity():
     """A scorer cannot silently realign predictions with the wrong external record keys."""
-    from skyulf.integrations.mlflow._spark_output import score_prediction_batches
+    from skyulf.integrations.mlflow.spark._spark_output import score_prediction_batches
 
     query = pd.DataFrame({"x": [1.0, 2.0]}, index=[7, 3])
     with pytest.raises(ValueError, match="row identity"):

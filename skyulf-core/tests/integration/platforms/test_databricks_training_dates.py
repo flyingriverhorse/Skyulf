@@ -5,7 +5,10 @@ from datetime import UTC, date, datetime
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.training_dates import TrainingDateSpec, parse_training_date
+from skyulf.integrations.databricks.data.training.training_dates import (
+    TrainingDateSpec,
+    parse_training_date,
+)
 
 
 @pytest.mark.parametrize("value", ["01/02/2026", datetime(2026, 1, 2), date(2026, 1, 2)])
@@ -67,7 +70,7 @@ def test_null_result_is_allowed_but_null_event_is_rejected():
 
 def test_transport_preserves_microseconds_and_rejects_naive_instants():
     """Integer transport must never round a boundary or consult the process timezone."""
-    from skyulf.integrations.databricks.training_dates import (
+    from skyulf.integrations.databricks.data.training.training_dates import (
         instant_from_microseconds,
         instant_microseconds,
     )

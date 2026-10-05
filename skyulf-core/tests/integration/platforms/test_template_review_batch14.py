@@ -22,7 +22,9 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.parametrize("weighted,count", [("false", 3), ("true", 3), ("true", 8)])
 def test_competition_graph_uses_selected_candidate_names(tmp_path, task, weighted, count):
     """Weighted answers must reach initialization, training, SHAP and winner selection."""
-    from skyulf.integrations.databricks.training_node_notebook import validate_model_task_names
+    from skyulf.integrations.databricks.jobs.training.training_node_notebook import (
+        validate_model_task_names,
+    )
 
     selected = (
         ["decision_tree_classifier", "logistic_regression", "random_forest_classifier"]

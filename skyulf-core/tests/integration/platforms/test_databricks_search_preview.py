@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from skyulf.integrations.databricks.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
 
 
 def _search(workflow_config, **changes):

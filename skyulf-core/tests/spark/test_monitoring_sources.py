@@ -4,8 +4,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from skyulf.integrations.databricks import spark_monitoring_sources as sources
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.spark import (
+    spark_monitoring_sources as sources,
+)
 
 
 def config(**options):

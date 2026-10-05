@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks._project_files import project_source
+from skyulf.integrations.databricks.projects._project_files import project_source
 
 FEATURES = (
     Path(__file__).resolve().parents[3]

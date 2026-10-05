@@ -7,8 +7,10 @@ from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_registered_reference_replays_training_membership(staged, monkeypatch, engine):
     """Persisted training evidence must validate for both supported local engines."""
-    from skyulf.integrations.databricks import monitoring_reference
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_reference
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     _, _, config, _, frame = staged
     config["engine"] = engine
@@ -48,9 +50,13 @@ def test_holdout_performance_baseline_uses_saved_model_and_verified_membership(
     from test_monitoring_performance import policy
 
     from skyulf.inference.local_scoring import score_local_pipeline
-    from skyulf.integrations.databricks import monitoring_reference
-    from skyulf.integrations.databricks.local_retraining import split_labeled_snapshot
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_reference
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
+        split_labeled_snapshot,
+    )
 
     _, _, config, _, frame = staged
     config["engine"] = engine

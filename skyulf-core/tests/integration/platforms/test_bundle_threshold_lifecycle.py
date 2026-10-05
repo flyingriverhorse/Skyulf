@@ -14,7 +14,7 @@ from test_databricks_lifecycle_tasks import (  # noqa: F401 - real isolated regi
 )
 
 from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.mlflow.registry import load_run_local_pipeline
+from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
 
 
 def _classification(staged, engine, classes, mode):

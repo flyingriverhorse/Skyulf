@@ -6,8 +6,11 @@ from unittest.mock import Mock
 import pytest
 from tests.integration.platforms.test_model_set_batch import _saved_set, _transport
 
-from skyulf.integrations.databricks.admission import BatchConflictError
-from skyulf.integrations.databricks.cdf_recovery import CdfHistoryExpired, CdfRecoveryRequired
+from skyulf.integrations.databricks.data.admission import BatchConflictError
+from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
+    CdfHistoryExpired,
+    CdfRecoveryRequired,
+)
 
 SOURCE = "workspace.test.source"
 TARGET = "workspace.test.predictions"
@@ -122,7 +125,7 @@ def test_failed_set_recovery_preserves_previous_output(tmp_path, monkeypatch):
 
 def test_set_overwrite_clears_partitions_even_with_dynamic_session_defaults(monkeypatch):
     """Full recovery must delete absent partitions, including a completely empty snapshot."""
-    from skyulf.integrations.databricks import model_set_batch as batch
+    from skyulf.integrations.databricks.model_sets import model_set_batch as batch
 
     receipt = {"source_table_id": SOURCE, "target_table_id": TARGET, "expected_target_version": 3}
     monkeypatch.setattr(batch, "table_identity", lambda spark, name: name)

@@ -91,13 +91,13 @@ def run_smoke(
         raise ValueError("model_prefix must be model or catalog.schema.model.")
     if registry_uri.startswith("databricks-uc") and len(model_prefix.split(".")) != 3:
         raise ValueError("Unity Catalog requires catalog.schema.model_prefix.")
-    from skyulf.integrations.mlflow.model import log_model
-    from skyulf.integrations.mlflow.registry import (
+    from skyulf.integrations.mlflow.models.model import log_model
+    from skyulf.integrations.mlflow.registration.registry import (
         load_registered_bundle,
         register_model,
         resolve_model,
     )
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     original, gold = build_gold_bundle(training_engine)
     check_predictions(

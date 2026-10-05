@@ -14,8 +14,10 @@ from test_model_set_project import _enable
 
 def test_set_handoff_does_not_enable_component_handoff(tmp_path, workflow_config):
     """A parent handoff must retain manual activation and disabled scoring per component."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
-    from skyulf.integrations.databricks.model_set_project import load_project_model_set
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values, _ = _project(tmp_path, workflow_config)
     path = Path(values["config_path"])
@@ -46,8 +48,8 @@ def test_final_report_publishes_score_condition(
     workflow_config, monkeypatch, handoff, action, kind
 ):
     """The child job must be gated by the saved transition, never by policy alone."""
-    from skyulf.integrations.databricks import training_node_notebook as module
-    from skyulf.integrations.mlflow.promotion import AliasChangeReceipt
+    from skyulf.integrations.databricks.jobs.training import training_node_notebook as module
+    from skyulf.integrations.mlflow.lifecycle.promotion import AliasChangeReceipt
 
     receipt = (
         asdict(
@@ -85,8 +87,11 @@ def test_schema_offers_multi_model_handoff():
 
 def test_initialization_saves_parent_handoff_separately(workflow_config, tracked):
     """A frozen parent policy must survive independently of disabled component handoff."""
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext, PhaseStore
-    from skyulf.integrations.databricks.branch_tasks import initialize_branch_training
+    from skyulf.integrations.databricks.jobs.training.branch_tasks import initialize_branch_training
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import (
+        LifecycleContext,
+        PhaseStore,
+    )
 
     uri, _ = tracked
     context = LifecycleContext("20", "30")

@@ -4,8 +4,11 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.local_competition import _trial_bound, choose_winner
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.competition.local_competition import (
+    _trial_bound,
+    choose_winner,
+)
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
 
 def _row(name, score=1.0, mode="fixed_cv"):
@@ -63,7 +66,7 @@ def test_missing_requested_candidate_fails():
 
 def test_single_call_training_does_not_ignore_competitors():
     """Only the phased training adapter can execute all candidates before registration."""
-    from skyulf.integrations.databricks.local_workflow import run_action
+    from skyulf.integrations.databricks.lifecycle.local_workflow import run_action
 
     with pytest.raises(ValueError, match="phased lifecycle"):
         run_action(None, {"training_layout": "model_competition"}, "train")

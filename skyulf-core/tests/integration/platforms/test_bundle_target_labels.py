@@ -15,9 +15,12 @@ from skyulf.engines.pandas_engine import SkyulfPandasWrapper
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.inference.local_evaluation import evaluate_local_holdout
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.tuning.local_cv import (
+    LocalCVSpec,
+    evaluate_training_cv,
+)
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 from skyulf.preprocessing.encoding.label import LabelEncoderApplier, LabelEncoderCalculator
 from skyulf.preprocessing.encoding.ordinal import OrdinalEncoderApplier, OrdinalEncoderCalculator
 

@@ -6,10 +6,10 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.local_search_results import (
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.local_search_results import (
     post_selection_cv,
     tuning_evidence,
     validate_search_membership,

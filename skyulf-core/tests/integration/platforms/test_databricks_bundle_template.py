@@ -48,7 +48,7 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
     """Changing task must change visible menus while keeping them aligned with Core."""
     from jsonschema import Draft7Validator
 
-    from skyulf.integrations.mlflow.validation import _CLASSIFICATION, _REGRESSION
+    from skyulf.integrations.mlflow.lifecycle.validation import _CLASSIFICATION, _REGRESSION
     from skyulf.modeling.base import BaseModelCalculator
     from skyulf.registry import NodeRegistry
 
@@ -76,7 +76,7 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     return local_workflow
 
@@ -243,7 +243,7 @@ def test_explicit_boundary_questions_only_apply_to_fixed_windows(window, strateg
 
 def _output():
     """Inspect output publication independently of notebook widgets."""
-    from skyulf.integrations.databricks import prediction_output
+    from skyulf.integrations.databricks.scoring.shared import prediction_output
 
     return prediction_output
 
@@ -265,6 +265,26 @@ def _render_default_config(
         compute_mode=compute_mode,
     )
     content = template.read_text(encoding="utf-8")
+    # These optional fields are absent for this helper's default full-snapshot
+    # configuration. Actual CLI cases cover their selected, non-default forms.
+    for name in (
+        "lookback_days",
+        "holdout_days",
+        "window_timezone",
+        "holdout_months",
+        "result_availability_lag_hours",
+        "cv_group_column",
+        "cv_test_size",
+        "cv_max_train_size",
+        "monthly_lookback_months",
+        "event_column",
+        "result_available_at_column",
+        "start",
+        "holdout_start",
+        "cutoff",
+        "result_cutoff",
+    ):
+        content = re.sub(r'{{if [^{}]+}}  "' + name + r'": [^\n]*,\n{{end}}', "", content)
     content = re.sub(r'{{if eq \.shap_enabled "true"}}.*?{{end}}', "", content, flags=re.DOTALL)
     content = (
         content[content.index("{\n") :]
@@ -585,7 +605,7 @@ def test_generated_default_training_does_not_require_dates():
     assert config["stratify"] is False
     assert config["filter_unavailable_results"] is False
     assert all(
-        config[key] is None
+        key not in config
         for key in (
             "event_column",
             "result_available_at_column",

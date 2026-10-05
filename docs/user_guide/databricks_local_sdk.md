@@ -110,7 +110,7 @@ for the four supported combinations.
 ## Fit and score a small batch
 
 Candidate training also accepts `cv=LocalCVSpec(enabled=True, folds=3)` from
-`skyulf.integrations.databricks.local_cv`. It reuses Core CV on training rows,
+`skyulf.integrations.databricks.training.tuning.local_cv`. It reuses Core CV on training rows,
 refits preprocessing per fold and logs a separate report to the candidate's
 MLflow run. Use `method="stratified_k_fold"` for classification; time-series CV
 requires an explicit event window and `shuffle=False`. The saved final pipeline
@@ -283,7 +283,7 @@ import mlflow
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.integrations.databricks import evaluate_local_holdout, fit_local_workflow
-from skyulf.integrations.mlflow.local_model import log_local_model
+from skyulf.integrations.mlflow.models.local_model import log_local_model
 
 # `frame` is a bounded, labeled pandas or Polars frame with 1,000 rows.
 training, heldout = frame[:800], frame[800:]
@@ -394,7 +394,7 @@ from skyulf.integrations.databricks import (
     BatchSpec, InputSource, LocalSourceSpec, LocalWorkflowConfig,
     ModelSelection, OutputSink, prepare_local_workflow, run_local_batch,
 )
-from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
 source_table = "catalog.schema.scoring_source"
 target_table = "catalog.schema.predictions"
@@ -483,7 +483,7 @@ from skyulf.integrations.databricks import (
     InputSource, LocalWorkflowConfig, ModelSelection, OutputSink,
     prepare_local_workflow, run_incremental_local_batch,
 )
-from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
 config = LocalWorkflowConfig(
     runtime="databricks",

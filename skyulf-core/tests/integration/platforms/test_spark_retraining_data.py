@@ -8,15 +8,15 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.local_retraining import (
-    LocalTrainingSpec,
-    _partition_training_rows,
-)
-from skyulf.integrations.databricks.spark_retraining_data import (
+from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _metadata_train_ordinals,
     _pandas_source_types,
     _require_supported_recipe,
     _row_hash,
+)
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
+    LocalTrainingSpec,
+    _partition_training_rows,
 )
 
 
@@ -68,7 +68,7 @@ def test_dtype_widening_preserves_hash():
 
 def test_nullable_integer_source_inference(monkeypatch):
     """Native casting must reproduce pandas rounding before rows are filtered or split."""
-    from skyulf.integrations.databricks import spark_retraining_data
+    from skyulf.integrations.databricks.data.training import spark_retraining_data
 
     fields = [
         SimpleNamespace(name=name, dataType=SimpleNamespace(typeName=lambda: "long"))
@@ -93,8 +93,8 @@ def test_nullable_integer_source_inference(monkeypatch):
 
 def test_historical_transport_does_not_reapply_string_parsing(monkeypatch):
     """Prepared timestamps already own UTC normalization regardless of raw source string rules."""
-    from skyulf.integrations.databricks import spark_retraining_data
-    from skyulf.integrations.databricks.training_dates import TrainingDateSpec
+    from skyulf.integrations.databricks.data.training import spark_retraining_data
+    from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
 
     spec = _spec(
         weight_column="weight",
@@ -130,7 +130,7 @@ def test_assessment_does_not_require_serverless_unsupported_persistence(monkeypa
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import spark_retraining_data as module
+    from skyulf.integrations.databricks.data.training import spark_retraining_data as module
 
     spec = _spec()
     evidence = {"prepared_reference_source_table_id": "identity", "model_version": "1"}

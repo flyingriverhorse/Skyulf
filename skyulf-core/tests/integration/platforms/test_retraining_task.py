@@ -8,10 +8,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig, json_digest
-from skyulf.integrations.databricks.retraining_task import (
+from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
     observation_decision,
     retraining_policy,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+    MonitorConfig,
+    json_digest,
 )
 
 
@@ -21,7 +24,7 @@ def test_train_lookup_preserves_development_name_prefix(prefix):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter(
@@ -169,7 +172,8 @@ def _job(name="demo_train", job_id=123):
 
 def test_multiple_ready_models_submit_one_training_job(monkeypatch):
     """Several drifting components must produce one idempotent whole-job request."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     first = monitor()
     second = replace(first, model_name="cat.models.other")
@@ -209,7 +213,8 @@ def test_multiple_ready_models_submit_one_training_job(monkeypatch):
 @pytest.mark.parametrize("change", ["removed", "promoted", "disabled", "threshold"])
 def test_enrollment_reread_blocks_superseded_candidates(monkeypatch, change):
     """Changes during data assessment must stop obsolete observations before Jobs lookup."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     original = monitor()
     changes = {
@@ -238,7 +243,8 @@ def test_enrollment_reread_blocks_superseded_candidates(monkeypatch, change):
 
 def test_no_eligible_candidates_do_not_contact_jobs_or_inventory(monkeypatch):
     """Healthy or unchanged data must return without creating cloud submission work."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     current = Mock()
     submit = Mock()
@@ -263,7 +269,7 @@ def test_no_eligible_candidates_do_not_contact_jobs_or_inventory(monkeypatch):
 
 def test_disabled_notebook_publishes_status_without_cloud_work(monkeypatch):
     """The default-disabled task must only publish its local decision and optional display."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock()
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -287,7 +293,7 @@ def test_disabled_notebook_publishes_status_without_cloud_work(monkeypatch):
 
 def test_training_job_lookup_accepts_one_exact_positive_identity():
     """Only one exactly named deployed train job can own the automatic request."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter([_job()])
@@ -310,7 +316,7 @@ def test_training_job_lookup_accepts_one_exact_positive_identity():
 )
 def test_training_job_lookup_rejects_missing_ambiguous_or_inexact_jobs(jobs):
     """API filters and malformed identities must not redirect the training mutation."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter(jobs)
@@ -320,7 +326,7 @@ def test_training_job_lookup_rejects_missing_ambiguous_or_inexact_jobs(jobs):
 
 def test_training_job_lookup_stops_after_second_match():
     """The SDK limit controls page size, so ambiguity must stop further pagination locally."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     def matches():
         """Fail if the lookup requests another page after duplicate ownership is proven."""
@@ -339,7 +345,7 @@ def test_training_job_lookup_stops_after_second_match():
 )
 def test_check_notebook_publishes_boolean_without_submission(monkeypatch, status, expected):
     """The Databricks condition consumes an explicit Boolean eligibility result."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock(return_value={"status": status})
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -353,7 +359,7 @@ def test_check_notebook_publishes_boolean_without_submission(monkeypatch, status
 
 def test_disabled_check_publishes_false_without_cloud_work(monkeypatch):
     """Disabled automation must visibly take the false branch without remote reads."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock()
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -367,7 +373,7 @@ def test_disabled_check_publishes_false_without_cloud_work(monkeypatch):
 
 def test_retraining_output_displays_both_reasons_and_shared_guard(monkeypatch):
     """An operator must see why each trigger qualified and why one shared request was skipped."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     outcome = {
         "status": "cooldown",
@@ -405,7 +411,9 @@ def test_disabled_output_explains_policy_without_empty_model_table(
     deployment, performance_mode, explanation
 ):
     """Skipped automation must explain its policy without inventing model eligibility or reading data."""
-    from skyulf.integrations.databricks.retraining_task import run_retraining_notebook
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
+        run_retraining_notebook,
+    )
 
     performance = {
         "mode": performance_mode,

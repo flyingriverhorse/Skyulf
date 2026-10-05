@@ -6,9 +6,11 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
-from skyulf.integrations.databricks.project import load_project_workflow
-from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+    load_training_branch_configs,
+)
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
 
 def _project(tmp_path, workflow_config, layout, source=None, branch_overlays=None):

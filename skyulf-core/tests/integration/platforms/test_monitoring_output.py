@@ -8,7 +8,9 @@ import pytest
 
 def test_queued_report_retains_independent_job_navigation():
     """Scoring output must identify the separate monitoring run before metrics are ready."""
-    from skyulf.integrations.databricks.monitoring_output import render_monitor_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_monitor_output,
+    )
 
     html = render_monitor_output({"status": "queued", "job_id": 123, "run_id": 456})
     assert "separate job" in html
@@ -18,7 +20,9 @@ def test_queued_report_retains_independent_job_navigation():
 
 def test_monitor_report_has_safe_dashboard_link_and_preserves_plain_text():
     """Notebook output must not turn registry names or configured URLs into active markup."""
-    from skyulf.integrations.databricks.monitoring_output import render_monitor_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_monitor_output,
+    )
 
     html = render_monitor_output(
         {"results": [{"model_name": "<script>bad</script>", "status": "drift"}]},
@@ -32,7 +36,9 @@ def test_monitor_report_has_safe_dashboard_link_and_preserves_plain_text():
 
 def test_drift_report_reads_only_the_completed_batch_and_does_not_recompute():
     """A delayed report task must display the same scoring commit, not the newest model batch."""
-    from skyulf.integrations.databricks.monitoring_output import run_drift_report_notebook
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        run_drift_report_notebook,
+    )
 
     dbutils, spark, display = Mock(), Mock(), Mock()
     dbutils.widgets.getAll.return_value = {"monitoring_dashboard_url": ""}
@@ -79,7 +85,7 @@ def test_drift_report_reads_only_the_completed_batch_and_does_not_recompute():
 
 def test_drift_report_displays_each_model_set_component(monkeypatch):
     """A successful set score must retain both targets in its visible drift report."""
-    from skyulf.integrations.databricks import monitoring_output as output
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_output as output
 
     references = [{"monitor_id": "revenue"}, {"monitor_id": "risk"}]
     rows = [
@@ -101,7 +107,9 @@ def test_drift_report_displays_each_model_set_component(monkeypatch):
 @pytest.mark.parametrize("status", ["disabled", "no_new_predictions"])
 def test_drift_report_skips_without_a_saved_batch(status):
     """An opted-out or empty scoring run must not display an unrelated historical report."""
-    from skyulf.integrations.databricks.monitoring_output import run_drift_report_notebook
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        run_drift_report_notebook,
+    )
 
     spark, dbutils = Mock(), Mock()
     dbutils.widgets.getAll.return_value = {}
@@ -112,7 +120,9 @@ def test_drift_report_skips_without_a_saved_batch(status):
 
 def test_drift_report_rejects_unbound_reference():
     """Unvalidated task values must not become a SQL predicate or table name."""
-    from skyulf.integrations.databricks.monitoring_output import load_observation
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        load_observation,
+    )
 
     with pytest.raises(ValueError):
         load_observation(Mock(), {"status": "ready", "namespace": "bad;sql"})
@@ -120,7 +130,9 @@ def test_drift_report_rejects_unbound_reference():
 
 def test_drift_report_shows_saved_performance_policy_evidence():
     """Operators must see the policy verdict and exact evidence for the saved report."""
-    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     row = {
         "report_id": "report-9",
@@ -183,7 +195,9 @@ def test_drift_report_shows_saved_performance_policy_evidence():
 
 def test_drift_report_marks_missing_policy_disabled_and_escapes_reason():
     """Absent policy and unavailable labels must never render as a healthy verdict."""
-    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     row = {
         "report_id": "r",
@@ -211,7 +225,9 @@ def test_drift_report_marks_missing_policy_disabled_and_escapes_reason():
 
 def test_drift_report_shows_later_saved_retraining_action():
     """A saved action override must identify the later request without altering the metric verdict."""
-    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     row = {
         "report_id": "report-10",
@@ -291,7 +307,9 @@ def _report_row(*, drift=False, performance_status="disabled", metric_value=0.7)
 
 def test_report_shows_observed_performance_when_loss_policy_is_disabled():
     """Measured accuracy must remain visible even without automatic loss monitoring."""
-    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     html = render_drift_output(_report_row())
     assert "<h2>Monitoring report</h2>" in html
@@ -307,7 +325,7 @@ def test_report_shows_observed_performance_when_loss_policy_is_disabled():
 @pytest.mark.parametrize("policy_status", ["healthy", "degraded", "unavailable", "disabled"])
 def test_monitoring_report_returns_independent_signal_statuses(monkeypatch, drift, policy_status):
     """A loss verdict or missing labels must not replace the separate drift result."""
-    from skyulf.integrations.databricks import monitoring_output as output
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_output as output
 
     row = _report_row(
         drift=drift,
@@ -328,7 +346,9 @@ def test_monitoring_report_returns_independent_signal_statuses(monkeypatch, drif
 
 def test_report_marks_absent_coverage_unavailable():
     """A missing label population must not show an invented coverage value or Python None."""
-    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     row = _report_row(performance_status="unavailable", metric_value=None)
     report = json.loads(row["report_json"])

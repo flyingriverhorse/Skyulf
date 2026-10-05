@@ -23,10 +23,10 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
 from skyulf.inference.local_scoring import scoring_output_schema
 from skyulf.integrations.databricks import run_incremental_local_batch, run_local_batch
-from skyulf.integrations.databricks._contracts import BatchSpec
-from skyulf.integrations.databricks.admission import SingleWriterAdmission
-from skyulf.integrations.databricks.local_batch import LocalSourceSpec
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import LocalSourceSpec
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -34,8 +34,10 @@ from skyulf.integrations.databricks.local_sdk import (
     PreflightResult,
     PreparedLocalWorkflow,
 )
-from skyulf.integrations.databricks.prediction_output import provision_prediction_table
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.shared.prediction_output import (
+    provision_prediction_table,
+)
+from skyulf.integrations.databricks.shared._contracts import BatchSpec
 from skyulf.pipeline import SkyulfPipeline
 
 TABLE_PREFIX = os.environ.get("SKYULF_TEST_TABLE_PREFIX", "spark_catalog.default.sm36a_scoring_")
@@ -250,7 +252,7 @@ def test_incremental_scoring_rules_publish_exclusions_retry_and_noop(
     make_scoring_delta_case, monkeypatch, engine, policy
 ):
     """Every input key is committed once, and failed writes never advance a source receipt."""
-    from skyulf.integrations.databricks import local_incremental
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental
 
     case = make_scoring_delta_case(engine, policy=policy)
     first = _increment(case)

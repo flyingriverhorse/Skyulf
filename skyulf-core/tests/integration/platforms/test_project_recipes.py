@@ -12,7 +12,7 @@ import polars as pl
 import pytest
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 
 CUSTOM = (
     Path(__file__).resolve().parents[3]
@@ -94,11 +94,11 @@ def test_phase_selections_do_not_select_each_other(tmp_path):
 
 def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
     """Fresh replay must register nondefault custom classes from both branch selections."""
-    from skyulf.integrations.databricks.local_branches import (
+    from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+    from skyulf.integrations.databricks.training.local_branches import (
         TrainingBranch,
         branch_training_payload,
     )
-    from skyulf.integrations.databricks.local_retraining import LocalTrainingSpec
 
     root = _project(tmp_path)
     branches = []
@@ -137,7 +137,7 @@ def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
     code = (
         "import json, sys\n"
         "from pathlib import Path\n"
-        "from skyulf.integrations.databricks.local_branches import "
+        "from skyulf.integrations.databricks.training.local_branches import "
         "restore_training_branches, branch_training_payload\n"
         "from skyulf.registry import NodeRegistry\n"
         "payload = json.loads(Path(sys.argv[1]).read_text())\n"
@@ -160,7 +160,7 @@ def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
 
 def test_branch_entry_selects_each_recipe(tmp_path, workflow_config):
     """Notebook branch entries pass both independent names through to captured code."""
-    from skyulf.integrations.databricks.branch_notebook import _branch_config
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import _branch_config
 
     source = tmp_path / "src"
     source.mkdir()
@@ -223,8 +223,8 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
     if transport == "mlflow":
         pytest.importorskip("mlflow")
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_retraining import (
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
         LocalTrainingSpec,
         split_labeled_snapshot,
     )
@@ -301,8 +301,8 @@ def _log_model(tmp_path):
     """Exercise the actual MLflow artifact packaging and fresh-process pyfunc loader."""
     import mlflow
 
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
     with track_run(

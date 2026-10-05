@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.bundle import build_bundle, save_bundle
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -49,7 +49,7 @@ def _config(path, **changes):
 
 def test_config_load_is_immutable_and_offline(tmp_path, monkeypatch) -> None:
     """Reading SDK config must never resolve aliases or mutate a workspace."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     monkeypatch.setattr(registry, "resolve_model", lambda *a, **k: pytest.fail("remote call"))
     config = _config(tmp_path / "local")
@@ -108,7 +108,7 @@ def test_changed_in_memory_pipeline_contract_is_reported(tmp_path) -> None:
 
 def test_registry_requires_explicit_remote_preparation(tmp_path, monkeypatch) -> None:
     """Local preflight must describe missing registry evidence without contacting MLflow."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     monkeypatch.setattr(registry, "resolve_model", lambda *a, **k: pytest.fail("remote call"))
     config = _config(
@@ -169,7 +169,7 @@ def test_optional_probe_reports_real_prediction_incompatibility(tmp_path) -> Non
 
 def test_registry_alias_is_resolved_once_and_passed_as_a_version(tmp_path, monkeypatch) -> None:
     """A moving alias cannot change the artifact selected inside one preparation."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     _, artifact = _artifact(tmp_path)
     calls = []
@@ -205,7 +205,7 @@ def test_registry_alias_is_resolved_once_and_passed_as_a_version(tmp_path, monke
 
 def test_remote_read_failure_returns_actionable_preflight_issue(tmp_path, monkeypatch) -> None:
     """A registry denial must be distinguishable from a local model mismatch."""
-    from skyulf.integrations.mlflow import registry
+    from skyulf.integrations.mlflow.registration import registry
 
     def denied(*args, **kwargs):
         """Simulate read-only MLflow access being rejected by the registry."""

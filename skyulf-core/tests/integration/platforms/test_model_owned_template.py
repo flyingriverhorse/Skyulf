@@ -22,8 +22,8 @@ def test_single_ensemble_questions_materialize_model_owned_settings(tmp_path, ta
     """Bundle selections must become visible editable params and selected-member search axes."""
     from test_databricks_bundle_generation import _generate_project
 
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     suffix = "classifier" if task == "classification" else "regressor"
     project = _generate_project(
@@ -67,9 +67,9 @@ def test_generated_mixed_branches_fit_and_score_heldout_without_edits(tmp_path, 
 
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_evaluation import evaluate_local_holdout
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     choices = [
         ("regression", "ridge_regression"),

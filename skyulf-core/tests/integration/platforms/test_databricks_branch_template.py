@@ -110,7 +110,9 @@ def _project(tmp_path, workflow_config):
 
 def test_branch_loader_preserves_independent_recipes_and_bindings(tmp_path, workflow_config):
     """Different targets must retain their model, source package and active deployment suffix."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
 
     values, _ = _project(tmp_path, workflow_config)
     before = Path(values["config_path"]).read_text()
@@ -130,7 +132,9 @@ def test_branch_loader_preserves_independent_recipes_and_bindings(tmp_path, work
 @pytest.mark.parametrize("change", [{"promotion_policy": "automatic"}, {"score_handoff": "always"}])
 def test_branch_loader_rejects_unsupported_policies(tmp_path, workflow_config, change):
     """Multi-target training must never silently enable promotion or scoring."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
 
     values, _ = _project(tmp_path, workflow_config)
     path = Path(values["config_path"])
@@ -145,7 +149,9 @@ def test_branch_loader_rejects_unsupported_policies(tmp_path, workflow_config, c
 )
 def test_branch_notebook_rejects_repairs_and_operator_actions(tmp_path, workflow_config, change):
     """An unsupported invocation must fail before editable code or cloud services execute."""
-    from skyulf.integrations.databricks.branch_notebook import run_branch_training_notebook
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        run_branch_training_notebook,
+    )
 
     values, _ = _project(tmp_path, workflow_config)
     values.update(change)
@@ -235,8 +241,10 @@ def test_generated_branches_validate_with_either_base_task(tmp_path, workflow_co
     """Selected branches must clear inherited policies and validate ordinary and ensemble models."""
     from test_databricks_bundle_generation import _generate_project
 
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     values, _ = _project(tmp_path, workflow_config)
     project = _generate_project(
@@ -293,7 +301,9 @@ def test_generated_branches_validate_with_either_base_task(tmp_path, workflow_co
 )
 def test_branch_loader_rejects_escaping_bindings(tmp_path, workflow_config, field, value, match):
     """Overlays must not escape deployment model ownership or the synced project."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
 
     values, entries = _project(tmp_path, workflow_config)
     selected = entries["revenue"] if field == "features_path" else entries["revenue"]["workflow"]
@@ -309,8 +319,11 @@ def test_branch_notebook_passes_resolved_configs_to_service(
     tmp_path, workflow_config, monkeypatch, explanations
 ):
     """The real notebook adapter must prepare once, pass all components and display escaped output."""
-    from skyulf.integrations.databricks import job_runtime, local_branches
-    from skyulf.integrations.databricks.branch_notebook import run_branch_training_notebook
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        run_branch_training_notebook,
+    )
+    from skyulf.integrations.databricks.training import local_branches
 
     values, entries = _project(tmp_path, workflow_config)
     if explanations:

@@ -12,7 +12,7 @@ mlflow = pytest.importorskip("mlflow")
 from test_mlflow_promotion import _promote, _stage, case  # noqa: F401 - pytest fixture registration
 
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-from skyulf.integrations.mlflow import registry
+from skyulf.integrations.mlflow.registration import registry
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -76,7 +76,7 @@ def test_resolve_uses_bound_registry_transport(
 @pytest.mark.parametrize("operation", ["stage", "promote", "rollback"])
 def test_refused_first_alias_write_can_be_retried(case, monkeypatch, operation):
     """A verified permission refusal must not leave a pending marker blocking later promotion."""
-    from skyulf.integrations.mlflow import promotion
+    from skyulf.integrations.mlflow.lifecycle import promotion
 
     client, _, name, _, _, _ = case
     if operation != "stage":
@@ -115,7 +115,7 @@ def test_refused_first_alias_write_can_be_retried(case, monkeypatch, operation):
 
 def test_failed_refusal_cleanup_keeps_pending_state(case, monkeypatch):
     """A registry cleanup failure remains explicitly uncertain instead of allowing unsafe retry."""
-    from skyulf.integrations.mlflow import promotion
+    from skyulf.integrations.mlflow.lifecycle import promotion
 
     client, _, name, _, _, _ = case
     _stage(case)

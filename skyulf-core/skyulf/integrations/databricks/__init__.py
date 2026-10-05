@@ -1,9 +1,14 @@
 """Optional Databricks batch and Delta integrations."""
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .batch import BatchResult, BatchSpec, run_batch
-from .local_batch import (
+# Keep old module imports available without loading every runtime component.
+__path__ = [*__path__, str(Path(__file__).with_name("_compat"))]
+
+from .data.training.training_dates import TrainingDateSpec
+from .scoring.batch.batch import BatchResult, BatchSpec, run_batch
+from .scoring.batch.local_batch import (
     LocalScoreResult,
     LocalSourceSpec,
     evaluate_local_holdout,
@@ -11,16 +16,12 @@ from .local_batch import (
     read_local_source,
     score_local_source,
 )
-from .local_incremental import IncrementalBatchResult, run_incremental_local_batch
-from .local_publish import run_local_batch
-from .local_retraining import (
-    LocalCandidateResult,
-    LocalTrainingSpec,
-    read_training_snapshot,
-    split_labeled_snapshot,
-    train_local_candidate,
+from .scoring.incremental.local_incremental import (
+    IncrementalBatchResult,
+    run_incremental_local_batch,
 )
-from .local_sdk import (
+from .scoring.local_publish import run_local_batch
+from .scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -32,10 +33,16 @@ from .local_sdk import (
     preflight_local,
     prepare_local_workflow,
 )
-from .training_dates import TrainingDateSpec
+from .training.fitting.local_retraining import (
+    LocalCandidateResult,
+    LocalTrainingSpec,
+    read_training_snapshot,
+    split_labeled_snapshot,
+    train_local_candidate,
+)
 
 if TYPE_CHECKING:
-    from .local_branches import (
+    from .training.local_branches import (
         BranchTrainingResult,
         TrainingBranch,
         branch_training_payload,
@@ -58,7 +65,7 @@ def __getattr__(name: str) -> Any:
     """Load training orchestration only after low-level alias imports have finished."""
     if name not in _BRANCH_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from . import local_branches  # noqa: PLC0415 - avoid promotion/admission import cycle
+    from .training import local_branches  # noqa: PLC0415 - avoid promotion/admission import cycle
 
     value = getattr(local_branches, name)
     globals()[name] = value

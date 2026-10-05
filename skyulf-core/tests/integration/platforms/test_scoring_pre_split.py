@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from skyulf.inference.project_scoring import run_project_scoring
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 
 TEMPLATE = (
     Path(__file__).resolve().parents[3]
@@ -236,7 +236,7 @@ def test_saved_reused_custom_filter_loads_in_fresh_process(tmp_path, engine, mod
     import sys
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     config = _project(tmp_path, engine=engine, mode=mode)
     root = tmp_path / "features"
@@ -287,9 +287,12 @@ def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engin
     """The real candidate recipe applies a non-idempotent replacement exactly once per prediction."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_scoring import score_local_pipeline
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_retraining import LocalTrainingSpec, candidate_config
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
+        LocalTrainingSpec,
+        candidate_config,
+    )
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     steps = [
         {

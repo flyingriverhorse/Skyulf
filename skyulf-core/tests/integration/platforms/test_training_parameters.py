@@ -11,13 +11,13 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_retraining import LocalTrainingSpec
-from skyulf.integrations.databricks.training_parameters import (
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+from skyulf.integrations.databricks.training.shared.training_parameters import (
     _parameter_value,
     log_training_parameters,
 )
-from skyulf.integrations.mlflow.tracking import TrackingRun
+from skyulf.integrations.mlflow.runs.tracking import TrackingRun
 
 
 @pytest.fixture

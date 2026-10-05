@@ -149,6 +149,16 @@ class SimpleImputerApplier(BaseApplier):
             config_match=(("strategy", strategy),),
         )
         for strategy in ("mean", "constant")
+    )
+    + (
+        ExecutionCapability(
+            "pandas",
+            "apply",
+            "python_batch",
+            "preserve",
+            "row",
+            config_match=(("strategy", "most_frequent"),),
+        ),
     ),
 )
 @node_meta(

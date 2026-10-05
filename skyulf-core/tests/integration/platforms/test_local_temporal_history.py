@@ -14,7 +14,7 @@ from skyulf.inference.local_pipeline import (
     predict_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.databricks.local_history import (
+from skyulf.integrations.databricks.scoring.incremental.local_history import (
     bind_period_history,
     history_receipt,
     incremental_history,
@@ -103,8 +103,8 @@ def test_mlflow_roundtrip_keeps_temporal_seed_and_continuation(tmp_path, monkeyp
     mlflow = pytest.importorskip("mlflow")
     import tempfile
 
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))

@@ -74,7 +74,7 @@ def fit_fixture(width, directory, model_prefix):
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.bundle import build_bundle
     from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-    from skyulf.integrations.mlflow.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
     from skyulf.pipeline import SkyulfPipeline
 
     columns = tuple(f"x{i}" for i in range(width))
@@ -227,7 +227,7 @@ def score_frame(spark, frame, fixture, mode, batch_rows, env_manager):
     """Use the public distributed routes without benchmark-specific scoring shortcuts."""
     from skyulf.core.execution import ExecutionOptions, FrameSpec
     from skyulf.inference.spark import predict_spark
-    from skyulf.integrations.mlflow.spark_model import predict_spark_pyfunc
+    from skyulf.integrations.mlflow.spark.spark_model import predict_spark_pyfunc
 
     if mode == "pyfunc":
         return predict_spark_pyfunc(
@@ -372,7 +372,7 @@ def run_benchmark(spark, dbutils):
     """Run the finite matrix and retain partial evidence even when a case fails."""
     import mlflow
 
-    from skyulf.integrations.mlflow.spark_model import runtime_source_digest
+    from skyulf.integrations.mlflow.spark.spark_model import runtime_source_digest
 
     dbutils.widgets.text("schema", "workspace.skyulf_sm58_20261005")
     dbutils.widgets.text("experiment", "/Shared/skyulf-sm58-20261005")

@@ -3,7 +3,9 @@
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import job_runtime, local_retraining, local_workflow
+from skyulf.integrations.databricks.jobs.shared import job_runtime
+from skyulf.integrations.databricks.lifecycle import local_workflow
+from skyulf.integrations.databricks.training.fitting import local_retraining
 
 mlflow = pytest.importorskip("mlflow")
 

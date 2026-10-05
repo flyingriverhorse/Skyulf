@@ -5,8 +5,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks import spark_monitoring_reference as reference
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.spark import (
+    spark_monitoring_reference as reference,
+)
 
 
 def test_reference_read_uses_prepared_snapshot_and_rejects_different_artifact(monkeypatch):

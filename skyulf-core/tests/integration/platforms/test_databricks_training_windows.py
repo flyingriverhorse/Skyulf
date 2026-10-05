@@ -6,14 +6,17 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.local_retraining import split_labeled_snapshot
-from skyulf.integrations.databricks.local_workflow import resolve_training_spec, training_spec
+from skyulf.integrations.databricks.lifecycle.local_workflow import (
+    resolve_training_spec,
+    training_spec,
+)
+from skyulf.integrations.databricks.training.fitting.local_retraining import split_labeled_snapshot
 
 
 @pytest.mark.parametrize("version", [None, 0, 7])
 def test_train_resolves_latest_only_when_version_is_unset(version):
     """A trigger must never override an explicit snapshot or require a second action."""
-    from skyulf.integrations.databricks.local_workflow import resolve_training_spec
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_training_spec
 
     spark = _spark()
     spec = resolve_training_spec(
@@ -25,7 +28,7 @@ def test_train_resolves_latest_only_when_version_is_unset(version):
 
 def test_train_preserves_explicit_result_cutoff():
     """An explicit maturity cutoff must survive both manual and cron invocations."""
-    from skyulf.integrations.databricks.local_workflow import resolve_training_spec
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_training_spec
 
     spec = resolve_training_spec(
         _spark(),

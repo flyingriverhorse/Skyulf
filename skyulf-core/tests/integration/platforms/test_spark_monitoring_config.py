@@ -2,7 +2,7 @@
 
 import pytest
 
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
 
 
 def fields():
@@ -38,7 +38,7 @@ def test_spark_requires_explicit_reference_store_and_valid_engine():
 
 def test_spark_enrollment_budget_is_independent_of_training_and_scoring():
     """Large scoring allowances cannot become monitoring driver-transfer allowances."""
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
     )
 

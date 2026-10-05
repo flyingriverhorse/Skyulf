@@ -48,7 +48,8 @@
 {{$indent}}    "tune_threshold": {{template "python_value" (index $v (printf "%ssearch_tune_threshold" $p))}},
 {{if or (eq $strategy "grid") (eq $strategy "halving_grid")}}{{$indent}}    "max_candidates": {{index $v (printf "%ssearch_max_candidates" $p)}},
 {{end -}}
-{{$indent}}    "timeout": {{if and (eq $strategy "optuna") $custom}}{{template "python_value" (index $v (printf "%ssearch_timeout" $p))}}{{else}}None{{end}},
+{{if and (eq $strategy "optuna") $custom (ne (index $v (printf "%ssearch_timeout" $p)) "null")}}{{$indent}}    "timeout": {{template "python_value" (index $v (printf "%ssearch_timeout" $p))}},
+{{end -}}
 {{$indent}}    "strategy_params": {{if and $halving $custom}}{
 {{$indent}}        "factor": {{index $v (printf "%ssearch_factor" $p)}},
 {{$indent}}        "resource": "{{$resource}}",

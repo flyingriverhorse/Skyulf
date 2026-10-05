@@ -12,7 +12,9 @@ from scipy.stats import ks_2samp
 )
 def test_exact_small_ks_probability(reference, current):
     """The bounded count-only lattice calculation matches scipy's exact two-sided gate."""
-    module = importlib.import_module("skyulf.integrations.databricks.spark_monitoring_drift")
+    module = importlib.import_module(
+        "skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift"
+    )
     expected = ks_2samp(reference, current)
     evidence = module._ks_evidence(float(expected.statistic), len(reference), len(current))
     assert evidence.p_value == pytest.approx(expected.pvalue)
@@ -23,8 +25,12 @@ def test_numeric_drift_effect_parity(spark):
     """Distributed CDF integration and reference quantile bins retain Core effect values."""
     import polars as pl
 
-    from skyulf.integrations.databricks.monitoring_metrics import _drift_evidence
-    from skyulf.integrations.databricks.spark_monitoring_drift import drift_evidence
+    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+        _drift_evidence,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        drift_evidence,
+    )
 
     reference = pd.DataFrame({"x": [float(index) for index in range(40)]})
     current = pd.DataFrame({"x": [float(index + 30) for index in range(40)]})
@@ -43,7 +49,10 @@ def test_numeric_drift_effect_parity(spark):
 
 def test_inconclusive_bound_is_unavailable():
     """A conservative probability bound that cannot reject must never imply healthy evidence."""
-    from skyulf.integrations.databricks.spark_monitoring_drift import _correct_results, _ks_evidence
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (
+        _correct_results,
+        _ks_evidence,
+    )
     from skyulf.profiling.drift import ColumnDrift
 
     evidence = _ks_evidence(0.001, 2000, 2000)
@@ -57,7 +66,7 @@ def test_missing_input_requires_saved_prediction(spark):
     """Stable training missingness is accepted only for rows the model actually scored."""
     from datetime import UTC, datetime
 
-    from skyulf.integrations.databricks.spark_monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
         build_spark_monitoring_report,
     )
 

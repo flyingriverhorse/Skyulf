@@ -8,9 +8,14 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig, json_digest
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
-from skyulf.integrations.databricks.retraining_task import observation_decision
+from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import observation_decision
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+    MonitorConfig,
+    json_digest,
+)
 
 
 def measured(engine, reference, current):

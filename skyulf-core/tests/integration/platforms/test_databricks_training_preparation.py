@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks import local_workflow as workflow
+from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
 
 
 def _config(engine, policy, version):

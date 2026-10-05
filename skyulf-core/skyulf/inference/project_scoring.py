@@ -137,7 +137,7 @@ def validate_scoring_config(config: Any, source: str) -> dict[str, Any]:
         raise ValueError("Scoring configuration requires eligibility and outputs lists.")
     module = load_project_module(source)
     if "pre_split" in config:
-        from ..integrations.databricks.scoring_pre_split import (  # noqa: PLC0415
+        from ..integrations.databricks.scoring.shared.scoring_pre_split import (  # noqa: PLC0415
             validate_pre_split_scoring,
         )
 
@@ -189,7 +189,7 @@ def _scoring_eligibility(
     """Evaluate pre-split first, then custom checks only on its original surviving inputs."""
     if "pre_split" not in config:
         return _eligibility(frame, config, module)
-    from ..integrations.databricks.scoring_pre_split import (  # noqa: PLC0415
+    from ..integrations.databricks.scoring.shared.scoring_pre_split import (  # noqa: PLC0415
         pre_split_exclusion_reasons,
     )
 

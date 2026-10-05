@@ -10,18 +10,18 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks._lifecycle_data import load_frame, save_frame
-from skyulf.integrations.databricks.job_output import _nested_search_output
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.jobs.shared.job_output import _nested_search_output
+from skyulf.integrations.databricks.lifecycle._lifecycle_data import load_frame, save_frame
+from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     _materialize_training_rows,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.local_search_results import tuning_evidence
-from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.local_search_results import tuning_evidence
 
 
 def _search():

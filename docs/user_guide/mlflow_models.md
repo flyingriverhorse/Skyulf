@@ -1,5 +1,19 @@
 # MLflow model packaging (development)
 
+## Library layout and compatibility
+
+MLflow implementation lives under `skyulf.integrations.mlflow`: `models` owns
+pyfunc adapters, `spark` owns distributed prediction and worker environments,
+`lifecycle` owns validation and champion/challenger decisions, `registration`
+owns registry resolution, and `runs` owns tracking. Shared client, signature and
+nullable transport helpers live in `shared`.
+
+Use these grouped paths in new code. Released flat import paths remain available
+through lazy `_compat` aliases, including classes referenced in saved models.
+The root still exports `TrackingConfig`, `TrackingRun` and `track_run` without
+loading the optional MLflow dependency. Worker wheels and source certificates
+continue to cover the entire `skyulf` package.
+
 ## Fitted local pipelines (pandas or Polars)
 
 Use a **local pipeline artifact** when fitted preprocessing contains nodes that
@@ -19,7 +33,7 @@ from skyulf.inference.local_pipeline import (
     save_local_pipeline,
 )
 from skyulf.integrations.mlflow import TrackingConfig, track_run
-from skyulf.integrations.mlflow.local_model import log_local_model
+from skyulf.integrations.mlflow.models.local_model import log_local_model
 
 # fitted_pipeline was already trained on pandas or Polars data.
 save_local_pipeline(fitted_pipeline, "artifacts/local-pipeline")
@@ -68,7 +82,7 @@ columns keep numeric signatures and do not need this string transport.
 Use the public helper with a loaded model:
 
 ```python
-from skyulf.integrations.mlflow.local_model import prepare_pyfunc_input
+from skyulf.integrations.mlflow.models.local_model import prepare_pyfunc_input
 
 loaded = mlflow.pyfunc.load_model(model_uri)
 # raw_frame contains the original, typed values expected by this artifact.
@@ -172,7 +186,7 @@ import mlflow
 
 from skyulf.inference.bundle import build_bundle
 from skyulf.integrations.mlflow import TrackingConfig, track_run
-from skyulf.integrations.mlflow.model import log_model
+from skyulf.integrations.mlflow.models.model import log_model
 
 bundle = build_bundle(
     fitted_pipeline,

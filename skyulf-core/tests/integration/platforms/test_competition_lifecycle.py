@@ -41,7 +41,7 @@ def _competition(config, engine="pandas"):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_only_winner_registered_after_shared_cv(staged, engine):
     """The heldout population cannot select losers or create their registry versions."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     _, client, config, _, _ = staged
     _competition(config, engine)
@@ -80,7 +80,7 @@ def test_only_winner_registered_after_shared_cv(staged, engine):
 
 def test_failed_candidate_prevents_registration(staged, monkeypatch):
     """A partial competition must never silently register its successful candidate."""
-    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     _, client, config, _, _ = staged
     _competition(config)
@@ -127,7 +127,7 @@ def test_shap_competition_preserves_winner_and_child_reports(staged):
 
 def test_cv_required_before_reading_source(staged, monkeypatch):
     """Competition cannot rank candidates by the independent final holdout."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     _, client, config, _, _ = staged
     _competition(config)
@@ -237,7 +237,7 @@ def test_mixed_model_families_and_search_strategies_register_one_winner(
 
 def test_winner_quality_failure_never_evaluates_runner_up(staged, monkeypatch):
     """A failed winner gate must leave the champion untouched without trying another candidate."""
-    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     _, client, config, _, frame = staged
     frame["target"] += [0, 2] * 10
@@ -286,8 +286,8 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
 
     from skyulf.inference.local_pipeline import predict_local_pipeline
     from skyulf.inference.project_scoring import run_project_scoring
-    from skyulf.integrations.databricks.project import load_project_workflow
-    from skyulf.integrations.mlflow.registry import load_run_local_pipeline
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
 
     _, client, config, _, frame = staged
     _competition(config, "polars")
@@ -374,8 +374,8 @@ def _register_in_fresh_process(tmp_path, config, frame, reference):
     code = (
         "import json, sys, pandas as pd\n"
         "from pathlib import Path\n"
-        "from skyulf.integrations.databricks import local_retraining\n"
-        "from skyulf.integrations.databricks.lifecycle_tasks import LifecycleContext, run_lifecycle_phase\n"
+        "from skyulf.integrations.databricks.training import local_retraining\n"
+        "from skyulf.integrations.databricks.jobs.lifecycle.lifecycle_tasks import LifecycleContext, run_lifecycle_phase\n"
         "frame=pd.read_json(sys.argv[1], orient='table')\n"
         "local_retraining.read_training_snapshot=lambda spark,spec: frame.copy()\n"
         "reference=json.loads(Path(sys.argv[2]).read_text())\n"

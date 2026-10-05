@@ -21,13 +21,13 @@ from skyulf.inference.local_pipeline import (
 from skyulf.pipeline import SkyulfPipeline
 
 mlflow = pytest.importorskip("mlflow")
-from skyulf.integrations.mlflow.local_model import log_local_model  # noqa: E402
-from skyulf.integrations.mlflow.registry import (  # noqa: E402
+from skyulf.integrations.mlflow.models.local_model import log_local_model  # noqa: E402
+from skyulf.integrations.mlflow.registration.registry import (  # noqa: E402
     load_registered_local_pipeline,
     register_model,
     resolve_model,
 )
-from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run  # noqa: E402
+from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -135,7 +135,7 @@ def test_local_pyfunc_matches_saved_categorical_pipeline(
         saved.reset_index(drop=True),
     )
 
-    from skyulf.integrations.databricks.local_sdk import (  # noqa: PLC0415 - integration boundary
+    from skyulf.integrations.databricks.scoring.local_sdk import (  # noqa: PLC0415 - integration boundary
         InputSource,
         LocalWorkflowConfig,
         ModelSelection,

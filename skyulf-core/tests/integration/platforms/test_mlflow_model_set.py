@@ -13,21 +13,24 @@ import polars as pl
 import pytest
 
 mlflow = pytest.importorskip("mlflow")
-from skyulf.integrations.mlflow.model_set import (  # noqa: E402
-    SkyulfModelSetPythonModel,
-    load_registered_model_set,
-    log_model_set,
-)
-from skyulf.integrations.mlflow.model_set_lifecycle import (  # noqa: E402
+from skyulf.integrations.mlflow.lifecycle.model_set_lifecycle import (  # noqa: E402
     approve_model_set,
     rollback_model_set,
 )
-from skyulf.integrations.mlflow.promotion import (  # noqa: E402
+from skyulf.integrations.mlflow.lifecycle.promotion import (  # noqa: E402
     AliasConflictError,
     AliasOutcomeUnknownError,
     LocalAliasAdmission,
 )
-from skyulf.integrations.mlflow.registry import register_model, resolve_model  # noqa: E402
+from skyulf.integrations.mlflow.models.model_set import (  # noqa: E402
+    SkyulfModelSetPythonModel,
+    load_registered_model_set,
+    log_model_set,
+)
+from skyulf.integrations.mlflow.registration.registry import (  # noqa: E402
+    register_model,
+    resolve_model,
+)
 
 
 def test_unloaded_model_set_fails_without_context() -> None:
@@ -38,7 +41,7 @@ def test_unloaded_model_set_fails_without_context() -> None:
 
 def test_set_challenger_history_rejection_and_approval(registered_sets):
     """Displaced and rejected contenders remain inspectable without partial set activation."""
-    from skyulf.integrations.mlflow.model_set_challenger import (
+    from skyulf.integrations.mlflow.lifecycle.model_set_challenger import (
         nominate_model_set,
         reject_model_set,
     )
@@ -92,7 +95,7 @@ def test_set_nomination_is_cleared_on_activation_and_rollback_preserves_new_cand
     registered_sets,
 ):
     """Champion activation removes its challenger alias and rollback preserves unrelated contenders."""
-    from skyulf.integrations.mlflow.model_set_challenger import nominate_model_set
+    from skyulf.integrations.mlflow.lifecycle.model_set_challenger import nominate_model_set
 
     client, uri, versions, query, admission = registered_sets
     options = {"admission": admission, "tracking_uri": uri, "registry_uri": uri}
@@ -266,7 +269,7 @@ def test_model_set_package_loads_in_fresh_process(registered_sets, tmp_path) -> 
 def test_explicit_set_activation_replacement_and_rollback(registered_sets) -> None:
     """One durable set champion switches and restores complete validated releases."""
     client, uri, versions, query, admission = registered_sets
-    from skyulf.integrations.mlflow.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
 
     artifact = load_registered_model_set(versions[0], tracking_uri=uri, registry_uri=uri)
     run_id = client.get_model_version("coherent", "1").run_id
@@ -464,7 +467,7 @@ def test_every_component_and_rule_must_be_exercised(
 
 def _capture_composition(tmp_path, source, pins):
     """Capture the same organized project dependency contract as the project adapter."""
-    from skyulf.integrations.databricks.model_set_project import capture_set_composition
+    from skyulf.integrations.databricks.model_sets.model_set_project import capture_set_composition
 
     project = tmp_path / "composition_project"
     package = project / "src" / "composition"
@@ -510,7 +513,7 @@ def test_composition_only_dependency_is_in_logged_requirements(registered_sets, 
 
 def test_composition_pin_conflicts_with_component_runtime(registered_sets, tmp_path) -> None:
     """Pin aggregation must reject contradictory component and composition dependencies."""
-    from skyulf.integrations.mlflow.model_set import _set_requirements
+    from skyulf.integrations.mlflow.models.model_set import _set_requirements
 
     _, uri, versions, _, _ = registered_sets
     artifact = load_registered_model_set(versions[0], tracking_uri=uri, registry_uri=uri)

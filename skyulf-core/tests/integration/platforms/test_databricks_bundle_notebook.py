@@ -25,7 +25,7 @@ def test_notebook_rejects_invalid_project_before_registry_or_writes(
     tmp_path, monkeypatch, workflow_config, change, entrypoint
 ):
     """Config and deployed graph mismatch must fail before any data or alias side effect."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     config_path = tmp_path / "workflow.json"
     config_path.write_text(json.dumps({**workflow_config, **change}))
@@ -56,7 +56,7 @@ def test_notebook_delegates_bound_target_and_selected_action(
     tmp_path, monkeypatch, workflow_config, engine, action
 ):
     """All widget actions must use the public library while preserving engine and target binding."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     inherited_action = (
         action.removeprefix("score_from_") if action.startswith("score_from_") else None
@@ -200,7 +200,7 @@ def test_score_notebook_retains_override_guards_when_removing_parent_evidence(
     tmp_path, monkeypatch, workflow_config, override, entrypoint
 ):
     """Filtering inherited approval inputs must not hide attempts to override the fixed role."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     config_path = tmp_path / "workflow.json"
     config_path.write_text(

@@ -188,7 +188,7 @@ def _enable_asset_examples(root):
 
 def test_commented_asset_examples_work_when_enabled(tmp_path):
     """The inactive asset examples must run once a user follows their three steps."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path / "features"
     shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
@@ -223,7 +223,7 @@ def test_frequency_rejects_ambiguous_columns(columns):
 
 def _enabled_project(tmp_path):
     """Enable the two separate builders exactly as a generated-project user would."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path / "features"
     shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
@@ -277,7 +277,7 @@ def _configure(root, *, pre_split, preprocessing):
 @pytest.mark.parametrize("pre_split, preprocessing", [(False, False), (True, False), (False, True)])
 def test_custom_builders_use_inline_steps(tmp_path, pre_split, preprocessing):
     """The real parent recipes configure custom steps independently without a demo toggle."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path / "features"
     shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
@@ -296,8 +296,8 @@ def test_custom_steps_train_and_reload_without_editable_code(
     """The completeness filter, learned frequencies and saved package must compose end to end."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_retraining import (
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
         LocalTrainingSpec,
         split_labeled_snapshot,
     )
@@ -372,8 +372,8 @@ def _log_model(tmp_path):
     """Publish to a temporary local MLflow store through the real Core integration."""
     import mlflow
 
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
     with track_run(
@@ -392,7 +392,10 @@ def test_frequencies_are_relearned_inside_each_cv_fold(tmp_path, monkeypatch, en
     """Each validation partition must use only its own training category frequencies."""
     from sklearn.model_selection import KFold
 
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.local_cv import (
+        LocalCVSpec,
+        evaluate_training_cv,
+    )
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
 

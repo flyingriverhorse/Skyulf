@@ -41,7 +41,7 @@ def build_preprocessing():
 
 def _project(tmp_path, source_text=SOURCE, *, package=False):
     """Resolve the editable Python source into a normal Core pipeline config."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path
     if package:
@@ -62,7 +62,7 @@ def test_project_code_and_fitted_state_survive_without_the_project_file(tmp_path
     """Inference must use saved training code/state even after the project file changes."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     source_text = SOURCE
     if recipe == "custom_fixture":
@@ -115,7 +115,7 @@ print(json.dumps(predict_local_pipeline(pd.DataFrame({"x": [5., 6.]}), artifact)
 
 def test_project_rejects_two_preprocessing_sources(tmp_path):
     """A JSON chain cannot be silently replaced by the Python chain."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(SOURCE, encoding="utf-8")
@@ -127,7 +127,7 @@ def test_project_rejects_two_preprocessing_sources(tmp_path):
 
 def test_sibling_tuning_hook_overrides_search_space_and_pins_source(tmp_path):
     """A selected search may use the project's bounded candidate factory."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(SOURCE, encoding="utf-8")
@@ -167,7 +167,7 @@ def test_sibling_tuning_hook_overrides_search_space_and_pins_source(tmp_path):
 )
 def test_missing_or_none_tuning_hook_preserves_search_space(tmp_path, hook_source):
     """Projects without a candidate override retain normal Core search selection."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(SOURCE, encoding="utf-8")
@@ -200,7 +200,7 @@ def test_missing_or_none_tuning_hook_preserves_search_space(tmp_path, hook_sourc
 )
 def test_invalid_tuning_hook_fails_before_training(tmp_path, hook_source):
     """Malformed custom search output cannot silently enter Core search."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(SOURCE, encoding="utf-8")
@@ -221,7 +221,7 @@ def test_invalid_tuning_hook_fails_before_training(tmp_path, hook_source):
 
 def test_tuning_hook_is_bounded_and_ignored_for_ordinary_model(tmp_path):
     """Only new searches read the optional sibling and its full source budget."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(SOURCE, encoding="utf-8")
@@ -245,7 +245,10 @@ def test_tuning_hook_is_bounded_and_ignored_for_ordinary_model(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_project_custom_fit_is_repeated_inside_cv_folds(tmp_path, monkeypatch, engine):
     """Custom learned preprocessing must never reuse a full-data mean inside CV."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.local_cv import (
+        LocalCVSpec,
+        evaluate_training_cv,
+    )
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
 
@@ -283,9 +286,9 @@ def test_mlflow_custom_code_loads_in_a_fresh_process(tmp_path, monkeypatch, engi
     """The complete MLflow package must predict without access to the project source."""
     mlflow = pytest.importorskip("mlflow")
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
     config, source = _project(tmp_path, package=package)
@@ -330,7 +333,7 @@ def test_changed_packaged_source_is_rejected_before_import(tmp_path):
     """A damaged code snapshot cannot execute before its checksum is checked."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_pipeline import load_local_pipeline
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     config, _ = _project(tmp_path)
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [3.0, 5.0, 7.0]})
@@ -353,8 +356,8 @@ def test_changed_packaged_source_is_rejected_before_import(tmp_path):
 def test_two_saved_code_versions_keep_their_own_transformations(tmp_path):
     """Loading another model's same-named classes cannot replace the first model's code."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     source = tmp_path / "preprocessing.py"
@@ -408,7 +411,7 @@ def test_notebook_uses_editable_code_only_for_training(
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     path = tmp_path / "workflow.json"
     workflow_config["pipeline"]["preprocessing"] = []

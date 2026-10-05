@@ -24,8 +24,8 @@ from skyulf.inference.model_set import (  # noqa: E402
     save_model_set,
 )
 from skyulf.inference.model_set_scoring import predict_model_set  # noqa: E402
-from skyulf.integrations.mlflow import local_model  # noqa: E402
-from skyulf.integrations.mlflow.model_set import log_model_set  # noqa: E402
+from skyulf.integrations.mlflow.models import local_model  # noqa: E402
+from skyulf.integrations.mlflow.models.model_set import log_model_set  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
 
@@ -255,7 +255,7 @@ def test_nullable_model_set_and_fresh_process(tmp_path):
     wire = _prepare(query, model)
     pd.testing.assert_frame_equal(model.predict(wire), expected)
     query.to_pickle(tmp_path / "input.pkl")
-    script = "import sys,pandas as pd,mlflow\nfrom skyulf.integrations.mlflow.local_model import prepare_pyfunc_input\nm=mlflow.pyfunc.load_model(sys.argv[1])\nx=pd.read_pickle(sys.argv[2])\nm.predict(prepare_pyfunc_input(x,m)).to_pickle(sys.argv[3])\n"
+    script = "import sys,pandas as pd,mlflow\nfrom skyulf.integrations.mlflow.models.local_model import prepare_pyfunc_input\nm=mlflow.pyfunc.load_model(sys.argv[1])\nx=pd.read_pickle(sys.argv[2])\nm.predict(prepare_pyfunc_input(x,m)).to_pickle(sys.argv[3])\n"
     result = subprocess.run(
         [
             sys.executable,

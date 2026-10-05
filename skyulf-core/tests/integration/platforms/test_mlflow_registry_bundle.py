@@ -13,8 +13,8 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference.bundle import build_bundle, predict_local
 
 mlflow = pytest.importorskip("mlflow")
-from skyulf.integrations.mlflow import registry
-from skyulf.integrations.mlflow.model import log_model
+from skyulf.integrations.mlflow.models.model import log_model
+from skyulf.integrations.mlflow.registration import registry
 from skyulf.pipeline import SkyulfPipeline
 
 

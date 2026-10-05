@@ -19,7 +19,7 @@ from skyulf.inference.local_pipeline import (
     predict_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.mlflow.registry import load_local_package
+from skyulf.integrations.mlflow.registration.registry import load_local_package
 from skyulf.pipeline import SkyulfPipeline
 
 

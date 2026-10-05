@@ -22,7 +22,7 @@ import pytest
 )
 def test_phase_notebook_rejects_unsafe_context_before_loading_config(change):
     """Repairs and role overrides cannot get as far as model or registry side effects."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     execute = getattr(job_runtime, "run_lifecycle_notebook", None)
     assert callable(execute), "Fixed lifecycle notebook adapter is missing"
@@ -42,7 +42,8 @@ def test_phase_notebook_rejects_unsafe_context_before_loading_config(change):
 
 def test_downstream_notebook_uses_saved_reference_without_editable_config(monkeypatch):
     """Later tasks must use the prepared invocation even if editable files disappear."""
-    from skyulf.integrations.databricks import job_runtime, lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     reference = {
         "run_id": "abc",
@@ -88,7 +89,8 @@ def test_downstream_notebook_uses_saved_reference_without_editable_config(monkey
 @pytest.mark.parametrize("phase", ["compare_decide", "complete"])
 def test_first_candidate_notebook_renders_null_champion_metrics(monkeypatch, phase, caplog):
     """First-model reports must show quality and operator actions instead of JSON fallback."""
-    from skyulf.integrations.databricks import job_runtime, lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     candidate = {
         "model_name": "workspace.test.model",
@@ -157,7 +159,8 @@ def test_first_candidate_notebook_renders_null_champion_metrics(monkeypatch, pha
 @pytest.mark.parametrize("fails", [False, True])
 def test_completion_publishes_score_request_only_after_verified_result(monkeypatch, fails):
     """The ALL_DONE join must never emit a score request when finalization fails."""
-    from skyulf.integrations.databricks import job_runtime, lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     payload = {"action": "train", "result": {}, "score_requested": True}
     execute = Mock(return_value=SimpleNamespace(reference={"phase": "result"}, output=payload))
@@ -214,7 +217,7 @@ def test_completion_publishes_score_request_only_after_verified_result(monkeypat
 )
 def test_generated_notebooks_bind_their_own_phase_and_defer_exit(monkeypatch, filename, phase):
     """Normal job nodes preserve their phase and JSON result without requesting HTML."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     path = (
         Path(__file__).resolve().parents[3]
@@ -241,7 +244,7 @@ def test_generated_notebooks_bind_their_own_phase_and_defer_exit(monkeypatch, fi
 
 def test_phase_output_escapes_values_and_folds_technical_digests():
     """Useful counts stay visible while long proof fields remain in technical details."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     output = render_lifecycle_output(
         "train",
@@ -257,7 +260,7 @@ def test_phase_output_escapes_values_and_folds_technical_digests():
 @pytest.mark.parametrize("phase", ["compare", "decide", "compare_decide"])
 def test_phase_report_shows_comparison_and_actual_promotion_decision(phase):
     """Reviewers must see metrics and the alias decision without opening technical JSON."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     candidate = {
         "model_version": "3",
@@ -289,7 +292,7 @@ def test_phase_report_shows_comparison_and_actual_promotion_decision(phase):
 @pytest.mark.parametrize("phase", ["decide", "compare_decide"])
 def test_manual_review_report_does_not_imply_promotion(phase):
     """A candidate awaiting human approval must not look like a successful champion change."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     visible = render_lifecycle_output(
         phase,
@@ -309,7 +312,8 @@ def test_prepare_freezes_project_code_only_for_training(
     tmp_path, monkeypatch, workflow_config, action
 ):
     """Operator actions must remain usable after a project's editable Python changes."""
-    from skyulf.integrations.databricks import job_runtime, lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     path = tmp_path / "workflow.json"
     path.write_text(json.dumps(workflow_config), encoding="utf-8")
@@ -386,7 +390,8 @@ def test_prepare_freezes_project_code_only_for_training(
 )
 def test_notebook_rejects_mixed_graph_contract_before_execution(monkeypatch, phase, contract):
     """Partially regenerated notebooks must not execute with another graph's contract."""
-    from skyulf.integrations.databricks import job_runtime, lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     execute = Mock()
     monkeypatch.setattr(lifecycle_tasks, "run_lifecycle_phase", execute)

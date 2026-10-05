@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.mlflow import tracking
+from skyulf.integrations.mlflow.runs import tracking
 
 
 def test_experiment_creation_recovers_forced_race() -> None:

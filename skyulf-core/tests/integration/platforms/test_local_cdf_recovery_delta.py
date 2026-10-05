@@ -8,10 +8,13 @@ from tests.integration.platforms.test_local_delta_publish import (
     local_delta_case,  # noqa: F401 - shared fixture
 )
 
-from skyulf.integrations.databricks import local_incremental as batch
-from skyulf.integrations.databricks.cdf_recovery import CdfHistoryExpired, CdfRecoveryRequired
-from skyulf.integrations.databricks.delta import table_identity
-from skyulf.integrations.databricks.local_sdk import InputSource
+from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
+    CdfHistoryExpired,
+    CdfRecoveryRequired,
+)
+from skyulf.integrations.databricks.data.delta_io.delta import table_identity
+from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+from skyulf.integrations.databricks.scoring.local_sdk import InputSource
 
 
 @pytest.mark.parametrize("empty", [False, True])

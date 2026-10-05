@@ -16,9 +16,13 @@ from skyulf.inference.local_pipeline import (  # noqa: E402
     predict_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.mlflow import local_model  # noqa: E402
-from skyulf.integrations.mlflow.local_model import log_local_model  # noqa: E402
-from skyulf.integrations.mlflow.tracking import TrackingConfig, TrackingRun, track_run  # noqa: E402
+from skyulf.integrations.mlflow.models import local_model  # noqa: E402
+from skyulf.integrations.mlflow.models.local_model import log_local_model  # noqa: E402
+from skyulf.integrations.mlflow.runs.tracking import (  # noqa: E402
+    TrackingConfig,
+    TrackingRun,
+    track_run,
+)
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
 

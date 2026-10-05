@@ -10,7 +10,7 @@ import pytest
 @pytest.fixture
 def submission(monkeypatch):
     """Replace Delta IO with shared durable rows while exercising the submission protocol."""
-    from skyulf.integrations.databricks import retraining_requests as module
+    from skyulf.integrations.databricks.lifecycle import retraining_requests as module
 
     rows = {}
 
@@ -284,7 +284,7 @@ def test_invalid_submission_fails_before_cloud_access(submission, changes):
 
 def test_store_rejects_foreign_table_before_writes():
     """An unrelated table cannot be adopted as the durable retraining gate."""
-    from skyulf.integrations.databricks.retraining_requests import _RequestStore
+    from skyulf.integrations.databricks.lifecycle.retraining_requests import _RequestStore
 
     spark = Mock()
     spark.catalog.tableExists.return_value = True
@@ -296,8 +296,8 @@ def test_store_rejects_foreign_table_before_writes():
 
 def test_store_requires_serializable_isolation():
     """Snapshot isolation alone cannot serialize two first claims for the same job."""
-    from skyulf.integrations.databricks.monitoring_store import OWNER
-    from skyulf.integrations.databricks.retraining_requests import _RequestStore
+    from skyulf.integrations.databricks.lifecycle.retraining_requests import _RequestStore
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import OWNER
 
     spark = Mock()
     spark.catalog.tableExists.return_value = True
@@ -313,7 +313,7 @@ def test_store_requires_serializable_isolation():
 
 def test_store_claim_sql_cannot_replace_an_unresolved_intent(monkeypatch):
     """The job-wide conflict predicate must be enforced inside the Delta transaction."""
-    from skyulf.integrations.databricks import retraining_requests as module
+    from skyulf.integrations.databricks.lifecycle import retraining_requests as module
 
     store = object.__new__(module._RequestStore)
     store.spark = Mock()

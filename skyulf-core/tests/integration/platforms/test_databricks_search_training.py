@@ -12,10 +12,10 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks import local_retraining as training
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting import local_retraining as training
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
 
 def _search_model(task="regression", strategy="grid"):

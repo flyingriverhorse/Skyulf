@@ -27,7 +27,7 @@ def test_combined_rules_capture_uses_shared_features_only_during_training(
     tmp_path, workflow_config
 ):
     """New rules must be captured with the set while score configuration stays source-free."""
-    from skyulf.integrations.databricks.model_set_project import (
+    from skyulf.integrations.databricks.model_sets.model_set_project import (
         capture_set_rules,
         load_project_model_set,
     )
@@ -59,7 +59,7 @@ def test_combined_rules_capture_uses_shared_features_only_during_training(
 
 def test_output_view_bindings_cannot_escape_deployment(tmp_path, workflow_config):
     """Nested publication destinations must follow the same ownership policy as the table."""
-    from skyulf.integrations.databricks.model_set_project import load_project_model_set
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(
@@ -75,9 +75,9 @@ def test_source_correction_policy_reaches_the_score_notebook(
     """The deployed factory must pass correction permission to the actual batch service."""
     from tests.integration.platforms.test_model_set_batch import _saved_set
 
-    from skyulf.integrations.databricks import model_set_batch
-    from skyulf.integrations.databricks import model_set_project as module
-    from skyulf.integrations.mlflow import model_set
+    from skyulf.integrations.databricks.model_sets import model_set_batch
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.mlflow.models import model_set
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path, source_change_policy="rebuild_on_change")
@@ -101,9 +101,9 @@ def test_component_performance_policy_fails_before_scoring_write(
     tmp_path, workflow_config, monkeypatch, policy_name
 ):
     """Unknown component names and missing labels must fail before publishing predictions."""
-    from skyulf.integrations.databricks import model_set_batch
-    from skyulf.integrations.databricks import model_set_project as module
-    from skyulf.integrations.mlflow import model_set
+    from skyulf.integrations.databricks.model_sets import model_set_batch
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.mlflow.models import model_set
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path)
@@ -154,7 +154,7 @@ def test_component_performance_policy_fails_before_scoring_write(
 
 def test_set_factory_resolves_owned_names_and_preserves_legacy(tmp_path, workflow_config):
     """Existing projects remain train only until a factory explicitly returns a set."""
-    from skyulf.integrations.databricks.model_set_project import load_project_model_set
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values, _ = _project(tmp_path, workflow_config)
     assert load_project_model_set(values) is None
@@ -168,7 +168,7 @@ def test_set_factory_resolves_owned_names_and_preserves_legacy(tmp_path, workflo
 @pytest.mark.parametrize("name", ["other.models.set_dev", "workspace.models.set"])
 def test_set_factory_rejects_escaping_names(tmp_path, workflow_config, name):
     """A set cannot bypass catalog ownership or the active deployment suffix."""
-    from skyulf.integrations.databricks.model_set_project import load_project_model_set
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path, model_name=name)
@@ -181,8 +181,10 @@ def test_set_operator_never_loads_training_or_composition(
     tmp_path, workflow_config, monkeypatch, action
 ):
     """Saved-set operations must work after editable training and rule source disappear."""
-    from skyulf.integrations.databricks import model_set_project as module
-    from skyulf.integrations.databricks.branch_notebook import run_branch_training_notebook
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        run_branch_training_notebook,
+    )
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path)
@@ -201,8 +203,8 @@ def test_set_operator_never_loads_training_or_composition(
 def test_spark_approval_limits_only_functional_probe_after_global_key_check(monkeypatch):
     """Large inference populations must not become local model-set approval inputs."""
     from skyulf.inference import model_set_partition_safety
-    from skyulf.integrations.databricks import model_set_project as module
-    from skyulf.integrations.databricks import spark_scoring
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.databricks.scoring.batch import spark_scoring
 
     spark = Mock()
     artifact = SimpleNamespace(
@@ -242,7 +244,7 @@ def test_spark_approval_limits_only_functional_probe_after_global_key_check(monk
 def test_spark_approval_rejects_unsafe_set_before_source_access(monkeypatch):
     """Functional sampling is safe only for a certified partition-independent set."""
     from skyulf.inference import model_set_partition_safety
-    from skyulf.integrations.databricks import model_set_project as module
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
 
     spark = Mock()
     monkeypatch.setattr(
@@ -257,7 +259,7 @@ def test_spark_approval_rejects_unsafe_set_before_source_access(monkeypatch):
 
 def test_set_key_schema_accepts_only_portable_types():
     """Floating keys are unsuitable for stable joins and must fail before packaging."""
-    from skyulf.integrations.databricks.model_set_project import _record_key_schema
+    from skyulf.integrations.databricks.model_sets.model_set_project import _record_key_schema
 
     source = SimpleNamespace(dtypes=[("id", "bigint"), ("label", "string"), ("active", "boolean")])
     schema = _record_key_schema(source, ("id", "label", "active"))
@@ -268,7 +270,7 @@ def test_set_key_schema_accepts_only_portable_types():
 
 def test_approval_frame_pins_integer_version_and_saved_columns(monkeypatch):
     """Delta history rows must be unpacked before configuring versionAsOf."""
-    from skyulf.integrations.databricks import model_set_project as module
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
 
     spark = Mock()
     artifact = SimpleNamespace(
@@ -297,7 +299,7 @@ def test_component_tags_preserve_long_names_and_tuned_model_type(model_type):
     """Inspection tags must preserve full model names and identify the tuned base estimator."""
     from typing import Any, cast
 
-    from skyulf.integrations.databricks.model_set_project import _component_tags
+    from skyulf.integrations.databricks.model_sets.model_set_project import _component_tags
 
     name = "catalog." + "s" * 250 + ".revenue"
     branch = SimpleNamespace(
@@ -327,9 +329,12 @@ def test_completed_training_packages_original_registered_components(
     from test_local_branches import _configs, _data
 
     from skyulf.inference.model_set_scoring import predict_model_set
-    from skyulf.integrations.databricks import local_branches, local_retraining
-    from skyulf.integrations.databricks.model_set_project import package_training_model_set
-    from skyulf.integrations.mlflow.model_set import load_registered_model_set
+    from skyulf.integrations.databricks.model_sets.model_set_project import (
+        package_training_model_set,
+    )
+    from skyulf.integrations.databricks.training import local_branches
+    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.mlflow.models.model_set import load_registered_model_set
 
     store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
     client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
@@ -417,10 +422,10 @@ def test_score_entrypoint_pins_set_and_uses_saved_artifact(
 ):
     """Scoring must pin at most once and never reopen editable training or business code."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks import model_set_batch
-    from skyulf.integrations.databricks import model_set_project as module
-    from skyulf.integrations.mlflow import model_set
-    from skyulf.integrations.mlflow.registry import ResolvedModel
+    from skyulf.integrations.databricks.model_sets import model_set_batch
+    from skyulf.integrations.databricks.model_sets import model_set_project as module
+    from skyulf.integrations.mlflow.models import model_set
+    from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path)

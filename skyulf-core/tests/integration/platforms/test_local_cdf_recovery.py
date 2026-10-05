@@ -12,10 +12,10 @@ from tests.integration.platforms.test_cdf_recovery import StructuredError
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.integrations.databricks import local_incremental as batch
-from skyulf.integrations.databricks.admission import BatchConflictError
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.data.admission import BatchConflictError
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -336,7 +336,7 @@ def recovery_case(tmp_path, monkeypatch):
 
 def recovery_request(store):
     """Obtain the routed request from the real incremental execution boundary."""
-    from skyulf.integrations.databricks.cdf_recovery import CdfRecoveryRequired
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import CdfRecoveryRequired
 
     with pytest.raises(CdfRecoveryRequired) as failure:
         batch.run_incremental_local_batch(
@@ -437,7 +437,7 @@ def test_empty_full_snapshot_clears_predictions_and_commits_progress(recovery_ca
 
 def test_failed_recovery_write_keeps_prior_rows_and_receipt(recovery_case):
     """A retry after a failed transaction must use the unchanged pinned base state."""
-    from skyulf.integrations.databricks.delta import DeltaPublishError
+    from skyulf.integrations.databricks.data.delta_io.delta import DeltaPublishError
 
     store = recovery_case
     request = recovery_request(store)
@@ -474,7 +474,7 @@ def _use_temporal_model(store, tmp_path):
 @pytest.mark.parametrize("empty", [False, True])
 def test_temporal_recovery_rebuilds_carry_and_next_append(recovery_case, tmp_path, empty):
     """Full recovery must match fresh causal scoring and preserve the next increment's tail."""
-    from skyulf.integrations.databricks.local_history import incremental_history
+    from skyulf.integrations.databricks.scoring.incremental.local_history import incremental_history
 
     store = recovery_case
     _use_temporal_model(store, tmp_path)

@@ -21,11 +21,15 @@ from skyulf.inference._manifest import ColumnSpec
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
 from skyulf.inference.model_set import ComponentReference, save_model_set
 from skyulf.inference.model_set_scoring import score_model_set
-from skyulf.integrations.databricks import model_set_batch as batch
-from skyulf.integrations.databricks.admission import SingleWriterAdmission
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
-from skyulf.integrations.databricks.monitoring_output import render_drift_output
-from skyulf.integrations.mlflow.registry import ResolvedModel
+from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
+from skyulf.integrations.databricks.model_sets import model_set_batch as batch
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+    render_drift_output,
+)
+from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 from skyulf.pipeline import SkyulfPipeline
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"

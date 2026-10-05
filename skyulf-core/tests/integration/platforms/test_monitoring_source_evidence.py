@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.monitoring_source_evidence import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_source_evidence import (
     source_evidence,
     validate_source_evidence,
 )

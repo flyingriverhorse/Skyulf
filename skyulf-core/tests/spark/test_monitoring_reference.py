@@ -7,7 +7,9 @@ import pandas as pd
 
 def test_prepared_frame_preserves_all_null_source_type(spark):
     """An all-null training column must not become a NullType Delta column."""
-    from skyulf.integrations.databricks.spark_monitoring_reference import _prepared_frame
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_reference import (
+        _prepared_frame,
+    )
 
     original = spark.createDataFrame([(1, None)], "id long, optional string")
     frame = _prepared_frame(

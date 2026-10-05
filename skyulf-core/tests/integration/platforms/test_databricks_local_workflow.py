@@ -18,7 +18,7 @@ def test_training_failure_retains_once_selected_version_and_window(
     """Later clock and history changes cannot replace an invocation's persisted pin."""
     import mlflow
 
-    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     workflow = _workflow()
     config = _config()
@@ -89,14 +89,14 @@ def test_training_failure_retains_once_selected_version_and_window(
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     return local_workflow
 
 
 def _output():
     """Inspect output publication independently of notebook widgets."""
-    from skyulf.integrations.databricks import prediction_output
+    from skyulf.integrations.databricks.scoring.shared import prediction_output
 
     return prediction_output
 
@@ -420,7 +420,7 @@ def test_train_compares_pinned_champion_without_activation(monkeypatch, tmp_path
 def test_train_allows_first_model_but_propagates_registry_errors(monkeypatch):
     """Only a missing champion alias is a valid first-training condition."""
     workflow = _workflow()
-    from skyulf.integrations.mlflow.registry import RegistryModelNotFoundError
+    from skyulf.integrations.mlflow.registration.registry import RegistryModelNotFoundError
 
     def missing(*args, **kwargs):
         """Represent a registry without a champion alias."""

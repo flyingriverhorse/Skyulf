@@ -29,13 +29,19 @@ from ..preprocessing.imputation.simple import SimpleImputerApplier, SimpleImpute
 from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
 from ..registry import NodeRegistry
+from . import _partition_nodes as batch_nodes
 from .local_pipeline import LocalPipelineArtifact
 from .local_scoring import prediction_output_schema
 
-_APPLIERS = {"SimpleImputer": SimpleImputerApplier, "StandardScaler": StandardScalerApplier}
+_APPLIERS = {
+    "SimpleImputer": SimpleImputerApplier,
+    "StandardScaler": StandardScalerApplier,
+    **batch_nodes.APPLIERS,
+}
 _CALCULATORS = {
     "SimpleImputer": SimpleImputerCalculator,
     "StandardScaler": StandardScalerCalculator,
+    **batch_nodes.CALCULATORS,
 }
 _SKIPS = {
     "Deduplicate": DeduplicateApplier,
@@ -138,10 +144,10 @@ def _check_model(artifact: LocalPipelineArtifact) -> Any:
         raise _reject("model", "Custom or absent model estimator is unsupported.")
     _check_instance_methods(estimator)
     model, actual_applier, tuning_result = _model_parts(estimator)
-    applier = _MODELS.get(type(model))
+    applier = _MODELS.get(type(model)) or batch_nodes.xgboost_applier(model)
     if applier is None or type(actual_applier) is not applier:
         raise _reject(
-            "model", "Only exact LinearRegression/LogisticRegression models are admitted."
+            "model", "Only reviewed exact linear, logistic and XGBRegressor models are admitted."
         )
     _check_instance_methods(model)
     if vars(actual_applier):
@@ -202,6 +208,8 @@ def _check_step_identity(record: dict, config: dict) -> None:
     expected = _APPLIERS.get(node, _SKIPS.get(node))
     if expected is None or type(record["applier"]) is not expected:
         raise ValueError("Unknown node or unreviewed applier identity.")
+    if NodeRegistry.get_applier(node) is not expected:
+        raise ValueError("Unreviewed applier registration.")
     if vars(record["applier"]):
         raise ValueError("Custom applier instance state is unsupported.")
     if record["artifact"].get("history_mode") == "carry":
@@ -241,9 +249,17 @@ def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
         )
     if NodeRegistry.get_calculator(node) is not _CALCULATORS[node]:
         raise ValueError("Unreviewed calculator registration.")
-    state = validate_state(node, record["artifact"])
-    params = _resolved_config(node, record.get("params", {}), state)
-    recipe = _resolved_config(node, config.get("params", {}), state)
+    batch_only = node in batch_nodes.APPLIERS or (
+        node == "SimpleImputer" and record["artifact"].get("strategy") == "most_frequent"
+    )
+    state = (
+        batch_nodes.batch_state(node, record["artifact"])
+        if batch_only
+        else validate_state(node, record["artifact"])
+    )
+    resolve = batch_nodes.batch_config if batch_only else _resolved_config
+    params = resolve(node, record.get("params", {}), state)
+    recipe = resolve(node, config.get("params", {}), state)
     if _pack(params) != _pack(recipe):
         raise ValueError("Recipe configuration disagrees with fitted parameters.")
     require_capability(

@@ -8,18 +8,18 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.local_retraining import (
-    LocalTrainingSpec,
-    split_labeled_snapshot,
-)
-from skyulf.integrations.databricks.retraining_data import _row_counts
-from skyulf.integrations.databricks.spark_retraining_data import (
+from skyulf.integrations.databricks.data.training.retraining_data import _row_counts
+from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _assessment,
     _counts,
     _eligible,
     _overlay_weights,
     _pandas_source_types,
     _training_partition,
+)
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
+    LocalTrainingSpec,
+    split_labeled_snapshot,
 )
 
 
@@ -169,8 +169,8 @@ def test_nullable_large_integer_matches_materialized_source(spark):
 
 def test_prepared_temporal_source_uses_normalized_timestamp_rules(spark, monkeypatch):
     """Weight replay must not apply original string parsing to cached UTC timestamps."""
-    from skyulf.integrations.databricks import spark_retraining_data
-    from skyulf.integrations.databricks.training_dates import TrainingDateSpec
+    from skyulf.integrations.databricks.data.training import spark_retraining_data
+    from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
 
     start = datetime(2026, 1, 1, tzinfo=UTC)
     spec = _spec(

@@ -3,12 +3,16 @@
 
 import json
 
-from skyulf.integrations.databricks.monitoring_output import run_monitoring_report_notebook
+from skyulf.integrations.databricks.jobs.shared.notebook_diagnostics import notebook_task
+from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+    run_monitoring_report_notebook,
+)
 
 if __name__ == "__main__":
-    output = run_monitoring_report_notebook(
-        globals()["spark"], globals()["dbutils"], display_html=globals().get("displayHTML")
-    )
+    with notebook_task("monitoring_report", globals()["dbutils"]):
+        output = run_monitoring_report_notebook(
+            globals()["spark"], globals()["dbutils"], display_html=globals().get("displayHTML")
+        )
 
 # COMMAND ----------
 

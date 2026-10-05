@@ -17,7 +17,7 @@ def spark_request(**changes):
 
 def prepare(monkeypatch, receipt, *, values=None, recovery=False):
     """Expose notebook inputs and capture published task values without Databricks."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = values or settings()
@@ -130,8 +130,8 @@ def test_native_handoff_noop_keeps_late_label_observation(monkeypatch):
 
 def test_native_handoff_keeps_pinned_model_set_components(monkeypatch):
     """A shared physical batch must retain each component and the original parent version."""
-    from skyulf.integrations.databricks import model_set_project
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.model_sets import model_set_project
 
     receipt = spark_request()
     base = receipt.pop("config")

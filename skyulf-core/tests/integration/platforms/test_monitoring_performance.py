@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import monitoring_metrics
+from skyulf.integrations.databricks.observability.monitoring.local import monitoring_metrics
 
 
 def policy():
@@ -77,8 +77,12 @@ def test_policy_observes_completed_window_with_current_label_cutoff(monkeypatch)
     """Late labels must be evaluated after maturity against the original saved predictions."""
     from types import SimpleNamespace
 
-    from skyulf.integrations.databricks import monitoring_performance as performance
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring.local import (
+        monitoring_performance as performance,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     now = datetime(2026, 10, 5, 12, tzinfo=UTC)
     config = MonitorConfig(
@@ -159,7 +163,7 @@ def test_performance_retrain_mode_does_not_enable_drift():
     """Independent performance opt-in must reach shared guards without enabling drift."""
     import json
 
-    from skyulf.integrations.databricks.retraining_task import retraining_policy
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import retraining_policy
 
     result = retraining_policy(
         {"monitoring_performance_policies": json.dumps({"cat.models.model": policy()})}
@@ -186,8 +190,12 @@ def test_performance_only_failure_reaches_training_data_gate(
     """A healthy feature distribution must not mask measured performance degradation."""
     import json
 
-    from skyulf.integrations.databricks import retraining_data, retraining_task
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig, json_digest
+    from skyulf.integrations.databricks.data.training import retraining_data
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+        json_digest,
+    )
 
     now = datetime(2026, 10, 5, 12, tzinfo=UTC)
     config = MonitorConfig(
@@ -201,7 +209,9 @@ def test_performance_only_failure_reaches_training_data_gate(
         result_available_at_column="available",
         performance_policy=policy(),
     )
-    from skyulf.integrations.databricks.performance_policy import evaluate_performance
+    from skyulf.integrations.databricks.observability.monitoring.performance.performance_policy import (
+        evaluate_performance,
+    )
 
     current = {
         "model_version": "2",
@@ -257,8 +267,10 @@ def test_noop_without_new_commit_still_measures_mature_performance(monkeypatch):
     """A no-op must revisit delayed labels even without a new scoring manifest."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     config = MonitorConfig(
         environment="test",
@@ -298,7 +310,9 @@ def test_noop_without_new_commit_still_measures_mature_performance(monkeypatch):
 
 def test_population_identity_changes_when_label_table_is_replaced():
     """A same-name label replacement must not inherit a production baseline or failure streak."""
-    from skyulf.integrations.databricks.monitoring_performance import population_contract
+    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_performance import (
+        population_contract,
+    )
 
     original = {
         "source_table_id": "source",
@@ -315,8 +329,10 @@ def test_failed_observation_retains_unavailable_policy_window(monkeypatch):
     import json
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import monitoring
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     config = MonitorConfig(
         environment="test",

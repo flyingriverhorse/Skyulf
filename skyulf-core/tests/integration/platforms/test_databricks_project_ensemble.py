@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 
 
 def _project(tmp_path: Path, model_type: str = "voting_regressor") -> tuple[dict, Path]:

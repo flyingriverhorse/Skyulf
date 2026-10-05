@@ -12,8 +12,8 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
 
 def _package(root):
@@ -112,10 +112,13 @@ def test_package_snapshot_rejects_missing_init_and_oversize(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_package_custom_filter_and_fold_learning_remain_separate(tmp_path, monkeypatch, engine):
     """Filtering precedes splitting while custom fitted means use each CV training fold."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
-    from skyulf.integrations.databricks.local_retraining import (
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
         LocalTrainingSpec,
         split_labeled_snapshot,
+    )
+    from skyulf.integrations.databricks.training.tuning.local_cv import (
+        LocalCVSpec,
+        evaluate_training_cv,
     )
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
@@ -199,7 +202,7 @@ def test_organized_modeling_hooks_are_both_applied(tmp_path):
 def test_package_failed_import_removes_partially_loaded_modules(tmp_path):
     """A failed package import must not leave stale children to satisfy a future load."""
     from skyulf.inference.project_code import project_source_digest
-    from skyulf.integrations.databricks._project_files import project_source
+    from skyulf.integrations.databricks.projects._project_files import project_source
 
     root = _package(tmp_path / "features")
     source = (root / "__init__.py").read_text(

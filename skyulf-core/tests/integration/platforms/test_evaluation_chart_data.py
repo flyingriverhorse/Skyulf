@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.evaluation_chart_data import (
+from skyulf.integrations.databricks.observability.charts.evaluation_chart_data import (
     chart_recorder,
     chart_settings,
     load_chart_sample,
@@ -145,7 +145,7 @@ def test_temporal_predictions_are_sampled_after_full_holdout_evaluation(tmp_path
         predict_local_pipeline,
         save_local_pipeline,
     )
-    from skyulf.integrations.databricks.local_retraining import evaluate_candidate
+    from skyulf.integrations.databricks.training.fitting.local_retraining import evaluate_candidate
 
     fitted = fitted_candidate()
     path = tmp_path / "model"

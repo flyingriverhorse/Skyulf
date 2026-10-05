@@ -4,7 +4,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from skyulf.integrations.databricks.spark_monitoring_metrics import _classification
+from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
+    _classification,
+)
 
 
 def test_confusion_cells_preserve_saved_class_order_and_population_counts():

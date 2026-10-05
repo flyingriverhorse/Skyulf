@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks._project_files import project_source
+from skyulf.integrations.databricks.projects._project_files import project_source
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
@@ -40,7 +40,7 @@ def test_shared_feature_callback_replays_with_two_saved_models(tmp_path):
 
     from skyulf.inference.model_set import ComponentReference, save_model_set
     from skyulf.inference.model_set_scoring import predict_model_set
-    from skyulf.integrations.databricks.model_set_project import capture_set_rules
+    from skyulf.integrations.databricks.model_sets.model_set_project import capture_set_rules
 
     original, _, query = _saved_set(tmp_path / "original")
     project = tmp_path / "project"

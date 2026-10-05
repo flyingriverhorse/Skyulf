@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 from tests.integration.platforms.test_local_cdf_recovery import recovery_case as recovery_case
 
-from skyulf.integrations.databricks.local_sdk import LocalWorkflowConfig
+from skyulf.integrations.databricks.scoring.local_sdk import LocalWorkflowConfig
 
 
 def _config(**overrides):
@@ -38,8 +38,8 @@ def test_legacy_configs_keep_local_inference():
 @pytest.mark.parametrize("model_set", [False, True])
 def test_prediction_batch_limit_does_not_mutate_restricted_spark_settings(monkeypatch, model_set):
     """Serverless must bound model calls without reading or setting forbidden Arrow config."""
-    from skyulf.integrations.databricks import spark_scoring
-    from skyulf.integrations.mlflow import spark_model
+    from skyulf.integrations.databricks.scoring.batch import spark_scoring
+    from skyulf.integrations.mlflow.spark import spark_model
 
     spark = Mock()
     spark.conf.set.side_effect = AssertionError("serverless Spark setting unavailable")
@@ -104,7 +104,7 @@ def test_prepared_spark_predict_rejects_driver_execution():
     """Even a direct call to the prepared local API cannot silently ignore Spark mode."""
     import pandas as pd
 
-    from skyulf.integrations.databricks.local_sdk import PreparedLocalWorkflow
+    from skyulf.integrations.databricks.scoring.local_sdk import PreparedLocalWorkflow
 
     prepared = PreparedLocalWorkflow(_config(inference_mode="spark"), Mock(), Mock())
     with pytest.raises(ValueError, match="distributed"):
@@ -113,7 +113,7 @@ def test_prepared_spark_predict_rejects_driver_execution():
 
 def test_distributed_source_retains_large_population_on_workers(monkeypatch):
     """A local row budget must not truncate a distributed scoring population."""
-    from skyulf.integrations.databricks import spark_scoring
+    from skyulf.integrations.databricks.scoring.batch import spark_scoring
 
     selected = MagicMock()
     frame = selected.select.return_value
@@ -131,7 +131,7 @@ def test_distributed_source_retains_large_population_on_workers(monkeypatch):
 @pytest.mark.parametrize("null_keys", [True, False])
 def test_distributed_keys_reject_null_or_duplicate_population(monkeypatch, null_keys):
     """Key validity must be checked globally before prediction or publication."""
-    from skyulf.integrations.databricks import spark_scoring
+    from skyulf.integrations.databricks.scoring.batch import spark_scoring
 
     selected = MagicMock()
     frame = selected.select.return_value
@@ -147,7 +147,8 @@ def test_distributed_keys_reject_null_or_duplicate_population(monkeypatch, null_
 
 def test_unsupported_spark_model_fails_before_source_or_target(monkeypatch):
     """Even target provisioning must wait until partition safety is proven."""
-    from skyulf.integrations.databricks import local_workflow, spark_scoring
+    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.scoring.batch import spark_scoring
 
     prepared = SimpleNamespace(config=_config(inference_mode="spark"))
     monkeypatch.setattr(local_workflow, "prepare_local_workflow", lambda config: prepared)
@@ -181,8 +182,8 @@ def distributed_case(recovery_case, monkeypatch):
     """Exercise existing Delta/CDF lifecycle with driver materialization forbidden."""
     from tests.integration.platforms.test_local_cdf_recovery import Frame
 
-    from skyulf.integrations.databricks import local_incremental as batch
-    from skyulf.integrations.databricks.spark_scoring import DistributedRows
+    from skyulf.integrations.databricks.scoring.batch.spark_scoring import DistributedRows
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
 
     store = recovery_case
     config = store.prepared.config
@@ -239,7 +240,7 @@ def test_distributed_worker_failure_keeps_previous_receipt(distributed_case, mon
     """A failing UDF cannot publish a partial population or advance its watermark."""
     from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
 
-    from skyulf.integrations.databricks import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
 
     store = distributed_case
     request = recovery_request(store)
@@ -256,8 +257,8 @@ def test_distributed_concurrent_target_change_prevents_write(distributed_case, m
     """The same commit guard must cover target changes during distributed execution."""
     from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
 
-    from skyulf.integrations.databricks import local_incremental as batch
-    from skyulf.integrations.databricks.admission import BatchConflictError
+    from skyulf.integrations.databricks.data.admission import BatchConflictError
+    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
 
     store = distributed_case
     request = recovery_request(store)
@@ -278,7 +279,10 @@ def test_distributed_model_set_failure_never_commits(tmp_path, monkeypatch):
     """One failed component must abort the complete set transaction."""
     from tests.integration.platforms.test_model_set_batch import _saved_set, _transport
 
-    from skyulf.integrations.databricks.spark_scoring import DistributedRows, SparkSetExecution
+    from skyulf.integrations.databricks.scoring.batch.spark_scoring import (
+        DistributedRows,
+        SparkSetExecution,
+    )
 
     artifact, model, query = _saved_set(tmp_path)
     batch, commit = _transport(monkeypatch, query)
@@ -313,7 +317,7 @@ def test_distributed_model_set_new_release_rebuilds_all_rows(tmp_path, monkeypat
     """Full rebuild retains registry release provenance even for identical model bytes."""
     from tests.integration.platforms.test_model_set_batch import _saved_set, _transport
 
-    from skyulf.integrations.databricks.spark_scoring import (
+    from skyulf.integrations.databricks.scoring.batch.spark_scoring import (
         DistributedRows,
         DistributedSetResult,
         SparkSetExecution,

@@ -7,7 +7,9 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

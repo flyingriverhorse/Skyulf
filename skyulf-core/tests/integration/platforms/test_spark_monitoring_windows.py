@@ -3,8 +3,10 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
-from skyulf.integrations.databricks import spark_monitoring_windows as windows
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.spark import (
+    spark_monitoring_windows as windows,
+)
 
 
 def config():

@@ -16,8 +16,8 @@ returns MLflow's model-version object. Registration never assigns an alias:
 promotion is a separate operation owned by the caller.
 
 ```python
-from skyulf.integrations.mlflow.model import log_model
-from skyulf.integrations.mlflow.registry import register_model
+from skyulf.integrations.mlflow.models.model import log_model
+from skyulf.integrations.mlflow.registration.registry import register_model
 
 model_uri = log_model(
     bundle,
@@ -39,7 +39,7 @@ the returned object carries the concrete version URI, so a later alias move does
 not change the model used by the running job.
 
 ```python
-from skyulf.integrations.mlflow.registry import resolve_model
+from skyulf.integrations.mlflow.registration.registry import resolve_model
 
 resolved = resolve_model(
     "customer_risk",
@@ -81,7 +81,7 @@ pinned registry version. That package supports whole-frame local inference;
 it does not become a Spark bundle merely because it is registered.
 
 ```python
-from skyulf.integrations.mlflow.registry import load_registered_bundle
+from skyulf.integrations.mlflow.registration.registry import load_registered_bundle
 
 bundle = load_registered_bundle(
     resolved,
@@ -107,7 +107,7 @@ its own MLflow run without implementing a second evaluator:
 
 ```python
 from skyulf.inference.local_evaluation import evaluate_local_holdout
-from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
 metrics = evaluate_local_holdout(artifact, heldout, target_column="target")
 with track_run(
@@ -128,8 +128,8 @@ The comparison uses the saved FE, model, class order and tuned thresholds.
 It accepts a row/memory budget and rejects incompatible tasks or class labels.
 
 ```python
-from skyulf.integrations.mlflow.registry import resolve_model
-from skyulf.integrations.mlflow.validation import compare_registered_local_models
+from skyulf.integrations.mlflow.registration.registry import resolve_model
+from skyulf.integrations.mlflow.lifecycle.validation import compare_registered_local_models
 
 candidate = resolve_model(
     "catalog.schema.customer_risk", version="2", registry_uri="databricks-uc"
@@ -184,7 +184,7 @@ not move `@champion`. A replacement challenger requires an explicit
 candidate. Merely registering or comparing a model never assigns an alias.
 
 An orchestrator can explicitly create `ChallengerLifecycle` from
-`skyulf.integrations.mlflow.challenger` and pass its `registered` method as
+`skyulf.integrations.mlflow.lifecycle.challenger` and pass its `registered` method as
 `train_local_candidate(..., on_registered=...)`. This nominates a registered
 contender before comparison, with `validation_status=pending`. After evaluation,
 `stage_challenger` records `passed` or `rejected`; `lifecycle.failed()` records
@@ -206,7 +206,7 @@ permissions must be restricted to that controlled path. A local development
 store can use LocalAliasAdmission with a shared lock directory:
 
 ~~~python
-from skyulf.integrations.mlflow.promotion import (
+from skyulf.integrations.mlflow.lifecycle.promotion import (
     LocalAliasAdmission,
     promote_candidate,
     rollback_promotion,
@@ -252,7 +252,7 @@ Provision it once with a plain CREATE TABLE statement so an existing authority
 cannot be overwritten:
 
 ~~~python
-from skyulf.integrations.mlflow.promotion import DeltaAliasAdmission, alias_resource_id
+from skyulf.integrations.mlflow.lifecycle.promotion import DeltaAliasAdmission, alias_resource_id
 
 key = alias_resource_id("catalog.schema.customer_risk", "champion")
 spark.sql(
@@ -296,7 +296,7 @@ controlled writers, not tamper-proof authorization tokens.
 The event tag key uses underscores, and its compact value stays within Unity
 Catalog's 256-byte tag-value limit.
 
-`skyulf.integrations.mlflow.rejection.reject_candidate(report, reason=...,
+`skyulf.integrations.mlflow.lifecycle.rejection.reject_candidate(report, reason=...,
 expected_champion_version=..., admission=..., tracking_uri=..., registry_uri=...)`
 records an explicit operator decision against the exact staged comparison.
 It leaves aliases and evaluation metrics/status unchanged, adding

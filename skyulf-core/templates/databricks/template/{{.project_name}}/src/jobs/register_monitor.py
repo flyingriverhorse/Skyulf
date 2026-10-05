@@ -3,10 +3,18 @@
 
 import json
 
-from skyulf.integrations.databricks.monitoring_tasks import run_monitor_enrollment_notebook
+from skyulf.integrations.databricks.jobs.monitoring.monitoring_tasks import (
+    run_monitor_enrollment_notebook,
+)
+from skyulf.integrations.databricks.jobs.shared.notebook_diagnostics import (
+    notebook_task,
+    result_summary,
+)
 
 if __name__ == "__main__":
-    output = run_monitor_enrollment_notebook(globals()["spark"], globals()["dbutils"])
+    with notebook_task("register_monitor", globals()["dbutils"]):
+        output = run_monitor_enrollment_notebook(globals()["spark"], globals()["dbutils"])
+        print(result_summary(output))
 
 # COMMAND ----------
 

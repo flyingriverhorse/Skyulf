@@ -13,7 +13,7 @@ from test_monitoring_registration import settings, workflow
 @pytest.fixture(autouse=True)
 def existing_monitoring_store(monkeypatch):
     """Keep component binding tests independent of shared-store DDL."""
-    from skyulf.integrations.databricks import monitoring_model_set as module
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as module
 
     monkeypatch.setattr(module, "ensure_monitoring_store", Mock())
 
@@ -28,7 +28,7 @@ def component(branch, version):
 @pytest.mark.parametrize("activation", [None, 1000])
 def test_components_share_physical_table_and_keep_own_versions(monkeypatch, activation):
     """Parent version and output generation must never be confused with component versions."""
-    from skyulf.integrations.databricks import monitoring_model_set as module
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as module
 
     enroll = Mock()
     monkeypatch.setattr(module, "enroll_monitor", enroll)
@@ -62,7 +62,9 @@ def test_components_share_physical_table_and_keep_own_versions(monkeypatch, acti
 
 def test_model_set_preflight_rejects_invalid_thresholds():
     """Direct model-set scoring validates custom policy before publishing component outputs."""
-    from skyulf.integrations.databricks.monitoring_model_set import validate_set_monitoring
+    from skyulf.integrations.databricks.model_sets.monitoring_model_set import (
+        validate_set_monitoring,
+    )
 
     with pytest.raises(ValueError, match="threshold"):
         validate_set_monitoring(
@@ -73,7 +75,9 @@ def test_model_set_preflight_rejects_invalid_thresholds():
 
 def test_model_set_preflight_rejects_invalid_performance_mapping():
     """Component policy errors are caught before scored outputs are published."""
-    from skyulf.integrations.databricks.monitoring_model_set import validate_set_monitoring
+    from skyulf.integrations.databricks.model_sets.monitoring_model_set import (
+        validate_set_monitoring,
+    )
 
     with pytest.raises(ValueError):
         validate_set_monitoring(
@@ -84,7 +88,7 @@ def test_model_set_preflight_rejects_invalid_performance_mapping():
 
 def test_model_set_rejects_unmatched_component_policy_before_enrollment(monkeypatch):
     """A typo in component identity must not be silently discarded after scoring."""
-    from skyulf.integrations.databricks import monitoring_model_set as module
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as module
 
     enroll = Mock()
     monkeypatch.setattr(module, "enroll_monitor", enroll)
@@ -99,7 +103,7 @@ def test_model_set_rejects_unmatched_component_policy_before_enrollment(monkeypa
 
 def test_model_set_selects_component_policy_independently(monkeypatch):
     """Each component gets only its own version-bound performance policy."""
-    from skyulf.integrations.databricks import monitoring_model_set as module
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as module
 
     monkeypatch.setattr(module, "enroll_monitor", Mock())
     parent = {"model_name": "models.risk.set", "prediction_table": "outputs.risk.set_scores"}
@@ -120,7 +124,9 @@ def test_model_set_selects_component_policy_independently(monkeypatch):
 
 def test_multi_target_request_publishes_batch_and_components():
     """Independent monitoring receives the scored parent batch without resolving aliases."""
-    from skyulf.integrations.databricks.monitoring_registration import publish_monitoring_request
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        publish_monitoring_request,
+    )
 
     dbutils = Mock()
     payload = {
@@ -140,8 +146,10 @@ def test_multi_target_request_publishes_batch_and_components():
 
 def test_component_batch_skips_only_completed_observations(monkeypatch):
     """One saved component cannot suppress another component's missing observation."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     configs = [
         MonitorConfig(
@@ -185,9 +193,10 @@ def test_component_batch_skips_only_completed_observations(monkeypatch):
 
 def test_set_activation_uses_frozen_settings_and_receipt(monkeypatch):
     """Enrollment before scoring must load the activated parent version, never its live alias."""
-    from skyulf.integrations.databricks import monitoring_model_set as module
-    from skyulf.integrations.databricks import monitoring_tasks
-    from skyulf.integrations.mlflow import model_set, registry
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as module
+    from skyulf.integrations.mlflow.models import model_set
+    from skyulf.integrations.mlflow.registration import registry
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()

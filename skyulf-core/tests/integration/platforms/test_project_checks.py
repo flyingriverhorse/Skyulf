@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from skyulf.integrations.databricks.project_checks import check_project
+from skyulf.integrations.databricks.projects.project_checks import check_project
 
 
 def _project(tmp_path, workflow_config):

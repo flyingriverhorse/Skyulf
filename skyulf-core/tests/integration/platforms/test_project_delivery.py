@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from skyulf.inference.project_code import load_project_module, project_source_digest
-from skyulf.integrations.databricks._project_files import project_source
+from skyulf.integrations.databricks.projects._project_files import project_source
 
 
 def test_competition_captured_source_retains_pins_without_executing_code():

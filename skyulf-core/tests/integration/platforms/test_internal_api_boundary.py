@@ -87,9 +87,9 @@ def test_shared_helpers_have_one_definition_name():
 @pytest.mark.parametrize(
     "first",
     [
-        "skyulf.integrations.mlflow.promotion",
-        "skyulf.integrations.databricks.training_nodes",
-        "skyulf.integrations.databricks.local_workflow",
+        "skyulf.integrations.mlflow.lifecycle.promotion",
+        "skyulf.integrations.databricks.jobs.training.training_nodes",
+        "skyulf.integrations.databricks.lifecycle.local_workflow",
     ],
 )
 def test_internal_helpers_preserve_optional_imports(first):
@@ -106,8 +106,8 @@ class BlockMlflow(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, BlockMlflow())
 importlib.import_module({first!r})
-from skyulf.integrations.mlflow._client import require_mlflow
-from skyulf.integrations.mlflow.registry import RegistryDependencyError
+from skyulf.integrations.mlflow.shared._client import require_mlflow
+from skyulf.integrations.mlflow.registration.registry import RegistryDependencyError
 try:
     require_mlflow()
 except RegistryDependencyError as exc:

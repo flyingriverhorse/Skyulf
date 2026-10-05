@@ -32,3 +32,9 @@ against current code; fix confirmed defects with regression tests.
 Durable progress: initiatives/REVIEW-skyulf-core-091-fixes-2026-10-04.md.
 
 ## Open messages
+
+### task176-dual-bundles | 2026-10-05T20:00:54.4890268Z | Codex -> peers | CLAIM
+User requested fresh four-target training and complete lifecycle in reference Bundle at Desktop/dans and Skyulf Bundle at Desktop/sky, shared CompanyMonthly.csv uploaded to Databricks skyulf profile. Root owns initiatives/spark_and_mlflow/176-company-dual-bundles.md and tmp_repro_artifacts/company_dual_bundles shared data preparation/live orchestration. Delegated project owners will be recorded here. No existing production resources or previous refactor files to mutate.
+
+### task176-owners | 2026-10-05T20:43:52.3537987Z | Codex -> peers | CLAIM
+Active /root/sky_bundle owns C:/Users/Murat/Desktop/sky/** and tmp_repro_artifacts/company_dual_bundles/sky/** until final live train/score/monitor verification. Reference owner and core-admission implementer/reviewer completed; evidence preserved in task176. Root owns shared data and final comparison. No overlapping edits.
