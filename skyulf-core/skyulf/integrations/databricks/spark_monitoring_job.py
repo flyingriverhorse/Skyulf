@@ -8,7 +8,8 @@ from typing import Any
 from .monitoring import run_monitoring
 from .monitoring_config import MonitorConfig, json_digest
 from .monitoring_registration import monitoring_destination
-from .monitoring_store import load_enrolled_models
+from .monitoring_sources import observation_window
+from .monitoring_store import ensure_monitoring_store, load_enrolled_models
 from .spark_monitoring_reference import prepare_spark_monitoring_reference
 from .spark_monitoring_windows import revisit_performance_windows
 
@@ -124,20 +125,23 @@ def _observe_project(spark: Any, dbutils: Any, values: dict, namespace: str) -> 
     """Bind one observation cutoff to active enrollments and optional scoring receipts."""
     from .monitoring_tasks import scoring_observation_window  # noqa: PLC0415
 
+    request = _monitoring_request(values)
+    now = _observation_time(values)
+    observation_window(now, None, None)
+    windows = _validate_observation_settings(values)
+    if request is None:
+        ensure_monitoring_store(spark, *namespace.split("."))
+    else:
+        _requested_configs(request, [], namespace)
     configs = project_configs(spark, namespace, values)
-    raw = values.get("monitoring_request", "")
-    request = json.loads(raw) if raw else None
     if request is not None:
         configs = _requested_configs(request, configs, namespace)
     if not configs:
         return {"status": "no_active_models"}
-    now = _observation_time(values)
     start, end = now - timedelta(days=1), now
     if request is not None and request.get("commit_version") is not None:
         start, end = scoring_observation_window(spark, configs[0], request["commit_version"])
-    revisit_performance_windows(
-        spark, namespace, configs, now, windows=int(values.get("monitoring_revisit_windows", "3"))
-    )
+    revisit_performance_windows(spark, namespace, configs, now, windows=windows)
     _publish_references(dbutils, namespace, configs, start, end)
     result = run_monitoring(
         spark,
@@ -153,6 +157,29 @@ def _observe_project(spark: Any, dbutils: Any, values: dict, namespace: str) -> 
     if result["failed"]:
         raise RuntimeError("Spark monitoring failed; durable failure reports were saved.")
     return result
+
+
+def _monitoring_request(values: dict) -> dict | None:
+    """Distinguish an absent schedule receipt from malformed explicit JSON values."""
+    raw = values.get("monitoring_request", "")
+    if not raw:
+        return None
+    request = json.loads(raw)
+    if not isinstance(request, dict):
+        raise ValueError("monitoring_request must be a JSON object.")
+    return request
+
+
+def _validate_observation_settings(values: dict) -> int:
+    """Reject invalid schedule controls before provisioning an empty shared store."""
+    for key in ("monitoring_environment", "monitoring_project"):
+        value = values.get(key)
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", value):
+            raise ValueError("Monitoring environment/project must be bounded identifiers.")
+    windows = int(values.get("monitoring_revisit_windows", "3"))
+    if not 1 <= windows <= 100:
+        raise ValueError("monitoring_revisit_windows must be an integer between 1 and 100.")
+    return windows
 
 
 def _observation_time(values: dict) -> datetime:

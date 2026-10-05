@@ -7,6 +7,14 @@ import pytest
 from test_monitoring_config import performance_policy
 
 
+@pytest.fixture(autouse=True)
+def existing_monitoring_store(monkeypatch):
+    """Isolate configuration assertions from the separately tested shared-store bootstrap."""
+    from skyulf.integrations.databricks import monitoring_registration as registration
+
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
+
+
 @pytest.mark.parametrize("enabled", ["true", "false"])
 def test_development_mode_never_registers_in_shared_monitoring(enabled):
     """Ephemeral dev models must not create or pause central inventory entries."""

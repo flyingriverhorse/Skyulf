@@ -1,18 +1,21 @@
-"""Contract checks for the central, portable monitoring dashboard example."""
+"""Contract checks for the shared monitoring dashboard shipped in the project template."""
 
 import json
 import re
+import runpy
 import sqlite3
 from pathlib import Path
 
 import yaml
 
-EXAMPLE = Path(__file__).resolve().parents[3] / "examples" / "databricks_monitoring"
+TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
 
 def _dashboard() -> dict:
     """Load the exact Lakeview payload shipped to the bundle."""
-    return json.loads((EXAMPLE / "src" / "monitoring.lvdash.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (TEMPLATE / "src/monitoring/monitoring.lvdash.json").read_text(encoding="utf-8")
+    )
 
 
 def _widgets(page: dict) -> list[dict]:
@@ -180,42 +183,32 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     assert widgets["performance_latest"]["spec"]["widgetType"] == "bar"
 
 
-def test_bundle_has_one_serial_manual_writer_and_stable_dashboard() -> None:
-    """A retry or redeploy must not fork the central writer or dashboard identity."""
-    bundle = yaml.safe_load((EXAMPLE / "databricks.yml").read_text())
-    job = yaml.safe_load((EXAMPLE / "resources" / "monitoring.job.yml").read_text())
-    dashboard = yaml.safe_load((EXAMPLE / "resources" / "monitoring.dashboard.yml").read_text())
-    assert {
-        "monitoring_catalog",
-        "monitoring_schema",
-        "warehouse_id",
-        "wheel_path",
-        "experiment_name",
-    } <= set(bundle["variables"])
-    assert bundle["targets"]["dev"]["mode"] == "development"
+def test_bundle_has_one_serial_manual_writer_and_stable_dashboard(tmp_path) -> None:
+    """One project owns the shared dashboard while existing monitoring jobs stay serialized."""
+    job = yaml.safe_load((TEMPLATE / "resources/monitoring.job.yml.tmpl").read_text())
     resource = job["resources"]["jobs"]["monitoring"]
     assert resource["max_concurrent_runs"] == 1
     assert resource["queue"]["enabled"] is True
-    assert "schedule" not in resource and "trigger" not in resource
-    assert len(resource["tasks"]) == 1
-    task = resource["tasks"][0]
-    assert task["environment_key"] == resource["environments"][0]["environment_key"]
-    assert resource["environments"][0]["spec"]["client"] == "4"
-    assert "${var.wheel_path}" in resource["environments"][0]["spec"]["dependencies"]
-    assert set(task["notebook_task"]["base_parameters"]) == {
-        "monitoring_catalog",
-        "monitoring_schema",
-        "experiment_name",
-        "as_of",
-        "window_start",
-        "window_end",
+    assert resource["schedule"]["pause_status"] == "${var.monitoring_pause_status}"
+    assert {task["task_key"] for task in resource["tasks"]} == {
+        "monitor_model",
+        "monitoring_report",
+        "evaluate_retraining",
     }
-    dashboards = dashboard["resources"]["dashboards"]
+    (tmp_path / "resources").mkdir()
+    asset = tmp_path / "src/monitoring/monitoring.lvdash.json"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes((TEMPLATE / "src/monitoring/monitoring.lvdash.json").read_bytes())
+    configure = runpy.run_path(str(TEMPLATE / "src/tools/configure_monitoring_dashboard.py"))[
+        "configure"
+    ]
+    configure(tmp_path, create_dashboard=True, warehouse_id="d047a4d9aa276958")
+    dashboard = yaml.safe_load((tmp_path / "resources/monitoring.dashboard.yml").read_text())
+    dashboards = dashboard["targets"]["test"]["resources"]["dashboards"]
     assert list(dashboards) == ["monitoring_dashboard"]
-    assert not set(dashboards).intersection(job["resources"]["jobs"])
     assert dashboards["monitoring_dashboard"]["dataset_catalog"] == "${var.monitoring_catalog}"
     assert dashboards["monitoring_dashboard"]["dataset_schema"] == "${var.monitoring_schema}"
-    assert dashboards["monitoring_dashboard"]["warehouse_id"] == "${var.warehouse_id}"
+    assert dashboards["monitoring_dashboard"]["embed_credentials"] is False
 
 
 def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
@@ -571,13 +564,17 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     assert any(c["displayName"] == "Performance result" for c in history["encodings"]["columns"])
 
 
-def test_shared_dashboard_refresh_waits_for_persisted_observations() -> None:
-    """Adding the optional central dashboard must also refresh it after measurements succeed."""
-    resource = yaml.safe_load((EXAMPLE / "resources/monitoring_refresh.job.yml").read_text())
-    task = resource["targets"]["dev"]["resources"]["jobs"]["monitoring"]["tasks"][0]
-    assert task["depends_on"] == [{"task_key": "observe_models"}]
-    assert task["dashboard_task"] == {
-        "dashboard_id": "${resources.dashboards.monitoring_dashboard.id}",
-        "warehouse_id": "${var.warehouse_id}",
-    }
-    assert "subscription" not in task["dashboard_task"]
+def test_shared_dashboard_refresh_waits_for_persisted_observations(tmp_path) -> None:
+    """Native refresh follows saved evidence and policy evaluation in the existing job."""
+    (tmp_path / "resources").mkdir()
+    configure = runpy.run_path(str(TEMPLATE / "src/tools/configure_monitoring_dashboard.py"))[
+        "configure"
+    ]
+    path = configure(tmp_path, dashboard_id="01f1c090238e1b6da5d633032ad9960b")
+    tasks = yaml.safe_load(path.read_text())["targets"]["test"]["resources"]["jobs"]["monitoring"][
+        "tasks"
+    ]
+    assert tasks[0]["depends_on"] == [{"task_key": "evaluate_retraining"}]
+    assert tasks[1]["depends_on"] == [{"task_key": "dashboard_refresh_enabled", "outcome": "true"}]
+    assert tasks[1]["dashboard_task"] == {"dashboard_id": "01f1c090238e1b6da5d633032ad9960b"}
+    assert "subscription" not in tasks[1]["dashboard_task"]

@@ -5,7 +5,7 @@ from typing import Any
 
 from .monitoring_config import MonitorConfig, parse_drift_thresholds, parse_performance_policies
 from .monitoring_registration import build_monitor_enrollment_config, monitoring_destination
-from .monitoring_store import enroll_monitor
+from .monitoring_store import _validate_activation_order, enroll_monitor, ensure_monitoring_store
 
 
 def validate_set_monitoring(values: dict, settings: dict) -> None:
@@ -75,6 +75,9 @@ def register_set_monitors(
     if namespace is None:
         return None
     configs = validate_component_monitoring(workflow, values, settings, resolved, artifact)
+    if activation_started_ms is not None:
+        _validate_activation_order(activation_started_ms)
+    ensure_monitoring_store(spark, *namespace.split("."))
     for config in configs:
         enroll_monitor(
             spark,

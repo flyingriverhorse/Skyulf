@@ -163,6 +163,71 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     return namespace
 
 
+def ensure_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
+    """Create missing shared objects; reuse compatible stores without replacement DDL.
+
+    First use requires schema/table/view creation privileges. Existing tables
+    must already have the current schema and Serializable inventory isolation;
+    explicit owner-run initialization remains responsible for upgrades.
+    """
+    from .performance_actions import ACTION_SCHEMA  # noqa: PLC0415
+
+    namespace = store_namespace(catalog, schema)
+    tables = {
+        "model_inventory": INVENTORY_SCHEMA,
+        "monitoring_results": RESULT_SCHEMA,
+        "performance_actions": ACTION_SCHEMA,
+    }
+    views = monitoring_views(namespace)
+    missing = [
+        name
+        for name in (*tables, *views)
+        if not _compatible_store_object(spark, namespace, name, tables.get(name))
+    ]
+    if missing:
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {table_name(namespace)}").collect()
+    for name in missing:
+        _create_store_object(spark, namespace, name, tables.get(name), views.get(name))
+        if not _compatible_store_object(spark, namespace, name, tables.get(name)):
+            raise ValueError(f"Monitoring object missing after creation: {namespace}.{name}.")
+    return namespace
+
+
+def _compatible_store_object(spark: Any, namespace: str, name: str, ddl: str | None) -> bool:
+    """Preflight all existing objects and verify the winner of a concurrent creation."""
+    full_name = f"{namespace}.{name}"
+    if not ensure_owned_object(spark, full_name):
+        return False
+    if ddl is not None:
+        expected = spark.createDataFrame([], schema=ddl).schema.simpleString()
+        if spark.table(full_name).schema.simpleString() != expected:
+            raise ValueError(f"Monitoring table schema differs: {full_name}.")
+    if (
+        name == "model_inventory"
+        and _inventory_isolation(spark, table_name(full_name)) != "Serializable"
+    ):
+        raise ValueError(
+            "Initialize the central inventory with Serializable isolation before registration."
+        )
+    return True
+
+
+def _create_store_object(
+    spark: Any, namespace: str, name: str, ddl: str | None, query: str | None
+) -> None:
+    """Use conditional creation so concurrent projects cannot replace shared objects."""
+    target = table_name(f"{namespace}.{name}")
+    properties = f"'{PROPERTY}' = '{OWNER}'"
+    if ddl is not None:
+        if name == "model_inventory":
+            properties += ", 'delta.isolationLevel' = 'Serializable'"
+        statement = f"CREATE TABLE IF NOT EXISTS {target} ({ddl}) USING DELTA"
+        statement += f" TBLPROPERTIES ({properties})"
+    else:
+        statement = f"CREATE VIEW IF NOT EXISTS {target} TBLPROPERTIES ({properties}) AS {query}"
+    spark.sql(statement).collect()
+
+
 def monitoring_views(namespace: str) -> dict[str, str]:
     """Build shared, filterable SQL without treating missing observations as healthy."""
     inventory = table_name(qualified_name(f"{namespace}.model_inventory"))

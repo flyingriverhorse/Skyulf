@@ -2084,6 +2084,137 @@
         " CASE WHEN performance_status = 'Policy disabled' THEN 1 ELSE 0 END AS policy_disabled_count\n",
         "FROM classified ORDER BY model_name, model_version, monitor_id\n"
       ]
+    },
+    {
+      "name": "overview_inventory",
+      "displayName": "Enrolled models and table associations",
+      "queryLines": [
+        "WITH inventory AS (\n",
+        " SELECT i.monitor_id, i.model_catalog, i.model_schema, i.model_name,\n",
+        " COALESCE(get_json_object(i.config_json, '$.model_version'), h.model_version) AS model_version,\n",
+        " i.enabled, i.config_digest,\n",
+        " concat(i.environment, ' / ', i.project) AS monitor_context,\n",
+        " COALESCE(get_json_object(i.config_json, '$.performance_policy.mode'), 'off') AS policy_mode,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.source_table')), '') AS source_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.prediction_table')), '') AS prediction_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.label_table')), '') AS label_table\n",
+        " FROM model_inventory i LEFT JOIN current_health h\n",
+        " ON i.monitor_id = h.monitor_id AND i.model_name = h.model_name\n",
+        " AND i.model_catalog = h.model_catalog AND i.model_schema = h.model_schema\n",
+        ")\n",
+        "SELECT *, LOWER(model_name) AS registered_model_identity,\n",
+        " LOWER(source_table) AS source_table_identity,\n",
+        " LOWER(prediction_table) AS prediction_table_identity,\n",
+        " COALESCE(source_table, 'Not configured') AS source_table_display,\n",
+        " COALESCE(prediction_table, 'Not configured') AS prediction_table_display,\n",
+        " COALESCE(label_table, 'Not configured') AS label_table_display,\n",
+        " CASE WHEN enabled THEN 'Enabled' ELSE 'Disabled' END AS enrollment_status\n",
+        "FROM inventory ORDER BY model_name, model_version, monitor_context, monitor_id\n"
+      ]
+    },
+    {
+      "name": "overview_drift_daily",
+      "displayName": "Daily saved drift checks by current enrollment",
+      "queryLines": [
+        "WITH inventory AS (\n",
+        " SELECT i.monitor_id, i.model_catalog, i.model_schema, i.model_name,\n",
+        " COALESCE(get_json_object(i.config_json, '$.model_version'), h.model_version) AS model_version,\n",
+        " i.enabled, i.config_digest,\n",
+        " concat(i.environment, ' / ', i.project) AS monitor_context,\n",
+        " COALESCE(get_json_object(i.config_json, '$.performance_policy.mode'), 'off') AS policy_mode,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.source_table')), '') AS source_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.prediction_table')), '') AS prediction_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.label_table')), '') AS label_table\n",
+        " FROM model_inventory i LEFT JOIN current_health h\n",
+        " ON i.monitor_id = h.monitor_id AND i.model_name = h.model_name\n",
+        " AND i.model_catalog = h.model_catalog AND i.model_schema = h.model_schema\n",
+        "), eligible AS (\n",
+        " SELECT r.report_id, r.monitor_id, r.model_version, r.window_end, r.measured_at,\n",
+        " r.status, i.model_catalog, i.model_schema, i.model_name,\n",
+        " date_add(DATE '1970-01-01', CAST(FLOOR(unix_timestamp(r.window_end) / 86400) AS INT)) AS window_day\n",
+        " FROM monitoring_results r JOIN inventory i\n",
+        " ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest\n",
+        " AND r.model_version = i.model_version\n",
+        " WHERE i.enabled AND r.window_end IS NOT NULL\n",
+        " AND NOT (r.status = 'no_data'\n",
+        " AND get_json_object(r.report_json, '$.current_rows') IS NULL\n",
+        " AND get_json_object(r.report_json, '$.performance') IS NOT NULL)\n",
+        "), ranked AS (\n",
+        " SELECT *, ROW_NUMBER() OVER (\n",
+        " PARTITION BY monitor_id, window_day\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM eligible\n",
+        "), checks AS (\n",
+        " SELECT report_id,\n",
+        " MAX(CASE WHEN status = 'measured' THEN 1 ELSE 0 END) AS any_measured,\n",
+        " MIN(CASE WHEN status = 'measured' THEN 1 ELSE 0 END) AS all_measured,\n",
+        " MAX(CASE WHEN status = 'measured' AND has_issue THEN 1 ELSE 0 END) AS has_drift\n",
+        " FROM metric_history WHERE category = 'drift' AND metric_name <> 'ks_test_p_value'\n",
+        " GROUP BY report_id\n",
+        "), daily AS (\n",
+        " SELECT r.*, CASE WHEN r.status IN ('failed', 'no_data') THEN 0\n",
+        " ELSE COALESCE(c.any_measured, 0) END AS any_measured,\n",
+        " CASE WHEN r.status IN ('failed', 'no_data') THEN 0\n",
+        " ELSE COALESCE(c.all_measured, 0) END AS all_measured,\n",
+        " CASE WHEN r.status IN ('failed', 'no_data') THEN 0\n",
+        " ELSE COALESCE(c.has_drift, 0) END AS has_drift\n",
+        " FROM ranked r LEFT JOIN checks c ON r.report_id = c.report_id\n",
+        " WHERE r.report_rank = 1\n",
+        ")\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Drift detected' AS series,\n",
+        " CASE WHEN has_drift = 1 THEN 1 WHEN all_measured = 1 THEN 0 END AS context_count FROM daily\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Checks measured' AS series,\n",
+        " any_measured AS context_count FROM daily\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Checks unavailable' AS series,\n",
+        " CASE WHEN all_measured = 0 THEN 1 ELSE 0 END AS context_count FROM daily\n",
+        "ORDER BY window_day, monitor_id, series\n"
+      ]
+    },
+    {
+      "name": "overview_performance_daily",
+      "displayName": "Daily saved performance by current enrollment",
+      "queryLines": [
+        "WITH inventory AS (\n",
+        " SELECT i.monitor_id, i.model_catalog, i.model_schema, i.model_name,\n",
+        " COALESCE(get_json_object(i.config_json, '$.model_version'), h.model_version) AS model_version,\n",
+        " i.enabled, i.config_digest,\n",
+        " concat(i.environment, ' / ', i.project) AS monitor_context,\n",
+        " COALESCE(get_json_object(i.config_json, '$.performance_policy.mode'), 'off') AS policy_mode,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.source_table')), '') AS source_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.prediction_table')), '') AS prediction_table,\n",
+        " NULLIF(TRIM(get_json_object(i.config_json, '$.label_table')), '') AS label_table\n",
+        " FROM model_inventory i LEFT JOIN current_health h\n",
+        " ON i.monitor_id = h.monitor_id AND i.model_name = h.model_name\n",
+        " AND i.model_catalog = h.model_catalog AND i.model_schema = h.model_schema\n",
+        "), eligible AS (\n",
+        " SELECT r.report_id, r.monitor_id, r.model_version, r.window_end, r.measured_at,\n",
+        " r.status, i.model_catalog, i.model_schema, i.model_name,\n",
+        " date_add(DATE '1970-01-01', CAST(FLOOR(unix_timestamp(r.window_end) / 86400) AS INT)) AS window_day\n",
+        " FROM performance_history r JOIN inventory i\n",
+        " ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest\n",
+        " AND r.model_version = i.model_version\n",
+        " WHERE i.enabled AND r.window_end IS NOT NULL\n",
+        " AND i.policy_mode IN ('report', 'retrain')\n",
+        "), ranked AS (\n",
+        " SELECT *, ROW_NUMBER() OVER (\n",
+        " PARTITION BY monitor_id, window_day\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM eligible\n",
+        "), daily AS (\n",
+        " SELECT * FROM ranked WHERE report_rank = 1\n",
+        ")\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Performance loss' AS series,\n",
+        " CASE WHEN status = 'degraded' THEN 1 WHEN status = 'healthy' THEN 0 END AS context_count FROM daily\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Measured' AS series,\n",
+        " CASE WHEN status IN ('healthy', 'degraded') THEN 1 ELSE 0 END AS context_count FROM daily\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, window_day, 'Insufficient evidence' AS series,\n",
+        " CASE WHEN status IN ('healthy', 'degraded') THEN 0 ELSE 1 END AS context_count FROM daily\n",
+        "ORDER BY window_day, monitor_id, series\n"
+      ]
     }
   ],
   "pages": [
@@ -2114,7 +2245,7 @@
             "name": "overview_note",
             "multilineTextboxSpec": {
               "lines": [
-                "Counts are monitoring enrollments, not unique models. Each identity can have separate project settings. Performance and drift/data quality are independent."
+                "Inventory includes enabled and disabled contexts. A registered model counts once across versions; each enrollment has its own settings and table associations."
               ]
             }
           },
@@ -2154,6 +2285,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_overview_inventory",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_drift_daily",
+                "query": {
+                  "datasetName": "overview_drift_daily",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_performance_daily",
+                "query": {
+                  "datasetName": "overview_performance_daily",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2170,6 +2340,21 @@
                     "fieldName": "model_catalog",
                     "displayName": "Catalog",
                     "queryName": "filter_performance"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "filter_overview_inventory"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "filter_overview_drift_daily"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "filter_overview_performance_daily"
                   }
                 ]
               },
@@ -2215,6 +2400,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_overview_inventory",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_drift_daily",
+                "query": {
+                  "datasetName": "overview_drift_daily",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_performance_daily",
+                "query": {
+                  "datasetName": "overview_performance_daily",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2231,6 +2455,21 @@
                     "fieldName": "model_schema",
                     "displayName": "Schema",
                     "queryName": "filter_performance"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "filter_overview_inventory"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "filter_overview_drift_daily"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "filter_overview_performance_daily"
                   }
                 ]
               },
@@ -2276,6 +2515,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_overview_inventory",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_drift_daily",
+                "query": {
+                  "datasetName": "overview_drift_daily",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_performance_daily",
+                "query": {
+                  "datasetName": "overview_performance_daily",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2292,6 +2570,21 @@
                     "fieldName": "model_name",
                     "displayName": "Model",
                     "queryName": "filter_performance"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model",
+                    "queryName": "filter_overview_inventory"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model",
+                    "queryName": "filter_overview_drift_daily"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model",
+                    "queryName": "filter_overview_performance_daily"
                   }
                 ]
               },
@@ -2337,6 +2630,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_overview_inventory",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_drift_daily",
+                "query": {
+                  "datasetName": "overview_drift_daily",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "filter_overview_performance_daily",
+                "query": {
+                  "datasetName": "overview_performance_daily",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2353,6 +2685,21 @@
                     "fieldName": "model_version",
                     "displayName": "Version",
                     "queryName": "filter_performance"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version",
+                    "queryName": "filter_overview_inventory"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version",
+                    "queryName": "filter_overview_drift_daily"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version",
+                    "queryName": "filter_overview_performance_daily"
                   }
                 ]
               },
@@ -2371,6 +2718,416 @@
         },
         {
           "widget": {
+            "name": "unique_models_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "count_distinct_registered_model_identity",
+                      "expression": "COUNT(DISTINCT `registered_model_identity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count_distinct_registered_model_identity",
+                  "displayName": "Registered models"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Registered models"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "enrolled_contexts_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "count_distinct_monitor_id",
+                      "expression": "COUNT(DISTINCT `monitor_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count_distinct_monitor_id",
+                  "displayName": "Enrolled contexts"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Enrolled contexts"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "source_tables_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "count_distinct_source_table_identity",
+                      "expression": "COUNT(DISTINCT `source_table_identity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count_distinct_source_table_identity",
+                  "displayName": "Scoring input tables"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scoring input tables"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "prediction_tables_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "count_distinct_prediction_table_identity",
+                      "expression": "COUNT(DISTINCT `prediction_table_identity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count_distinct_prediction_table_identity",
+                  "displayName": "Prediction tables"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Prediction tables"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 4,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "overview_trend_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Saved windows by UTC day: one last window per enabled context per day, matching its current settings and version. Points show sampled days only; gaps are not zero. Missing checks remain unavailable. Performance excludes policies that are off."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "overview_drift_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_drift_daily",
+                  "fields": [
+                    {
+                      "name": "window_day",
+                      "expression": "`window_day`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    },
+                    {
+                      "name": "context_count",
+                      "expression": "SUM(`context_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "window_day",
+                  "displayName": "Window day (UTC)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "context_count",
+                  "displayName": "Enrolled contexts",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Daily drift checks",
+                "showDescription": true,
+                "description": "Contexts with drift, any measured check, or unavailable checks; categories can overlap."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "overview_performance_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance_daily",
+                  "fields": [
+                    {
+                      "name": "window_day",
+                      "expression": "`window_day`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    },
+                    {
+                      "name": "context_count",
+                      "expression": "SUM(`context_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "window_day",
+                  "displayName": "Window day (UTC)",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "context_count",
+                  "displayName": "Enrolled contexts",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Daily performance checks",
+                "showDescription": true,
+                "description": "Measured includes within tolerance and loss; insufficient evidence is separate."
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "model_table_mapping",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_inventory",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "source_table_display",
+                      "expression": "`source_table_display`"
+                    },
+                    {
+                      "name": "prediction_table_display",
+                      "expression": "`prediction_table_display`"
+                    },
+                    {
+                      "name": "label_table_display",
+                      "expression": "`label_table_display`"
+                    },
+                    {
+                      "name": "enrollment_status",
+                      "expression": "`enrollment_status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Registered model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Context"
+                  },
+                  {
+                    "fieldName": "source_table_display",
+                    "displayName": "Scoring input table"
+                  },
+                  {
+                    "fieldName": "prediction_table_display",
+                    "displayName": "Prediction table"
+                  },
+                  {
+                    "fieldName": "label_table_display",
+                    "displayName": "Actual target table"
+                  },
+                  {
+                    "fieldName": "enrollment_status",
+                    "displayName": "Monitoring"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Models and their tables",
+                "showDescription": true,
+                "description": "Current enrollment configuration. Scoring inputs are the tables used for prediction; actual targets are optional."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
             "name": "performance_overview_heading",
             "multilineTextboxSpec": {
               "lines": [
@@ -2380,7 +3137,7 @@
           },
           "position": {
             "x": 0,
-            "y": 4,
+            "y": 21,
             "width": 12,
             "height": 1
           }
@@ -2396,7 +3153,7 @@
           },
           "position": {
             "x": 0,
-            "y": 5,
+            "y": 22,
             "width": 12,
             "height": 2
           }
@@ -2436,7 +3193,7 @@
           },
           "position": {
             "x": 0,
-            "y": 7,
+            "y": 24,
             "width": 3,
             "height": 3
           }
@@ -2476,7 +3233,7 @@
           },
           "position": {
             "x": 3,
-            "y": 7,
+            "y": 24,
             "width": 3,
             "height": 3
           }
@@ -2516,7 +3273,7 @@
           },
           "position": {
             "x": 6,
-            "y": 7,
+            "y": 24,
             "width": 3,
             "height": 3
           }
@@ -2556,7 +3313,7 @@
           },
           "position": {
             "x": 9,
-            "y": 7,
+            "y": 24,
             "width": 3,
             "height": 3
           }
@@ -2572,7 +3329,7 @@
           },
           "position": {
             "x": 0,
-            "y": 10,
+            "y": 27,
             "width": 12,
             "height": 1
           }
@@ -2612,7 +3369,7 @@
           },
           "position": {
             "x": 0,
-            "y": 11,
+            "y": 28,
             "width": 3,
             "height": 3
           }
@@ -2652,7 +3409,7 @@
           },
           "position": {
             "x": 3,
-            "y": 11,
+            "y": 28,
             "width": 3,
             "height": 3
           }
@@ -2692,7 +3449,7 @@
           },
           "position": {
             "x": 6,
-            "y": 11,
+            "y": 28,
             "width": 3,
             "height": 3
           }
@@ -2732,7 +3489,7 @@
           },
           "position": {
             "x": 9,
-            "y": 11,
+            "y": 28,
             "width": 3,
             "height": 3
           }
@@ -2774,7 +3531,7 @@
           },
           "position": {
             "x": 0,
-            "y": 14,
+            "y": 31,
             "width": 3,
             "height": 3
           }
@@ -2814,7 +3571,7 @@
           },
           "position": {
             "x": 3,
-            "y": 14,
+            "y": 31,
             "width": 3,
             "height": 3
           }
@@ -2854,7 +3611,7 @@
           },
           "position": {
             "x": 6,
-            "y": 14,
+            "y": 31,
             "width": 3,
             "height": 3
           }
@@ -2894,61 +3651,9 @@
           },
           "position": {
             "x": 9,
-            "y": 14,
+            "y": 31,
             "width": 3,
             "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "status_counts",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "health_status",
-                      "expression": "`health_status`"
-                    },
-                    {
-                      "name": "count(*)",
-                      "expression": "COUNT(`*`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "health_status",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                },
-                "y": {
-                  "fieldName": "count(*)",
-                  "scale": {
-                    "type": "quantitative"
-                  }
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Enrollments by drift / data quality status"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 17,
-            "width": 12,
-            "height": 5
           }
         }
       ]
@@ -3625,7 +4330,7 @@
                 "showTitle": true,
                 "title": "Which features changed?",
                 "showDescription": true,
-                "description": "Latest saved observation Â· Top 10 PSI values and their own limits"
+                "description": "Latest saved observation \u00c2\u00b7 Top 10 PSI values and their own limits"
               },
               "mark": {
                 "layout": "group"
@@ -3716,7 +4421,7 @@
                 "showTitle": true,
                 "title": "How many features show drift?",
                 "showDescription": true,
-                "description": "Per measurement Â· A feature is counted once, even if several checks flag it"
+                "description": "Per measurement \u00c2\u00b7 A feature is counted once, even if several checks flag it"
               },
               "mark": {
                 "layout": "group"

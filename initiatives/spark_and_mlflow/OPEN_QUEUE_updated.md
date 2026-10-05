@@ -7,7 +7,8 @@
 > and an implementation plan. Runtime/UDF delivery is still open ([Plan166](166-sm57-spark-udf-plan.md)).
 > SM-23b serving observability remains dependent on SM-19a; company/identity
 > gates stay in SM-37/43b. Earlier dated/uncommitted notes below are historical;
-> the active dashboard and latest evidence are in [Delivery164](164-sm23i-monitoring-overview-closure.md).
+> the shared dashboard now ships inside the existing project template, with automatic
+> create/reuse storage and Overview summaries ([Delivery168](168-sm23k-monitoring-home-overview.md)).
 > SM-39 delivered (2026-10-04): centralized runtime requirements,
 > automatic optional model/Optuna dependencies, checked wheel build and target
 > compute overrides. Two clean installations and two real train-to-score jobs

@@ -1074,8 +1074,9 @@ with the updated Skyulf wheel for this behavior to apply to an existing project.
 Each repository registers its activated model before scoring, and its scored
 version after successful inference, directly in a shared
 Delta inventory. No central model-list file or export/copy step is needed.
-First deploy and initialize Skyulf's `examples/databricks_monitoring/` once.
-Then set these independent variables in this project's deployment target:
+The shared dashboard and its setup are part of this template under
+`src/monitoring/`; there is no second monitoring template. Set these independent
+variables in this project's deployment target:
 
 ```yaml
 monitoring_catalog: operations
@@ -1102,8 +1103,11 @@ These locations are for monitoring storage, separate from this project's
 principal needs SELECT/MODIFY on the central inventory and access to its
 catalog/schema. The `monitor_model` task also needs SELECT/MODIFY on
 `monitoring_results`, read access to saved training data/models and optional
-labels, and access to its optional MLflow experiment. The central initializer
-creates the inventory, results and dashboard views. A successful score or CDF recovery pins the exact
+labels, and access to its optional MLflow experiment. The first activation, scoring
+registration or scheduled monitoring run creates missing owned store objects; this
+requires schema/table/view creation permissions. Later runs reuse a complete store
+without replacing data or views. Foreign objects and incompatible schemas fail
+visibly. `initialize_monitoring_store` remains available for explicit view upgrades. A successful score or CDF recovery pins the exact
 scored version and physical output generation. A no-op scoring retry can repair
 registration without creating duplicate predictions. Registration failure is a
 visible job failure; committed predictions remain intact.
@@ -1143,6 +1147,20 @@ includes an **Open monitoring dashboard** link
 when the shared HTTPS `monitoring_dashboard_url` is configured. Databricks AI/BI
 displays the durable Skyulf tables; its native profiling is a separate product,
 not the source of these metrics.
+
+The complete operator guide is [src/monitoring/README.md](src/monitoring/README.md).
+Keep the existing shared dashboard URL when one already exists. For the first
+shared dashboard only, choose one owning project and target:
+
+```bash
+python src/tools/configure_monitoring_dashboard.py --target test --create-dashboard --warehouse-id <warehouse-id>
+```
+
+This generates a target-owned dashboard resource using
+`src/monitoring/monitoring.lvdash.json`, plus its native refresh task. Initialize
+the store and validate every dataset SQL before deploying the dashboard. Other
+projects reuse that dashboard's URL; do not create one dashboard per project.
+`--disable` removes refresh while keeping the owned dashboard resource.
 
 To refresh that published dashboard automatically after monitoring completes,
 configure the native dashboard task once using the same URL:
@@ -1355,9 +1373,8 @@ RUN on the train job, in addition to monitoring's read permissions. Keep train
 `max_concurrent_runs: 1`. Ambiguous API failures retain the pending claim; repair
 the same scoring task to retry the same idempotency token. An unresolved request
 blocks other automatic requests instead of guessing that submission failed.
-The independent producer monitoring job revisits delayed labels and can submit
-guarded training requests. The central inventory-wide example is a separate
-reporting/measurement deployment.
+The independent monitoring job revisits delayed labels and can submit guarded
+training requests. All project layouts use the same store and shared dashboard.
 
 ## Offline checks
 
@@ -1373,5 +1390,5 @@ A delayed score cannot replace an activated different version, and repairing an
 older activation cannot replace a newer activation. Enrollment-only repairs read
 the verified original receipt without repeating training or alias changes.
 The private activation-order metadata lives in inventory config_json; table
-schemas and model configuration digests are unchanged. Deploy the updated central
-monitoring runner together with model jobs so inventory readers understand it.
+schemas and model configuration digests are unchanged. Deploy the updated Skyulf wheel with model and monitoring jobs so all inventory
+readers understand it.

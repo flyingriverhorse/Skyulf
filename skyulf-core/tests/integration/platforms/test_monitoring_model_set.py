@@ -10,6 +10,14 @@ from test_monitoring_config import performance_policy
 from test_monitoring_registration import settings, workflow
 
 
+@pytest.fixture(autouse=True)
+def existing_monitoring_store(monkeypatch):
+    """Keep component binding tests independent of shared-store DDL."""
+    from skyulf.integrations.databricks import monitoring_model_set as module
+
+    monkeypatch.setattr(module, "ensure_monitoring_store", Mock())
+
+
 def component(branch, version):
     """Represent the already validated immutable parent manifest."""
     return SimpleNamespace(

@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-EXAMPLE = Path(__file__).resolve().parents[3] / "examples" / "databricks_monitoring"
+TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
 
 def _compute_sql(dataset: str) -> str:
     """Retain production interval union and weighting while adapting Spark syntax."""
-    dashboard = json.loads((EXAMPLE / "src" / "monitoring.lvdash.json").read_text())
+    dashboard = json.loads((TEMPLATE / "src/monitoring/monitoring.lvdash.json").read_text())
     datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
     assert dataset in datasets, "Execution needs a query backed by real node telemetry"
     sql = datasets[dataset]

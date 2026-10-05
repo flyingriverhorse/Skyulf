@@ -10,7 +10,7 @@ import pytest
 
 DASHBOARD = (
     Path(__file__).resolve().parents[3]
-    / "examples/databricks_monitoring/src/monitoring.lvdash.json"
+    / "templates/databricks/template/{{.project_name}}/src/monitoring/monitoring.lvdash.json"
 )
 NOW = "2026-10-05 12:00:00"
 

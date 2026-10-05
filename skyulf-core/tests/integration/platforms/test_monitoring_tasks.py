@@ -38,9 +38,11 @@ def test_development_monitoring_tasks_exit_before_reading_models_or_tables(monke
 @pytest.fixture(autouse=True)
 def no_previous_observation(monkeypatch):
     """Keep task unit tests independent of a real Delta results table."""
+    from skyulf.integrations.databricks import monitoring_registration as registration
     from skyulf.integrations.databricks import monitoring_tasks as tasks
 
     monkeypatch.setattr(tasks, "completed_observation", lambda *args: False)
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
 
 
 @pytest.mark.parametrize(

@@ -202,6 +202,7 @@ def test_large_producer_can_register_or_pause_monitor(monkeypatch, enabled, acti
     from skyulf.integrations.databricks import monitoring_registration as registration
 
     enroll = Mock()
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
     monkeypatch.setattr(registration, "enroll_monitor", enroll)
     producer = workflow(max_rows=2_000_000, max_input_mb=2048)
     values = settings(monitoring_enabled=enabled)
