@@ -526,6 +526,21 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
+### SM-23f — Dashboard interaction and monitoring report (DELIVERED, 2026-10-05)
+
+User-reported empty selectors were reproduced in authenticated Chrome. Independent
+option datasets and NULL-safe defaults fix their mutual filtering and blank results.
+All 24 datasets passed 48 default/NULL query checks before same-ID publication;
+published drift charts, model selection, real RMSE degradation, confusion counts
+and job execution rows were verified in Chrome. Attributed billing has no rows.
+Runtime reports now separate drift, measured performance and performance loss;
+the generated graph is `monitor_model -> monitoring_report -> evaluate_retraining`.
+All three layouts redeployed in place; a final model-set monitoring run passed
+all three tasks. Historical real-label comparisons show regression degradation
+without changing policies or requesting training. All 142 distinct focused cases,
+independent review, full CI static gates and applicable pre-commit hooks passed.
+[Evidence161](161-sm23f-monitoring-dashboard-runtime-repair.md).
+
 ### SM-23e — Native job handoff and dashboard acceptance (DELIVERED, 2026-10-05)
 
 Approved follow-up: generated jobs use Spark directly, with visible native

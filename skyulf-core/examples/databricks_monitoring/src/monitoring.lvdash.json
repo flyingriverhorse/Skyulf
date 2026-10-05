@@ -28,9 +28,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
-        " AND (:drift_version = '' OR model_version = :drift_version)\n",
-        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " WHERE (COALESCE(:drift_model, '') = '' OR model_name = :drift_model)\n",
+        " AND (COALESCE(:drift_version, '') = '' OR model_version = :drift_version)\n",
+        " AND (COALESCE(:drift_monitor, '') = '' OR monitor_context = :drift_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -132,9 +132,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
-        " AND (:drift_version = '' OR model_version = :drift_version)\n",
-        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " WHERE (COALESCE(:drift_model, '') = '' OR model_name = :drift_model)\n",
+        " AND (COALESCE(:drift_version, '') = '' OR model_version = :drift_version)\n",
+        " AND (COALESCE(:drift_monitor, '') = '' OR monitor_context = :drift_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -225,9 +225,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -339,9 +339,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -438,9 +438,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected_metric AS (\n",
@@ -448,7 +448,7 @@
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
         " WHERE category = 'performance'\n",
-        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " AND (COALESCE(:performance_metric, '') = '' OR metric_name = :performance_metric)\n",
         " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
         " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
         ")\n",
@@ -547,9 +547,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -631,9 +631,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
-        " AND (:drift_version = '' OR model_version = :drift_version)\n",
-        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " WHERE (COALESCE(:drift_model, '') = '' OR model_name = :drift_model)\n",
+        " AND (COALESCE(:drift_version, '') = '' OR model_version = :drift_version)\n",
+        " AND (COALESCE(:drift_monitor, '') = '' OR monitor_context = :drift_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected AS (\n",
@@ -730,9 +730,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
-        " AND (:drift_version = '' OR model_version = :drift_version)\n",
-        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " WHERE (COALESCE(:drift_model, '') = '' OR model_name = :drift_model)\n",
+        " AND (COALESCE(:drift_version, '') = '' OR model_version = :drift_version)\n",
+        " AND (COALESCE(:drift_monitor, '') = '' OR monitor_context = :drift_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected AS (\n",
@@ -831,9 +831,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected_metric AS (\n",
@@ -841,7 +841,7 @@
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
         " WHERE category = 'performance'\n",
-        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " AND (COALESCE(:performance_metric, '') = '' OR metric_name = :performance_metric)\n",
         " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
         " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
         ")\n",
@@ -948,9 +948,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -1027,9 +1027,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected_metric AS (\n",
@@ -1037,7 +1037,7 @@
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
         " WHERE category = 'performance'\n",
-        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " AND (COALESCE(:performance_metric, '') = '' OR metric_name = :performance_metric)\n",
         " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
         " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
         "), selected AS (\n",
@@ -1160,9 +1160,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
-        " AND (:drift_version = '' OR model_version = :drift_version)\n",
-        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " WHERE (COALESCE(:drift_model, '') = '' OR model_name = :drift_model)\n",
+        " AND (COALESCE(:drift_version, '') = '' OR model_version = :drift_version)\n",
+        " AND (COALESCE(:drift_monitor, '') = '' OR monitor_context = :drift_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -1252,9 +1252,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
@@ -1344,9 +1344,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), ranked_reports AS (\n",
@@ -1441,9 +1441,9 @@
         " model_version, environment, project\n",
         "), chosen_context AS (\n",
         " SELECT * FROM available_contexts\n",
-        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
-        " AND (:trend_version = '' OR model_version = :trend_version)\n",
-        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), ranked_reports AS (\n",
@@ -1643,7 +1643,7 @@
       "displayName": "Execution Status",
       "queryLines": [
         "SELECT :execution_workspace AS workspace_id, :execution_job AS job_id,\n",
-        " CASE WHEN :execution_workspace = '' OR :execution_job = ''\n",
+        " CASE WHEN COALESCE(:execution_workspace, '') = '' OR COALESCE(:execution_job, '') = ''\n",
         " THEN 'Select a workspace and job to see execution and attributed billing'\n",
         " ELSE 'Exact workspace/job scope; empty charts can mean telemetry or billing has not arrived'\n",
         " END AS telemetry_status,\n",
@@ -1680,6 +1680,62 @@
             }
           }
         }
+      ]
+    },
+    {
+      "name": "version_choices",
+      "displayName": "Model version choices",
+      "queryLines": [
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, CASE WHEN NOT (status = 'no_data'\n",
+        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
+        " AND get_json_object(report_json, '$.current_rows') IS NULL) THEN measured_at END AS measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project"
+      ]
+    },
+    {
+      "name": "monitor_choices",
+      "displayName": "Monitoring identity choices",
+      "queryLines": [
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, CASE WHEN NOT (status = 'no_data'\n",
+        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
+        " AND get_json_object(report_json, '$.current_rows') IS NULL) THEN measured_at END AS measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project"
+      ]
+    },
+    {
+      "name": "execution_job_choices",
+      "displayName": "Project job choices",
+      "queryLines": [
+        "WITH latest_jobs AS (\n",
+        " SELECT *, row_number() OVER (PARTITION BY workspace_id, job_id ORDER BY change_time DESC) AS revision\n",
+        " FROM system.lakeflow.jobs\n",
+        ")\n",
+        "SELECT DISTINCT cast(workspace_id AS STRING) AS workspace_id,\n",
+        " cast(job_id AS STRING) AS job_id, name AS job_name\n",
+        "FROM latest_jobs j JOIN (SELECT DISTINCT project FROM model_inventory) i\n",
+        " ON j.name IN (concat(i.project, '_train'), concat(i.project, '_score'), concat(i.project, '_monitoring'))\n",
+        "WHERE revision = 1 AND delete_time IS NULL\n",
+        "ORDER BY workspace_id, job_name, job_id"
       ]
     }
   ],
@@ -2562,7 +2618,7 @@
               {
                 "name": "options",
                 "query": {
-                  "datasetName": "context_choices",
+                  "datasetName": "version_choices",
                   "fields": [
                     {
                       "name": "model_version",
@@ -3424,7 +3480,7 @@
               {
                 "name": "options",
                 "query": {
-                  "datasetName": "context_choices",
+                  "datasetName": "monitor_choices",
                   "fields": [
                     {
                       "name": "monitor_context",
@@ -3885,7 +3941,7 @@
               {
                 "name": "options",
                 "query": {
-                  "datasetName": "context_choices",
+                  "datasetName": "version_choices",
                   "fields": [
                     {
                       "name": "model_version",
@@ -4375,19 +4431,6 @@
                   ],
                   "disaggregated": false
                 }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "metric_name",
-                      "expression": "`metric_name`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
               }
             ],
             "spec": {
@@ -4410,10 +4453,6 @@
                   {
                     "parameterName": "performance_metric",
                     "queryName": "parameter_performance_policy_series"
-                  },
-                  {
-                    "fieldName": "metric_name",
-                    "queryName": "q_policy"
                   }
                 ]
               },
@@ -5171,7 +5210,7 @@
               {
                 "name": "options",
                 "query": {
-                  "datasetName": "context_choices",
+                  "datasetName": "monitor_choices",
                   "fields": [
                     {
                       "name": "monitor_context",
@@ -5758,7 +5797,7 @@
               {
                 "name": "options",
                 "query": {
-                  "datasetName": "execution_choices",
+                  "datasetName": "execution_job_choices",
                   "fields": [
                     {
                       "name": "job_id",

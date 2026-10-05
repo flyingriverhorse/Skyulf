@@ -871,7 +871,8 @@ The `train` job has one active run, with queued training and operator actions:
 | `training_report` | Finalize the run and publish verified results and next actions |
 | `register_monitor` | Enroll the activated model, competition winner or model-set components before scoring |
 | `monitor_model` | Measure the successful scoring commit and save shared monitoring results |
-| `drift_report` | Display the saved batch's feature drift values/limits and shared dashboard link |
+| `monitoring_report` | Display separate drift, observed performance and performance loss evidence |
+| `evaluate_retraining` | Show both trigger reasons and apply one shared guarded training request |
 | `scoring_requested` | Check whether scoring was requested |
 | `run_batch_scoring` | Invoke the existing score job |
 
@@ -1120,7 +1121,7 @@ receipt is passed to the independent `monitoring` job without resolving aliases.
 That third job has its own serverless environment, timeout,
 retry budget and UTC schedule. The schedule starts `PAUSED`; after preparing and
 verifying references, unpause it to revisit delayed outcomes even when no new
-predictions arrive. Its `monitor_model -> drift_report -> retrain_on_drift` tasks
+predictions arrive. Its `monitor_model -> monitoring_report -> evaluate_retraining` tasks
 measure, display and apply the guarded training decision. A failed observation
 is saved as durable evidence and fails the monitoring task; committed predictions
 remain intact. A no-op scoring retry can repair an incomplete request for its
@@ -1130,8 +1131,11 @@ Set `monitoring_revisit_windows` to the number of completed performance windows
 to check for late labels, from 1 to 100; the default is `3` and includes the
 latest window. Earlier windows are revisited without starting training from
 historical observations. Scoring and scheduled observations use the same central
-inventory and result tables. `drift_report` reads the saved observation rather
-than recalculating it. Task output includes an **Open monitoring dashboard** link
+inventory and result tables. `monitoring_report` reads the saved observation rather
+than recalculating it. Drift and performance loss are shown separately; missing
+labels are unavailable evidence, not performance loss. Observed target metrics
+remain visible even when the performance loss policy is disabled. Task output
+includes an **Open monitoring dashboard** link
 when the shared HTTPS `monitoring_dashboard_url` is configured. Databricks AI/BI
 displays the durable Skyulf tables; its native profiling is a separate product,
 not the source of these metrics.
@@ -1252,7 +1256,7 @@ performance retraining requests. Set a model's performance policy to
 train job request. Neither trigger bypasses model evaluation or approval.
 
 The independent Spark monitoring job runs
-`monitor_model -> drift_report -> retrain_on_drift` after a score request or on
+`monitor_model -> monitoring_report -> evaluate_retraining` after a score request or on
 its unpaused schedule. The scoring job's native Run Job task provides the exact
 validated receipt and exposes the child run directly in the graph.
 The check reads the saved observation, checks the current enrolled version,

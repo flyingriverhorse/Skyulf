@@ -243,3 +243,98 @@ def test_drift_report_shows_later_saved_retraining_action():
     assert "Training data unchanged &lt;script&gt;" in html
     assert "request-10" in html and "run-20" in html
     assert "<script>" not in html
+
+
+def _report_row(*, drift=False, performance_status="disabled", metric_value=0.7):
+    """Keep observed metrics independent of an optional loss policy in saved evidence."""
+    return {
+        "report_id": "report-independent",
+        "model_name": "models.schema.model",
+        "model_version": "2",
+        "status": "drift" if drift else "healthy",
+        "observed_at": "2026-10-05T00:00:00Z",
+        "measured_at": "2026-10-05T01:00:00Z",
+        "drifted_columns": int(drift),
+        "report_json": json.dumps(
+            {
+                "scored_rows": 40,
+                "labeled_rows": 20 if metric_value is not None else 0,
+                "label_coverage": 0.5 if metric_value is not None else 0,
+                "metrics": [
+                    {
+                        "category": "drift",
+                        "column_name": "x",
+                        "metric_name": "psi",
+                        "value": 0.3 if drift else 0.1,
+                        "threshold": 0.2,
+                        "has_issue": drift,
+                        "status": "measured",
+                    },
+                    {
+                        "category": "performance",
+                        "column_name": "outcome<script>",
+                        "metric_name": "accuracy",
+                        "value": metric_value,
+                        "status": "measured" if metric_value is not None else "unavailable",
+                    },
+                ],
+                "performance": {
+                    "status": performance_status,
+                    "reason": "insufficient_labels"
+                    if performance_status == "unavailable"
+                    else "policy_off",
+                },
+            }
+        ),
+    }
+
+
+def test_report_shows_observed_performance_when_loss_policy_is_disabled():
+    """Measured accuracy must remain visible even without automatic loss monitoring."""
+    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+
+    html = render_drift_output(_report_row())
+    assert "<h2>Monitoring report</h2>" in html
+    assert "<h2>Feature drift</h2>" in html
+    assert "<h2>Observed performance</h2>" in html
+    assert "accuracy" in html and "0.7" in html
+    assert "Matched actual targets" in html and "20" in html
+    assert "outcome&lt;script&gt;" in html and "<script>" not in html
+    assert "Disabled" in html
+
+
+@pytest.mark.parametrize("drift", [False, True])
+@pytest.mark.parametrize("policy_status", ["healthy", "degraded", "unavailable", "disabled"])
+def test_monitoring_report_returns_independent_signal_statuses(monkeypatch, drift, policy_status):
+    """A loss verdict or missing labels must not replace the separate drift result."""
+    from skyulf.integrations.databricks import monitoring_output as output
+
+    row = _report_row(
+        drift=drift,
+        performance_status=policy_status,
+        metric_value=None if policy_status == "unavailable" else 0.7,
+    )
+    monkeypatch.setattr(output, "load_observation", lambda *args: row)
+    dbutils = Mock()
+    dbutils.widgets.getAll.return_value = {}
+    dbutils.jobs.taskValues.get.return_value = {"status": "ready"}
+    result = output.run_monitoring_report_notebook(Mock(), dbutils)
+    assert result["drift_status"] == ("detected" if drift else "not_detected")
+    assert result["performance_status"] == (
+        "unavailable" if policy_status == "unavailable" else "measured"
+    )
+    assert result["performance_loss_status"] == policy_status
+
+
+def test_report_marks_absent_coverage_unavailable():
+    """A missing label population must not show an invented coverage value or Python None."""
+    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+
+    row = _report_row(performance_status="unavailable", metric_value=None)
+    report = json.loads(row["report_json"])
+    report["label_coverage"] = None
+    row["report_json"] = json.dumps(report)
+    html = render_drift_output(row)
+    observed = html.split("<h2>Observed performance</h2>")[1].split("<h2>Performance policy")[0]
+    assert "<td>None</td>" not in observed
+    assert "Unavailable" in observed

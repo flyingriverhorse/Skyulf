@@ -32,7 +32,8 @@ def render_monitor_output(result: dict, dashboard_url: str = "") -> str:
     if result.get("status") == "queued":
         return (
             "<h2>Model monitoring queued</h2>"
-            "<p>Monitoring runs in a separate job. Open that job's drift_report task "
+            "<p>Monitoring runs in a separate job. Open its monitoring_report task "
+            "(drift_report in older projects) "
             "for these results. The dashboard shows the latest completed calculations.</p>"
             + output_table(
                 ("Monitoring job", "Monitoring run"),
@@ -49,9 +50,8 @@ def render_monitor_output(result: dict, dashboard_url: str = "") -> str:
     return (
         "<h2>Model monitoring</h2>"
         "<p>Checks: feature drift, data quality and performance when actual targets are available. "
-        "Open the drift_report task for this batch's feature results.</p>"
-        + summary
-        + _dashboard_link(dashboard_url)
+        "Open monitoring_report (drift_report in older projects) for this batch's "
+        "drift and performance results.</p>" + summary + _dashboard_link(dashboard_url)
     )
 
 
@@ -166,8 +166,82 @@ def _performance_policy_section(report: dict, row: dict) -> str:
     return heading + output_table(("Evidence", "Saved value"), list(fields))
 
 
+def _drift_status(report: dict) -> str:
+    """Describe feature evidence independently of outcome metrics and policy eligibility."""
+    checks = [
+        metric
+        for metric in report.get("metrics", [])
+        if metric.get("category") == "drift" and metric.get("metric_name") != "ks_test_p_value"
+    ]
+    if any(metric.get("has_issue") for metric in checks):
+        return "detected"
+    if checks and all(metric.get("status") == "measured" for metric in checks):
+        return "not_detected"
+    return "unavailable"
+
+
+def _performance_loss_status(report: dict) -> str:
+    """Keep missing labels distinct from measured degradation and an absent policy."""
+    evidence = report.get("performance") or {}
+    status = evidence.get("status", "disabled")
+    if status in {"off", "disabled"}:
+        return "disabled"
+    return status if status in {"healthy", "degraded", "unavailable"} else "unavailable"
+
+
+def _monitoring_statuses(report: dict) -> dict[str, str]:
+    """Expose independent observed drift, measured performance and policy loss states."""
+    measured = any(
+        metric.get("category") == "performance" and metric.get("value") is not None
+        for metric in report.get("metrics", [])
+    )
+    return {
+        "drift_status": _drift_status(report),
+        "performance_status": "measured" if measured else "unavailable",
+        "performance_loss_status": _performance_loss_status(report),
+    }
+
+
+def _observed_performance_section(report: dict) -> str:
+    """Display saved target metrics even when no degradation policy is configured."""
+    metrics = [
+        metric for metric in report.get("metrics", []) if metric.get("category") == "performance"
+    ]
+    summary = output_table(
+        ("Predictions", "Matched actual targets", "Label coverage"),
+        [
+            tuple(
+                "Unavailable" if report.get(key) is None else report[key]
+                for key in ("scored_rows", "labeled_rows", "label_coverage")
+            )
+        ],
+    )
+    detail = (
+        output_table(
+            ("Target", "Metric", "Observed value", "Measurement status"),
+            [
+                (
+                    metric["column_name"],
+                    metric["metric_name"],
+                    _metric_cell(metric),
+                    metric.get("status", "unavailable"),
+                )
+                for metric in metrics
+            ],
+        )
+        if metrics
+        else "<p>No saved performance metrics are available for this observation.</p>"
+    )
+    return (
+        "<h2>Observed performance</h2>"
+        "<p>Metrics use predictions matched to eligible actual targets. Missing labels are "
+        "unavailable evidence, not performance loss. Policy windows below may cover a "
+        "different population from this scoring observation.</p>" + summary + detail
+    )
+
+
 def render_drift_output(row: dict, dashboard_url: str = "") -> str:
-    """Render a compact per-feature table from the persisted report, without recalculation."""
+    """Render saved drift and performance evidence through the compatible report API."""
     features: dict[str, dict] = {}
     report = json.loads(row["report_json"])
     for metric in report.get("metrics", []):
@@ -219,17 +293,27 @@ def render_drift_output(row: dict, dashboard_url: str = "") -> str:
         else "<p>No feature drift metrics are available for this batch.</p>"
     )
     return (
-        "<h2>Drift report</h2><p>Saved results for this scoring batch. Each metric has its own limit. "
+        "<h2>Monitoring report</h2><p>Saved results for this scoring batch. Each metric has its own limit. "
         "KS p-value is diagnostic only. Timestamps use the Spark session timezone.</p>"
         + summary
+        + output_table(
+            ("Feature drift", "Observed performance", "Performance loss policy"),
+            [tuple(_monitoring_statuses(report).values())],
+        )
+        + "<h2>Feature drift</h2>"
         + detail
+        + _observed_performance_section(report)
         + _performance_policy_section(report, row)
         + _dashboard_link(dashboard_url)
     )
 
 
-def run_drift_report_notebook(
-    spark: Any, dbutils: Any, *, display_html: Callable[[str], Any] | None = None
+def _run_report_notebook(
+    spark: Any,
+    dbutils: Any,
+    *,
+    display_html: Callable[[str], Any] | None,
+    independent_statuses: bool,
 ) -> dict:
     """Display the upstream monitor's saved batch and return a small task result."""
     reference = dbutils.jobs.taskValues.get(taskKey="monitor_model", key="monitoring_reference")
@@ -248,11 +332,35 @@ def run_drift_report_notebook(
         rows = [
             load_observation(spark, item) for item in reference.get("observations", [reference])
         ]
-        results = [
-            {key: row[key] for key in ("report_id", "status", "drifted_columns")} for row in rows
-        ]
+        results = [_report_result(row, independent_statuses) for row in rows]
         result = results[0] if len(results) == 1 else {"results": results}
         html = "".join(render_drift_output(row, url) for row in rows)
     if display_html is not None:
         display_html(html)
     return result
+
+
+def _report_result(row: dict, independent_statuses: bool) -> dict:
+    """Extend new notebook results while preserving the legacy drift task result shape."""
+    result = {key: row[key] for key in ("report_id", "status", "drifted_columns")}
+    if independent_statuses:
+        result.update(_monitoring_statuses(json.loads(row["report_json"])))
+    return result
+
+
+def run_monitoring_report_notebook(
+    spark: Any, dbutils: Any, *, display_html: Callable[[str], Any] | None = None
+) -> dict:
+    """Display independent drift and performance states for the exact saved observation."""
+    return _run_report_notebook(
+        spark, dbutils, display_html=display_html, independent_statuses=True
+    )
+
+
+def run_drift_report_notebook(
+    spark: Any, dbutils: Any, *, display_html: Callable[[str], Any] | None = None
+) -> dict:
+    """Keep the legacy notebook entrypoint and compact result compatible."""
+    return _run_report_notebook(
+        spark, dbutils, display_html=display_html, independent_statuses=False
+    )

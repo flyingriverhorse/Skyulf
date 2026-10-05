@@ -1,4 +1,4 @@
-"""Request existing training workflows after fresh, usable feature drift."""
+"""Request one guarded training workflow for eligible drift or performance loss."""
 
 import json
 import math
@@ -204,6 +204,7 @@ def _candidate(
         "monitor_id": config.monitor_id,
         "config_digest": row["config_digest"],
         "triggers": triggers,
+        "drift_reason": drift,
         "performance_reason": performance,
         "performance_monitored": bool(
             config.performance_policy and config.performance_policy.get("mode") != "off"
@@ -331,7 +332,7 @@ def run_retraining_notebook(
     workspace: Any = None,
     display_html: Callable[[str], Any] | None = None,
 ) -> dict:
-    """Expose optional retraining as a visible, asynchronous scoring-job task."""
+    """Evaluate both trigger policies and expose one guarded asynchronous training request."""
     values = dbutils.widgets.getAll()
     policy = retraining_policy(values)
     result: dict = {"status": "disabled"}
@@ -344,10 +345,54 @@ def run_retraining_notebook(
             + output_table(
                 ("Decision", "Training run"), [(result["status"], result.get("run_id", ""))]
             )
+            + _retraining_policy_explanation(values, policy)
+            + _retraining_model_table(result)
             + "<p>Training uses the existing quality and approval policy. "
             "Actual targets must already be present in the configured training source.</p>"
         )
     return result
+
+
+def _retraining_policy_explanation(values: dict, policy: dict) -> str:
+    """Explain disabled automation from local settings without evaluating model eligibility."""
+    if policy["mode"] != "disabled":
+        return ""
+    if values.get("monitoring_deployment_mode") == "development":
+        return "<p>Automatic retraining is disabled in development mode.</p>"
+    performance = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    if any(item["mode"] == "report" for item in performance.values()):
+        return (
+            "<p>Performance monitoring is report-only and automatic retraining for drift is disabled. "
+            "Open monitoring_report for the saved evidence. No training request is made.</p>"
+        )
+    return "<p>Both automatic retraining triggers are disabled. No training request is made.</p>"
+
+
+def _retraining_model_table(result: dict) -> str:
+    """Show each signal's eligibility separately from the shared submission guard."""
+    if not result.get("models"):
+        return ""
+    return output_table(
+        (
+            "Model",
+            "Drift eligibility",
+            "Performance loss eligibility",
+            "Eligible triggers",
+            "Model decision",
+            "New or changed training rows",
+        ),
+        [
+            (
+                item["model_name"],
+                item.get("drift_reason", "unavailable"),
+                item.get("performance_reason", "unavailable"),
+                ", ".join(item.get("triggers", [])),
+                item["status"],
+                item.get("changed_rows", ""),
+            )
+            for item in result.get("models", [])
+        ],
+    )
 
 
 def run_retraining_check_notebook(

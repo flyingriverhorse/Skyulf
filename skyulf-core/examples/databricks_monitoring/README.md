@@ -4,6 +4,14 @@ Independent model repositories register directly in a shared Delta inventory.
 The central job reads that inventory; there is no models.json or export/copy step.
 Models and their data retain their own catalog/schema locations.
 
+`src/monitoring.lvdash.json` is the version-controlled definition of the native
+Databricks AI/BI dashboard: datasets, filters, charts and pages. It is required
+by `resources/monitoring.dashboard.yml` during deployment; it is not a second
+monitoring engine. This directory contains the standalone shared deployment
+example, while the measurement library lives in `skyulf.integrations.databricks`.
+Deploy the shared dashboard once and give producer projects its URL. Producer
+jobs do not need their own copied dashboard definition.
+
 ## Choose the monitoring destination
 
 The central Bundle and every producer Bundle use the same independent
@@ -197,8 +205,36 @@ scoring through the same native job hierarchy. Monitoring uses its own serverles
 environment, timeout and retry settings, and a UTC schedule that starts `PAUSED`. Prepare and
 verify references before unpausing it. The scheduled run observes enrolled models
 and delayed labels even if no new scoring batch arrives. Its tasks run
-`monitor_model -> drift_report -> retrain_on_drift`; a guarded policy may submit
+`monitor_model -> monitoring_report -> evaluate_retraining`; a guarded policy may submit
 the producer's complete train job.
+
+With monitoring configured and enabled, every successful scoring receipt reaches
+the dedicated monitoring job. Failed scoring and missing saved batches do not
+create a successful observation. Dashboard refresh reads saved results; it does
+not run monitoring and an already open page is not a push stream. Use the
+dashboard's refresh control to load new observations; reloading the browser can
+still reuse cached query results. Scheduled monitoring covers late labels even
+when scoring has not run again.
+
+`monitoring_report` displays feature drift, observed prediction/outcome metrics
+and the separate performance-loss policy. A measured RMSE or F1 value alone does
+not establish degradation: the policy also requires a valid baseline, completed
+window, label coverage and configured tolerance. The policy population can differ
+from the exact scoring batch shown under observed performance.
+`healthy` means the selected metric has not degraded beyond its configured
+tolerance; it does not establish that the model meets an absolute quality goal.
+
+| Eligible signal | Retraining decision |
+| --- | --- |
+| Neither drift nor performance loss | No training request. |
+| Drift only, with `on_drift: retrain` | One request, subject to shared guards. |
+| Performance loss only, with policy `mode: retrain` | One request, subject to shared guards. |
+| Both signals eligible | One combined request, not two training jobs. |
+| Missing labels, unavailable metrics or policy `mode: report` | No performance-driven training request; drift remains independently eligible. |
+
+Shared guards still require usable input, fresh training data, cooldown and no
+active or duplicate request. Older generated projects may still call the
+compatible `drift_report` and `retrain_on_drift` notebook entrypoints.
 
 `monitoring_revisit_windows` controls how many completed performance windows are
 checked for late labels. It defaults to `3`, includes the latest window, and

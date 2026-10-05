@@ -175,10 +175,13 @@ def test_performance_retrain_mode_does_not_enable_drift():
         (True, True, ["performance"]),
         (True, False, []),
         (False, False, []),
+        (True, None, []),
+        (False, None, []),
     ],
 )
+@pytest.mark.parametrize("drift_present", [False, True])
 def test_performance_only_failure_reaches_training_data_gate(
-    monkeypatch, drift_enabled, performance_ready, expected
+    monkeypatch, drift_enabled, performance_ready, expected, drift_present
 ):
     """A healthy feature distribution must not mask measured performance degradation."""
     import json
@@ -205,22 +208,31 @@ def test_performance_only_failure_reaches_training_data_gate(
         "metric": "mae",
         "contract_digest": "a" * 64,
         "value": 5.0 if performance_ready else 0.2,
-        "labeled_rows": 5,
-        "label_coverage": 1,
+        "labeled_rows": 0 if performance_ready is None else 5,
+        "label_coverage": 0 if performance_ready is None else 1,
         "as_of": now.isoformat(),
         "window_start": "2026-10-03T00:00:00+00:00",
         "window_end": "2026-10-04T00:00:00+00:00",
     }
     baseline = {**current, "value": 0.25}
     verdict = evaluate_performance(policy(), current, baseline, [], now=now)
+    from test_retraining_task import observation
+
     row = {
         "report_id": "b" * 64,
         "monitor_id": config.monitor_id,
         "config_digest": json_digest(config.payload()),
         "model_version": "2",
-        "status": "healthy",
+        "status": "drift" if drift_present else "healthy",
         "observed_at": now,
-        "report_json": json.dumps({"metrics": [], "performance": verdict}),
+        "report_json": json.dumps(
+            {
+                "metrics": json.loads(observation(config, now)["report_json"])["metrics"]
+                if drift_present
+                else [],
+                "performance": verdict,
+            }
+        ),
     }
     calls = []
 
@@ -231,7 +243,11 @@ def test_performance_only_failure_reaches_training_data_gate(
 
     monkeypatch.setattr(retraining_data, "assess_training_data", assess)
     result = retraining_task._candidate(None, row, config, {}, now, 1, drift_enabled=drift_enabled)
+    expected = (["drift"] if drift_enabled and drift_present else []) + expected
     assert result["triggers"] == expected
+    assert result["drift_reason"] == (
+        "disabled" if not drift_enabled else "ready" if drift_present else "no_drift"
+    )
     assert len(calls) == bool(expected)
     if expected:
         assert result["status"] == "no_new_training_data"

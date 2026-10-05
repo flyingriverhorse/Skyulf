@@ -363,3 +363,76 @@ def test_disabled_check_publishes_false_without_cloud_work(monkeypatch):
     enabled.assert_not_called()
     dbutils.jobs.taskValues.set.assert_any_call(key="retraining_needed", value=False)
     assert result == {"status": "disabled"}
+
+
+def test_retraining_output_displays_both_reasons_and_shared_guard(monkeypatch):
+    """An operator must see why each trigger qualified and why one shared request was skipped."""
+    from skyulf.integrations.databricks import retraining_task
+
+    outcome = {
+        "status": "cooldown",
+        "models": [
+            {
+                "model_name": "model<script>",
+                "status": "ready",
+                "drift_reason": "no_drift",
+                "performance_reason": "ready",
+                "triggers": ["performance"],
+                "changed_rows": 3,
+            }
+        ],
+    }
+    monkeypatch.setattr(retraining_task, "_run_enabled", lambda *args: outcome)
+    dbutils, display = Mock(), Mock()
+    dbutils.widgets.getAll.return_value = {"on_drift": "retrain"}
+    result = retraining_task.run_retraining_notebook(Mock(), dbutils, display_html=display)
+    html = display.call_args.args[0]
+    assert "Drift eligibility" in html and "Performance loss eligibility" in html
+    assert "no_drift" in html and "performance" in html and "cooldown" in html
+    assert "model&lt;script&gt;" in html and "<script>" not in html
+    assert result == outcome
+
+
+@pytest.mark.parametrize(
+    "deployment,performance_mode,explanation",
+    [
+        ("production", "off", "Both automatic retraining triggers are disabled"),
+        ("production", "report", "Performance monitoring is report-only"),
+        ("development", "retrain", "Automatic retraining is disabled in development mode"),
+    ],
+)
+def test_disabled_output_explains_policy_without_empty_model_table(
+    deployment, performance_mode, explanation
+):
+    """Skipped automation must explain its policy without inventing model eligibility or reading data."""
+    from skyulf.integrations.databricks.retraining_task import run_retraining_notebook
+
+    performance = {
+        "mode": performance_mode,
+        "metric": "mae",
+        "direction": "lower",
+        "baseline": {"kind": "training_holdout", "model_version": "2"},
+        "tolerance": 1.0,
+        "tolerance_mode": "absolute",
+        "window_hours": 24,
+        "label_delay_hours": 24,
+        "minimum_labeled_rows": 2,
+        "minimum_label_coverage": 0.5,
+        "consecutive_windows": 1,
+    }
+    if performance_mode == "off":
+        performance = {"mode": "off"}
+    spark, workspace, dbutils, display = Mock(), Mock(), Mock(), Mock()
+    dbutils.widgets.getAll.return_value = {
+        "monitoring_deployment_mode": deployment,
+        "on_drift": "retrain" if deployment == "development" else "disabled",
+        "monitoring_performance_policies": json.dumps({"cat.models.model": performance}),
+    }
+    result = run_retraining_notebook(spark, dbutils, workspace=workspace, display_html=display)
+    html = display.call_args.args[0]
+    assert explanation in html
+    assert "Drift eligibility" not in html
+    assert "<tbody></tbody>" not in html
+    dbutils.jobs.taskValues.get.assert_not_called()
+    assert spark.mock_calls == workspace.mock_calls == []
+    assert result == {"status": "disabled"}

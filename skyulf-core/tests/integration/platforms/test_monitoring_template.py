@@ -15,7 +15,12 @@ def test_separate_spark_monitoring_template_exists():
     assert "monitoring_cron" in job
     assert "monitoring_request" in job
     assert "../src/jobs/monitor_project.py" in job
-    assert "../src/jobs/retrain_on_drift.py" in job
+    assert "../src/jobs/monitoring_report.py" in job
+    assert "../src/jobs/evaluate_retraining.py" in job
+    assert "task_key: monitoring_report" in job
+    assert "task_key: evaluate_retraining" in job
+    assert "task_key: drift_report" not in job
+    assert "task_key: retrain_on_drift" not in job
 
 
 @pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
@@ -54,6 +59,16 @@ def test_generated_projects_bind_independent_monitoring_destination(
         task for task in monitoring_job["tasks"] if task["task_key"] == "monitor_model"
     )
     monitoring_params = monitoring_task["notebook_task"]["base_parameters"]
+    monitoring_tasks = {task["task_key"]: task for task in monitoring_job["tasks"]}
+    assert set(monitoring_tasks) == {"monitor_model", "monitoring_report", "evaluate_retraining"}
+    assert monitoring_tasks["monitoring_report"]["depends_on"] == [{"task_key": "monitor_model"}]
+    assert monitoring_tasks["evaluate_retraining"]["depends_on"] == [
+        {"task_key": "monitoring_report"}
+    ]
+    for task_name in ("monitoring_report", "evaluate_retraining"):
+        notebook = monitoring_tasks[task_name]["notebook_task"]
+        assert notebook["notebook_path"] == f"../src/jobs/{task_name}.py"
+        assert (project / "src/jobs" / f"{task_name}.py").is_file()
     assert monitoring_params["as_of_unix_ms"] == "{{job.start_time.timestamp_ms}}"
     assert "as_of" not in monitoring_params
     job = yaml.safe_load((project / "resources/score.job.yml").read_text())["resources"]["jobs"][
@@ -74,6 +89,8 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert len(tasks) == (4 if recovery == "true" else 2)
     assert not {
         "drift_report",
+        "monitoring_report",
+        "evaluate_retraining",
         "check_retraining",
         "retraining_needed",
         "retrain_on_drift",

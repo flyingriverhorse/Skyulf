@@ -59,7 +59,8 @@ resources:
               monitoring_revisit_windows: ${var.monitoring_revisit_windows}
               monitoring_action: '{{"{{job.parameters.monitoring_action}}"}}'
               as_of_unix_ms: '{{"{{job.start_time.timestamp_ms}}"}}'
-        - task_key: drift_report
+        - task_key: monitoring_report
+          description: Show independent feature drift, observed performance and performance loss evidence
           depends_on:
             - task_key: monitor_model
           timeout_seconds: ${var.monitoring_task_timeout_seconds}
@@ -67,7 +68,7 @@ resources:
           min_retry_interval_millis: 60000
           environment_key: monitoring
           notebook_task:
-            notebook_path: ../src/jobs/drift_report.py
+            notebook_path: ../src/jobs/monitoring_report.py
             base_parameters:
               on_drift: ${var.on_drift}
               on_drift_cooldown_hours: ${var.on_drift_cooldown_hours}
@@ -97,15 +98,16 @@ resources:
               monitoring_environment: ${bundle.target}
               monitoring_deployment_mode: ${bundle.mode}
               monitoring_project: ${bundle.name}
-        - task_key: retrain_on_drift
+        - task_key: evaluate_retraining
+          description: Evaluate drift or performance loss and submit at most one guarded training request
           depends_on:
-            - task_key: drift_report
+            - task_key: monitoring_report
           timeout_seconds: ${var.monitoring_task_timeout_seconds}
           max_retries: ${var.monitoring_max_retries}
           min_retry_interval_millis: 60000
           environment_key: monitoring
           notebook_task:
-            notebook_path: ../src/jobs/retrain_on_drift.py
+            notebook_path: ../src/jobs/evaluate_retraining.py
             base_parameters:
               on_drift: ${var.on_drift}
               on_drift_cooldown_hours: ${var.on_drift_cooldown_hours}

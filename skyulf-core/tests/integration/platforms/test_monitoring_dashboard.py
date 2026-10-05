@@ -1,6 +1,8 @@
 """Contract checks for the central, portable monitoring dashboard example."""
 
 import json
+import re
+import sqlite3
 from pathlib import Path
 
 import yaml
@@ -272,7 +274,7 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
     assert line["spec"]["widgetType"] == "line"
     assert line["spec"]["encodings"]["color"]["fieldName"] == "series"
     assert line["queries"][0]["query"]["datasetName"] == "performance_policy_series"
-    for field in ("model_name", "model_version", "metric_name"):
+    for field in ("model_name", "model_version"):
         control = widgets[f"filter_{field}_performance"]
         assert any(
             query["query"]["datasetName"] == "performance_policy" for query in control["queries"]
@@ -369,3 +371,71 @@ def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> N
     assert "currency_code = 'USD'" in cost
     assert "COALESCE(lp.pricing" not in cost
     assert "Select a workspace and job" in datasets["execution_status"]
+
+
+def test_nullable_context_parameters_keep_latest_and_explicit_selections() -> None:
+    """Clearing a selector must choose the latest identity instead of hiding every row."""
+    datasets = _dashboard()["datasets"]
+    expected = {
+        dataset["name"]
+        for dataset in datasets
+        if any(p["keyword"].endswith("_model") for p in dataset.get("parameters", []))
+    }
+    checked: set[str] = set()
+    with sqlite3.connect(":memory:") as connection:
+        connection.execute(
+            "CREATE TABLE available_contexts (monitor_id TEXT, model_name TEXT, "
+            "model_version TEXT, monitor_context TEXT, latest_measurement INTEGER)"
+        )
+        connection.executemany(
+            "INSERT INTO available_contexts VALUES (?, ?, ?, ?, ?)",
+            [("old", "model-a", "1", "project-a", 1), ("new", "model-b", "2", "project-b", 2)],
+        )
+        for dataset in datasets:
+            sql = "".join(dataset["queryLines"])
+            match = re.search(r"SELECT \* FROM available_contexts\n WHERE .*?LIMIT 1", sql, re.S)
+            if match is None:
+                continue
+            checked.add(dataset["name"])
+            query = match.group()
+            keywords = re.findall(r":([a-z_]+)", query)
+            for empty in (None, ""):
+                parameters = dict.fromkeys(keywords, empty)
+                assert connection.execute(query, parameters).fetchone()[0] == "new", dataset["name"]
+                parameters.update({key: "model-a" for key in keywords if key.endswith("_model")})
+                assert connection.execute(query, parameters).fetchone()[0] == "old", dataset["name"]
+                parameters.update({key: "2" for key in keywords if key.endswith("_version")})
+                assert connection.execute(query, parameters).fetchone() is None, dataset["name"]
+    assert checked == expected and checked
+
+
+def test_parameter_option_datasets_do_not_prune_sibling_selectors() -> None:
+    """An empty scalar default must not remove the choices in another selector."""
+    for page in _dashboard()["pages"]:
+        used_options: set[str] = set()
+        for widget in _widgets(page):
+            fields = widget.get("spec", {}).get("encodings", {}).get("fields", [])
+            if not any("parameterName" in field for field in fields):
+                continue
+            queries = {query["name"]: query["query"] for query in widget["queries"]}
+            options = {
+                queries[field["queryName"]]["datasetName"]
+                for field in fields
+                if "fieldName" in field
+            }
+            assert not options & used_options, widget["name"]
+            used_options.update(options)
+
+
+def test_empty_metric_selection_keeps_policy_evidence_visible() -> None:
+    """A blank or unrelated chart metric must not hide the configured policy evidence."""
+    dashboard = _dashboard()
+    policy = next(d for d in dashboard["datasets"] if d["name"] == "performance_policy")
+    assert "performance_metric" not in {p["keyword"] for p in policy["parameters"]}
+    widget = next(
+        w
+        for page in dashboard["pages"]
+        for w in _widgets(page)
+        if w["name"] == "filter_metric_name_performance"
+    )
+    assert all(q["query"]["datasetName"] != "performance_policy" for q in widget["queries"])
