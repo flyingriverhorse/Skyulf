@@ -23,7 +23,7 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
     dashboard = _dashboard()
     datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
     pages = {page["name"]: page for page in dashboard["pages"]}
-    assert set(pages) == {"overview", "drift_quality", "performance"}
+    assert set(pages) == {"overview", "drift_quality", "performance", "execution"}
     assert "FROM current_health" in datasets["current_health"]
     assert "FROM metric_history" in datasets["metric_history"]
     assert "WHERE measured_at" not in datasets["current_health"]
@@ -152,7 +152,8 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     for dataset in ("drift_psi_chart", "drift_trend"):
         assert "model_name = :drift_model" in datasets[dataset]
         assert "model_version = :drift_version" in datasets[dataset]
-        assert "count(DISTINCT monitor_id)" in datasets[dataset]
+        assert "chosen_context" in datasets[dataset]
+        assert "monitor_id" in datasets[dataset]
         for field in ("model_name", "model_version"):
             control = widgets[f"filter_{field}_drift_quality"]
             assert control["spec"]["widgetType"] == "filter-single-select"
@@ -161,12 +162,16 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     assert "metric_name = 'psi'" in psi
     assert "threshold AS plot_value" in psi
     assert "report_rank = 1" in psi and "LIMIT 10" in psi
+    assert "FROM monitoring_results" in psi
+    assert "window_end DESC" in psi
     assert "metric_name <> 'ks_test_p_value'" in datasets["drift_trend"]
     assert "current_timezone()" in datasets["drift_trend"]
     assert widgets["drift_trend"]["spec"]["encodings"]["x"]["fieldName"] == "measurement_time"
     latest = datasets["performance_latest"]
-    assert "ORDER BY measured_at DESC, report_id DESC" in latest
+    assert "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in latest
     assert "value IS NOT NULL" not in latest
+    assert "FROM monitoring_results" in latest
+    assert "history.report_id = latest_reports.report_id" in latest
     for field in ("model_name", "model_version", "metric_name"):
         control = widgets[f"filter_{field}_performance"]
         assert any(q["query"]["datasetName"] == "performance_latest" for q in control["queries"])
@@ -226,9 +231,9 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
             "current_value",
             "baseline_value",
             "threshold_value",
-            "metric = :policy_metric",
-            "model_name = :policy_model",
-            "model_version = :policy_version",
+            ":performance_metric",
+            "model_name = :trend_model",
+            "model_version = :trend_version",
         )
     )
     assert "FROM metric_history" in datasets["performance_measurements"]
@@ -276,3 +281,68 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
         query["query"]["datasetName"] == "performance_policy_series"
         for query in widgets["filter_measured_at_performance"]["queries"]
     )
+
+
+def test_context_selection_keeps_unobserved_models_and_resolves_one_identity() -> None:
+    """An enrolled model must remain selectable when another monitor shares its version."""
+    dashboard = _dashboard()
+    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
+    assert "FROM current_health" in datasets["context_choices"]
+    assert "FROM monitoring_results" in datasets["context_choices"]
+    for name in ("metric_history", "quality_history", "performance_measurements"):
+        assert "chosen_context" in datasets[name]
+        assert "LIMIT 1" in datasets[name]
+        assert "source.monitor_id = context.monitor_id" in datasets[name]
+    for name in ("drift_context", "performance_context"):
+        assert "monitor_context" in datasets[name]
+        assert "No matching enrollment" in datasets[name]
+    assert {
+        parameter["keyword"]
+        for dataset in dashboard["datasets"]
+        for parameter in dataset.get("parameters", [])
+    } == {
+        "drift_model",
+        "drift_version",
+        "drift_monitor",
+        "trend_model",
+        "trend_version",
+        "trend_monitor",
+        "performance_metric",
+        "execution_workspace",
+        "execution_job",
+    }
+
+
+def test_confusion_matrix_preserves_labels_and_missing_evidence() -> None:
+    """Absent historical matrix data must not turn into perfect or zero classification results."""
+    dashboard = _dashboard()
+    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
+    assert "$.confusion_matrix" in datasets["confusion_cells"]
+    assert "actual_index" in datasets["confusion_cells"]
+    assert "predicted_index" in datasets["confusion_cells"]
+    assert "not_recorded" in datasets["confusion_status"]
+    status = datasets["confusion_status"]
+    assert status.index("status = 'failed'") < status.index("'not_recorded'")
+    assert status.index("status = 'no_data'") < status.index("'not_recorded'")
+    assert "error_message" in status
+    assert (
+        "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in datasets["confusion_cells"]
+    )
+    widgets = {w["name"]: w for p in dashboard["pages"] for w in _widgets(p)}
+    assert widgets["confusion_matrix"]["spec"]["widgetType"] == "pivot"
+
+
+def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> None:
+    """Empty portable settings must never expose arbitrary workspace spend or fake exact cost."""
+    dashboard = _dashboard()
+    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
+    for name in ("execution_runs", "execution_cost"):
+        assert ":execution_workspace" in datasets[name]
+        assert ":execution_job" in datasets[name]
+    cost = datasets["execution_cost"]
+    assert "system.billing.usage" in cost
+    assert "system.billing.list_prices" in cost
+    assert "unpriced_records" in cost
+    assert "currency_code = 'USD'" in cost
+    assert "COALESCE(lp.pricing" not in cost
+    assert "Select a workspace and job" in datasets["execution_status"]

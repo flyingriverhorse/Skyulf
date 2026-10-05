@@ -1063,12 +1063,12 @@ clock or filesystem state. Use the saved asset helper for lookup data.
 Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
 `prod`). Personal development targets do not enroll temporary models or create
 monitoring tables. The `monitoring_allowed` condition excludes enrollment and the
-post-scoring monitoring/drift/retraining branch in `mode: development`; training
+post-scoring monitoring handoff in `mode: development`; training
 and scoring still run normally, including automatic scoring after activation.
 Development targets also set `monitoring_enabled: "false"`,
 `monitoring_performance_policies: '{}'` and `on_drift: disabled`.
 The deployment-mode guard remains effective even if shared monitoring destinations
-or an enabled flag are inherited from common settings. Deploy both updated jobs
+or an enabled flag are inherited from common settings. Deploy all three updated jobs
 with the updated Skyulf wheel for this behavior to apply to an existing project.
 
 Each repository registers its activated model before scoring, and its scored
@@ -1080,7 +1080,6 @@ Then set these independent variables in this project's deployment target:
 ```yaml
 monitoring_catalog: operations
 monitoring_schema: model_monitoring
-monitoring_execution_engine: spark # Default; local uses bounded inline monitoring
 monitoring_expected_interval_hours: "24"
 monitoring_revisit_windows: "3" # Completed performance windows, including latest
 monitoring_drift_thresholds: '{"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}'
@@ -1112,9 +1111,13 @@ visible job failure; committed predictions remain intact.
 For all three layouts, `training_report -> register_monitor`
 enrolls the activated version from its verified lifecycle receipt, before
 `scoring_requested`. Pending or rejected candidates leave enrollment unchanged.
-With the default `monitoring_execution_engine: spark`, scoring publishes a
-receipt-bound request to the independent `monitoring` job and does not wait for
-metric computation. That third job has its own serverless environment, timeout,
+Generated jobs always use Spark monitoring. After successful scoring or recovery,
+`prepare_monitoring` validates the exact saved model versions and commit, then
+`monitoring_ready` gates the native `monitor_model` Run Job task. Disabled monitoring
+skips child dispatch. The child run is visible from the scoring job graph; its
+completion or failure is reflected in the parent Run Job task. The exact serialized
+receipt is passed to the independent `monitoring` job without resolving aliases.
+That third job has its own serverless environment, timeout,
 retry budget and UTC schedule. The schedule starts `PAUSED`; after preparing and
 verifying references, unpause it to revisit delayed outcomes even when no new
 predictions arrive. Its `monitor_model -> drift_report -> retrain_on_drift` tasks
@@ -1133,9 +1136,11 @@ when the shared HTTPS `monitoring_dashboard_url` is configured. Databricks AI/BI
 displays the durable Skyulf tables; its native profiling is a separate product,
 not the source of these metrics.
 
-For the bounded `local` execution setting, the score job retains its inline
-monitoring tasks and local row/byte safety caps. Spark monitoring aggregates
-ongoing observations without the local one-million-row monitoring cap. Reference
+The public local monitoring API remains available for bounded callers, with
+`max_rows=10000` by default and a hard cap of `1000000`; its byte budget defaults
+to 64 MiB and is capped at 1 GiB. Generated job graphs expose no engine selector
+and contain no inline monitoring or retraining branch. Spark monitoring aggregates
+ongoing observations without applying local raw row or byte caps. Reference
 preparation replays the original training source once under the existing bounded
 training budget; training and scoring do not become distributed. A model trained
 before `monitoring_source_evidence.json` was saved needs retraining or verified
@@ -1246,11 +1251,10 @@ performance retraining requests. Set a model's performance policy to
 `on_drift` remains an independent setting. Either trigger uses the same guarded
 train job request. Neither trigger bypasses model evaluation or approval.
 
-With the default Spark setting, the independent monitoring job runs
+The independent Spark monitoring job runs
 `monitor_model -> drift_report -> retrain_on_drift` after a score request or on
-its unpaused schedule. The bounded local setting retains the score job's
-`score -> monitor_model -> drift_report -> check_retraining` chain, followed by
-the `retraining_needed` If/else task and its request/skip branches.
+its unpaused schedule. The scoring job's native Run Job task provides the exact
+validated receipt and exposes the child run directly in the graph.
 The check reads the saved observation, checks the current enrolled version,
 and compares actual eligible training rows with the saved model's training data.
 Feature quality/schema problems, incomplete drift checks, stale observations,

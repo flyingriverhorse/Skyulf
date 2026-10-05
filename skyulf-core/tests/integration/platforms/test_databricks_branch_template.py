@@ -160,7 +160,7 @@ def test_branch_notebook_rejects_repairs_and_operator_actions(tmp_path, workflow
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
 @pytest.mark.parametrize("policy", ["manual_approval", "automatic"])
 @pytest.mark.parametrize("handoff", ["disabled", "after_alias_change"])
-def test_multi_target_cli_graph_has_same_two_jobs(tmp_path, compute, policy, handoff):
+def test_multi_target_cli_graph_has_same_three_jobs(tmp_path, compute, policy, handoff):
     """Actual Go expansion must create independent fits and retain a single complete-set join."""
     from test_databricks_bundle_generation import _generate_project, _read_jobs, _synced_sources
 
@@ -172,7 +172,7 @@ def test_multi_target_cli_graph_has_same_two_jobs(tmp_path, compute, policy, han
         score_handoff=handoff,
     )
     jobs = _read_jobs(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     train = jobs["train"]
     assert train["max_concurrent_runs"] == 1
     assert len(train["tasks"]) == 12

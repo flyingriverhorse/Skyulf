@@ -45,6 +45,16 @@ def test_inventory_keeps_namespace_and_selection():
     assert row["selection"] == "version:2"
 
 
+def test_current_health_exposes_pinned_inventory_version_before_observation():
+    """A newly enrolled model must remain selectable before its first report arrives."""
+    from skyulf.integrations.databricks.monitoring_store import monitoring_views
+
+    query = monitoring_views("ops.monitoring")["current_health"]
+    assert "COALESCE(r.model_version, get_json_object(i.config_json, '$.model_version'))" in query
+    assert "'$.model_set_name'" in query
+    assert "'$.model_set_version'" in query
+
+
 def test_persistence_rejects_nonfinite_report_values():
     """Invalid JSON cannot become a misleading dashboard metric."""
     from skyulf.integrations.databricks.monitoring_store import result_row

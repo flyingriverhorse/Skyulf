@@ -10,6 +10,7 @@ from typing import Any, Self
 from ._contracts import column_name, table_name
 from .performance_policy import validate_performance_policy
 
+# Safety ceilings for the legacy local reader, not Spark observation row limits.
 MAX_MONITOR_ROWS = 1_000_000
 MAX_MONITOR_BYTES = 1024**3
 
@@ -37,7 +38,13 @@ def json_digest(value: Any) -> str:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MonitorConfig:
-    """Enroll one model while keeping source, result and registry locations independent."""
+    """Enroll a model with independent source, result and registry locations.
+
+    ``max_rows`` and ``max_bytes`` bound legacy local materialization. Their
+    defaults are per-observation budgets, while MAX_MONITOR_* are safety ceilings.
+    Spark readers keep observations distributed and do not apply these row/byte
+    caps; bounded metadata and training-reference preparation have separate limits.
+    """
 
     environment: str
     project: str

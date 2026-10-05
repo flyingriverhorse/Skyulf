@@ -13,6 +13,7 @@ from .monitoring import run_monitoring
 from .monitoring_config import MonitorConfig, json_digest, qualified_name
 from .monitoring_output import render_monitor_output
 from .monitoring_registration import monitoring_destination, register_deployed_monitor
+from .prediction_output import scoring_target
 
 
 def deployment_store(values: dict[str, str], *, expected_phase: str = "result") -> PhaseStore:
@@ -94,6 +95,74 @@ def completed_observation(
         f"AND window_end = TIMESTAMP '{end.isoformat()}' AND status <> 'failed'"
     )
     return bool(spark.table(name).where(predicate).limit(1).count())
+
+
+def prepare_scoring_monitoring_notebook(dbutils: Any) -> dict:
+    """Publish an exact validated Spark receipt for a visible native Run Job task."""
+    values = dbutils.widgets.getAll()
+    dbutils.jobs.taskValues.set(key="monitoring_ready", value=False)
+    dbutils.jobs.taskValues.set(key="monitoring_request_json", value="")
+    namespace = monitoring_destination(values)
+    if namespace is None or values.get("monitoring_enabled", "true") != "true":
+        return {"status": "disabled"}
+    workflow = read_notebook_config(values)
+    request = _scoring_request(dbutils, workflow)
+    configs = _native_request_configs(request, namespace)
+    _validate_requested_models(configs, workflow, values)
+    for config in configs:
+        _validate_native_config(config, namespace, workflow, values)
+    if _empty_scoring_request(request, configs):
+        return {"status": "no_new_predictions"}
+    serialized = json.dumps(request, sort_keys=True, allow_nan=False)
+    dbutils.jobs.taskValues.set(key="monitoring_request_json", value=serialized)
+    dbutils.jobs.taskValues.set(key="monitoring_ready", value=True)
+    return {"status": "ready"}
+
+
+def _native_request_configs(request: dict, namespace: str) -> list[MonitorConfig]:
+    """Reject ambiguous identities and invalid committed-batch metadata before dispatch."""
+    _validate_native_receipt(request, namespace)
+    configs = [
+        MonitorConfig.from_dict(item) for item in request.get("configs", [request.get("config")])
+    ]
+    if not configs or len({config.monitor_id for config in configs}) != len(configs):
+        raise ValueError("Monitoring request requires distinct model identities.")
+    return configs
+
+
+def _validate_native_receipt(request: dict, namespace: str) -> None:
+    """Require one configuration form and explicit successful scoring commit metadata."""
+    if ("configs" in request) == ("config" in request):
+        raise ValueError("Monitoring requires exactly one configuration form.")
+    if namespace != request.get("namespace"):
+        raise ValueError("Monitoring destination differs from the scoring request.")
+    if type(request.get("has_saved_batch", False)) is not bool:
+        raise ValueError("Monitoring requires a boolean saved-batch marker.")
+    commit = request.get("commit_version")
+    requires_commit = not request["noop"] or request.get("has_saved_batch", False)
+    if (requires_commit or commit is not None) and (type(commit) is not int or commit < 0):
+        raise ValueError("Monitoring requires a committed prediction version.")
+
+
+def _validate_native_config(
+    config: MonitorConfig, namespace: str, workflow: dict, values: dict
+) -> None:
+    """Bind native Spark observation to this producer's pinned physical scoring output."""
+    if config.execution_engine != "spark" or not config.model_version or not config.enabled:
+        raise ValueError("Native monitoring requires an enabled pinned Spark configuration.")
+    expected = (
+        namespace,
+        values.get("monitoring_environment"),
+        values.get("monitoring_project"),
+        workflow["score_source_table"],
+    )
+    actual = (config.reference_namespace, config.environment, config.project, config.source_table)
+    if actual != expected:
+        raise ValueError("Monitoring configuration differs from the scoring producer.")
+    if workflow.get("training_layout") != "multi_target":
+        prediction_table = scoring_target(workflow | {"model_version": config.model_version})
+        if config.model_set_name or config.prediction_table != prediction_table:
+            raise ValueError("Monitoring prediction table differs from the scoring request.")
 
 
 def _run_scoring_monitor(spark: Any, dbutils: Any) -> dict:

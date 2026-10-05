@@ -229,14 +229,29 @@ def _confusion_values(cells: list[tuple[int, int, int]], class_count: int) -> di
     return result
 
 
-def _classification(pairs: Any, classes: tuple) -> dict[str, float]:
+def _classification(pairs: Any, classes: tuple) -> tuple[dict[str, float], dict]:
     """Collect at most the explicitly bounded class-squared confusion matrix."""
     cells = pairs.groupBy("__sm_truth", "prediction").count().limit(MAX_CLASSES**2 + 1).collect()
     if len(cells) > MAX_CLASSES**2:
         raise ValueError("Monitoring confusion matrix exceeded its metadata limit.")
     indexes = {label: index for index, label in enumerate(classes)}
     counts = [(indexes[row[0]], indexes[row[1]], row[2]) for row in cells]
-    return _confusion_values(counts, len(classes))
+    by_pair = {(actual, predicted): count for actual, predicted, count in counts}
+    matrix = {
+        "status": "measured",
+        "cells": [
+            {
+                "actual_label": str(actual),
+                "predicted_label": str(predicted),
+                "actual_index": i,
+                "predicted_index": j,
+                "count": by_pair.get((i, j), 0),
+            }
+            for i, actual in enumerate(classes)
+            for j, predicted in enumerate(classes)
+        ],
+    }
+    return _confusion_values(counts, len(classes)), matrix
 
 
 def _performance(
@@ -247,7 +262,7 @@ def _performance(
     task: str,
     classes: tuple,
     probabilities: tuple,
-) -> tuple[dict, int, list[str]]:
+) -> tuple[dict, int, list[str], dict]:
     """Measure aggregate metrics and expose unsupported probability evidence explicitly."""
     pairs = _pairs(scored, labels, keys, target, task, classes)
     count = 0 if pairs is None else pairs.count()
@@ -257,8 +272,13 @@ def _performance(
             dict.fromkeys(names),
             count,
             ["Performance unavailable: fewer than two finite labeled pairs."],
+            {"status": "unavailable", "reason": "insufficient_labels", "cells": []},
         )
-    values = _regression(pairs) if task == "regression" else _classification(pairs, classes)
+    if task == "regression":
+        values = _regression(pairs)
+        matrix = {"status": "not_applicable", "reason": "regression", "cells": []}
+    else:
+        values, matrix = _classification(pairs, classes)
     notes = []
     if probabilities:
         from .spark_monitoring_probability import probability_values  # noqa: PLC0415
@@ -270,6 +290,7 @@ def _performance(
         {name: value if math.isfinite(value) else None for name, value in values.items()},
         count,
         notes,
+        matrix,
     )
 
 
@@ -294,7 +315,7 @@ def build_spark_performance_report(
     eligible = _eligible(
         labels, result_available_at_column, as_of, record_key_columns, target_column
     )
-    values, labeled, notes = _performance(
+    values, labeled, notes, matrix = _performance(
         scored, eligible, record_key_columns, target_column, task, classes, probabilities
     )
     count = scored.count()
@@ -305,6 +326,7 @@ def build_spark_performance_report(
         "labeled_rows": labeled,
         "label_coverage": labeled / count if count else None,
         "notes": notes,
+        "confusion_matrix": matrix,
     }
 
 

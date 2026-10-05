@@ -183,6 +183,7 @@ def monitoring_report(
         "scored_rows": performance["scored_rows"],
         "labeled_rows": performance["labeled_rows"],
         "label_coverage": performance["label_coverage"],
+        "confusion_matrix": performance["confusion_matrix"],
         "drifted_columns": drifted,
         "metrics": metrics,
         "notes": notes,

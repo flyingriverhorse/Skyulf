@@ -1,4 +1,4 @@
-"""Opt-in real CLI generation checks for the deployable two-job operator graph."""
+"""Opt-in real CLI generation checks for the deployable three-job operator graph."""
 
 import json
 import os
@@ -122,18 +122,15 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
     config = _read_validated_config(project)
     assert config["auto_rebuild_on_cdf_expiry"] is (enabled == "true")
     jobs = _read_jobs(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
     if enabled == "false":
         assert set(tasks) == {
             "score",
             "monitoring_allowed",
+            "prepare_monitoring",
+            "monitoring_ready",
             "monitor_model",
-            "drift_report",
-            "check_retraining",
-            "retraining_needed",
-            "retrain_on_drift",
-            "retraining_skipped",
         }
         return
     assert set(tasks) == {
@@ -142,12 +139,9 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         "recover_predictions",
         "scoring_report",
         "monitoring_allowed",
+        "prepare_monitoring",
+        "monitoring_ready",
         "monitor_model",
-        "drift_report",
-        "retrain_on_drift",
-        "check_retraining",
-        "retraining_needed",
-        "retraining_skipped",
     }
     assert tasks["recovery_needed"]["depends_on"] == [{"task_key": "score"}]
     assert tasks["recovery_needed"]["condition_task"] == {
@@ -444,8 +438,12 @@ def _read_jobs(project):
     """Keep each job independently parseable with stable resource keys and no duplicates."""
     jobs = {}
     resources = project / "resources"
-    assert {path.name for path in resources.glob("*.yml")} == {"train.job.yml", "score.job.yml"}
-    for name in ("train", "score"):
+    assert {path.name for path in resources.glob("*.yml")} == {
+        "train.job.yml",
+        "score.job.yml",
+        "monitoring.job.yml",
+    }
+    for name in ("train", "score", "monitoring"):
         document = yaml.safe_load((resources / f"{name}.job.yml").read_text())
         resource_jobs = document["resources"]["jobs"]
         assert set(resource_jobs) == {name}
@@ -647,7 +645,9 @@ def _read_validated_config(project, *, action="score"):
 
 @pytest.mark.parametrize("train_mode", ["manual", "scheduled"])
 @pytest.mark.parametrize("score_mode", ["manual", "scheduled"])
-def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train_mode, score_mode):
+def test_cli_independent_schedules_preserve_shared_three_job_graph(
+    tmp_path, train_mode, score_mode
+):
     """Each clock is optional and target-overridable without duplicating score handoff."""
     project = _generate_project(
         tmp_path,
@@ -663,7 +663,7 @@ def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train
     variables = _read_bundle(project)["variables"]
     jobs = _read_jobs(project)
     config = _read_validated_config(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     synced_notebooks = _synced_sources(project, bundle)
     assert all((project / path).is_file() for path in synced_notebooks)
@@ -833,7 +833,8 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     )
     config = _read_validated_config(project)
     jobs = _read_jobs(project)
-    for role, job in jobs.items():
+    for role in ("train", "score"):
+        job = jobs[role]
         for entry in job["tasks"]:
             if "notebook_task" in entry:
                 assert entry["max_retries"] == (
@@ -1035,7 +1036,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     )
     jobs = _read_jobs(project)
     config = _read_validated_config(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     for job in jobs.values():
         assert job["max_concurrent_runs"] == 1 and job["queue"]["enabled"] is True
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
@@ -1307,7 +1308,7 @@ def test_temporal_cv_initializes_a_usable_default_holdout(tmp_path, method):
 
 
 @pytest.mark.parametrize("policy", ["time_series_split", "stratified_group_k_fold"])
-def test_generated_nested_policies_preserve_controls_and_two_jobs(tmp_path, policy):
+def test_generated_nested_policies_preserve_controls_and_three_jobs(tmp_path, policy):
     """Real template expansion must carry split metadata and threshold opt-in into Core."""
     from skyulf.integrations.databricks.local_cv import LocalCVSpec
     from skyulf.integrations.databricks.local_search import prepare_search_pipeline
@@ -1339,7 +1340,7 @@ def test_generated_nested_policies_preserve_controls_and_two_jobs(tmp_path, poli
         target_column=config["target_column"],
         event_column=config.get("event_column"),
     )
-    assert set(_read_jobs(project)) == {"train", "score"}
+    assert set(_read_jobs(project)) == {"train", "score", "monitoring"}
     assert recipe["modeling"]["cv_nested_type"] == policy
     if temporal:
         assert recipe["modeling"]["cv_time_column"] == "event"

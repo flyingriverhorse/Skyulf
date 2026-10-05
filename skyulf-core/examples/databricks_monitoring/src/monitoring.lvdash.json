@@ -4,14 +4,35 @@
       "name": "current_health",
       "displayName": "Current model health",
       "queryLines": [
-        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version, selection, health_status, measurement_status, observed_at, measured_at, current_rows, scored_rows, labeled_rows, label_coverage, drifted_columns, error_message, CASE WHEN health_status = 'healthy' THEN 1 ELSE 0 END AS healthy_count, CASE WHEN health_status = 'drift' THEN 1 ELSE 0 END AS drift_count, CASE WHEN health_status = 'degraded' THEN 1 ELSE 0 END AS degraded_count, CASE WHEN health_status = 'stale' THEN 1 ELSE 0 END AS stale_count, CASE WHEN health_status = 'failed' THEN 1 ELSE 0 END AS failed_count, CASE WHEN health_status = 'no_data' THEN 1 ELSE 0 END AS no_data_count, CASE WHEN health_status = 'disabled' THEN 1 ELSE 0 END AS disabled_count, CASE WHEN health_status = 'never_observed' THEN 1 ELSE 0 END AS never_observed_count, CASE WHEN health_status = 'unavailable' THEN 1 ELSE 0 END AS unavailable_count FROM current_health ORDER BY model_name, model_version, monitor_id"
+        "SELECT monitor_id, model_set_name, model_set_version, model_catalog, model_schema, model_name, model_version, selection, health_status, measurement_status, observed_at, measured_at, current_rows, scored_rows, labeled_rows, label_coverage, drifted_columns, error_message, CASE WHEN health_status = 'healthy' THEN 1 ELSE 0 END AS healthy_count, CASE WHEN health_status = 'drift' THEN 1 ELSE 0 END AS drift_count, CASE WHEN health_status = 'degraded' THEN 1 ELSE 0 END AS degraded_count, CASE WHEN health_status = 'stale' THEN 1 ELSE 0 END AS stale_count, CASE WHEN health_status = 'failed' THEN 1 ELSE 0 END AS failed_count, CASE WHEN health_status = 'no_data' THEN 1 ELSE 0 END AS no_data_count, CASE WHEN health_status = 'disabled' THEN 1 ELSE 0 END AS disabled_count, CASE WHEN health_status = 'never_observed' THEN 1 ELSE 0 END AS never_observed_count, CASE WHEN health_status = 'unavailable' THEN 1 ELSE 0 END AS unavailable_count FROM current_health ORDER BY model_name, model_version, monitor_id"
       ]
     },
     {
       "name": "metric_history",
       "displayName": "Input data drift",
       "queryLines": [
-        "WITH wide AS (\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
+        " AND (:drift_version = '' OR model_version = :drift_version)\n",
+        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT source.* FROM (WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, measured_at, observed_at, column_name, measurement_status,\n",
         "MAX(CASE WHEN metric_name = 'psi' THEN value END) AS psi,\n",
         "MAX(CASE WHEN metric_name = 'ks_statistic' THEN value END) AS ks_statistic,\n",
@@ -36,14 +57,84 @@
         "CASE WHEN ks_statistic IS NULL THEN 'Unavailable' ELSE concat(cast(round(ks_statistic, 4) AS STRING), ' / ', cast(ks_statistic_threshold AS STRING)) END AS ks_statistic_display,\n",
         "CASE WHEN wasserstein_distance IS NULL THEN 'Unavailable' ELSE concat(cast(round(wasserstein_distance, 4) AS STRING), ' / ', cast(wasserstein_distance_threshold AS STRING)) END AS wasserstein_distance_display,\n",
         "CASE WHEN kl_divergence IS NULL THEN 'Unavailable' ELSE concat(cast(round(kl_divergence, 4) AS STRING), ' / ', cast(kl_divergence_threshold AS STRING)) END AS kl_divergence_display,\n",
-        "CASE WHEN drift_issues <> '' THEN 'Drift detected' WHEN unavailable_metrics <> '' THEN 'Some checks unavailable' ELSE 'No drift detected' END AS drift_status FROM wide ORDER BY measured_at DESC, model_name, column_name, report_id"
+        "CASE WHEN drift_issues <> '' THEN 'Drift detected' WHEN unavailable_metrics <> '' THEN 'Some checks unavailable' ELSE 'No drift detected' END AS drift_status FROM wide ORDER BY measured_at DESC, model_name, column_name, report_id) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version"
+      ],
+      "parameters": [
+        {
+          "displayName": "Drift Model",
+          "keyword": "drift_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Monitor",
+          "keyword": "drift_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Version",
+          "keyword": "drift_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "quality_history",
       "displayName": "Input data quality",
       "queryLines": [
-        "WITH wide AS (\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
+        " AND (:drift_version = '' OR model_version = :drift_version)\n",
+        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT source.* FROM (WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, measured_at, observed_at, column_name, measurement_status,\n",
         "MAX(CASE WHEN metric_name = 'psi' THEN value END) AS psi,\n",
         "MAX(CASE WHEN metric_name = 'ks_statistic' THEN value END) AS ks_statistic,\n",
@@ -57,14 +148,84 @@
         "concat_ws(', ', sort_array(collect_set(CASE WHEN has_issue THEN metric_name END))) AS flagged_metrics\n",
         "FROM metric_history WHERE category = 'quality'\n",
         "GROUP BY monitor_id, report_id, model_catalog, model_schema, model_name, model_version, measured_at, observed_at, column_name, measurement_status\n",
-        ") SELECT *, CASE WHEN flagged_metrics <> '' THEN 'Data quality issue' WHEN unavailable_metrics <> '' THEN 'Unavailable' ELSE 'No issues' END AS quality_status FROM wide ORDER BY observed_at DESC, model_name, column_name, report_id"
+        ") SELECT *, CASE WHEN flagged_metrics <> '' THEN 'Data quality issue' WHEN unavailable_metrics <> '' THEN 'Unavailable' ELSE 'No issues' END AS quality_status FROM wide ORDER BY observed_at DESC, model_name, column_name, report_id) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version"
+      ],
+      "parameters": [
+        {
+          "displayName": "Drift Model",
+          "keyword": "drift_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Monitor",
+          "keyword": "drift_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Version",
+          "keyword": "drift_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "performance_measurements",
       "displayName": "Measured performance by target and report",
       "queryLines": [
-        "WITH wide AS (\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT source.* FROM (WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, measured_at, observed_at, column_name, measurement_status,\n",
         "MAX(CASE WHEN metric_name = 'rmse' THEN value END) AS rmse,\n",
         "MAX(CASE WHEN metric_name = 'mae' THEN value END) AS mae,\n",
@@ -99,14 +260,84 @@
         " WHEN r.scored_rows IS NULL OR r.scored_rows = 0 THEN 'No predictions to evaluate'\n",
         " WHEN r.labeled_rows = 0 THEN concat(cast(r.scored_rows AS STRING), ' predictions; waiting for actual target values')\n",
         " WHEN r.labeled_rows < 2 THEN concat(cast(r.scored_rows AS STRING), ' predictions; only 1 actual target matched; at least 2 are required for performance')\n",
-        " ELSE concat(cast(r.scored_rows AS STRING), ' predictions; ', cast(r.labeled_rows AS STRING), ' matched actual targets; performance calculated from these ', cast(r.labeled_rows AS STRING), ' records') END AS outcome_summary FROM wide w JOIN monitoring_results r ON w.report_id = r.report_id ORDER BY w.measured_at DESC, w.model_name, w.report_id"
+        " ELSE concat(cast(r.scored_rows AS STRING), ' predictions; ', cast(r.labeled_rows AS STRING), ' matched actual targets; performance calculated from these ', cast(r.labeled_rows AS STRING), ' records') END AS outcome_summary FROM wide w JOIN monitoring_results r ON w.report_id = r.report_id ORDER BY w.measured_at DESC, w.model_name, w.report_id) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     {
       "name": "performance_cells",
       "displayName": "Performance metrics",
       "queryLines": [
-        "WITH observations AS (\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT source.* FROM (WITH observations AS (\n",
         " SELECT DISTINCT report_id, monitor_id, model_name, model_version, column_name, measured_at\n",
         " FROM metric_history WHERE category = 'performance'\n",
         "), numbered AS (\n",
@@ -126,43 +357,14 @@
         "FROM metric_history m JOIN numbered n ON m.report_id = n.report_id AND m.column_name = n.column_name\n",
         "JOIN monitoring_results r ON m.report_id = r.report_id\n",
         "WHERE m.category = 'performance'\n",
-        "ORDER BY m.measured_at DESC, m.model_name, m.metric_name"
-      ]
-    },
-    {
-      "name": "performance_chart",
-      "displayName": "Model performance over time",
-      "queryLines": [
-        "WITH selected AS (\n",
-        " SELECT * FROM metric_history WHERE category = 'performance'\n",
-        " AND metric_name = :performance_metric AND model_name = :trend_model AND model_version = :trend_version\n",
-        "), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " measured_at, observed_at, column_name, metric_name, value,\n",
-        " concat(upper(metric_name), CASE WHEN metric_name IN ('mae','mse','rmse','mape','log_loss')\n",
-        "   THEN ' — lower is better' ELSE ' — higher is better' END, ' / ', column_name) AS metric_label\n",
-        "FROM selected WHERE (SELECT monitors FROM identity_count) = 1\n",
-        "ORDER BY measured_at, report_id"
+        "ORDER BY m.measured_at DESC, m.model_name, m.metric_name) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version"
       ],
       "parameters": [
         {
-          "keyword": "performance_metric",
-          "displayName": "Metric",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": "rmse"
-                }
-              ]
-            }
-          }
-        },
-        {
+          "displayName": "Trend Model",
           "keyword": "trend_model",
-          "displayName": "Model",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -176,8 +378,130 @@
           }
         },
         {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
           "keyword": "trend_version",
-          "displayName": "Version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_chart",
+      "displayName": "Model performance over time",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), selected_metric AS (\n",
+        " SELECT metric_name FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        " WHERE category = 'performance'\n",
+        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
+        " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
+        ")\n",
+        "SELECT source.report_id, source.monitor_id, source.model_catalog, source.model_schema,\n",
+        " source.model_name, source.model_version, source.measured_at, source.observed_at,\n",
+        " source.column_name, source.metric_name, source.value,\n",
+        " concat(upper(metric_name), CASE WHEN metric_name IN ('mae','mse','rmse','mape','log_loss')\n",
+        " THEN ' - lower is better' ELSE ' - higher is better' END, ' / ', column_name) AS metric_label\n",
+        "FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "WHERE category = 'performance' AND metric_name = (SELECT metric_name FROM selected_metric)\n",
+        "ORDER BY measured_at, report_id"
+      ],
+      "parameters": [
+        {
+          "displayName": "Performance Metric",
+          "keyword": "performance_metric",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -196,37 +520,40 @@
       "name": "performance_choices",
       "displayName": "Available performance metrics",
       "queryLines": [
-        "SELECT DISTINCT metric_name FROM metric_history WHERE category = 'performance' ORDER BY metric_name"
-      ]
-    },
-    {
-      "name": "drift_psi_chart",
-      "displayName": "Feature PSI and its limit",
-      "queryLines": [
-        "WITH selected AS (\n",
-        " SELECT * FROM metric_history WHERE category = 'drift'\n",
-        " AND model_name = :drift_model AND model_version = :drift_version\n",
-        "), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\n",
-        ", ranked AS (\n",
-        " SELECT *, dense_rank() OVER (ORDER BY measured_at DESC, report_id DESC) AS report_rank\n",
-        " FROM selected WHERE (SELECT monitors FROM identity_count) = 1\n",
-        "), top_features AS (\n",
-        " SELECT * FROM ranked WHERE report_rank = 1 AND metric_name = 'psi'\n",
-        " ORDER BY value DESC NULLS LAST, column_name LIMIT 10\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
         ")\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " measured_at, observed_at, measurement_status, column_name, value AS plot_value,\n",
-        " 'Measured PSI' AS series FROM top_features\n",
-        "UNION ALL\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " measured_at, observed_at, measurement_status, column_name, threshold AS plot_value,\n",
-        " 'PSI limit' AS series FROM top_features\n",
-        "ORDER BY column_name, series\n"
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT DISTINCT metric_name FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version WHERE category = 'performance'\n",
+        "UNION\n",
+        "SELECT DISTINCT metric AS metric_name FROM performance_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version WHERE metric IS NOT NULL\n",
+        "ORDER BY metric_name"
       ],
       "parameters": [
         {
-          "keyword": "drift_model",
-          "displayName": "Model",
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -240,8 +567,118 @@
           }
         },
         {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "drift_psi_chart",
+      "displayName": "Feature PSI and its limit",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
+        " AND (:drift_version = '' OR model_version = :drift_version)\n",
+        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), selected AS (\n",
+        " SELECT source.* FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version WHERE category = 'drift'\n",
+        "), latest_reports AS (SELECT report_id, row_number() OVER (\n",
+        " PARTITION BY monitor_id, model_name, model_version\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM monitoring_results), ranked AS (\n",
+        " SELECT selected.*, latest_reports.report_rank FROM selected JOIN latest_reports\n",
+        " ON selected.report_id = latest_reports.report_id\n",
+        "), top_features AS (\n",
+        " SELECT * FROM ranked WHERE report_rank = 1 AND metric_name = 'psi'\n",
+        " ORDER BY value DESC NULLS LAST, column_name LIMIT 10\n",
+        ")\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " measured_at, observed_at, measurement_status, column_name, value AS plot_value,\n",
+        " 'Measured PSI' AS series FROM top_features\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " measured_at, observed_at, measurement_status, column_name, threshold AS plot_value,\n",
+        " 'PSI limit' AS series FROM top_features\n",
+        "ORDER BY column_name, series"
+      ],
+      "parameters": [
+        {
+          "displayName": "Drift Model",
+          "keyword": "drift_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Monitor",
+          "keyword": "drift_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Version",
           "keyword": "drift_version",
-          "displayName": "Version",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -260,16 +697,36 @@
       "name": "drift_trend",
       "displayName": "Features with drift over time",
       "queryLines": [
-        "WITH selected AS (\n",
-        " SELECT * FROM metric_history WHERE category = 'drift'\n",
-        " AND model_name = :drift_model AND model_version = :drift_version\n",
-        "), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\n",
-        ", features AS (\n",
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
+        " AND (:drift_version = '' OR model_version = :drift_version)\n",
+        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), selected AS (\n",
+        " SELECT source.* FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version WHERE category = 'drift'\n",
+        "), features AS (\n",
         " SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " measured_at, observed_at, measurement_status, column_name,\n",
         " MAX(CASE WHEN has_issue THEN 1 WHEN status = 'measured' THEN 0 END) AS drifted_feature,\n",
         " MAX(CASE WHEN status = 'unavailable' THEN 1 ELSE 0 END) AS unavailable_feature\n",
-        " FROM selected WHERE (SELECT monitors FROM identity_count) = 1\n",
+        " FROM selected WHERE true\n",
         " AND metric_name <> 'ks_test_p_value'\n",
         " GROUP BY report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " measured_at, observed_at, measurement_status, column_name\n",
@@ -285,12 +742,12 @@
         " concat(date_format(measured_at, 'yyyy-MM-dd HH:mm:ss'), ' ', current_timezone()) AS measurement_time,\n",
         " unavailable_feature AS feature_count,\n",
         " 'Checks unavailable' AS series FROM features\n",
-        "ORDER BY measured_at, report_id, series, column_name\n"
+        "ORDER BY measured_at, report_id, series, column_name"
       ],
       "parameters": [
         {
+          "displayName": "Drift Model",
           "keyword": "drift_model",
-          "displayName": "Model",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -304,8 +761,23 @@
           }
         },
         {
+          "displayName": "Drift Monitor",
+          "keyword": "drift_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Version",
           "keyword": "drift_version",
-          "displayName": "Version",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -324,42 +796,56 @@
       "name": "performance_latest",
       "displayName": "Latest measured performance",
       "queryLines": [
-        "WITH history AS (\n",
-        "WITH selected AS (\n",
-        " SELECT * FROM metric_history WHERE category = 'performance'\n",
-        " AND metric_name = :performance_metric AND model_name = :trend_model AND model_version = :trend_version\n",
-        "), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " measured_at, observed_at, column_name, metric_name, value,\n",
-        " concat(upper(metric_name), CASE WHEN metric_name IN ('mae','mse','rmse','mape','log_loss')\n",
-        "   THEN ' — lower is better' ELSE ' — higher is better' END, ' / ', column_name) AS metric_label\n",
-        "FROM selected WHERE (SELECT monitors FROM identity_count) = 1\n",
-        "ORDER BY measured_at, report_id\n",
-        "), ranked AS (\n",
-        " SELECT *, dense_rank() OVER (ORDER BY measured_at DESC, report_id DESC) AS report_rank\n",
-        " FROM history\n",
+        "WITH history AS (WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
         ")\n",
-        "SELECT * FROM ranked WHERE report_rank = 1 ORDER BY column_name\n"
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), selected_metric AS (\n",
+        " SELECT metric_name FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        " WHERE category = 'performance'\n",
+        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
+        " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
+        ")\n",
+        "SELECT source.report_id, source.monitor_id, source.model_catalog, source.model_schema,\n",
+        " source.model_name, source.model_version, source.measured_at, source.observed_at,\n",
+        " source.column_name, source.metric_name, source.value,\n",
+        " concat(upper(metric_name), CASE WHEN metric_name IN ('mae','mse','rmse','mape','log_loss')\n",
+        " THEN ' - lower is better' ELSE ' - higher is better' END, ' / ', column_name) AS metric_label\n",
+        "FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "WHERE category = 'performance' AND metric_name = (SELECT metric_name FROM selected_metric)\n",
+        "ORDER BY measured_at, report_id), latest_reports AS (SELECT report_id, row_number() OVER (\n",
+        " PARTITION BY monitor_id, model_name, model_version\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM monitoring_results)\n",
+        "SELECT history.* FROM history JOIN latest_reports\n",
+        " ON history.report_id = latest_reports.report_id\n",
+        "WHERE latest_reports.report_rank = 1 ORDER BY column_name"
       ],
       "parameters": [
         {
+          "displayName": "Performance Metric",
           "keyword": "performance_metric",
-          "displayName": "Metric",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": "rmse"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "keyword": "trend_model",
-          "displayName": "Model",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -373,8 +859,38 @@
           }
         },
         {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
           "keyword": "trend_version",
-          "displayName": "Version",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -393,34 +909,35 @@
       "name": "performance_policy",
       "displayName": "Saved performance policy decisions",
       "queryLines": [
-        "SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history"
-      ]
-    },
-    {
-      "name": "performance_policy_series",
-      "displayName": "Performance policy current baseline and boundary",
-      "queryLines": [
-        "WITH selected AS (\n SELECT * FROM performance_history WHERE metric = :policy_metric AND model_name = :policy_model AND model_version = :policy_version\n), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, current_value AS value, 'Current' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nUNION ALL\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, baseline_value AS value, 'Baseline' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nUNION ALL\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, threshold_value AS value, 'Tolerance boundary' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nORDER BY measured_at, report_id, series"
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        "SELECT source.* FROM (SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version"
       ],
       "parameters": [
         {
-          "keyword": "policy_metric",
-          "displayName": "Metric",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": "rmse"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "keyword": "policy_model",
-          "displayName": "Model",
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -434,8 +951,679 @@
           }
         },
         {
-          "keyword": "policy_version",
-          "displayName": "Version",
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_policy_series",
+      "displayName": "Performance policy current baseline and boundary",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), selected_metric AS (\n",
+        " SELECT metric_name FROM metric_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        " WHERE category = 'performance'\n",
+        " AND (:performance_metric = '' OR metric_name = :performance_metric)\n",
+        " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
+        " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
+        "), selected AS (\n",
+        " SELECT source.* FROM performance_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        " WHERE metric = COALESCE(NULLIF(:performance_metric, ''), (SELECT metric_name FROM selected_metric))\n",
+        ")\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " measured_at, metric AS metric_name, current_value AS value, 'Current' AS series FROM selected\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " measured_at, metric AS metric_name, baseline_value AS value, 'Baseline' AS series FROM selected\n",
+        "UNION ALL\n",
+        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " measured_at, metric AS metric_name, threshold_value AS value, 'Tolerance boundary' AS series FROM selected\n",
+        "ORDER BY measured_at, report_id, series"
+      ],
+      "parameters": [
+        {
+          "displayName": "Performance Metric",
+          "keyword": "performance_metric",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "context_choices",
+      "displayName": "Enrolled models and historical versions",
+      "queryLines": [
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project"
+      ]
+    },
+    {
+      "name": "drift_context",
+      "displayName": "Drift Context",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:drift_model = '' OR model_name = :drift_model)\n",
+        " AND (:drift_version = '' OR model_version = :drift_version)\n",
+        " AND (:drift_monitor = '' OR monitor_context = :drift_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        ", ranked_status AS (\n",
+        " SELECT monitor_id, model_version, status, row_number() OVER (\n",
+        " PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC\n",
+        " ) AS rank FROM monitoring_results\n",
+        ")\n",
+        "SELECT context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
+        " context.latest_measurement, COALESCE(result.status, 'never_observed') AS latest_status,\n",
+        " CASE WHEN context.monitor_id IS NULL THEN 'No matching enrollment; clear model/version/context selections'\n",
+        " WHEN context.latest_measurement IS NULL THEN 'Enrolled; no saved observation yet'\n",
+        " ELSE 'Showing one monitoring identity; empty selectors choose the latest matching context'\n",
+        " END AS selection_status\n",
+        "FROM (SELECT 1) anchor LEFT JOIN chosen_context context ON true\n",
+        "LEFT JOIN ranked_status result ON context.monitor_id = result.monitor_id\n",
+        " AND context.model_version = result.model_version AND result.rank = 1"
+      ],
+      "parameters": [
+        {
+          "displayName": "Drift Model",
+          "keyword": "drift_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Monitor",
+          "keyword": "drift_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Drift Version",
+          "keyword": "drift_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_context",
+      "displayName": "Performance Context",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        ")\n",
+        ", ranked_status AS (\n",
+        " SELECT monitor_id, model_version, status, row_number() OVER (\n",
+        " PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC\n",
+        " ) AS rank FROM monitoring_results\n",
+        ")\n",
+        "SELECT context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
+        " context.latest_measurement, COALESCE(result.status, 'never_observed') AS latest_status,\n",
+        " CASE WHEN context.monitor_id IS NULL THEN 'No matching enrollment; clear model/version/context selections'\n",
+        " WHEN context.latest_measurement IS NULL THEN 'Enrolled; no saved observation yet'\n",
+        " ELSE 'Showing one monitoring identity; empty selectors choose the latest matching context'\n",
+        " END AS selection_status\n",
+        "FROM (SELECT 1) anchor LEFT JOIN chosen_context context ON true\n",
+        "LEFT JOIN ranked_status result ON context.monitor_id = result.monitor_id\n",
+        " AND context.model_version = result.model_version AND result.rank = 1"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "confusion_status",
+      "displayName": "Confusion Status",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), ranked_reports AS (\n",
+        " SELECT source.*, row_number() OVER (\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM monitoring_results source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "), latest_report AS (SELECT * FROM ranked_reports WHERE report_rank = 1)\n",
+        "\n",
+        "SELECT report_id, model_name, model_version, measured_at,\n",
+        " CASE WHEN report_id IS NULL THEN 'never_observed'\n",
+        " WHEN status = 'failed' THEN 'failed'\n",
+        " WHEN status = 'no_data' THEN 'no_data'\n",
+        " ELSE COALESCE(get_json_object(report_json, '$.confusion_matrix.status'), 'not_recorded') END AS matrix_status,\n",
+        " CASE WHEN report_id IS NULL THEN 'No saved observation for the selected context'\n",
+        " WHEN status = 'failed' THEN COALESCE(error_message, 'Monitoring failed before saving a confusion matrix')\n",
+        " WHEN status = 'no_data' THEN 'The latest observation has no usable reference or current data'\n",
+        " WHEN get_json_object(report_json, '$.confusion_matrix') IS NULL\n",
+        " THEN 'No confusion matrix was saved for this observation (historical or metrics-only report)'\n",
+        " ELSE get_json_object(report_json, '$.confusion_matrix.reason') END AS matrix_reason\n",
+        "FROM (SELECT 1) anchor LEFT JOIN latest_report ON true"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "confusion_cells",
+      "displayName": "Confusion Cells",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (:trend_model = '' OR model_name = :trend_model)\n",
+        " AND (:trend_version = '' OR model_version = :trend_version)\n",
+        " AND (:trend_monitor = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), ranked_reports AS (\n",
+        " SELECT source.*, row_number() OVER (\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM monitoring_results source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "), latest_report AS (SELECT * FROM ranked_reports WHERE report_rank = 1)\n",
+        "\n",
+        "SELECT report_id, monitor_id, model_name, model_version, measured_at,\n",
+        " cell.actual_index, cell.predicted_index,\n",
+        " concat(cast(cell.actual_index AS STRING), ': ', cell.actual_label) AS actual_class,\n",
+        " concat(cast(cell.predicted_index AS STRING), ': ', cell.predicted_label) AS predicted_class,\n",
+        " cell.count AS cell_count\n",
+        "FROM latest_report LATERAL VIEW explode(from_json(\n",
+        " get_json_object(report_json, '$.confusion_matrix.cells'),\n",
+        " 'ARRAY<STRUCT<actual_label:STRING,predicted_label:STRING,actual_index:INT,predicted_index:INT,count:BIGINT>>'\n",
+        ")) matrix AS cell\n",
+        "WHERE get_json_object(report_json, '$.confusion_matrix.status') = 'measured'\n",
+        "ORDER BY actual_index, predicted_index"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution_choices",
+      "displayName": "Execution Choices",
+      "queryLines": [
+        "WITH latest_jobs AS (\n",
+        " SELECT *, row_number() OVER (PARTITION BY workspace_id, job_id ORDER BY change_time DESC) AS revision\n",
+        " FROM system.lakeflow.jobs\n",
+        ")\n",
+        "SELECT DISTINCT cast(workspace_id AS STRING) AS workspace_id,\n",
+        " cast(job_id AS STRING) AS job_id, name AS job_name\n",
+        "FROM latest_jobs j JOIN (SELECT DISTINCT project FROM model_inventory) i\n",
+        " ON j.name IN (concat(i.project, '_train'), concat(i.project, '_score'), concat(i.project, '_monitoring'))\n",
+        "WHERE revision = 1 AND delete_time IS NULL\n",
+        "ORDER BY workspace_id, job_name, job_id"
+      ]
+    },
+    {
+      "name": "execution_runs",
+      "displayName": "Execution Runs",
+      "queryLines": [
+        "SELECT cast(workspace_id AS STRING) AS workspace_id, cast(job_id AS STRING) AS job_id,\n",
+        " cast(run_id AS STRING) AS run_id, min(period_start_time) AS started_at,\n",
+        " max(period_end_time) AS ended_at, max_by(result_state, period_end_time) AS result_state,\n",
+        " max_by(termination_code, period_end_time) AS termination_code,\n",
+        " sum(timestampdiff(SECOND, period_start_time, period_end_time)) / 60.0 AS timeline_minutes,\n",
+        " max(queue_duration_seconds) AS queue_seconds,\n",
+        " max(execution_duration_seconds) AS execution_seconds\n",
+        "FROM system.lakeflow.job_run_timeline\n",
+        "WHERE cast(workspace_id AS STRING) = :execution_workspace\n",
+        " AND cast(job_id AS STRING) = :execution_job\n",
+        " AND period_start_time >= date_sub(current_date(), 30)\n",
+        "GROUP BY workspace_id, job_id, run_id ORDER BY started_at DESC"
+      ],
+      "parameters": [
+        {
+          "displayName": "Execution Job",
+          "keyword": "execution_job",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Execution Workspace",
+          "keyword": "execution_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution_cost",
+      "displayName": "Execution Cost",
+      "queryLines": [
+        "WITH priced_usage AS (\n",
+        " SELECT u.usage_date, u.sku_name, u.usage_unit, u.usage_quantity,\n",
+        " COALESCE(try_cast(lp.pricing.effective_list.default AS DOUBLE),\n",
+        " try_cast(lp.pricing.default AS DOUBLE)) AS unit_price_usd\n",
+        " FROM system.billing.usage u LEFT JOIN system.billing.list_prices lp\n",
+        " ON u.sku_name = lp.sku_name AND u.cloud = lp.cloud AND u.usage_unit = lp.usage_unit\n",
+        " AND lp.currency_code = 'USD'\n",
+        " AND u.usage_start_time >= lp.price_start_time\n",
+        " AND (lp.price_end_time IS NULL OR u.usage_start_time < lp.price_end_time)\n",
+        " WHERE cast(u.workspace_id AS STRING) = :execution_workspace\n",
+        " AND cast(u.usage_metadata.job_id AS STRING) = :execution_job\n",
+        " AND u.usage_date >= date_sub(current_date(), 30)\n",
+        ")\n",
+        "SELECT usage_date, sku_name, usage_unit, sum(usage_quantity) AS usage_quantity,\n",
+        " sum(usage_quantity * unit_price_usd) AS priced_cost_usd,\n",
+        " sum(CASE WHEN unit_price_usd IS NULL THEN 1 ELSE 0 END) AS unpriced_records,\n",
+        " count(*) AS billing_records\n",
+        "FROM priced_usage GROUP BY usage_date, sku_name, usage_unit ORDER BY usage_date, sku_name"
+      ],
+      "parameters": [
+        {
+          "displayName": "Execution Job",
+          "keyword": "execution_job",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Execution Workspace",
+          "keyword": "execution_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution_status",
+      "displayName": "Execution Status",
+      "queryLines": [
+        "SELECT :execution_workspace AS workspace_id, :execution_job AS job_id,\n",
+        " CASE WHEN :execution_workspace = '' OR :execution_job = ''\n",
+        " THEN 'Select a workspace and job to see execution and attributed billing'\n",
+        " ELSE 'Exact workspace/job scope; empty charts can mean telemetry or billing has not arrived'\n",
+        " END AS telemetry_status,\n",
+        " 'Last 30 days; list-price USD estimate only. Unpriced usage is excluded from priced cost. Shared compute without job attribution is not included. System tables can lag.' AS cost_scope"
+      ],
+      "parameters": [
+        {
+          "displayName": "Execution Job",
+          "keyword": "execution_job",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Execution Workspace",
+          "keyword": "execution_workspace",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -479,7 +1667,7 @@
             "name": "overview_note",
             "multilineTextboxSpec": {
               "lines": [
-                "Current model health across catalogs and schemas. A model appears as soon as it is activated."
+                "Enrolled models in this monitoring store. Each row is one monitoring identity; the same model can have separate project enrollments. Activation appears before the first measurement."
               ]
             }
           },
@@ -1023,7 +2211,7 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Models by status"
+                "title": "Monitoring enrollments by status"
               }
             }
           },
@@ -1074,6 +2262,18 @@
                     {
                       "name": "error_message",
                       "expression": "`error_message`"
+                    },
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    },
+                    {
+                      "name": "model_set_name",
+                      "expression": "`model_set_name`"
+                    },
+                    {
+                      "name": "model_set_version",
+                      "expression": "`model_set_version`"
                     }
                   ],
                   "disaggregated": true
@@ -1116,6 +2316,18 @@
                   {
                     "fieldName": "error_message",
                     "displayName": "Error message"
+                  },
+                  {
+                    "fieldName": "monitor_id",
+                    "displayName": "Monitoring identity"
+                  },
+                  {
+                    "fieldName": "model_set_name",
+                    "displayName": "Parent model set"
+                  },
+                  {
+                    "fieldName": "model_set_version",
+                    "displayName": "Set version"
                   }
                 ]
               },
@@ -1174,252 +2386,84 @@
         },
         {
           "widget": {
-            "name": "filter_model_catalog_drift_quality",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "metric_history",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "quality_history",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_drift_psi_chart",
-                "query": {
-                  "datasetName": "drift_psi_chart",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_drift_trend",
-                "query": {
-                  "datasetName": "drift_trend",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ]
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q1"
-                  },
-                  {
-                    "queryName": "q_drift_psi_chart",
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog"
-                  },
-                  {
-                    "queryName": "q_drift_trend",
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Catalog"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 2,
-            "width": 3,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "filter_model_schema_drift_quality",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "metric_history",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "quality_history",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_drift_psi_chart",
-                "query": {
-                  "datasetName": "drift_psi_chart",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_drift_trend",
-                "query": {
-                  "datasetName": "drift_trend",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ]
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q1"
-                  },
-                  {
-                    "queryName": "q_drift_psi_chart",
-                    "fieldName": "model_schema",
-                    "displayName": "Schema"
-                  },
-                  {
-                    "queryName": "q_drift_trend",
-                    "fieldName": "model_schema",
-                    "displayName": "Schema"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Schema"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 2,
-            "width": 3,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
             "name": "filter_model_name_drift_quality",
             "queries": [
               {
-                "name": "q0",
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_metric_history",
                 "query": {
                   "datasetName": "metric_history",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_name",
-                      "expression": "`model_name`"
+                      "name": "drift_model",
+                      "keyword": "drift_model"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q1",
+                "name": "parameter_quality_history",
                 "query": {
                   "datasetName": "quality_history",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_name",
-                      "expression": "`model_name`"
+                      "name": "drift_model",
+                      "keyword": "drift_model"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q_drift_psi_chart",
+                "name": "parameter_drift_psi_chart",
                 "query": {
                   "datasetName": "drift_psi_chart",
-                  "disaggregated": false,
                   "parameters": [
                     {
                       "name": "drift_model",
                       "keyword": "drift_model"
                     }
-                  ]
+                  ],
+                  "disaggregated": false
                 }
               },
               {
-                "name": "q_drift_trend",
+                "name": "parameter_drift_trend",
                 "query": {
                   "datasetName": "drift_trend",
-                  "disaggregated": false,
                   "parameters": [
                     {
                       "name": "drift_model",
                       "keyword": "drift_model"
                     }
-                  ]
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_drift_context",
+                "query": {
+                  "datasetName": "drift_context",
+                  "parameters": [
+                    {
+                      "name": "drift_model",
+                      "keyword": "drift_model"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -1430,34 +2474,40 @@
                 "fields": [
                   {
                     "fieldName": "model_name",
-                    "displayName": "Model",
-                    "queryName": "q0"
+                    "queryName": "options"
                   },
                   {
-                    "fieldName": "model_name",
-                    "displayName": "Model",
-                    "queryName": "q1"
+                    "parameterName": "drift_model",
+                    "queryName": "parameter_metric_history"
                   },
                   {
-                    "queryName": "q_drift_psi_chart",
-                    "parameterName": "drift_model"
+                    "parameterName": "drift_model",
+                    "queryName": "parameter_quality_history"
                   },
                   {
-                    "queryName": "q_drift_trend",
-                    "parameterName": "drift_model"
+                    "parameterName": "drift_model",
+                    "queryName": "parameter_drift_psi_chart"
+                  },
+                  {
+                    "parameterName": "drift_model",
+                    "queryName": "parameter_drift_trend"
+                  },
+                  {
+                    "parameterName": "drift_model",
+                    "queryName": "parameter_drift_context"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Model"
+                "title": "Model (empty: latest)"
               }
             }
           },
           "position": {
-            "x": 6,
+            "x": 0,
             "y": 2,
-            "width": 3,
+            "width": 4,
             "height": 2
           }
         },
@@ -1466,55 +2516,81 @@
             "name": "filter_model_version_drift_quality",
             "queries": [
               {
-                "name": "q0",
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_metric_history",
                 "query": {
                   "datasetName": "metric_history",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_version",
-                      "expression": "`model_version`"
+                      "name": "drift_version",
+                      "keyword": "drift_version"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q1",
+                "name": "parameter_quality_history",
                 "query": {
                   "datasetName": "quality_history",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_version",
-                      "expression": "`model_version`"
+                      "name": "drift_version",
+                      "keyword": "drift_version"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q_drift_psi_chart",
+                "name": "parameter_drift_psi_chart",
                 "query": {
                   "datasetName": "drift_psi_chart",
-                  "disaggregated": false,
                   "parameters": [
                     {
                       "name": "drift_version",
                       "keyword": "drift_version"
                     }
-                  ]
+                  ],
+                  "disaggregated": false
                 }
               },
               {
-                "name": "q_drift_trend",
+                "name": "parameter_drift_trend",
                 "query": {
                   "datasetName": "drift_trend",
-                  "disaggregated": false,
                   "parameters": [
                     {
                       "name": "drift_version",
                       "keyword": "drift_version"
                     }
-                  ]
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_drift_context",
+                "query": {
+                  "datasetName": "drift_context",
+                  "parameters": [
+                    {
+                      "name": "drift_version",
+                      "keyword": "drift_version"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -1525,34 +2601,40 @@
                 "fields": [
                   {
                     "fieldName": "model_version",
-                    "displayName": "Version",
-                    "queryName": "q0"
+                    "queryName": "options"
                   },
                   {
-                    "fieldName": "model_version",
-                    "displayName": "Version",
-                    "queryName": "q1"
+                    "parameterName": "drift_version",
+                    "queryName": "parameter_metric_history"
                   },
                   {
-                    "queryName": "q_drift_psi_chart",
-                    "parameterName": "drift_version"
+                    "parameterName": "drift_version",
+                    "queryName": "parameter_quality_history"
                   },
                   {
-                    "queryName": "q_drift_trend",
-                    "parameterName": "drift_version"
+                    "parameterName": "drift_version",
+                    "queryName": "parameter_drift_psi_chart"
+                  },
+                  {
+                    "parameterName": "drift_version",
+                    "queryName": "parameter_drift_trend"
+                  },
+                  {
+                    "parameterName": "drift_version",
+                    "queryName": "parameter_drift_context"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Version"
+                "title": "Version (empty: latest)"
               }
             }
           },
           "position": {
-            "x": 9,
+            "x": 4,
             "y": 2,
-            "width": 3,
+            "width": 4,
             "height": 2
           }
         },
@@ -1648,7 +2730,7 @@
           },
           "position": {
             "x": 0,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -1745,7 +2827,7 @@
           },
           "position": {
             "x": 4,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -1842,7 +2924,7 @@
           },
           "position": {
             "x": 8,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -1852,13 +2934,13 @@
             "name": "drift_chart_help",
             "multilineTextboxSpec": {
               "lines": [
-                "Choose one model and version. Left: the 10 highest PSI values from the latest saved drift observation; a measured bar longer than its limit signals drift. Right: feature counts at each measurement (all drift checks). Missing checks stay visible. Date/feature filters can hide latest-observation bars; they do not choose an older observation. Multiple monitor identities are not combined."
+                "Empty selectors choose the latest matching context shown above. Each chart and table uses one monitoring identity. Left: latest saved drift observation, top 10 PSI values and their own limits. Right: feature drift counts by measurement. Date/feature filters can hide latest bars; they do not substitute an older observation."
               ]
             }
           },
           "position": {
             "x": 0,
-            "y": 6,
+            "y": 10,
             "width": 12,
             "height": 2
           }
@@ -1945,7 +3027,7 @@
           },
           "position": {
             "x": 0,
-            "y": 8,
+            "y": 12,
             "width": 6,
             "height": 7
           }
@@ -2036,7 +3118,7 @@
           },
           "position": {
             "x": 6,
-            "y": 8,
+            "y": 12,
             "width": 6,
             "height": 7
           }
@@ -2166,7 +3248,7 @@
           },
           "position": {
             "x": 0,
-            "y": 15,
+            "y": 19,
             "width": 12,
             "height": 6
           }
@@ -2182,7 +3264,7 @@
           },
           "position": {
             "x": 0,
-            "y": 21,
+            "y": 25,
             "width": 12,
             "height": 1
           }
@@ -2286,9 +3368,218 @@
           },
           "position": {
             "x": 0,
-            "y": 22,
+            "y": 26,
             "width": 12,
             "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_context_drift_quality",
+            "queries": [
+              {
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_metric_history",
+                "query": {
+                  "datasetName": "metric_history",
+                  "parameters": [
+                    {
+                      "name": "drift_monitor",
+                      "keyword": "drift_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_quality_history",
+                "query": {
+                  "datasetName": "quality_history",
+                  "parameters": [
+                    {
+                      "name": "drift_monitor",
+                      "keyword": "drift_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_drift_psi_chart",
+                "query": {
+                  "datasetName": "drift_psi_chart",
+                  "parameters": [
+                    {
+                      "name": "drift_monitor",
+                      "keyword": "drift_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_drift_trend",
+                "query": {
+                  "datasetName": "drift_trend",
+                  "parameters": [
+                    {
+                      "name": "drift_monitor",
+                      "keyword": "drift_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_drift_context",
+                "query": {
+                  "datasetName": "drift_context",
+                  "parameters": [
+                    {
+                      "name": "drift_monitor",
+                      "keyword": "drift_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "monitor_context",
+                    "queryName": "options"
+                  },
+                  {
+                    "parameterName": "drift_monitor",
+                    "queryName": "parameter_metric_history"
+                  },
+                  {
+                    "parameterName": "drift_monitor",
+                    "queryName": "parameter_quality_history"
+                  },
+                  {
+                    "parameterName": "drift_monitor",
+                    "queryName": "parameter_drift_psi_chart"
+                  },
+                  {
+                    "parameterName": "drift_monitor",
+                    "queryName": "parameter_drift_trend"
+                  },
+                  {
+                    "parameterName": "drift_monitor",
+                    "queryName": "parameter_drift_context"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Monitor context (empty: latest)"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "drift_context",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "drift_context",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "latest_measurement",
+                      "expression": "`latest_measurement`"
+                    },
+                    {
+                      "name": "selection_status",
+                      "expression": "`selection_status`"
+                    },
+                    {
+                      "name": "latest_status",
+                      "expression": "`latest_status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Current monitoring context"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Selected model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Monitoring identity"
+                  },
+                  {
+                    "fieldName": "latest_measurement",
+                    "displayName": "Latest measurement"
+                  },
+                  {
+                    "fieldName": "selection_status",
+                    "displayName": "Selection"
+                  },
+                  {
+                    "fieldName": "latest_status",
+                    "displayName": "Latest saved status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 12,
+            "height": 4
           }
         }
       ]
@@ -2333,266 +3624,49 @@
         },
         {
           "widget": {
-            "name": "filter_model_catalog_performance",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "performance_measurements",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "performance_cells",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_performance_latest",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_policy_series",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "fields": [
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q1"
-                  },
-                  {
-                    "queryName": "q_performance_latest",
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog"
-                  },
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q_policy"
-                  },
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog",
-                    "queryName": "q_policy_series"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Catalog"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 2,
-            "width": 3,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "filter_model_schema_performance",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "performance_measurements",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "performance_cells",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_performance_latest",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_policy_series",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "fields": [
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q1"
-                  },
-                  {
-                    "queryName": "q_performance_latest",
-                    "fieldName": "model_schema",
-                    "displayName": "Schema"
-                  },
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q_policy"
-                  },
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema",
-                    "queryName": "q_policy_series"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Schema"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 2,
-            "width": 3,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
             "name": "filter_model_name_performance",
             "queries": [
               {
-                "name": "q0",
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_measurements",
                 "query": {
                   "datasetName": "performance_measurements",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_name",
-                      "expression": "`model_name`"
+                      "name": "trend_model",
+                      "keyword": "trend_model"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q1",
+                "name": "parameter_performance_cells",
                 "query": {
                   "datasetName": "performance_cells",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_name",
-                      "expression": "`model_name`"
+                      "name": "trend_model",
+                      "keyword": "trend_model"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "parameter",
+                "name": "parameter_performance_chart",
                 "query": {
                   "datasetName": "performance_chart",
                   "parameters": [
@@ -2605,39 +3679,91 @@
                 }
               },
               {
-                "name": "q_performance_latest",
+                "name": "parameter_performance_choices",
                 "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
+                  "datasetName": "performance_choices",
                   "parameters": [
                     {
                       "name": "trend_model",
                       "keyword": "trend_model"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q_policy_series",
+                "name": "parameter_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_series",
                 "query": {
                   "datasetName": "performance_policy_series",
                   "parameters": [
                     {
-                      "name": "policy_model",
-                      "keyword": "policy_model"
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_context",
+                "query": {
+                  "datasetName": "performance_context",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_status",
+                "query": {
+                  "datasetName": "confusion_status",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_cells",
+                "query": {
+                  "datasetName": "confusion_cells",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
                     }
                   ],
                   "disaggregated": false
@@ -2651,43 +3777,60 @@
                 "fields": [
                   {
                     "fieldName": "model_name",
-                    "displayName": "Model",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model",
-                    "queryName": "q1"
+                    "queryName": "options"
                   },
                   {
                     "parameterName": "trend_model",
-                    "queryName": "parameter"
+                    "queryName": "parameter_performance_measurements"
                   },
                   {
-                    "queryName": "q_performance_latest",
-                    "parameterName": "trend_model"
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_cells"
                   },
                   {
-                    "fieldName": "model_name",
-                    "displayName": "Model",
-                    "queryName": "q_policy"
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_chart"
                   },
                   {
-                    "parameterName": "policy_model",
-                    "queryName": "q_policy_series"
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_choices"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_latest"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_policy"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_policy_series"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_context"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_confusion_status"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_confusion_cells"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Model"
+                "title": "Model (empty: latest)"
               }
             }
           },
           "position": {
-            "x": 6,
+            "x": 0,
             "y": 2,
-            "width": 3,
+            "width": 4,
             "height": 2
           }
         },
@@ -2696,33 +3839,46 @@
             "name": "filter_model_version_performance",
             "queries": [
               {
-                "name": "q0",
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_measurements",
                 "query": {
                   "datasetName": "performance_measurements",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_version",
-                      "expression": "`model_version`"
+                      "name": "trend_version",
+                      "keyword": "trend_version"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q1",
+                "name": "parameter_performance_cells",
                 "query": {
                   "datasetName": "performance_cells",
-                  "fields": [
+                  "parameters": [
                     {
-                      "name": "model_version",
-                      "expression": "`model_version`"
+                      "name": "trend_version",
+                      "keyword": "trend_version"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "parameter",
+                "name": "parameter_performance_chart",
                 "query": {
                   "datasetName": "performance_chart",
                   "parameters": [
@@ -2735,39 +3891,91 @@
                 }
               },
               {
-                "name": "q_performance_latest",
+                "name": "parameter_performance_choices",
                 "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
+                  "datasetName": "performance_choices",
                   "parameters": [
                     {
                       "name": "trend_version",
                       "keyword": "trend_version"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
                     }
                   ],
                   "disaggregated": false
                 }
               },
               {
-                "name": "q_policy_series",
+                "name": "parameter_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_series",
                 "query": {
                   "datasetName": "performance_policy_series",
                   "parameters": [
                     {
-                      "name": "policy_version",
-                      "keyword": "policy_version"
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_context",
+                "query": {
+                  "datasetName": "performance_context",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_status",
+                "query": {
+                  "datasetName": "confusion_status",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_cells",
+                "query": {
+                  "datasetName": "confusion_cells",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
                     }
                   ],
                   "disaggregated": false
@@ -2781,43 +3989,60 @@
                 "fields": [
                   {
                     "fieldName": "model_version",
-                    "displayName": "Version",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version",
-                    "queryName": "q1"
+                    "queryName": "options"
                   },
                   {
                     "parameterName": "trend_version",
-                    "queryName": "parameter"
+                    "queryName": "parameter_performance_measurements"
                   },
                   {
-                    "queryName": "q_performance_latest",
-                    "parameterName": "trend_version"
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_cells"
                   },
                   {
-                    "fieldName": "model_version",
-                    "displayName": "Version",
-                    "queryName": "q_policy"
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_chart"
                   },
                   {
-                    "parameterName": "policy_version",
-                    "queryName": "q_policy_series"
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_choices"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_latest"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_policy"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_policy_series"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_context"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_confusion_status"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_confusion_cells"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Version"
+                "title": "Version (empty: latest)"
               }
             }
           },
           "position": {
-            "x": 9,
+            "x": 4,
             "y": 2,
-            "width": 3,
+            "width": 4,
             "height": 2
           }
         },
@@ -2949,7 +4174,7 @@
           },
           "position": {
             "x": 0,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -3046,7 +4271,7 @@
           },
           "position": {
             "x": 4,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -3056,7 +4281,7 @@
             "name": "filter_metric_name_performance",
             "queries": [
               {
-                "name": "q0",
+                "name": "options",
                 "query": {
                   "datasetName": "performance_choices",
                   "fields": [
@@ -3069,7 +4294,7 @@
                 }
               },
               {
-                "name": "parameter",
+                "name": "parameter_performance_chart",
                 "query": {
                   "datasetName": "performance_chart",
                   "parameters": [
@@ -3082,16 +4307,29 @@
                 }
               },
               {
-                "name": "q_performance_latest",
+                "name": "parameter_performance_latest",
                 "query": {
                   "datasetName": "performance_latest",
-                  "disaggregated": false,
                   "parameters": [
                     {
                       "name": "performance_metric",
                       "keyword": "performance_metric"
                     }
-                  ]
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "parameters": [
+                    {
+                      "name": "performance_metric",
+                      "keyword": "performance_metric"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               },
               {
@@ -3106,19 +4344,6 @@
                   ],
                   "disaggregated": false
                 }
-              },
-              {
-                "name": "q_policy_series",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "parameters": [
-                    {
-                      "name": "policy_metric",
-                      "keyword": "policy_metric"
-                    }
-                  ],
-                  "disaggregated": false
-                }
               }
             ],
             "spec": {
@@ -3128,37 +4353,35 @@
                 "fields": [
                   {
                     "fieldName": "metric_name",
-                    "displayName": "Metric to plot",
-                    "queryName": "q0"
+                    "queryName": "options"
                   },
                   {
                     "parameterName": "performance_metric",
-                    "queryName": "parameter"
+                    "queryName": "parameter_performance_chart"
                   },
                   {
-                    "queryName": "q_performance_latest",
-                    "parameterName": "performance_metric"
+                    "parameterName": "performance_metric",
+                    "queryName": "parameter_performance_latest"
+                  },
+                  {
+                    "parameterName": "performance_metric",
+                    "queryName": "parameter_performance_policy_series"
                   },
                   {
                     "fieldName": "metric_name",
-                    "displayName": "Metric to plot",
                     "queryName": "q_policy"
-                  },
-                  {
-                    "parameterName": "policy_metric",
-                    "queryName": "q_policy_series"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Metric to plot"
+                "title": "Metric (empty: available default)"
               }
             }
           },
           "position": {
             "x": 8,
-            "y": 4,
+            "y": 8,
             "width": 4,
             "height": 2
           }
@@ -3168,13 +4391,13 @@
             "name": "trend_help",
             "multilineTextboxSpec": {
               "lines": [
-                "Choose a model, version and metric. Left: the latest saved performance observation, shown even when there is only one. Right: measurement history. The legend states whether higher or lower is better. Date/target filters can hide latest bars; they do not substitute an older result. Missing actual targets leave performance unavailable."
+                "Empty selectors choose the latest matching context shown above. Choose model, version and context to compare a specific enrollment. Metric defaults to an available MAE, weighted F1 or accuracy. Date/target filters can hide latest bars; they do not substitute older observations. Missing actual targets remain unavailable. The confusion matrix always uses the latest saved report for this context, independently of history date/target filters."
               ]
             }
           },
           "position": {
             "x": 0,
-            "y": 6,
+            "y": 10,
             "width": 12,
             "height": 2
           }
@@ -3251,7 +4474,7 @@
           },
           "position": {
             "x": 0,
-            "y": 8,
+            "y": 12,
             "width": 6,
             "height": 7
           }
@@ -3325,7 +4548,7 @@
           },
           "position": {
             "x": 6,
-            "y": 8,
+            "y": 12,
             "width": 6,
             "height": 7
           }
@@ -3391,7 +4614,7 @@
           },
           "position": {
             "x": 0,
-            "y": 15,
+            "y": 19,
             "width": 12,
             "height": 4
           }
@@ -3502,7 +4725,7 @@
           },
           "position": {
             "x": 0,
-            "y": 19,
+            "y": 23,
             "width": 12,
             "height": 6
           }
@@ -3512,14 +4735,13 @@
             "name": "policy_heading",
             "multilineTextboxSpec": {
               "lines": [
-                "## Performance degradation policy",
-                "The policy verdict is separate from distribution drift. Unavailable evidence is not a healthy verdict."
+                "## Performance degradation policy\n\nThe policy verdict is separate from distribution drift. Unavailable evidence is not a healthy verdict."
               ]
             }
           },
           "position": {
             "x": 0,
-            "y": 25,
+            "y": 29,
             "width": 12,
             "height": 2
           }
@@ -3593,7 +4815,7 @@
           },
           "position": {
             "x": 0,
-            "y": 27,
+            "y": 31,
             "width": 12,
             "height": 6
           }
@@ -3893,9 +5115,1053 @@
           },
           "position": {
             "x": 0,
-            "y": 33,
+            "y": 37,
             "width": 12,
             "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_context_performance",
+            "queries": [
+              {
+                "name": "options",
+                "query": {
+                  "datasetName": "context_choices",
+                  "fields": [
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_measurements",
+                "query": {
+                  "datasetName": "performance_measurements",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_cells",
+                "query": {
+                  "datasetName": "performance_cells",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_chart",
+                "query": {
+                  "datasetName": "performance_chart",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_choices",
+                "query": {
+                  "datasetName": "performance_choices",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_context",
+                "query": {
+                  "datasetName": "performance_context",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_status",
+                "query": {
+                  "datasetName": "confusion_status",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_confusion_cells",
+                "query": {
+                  "datasetName": "confusion_cells",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "monitor_context",
+                    "queryName": "options"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_measurements"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_cells"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_chart"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_choices"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_latest"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_policy"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_policy_series"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_context"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_confusion_status"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_confusion_cells"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Monitor context (empty: latest)"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_context",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_context",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "latest_measurement",
+                      "expression": "`latest_measurement`"
+                    },
+                    {
+                      "name": "selection_status",
+                      "expression": "`selection_status`"
+                    },
+                    {
+                      "name": "latest_status",
+                      "expression": "`latest_status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Current monitoring context"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Selected model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Monitoring identity"
+                  },
+                  {
+                    "fieldName": "latest_measurement",
+                    "displayName": "Latest measurement"
+                  },
+                  {
+                    "fieldName": "selection_status",
+                    "displayName": "Selection"
+                  },
+                  {
+                    "fieldName": "latest_status",
+                    "displayName": "Latest saved status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "confusion_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "confusion_status",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "matrix_status",
+                      "expression": "`matrix_status`"
+                    },
+                    {
+                      "name": "matrix_reason",
+                      "expression": "`matrix_reason`"
+                    },
+                    {
+                      "name": "report_id",
+                      "expression": "`report_id`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Latest confusion matrix evidence"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measured at"
+                  },
+                  {
+                    "fieldName": "matrix_status",
+                    "displayName": "Matrix status"
+                  },
+                  {
+                    "fieldName": "matrix_reason",
+                    "displayName": "Reason"
+                  },
+                  {
+                    "fieldName": "report_id",
+                    "displayName": "Report"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 45,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "confusion_matrix",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "confusion_cells",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "actual_class",
+                      "expression": "`actual_class`"
+                    },
+                    {
+                      "name": "predicted_class",
+                      "expression": "`predicted_class`"
+                    },
+                    {
+                      "name": "count",
+                      "expression": "SUM(`cell_count`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pivot",
+              "encodings": {
+                "rows": [
+                  {
+                    "fieldName": "actual_class",
+                    "displayName": "Actual class",
+                    "total": {
+                      "show": false
+                    }
+                  }
+                ],
+                "columns": [
+                  {
+                    "fieldName": "predicted_class",
+                    "displayName": "Predicted class",
+                    "total": {
+                      "show": false
+                    }
+                  }
+                ],
+                "cell": {
+                  "type": "multi-cell",
+                  "fields": [
+                    {
+                      "fieldName": "count",
+                      "cellType": "text",
+                      "format": {
+                        "type": "number",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 0
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Confusion matrix: actual rows and predicted columns"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 49,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution",
+      "displayName": "Execution and compute",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "execution_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Execution and compute"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_intro",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Choose exact workspace and job IDs. Job suggestions match enrolled project job names; verify the identity before reading spend. No job is selected by default. Cost includes only billing records explicitly attributed to the selected job, with available USD list prices."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_execution_workspace",
+            "queries": [
+              {
+                "name": "options",
+                "query": {
+                  "datasetName": "execution_choices",
+                  "fields": [
+                    {
+                      "name": "workspace_id",
+                      "expression": "`workspace_id`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_runs",
+                "query": {
+                  "datasetName": "execution_runs",
+                  "parameters": [
+                    {
+                      "name": "execution_workspace",
+                      "keyword": "execution_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_cost",
+                "query": {
+                  "datasetName": "execution_cost",
+                  "parameters": [
+                    {
+                      "name": "execution_workspace",
+                      "keyword": "execution_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_status",
+                "query": {
+                  "datasetName": "execution_status",
+                  "parameters": [
+                    {
+                      "name": "execution_workspace",
+                      "keyword": "execution_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "workspace_id",
+                    "queryName": "options"
+                  },
+                  {
+                    "parameterName": "execution_workspace",
+                    "queryName": "parameter_execution_runs"
+                  },
+                  {
+                    "parameterName": "execution_workspace",
+                    "queryName": "parameter_execution_cost"
+                  },
+                  {
+                    "parameterName": "execution_workspace",
+                    "queryName": "parameter_execution_status"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Workspace"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_execution_job",
+            "queries": [
+              {
+                "name": "options",
+                "query": {
+                  "datasetName": "execution_choices",
+                  "fields": [
+                    {
+                      "name": "job_id",
+                      "expression": "`job_id`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_runs",
+                "query": {
+                  "datasetName": "execution_runs",
+                  "parameters": [
+                    {
+                      "name": "execution_job",
+                      "keyword": "execution_job"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_cost",
+                "query": {
+                  "datasetName": "execution_cost",
+                  "parameters": [
+                    {
+                      "name": "execution_job",
+                      "keyword": "execution_job"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_execution_status",
+                "query": {
+                  "datasetName": "execution_status",
+                  "parameters": [
+                    {
+                      "name": "execution_job",
+                      "keyword": "execution_job"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "job_id",
+                    "queryName": "options"
+                  },
+                  {
+                    "parameterName": "execution_job",
+                    "queryName": "parameter_execution_runs"
+                  },
+                  {
+                    "parameterName": "execution_job",
+                    "queryName": "parameter_execution_cost"
+                  },
+                  {
+                    "parameterName": "execution_job",
+                    "queryName": "parameter_execution_status"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Job ID"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_status",
+                  "fields": [
+                    {
+                      "name": "workspace_id",
+                      "expression": "`workspace_id`"
+                    },
+                    {
+                      "name": "job_id",
+                      "expression": "`job_id`"
+                    },
+                    {
+                      "name": "telemetry_status",
+                      "expression": "`telemetry_status`"
+                    },
+                    {
+                      "name": "cost_scope",
+                      "expression": "`cost_scope`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Telemetry scope"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "workspace_id",
+                    "displayName": "Workspace"
+                  },
+                  {
+                    "fieldName": "job_id",
+                    "displayName": "Job"
+                  },
+                  {
+                    "fieldName": "telemetry_status",
+                    "displayName": "Availability"
+                  },
+                  {
+                    "fieldName": "cost_scope",
+                    "displayName": "Cost and latency limits"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_jobs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_choices",
+                  "fields": [
+                    {
+                      "name": "workspace_id",
+                      "expression": "`workspace_id`"
+                    },
+                    {
+                      "name": "job_id",
+                      "expression": "`job_id`"
+                    },
+                    {
+                      "name": "job_name",
+                      "expression": "`job_name`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Enrolled project job suggestions"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "workspace_id",
+                    "displayName": "Workspace"
+                  },
+                  {
+                    "fieldName": "job_id",
+                    "displayName": "Job ID"
+                  },
+                  {
+                    "fieldName": "job_name",
+                    "displayName": "Project job name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_runs",
+                  "fields": [
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "started_at",
+                      "expression": "`started_at`"
+                    },
+                    {
+                      "name": "ended_at",
+                      "expression": "`ended_at`"
+                    },
+                    {
+                      "name": "result_state",
+                      "expression": "`result_state`"
+                    },
+                    {
+                      "name": "termination_code",
+                      "expression": "`termination_code`"
+                    },
+                    {
+                      "name": "timeline_minutes",
+                      "expression": "`timeline_minutes`"
+                    },
+                    {
+                      "name": "queue_seconds",
+                      "expression": "`queue_seconds`"
+                    },
+                    {
+                      "name": "execution_seconds",
+                      "expression": "`execution_seconds`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Job executions in the last 30 days"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_id",
+                    "displayName": "Run ID"
+                  },
+                  {
+                    "fieldName": "started_at",
+                    "displayName": "Started"
+                  },
+                  {
+                    "fieldName": "ended_at",
+                    "displayName": "Last timeline end"
+                  },
+                  {
+                    "fieldName": "result_state",
+                    "displayName": "Result"
+                  },
+                  {
+                    "fieldName": "termination_code",
+                    "displayName": "Termination"
+                  },
+                  {
+                    "fieldName": "timeline_minutes",
+                    "displayName": "Timeline minutes"
+                  },
+                  {
+                    "fieldName": "queue_seconds",
+                    "displayName": "Queue seconds"
+                  },
+                  {
+                    "fieldName": "execution_seconds",
+                    "displayName": "Execution seconds"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_cost",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_cost",
+                  "fields": [
+                    {
+                      "name": "usage_date",
+                      "expression": "`usage_date`"
+                    },
+                    {
+                      "name": "sku_name",
+                      "expression": "`sku_name`"
+                    },
+                    {
+                      "name": "usage_unit",
+                      "expression": "`usage_unit`"
+                    },
+                    {
+                      "name": "usage_quantity",
+                      "expression": "`usage_quantity`"
+                    },
+                    {
+                      "name": "priced_cost_usd",
+                      "expression": "`priced_cost_usd`"
+                    },
+                    {
+                      "name": "unpriced_records",
+                      "expression": "`unpriced_records`"
+                    },
+                    {
+                      "name": "billing_records",
+                      "expression": "`billing_records`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Attributed billing: list-price estimates"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "usage_date",
+                    "displayName": "Usage date"
+                  },
+                  {
+                    "fieldName": "sku_name",
+                    "displayName": "SKU"
+                  },
+                  {
+                    "fieldName": "usage_unit",
+                    "displayName": "Usage unit"
+                  },
+                  {
+                    "fieldName": "usage_quantity",
+                    "displayName": "Usage quantity"
+                  },
+                  {
+                    "fieldName": "priced_cost_usd",
+                    "displayName": "Priced cost (USD)"
+                  },
+                  {
+                    "fieldName": "unpriced_records",
+                    "displayName": "Unpriced records"
+                  },
+                  {
+                    "fieldName": "billing_records",
+                    "displayName": "Billing records"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "execution_cost_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_cost",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "usage_date",
+                      "expression": "`usage_date`"
+                    },
+                    {
+                      "name": "priced_cost_usd",
+                      "expression": "SUM(`priced_cost_usd`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "frame": {
+                "title": "Attributed priced cost by day (USD)",
+                "showTitle": true
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "usage_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "priced_cost_usd",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 6
           }
         }
       ]

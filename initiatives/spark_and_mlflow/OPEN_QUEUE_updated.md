@@ -526,6 +526,19 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
+### SM-23e — Native job handoff and dashboard acceptance (IN PROGRESS, 2026-10-05)
+
+Approved follow-up: generated jobs use Spark directly, with visible native
+train -> score -> monitoring job handoff. Remove the redundant inline score
+report/retraining graph and engine choice. Repair dashboard model/context
+selection, preserve missing-latest-result semantics, expose confusion counts,
+and add explicitly scoped native execution/list-price billing views.
+
+[Implementation and evidence160](160-sm23e-monitoring-jobs-dashboard.md) tracks
+focused tests and actual single/competition/model-set deployments. Live completion,
+late-label evidence, final dashboard publication and independent review are pending.
+This follow-up does not relax the inherited production identity/approval gates.
+
 ### SM-23d — Distributed monitoring (DELIVERED, 2026-10-05)
 
 Training/scoring capacity and monitoring capacity remain separate budgets.

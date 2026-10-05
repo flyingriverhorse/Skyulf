@@ -176,7 +176,11 @@ def monitoring_views(namespace: str) -> dict[str, str]:
         )
         SELECT i.monitor_id, i.environment, i.project, i.model_name,
             i.model_catalog, i.model_schema, i.selection, i.expected_interval_hours,
-            r.model_version, r.report_id, r.measured_at, r.observed_at,
+            COALESCE(r.model_version, get_json_object(i.config_json, '$.model_version'))
+                AS model_version,
+            get_json_object(i.config_json, '$.model_set_name') AS model_set_name,
+            get_json_object(i.config_json, '$.model_set_version') AS model_set_version,
+            r.report_id, r.measured_at, r.observed_at,
             r.current_rows, r.scored_rows, r.labeled_rows, r.label_coverage,
             r.drifted_columns, r.error_message, r.mlflow_run_id,
             CASE WHEN NOT i.enabled THEN 'disabled'

@@ -120,6 +120,37 @@ def test_class_order_and_eligibility(spark):
     assert result["values"] == pytest.approx(expected["values"])
     assert result["excluded_rows"] == 1
     assert result["label_coverage"] == 1
+    assert result["confusion_matrix"]["status"] == "measured"
+    assert result["confusion_matrix"]["cells"] == [
+        {
+            "actual_label": "z",
+            "predicted_label": "z",
+            "actual_index": 0,
+            "predicted_index": 0,
+            "count": 0,
+        },
+        {
+            "actual_label": "z",
+            "predicted_label": "a",
+            "actual_index": 0,
+            "predicted_index": 1,
+            "count": 0,
+        },
+        {
+            "actual_label": "a",
+            "predicted_label": "z",
+            "actual_index": 1,
+            "predicted_index": 0,
+            "count": 1,
+        },
+        {
+            "actual_label": "a",
+            "predicted_label": "a",
+            "actual_index": 1,
+            "predicted_index": 1,
+            "count": 1,
+        },
+    ]
 
 
 @pytest.mark.parametrize("availability", ["2026-01-01", "invalid", None])

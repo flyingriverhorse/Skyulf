@@ -186,7 +186,7 @@ def test_selected_runtime_dependencies_reach_both_job_types(
     for role, job in jobs.items():
         requirements_file = "train-requirements.txt" if role == "train" else "requirements.txt"
         requirements_path = "${workspace.file_path}/deployment/" + requirements_file
-        if compute == "serverless":
+        if compute == "serverless" or role == "monitoring":
             dependencies = job["environments"][0]["spec"]["dependencies"]
             assert "-r " + requirements_path in dependencies
             assert "../dist/skyulf/*.whl" in dependencies

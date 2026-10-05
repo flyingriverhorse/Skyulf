@@ -41,6 +41,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
         else:
             assert target["variables"].get("monitoring_enabled", "true") == "true"
     assert variables["monitoring_enabled"]["default"] == "true"
+    assert "monitoring_execution_engine" not in variables
     assert variables["monitoring_catalog"]["default"] == ""
     assert variables["monitoring_schema"]["default"] == ""
     assert variables["monitoring_drift_thresholds"]["default"] == "{}"
@@ -61,11 +62,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
     tasks = [task for task in job["tasks"] if "notebook_task" in task]
     for task in tasks:
         params = task["notebook_task"]["base_parameters"]
-        if task["task_key"] == "retraining_skipped":
-            continue
-        if task["task_key"] == "drift_report":
-            assert params["monitoring_dashboard_url"] == "${var.monitoring_dashboard_url}"
-            continue
+        assert params["monitoring_execution_engine"] == "spark"
         assert params["catalog"] == "${var.catalog}"
         assert params["monitoring_catalog"] == "${var.monitoring_catalog}"
         assert params["monitoring_schema"] == "${var.monitoring_schema}"
@@ -74,27 +71,15 @@ def test_generated_projects_bind_independent_monitoring_destination(
         assert params["monitoring_project"] == "${bundle.name}"
         assert params["monitoring_drift_thresholds"] == "${var.monitoring_drift_thresholds}"
         assert params["monitoring_performance_policies"] == "${var.monitoring_performance_policies}"
-    assert len(tasks) == (8 if recovery == "true" else 6)
-    retrain = next(task for task in tasks if task["task_key"] == "retrain_on_drift")
-    assert retrain["depends_on"] == [{"task_key": "retraining_needed", "outcome": "true"}]
-    check = next(task for task in tasks if task["task_key"] == "check_retraining")
-    assert check["depends_on"] == [{"task_key": "drift_report"}]
-    condition = next(task for task in job["tasks"] if task["task_key"] == "retraining_needed")
-    assert condition["depends_on"] == [{"task_key": "check_retraining"}]
-    assert condition["condition_task"] == {
-        "op": "EQUAL_TO",
-        "left": "{{tasks.check_retraining.values.retraining_needed}}",
-        "right": "true",
-    }
-    skipped = next(task for task in tasks if task["task_key"] == "retraining_skipped")
-    assert skipped["depends_on"] == [{"task_key": "retraining_needed", "outcome": "false"}]
-    for name in ("check_retraining", "retraining_skipped"):
-        assert (project / "src/jobs" / (name + ".py")).is_file()
-    params = retrain["notebook_task"]["base_parameters"]
-    assert params["train_job_name"] == "${bundle.name}_train"
-    assert params["score_job_name"] == "{{job.name}}"
-    assert params["on_drift"] == "${var.on_drift}"
-    monitor = next(task for task in tasks if task["task_key"] == "monitor_model")
+    assert len(tasks) == (4 if recovery == "true" else 2)
+    assert not {
+        "drift_report",
+        "check_retraining",
+        "retraining_needed",
+        "retrain_on_drift",
+        "retraining_skipped",
+    }.intersection(task["task_key"] for task in job["tasks"])
+    monitor = next(task for task in tasks if task["task_key"] == "prepare_monitoring")
     assert monitor["depends_on"] == [{"task_key": "monitoring_allowed", "outcome": "true"}]
     allowed = next(task for task in job["tasks"] if task["task_key"] == "monitoring_allowed")
     assert allowed["depends_on"] == [
@@ -105,17 +90,29 @@ def test_generated_projects_bind_independent_monitoring_destination(
         "left": "${bundle.mode}",
         "right": "production",
     }
-    assert monitor["notebook_task"]["notebook_path"] == "../src/jobs/monitor_model.py"
-    assert monitor["notebook_task"]["base_parameters"]["monitoring_invocation_id"] == (
-        "{{job.run_id}}"
-    )
+    assert monitor["notebook_task"]["notebook_path"] == "../src/jobs/prepare_monitoring.py"
+    assert "monitoring_invocation_id" not in monitor["notebook_task"]["base_parameters"]
     assert (
         monitor["notebook_task"]["base_parameters"]["monitoring_dashboard_url"]
         == "${var.monitoring_dashboard_url}"
     )
-    drift = next(task for task in tasks if task["task_key"] == "drift_report")
-    assert drift["depends_on"] == [{"task_key": "monitor_model"}]
-    assert drift["notebook_task"]["notebook_path"] == "../src/jobs/drift_report.py"
+    ready = next(task for task in job["tasks"] if task["task_key"] == "monitoring_ready")
+    assert ready["depends_on"] == [{"task_key": "prepare_monitoring"}]
+    assert ready["condition_task"] == {
+        "op": "EQUAL_TO",
+        "left": "{{tasks.prepare_monitoring.values.monitoring_ready}}",
+        "right": "true",
+    }
+    dispatch = next(task for task in job["tasks"] if task["task_key"] == "monitor_model")
+    assert dispatch["depends_on"] == [{"task_key": "monitoring_ready", "outcome": "true"}]
+    assert dispatch["run_job_task"] == {
+        "job_id": "${resources.jobs.monitoring.id}",
+        "job_parameters": {
+            "monitoring_request": "{{tasks.prepare_monitoring.values.monitoring_request_json}}",
+            "score_model_version": "{{job.parameters.score_model_version}}",
+        },
+    }
+    assert monitoring_params["monitoring_execution_engine"] == "spark"
     dependencies = (
         job["environments"][0]["spec"]["dependencies"]
         if compute == "serverless"
@@ -144,6 +141,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
     ]
     reference_task = "initialize_run" if layout == "multi_target" else "training_report"
     registration = training_tasks["register_monitor"]["notebook_task"]
+    assert registration["base_parameters"]["monitoring_execution_engine"] == "spark"
     assert registration["base_parameters"]["reference_json"] == (
         "{{tasks." + reference_task + ".values.reference_json}}"
     )

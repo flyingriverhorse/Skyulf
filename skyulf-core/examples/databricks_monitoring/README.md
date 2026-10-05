@@ -303,9 +303,18 @@ acceptance thresholds or notifications are enabled by this example.
 
 ## Dashboard layout
 
-Catalog, schema, model and version filters select the models shown on each page.
-Environment/project remain part of enrollment identity but are not displayed as
-dashboard filters or table columns. No monitoring tables change for this layout.
+Overview lists all enrollments in the configured monitoring store, with catalog,
+schema, model and version filters. It includes parent model-set identity where
+available. Models registered elsewhere appear only after enrollment in this store.
+Counts represent monitoring enrollments; two projects can monitor the same model.
+
+Drift and performance use model, version and monitoring-context selectors. Choices
+come from both current inventory and saved history, including models that have not
+yet been observed. The context label includes environment/project and a short
+monitor identifier. Empty selectors choose the most recently measured matching
+context; the selected model, version, identity and latest status are shown above
+the charts. Explicit selections never combine separate monitor identities. Clear
+an old context selection when switching to a model from another project.
 
 The drift/quality page keeps two tables and adds two charts for one selected
 model/version: the latest observation's top ten feature PSI values beside each
@@ -342,8 +351,8 @@ selected model, version and metric. Both use the same metric and units; their
 legends identify whether higher or lower is better. The bar remains useful
 when only one observation exists. A latest unavailable measurement stays blank,
 rather than falling back to an older measured value.
-Select model/version before viewing the portable example; the live demonstration
-has sample selections. A single observation does not establish a trend. The chart
+The metric selector defaults to an available MAE, weighted F1, accuracy or other
+saved metric for the selected context. A single observation does not establish a trend. The chart
 does not combine different monitor identities for the same model/version. Metric
 selection does not remove columns from the performance table. Latest-observation
 charts choose the latest saved report before applying date/feature/target filters;
@@ -351,6 +360,37 @@ those filters can hide its bars but do not choose an older report. The PSI chart
 shows the top ten features before feature filtering; use the tables for the rest.
 Dashboard refresh
 reads stored results and does not trigger new monitoring calculations.
+
+Latest PSI and performance bars use the newest saved report for that context,
+ranked by observation window and measurement time. A newer empty or failed report
+does not resurrect an older measured bar. Historical trend charts retain history.
+The context summary exposes the newest report status even when charts are empty.
+
+The confusion matrix uses the latest report's saved bounded class counts, with
+actual classes on rows and predictions on columns. Numeric class indices preserve
+identity when display labels collide. Measured zeros are real counts; unavailable
+classification, regression and historical reports without a stored matrix show an
+explicit status. The matrix is independent of history date and target filters.
+
+### Execution and compute
+
+This page requires SELECT access to `system.lakeflow.jobs`,
+`system.lakeflow.job_run_timeline`, `system.billing.usage` and
+`system.billing.list_prices`. Dashboard readers need these permissions themselves;
+a permission error is not evidence of zero usage. The portable dashboard leaves
+workspace and job selections empty. Deployment-specific defaults may select exact
+owned IDs after verification. Job suggestions match current job names to enrolled
+project names with `_train`, `_score` and `_monitoring` suffixes; this is a discovery
+aid, not proof that all project costs are attributed to that job.
+
+Both workspace ID and job ID must match before execution or billing rows are
+shown. Execution details summarize the last 30 days of run timeline records.
+Billing includes only usage with an explicit matching job ID. It preserves usage
+units and correction quantities, joins the applicable USD list price by SKU,
+cloud, unit and effective time, and reports unpriced records separately. Priced
+cost is an estimate, not an invoice or full project cost. Shared compute without
+job attribution is excluded. System telemetry and billing can arrive late; empty
+results do not prove that a job did not run or incur cost.
 
 ## File responsibilities
 
@@ -373,7 +413,7 @@ Library files live under skyulf/integrations/databricks/:
 In this example, databricks.yml selects central storage and compute;
 resources/monitoring.job.yml defines the runner and dependencies;
 src/monitoring_notebook.py calls the library; resources/monitoring.dashboard.yml
-binds storage; src/monitoring.lvdash.json defines SQL, filters and three pages.
+binds storage; src/monitoring.lvdash.json defines SQL, filters and four pages.
 Generated producer deployment variables and the separate monitoring job pass
 independent monitoring settings. The producer README documents Spark-default
 dispatch, the paused schedule and reference preparation.
