@@ -437,10 +437,16 @@ schema, model and version filters. Models registered elsewhere appear only after
 enrollment in this store. Counts represent monitoring enrollments; two projects
 can monitor the same model.
 
-Four counters show distinct registered models, monitoring contexts, scoring-input
-tables and prediction-output tables. The compact mapping lists each model/version
+Four counters show distinct registered models, monitoring registrations,
+scoring-input tables and prediction-output tables. A monitoring registration is
+one environment/project/model identity, including paused entries; the same model
+can have multiple registrations. For example, five models can produce six
+registrations when one model is monitored by two projects. The compact mapping lists each model/version
 and its input, prediction and optional actual-outcome table. A shared table counts
 once even when several model-set components use it.
+
+Overview places Drift and data quality and Latest saved performance immediately
+after the top inventory counters, before the daily charts and model/table map.
 
 Two line charts show daily drift and performance-policy checks. Each counts one
 enrollment per UTC window day using the latest saved window, then measurement and

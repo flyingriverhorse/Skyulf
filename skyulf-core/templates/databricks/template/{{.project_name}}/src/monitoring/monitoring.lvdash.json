@@ -2245,7 +2245,7 @@
             "name": "overview_note",
             "multilineTextboxSpec": {
               "lines": [
-                "Inventory includes enabled and disabled contexts. A registered model counts once across versions; each enrollment has its own settings and table associations."
+                "One monitoring registration identifies an environment, project and model. The same model can have several registrations with different settings and tables. Counts include enabled and paused registrations."
               ]
             }
           },
@@ -2785,7 +2785,9 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Enrolled contexts"
+                "title": "Monitoring registrations",
+                "showDescription": true,
+                "description": "Per environment / project / model"
               }
             }
           },
@@ -2878,16 +2880,546 @@
         },
         {
           "widget": {
-            "name": "overview_trend_note",
+            "name": "quality_overview_heading",
             "multilineTextboxSpec": {
               "lines": [
-                "Saved windows by UTC day: one last window per enabled context per day, matching its current settings and version. Points show sampled days only; gaps are not zero. Missing checks remain unavailable. Performance excludes policies that are off."
+                "## Drift and data quality"
               ]
             }
           },
           "position": {
             "x": 0,
             "y": 7,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "healthy_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(healthy_count)",
+                      "expression": "SUM(`healthy_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(healthy_count)",
+                  "displayName": "Healthy"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Healthy"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "drift_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(drift_count)",
+                      "expression": "SUM(`drift_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(drift_count)",
+                  "displayName": "Drift"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Drift"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 8,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "stale_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(stale_count)",
+                      "expression": "SUM(`stale_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(stale_count)",
+                  "displayName": "Stale"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stale"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 8,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "never_observed_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(never_observed_count)",
+                      "expression": "SUM(`never_observed_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(never_observed_count)",
+                  "displayName": "Never observed"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Never observed"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 8,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "degraded_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(degraded_count)",
+                      "expression": "SUM(`degraded_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(degraded_count)",
+                  "displayName": "Measurement issues"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Measurement issues",
+                "showDescription": true,
+                "description": "Measurement or data quality problems"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "failed_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(failed_count)",
+                      "expression": "SUM(`failed_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(failed_count)",
+                  "displayName": "Failed"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Failed"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "no_data_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(no_data_count)",
+                      "expression": "SUM(`no_data_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(no_data_count)",
+                  "displayName": "No data"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "No data"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "disabled_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "sum(disabled_count)",
+                      "expression": "SUM(`disabled_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(disabled_count)",
+                  "displayName": "Monitoring disabled"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Monitoring disabled"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 11,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_overview_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Latest saved performance"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_overview_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Current enrollment settings and concrete version only. Old mature windows become insufficient evidence after the expected monitoring interval; label delay and policy window size are included. Disabled monitoring is excluded from these four counts."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "within_tolerance_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(within_tolerance_count)",
+                      "expression": "SUM(`within_tolerance_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(within_tolerance_count)",
+                  "displayName": "Within tolerance"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Within tolerance"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_loss_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(performance_loss_count)",
+                      "expression": "SUM(`performance_loss_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(performance_loss_count)",
+                  "displayName": "Performance loss"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Performance loss"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 17,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "insufficient_evidence_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(insufficient_evidence_count)",
+                      "expression": "SUM(`insufficient_evidence_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(insufficient_evidence_count)",
+                  "displayName": "Insufficient evidence"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Insufficient evidence"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 17,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "policy_disabled_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(policy_disabled_count)",
+                      "expression": "SUM(`policy_disabled_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(policy_disabled_count)",
+                  "displayName": "Policy disabled"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Policy disabled"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 17,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "overview_trend_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Saved windows by UTC day: one last window per enabled monitoring registration per day, matching its current settings and version. Points show recorded days only; gaps are not zero. Missing checks remain unavailable. Performance excludes policies that are off."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
             "width": 12,
             "height": 2
           }
@@ -2931,7 +3463,7 @@
                 },
                 "y": {
                   "fieldName": "context_count",
-                  "displayName": "Enrolled contexts",
+                  "displayName": "Monitoring registrations",
                   "scale": {
                     "type": "quantitative"
                   }
@@ -2952,13 +3484,13 @@
                 "showTitle": true,
                 "title": "Daily drift checks",
                 "showDescription": true,
-                "description": "Contexts with drift, any measured check, or unavailable checks; categories can overlap."
+                "description": "Registrations with drift, any measured check, or unavailable checks; categories can overlap."
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 9,
+            "y": 22,
             "width": 6,
             "height": 6
           }
@@ -3002,7 +3534,7 @@
                 },
                 "y": {
                   "fieldName": "context_count",
-                  "displayName": "Enrolled contexts",
+                  "displayName": "Monitoring registrations",
                   "scale": {
                     "type": "quantitative"
                   }
@@ -3029,7 +3561,7 @@
           },
           "position": {
             "x": 6,
-            "y": 9,
+            "y": 22,
             "width": 6,
             "height": 6
           }
@@ -3121,539 +3653,9 @@
           },
           "position": {
             "x": 0,
-            "y": 15,
+            "y": 28,
             "width": 12,
             "height": 6
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_overview_heading",
-            "multilineTextboxSpec": {
-              "lines": [
-                "## Latest saved performance"
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 21,
-            "width": 12,
-            "height": 1
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_overview_note",
-            "multilineTextboxSpec": {
-              "lines": [
-                "Current enrollment settings and concrete version only. Old mature windows become insufficient evidence after the expected monitoring interval; label delay and policy window size are included. Disabled monitoring is excluded from these four counts."
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 22,
-            "width": 12,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "within_tolerance_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "overview_performance",
-                  "fields": [
-                    {
-                      "name": "sum(within_tolerance_count)",
-                      "expression": "SUM(`within_tolerance_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(within_tolerance_count)",
-                  "displayName": "Within tolerance"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Within tolerance"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 24,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_loss_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "overview_performance",
-                  "fields": [
-                    {
-                      "name": "sum(performance_loss_count)",
-                      "expression": "SUM(`performance_loss_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(performance_loss_count)",
-                  "displayName": "Performance loss"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Performance loss"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 24,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "insufficient_evidence_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "overview_performance",
-                  "fields": [
-                    {
-                      "name": "sum(insufficient_evidence_count)",
-                      "expression": "SUM(`insufficient_evidence_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(insufficient_evidence_count)",
-                  "displayName": "Insufficient evidence"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Insufficient evidence"
-              }
-            }
-          },
-          "position": {
-            "x": 6,
-            "y": 24,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "policy_disabled_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "overview_performance",
-                  "fields": [
-                    {
-                      "name": "sum(policy_disabled_count)",
-                      "expression": "SUM(`policy_disabled_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(policy_disabled_count)",
-                  "displayName": "Policy disabled"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Policy disabled"
-              }
-            }
-          },
-          "position": {
-            "x": 9,
-            "y": 24,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "quality_overview_heading",
-            "multilineTextboxSpec": {
-              "lines": [
-                "## Drift and data quality"
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 27,
-            "width": 12,
-            "height": 1
-          }
-        },
-        {
-          "widget": {
-            "name": "healthy_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(healthy_count)",
-                      "expression": "SUM(`healthy_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(healthy_count)",
-                  "displayName": "Healthy"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Healthy"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 28,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "drift_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(drift_count)",
-                      "expression": "SUM(`drift_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(drift_count)",
-                  "displayName": "Drift"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Drift"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 28,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "stale_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(stale_count)",
-                      "expression": "SUM(`stale_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(stale_count)",
-                  "displayName": "Stale"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Stale"
-              }
-            }
-          },
-          "position": {
-            "x": 6,
-            "y": 28,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "never_observed_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(never_observed_count)",
-                      "expression": "SUM(`never_observed_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(never_observed_count)",
-                  "displayName": "Never observed"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Never observed"
-              }
-            }
-          },
-          "position": {
-            "x": 9,
-            "y": 28,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "degraded_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(degraded_count)",
-                      "expression": "SUM(`degraded_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(degraded_count)",
-                  "displayName": "Measurement issues"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Measurement issues",
-                "showDescription": true,
-                "description": "Measurement or data quality problems"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 31,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "failed_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(failed_count)",
-                      "expression": "SUM(`failed_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(failed_count)",
-                  "displayName": "Failed"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Failed"
-              }
-            }
-          },
-          "position": {
-            "x": 3,
-            "y": 31,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "no_data_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(no_data_count)",
-                      "expression": "SUM(`no_data_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(no_data_count)",
-                  "displayName": "No data"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "No data"
-              }
-            }
-          },
-          "position": {
-            "x": 6,
-            "y": 31,
-            "width": 3,
-            "height": 3
-          }
-        },
-        {
-          "widget": {
-            "name": "disabled_count",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "sum(disabled_count)",
-                      "expression": "SUM(`disabled_count`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "counter",
-              "encodings": {
-                "value": {
-                  "fieldName": "sum(disabled_count)",
-                  "displayName": "Monitoring disabled"
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Monitoring disabled"
-              }
-            }
-          },
-          "position": {
-            "x": 9,
-            "y": 31,
-            "width": 3,
-            "height": 3
           }
         }
       ]
