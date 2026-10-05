@@ -233,7 +233,6 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
             "current_value",
             "baseline_value",
             "threshold_value",
-            ":performance_metric",
             "model_name = :trend_model",
             "model_version = :trend_version",
         )
@@ -243,7 +242,7 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
     assert table["spec"]["widgetType"] == "table"
     assert table["queries"][0]["query"]["datasetName"] == "performance_policy"
     columns = {column["fieldName"] for column in table["spec"]["encodings"]["columns"]}
-    assert {
+    evidence_fields = {
         "status",
         "reason",
         "report_id",
@@ -269,7 +268,10 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
         "action_reason",
         "request_id",
         "run_id",
-    } <= columns
+    }
+    assert {"status", "metric", "baseline_value", "current_value", "label_coverage"} <= columns
+    assert len(columns) <= 8
+    assert all(field in datasets["performance_policy"] for field in evidence_fields)
     line = widgets["performance_policy_trend"]
     assert line["spec"]["widgetType"] == "line"
     assert line["spec"]["encodings"]["color"]["fieldName"] == "series"
@@ -439,3 +441,97 @@ def test_empty_metric_selection_keeps_policy_evidence_visible() -> None:
         if w["name"] == "filter_metric_name_performance"
     )
     assert all(q["query"]["datasetName"] != "performance_policy" for q in widget["queries"])
+
+
+def test_performance_snapshot_uses_latest_full_observation_without_inventing_counts() -> None:
+    """A fresh failed measurement must clear headline counts instead of reviving old success."""
+    dataset = next(d for d in _dashboard()["datasets"] if d["name"] == "performance_snapshot")
+    tail = "".join(dataset["queryLines"]).split("), ranked_reports AS (", 1)[1]
+    sql = (
+        "WITH chosen_context AS (SELECT 'm' AS monitor_id, 'model' AS model_name, "
+        "'1' AS model_version), ranked_reports AS (" + tail
+    )
+    with sqlite3.connect(":memory:") as connection:
+        connection.row_factory = sqlite3.Row
+
+        def json_value(raw: str, path: str) -> str | None:
+            """Match Spark's SQL NULL for both absent fields and explicit JSON null."""
+            value = json.loads(raw).get(path[2:])
+            return json.dumps(value) if value is not None else None
+
+        connection.create_function("get_json_object", 2, json_value)
+        connection.execute(
+            "CREATE TABLE monitoring_results (monitor_id TEXT, model_name TEXT, model_version TEXT, "
+            "report_id TEXT, window_end INTEGER, measured_at INTEGER, status TEXT, report_json TEXT, "
+            "scored_rows INTEGER, labeled_rows INTEGER, label_coverage REAL)"
+        )
+        assert connection.execute(sql).fetchone()["scored_rows"] is None
+        connection.executemany(
+            "INSERT INTO monitoring_results VALUES ('m','model','1',?,?,?,?,?,?,?,?)",
+            [
+                ("full", 1, 1, "healthy", '{"current_rows":40}', 40, 20, 0.5),
+                ("policy", 2, 2, "no_data", '{"performance":{}}', 0, 0, 0.0),
+                (
+                    "policy-null",
+                    2,
+                    3,
+                    "no_data",
+                    '{"performance":{},"current_rows":null}',
+                    0,
+                    0,
+                    0.0,
+                ),
+            ],
+        )
+        row = connection.execute(sql).fetchone()
+        assert (row["scored_rows"], row["labeled_rows"], row["label_coverage"]) == (40, 20, 0.5)
+        connection.execute(
+            "INSERT INTO monitoring_results VALUES ('m','model','1','failed',3,3,'failed','{}',0,0,0)"
+        )
+        row = connection.execute(sql).fetchone()
+        assert all(row[name] is None for name in ("scored_rows", "labeled_rows", "label_coverage"))
+
+
+def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> None:
+    """Historical loss must not replace a missing latest policy check or depend on chart metric."""
+    datasets = {d["name"]: d for d in _dashboard()["datasets"]}
+    sql = "".join(datasets["performance_policy_snapshot"]["queryLines"])
+    assert "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in sql
+    assert "WHERE status = 'degraded'" not in sql and "current_value IS NOT NULL" not in sql
+    tail = sql.split("), policy_ranked AS (", 1)[1]
+    query = (
+        "WITH chosen_context AS (SELECT 'm' AS monitor_id, 'model' AS model_name, "
+        "'1' AS model_version), policy_ranked AS (" + tail
+    )
+    with sqlite3.connect(":memory:") as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute(
+            "CREATE TABLE performance_history (monitor_id TEXT, model_name TEXT, model_version TEXT, "
+            "report_id TEXT, window_end INTEGER, measured_at INTEGER, metric TEXT, status TEXT, "
+            "reason TEXT, action TEXT, baseline_value REAL, current_value REAL, threshold_value REAL)"
+        )
+        connection.executemany(
+            "INSERT INTO performance_history VALUES ('m','model','1',?,?,?,'rmse',?,?,'none',1,?,1.1)",
+            [
+                ("backfill", 1, 100, "degraded", "historical_window", 1.5),
+                ("latest", 2, 2, "unavailable", "current.value must be a finite number.", None),
+            ],
+        )
+        row = connection.execute(query).fetchone()
+        assert row["report_id"] == "latest" and row["current_value"] is None
+        assert row["policy_status"] == "Insufficient evidence"
+        connection.execute(
+            "INSERT INTO performance_history VALUES "
+            "('m','model','1','disabled',3,3,NULL,'disabled','policy_off','none',NULL,NULL,NULL)"
+        )
+        assert connection.execute(query).fetchone()["policy_status"] == "Policy disabled"
+    for name in ("performance_policy_snapshot", "performance_policy_series"):
+        assert "performance_metric" not in {p["keyword"] for p in datasets[name]["parameters"]}
+    series = "".join(datasets["performance_policy_series"]["queryLines"])
+    assert "SELECT metric AS metric_name FROM performance_history" in series
+    widgets = {w["name"]: w for p in _dashboard()["pages"] for w in _widgets(p)}
+    assert "monitor_context" in {
+        c["fieldName"] for c in widgets["performance_context"]["spec"]["encodings"]["columns"]
+    }
+    metric = widgets["filter_metric_name_performance"]
+    assert all(q["query"]["datasetName"] != "performance_policy_series" for q in metric["queries"])

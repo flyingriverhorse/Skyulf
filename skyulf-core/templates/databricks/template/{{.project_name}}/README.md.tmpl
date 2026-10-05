@@ -683,7 +683,6 @@ The graph uses meaningful model names; notebook implementation is shared:
 | `model_set_decision.py` | Apply set promotion policy or an explicit approve/reject/rollback action |
 | `training_report.py`, `models_report.py` | Final single/competition or multi-model status |
 | `score.py`, `score_models.py` | Saved single-model or model-set scoring |
-| `train_models.py` | Compatibility entrypoint for earlier sequential multi-model callers |
 
 Changing parameters or a recipe keeps the graph unchanged. After adding,
 removing or renaming entries in `src/modeling/model_competition.py` or
@@ -1126,6 +1125,11 @@ measure, display and apply the guarded training decision. A failed observation
 is saved as durable evidence and fails the monitoring task; committed predictions
 remain intact. A no-op scoring retry can repair an incomplete request for its
 original commit. External alias edits do not trigger enrollment.
+
+The monitoring job's `monitor_model` task executes `src/jobs/monitor_project.py`;
+the scoring job's task with the same key invokes that job. Newly generated projects
+omit obsolete notebook wrappers. Existing run history retains the task names used
+when each run started; inspect the current job definition for the deployed graph.
 
 Set `monitoring_revisit_windows` to the number of completed performance windows
 to check for late labels, from 1 to 100; the default is `3` and includes the

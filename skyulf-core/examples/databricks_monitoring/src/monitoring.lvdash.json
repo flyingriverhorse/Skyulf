@@ -956,7 +956,8 @@
         ")\n",
         "SELECT source.* FROM (SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history) source JOIN chosen_context context\n",
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
-        " AND source.model_version = context.model_version"
+        " AND source.model_version = context.model_version\n",
+        "ORDER BY window_end DESC, measured_at DESC, report_id DESC\n"
       ],
       "parameters": [
         {
@@ -1033,18 +1034,15 @@
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         "), selected_metric AS (\n",
-        " SELECT metric_name FROM metric_history source JOIN chosen_context context\n",
+        " SELECT metric AS metric_name FROM performance_history source JOIN chosen_context context\n",
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
-        " WHERE category = 'performance'\n",
-        " AND (COALESCE(:performance_metric, '') = '' OR metric_name = :performance_metric)\n",
-        " GROUP BY metric_name ORDER BY CASE metric_name WHEN 'mae' THEN 0\n",
-        " WHEN 'f1_weighted' THEN 1 WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name LIMIT 1\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC LIMIT 1\n",
         "), selected AS (\n",
         " SELECT source.* FROM performance_history source JOIN chosen_context context\n",
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
-        " WHERE metric = COALESCE(NULLIF(:performance_metric, ''), (SELECT metric_name FROM selected_metric))\n",
+        " WHERE metric = (SELECT metric_name FROM selected_metric)\n",
         ")\n",
         "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " measured_at, metric AS metric_name, current_value AS value, 'Current' AS series FROM selected\n",
@@ -1057,21 +1055,6 @@
         "ORDER BY measured_at, report_id, series"
       ],
       "parameters": [
-        {
-          "displayName": "Performance Metric",
-          "keyword": "performance_metric",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": ""
-                }
-              ]
-            }
-          }
-        },
         {
           "displayName": "Trend Model",
           "keyword": "trend_model",
@@ -1269,7 +1252,7 @@
         " context.latest_measurement, COALESCE(result.status, 'never_observed') AS latest_status,\n",
         " CASE WHEN context.monitor_id IS NULL THEN 'No matching enrollment; clear model/version/context selections'\n",
         " WHEN context.latest_measurement IS NULL THEN 'Enrolled; no saved observation yet'\n",
-        " ELSE 'Showing one monitoring identity; empty selectors choose the latest matching context'\n",
+        " ELSE 'Latest matching context'\n",
         " END AS selection_status\n",
         "FROM (SELECT 1) anchor LEFT JOIN chosen_context context ON true\n",
         "LEFT JOIN ranked_status result ON context.monitor_id = result.monitor_id\n",
@@ -1736,6 +1719,195 @@
         " ON j.name IN (concat(i.project, '_train'), concat(i.project, '_score'), concat(i.project, '_monitoring'))\n",
         "WHERE revision = 1 AND delete_time IS NULL\n",
         "ORDER BY workspace_id, job_name, job_id"
+      ]
+    },
+    {
+      "name": "performance_snapshot",
+      "displayName": "Latest prediction and label counts",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, CASE WHEN NOT (status = 'no_data'\n",
+        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
+        " AND get_json_object(report_json, '$.current_rows') IS NULL) THEN measured_at END AS measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), ranked_reports AS (\n",
+        " SELECT source.*, row_number() OVER (\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS report_rank\n",
+        " FROM (SELECT * FROM monitoring_results WHERE NOT (status = 'no_data'\n",
+        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
+        " AND get_json_object(report_json, '$.current_rows') IS NULL)) source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "), latest_report AS (SELECT * FROM ranked_reports WHERE report_rank = 1)\n",
+        "\n",
+        "SELECT report_id, model_name, model_version, measured_at,\n",
+        " CASE WHEN status = 'failed' THEN NULL ELSE scored_rows END AS scored_rows,\n",
+        " CASE WHEN status = 'failed' THEN NULL ELSE labeled_rows END AS labeled_rows,\n",
+        " CASE WHEN status = 'failed' THEN NULL ELSE label_coverage END AS label_coverage\n",
+        "FROM (SELECT 1) anchor LEFT JOIN latest_report ON true\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_policy_snapshot",
+      "displayName": "Latest completed policy window",
+      "queryLines": [
+        "WITH available_contexts AS (\n",
+        "WITH identities AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, measured_at FROM current_health\n",
+        " UNION ALL\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " environment, project, CASE WHEN NOT (status = 'no_data'\n",
+        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
+        " AND get_json_object(report_json, '$.current_rows') IS NULL) THEN measured_at END AS measured_at FROM monitoring_results\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " max(measured_at) AS latest_measurement\n",
+        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
+        " model_version, environment, project\n",
+        "), chosen_context AS (\n",
+        " SELECT * FROM available_contexts\n",
+        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
+        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
+        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
+        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
+        " LIMIT 1\n",
+        "), policy_ranked AS (\n",
+        " SELECT source.*, row_number() OVER (\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS policy_rank\n",
+        " FROM performance_history source JOIN chosen_context context\n",
+        " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
+        " AND source.model_version = context.model_version\n",
+        "), latest_policy AS (SELECT * FROM policy_ranked WHERE policy_rank = 1)\n",
+        "\n",
+        "SELECT report_id, window_end, metric, baseline_value, current_value, threshold_value,\n",
+        " CASE WHEN report_id IS NULL THEN 'No policy evidence'\n",
+        " WHEN status IN ('disabled', 'off', 'policy_off') THEN 'Policy disabled'\n",
+        " WHEN status = 'degraded' THEN 'Performance loss'\n",
+        " WHEN status = 'healthy' THEN 'Within tolerance'\n",
+        " ELSE 'Insufficient evidence' END AS policy_status,\n",
+        " CASE WHEN report_id IS NULL THEN 'No saved policy check for this selection'\n",
+        " WHEN status IN ('disabled', 'off', 'policy_off') THEN 'No degradation policy is enabled for this model'\n",
+        " WHEN reason = 'current.value must be a finite number.' THEN 'No usable metric in this window'\n",
+        " WHEN reason = 'historical_window' THEN 'Historical window; no new training request'\n",
+        " WHEN reason = 'within_tolerance' THEN 'Change is within the configured tolerance'\n",
+        " ELSE reason END AS policy_reason,\n",
+        " CASE WHEN report_id IS NULL THEN 'Not evaluated'\n",
+        " WHEN action = 'none' THEN 'No training requested'\n",
+        " ELSE action END AS policy_action\n",
+        "FROM (SELECT 1) anchor LEFT JOIN latest_policy ON true\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "Trend Model",
+          "keyword": "trend_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Monitor",
+          "keyword": "trend_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Trend Version",
+          "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
       ]
     }
   ],
@@ -3118,7 +3290,7 @@
                 "showTitle": true,
                 "title": "Which features changed?",
                 "showDescription": true,
-                "description": "Latest saved observation · Top 10 PSI values and their own limits"
+                "description": "Latest saved observation \u00c2\u00b7 Top 10 PSI values and their own limits"
               },
               "mark": {
                 "layout": "group"
@@ -3209,7 +3381,7 @@
                 "showTitle": true,
                 "title": "How many features show drift?",
                 "showDescription": true,
-                "description": "Per measurement · A feature is counted once, even if several checks flag it"
+                "description": "Per measurement \u00c2\u00b7 A feature is counted once, even if several checks flag it"
               },
               "mark": {
                 "layout": "group"
@@ -3695,7 +3867,7 @@
             "name": "performance_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Model performance"
+                "## Model performance\n\nPrediction quality, actual outcomes and changes from the saved baseline."
               ]
             }
           },
@@ -3703,23 +3875,7 @@
             "x": 0,
             "y": 0,
             "width": 12,
-            "height": 1
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_intro",
-            "multilineTextboxSpec": {
-              "lines": [
-                "Actual target values are not available in every source. Performance uses only predictions matched to an actual target value."
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 1,
-            "width": 12,
-            "height": 1
+            "height": 2
           }
         },
         {
@@ -3868,6 +4024,32 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_performance_snapshot",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_snapshot",
+                "query": {
+                  "datasetName": "performance_policy_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_model",
+                      "keyword": "trend_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -3918,19 +4100,27 @@
                   {
                     "parameterName": "trend_model",
                     "queryName": "parameter_confusion_cells"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_snapshot"
+                  },
+                  {
+                    "parameterName": "trend_model",
+                    "queryName": "parameter_performance_policy_snapshot"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Model (empty: latest)"
+                "title": "Model"
               }
             }
           },
           "position": {
             "x": 0,
             "y": 2,
-            "width": 4,
+            "width": 6,
             "height": 2
           }
         },
@@ -4080,6 +4270,32 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_performance_snapshot",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_snapshot",
+                "query": {
+                  "datasetName": "performance_policy_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_version",
+                      "keyword": "trend_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -4130,1077 +4346,28 @@
                   {
                     "parameterName": "trend_version",
                     "queryName": "parameter_confusion_cells"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_snapshot"
+                  },
+                  {
+                    "parameterName": "trend_version",
+                    "queryName": "parameter_performance_policy_snapshot"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Version (empty: latest)"
-              }
-            }
-          },
-          "position": {
-            "x": 4,
-            "y": 2,
-            "width": 4,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "filter_measured_at_performance",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "performance_measurements",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "performance_cells",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q2",
-                "query": {
-                  "datasetName": "performance_chart",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_performance_latest",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "q_policy",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_policy_series",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-date-range-picker",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date",
-                    "queryName": "q1"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date",
-                    "queryName": "q2"
-                  },
-                  {
-                    "queryName": "q_performance_latest",
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date",
-                    "queryName": "q_policy"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measurement date",
-                    "queryName": "q_policy_series"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Measurement date"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 8,
-            "width": 4,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "filter_column_name_performance",
-            "queries": [
-              {
-                "name": "q0",
-                "query": {
-                  "datasetName": "performance_measurements",
-                  "fields": [
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q1",
-                "query": {
-                  "datasetName": "performance_cells",
-                  "fields": [
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q2",
-                "query": {
-                  "datasetName": "performance_chart",
-                  "fields": [
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "q_performance_latest",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "disaggregated": false,
-                  "fields": [
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    }
-                  ]
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-multi-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "column_name",
-                    "displayName": "Target",
-                    "queryName": "q0"
-                  },
-                  {
-                    "fieldName": "column_name",
-                    "displayName": "Target",
-                    "queryName": "q1"
-                  },
-                  {
-                    "fieldName": "column_name",
-                    "displayName": "Target",
-                    "queryName": "q2"
-                  },
-                  {
-                    "queryName": "q_performance_latest",
-                    "fieldName": "column_name",
-                    "displayName": "Target"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Target"
-              }
-            }
-          },
-          "position": {
-            "x": 4,
-            "y": 8,
-            "width": 4,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "filter_metric_name_performance",
-            "queries": [
-              {
-                "name": "options",
-                "query": {
-                  "datasetName": "performance_choices",
-                  "fields": [
-                    {
-                      "name": "metric_name",
-                      "expression": "`metric_name`"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "parameter_performance_chart",
-                "query": {
-                  "datasetName": "performance_chart",
-                  "parameters": [
-                    {
-                      "name": "performance_metric",
-                      "keyword": "performance_metric"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "parameter_performance_latest",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "parameters": [
-                    {
-                      "name": "performance_metric",
-                      "keyword": "performance_metric"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
-                "name": "parameter_performance_policy_series",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "parameters": [
-                    {
-                      "name": "performance_metric",
-                      "keyword": "performance_metric"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "filter-single-select",
-              "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "metric_name",
-                    "queryName": "options"
-                  },
-                  {
-                    "parameterName": "performance_metric",
-                    "queryName": "parameter_performance_chart"
-                  },
-                  {
-                    "parameterName": "performance_metric",
-                    "queryName": "parameter_performance_latest"
-                  },
-                  {
-                    "parameterName": "performance_metric",
-                    "queryName": "parameter_performance_policy_series"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Metric (empty: available default)"
-              }
-            }
-          },
-          "position": {
-            "x": 8,
-            "y": 8,
-            "width": 4,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "trend_help",
-            "multilineTextboxSpec": {
-              "lines": [
-                "Empty selectors choose the latest matching context shown above. Choose model, version and context to compare a specific enrollment. Metric defaults to an available MAE, weighted F1 or accuracy. Date/target filters can hide latest bars; they do not substitute older observations. Missing actual targets remain unavailable. The confusion matrix uses the latest full observation for this context; mature policy windows remain separate. History date/target filters do not change the matrix."
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 10,
-            "width": 12,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_latest",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_latest",
-                  "fields": [
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    },
-                    {
-                      "name": "value",
-                      "expression": "`value`"
-                    },
-                    {
-                      "name": "metric_label",
-                      "expression": "`metric_label`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "bar",
-              "encodings": {
-                "x": {
-                  "fieldName": "column_name",
-                  "displayName": "Target",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                },
-                "y": {
-                  "fieldName": "value",
-                  "displayName": "Metric value",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "format": {
-                    "type": "number",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 4
-                    }
-                  }
-                },
-                "color": {
-                  "fieldName": "metric_label",
-                  "displayName": "Metric and improvement direction",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "How well does the model predict now?",
-                "showDescription": true,
-                "description": "Latest saved observation · Same metric and units as the trend"
-              },
-              "mark": {
-                "layout": "group"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 12,
-            "width": 6,
-            "height": 7
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_trend",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_chart",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    },
-                    {
-                      "name": "value",
-                      "expression": "`value`"
-                    },
-                    {
-                      "name": "metric_label",
-                      "expression": "`metric_label`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "line",
-              "encodings": {
-                "x": {
-                  "fieldName": "measured_at",
-                  "displayName": "Measurement time",
-                  "scale": {
-                    "type": "temporal"
-                  }
-                },
-                "y": {
-                  "fieldName": "value",
-                  "displayName": "Metric value",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "format": {
-                    "type": "number",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 4
-                    }
-                  }
-                },
-                "color": {
-                  "fieldName": "metric_label",
-                  "displayName": "Metric and improvement direction",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Is model performance changing?",
-                "showDescription": true,
-                "description": "Selected model, version and metric · At least two observations form a trend"
+                "title": "Version"
               }
             }
           },
           "position": {
             "x": 6,
-            "y": 12,
-            "width": 6,
-            "height": 7
-          }
-        },
-        {
-          "widget": {
-            "name": "outcomes",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_measurements",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "observed_at",
-                      "expression": "`observed_at`"
-                    },
-                    {
-                      "name": "outcome_summary",
-                      "expression": "`outcome_summary`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "observed_at",
-                    "displayName": "Scoring time"
-                  },
-                  {
-                    "fieldName": "outcome_summary",
-                    "displayName": "Records used for performance"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "How many predictions have actual target values?"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 19,
-            "width": 12,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_metrics",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_cells",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "column_name",
-                      "expression": "`column_name`"
-                    },
-                    {
-                      "name": "observation",
-                      "expression": "`observation`"
-                    },
-                    {
-                      "name": "metric_name",
-                      "expression": "`metric_name`"
-                    },
-                    {
-                      "name": "metric_value",
-                      "expression": "MAX(`value`)"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "pivot",
-              "encodings": {
-                "rows": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model",
-                    "total": {
-                      "show": false
-                    }
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version",
-                    "total": {
-                      "show": false
-                    }
-                  },
-                  {
-                    "fieldName": "column_name",
-                    "displayName": "Target",
-                    "total": {
-                      "show": false
-                    }
-                  },
-                  {
-                    "fieldName": "observation",
-                    "displayName": "Measurement time",
-                    "total": {
-                      "show": false
-                    }
-                  }
-                ],
-                "columns": [
-                  {
-                    "fieldName": "metric_name",
-                    "displayName": "Metric",
-                    "total": {
-                      "show": false
-                    }
-                  }
-                ],
-                "cell": {
-                  "type": "multi-cell",
-                  "fields": [
-                    {
-                      "fieldName": "metric_value",
-                      "cellType": "text",
-                      "format": {
-                        "type": "number",
-                        "decimalPlaces": {
-                          "type": "max",
-                          "places": 4
-                        }
-                      }
-                    }
-                  ]
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "How well does the model predict?"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 23,
-            "width": 12,
-            "height": 6
-          }
-        },
-        {
-          "widget": {
-            "name": "policy_heading",
-            "multilineTextboxSpec": {
-              "lines": [
-                "## Performance degradation policy\n\nThe policy verdict is separate from distribution drift. Select the configured metric shown in the policy table (for example, accuracy) to show its chart; other metrics have no policy series. Missing or insufficient actual targets leave policy unavailable. Check Reason and Label coverage below."
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 29,
-            "width": 12,
+            "y": 2,
+            "width": 2,
             "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_policy_trend",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_policy_series",
-                  "fields": [
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    },
-                    {
-                      "name": "value",
-                      "expression": "`value`"
-                    },
-                    {
-                      "name": "series",
-                      "expression": "`series`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 3,
-              "widgetType": "line",
-              "encodings": {
-                "x": {
-                  "fieldName": "measured_at",
-                  "displayName": "Measurement time",
-                  "scale": {
-                    "type": "temporal"
-                  }
-                },
-                "y": {
-                  "fieldName": "value",
-                  "displayName": "Metric value",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "format": {
-                    "type": "number",
-                    "decimalPlaces": {
-                      "type": "max",
-                      "places": 4
-                    }
-                  }
-                },
-                "color": {
-                  "fieldName": "series",
-                  "displayName": "Evidence series",
-                  "scale": {
-                    "type": "categorical"
-                  }
-                }
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Current metric against baseline and tolerance",
-                "showDescription": true,
-                "description": "Selected model, version and metric; missing values remain gaps"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 31,
-            "width": 12,
-            "height": 6
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_policy_evidence",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_policy",
-                  "fields": [
-                    {
-                      "name": "report_id",
-                      "expression": "`report_id`"
-                    },
-                    {
-                      "name": "monitor_id",
-                      "expression": "`monitor_id`"
-                    },
-                    {
-                      "name": "environment",
-                      "expression": "`environment`"
-                    },
-                    {
-                      "name": "project",
-                      "expression": "`project`"
-                    },
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "model_catalog",
-                      "expression": "`model_catalog`"
-                    },
-                    {
-                      "name": "model_schema",
-                      "expression": "`model_schema`"
-                    },
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    },
-                    {
-                      "name": "observed_at",
-                      "expression": "`observed_at`"
-                    },
-                    {
-                      "name": "window_start",
-                      "expression": "`window_start`"
-                    },
-                    {
-                      "name": "window_end",
-                      "expression": "`window_end`"
-                    },
-                    {
-                      "name": "status",
-                      "expression": "`status`"
-                    },
-                    {
-                      "name": "reason",
-                      "expression": "`reason`"
-                    },
-                    {
-                      "name": "metric",
-                      "expression": "`metric`"
-                    },
-                    {
-                      "name": "direction",
-                      "expression": "`direction`"
-                    },
-                    {
-                      "name": "baseline_kind",
-                      "expression": "`baseline_kind`"
-                    },
-                    {
-                      "name": "baseline_reference",
-                      "expression": "`baseline_reference`"
-                    },
-                    {
-                      "name": "baseline_value",
-                      "expression": "`baseline_value`"
-                    },
-                    {
-                      "name": "current_value",
-                      "expression": "`current_value`"
-                    },
-                    {
-                      "name": "absolute_degradation",
-                      "expression": "`absolute_degradation`"
-                    },
-                    {
-                      "name": "relative_degradation",
-                      "expression": "`relative_degradation`"
-                    },
-                    {
-                      "name": "tolerance",
-                      "expression": "`tolerance`"
-                    },
-                    {
-                      "name": "tolerance_mode",
-                      "expression": "`tolerance_mode`"
-                    },
-                    {
-                      "name": "threshold_value",
-                      "expression": "`threshold_value`"
-                    },
-                    {
-                      "name": "labeled_rows",
-                      "expression": "`labeled_rows`"
-                    },
-                    {
-                      "name": "label_coverage",
-                      "expression": "`label_coverage`"
-                    },
-                    {
-                      "name": "consecutive_failures",
-                      "expression": "`consecutive_failures`"
-                    },
-                    {
-                      "name": "required_windows",
-                      "expression": "`required_windows`"
-                    },
-                    {
-                      "name": "action",
-                      "expression": "`action`"
-                    },
-                    {
-                      "name": "action_reason",
-                      "expression": "`action_reason`"
-                    },
-                    {
-                      "name": "request_id",
-                      "expression": "`request_id`"
-                    },
-                    {
-                      "name": "run_id",
-                      "expression": "`run_id`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "report_id",
-                    "displayName": "Report ID"
-                  },
-                  {
-                    "fieldName": "monitor_id",
-                    "displayName": "Monitor ID"
-                  },
-                  {
-                    "fieldName": "environment",
-                    "displayName": "Environment"
-                  },
-                  {
-                    "fieldName": "project",
-                    "displayName": "Project"
-                  },
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "model_catalog",
-                    "displayName": "Catalog"
-                  },
-                  {
-                    "fieldName": "model_schema",
-                    "displayName": "Schema"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measured at"
-                  },
-                  {
-                    "fieldName": "observed_at",
-                    "displayName": "Scoring time"
-                  },
-                  {
-                    "fieldName": "window_start",
-                    "displayName": "Window start"
-                  },
-                  {
-                    "fieldName": "window_end",
-                    "displayName": "Window end"
-                  },
-                  {
-                    "fieldName": "status",
-                    "displayName": "Policy status"
-                  },
-                  {
-                    "fieldName": "reason",
-                    "displayName": "Reason"
-                  },
-                  {
-                    "fieldName": "metric",
-                    "displayName": "Metric"
-                  },
-                  {
-                    "fieldName": "direction",
-                    "displayName": "Direction"
-                  },
-                  {
-                    "fieldName": "baseline_kind",
-                    "displayName": "Baseline kind"
-                  },
-                  {
-                    "fieldName": "baseline_reference",
-                    "displayName": "Baseline reference"
-                  },
-                  {
-                    "fieldName": "baseline_value",
-                    "displayName": "Baseline"
-                  },
-                  {
-                    "fieldName": "current_value",
-                    "displayName": "Current"
-                  },
-                  {
-                    "fieldName": "absolute_degradation",
-                    "displayName": "Absolute degradation"
-                  },
-                  {
-                    "fieldName": "relative_degradation",
-                    "displayName": "Relative degradation"
-                  },
-                  {
-                    "fieldName": "tolerance",
-                    "displayName": "Tolerance"
-                  },
-                  {
-                    "fieldName": "tolerance_mode",
-                    "displayName": "Tolerance mode"
-                  },
-                  {
-                    "fieldName": "threshold_value",
-                    "displayName": "Boundary"
-                  },
-                  {
-                    "fieldName": "labeled_rows",
-                    "displayName": "Labeled rows"
-                  },
-                  {
-                    "fieldName": "label_coverage",
-                    "displayName": "Label coverage"
-                  },
-                  {
-                    "fieldName": "consecutive_failures",
-                    "displayName": "Failing windows"
-                  },
-                  {
-                    "fieldName": "required_windows",
-                    "displayName": "Required windows"
-                  },
-                  {
-                    "fieldName": "action",
-                    "displayName": "Action"
-                  },
-                  {
-                    "fieldName": "action_reason",
-                    "displayName": "Action reason"
-                  },
-                  {
-                    "fieldName": "request_id",
-                    "displayName": "Request ID"
-                  },
-                  {
-                    "fieldName": "run_id",
-                    "displayName": "Run ID"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Performance policy evidence and action",
-                "showDescription": true,
-                "description": "Saved status, exact window, baseline, coverage, streak, and request IDs"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 37,
-            "width": 12,
-            "height": 8
           }
         },
         {
@@ -5349,6 +4516,32 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_performance_snapshot",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_policy_snapshot",
+                "query": {
+                  "datasetName": "performance_policy_snapshot",
+                  "parameters": [
+                    {
+                      "name": "trend_monitor",
+                      "keyword": "trend_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -5399,12 +4592,20 @@
                   {
                     "parameterName": "trend_monitor",
                     "queryName": "parameter_confusion_cells"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_snapshot"
+                  },
+                  {
+                    "parameterName": "trend_monitor",
+                    "queryName": "parameter_performance_policy_snapshot"
                   }
                 ]
               },
               "frame": {
                 "showTitle": true,
-                "title": "Monitor context (empty: latest)"
+                "title": "Context"
               }
             }
           },
@@ -5443,10 +4644,6 @@
                     {
                       "name": "selection_status",
                       "expression": "`selection_status`"
-                    },
-                    {
-                      "name": "latest_status",
-                      "expression": "`latest_status`"
                     }
                   ],
                   "disaggregated": true
@@ -5458,89 +4655,9 @@
               "widgetType": "table",
               "frame": {
                 "showTitle": true,
-                "title": "Current monitoring context"
-              },
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Selected model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "monitor_context",
-                    "displayName": "Monitoring identity"
-                  },
-                  {
-                    "fieldName": "latest_measurement",
-                    "displayName": "Latest measurement"
-                  },
-                  {
-                    "fieldName": "selection_status",
-                    "displayName": "Selection"
-                  },
-                  {
-                    "fieldName": "latest_status",
-                    "displayName": "Latest saved status"
-                  }
-                ]
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 4,
-            "width": 12,
-            "height": 4
-          }
-        },
-        {
-          "widget": {
-            "name": "confusion_status",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "confusion_status",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    },
-                    {
-                      "name": "matrix_status",
-                      "expression": "`matrix_status`"
-                    },
-                    {
-                      "name": "matrix_reason",
-                      "expression": "`matrix_reason`"
-                    },
-                    {
-                      "name": "report_id",
-                      "expression": "`report_id`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "frame": {
-                "showTitle": true,
-                "title": "Latest confusion matrix evidence"
+                "title": "Selected model",
+                "showDescription": true,
+                "description": "Clear model, version and context to return to the latest enrollment."
               },
               "encodings": {
                 "columns": [
@@ -5553,20 +4670,16 @@
                     "displayName": "Version"
                   },
                   {
-                    "fieldName": "measured_at",
-                    "displayName": "Measured at"
+                    "fieldName": "monitor_context",
+                    "displayName": "Context"
                   },
                   {
-                    "fieldName": "matrix_status",
-                    "displayName": "Matrix status"
+                    "fieldName": "latest_measurement",
+                    "displayName": "Last measured"
                   },
                   {
-                    "fieldName": "matrix_reason",
-                    "displayName": "Reason"
-                  },
-                  {
-                    "fieldName": "report_id",
-                    "displayName": "Report"
+                    "fieldName": "selection_status",
+                    "displayName": "Selection"
                   }
                 ]
               }
@@ -5574,9 +4687,933 @@
           },
           "position": {
             "x": 0,
-            "y": 45,
+            "y": 4,
             "width": 12,
-            "height": 4
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "prediction_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "fields": [
+                    {
+                      "name": "scored_rows",
+                      "expression": "`scored_rows`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Predictions",
+                "showDescription": true,
+                "description": "Latest saved batch"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "scored_rows",
+                  "displayName": "Predictions",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "labeled_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "fields": [
+                    {
+                      "name": "labeled_rows",
+                      "expression": "`labeled_rows`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Matched outcomes",
+                "showDescription": true,
+                "description": "Latest saved batch"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "labeled_rows",
+                  "displayName": "Matched outcomes",
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "label_coverage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_snapshot",
+                  "fields": [
+                    {
+                      "name": "label_coverage",
+                      "expression": "`label_coverage`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Label coverage",
+                "showDescription": true,
+                "description": "Latest saved batch"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "label_coverage",
+                  "displayName": "Label coverage",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 6,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_metric_name_performance",
+            "queries": [
+              {
+                "name": "options",
+                "query": {
+                  "datasetName": "performance_choices",
+                  "fields": [
+                    {
+                      "name": "metric_name",
+                      "expression": "`metric_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_chart",
+                "query": {
+                  "datasetName": "performance_chart",
+                  "parameters": [
+                    {
+                      "name": "performance_metric",
+                      "keyword": "performance_metric"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "parameters": [
+                    {
+                      "name": "performance_metric",
+                      "keyword": "performance_metric"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "metric_name",
+                    "queryName": "options"
+                  },
+                  {
+                    "parameterName": "performance_metric",
+                    "queryName": "parameter_performance_chart"
+                  },
+                  {
+                    "parameterName": "performance_metric",
+                    "queryName": "parameter_performance_latest"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chart metric"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_measured_at_performance",
+            "queries": [
+              {
+                "name": "q0",
+                "query": {
+                  "datasetName": "performance_measurements",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1",
+                "query": {
+                  "datasetName": "performance_cells",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q2",
+                "query": {
+                  "datasetName": "performance_chart",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q0"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q1"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q2"
+                  },
+                  {
+                    "queryName": "q_performance_latest",
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q_policy_series"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "History date"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 9,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filter_column_name_performance",
+            "queries": [
+              {
+                "name": "q0",
+                "query": {
+                  "datasetName": "performance_measurements",
+                  "fields": [
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1",
+                "query": {
+                  "datasetName": "performance_cells",
+                  "fields": [
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q2",
+                "query": {
+                  "datasetName": "performance_chart",
+                  "fields": [
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_performance_latest",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "column_name",
+                    "displayName": "Target",
+                    "queryName": "q0"
+                  },
+                  {
+                    "fieldName": "column_name",
+                    "displayName": "Target",
+                    "queryName": "q1"
+                  },
+                  {
+                    "fieldName": "column_name",
+                    "displayName": "Target",
+                    "queryName": "q2"
+                  },
+                  {
+                    "queryName": "q_performance_latest",
+                    "fieldName": "column_name",
+                    "displayName": "Target"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Target"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 9,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_latest",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_latest",
+                  "fields": [
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "metric_label",
+                      "expression": "`metric_label`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "column_name",
+                  "displayName": "Target",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "metric_label",
+                  "displayName": "Metric and improvement direction",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Latest metric by target",
+                "showDescription": true,
+                "description": "Latest full observation; lower error or higher score is better."
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_chart",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "metric_label",
+                      "expression": "`metric_label`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "measured_at",
+                  "displayName": "Measurement time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "metric_label",
+                  "displayName": "Metric and improvement direction",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Observed performance over time",
+                "showDescription": true,
+                "description": "Same selected metric and target; a single observation is not a trend."
+              },
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 11,
+            "width": 8,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "policy_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Performance loss\nCompare completed policy windows with the saved baseline; this is separate from feature drift."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_policy_summary",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_policy_snapshot",
+                  "fields": [
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "policy_status",
+                      "expression": "`policy_status`"
+                    },
+                    {
+                      "name": "policy_reason",
+                      "expression": "`policy_reason`"
+                    },
+                    {
+                      "name": "policy_action",
+                      "expression": "`policy_action`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Latest policy check",
+                "showDescription": true,
+                "description": "Latest completed window, including missing evidence. Historical loss remains below."
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Window end"
+                  },
+                  {
+                    "fieldName": "metric",
+                    "displayName": "Metric"
+                  },
+                  {
+                    "fieldName": "policy_status",
+                    "displayName": "Decision"
+                  },
+                  {
+                    "fieldName": "policy_reason",
+                    "displayName": "Explanation"
+                  },
+                  {
+                    "fieldName": "policy_action",
+                    "displayName": "Action"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_policy_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "measured_at",
+                  "displayName": "Measurement time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "displayName": "Evidence series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Policy metric vs baseline",
+                "showDescription": true,
+                "description": "The policy metric is independent of the chart selector. Missing values remain gaps."
+              },
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 22,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_policy_evidence",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "baseline_value",
+                      "expression": "`baseline_value`"
+                    },
+                    {
+                      "name": "current_value",
+                      "expression": "`current_value`"
+                    },
+                    {
+                      "name": "threshold_value",
+                      "expression": "`threshold_value`"
+                    },
+                    {
+                      "name": "label_coverage",
+                      "expression": "`label_coverage`"
+                    },
+                    {
+                      "name": "action",
+                      "expression": "`action`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Policy history",
+                "showDescription": true,
+                "description": "Saved checks, newest window first. Full reasons, baselines and request IDs are in monitoring_report and performance_history."
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Window end"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Decision"
+                  },
+                  {
+                    "fieldName": "metric",
+                    "displayName": "Metric"
+                  },
+                  {
+                    "fieldName": "baseline_value",
+                    "displayName": "Baseline",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 4
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "current_value",
+                    "displayName": "Actual",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 4
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "threshold_value",
+                    "displayName": "Limit",
+                    "format": {
+                      "type": "number",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 4
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "label_coverage",
+                    "displayName": "Coverage",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "action",
+                    "displayName": "Action"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "classification_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Classification results"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 12,
+            "height": 1
           }
         },
         {
@@ -5646,15 +5683,206 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Confusion matrix: actual rows and predicted columns"
+                "title": "Confusion matrix",
+                "showDescription": true,
+                "description": "Actual classes on rows, predicted classes on columns."
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 49,
+            "y": 33,
+            "width": 7,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "confusion_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "confusion_status",
+                  "fields": [
+                    {
+                      "name": "matrix_status",
+                      "expression": "`matrix_status`"
+                    },
+                    {
+                      "name": "matrix_reason",
+                      "expression": "`matrix_reason`"
+                    },
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Classification evidence",
+                "showDescription": true,
+                "description": "Regression has no confusion matrix. Missing results are not zero counts."
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "matrix_status",
+                    "displayName": "Availability"
+                  },
+                  {
+                    "fieldName": "matrix_reason",
+                    "displayName": "Explanation"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measured"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 33,
+            "width": 5,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "metrics_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Metric history"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 39,
             "width": 12,
-            "height": 7
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_metrics",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_cells",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "column_name",
+                      "expression": "`column_name`"
+                    },
+                    {
+                      "name": "observation",
+                      "expression": "`observation`"
+                    },
+                    {
+                      "name": "metric_name",
+                      "expression": "`metric_name`"
+                    },
+                    {
+                      "name": "metric_value",
+                      "expression": "MAX(`value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pivot",
+              "encodings": {
+                "rows": [
+                  {
+                    "fieldName": "column_name",
+                    "displayName": "Target",
+                    "total": {
+                      "show": false
+                    }
+                  },
+                  {
+                    "fieldName": "observation",
+                    "displayName": "Measurement time",
+                    "total": {
+                      "show": false
+                    }
+                  }
+                ],
+                "columns": [
+                  {
+                    "fieldName": "metric_name",
+                    "displayName": "Metric",
+                    "total": {
+                      "show": false
+                    }
+                  }
+                ],
+                "cell": {
+                  "type": "multi-cell",
+                  "fields": [
+                    {
+                      "fieldName": "metric_value",
+                      "cellType": "text",
+                      "format": {
+                        "type": "number",
+                        "decimalPlaces": {
+                          "type": "max",
+                          "places": 4
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "All observed metrics"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 40,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_notes",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Snapshot cards and the confusion matrix use the latest full observation. Date and target filters apply to history and charts; they never substitute an older snapshot. Missing outcomes remain unavailable."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 46,
+            "width": 12,
+            "height": 2
           }
         }
       ]

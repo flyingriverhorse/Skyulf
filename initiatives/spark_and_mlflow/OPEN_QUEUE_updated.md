@@ -526,6 +526,18 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
+### SM-23g — Performance presentation and template cleanup (DELIVERED, 2026-10-05)
+
+Native performance page now separates latest batch counts, measured metrics,
+latest policy decision, historical loss and classification evidence. All 26
+datasets passed 52 default/NULL SQL checks; the same dashboard ID was published.
+Six unreferenced template notebooks were removed. All three existing layouts
+redeployed with nine unchanged job IDs; competition monitoring run
+`844667177339309` passed the current three-task graph without requesting training.
+Documentation distinguishes Spark calculation, Delta storage, native AI/BI,
+separate dashboard refresh, and independently enabled drift/performance triggers.
+[Evidence162](162-sm23g-monitoring-presentation-cleanup.md).
+
 ### SM-23f — Dashboard interaction and monitoring report (DELIVERED, 2026-10-05)
 
 User-reported empty selectors were reproduced in authenticated Chrome. Independent

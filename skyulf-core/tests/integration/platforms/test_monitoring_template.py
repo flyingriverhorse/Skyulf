@@ -23,6 +23,17 @@ def test_separate_spark_monitoring_template_exists():
     assert "task_key: retrain_on_drift" not in job
 
 
+def test_template_job_notebooks_have_current_callers():
+    """New repositories must not ship obsolete notebooks absent from every graph and graph tool."""
+    root = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
+    callers = [*(root / "resources").glob("*.tmpl"), *(root / "src/tools").glob("*.py")]
+    references = "\n".join(path.read_text(encoding="utf-8") for path in callers)
+    unused = sorted(
+        path.name for path in (root / "src/jobs").glob("*.py") if path.name not in references
+    )
+    assert unused == []
+
+
 @pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("recovery", ["false", "true"])
@@ -36,6 +47,15 @@ def test_generated_projects_bind_independent_monitoring_destination(
     project = _generate_project(
         tmp_path, training_layout=layout, auto_rebuild_on_cdf_expiry=recovery, compute_mode=compute
     )
+    retired = {
+        "drift_report.py",
+        "retrain_on_drift.py",
+        "check_retraining.py",
+        "retraining_skipped.py",
+        "monitor_model.py",
+        "train_models.py",
+    }
+    assert not retired.intersection(path.name for path in (project / "src/jobs").glob("*.py"))
     variables = yaml.safe_load((project / "deployment/variables.yml").read_text())["variables"]
     targets = yaml.safe_load((project / "deployment/targets.yml").read_text())["targets"]
     for target in targets.values():

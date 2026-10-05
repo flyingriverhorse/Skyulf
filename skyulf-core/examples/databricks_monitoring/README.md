@@ -12,6 +12,33 @@ example, while the measurement library lives in `skyulf.integrations.databricks`
 Deploy the shared dashboard once and give producer projects its URL. Producer
 jobs do not need their own copied dashboard definition.
 
+## What is automatic?
+
+| Operation | Trigger and effect |
+| --- | --- |
+| Measure drift and performance | Successful scoring calls the separate Spark monitoring job when monitoring is configured and enabled. A production-mode target is required; development targets bypass shared monitoring. |
+| Revisit delayed outcomes | Unpause the monitoring job's schedule after setup. The generated schedule starts paused. |
+| Update the dashboard display | The native AI/BI dashboard reads saved Delta results. Refresh reruns its queries; it does not calculate new monitoring metrics. |
+| Request training | Drift or performance loss can qualify independently when its own policy enables retraining. Shared guards must also pass. |
+
+Changing training/scoring compute to a cluster does not enable monitoring, change
+its storage destination, or enable automatic retraining. The generated monitoring
+job has its own serverless environment. Job runs and attributed billing appear
+after Databricks system telemetry becomes available; cluster CPU/RAM charts are
+not part of this dashboard.
+
+Native AI/BI is the visualization product, not Databricks' separate data-profiling
+monitor. This Bundle does not provision a native `quality_monitors` monitor.
+Automatic dashboard refresh is separately configurable using a
+[dashboard schedule](https://docs.databricks.com/aws/en/sql/get-started/sample-dashboards)
+or a [Dashboard job task](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
+Neither is enabled by this example. The current graph ends at
+`evaluate_retraining`; the dashboard URL alone does not create a refresh task.
+Updating source data does not automatically invalidate the
+[dashboard result cache](https://docs.databricks.com/aws/en/dashboards/caching).
+Dashboard refresh and monitoring schedules serve different purposes; neither
+should be described as a continuously pushed browser display.
+
 ## Choose the monitoring destination
 
 The central Bundle and every producer Bundle use the same independent
@@ -28,8 +55,16 @@ The catalog must exist. The central initializer creates the schema if missing.
 | `performance_actions` (Delta) | Create if absent | Append request and skip receipts without rewriting observations. |
 | `performance_history` (view) | Create | Refresh definition; join performance evidence with the latest applicable action. |
 
-One store serves all enrolled models; new models do not create new monitoring
-tables. Existing foreign objects or incompatible table schemas are rejected.
+One store serves all enrolled models; inventory, observations and action history
+are shared rather than recreated per model or score run. Spark reference
+preparation additionally creates four immutable Delta tables under the configured
+monitoring catalog/schema: `monitor_ref_<identity>_train`, `_source`, `_seen`
+and `_receipt`. Their identity binds the enrollment and verified model/training
+evidence. They preserve training populations, freshness evidence and holdout
+metric metadata. They are prepared once for that identity and reused; a new
+model/training identity can require new reference tables. Ordinary monitoring
+observations append to the shared results table, not to new per-run tables.
+Existing foreign objects or incompatible table schemas are rejected.
 The central initializer sets inventory isolation to Serializable. Producer
 registrations retry optimistic Delta conflicts at most three times; exhausted
 conflicts and other errors remain visible. Observation runs are serialized by
@@ -235,6 +270,20 @@ tolerance; it does not establish that the model meets an absolute quality goal.
 Shared guards still require usable input, fresh training data, cooldown and no
 active or duplicate request. Older generated projects may still call the
 compatible `drift_report` and `retrain_on_drift` notebook entrypoints.
+New templates omit those unused wrappers; their library functions remain
+available to already deployed projects. Historical run graphs retain their old
+task names after a job is redeployed. Open the current job or a new run to see
+`monitoring_report` and `evaluate_retraining`.
+
+The two retraining opt-ins form an OR decision, not an AND requirement:
+`on_drift: retrain` enables drift; a model's performance policy `mode: retrain`
+enables performance loss. Setting only one leaves the other disabled. For
+performance, eligible labels, a matching baseline, tolerance and the configured
+consecutive-window count must pass first. Missing labels, an unavailable metric,
+`mode: report`, or a historical backfill cannot independently start training.
+Both eligible signals are combined into one idempotent project training request.
+The resulting candidate still goes through the existing evaluation, promotion
+and approval rules; detecting a change does not itself approve a new model.
 
 `monitoring_revisit_windows` controls how many completed performance windows are
 checked for late labels. It defaults to `3`, includes the latest window, and
@@ -348,8 +397,9 @@ Drift and performance use model, version and monitoring-context selectors. Choic
 come from both current inventory and saved history, including models that have not
 yet been observed. The context label includes environment/project and a short
 monitor identifier. Empty selectors choose the most recently measured matching
-context; the selected model, version, identity and latest status are shown above
-the charts. Explicit selections never combine separate monitor identities. Clear
+context; the selected model, version, identity and measurement time appear above
+the charts. Drift also shows the latest health status; performance has its own
+policy decision summary. Explicit selections never combine separate monitor identities. Clear
 an old context selection when switching to a model from another project.
 
 The drift/quality page keeps two tables and adds two charts for one selected
@@ -380,7 +430,21 @@ Performance metrics appear as dynamic pivot columns, so selecting a regression
 model shows its regression metrics, while classification shows its available
 metrics, including G-score and AUC. Same-time reports get deterministic observation
 suffixes so the pivot cannot merge distinct reports/monitors. Blank cells remain
-unavailable, never zero. The outcome-count table explains which rows were used.
+unavailable, never zero. Three snapshot cards show predictions, matched outcomes
+and label coverage from exactly the latest full observation. A failed latest
+measurement clears these counts rather than reviving an older success.
+
+The compact performance page starts with model/version/context and these cards,
+then the selected metric and its trend. Policy checks have their own summary,
+baseline/current/limit chart and an eight-column history table. The policy chart
+uses the latest saved policy's metric independently of the observed chart metric;
+selecting MAE does not hide an RMSE policy. The latest policy summary ranks by
+window end before measurement time: a late historical degradation cannot replace
+a newer unavailable window. Disabled policies are explicitly labeled disabled.
+Full reasons, source references and request IDs remain in `performance_history`
+and the job's saved reports instead of dominating the visual page. Classification
+matrix availability sits beside the confusion matrix; the full metric matrix
+follows below.
 
 Performance pairs a latest-observation bar chart with a time series for one
 selected model, version and metric. Both use the same metric and units; their
@@ -400,7 +464,7 @@ reads stored results and does not trigger new monitoring calculations.
 Latest PSI and performance bars use the newest saved report for that context,
 ranked by observation window and measurement time. A newer empty or failed report
 does not resurrect an older measured bar. Historical trend charts retain history.
-The context summary exposes the newest report status even when charts are empty.
+The drift context summary exposes the newest report status even when charts are empty.
 Mature performance-window-only reports stay in policy history; they do not replace
 the full feature observation, current model health or confusion matrix.
 
