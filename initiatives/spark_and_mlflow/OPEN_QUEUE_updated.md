@@ -477,7 +477,7 @@ Acceptance additions (details in report93):
 | SM-45 | WAIT | SM-37, SM-40; suffix-scoped dev/CI cleanup job, dry-run default, production targets refused; separate from SM-41 retention |
 | SM-46 | WAIT | SM-34, SM-38; optional `scoring_mode: on_table_update` via Jobs table-update trigger, reusing CDF/queue/no-op |
 | SM-47 | WAIT | SM-38; MLflow dataset input for UC lineage, model-version card, optional experiment resource; MLflow 3 deployment jobs investigated without a second alias writer |
-| SM-23c | PARTIAL | SM-23a, SM-37; drift-triggered retraining delivered. Performance measurement exists; degradation policy/retraining remains open with metric, baseline, minimum labeled coverage and consecutive-window acceptance below. Never approves. |
+| SM-23c | PARTIAL | SM-23a, SM-37; drift and independent performance policy delivered. Local gates and isolated Databricks measurement/request/replay acceptance passed. Remaining separate-identity/company production gates belong to SM-37/43b. [Delivery158](158-sm23c-performance-policy.md). Never approves. |
 | SM-48 | PARTIAL | Local split complete; live redeploy ID/history check pending. None; split `resources/workflow.jobs.yml` into `train.job.yml`/`score.job.yml` and optionally clearer job display names; keep job keys `train`/`score` (renaming recreates jobs and loses IDs/history) |
 | SM-49 | WAIT | SM-39, SM-48; upgrade path for generated projects: regenerate from saved answers into a temporary directory, review the diff, run config migration and deployed-contract checks |
 | SM-50 | WAIT | SM-41; optional explicit period backfill operator action reusing `publish_replace_period`, separate from incremental and full rebuild |
@@ -521,7 +521,7 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
 | SM-23a | PARTIAL | Batch quality/drift/delayed-label reporting and central AI/BI dashboard delivered after user resumed scope (2026-10-01). Reuses Core `DriftCalculator`, explicit cross-namespace enrollment, original scoring snapshots and keyed available labels. Two-schema pandas/Polars live acceptance, final Bundle job, dashboard SQL/publish/readback and stable-ID redeploy passed ([delivery142](142-sm23a-monitoring-delivery.md)). Optional native `quality_monitors` InferenceLog, slices and infrastructure cost reports remain deferred; prior removal history remains in [report129](129-reference-followups-delivery.md). |
 | SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
-| SM-23c | PARTIAL | SM-23a, SM-37; drift trigger delivered; separate opt-in performance-degradation policy remains open. Use the acceptance below, preserve training/approval gates, never approves ([report93](93-dbml-reference-recomparison.md)). |
+| SM-23c | PARTIAL | SM-23a, SM-37; opt-in performance policy and real request/replay acceptance delivered. Functional performance scope complete; inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Never approves ([report93](93-dbml-reference-recomparison.md)). |
 | SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
@@ -551,9 +551,10 @@ This is a future task, not an additional closure in the 138-item defect audit.
 
 ### SM-23c performance policy acceptance - clarified 2026-10-04
 
-The user explicitly requested this remaining policy. It is planned, not implemented.
-Current code measures prediction performance against eligible actual outcomes;
-`on_drift` only reacts to usable distribution drift. These are separate signals.
+The user explicitly requested this policy. Implementation, local gates and isolated
+live measurement/request/replay acceptance passed on 2026-10-05. The performance
+scope is complete; evidence is in [Delivery158](158-sm23c-performance-policy.md).
+`on_drift` and performance policy remain independent signals.
 
 - Add an independent, default-disabled performance policy with off/report/retrain
   behavior; retain independent drift controls. Reuse existing Core metric
@@ -647,7 +648,7 @@ describes that current implementation.
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
 | SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
-| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Optional `on_drift` mode delivered. Separate default-disabled performance-degradation policy remains open: explicit metric/baseline/tolerance, label coverage, consecutive completed windows and shared retraining guards; see clarified acceptance above. Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
+| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Independent default-off performance policy delivered: pinned metric/baseline/tolerance, mature labels, coverage, consecutive windows and shared retraining guards. Local gates, dashboard SQL/publish/readback, real training request, unchanged-data skip and replay/combined-trigger dedup passed live. Functional scope complete; inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 | SM-45 | Suffix-scoped dev/CI resource cleanup | SM-37, SM-40 | WAIT | Dry-run default, confirmation, production targets refused; deleted set equals preview; other suffixes untouched; [report93](93-dbml-reference-recomparison.md) |
