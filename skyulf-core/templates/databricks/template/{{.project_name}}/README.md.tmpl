@@ -1144,6 +1144,34 @@ when the shared HTTPS `monitoring_dashboard_url` is configured. Databricks AI/BI
 displays the durable Skyulf tables; its native profiling is a separate product,
 not the source of these metrics.
 
+To refresh that published dashboard automatically after monitoring completes,
+configure the native dashboard task once using the same URL:
+
+```bash
+python src/tools/configure_monitoring_dashboard.py --target test --dashboard-url "https://<workspace-host>/dashboardsv3/<dashboard-id>/published"
+databricks bundle validate --strict -t test --profile <profile>
+databricks bundle deploy -t test --profile <profile>
+```
+
+The helper creates `resources/monitoring_dashboard.job.yml` with target overrides, adding
+`dashboard_refresh_enabled -> refresh_monitoring_dashboard` after
+`evaluate_retraining`. It preserves existing job schedules, policies and compute.
+Refresh runs only in production deployment mode with monitoring enabled; development
+mode and disabled monitoring skip it. The refresh uses the dashboard's published
+warehouse unless `--warehouse-id <id>` is supplied. No email subscription is created.
+For a dashboard published without shared data permissions, the job's Run as identity
+needs access to its data and warehouse. See the
+[Databricks dashboard task documentation](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
+
+The initializer asks no additional questions and adds no task until this helper is
+run. Use `--dashboard-id <id>` when a URL is unavailable. Re-run it to change the
+dashboard or warehouse; use `--disable`, then validate and redeploy, to remove only
+the generated refresh overlay. The target defaults to `test`; repeat `--target` to
+configure multiple targets for the same dashboard. Commit the configured overlay
+with your project and edit its target overrides when environments use different
+dashboards. Re-running the helper replaces its complete overlay, so include every
+target that should keep the automatic refresh.
+
 The public local monitoring API remains available for bounded callers, with
 `max_rows=10000` by default and a hard cap of `1000000`; its byte budget defaults
 to 64 MiB and is capped at 1 GiB. Generated job graphs expose no engine selector

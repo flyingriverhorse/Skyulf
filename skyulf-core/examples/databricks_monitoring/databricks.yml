@@ -3,7 +3,9 @@ bundle:
 
 include:
   - resources/monitoring.job.yml
-  # After the first job provisions views, add resources/monitoring.dashboard.yml here.
+  # After the first job provisions views, include both optional resources:
+  # - resources/monitoring.dashboard.yml
+  # - resources/monitoring_refresh.job.yml
 
 sync:
   exclude:

@@ -269,7 +269,13 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
         "request_id",
         "run_id",
     }
-    assert {"status", "metric", "baseline_value", "current_value", "label_coverage"} <= columns
+    assert {
+        "result_label",
+        "metric",
+        "baseline_value",
+        "current_value",
+        "label_coverage",
+    } <= columns
     assert len(columns) <= 8
     assert all(field in datasets["performance_policy"] for field in evidence_fields)
     line = widgets["performance_policy_trend"]
@@ -297,7 +303,7 @@ def test_context_selection_keeps_unobserved_models_and_resolves_one_identity() -
         assert "chosen_context" in datasets[name]
         assert "LIMIT 1" in datasets[name]
         assert "source.monitor_id = context.monitor_id" in datasets[name]
-    for name in ("drift_context", "performance_context"):
+    for name in ("drift_context",):
         assert "monitor_context" in datasets[name]
         assert "No matching enrollment" in datasets[name]
     assert {
@@ -343,7 +349,6 @@ def test_latest_observations_do_not_rank_policy_only_windows_as_feature_reports(
     for name in (
         "context_choices",
         "drift_context",
-        "performance_context",
         "drift_psi_chart",
         "performance_latest",
         "confusion_status",
@@ -530,8 +535,49 @@ def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> 
     series = "".join(datasets["performance_policy_series"]["queryLines"])
     assert "SELECT metric AS metric_name FROM performance_history" in series
     widgets = {w["name"]: w for p in _dashboard()["pages"] for w in _widgets(p)}
-    assert "monitor_context" in {
-        c["fieldName"] for c in widgets["performance_context"]["spec"]["encodings"]["columns"]
-    }
+    assert "performance_context" not in widgets
     metric = widgets["filter_metric_name_performance"]
     assert all(q["query"]["datasetName"] != "performance_policy_series" for q in metric["queries"])
+
+
+def test_performance_checks_explain_results_without_claiming_training_started() -> None:
+    """A loss or eligible request must not be mislabeled as an already submitted training run."""
+    dashboard = _dashboard()
+    dataset = next(d for d in dashboard["datasets"] if d["name"] == "performance_policy")
+    sql = "".join(dataset["queryLines"])
+    labels = sql.split("SELECT source.*,", 1)[1].split("FROM (SELECT", 1)[0]
+    with sqlite3.connect(":memory:") as connection:
+        cases = [
+            ("healthy", "none", "Within tolerance", "No training requested"),
+            ("degraded", "report", "Performance loss", "Report only"),
+            ("degraded", "request_eligible", "Performance loss", "Eligible; checks pending"),
+            ("degraded", "retraining_requested", "Performance loss", "Training requested"),
+            ("degraded", "retraining_skipped", "Performance loss", "Training skipped"),
+            ("unavailable", None, "Insufficient evidence", "Not evaluated"),
+            ("disabled", "none", "Policy disabled", "No training requested"),
+        ]
+        for status, action, result, training in cases:
+            row = connection.execute(
+                "SELECT " + labels + " FROM (SELECT ? AS status, ? AS action) source",
+                (status, action),
+            ).fetchone()
+            assert row == (result, training)
+    page = next(p for p in dashboard["pages"] if p["name"] == "performance")
+    widgets = {w["name"]: w for w in _widgets(page)}
+    assert "performance_context" not in widgets
+    history = widgets["performance_policy_evidence"]["spec"]
+    assert history["frame"]["title"] == "Performance checks"
+    assert "monitoring_report" not in history["frame"]["description"]
+    assert any(c["displayName"] == "Performance result" for c in history["encodings"]["columns"])
+
+
+def test_shared_dashboard_refresh_waits_for_persisted_observations() -> None:
+    """Adding the optional central dashboard must also refresh it after measurements succeed."""
+    resource = yaml.safe_load((EXAMPLE / "resources/monitoring_refresh.job.yml").read_text())
+    task = resource["targets"]["dev"]["resources"]["jobs"]["monitoring"]["tasks"][0]
+    assert task["depends_on"] == [{"task_key": "observe_models"}]
+    assert task["dashboard_task"] == {
+        "dashboard_id": "${resources.dashboards.monitoring_dashboard.id}",
+        "warehouse_id": "${var.warehouse_id}",
+    }
+    assert "subscription" not in task["dashboard_task"]

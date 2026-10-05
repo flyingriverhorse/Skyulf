@@ -526,6 +526,17 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
+### SM-23h — Native refresh and cluster utilization (DELIVERED, 2026-10-05)
+
+Native post-monitoring dashboard refresh is deployed to all three existing
+producer layouts. Competition run `825802718768390` passed all five tasks,
+including `refresh_monitoring_dashboard`, without requesting training.
+CPU/RAM cards and trends use scoped classic-node telemetry; current serverless
+workloads correctly show unavailable metrics. The redundant Selected model table
+is removed; Performance checks separates the measured result from training action.
+All 27 datasets passed 54 live SQL checks; 55 distinct focused tests passed.
+[Evidence163](163-sm23h-dashboard-refresh-compute.md).
+
 ### SM-23g — Performance presentation and template cleanup (DELIVERED, 2026-10-05)
 
 Native performance page now separates latest batch counts, measured metrics,

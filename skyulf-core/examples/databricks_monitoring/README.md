@@ -18,26 +18,52 @@ jobs do not need their own copied dashboard definition.
 | --- | --- |
 | Measure drift and performance | Successful scoring calls the separate Spark monitoring job when monitoring is configured and enabled. A production-mode target is required; development targets bypass shared monitoring. |
 | Revisit delayed outcomes | Unpause the monitoring job's schedule after setup. The generated schedule starts paused. |
-| Update the dashboard display | The native AI/BI dashboard reads saved Delta results. Refresh reruns its queries; it does not calculate new monitoring metrics. |
+| Refresh dashboard results | The configured native Dashboard task reruns published datasets after monitoring completes. It does not calculate new monitoring metrics. |
 | Request training | Drift or performance loss can qualify independently when its own policy enables retraining. Shared guards must also pass. |
 
 Changing training/scoring compute to a cluster does not enable monitoring, change
 its storage destination, or enable automatic retraining. The generated monitoring
 job has its own serverless environment. Job runs and attributed billing appear
-after Databricks system telemetry becomes available; cluster CPU/RAM charts are
-not part of this dashboard.
+after Databricks system telemetry becomes available. CPU/RAM cards and trends use
+classic cluster node samples during the selected job; serverless CPU/RAM is not
+exposed by these system tables and stays unavailable, never zero.
 
-Native AI/BI is the visualization product, not Databricks' separate data-profiling
-monitor. This Bundle does not provision a native `quality_monitors` monitor.
-Automatic dashboard refresh is separately configurable using a
-[dashboard schedule](https://docs.databricks.com/aws/en/sql/get-started/sample-dashboards)
-or a [Dashboard job task](https://docs.databricks.com/aws/en/jobs/tasks/dashboard).
-Neither is enabled by this example. The current graph ends at
-`evaluate_retraining`; the dashboard URL alone does not create a refresh task.
+Native AI/BI is the visualization product, distinct from Databricks Data Profiling.
+This Bundle does not provision a separate native data profile. The older
+`quality_monitors` API is deprecated; new integrations use `data_quality`.
+An InferenceLog profile can calculate model quality from prediction and label
+columns, but it requires its own input table, refresh lifecycle and metric tables.
+It does not replace this project's delayed-outcome matching, concrete training
+holdout references, consecutive-window policy or guarded training requests.
+See [the current Data Profiling API](https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-quality-monitoring/data-profiling/create-monitor-api).
+
+Include the central `monitoring.dashboard.yml` and `monitoring_refresh.job.yml`
+resources together to add a native
+[Dashboard job task](https://docs.databricks.com/aws/en/jobs/tasks/dashboard)
+after `observe_models` for the example's `dev` target. For another target, move
+that resource's target override to the matching target name. Generated producer
+projects configure the task once, without a new initialization prompt:
+
+```powershell
+python src/tools/configure_monitoring_dashboard.py --target prod --dashboard-url "https://<workspace-host>/dashboardsv3/<dashboard-id>/published" --warehouse-id <warehouse-id>
+databricks bundle validate --strict -t prod --profile <profile>
+databricks bundle deploy -t prod --profile <profile>
+```
+
+The helper creates an owned resource override for the chosen target. Monitoring
+finishes `evaluate_retraining`, checks whether production monitoring is enabled,
+then runs `refresh_monitoring_dashboard`. Disabled/development monitoring skips
+the refresh. No email subscription is created. Use the helper's `--disable`
+option to remove its override. Unconfigured producer projects have no placeholder
+dashboard task. The URL variable alone does not create a task.
+
 Updating source data does not automatically invalidate the
 [dashboard result cache](https://docs.databricks.com/aws/en/dashboards/caching).
-Dashboard refresh and monitoring schedules serve different purposes; neither
-should be described as a continuously pushed browser display.
+The task now performs the explicit refresh after successful monitoring. It runs
+as the job identity and preserves `embed_credentials=false`; other viewers keep
+their own data permissions and caches. This is automatic result refresh, not a
+continuously pushed update of every already-open browser tab. A separate
+dashboard schedule can refresh independently of monitoring if desired.
 
 ## Choose the monitoring destination
 
@@ -83,7 +109,8 @@ an authenticated target or `--var` flags. No credentials are stored here.
    this creates the store before producer projects register themselves.
 3. Execute all dataset SQL queries from `src/monitoring.lvdash.json` on
    the chosen warehouse with its catalog/schema set to the central namespace.
-4. Add `resources/monitoring.dashboard.yml` to the same Bundle's include list,
+4. Add `resources/monitoring.dashboard.yml` and `resources/monitoring_refresh.job.yml`
+   to the same Bundle's include list,
    validate and deploy again. Preserve its state and `monitoring_dashboard` key
    to update the same dashboard. Readers use their own credentials.
 
@@ -154,6 +181,14 @@ An individual window can already be reported as degraded before the required
 streak is reached. `report` never requests training, even after three failures.
 With `retrain`, reaching the streak only makes the performance trigger eligible;
 fresh training data, cooldown, active-run and duplicate-request guards still apply.
+
+To enable performance-driven retraining, change only the relevant model's policy
+from `"mode":"report"` to `"mode":"retrain"` in the producer target variables,
+retain its metric, matching baseline and evidence requirements, then validate and
+deploy that producer Bundle. Run its monitoring job to refresh enrollment and
+evaluate the next eligible window. This is a job configuration change; there is
+no dashboard switch that starts training. A policy change does not turn an old
+report into a new eligible request or bypass consecutive-window requirements.
 
 | Project layout | Policy scope |
 | --- | --- |
@@ -397,9 +432,9 @@ Drift and performance use model, version and monitoring-context selectors. Choic
 come from both current inventory and saved history, including models that have not
 yet been observed. The context label includes environment/project and a short
 monitor identifier. Empty selectors choose the most recently measured matching
-context; the selected model, version, identity and measurement time appear above
-the charts. Drift also shows the latest health status; performance has its own
-policy decision summary. Explicit selections never combine separate monitor identities. Clear
+context. Drift shows the resolved identity and latest health status; performance
+uses the model/version/context selectors directly without a separate Selected
+model table. Explicit selections never combine separate monitor identities. Clear
 an old context selection when switching to a model from another project.
 
 The drift/quality page keeps two tables and adds two charts for one selected
@@ -434,15 +469,19 @@ unavailable, never zero. Three snapshot cards show predictions, matched outcomes
 and label coverage from exactly the latest full observation. A failed latest
 measurement clears these counts rather than reviving an older success.
 
-The compact performance page starts with model/version/context and these cards,
+The compact performance page starts with model/version/context selectors and these cards,
 then the selected metric and its trend. Policy checks have their own summary,
 baseline/current/limit chart and an eight-column history table. The policy chart
 uses the latest saved policy's metric independently of the observed chart metric;
 selecting MAE does not hide an RMSE policy. The latest policy summary ranks by
 window end before measurement time: a late historical degradation cannot replace
 a newer unavailable window. Disabled policies are explicitly labeled disabled.
+The Performance checks table is the history of those per-window comparisons.
+Performance result means Within tolerance, Performance loss, Insufficient evidence
+or Policy disabled. Training action is separate: loss can be report-only, awaiting
+further checks, skipped or actually requested. Eligible is not already submitted.
 Full reasons, source references and request IDs remain in `performance_history`
-and the job's saved reports instead of dominating the visual page. Classification
+and the job's saved reports. Classification
 matrix availability sits beside the confusion matrix; the full metric matrix
 follows below.
 
@@ -477,7 +516,8 @@ explicit status. The matrix is independent of history date and target filters.
 ### Execution and compute
 
 This page requires SELECT access to `system.lakeflow.jobs`,
-`system.lakeflow.job_run_timeline`, `system.billing.usage` and
+`system.lakeflow.job_run_timeline`, `system.lakeflow.job_task_run_timeline`,
+`system.compute.node_timeline`, `system.billing.usage` and
 `system.billing.list_prices`. Dashboard readers need these permissions themselves;
 a permission error is not evidence of zero usage. The portable dashboard leaves
 workspace and job selections empty. Deployment-specific defaults may select exact
@@ -493,6 +533,20 @@ cloud, unit and effective time, and reports unpriced records separately. Priced
 cost is an estimate, not an invoice or full project cost. Shared compute without
 job attribution is excluded. System telemetry and billing can arrive late; empty
 results do not prove that a job did not run or incur cost.
+
+CPU combines user and system utilization; memory uses `mem_used_percent`.
+The queries join task compute IDs to node samples using account, workspace and
+cluster identity, bounded to overlapping task time in the last 30 days. Overlapping
+tasks/retries are merged before aggregation so shared nodes are not counted twice.
+Average cards weight each node sample by its observed duration; peak cards show
+the highest individual node sample, not a cluster-wide capacity percentage.
+Each metric excludes missing samples from its own denominator. Shared-cluster
+usage can include other workloads during the job; it is not exclusive job usage.
+
+The [compute system tables](https://docs.databricks.com/aws/en/admin/system-tables/compute)
+cover classic compute; serverless usage and very short-lived nodes may have no
+node samples. Availability explains the absence; the cards remain NULL rather
+than displaying zero CPU or memory. CPU and memory trends show averages over time.
 
 ## File responsibilities
 

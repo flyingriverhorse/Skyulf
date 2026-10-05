@@ -954,7 +954,18 @@
         " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
         " LIMIT 1\n",
         ")\n",
-        "SELECT source.* FROM (SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history) source JOIN chosen_context context\n",
+        "SELECT source.*,\n",
+        " CASE WHEN source.status IN ('disabled', 'off', 'policy_off') THEN 'Policy disabled'\n",
+        " WHEN source.status = 'degraded' THEN 'Performance loss'\n",
+        " WHEN source.status = 'healthy' THEN 'Within tolerance'\n",
+        " ELSE 'Insufficient evidence' END AS result_label,\n",
+        " CASE WHEN source.action = 'none' THEN 'No training requested'\n",
+        " WHEN source.action = 'report' THEN 'Report only'\n",
+        " WHEN source.action = 'request_eligible' THEN 'Eligible; checks pending'\n",
+        " WHEN source.action = 'retraining_requested' THEN 'Training requested'\n",
+        " WHEN source.action = 'retraining_skipped' THEN 'Training skipped'\n",
+        " ELSE 'Not evaluated' END AS action_label\n",
+        "FROM (SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history) source JOIN chosen_context context\n",
         " ON source.monitor_id = context.monitor_id AND source.model_name = context.model_name\n",
         " AND source.model_version = context.model_version\n",
         "ORDER BY window_end DESC, measured_at DESC, report_id DESC\n"
@@ -1200,98 +1211,6 @@
         {
           "displayName": "Drift Version",
           "keyword": "drift_version",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": ""
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "performance_context",
-      "displayName": "Performance Context",
-      "queryLines": [
-        "WITH available_contexts AS (\n",
-        "WITH identities AS (\n",
-        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " environment, project, measured_at FROM current_health\n",
-        " UNION ALL\n",
-        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " environment, project, CASE WHEN NOT (status = 'no_data'\n",
-        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
-        " AND get_json_object(report_json, '$.current_rows') IS NULL) THEN measured_at END AS measured_at FROM monitoring_results\n",
-        ")\n",
-        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
-        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
-        " max(measured_at) AS latest_measurement\n",
-        "FROM identities GROUP BY monitor_id, model_catalog, model_schema, model_name,\n",
-        " model_version, environment, project\n",
-        "), chosen_context AS (\n",
-        " SELECT * FROM available_contexts\n",
-        " WHERE (COALESCE(:trend_model, '') = '' OR model_name = :trend_model)\n",
-        " AND (COALESCE(:trend_version, '') = '' OR model_version = :trend_version)\n",
-        " AND (COALESCE(:trend_monitor, '') = '' OR monitor_context = :trend_monitor)\n",
-        " ORDER BY latest_measurement DESC NULLS LAST, model_name, model_version, monitor_id\n",
-        " LIMIT 1\n",
-        ")\n",
-        ", ranked_status AS (\n",
-        " SELECT monitor_id, model_version, status, row_number() OVER (\n",
-        " PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC\n",
-        " ) AS rank FROM monitoring_results WHERE NOT (status = 'no_data'\n",
-        " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
-        " AND get_json_object(report_json, '$.current_rows') IS NULL)\n",
-        ")\n",
-        "SELECT context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
-        " context.latest_measurement, COALESCE(result.status, 'never_observed') AS latest_status,\n",
-        " CASE WHEN context.monitor_id IS NULL THEN 'No matching enrollment; clear model/version/context selections'\n",
-        " WHEN context.latest_measurement IS NULL THEN 'Enrolled; no saved observation yet'\n",
-        " ELSE 'Latest matching context'\n",
-        " END AS selection_status\n",
-        "FROM (SELECT 1) anchor LEFT JOIN chosen_context context ON true\n",
-        "LEFT JOIN ranked_status result ON context.monitor_id = result.monitor_id\n",
-        " AND context.model_version = result.model_version AND result.rank = 1"
-      ],
-      "parameters": [
-        {
-          "displayName": "Trend Model",
-          "keyword": "trend_model",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": ""
-                }
-              ]
-            }
-          }
-        },
-        {
-          "displayName": "Trend Monitor",
-          "keyword": "trend_monitor",
-          "dataType": "STRING",
-          "defaultSelection": {
-            "values": {
-              "dataType": "STRING",
-              "values": [
-                {
-                  "value": ""
-                }
-              ]
-            }
-          }
-        },
-        {
-          "displayName": "Trend Version",
-          "keyword": "trend_version",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -1859,7 +1778,11 @@
         " ELSE reason END AS policy_reason,\n",
         " CASE WHEN report_id IS NULL THEN 'Not evaluated'\n",
         " WHEN action = 'none' THEN 'No training requested'\n",
-        " ELSE action END AS policy_action\n",
+        " WHEN action = 'report' THEN 'Report only'\n",
+        " WHEN action = 'request_eligible' THEN 'Eligible; checks pending'\n",
+        " WHEN action = 'retraining_requested' THEN 'Training requested'\n",
+        " WHEN action = 'retraining_skipped' THEN 'Training skipped'\n",
+        " ELSE 'Not evaluated' END AS policy_action\n",
         "FROM (SELECT 1) anchor LEFT JOIN latest_policy ON true\n"
       ],
       "parameters": [
@@ -1896,6 +1819,196 @@
         {
           "displayName": "Trend Version",
           "keyword": "trend_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution_compute_summary",
+      "displayName": "Cluster utilization summary",
+      "queryLines": [
+        "WITH bounds AS (\n",
+        " SELECT current_timestamp() - INTERVAL 30 DAYS AS window_start,\n",
+        " current_timestamp() AS window_end\n",
+        "), scoped_tasks AS (\n",
+        " SELECT t.* FROM system.lakeflow.job_task_run_timeline t CROSS JOIN bounds b\n",
+        " WHERE t.workspace_id = :execution_workspace AND t.job_id = :execution_job\n",
+        " AND t.period_end_time > b.window_start AND t.period_start_time < b.window_end\n",
+        " AND t.period_end_time > t.period_start_time\n",
+        "), task_intervals AS (\n",
+        " SELECT DISTINCT account_id, workspace_id, cluster_id,\n",
+        " greatest(period_start_time, window_start) AS interval_start,\n",
+        " least(period_end_time, window_end) AS interval_end\n",
+        " FROM scoped_tasks CROSS JOIN bounds\n",
+        " LATERAL VIEW explode(compute_ids) e AS cluster_id\n",
+        " WHERE cluster_id IS NOT NULL\n",
+        "), prior_intervals AS (\n",
+        " SELECT *, max(interval_end) OVER (\n",
+        " PARTITION BY account_id, workspace_id, cluster_id\n",
+        " ORDER BY interval_start, interval_end\n",
+        " ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prior_end\n",
+        " FROM task_intervals\n",
+        "), interval_groups AS (\n",
+        " SELECT *, sum(CASE WHEN prior_end IS NULL OR interval_start > prior_end THEN 1 ELSE 0 END)\n",
+        " OVER (PARTITION BY account_id, workspace_id, cluster_id\n",
+        " ORDER BY interval_start, interval_end ROWS UNBOUNDED PRECEDING) AS interval_group\n",
+        " FROM prior_intervals\n",
+        "), merged_intervals AS (\n",
+        " SELECT account_id, workspace_id, cluster_id, min(interval_start) AS interval_start,\n",
+        " max(interval_end) AS interval_end FROM interval_groups\n",
+        " GROUP BY account_id, workspace_id, cluster_id, interval_group\n",
+        "), nodes AS (\n",
+        " SELECT DISTINCT n.account_id, n.workspace_id, n.cluster_id, n.instance_id,\n",
+        " n.start_time, n.end_time, n.driver,\n",
+        " n.cpu_user_percent + n.cpu_system_percent AS cpu_percent,\n",
+        " n.mem_used_percent AS ram_percent\n",
+        " FROM system.compute.node_timeline n CROSS JOIN bounds b\n",
+        " WHERE n.workspace_id = :execution_workspace\n",
+        " AND n.start_time >= b.window_start - INTERVAL 1 MINUTE\n",
+        " AND n.start_time < b.window_end AND n.end_time > b.window_start\n",
+        " AND n.end_time > n.start_time\n",
+        "), weighted_samples AS (\n",
+        " SELECT n.*, timestampdiff(MICROSECOND,\n",
+        " greatest(n.start_time, i.interval_start), least(n.end_time, i.interval_end)) / 1000000.0 AS sample_seconds\n",
+        " FROM nodes n JOIN merged_intervals i\n",
+        " ON n.account_id = i.account_id AND n.workspace_id = i.workspace_id AND n.cluster_id = i.cluster_id\n",
+        " AND n.start_time < i.interval_end AND n.end_time > i.interval_start\n",
+        ")\n",
+        "SELECT :execution_workspace AS workspace_id, :execution_job AS job_id,\n",
+        " sum(cpu_percent * sample_seconds) / nullif(sum(CASE WHEN cpu_percent IS NOT NULL THEN sample_seconds END), 0) / 100.0 AS avg_cpu,\n",
+        " max(cpu_percent) / 100.0 AS peak_cpu,\n",
+        " sum(ram_percent * sample_seconds) / nullif(sum(CASE WHEN ram_percent IS NOT NULL THEN sample_seconds END), 0) / 100.0 AS avg_ram,\n",
+        " max(ram_percent) / 100.0 AS peak_ram,\n",
+        " count(DISTINCT cluster_id) AS measured_clusters,\n",
+        " max(end_time) AS latest_sample,\n",
+        " CASE WHEN coalesce(:execution_workspace, '') = '' OR coalesce(:execution_job, '') = '' THEN 'Select a workspace and job'\n",
+        " WHEN count(*) > 0 THEN 'Classic cluster measurements available'\n",
+        " WHEN (SELECT count(*) FROM scoped_tasks) = 0 THEN 'No task telemetry in the last 30 days; system tables may lag'\n",
+        " WHEN (SELECT count_if(exists(compute, c -> c.type = 'SERVERLESS_COMPUTE')) FROM scoped_tasks) > 0\n",
+        " THEN 'No classic CPU/RAM samples; serverless tasks detected. Serverless CPU/RAM is unavailable'\n",
+        " ELSE 'No matching classic CPU/RAM samples; short-lived nodes or telemetry delay may explain missing data'\n",
+        " END AS compute_status\n",
+        " FROM weighted_samples"
+      ],
+      "parameters": [
+        {
+          "displayName": "Execution Job",
+          "keyword": "execution_job",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Execution Workspace",
+          "keyword": "execution_workspace",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execution_compute_timeline",
+      "displayName": "Cluster utilization timeline",
+      "queryLines": [
+        "WITH bounds AS (\n",
+        " SELECT current_timestamp() - INTERVAL 30 DAYS AS window_start,\n",
+        " current_timestamp() AS window_end\n",
+        "), scoped_tasks AS (\n",
+        " SELECT t.* FROM system.lakeflow.job_task_run_timeline t CROSS JOIN bounds b\n",
+        " WHERE t.workspace_id = :execution_workspace AND t.job_id = :execution_job\n",
+        " AND t.period_end_time > b.window_start AND t.period_start_time < b.window_end\n",
+        " AND t.period_end_time > t.period_start_time\n",
+        "), task_intervals AS (\n",
+        " SELECT DISTINCT account_id, workspace_id, cluster_id,\n",
+        " greatest(period_start_time, window_start) AS interval_start,\n",
+        " least(period_end_time, window_end) AS interval_end\n",
+        " FROM scoped_tasks CROSS JOIN bounds\n",
+        " LATERAL VIEW explode(compute_ids) e AS cluster_id\n",
+        " WHERE cluster_id IS NOT NULL\n",
+        "), prior_intervals AS (\n",
+        " SELECT *, max(interval_end) OVER (\n",
+        " PARTITION BY account_id, workspace_id, cluster_id\n",
+        " ORDER BY interval_start, interval_end\n",
+        " ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prior_end\n",
+        " FROM task_intervals\n",
+        "), interval_groups AS (\n",
+        " SELECT *, sum(CASE WHEN prior_end IS NULL OR interval_start > prior_end THEN 1 ELSE 0 END)\n",
+        " OVER (PARTITION BY account_id, workspace_id, cluster_id\n",
+        " ORDER BY interval_start, interval_end ROWS UNBOUNDED PRECEDING) AS interval_group\n",
+        " FROM prior_intervals\n",
+        "), merged_intervals AS (\n",
+        " SELECT account_id, workspace_id, cluster_id, min(interval_start) AS interval_start,\n",
+        " max(interval_end) AS interval_end FROM interval_groups\n",
+        " GROUP BY account_id, workspace_id, cluster_id, interval_group\n",
+        "), nodes AS (\n",
+        " SELECT DISTINCT n.account_id, n.workspace_id, n.cluster_id, n.instance_id,\n",
+        " n.start_time, n.end_time, n.driver,\n",
+        " n.cpu_user_percent + n.cpu_system_percent AS cpu_percent,\n",
+        " n.mem_used_percent AS ram_percent\n",
+        " FROM system.compute.node_timeline n CROSS JOIN bounds b\n",
+        " WHERE n.workspace_id = :execution_workspace\n",
+        " AND n.start_time >= b.window_start - INTERVAL 1 MINUTE\n",
+        " AND n.start_time < b.window_end AND n.end_time > b.window_start\n",
+        " AND n.end_time > n.start_time\n",
+        "), weighted_samples AS (\n",
+        " SELECT n.*, timestampdiff(MICROSECOND,\n",
+        " greatest(n.start_time, i.interval_start), least(n.end_time, i.interval_end)) / 1000000.0 AS sample_seconds\n",
+        " FROM nodes n JOIN merged_intervals i\n",
+        " ON n.account_id = i.account_id AND n.workspace_id = i.workspace_id AND n.cluster_id = i.cluster_id\n",
+        " AND n.start_time < i.interval_end AND n.end_time > i.interval_start\n",
+        ")\n",
+        "SELECT start_time AS measured_at,\n",
+        " sum(cpu_percent * sample_seconds) / nullif(sum(CASE WHEN cpu_percent IS NOT NULL THEN sample_seconds END), 0) / 100.0 AS avg_cpu,\n",
+        " sum(ram_percent * sample_seconds) / nullif(sum(CASE WHEN ram_percent IS NOT NULL THEN sample_seconds END), 0) / 100.0 AS avg_ram,\n",
+        " max(cpu_percent) / 100.0 AS peak_cpu, max(ram_percent) / 100.0 AS peak_ram\n",
+        " FROM weighted_samples GROUP BY start_time ORDER BY measured_at"
+      ],
+      "parameters": [
+        {
+          "displayName": "Execution Job",
+          "keyword": "execution_job",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Execution Workspace",
+          "keyword": "execution_workspace",
           "dataType": "STRING",
           "defaultSelection": {
             "values": {
@@ -3867,7 +3980,7 @@
             "name": "performance_title",
             "multilineTextboxSpec": {
               "lines": [
-                "## Model performance\n\nPrediction quality, actual outcomes and changes from the saved baseline."
+                "## Model performance\n\nPrediction quality and change from baseline. Empty selectors use the latest matching monitoring context."
               ]
             }
           },
@@ -3987,19 +4100,6 @@
                 }
               },
               {
-                "name": "parameter_performance_context",
-                "query": {
-                  "datasetName": "performance_context",
-                  "parameters": [
-                    {
-                      "name": "trend_model",
-                      "keyword": "trend_model"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
                 "name": "parameter_confusion_status",
                 "query": {
                   "datasetName": "confusion_status",
@@ -4088,10 +4188,6 @@
                   {
                     "parameterName": "trend_model",
                     "queryName": "parameter_performance_policy_series"
-                  },
-                  {
-                    "parameterName": "trend_model",
-                    "queryName": "parameter_performance_context"
                   },
                   {
                     "parameterName": "trend_model",
@@ -4233,19 +4329,6 @@
                 }
               },
               {
-                "name": "parameter_performance_context",
-                "query": {
-                  "datasetName": "performance_context",
-                  "parameters": [
-                    {
-                      "name": "trend_version",
-                      "keyword": "trend_version"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
                 "name": "parameter_confusion_status",
                 "query": {
                   "datasetName": "confusion_status",
@@ -4334,10 +4417,6 @@
                   {
                     "parameterName": "trend_version",
                     "queryName": "parameter_performance_policy_series"
-                  },
-                  {
-                    "parameterName": "trend_version",
-                    "queryName": "parameter_performance_context"
                   },
                   {
                     "parameterName": "trend_version",
@@ -4479,19 +4558,6 @@
                 }
               },
               {
-                "name": "parameter_performance_context",
-                "query": {
-                  "datasetName": "performance_context",
-                  "parameters": [
-                    {
-                      "name": "trend_monitor",
-                      "keyword": "trend_monitor"
-                    }
-                  ],
-                  "disaggregated": false
-                }
-              },
-              {
                 "name": "parameter_confusion_status",
                 "query": {
                   "datasetName": "confusion_status",
@@ -4583,10 +4649,6 @@
                   },
                   {
                     "parameterName": "trend_monitor",
-                    "queryName": "parameter_performance_context"
-                  },
-                  {
-                    "parameterName": "trend_monitor",
                     "queryName": "parameter_confusion_status"
                   },
                   {
@@ -4613,82 +4675,6 @@
             "x": 8,
             "y": 2,
             "width": 4,
-            "height": 2
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_context",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "performance_context",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "monitor_context",
-                      "expression": "`monitor_context`"
-                    },
-                    {
-                      "name": "latest_measurement",
-                      "expression": "`latest_measurement`"
-                    },
-                    {
-                      "name": "selection_status",
-                      "expression": "`selection_status`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "frame": {
-                "showTitle": true,
-                "title": "Selected model",
-                "showDescription": true,
-                "description": "Clear model, version and context to return to the latest enrollment."
-              },
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "monitor_context",
-                    "displayName": "Context"
-                  },
-                  {
-                    "fieldName": "latest_measurement",
-                    "displayName": "Last measured"
-                  },
-                  {
-                    "fieldName": "selection_status",
-                    "displayName": "Selection"
-                  }
-                ]
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 4,
-            "width": 12,
             "height": 2
           }
         },
@@ -4736,7 +4722,7 @@
           },
           "position": {
             "x": 0,
-            "y": 6,
+            "y": 4,
             "width": 4,
             "height": 3
           }
@@ -4785,7 +4771,7 @@
           },
           "position": {
             "x": 4,
-            "y": 6,
+            "y": 4,
             "width": 4,
             "height": 3
           }
@@ -4834,7 +4820,7 @@
           },
           "position": {
             "x": 8,
-            "y": 6,
+            "y": 4,
             "width": 4,
             "height": 3
           }
@@ -4910,7 +4896,7 @@
           },
           "position": {
             "x": 0,
-            "y": 9,
+            "y": 7,
             "width": 4,
             "height": 2
           }
@@ -5043,7 +5029,7 @@
           },
           "position": {
             "x": 4,
-            "y": 9,
+            "y": 7,
             "width": 4,
             "height": 2
           }
@@ -5140,7 +5126,7 @@
           },
           "position": {
             "x": 8,
-            "y": 9,
+            "y": 7,
             "width": 4,
             "height": 2
           }
@@ -5217,7 +5203,7 @@
           },
           "position": {
             "x": 0,
-            "y": 11,
+            "y": 9,
             "width": 4,
             "height": 6
           }
@@ -5296,7 +5282,7 @@
           },
           "position": {
             "x": 4,
-            "y": 11,
+            "y": 9,
             "width": 8,
             "height": 6
           }
@@ -5306,13 +5292,13 @@
             "name": "policy_heading",
             "multilineTextboxSpec": {
               "lines": [
-                "### Performance loss\nCompare completed policy windows with the saved baseline; this is separate from feature drift."
+                "### Performance loss\n\nA loss exceeds the configured tolerance. Retraining also requires an enabled policy and eligible data."
               ]
             }
           },
           "position": {
             "x": 0,
-            "y": 17,
+            "y": 15,
             "width": 12,
             "height": 2
           }
@@ -5356,9 +5342,9 @@
               "widgetType": "table",
               "frame": {
                 "showTitle": true,
-                "title": "Latest policy check",
+                "title": "Latest performance check",
                 "showDescription": true,
-                "description": "Latest completed window, including missing evidence. Historical loss remains below."
+                "description": "The latest completed window, including checks with insufficient outcomes."
               },
               "encodings": {
                 "columns": [
@@ -5372,7 +5358,7 @@
                   },
                   {
                     "fieldName": "policy_status",
-                    "displayName": "Decision"
+                    "displayName": "Performance result"
                   },
                   {
                     "fieldName": "policy_reason",
@@ -5380,7 +5366,7 @@
                   },
                   {
                     "fieldName": "policy_action",
-                    "displayName": "Action"
+                    "displayName": "Training action"
                   }
                 ]
               }
@@ -5388,7 +5374,7 @@
           },
           "position": {
             "x": 0,
-            "y": 19,
+            "y": 17,
             "width": 12,
             "height": 3
           }
@@ -5467,7 +5453,7 @@
           },
           "position": {
             "x": 0,
-            "y": 22,
+            "y": 20,
             "width": 12,
             "height": 5
           }
@@ -5486,8 +5472,8 @@
                       "expression": "`window_end`"
                     },
                     {
-                      "name": "status",
-                      "expression": "`status`"
+                      "name": "result_label",
+                      "expression": "`result_label`"
                     },
                     {
                       "name": "metric",
@@ -5510,8 +5496,8 @@
                       "expression": "`label_coverage`"
                     },
                     {
-                      "name": "action",
-                      "expression": "`action`"
+                      "name": "action_label",
+                      "expression": "`action_label`"
                     }
                   ],
                   "disaggregated": true
@@ -5523,9 +5509,9 @@
               "widgetType": "table",
               "frame": {
                 "showTitle": true,
-                "title": "Policy history",
+                "title": "Performance checks",
                 "showDescription": true,
-                "description": "Saved checks, newest window first. Full reasons, baselines and request IDs are in monitoring_report and performance_history."
+                "description": "Each completed window is compared with its baseline. Performance loss does not by itself mean training started."
               },
               "encodings": {
                 "columns": [
@@ -5534,8 +5520,8 @@
                     "displayName": "Window end"
                   },
                   {
-                    "fieldName": "status",
-                    "displayName": "Decision"
+                    "fieldName": "result_label",
+                    "displayName": "Performance result"
                   },
                   {
                     "fieldName": "metric",
@@ -5586,8 +5572,8 @@
                     }
                   },
                   {
-                    "fieldName": "action",
-                    "displayName": "Action"
+                    "fieldName": "action_label",
+                    "displayName": "Training action"
                   }
                 ]
               }
@@ -5595,7 +5581,7 @@
           },
           "position": {
             "x": 0,
-            "y": 27,
+            "y": 25,
             "width": 12,
             "height": 5
           }
@@ -5611,7 +5597,7 @@
           },
           "position": {
             "x": 0,
-            "y": 32,
+            "y": 30,
             "width": 12,
             "height": 1
           }
@@ -5691,7 +5677,7 @@
           },
           "position": {
             "x": 0,
-            "y": 33,
+            "y": 31,
             "width": 7,
             "height": 6
           }
@@ -5751,7 +5737,7 @@
           },
           "position": {
             "x": 7,
-            "y": 33,
+            "y": 31,
             "width": 5,
             "height": 6
           }
@@ -5767,7 +5753,7 @@
           },
           "position": {
             "x": 0,
-            "y": 39,
+            "y": 37,
             "width": 12,
             "height": 1
           }
@@ -5864,7 +5850,7 @@
           },
           "position": {
             "x": 0,
-            "y": 40,
+            "y": 38,
             "width": 12,
             "height": 6
           }
@@ -5880,7 +5866,7 @@
           },
           "position": {
             "x": 0,
-            "y": 46,
+            "y": 44,
             "width": 12,
             "height": 2
           }
@@ -5914,7 +5900,7 @@
             "name": "execution_intro",
             "multilineTextboxSpec": {
               "lines": [
-                "Choose exact workspace and job IDs. Job suggestions match enrolled project job names; verify the identity before reading spend. Deployment defaults may select a verified job; confirm the workspace/job scope. Cost includes only billing records explicitly attributed to the selected job, with available USD list prices."
+                "Select a workspace and job. Execution, attributed cost and classic cluster usage cover the last 30 days. System telemetry can arrive later than the job result."
               ]
             }
           },
@@ -5980,6 +5966,32 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "execution_compute_summary_execution_workspace",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "parameters": [
+                    {
+                      "name": "execution_workspace",
+                      "keyword": "execution_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "execution_compute_timeline_execution_workspace",
+                "query": {
+                  "datasetName": "execution_compute_timeline",
+                  "parameters": [
+                    {
+                      "name": "execution_workspace",
+                      "keyword": "execution_workspace"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -6002,6 +6014,14 @@
                   {
                     "parameterName": "execution_workspace",
                     "queryName": "parameter_execution_status"
+                  },
+                  {
+                    "parameterName": "execution_workspace",
+                    "queryName": "execution_compute_summary_execution_workspace"
+                  },
+                  {
+                    "parameterName": "execution_workspace",
+                    "queryName": "execution_compute_timeline_execution_workspace"
                   }
                 ]
               },
@@ -6073,6 +6093,32 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "execution_compute_summary_execution_job",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "parameters": [
+                    {
+                      "name": "execution_job",
+                      "keyword": "execution_job"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "execution_compute_timeline_execution_job",
+                "query": {
+                  "datasetName": "execution_compute_timeline",
+                  "parameters": [
+                    {
+                      "name": "execution_job",
+                      "keyword": "execution_job"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -6095,6 +6141,14 @@
                   {
                     "parameterName": "execution_job",
                     "queryName": "parameter_execution_status"
+                  },
+                  {
+                    "parameterName": "execution_job",
+                    "queryName": "execution_compute_summary_execution_job"
+                  },
+                  {
+                    "parameterName": "execution_job",
+                    "queryName": "execution_compute_timeline_execution_job"
                   }
                 ]
               },
@@ -6472,6 +6526,404 @@
             "x": 0,
             "y": 27,
             "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Cluster CPU and memory\n\nNode usage during this job. Shared-cluster measurements can include other workloads. Serverless CPU/RAM is not exposed."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 33,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_avg_cpu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "fields": [
+                    {
+                      "name": "avg_cpu",
+                      "expression": "`avg_cpu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Average CPU",
+                "showDescription": true,
+                "description": "Time-weighted nodes"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_cpu",
+                  "displayName": "Average CPU",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 38,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_peak_cpu",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "fields": [
+                    {
+                      "name": "peak_cpu",
+                      "expression": "`peak_cpu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Peak CPU",
+                "showDescription": true,
+                "description": "Peak node sample"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "peak_cpu",
+                  "displayName": "Peak CPU",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 38,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_avg_ram",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "fields": [
+                    {
+                      "name": "avg_ram",
+                      "expression": "`avg_ram`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Average memory",
+                "showDescription": true,
+                "description": "Time-weighted nodes"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "avg_ram",
+                  "displayName": "Average memory",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 38,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_peak_ram",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "fields": [
+                    {
+                      "name": "peak_ram",
+                      "expression": "`peak_ram`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "frame": {
+                "showTitle": true,
+                "title": "Peak memory",
+                "showDescription": true,
+                "description": "Peak node sample"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "peak_ram",
+                  "displayName": "Peak memory",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 38,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_status",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_summary",
+                  "fields": [
+                    {
+                      "name": "compute_status",
+                      "expression": "`compute_status`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Compute availability"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "compute_status",
+                    "displayName": "Availability"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 35,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_cpu_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_timeline",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "avg_cpu",
+                      "expression": "`avg_cpu`"
+                    },
+                    {
+                      "name": "peak_cpu",
+                      "expression": "`peak_cpu`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "CPU over time",
+                "showDescription": true,
+                "description": "Average node utilization during the selected job; gaps mean no samples."
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "measured_at",
+                  "displayName": "Measurement time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg_cpu",
+                  "displayName": "CPU utilization",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 41,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "compute_ram_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "execution_compute_timeline",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "avg_ram",
+                      "expression": "`avg_ram`"
+                    },
+                    {
+                      "name": "peak_ram",
+                      "expression": "`peak_ram`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "mark": {
+                "marker": {
+                  "shape": "circle"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Memory over time",
+                "showDescription": true,
+                "description": "Average node utilization during the selected job; gaps mean no samples."
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "measured_at",
+                  "displayName": "Measurement time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg_ram",
+                  "displayName": "Memory utilization",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 41,
+            "width": 6,
             "height": 6
           }
         }
