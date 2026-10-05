@@ -534,6 +534,11 @@ SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
 ### SM-23i — Overview performance and batch closure (DONE, 2026-10-05)
 
+Presentation follow-up: Current monitoring enrollments moves to Drift and data
+quality without the displayed Monitoring identity column; Overview retains
+counters and removes its duplicate performance evidence table. Dataset and
+monitoring semantics are unchanged. [Record167](167-sm23j-overview-layout-cleanup.md).
+
 Four separate performance counters use current enrollment/version evidence;
 drift/data-quality counters retain their independent meaning. Old configurations,
 backfills and stale/unavailable policy windows cannot appear healthy. Shared model

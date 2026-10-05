@@ -12,6 +12,13 @@ example, while the measurement library lives in `skyulf.integrations.databricks`
 Deploy the shared dashboard once and give producer projects its URL. Producer
 jobs do not need their own copied dashboard definition.
 
+The `examples` location is a runnable deployment example, not an unused sample.
+This shared-service Bundle owns `resources/monitoring.dashboard.yml`, which loads
+the JSON above. The producer template under `templates/databricks` creates model
+projects and links their monitoring/refresh jobs to this shared dashboard. Keeping
+one definition here avoids creating one dashboard per single, competition or
+model-set project. Deploy this Bundle once per intended monitoring store.
+
 ## What is automatic?
 
 | Operation | Trigger and effect |
@@ -423,10 +430,10 @@ acceptance thresholds or notifications are enabled by this example.
 
 ## Dashboard layout
 
-Overview lists all enrollments in the configured monitoring store, with catalog,
-schema, model and version filters. It includes parent model-set identity where
-available. Models registered elsewhere appear only after enrollment in this store.
-Counts represent monitoring enrollments; two projects can monitor the same model.
+Overview summarizes enrollments in the configured monitoring store, with catalog,
+schema, model and version filters. Models registered elsewhere appear only after
+enrollment in this store. Counts represent monitoring enrollments; two projects
+can monitor the same model.
 
 Overview separates **Drift and data quality** from **Model performance**. The
 first group's Healthy status means the measured input checks passed; it does not
@@ -439,8 +446,9 @@ loss require usable, sufficiently recent policy evidence. Insufficient evidence
 includes missing checks, unavailable labels/baselines and stale windows. Policy
 disabled is an explicit `off` policy, not a missing report. Disabled enrollments
 are excluded from active performance counts and remain visible in the enrollment
-inventory. The accompanying evidence table explains each result and its window.
-The catalog, schema, model and version filters apply to both groups.
+inventory on Drift and data quality. Detailed policy evidence stays on Model
+performance; Overview has no enrollment or performance-evidence table.
+The catalog, schema, model and version filters apply to both counter groups.
 Freshness uses the latest completed UTC policy window after `label_delay_hours`:
 the saved window becomes stale when it trails that window by more than the
 enrollment's `expected_interval_hours`. Future or immature windows cannot count
@@ -468,6 +476,12 @@ measurement time. Each feature is counted once even if multiple checks flag it;
 the count chart uses full monitoring date/time and the SQL session timezone,
 rather than ambiguous abbreviated hour labels. Monitoring time is when checks
 were calculated; scoring time is when predictions were committed.
+The Current monitoring enrollments table follows the drift/quality details and
+lists the store's full current inventory independently of chart selectors. It
+retains parent model-set details but omits the long Monitoring identity column.
+The underlying identity remains in the dataset so separate enrollments are not
+merged. Use the context selector above for one model's detailed charts.
+
 KS p-value is excluded from decisions. Unavailable checks are shown separately,
 and missing values never become zero. PSI is only one drift check; the counts
 and table include other distribution and schema checks too.

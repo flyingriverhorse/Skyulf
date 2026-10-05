@@ -2950,234 +2950,6 @@
             "width": 12,
             "height": 5
           }
-        },
-        {
-          "widget": {
-            "name": "model_inventory",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "current_health",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "health_status",
-                      "expression": "`health_status`"
-                    },
-                    {
-                      "name": "observed_at",
-                      "expression": "`observed_at`"
-                    },
-                    {
-                      "name": "scored_rows",
-                      "expression": "`scored_rows`"
-                    },
-                    {
-                      "name": "labeled_rows",
-                      "expression": "`labeled_rows`"
-                    },
-                    {
-                      "name": "drifted_columns",
-                      "expression": "`drifted_columns`"
-                    },
-                    {
-                      "name": "error_message",
-                      "expression": "`error_message`"
-                    },
-                    {
-                      "name": "monitor_id",
-                      "expression": "`monitor_id`"
-                    },
-                    {
-                      "name": "model_set_name",
-                      "expression": "`model_set_name`"
-                    },
-                    {
-                      "name": "model_set_version",
-                      "expression": "`model_set_version`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "health_status",
-                    "displayName": "Health status"
-                  },
-                  {
-                    "fieldName": "observed_at",
-                    "displayName": "Scored at"
-                  },
-                  {
-                    "fieldName": "scored_rows",
-                    "displayName": "Predictions"
-                  },
-                  {
-                    "fieldName": "labeled_rows",
-                    "displayName": "Matched actual targets"
-                  },
-                  {
-                    "fieldName": "drifted_columns",
-                    "displayName": "Drifted columns"
-                  },
-                  {
-                    "fieldName": "error_message",
-                    "displayName": "Error message"
-                  },
-                  {
-                    "fieldName": "monitor_id",
-                    "displayName": "Monitoring identity"
-                  },
-                  {
-                    "fieldName": "model_set_name",
-                    "displayName": "Parent model set"
-                  },
-                  {
-                    "fieldName": "model_set_version",
-                    "displayName": "Set version"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Current monitoring enrollments"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 22,
-            "width": 12,
-            "height": 7
-          }
-        },
-        {
-          "widget": {
-            "name": "performance_evidence_heading",
-            "multilineTextboxSpec": {
-              "lines": [
-                "## Performance evidence"
-              ]
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 29,
-            "width": 12,
-            "height": 1
-          }
-        },
-        {
-          "widget": {
-            "name": "overview_performance_evidence",
-            "queries": [
-              {
-                "name": "main_query",
-                "query": {
-                  "datasetName": "overview_performance",
-                  "fields": [
-                    {
-                      "name": "model_name",
-                      "expression": "`model_name`"
-                    },
-                    {
-                      "name": "model_version",
-                      "expression": "`model_version`"
-                    },
-                    {
-                      "name": "performance_status",
-                      "expression": "`performance_status`"
-                    },
-                    {
-                      "name": "performance_reason",
-                      "expression": "`performance_reason`"
-                    },
-                    {
-                      "name": "window_end",
-                      "expression": "`window_end`"
-                    },
-                    {
-                      "name": "measured_at",
-                      "expression": "`measured_at`"
-                    },
-                    {
-                      "name": "monitor_id",
-                      "expression": "`monitor_id`"
-                    }
-                  ],
-                  "disaggregated": true
-                }
-              }
-            ],
-            "spec": {
-              "version": 2,
-              "widgetType": "table",
-              "encodings": {
-                "columns": [
-                  {
-                    "fieldName": "model_name",
-                    "displayName": "Model"
-                  },
-                  {
-                    "fieldName": "model_version",
-                    "displayName": "Version"
-                  },
-                  {
-                    "fieldName": "performance_status",
-                    "displayName": "Performance status"
-                  },
-                  {
-                    "fieldName": "performance_reason",
-                    "displayName": "Reason"
-                  },
-                  {
-                    "fieldName": "window_end",
-                    "displayName": "Saved window end"
-                  },
-                  {
-                    "fieldName": "measured_at",
-                    "displayName": "Measured at"
-                  },
-                  {
-                    "fieldName": "monitor_id",
-                    "displayName": "Monitoring identity"
-                  }
-                ]
-              },
-              "frame": {
-                "showTitle": true,
-                "title": "Latest saved performance evidence by enrollment"
-              }
-            }
-          },
-          "position": {
-            "x": 0,
-            "y": 30,
-            "width": 12,
-            "height": 7
-          }
         }
       ]
     },
@@ -3853,7 +3625,7 @@
                 "showTitle": true,
                 "title": "Which features changed?",
                 "showDescription": true,
-                "description": "Latest saved observation \u00c2\u00b7 Top 10 PSI values and their own limits"
+                "description": "Latest saved observation Â· Top 10 PSI values and their own limits"
               },
               "mark": {
                 "layout": "group"
@@ -3944,7 +3716,7 @@
                 "showTitle": true,
                 "title": "How many features show drift?",
                 "showDescription": true,
-                "description": "Per measurement \u00c2\u00b7 A feature is counted once, even if several checks flag it"
+                "description": "Per measurement Â· A feature is counted once, even if several checks flag it"
               },
               "mark": {
                 "layout": "group"
@@ -4415,6 +4187,126 @@
             "y": 4,
             "width": 12,
             "height": 4
+          }
+        },
+        {
+          "widget": {
+            "name": "model_inventory",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "current_health",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "health_status",
+                      "expression": "`health_status`"
+                    },
+                    {
+                      "name": "observed_at",
+                      "expression": "`observed_at`"
+                    },
+                    {
+                      "name": "scored_rows",
+                      "expression": "`scored_rows`"
+                    },
+                    {
+                      "name": "labeled_rows",
+                      "expression": "`labeled_rows`"
+                    },
+                    {
+                      "name": "drifted_columns",
+                      "expression": "`drifted_columns`"
+                    },
+                    {
+                      "name": "error_message",
+                      "expression": "`error_message`"
+                    },
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    },
+                    {
+                      "name": "model_set_name",
+                      "expression": "`model_set_name`"
+                    },
+                    {
+                      "name": "model_set_version",
+                      "expression": "`model_set_version`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "health_status",
+                    "displayName": "Health status"
+                  },
+                  {
+                    "fieldName": "observed_at",
+                    "displayName": "Scored at"
+                  },
+                  {
+                    "fieldName": "scored_rows",
+                    "displayName": "Predictions"
+                  },
+                  {
+                    "fieldName": "labeled_rows",
+                    "displayName": "Matched actual targets"
+                  },
+                  {
+                    "fieldName": "drifted_columns",
+                    "displayName": "Drifted columns"
+                  },
+                  {
+                    "fieldName": "error_message",
+                    "displayName": "Error message"
+                  },
+                  {
+                    "fieldName": "model_set_name",
+                    "displayName": "Parent model set"
+                  },
+                  {
+                    "fieldName": "model_set_version",
+                    "displayName": "Set version"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Current monitoring enrollments",
+                "showDescription": true,
+                "description": "All current enrollments in this store. Independent of the chart selectors above."
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 12,
+            "height": 7
           }
         }
       ]
