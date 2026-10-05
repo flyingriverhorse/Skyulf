@@ -41,6 +41,14 @@ from .model_set_output import (
     publication_views,
 )
 from .prediction_output import OUTPUT_TYPES, check_existing_table
+from .spark_scoring import (
+    DistributedRows,
+    SparkSetExecution,
+    complete_distributed_set,
+    prepare_spark_set_execution,
+    read_distributed_rows,
+    score_distributed_set,
+)
 
 if TYPE_CHECKING:
     from ...inference.model_set import ModelSetArtifact
@@ -186,6 +194,8 @@ def _score_increment(
     max_bytes: int,
 ) -> Any:
     """Propose all component predictions and temporal history before any output write."""
+    if isinstance(frame, DistributedRows):
+        return score_distributed_set(frame)
     from ...inference.model_set_scoring import score_model_set  # noqa: PLC0415
 
     state = previous.get("set_history") if previous and write_mode == "append" else None
@@ -267,6 +277,7 @@ def _publication_receipt(
     source_rebuilt: bool = False,
     write_mode: str = "append",
     recovery_request: dict[str, Any] | None = None,
+    execution: SparkSetExecution | None = None,
 ) -> dict[str, Any]:
     """Bind provenance, progress and component continuation to one atomic write."""
     receipt = {
@@ -289,6 +300,12 @@ def _publication_receipt(
     }
     if recovery_request is not None:
         receipt.update(recovery_receipt_fields(recovery_request))
+    if execution is not None:
+        receipt.update(
+            inference_mode="spark",
+            spark_udf_env_manager=execution.env_manager,
+            spark_udf_prediction_batch_rows=execution.prediction_batch_rows,
+        )
     encoded = json.dumps(receipt, sort_keys=True, allow_nan=False).encode()
     if len(encoded) > 60 * 1024:
         raise ValueError("Model-set publication receipt exceeds its 60 KiB budget.")
@@ -307,6 +324,16 @@ def _output_frame(
     max_bytes: int,
 ) -> Any:
     """Materialize one typed complete result and reject previously published keys."""
+    if isinstance(frame, DistributedRows):
+        return complete_distributed_set(
+            spark,
+            frame,
+            target,
+            receipt,
+            _METADATA,
+            artifact.manifest.record_key_columns,
+            write_mode,
+        )
     frame = frame.copy(deep=True)
     for name in _METADATA:
         frame[name] = receipt[name]
@@ -379,6 +406,11 @@ def run_model_set_batch(
     publication: dict[str, Any] | None = None,
     source_change_policy: str = "reject",
     recovery_request: dict[str, Any] | None = None,
+    inference_mode: str = "local",
+    spark_udf_env_manager: str = "virtualenv",
+    spark_udf_prediction_batch_rows: int = 10_000,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
 ) -> ModelSetBatchResult:
     """Publish all keyed component and rule outcomes together, or publish nothing.
 
@@ -393,6 +425,16 @@ def run_model_set_batch(
     source_change_policy = validate_source_change_policy(source_change_policy)
     _validate_request(
         model, artifact, source_table, prediction_table, model_change_mode, max_rows, max_bytes
+    )
+    execution = prepare_spark_set_execution(
+        spark,
+        artifact,
+        model.model_uri,
+        inference_mode,
+        spark_udf_env_manager,
+        spark_udf_prediction_batch_rows,
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
     )
     publication = publication_policy(publication)
     publication_columns(artifact, publication)
@@ -420,6 +462,7 @@ def run_model_set_batch(
             publication,
             source_change_policy,
             recovery_request,
+            execution,
         )
 
 
@@ -437,6 +480,7 @@ def _run_admitted_set(
     publication: dict[str, Any] | None = None,
     source_change_policy: str = "reject",
     recovery_request: dict[str, Any] | None = None,
+    execution: SparkSetExecution | None = None,
 ) -> ModelSetBatchResult:
     """Hold the common target claim through snapshot selection and complete publication."""
     if table_identity(spark, source) != source_id or table_identity(spark, target) != target_id:
@@ -474,6 +518,7 @@ def _run_admitted_set(
         source_change_policy,
         max_rows,
         max_bytes,
+        execution,
     )
     if source_rebuilt:
         prior, write_mode = None, "overwrite"
@@ -493,13 +538,18 @@ def _run_admitted_set(
         source_rebuilt=source_rebuilt,
         write_mode=write_mode,
         recovery_request=recovery_request,
+        execution=execution,
     )
     selected_columns = [
         name for name in publication_columns(artifact, publication) if name not in _METADATA
     ]
     output = _output_frame(
         spark,
-        scored.frame[selected_columns],
+        (
+            scored.frame.select(selected_columns)
+            if isinstance(scored.frame, DistributedRows)
+            else scored.frame[selected_columns]
+        ),
         artifact,
         model,
         target,
@@ -565,18 +615,19 @@ def _read_set_frame(
     policy: str,
     max_rows: int,
     max_bytes: int,
+    execution: SparkSetExecution | None = None,
 ) -> tuple[Any, bool]:
     """Classify history loss only while reading an incremental window, never while writing."""
     try:
         selected, rebuilt = _select_set_source(spark, source, prior, upper, functions, policy)
         context = normalize_cdf_error() if prior is not None and not rebuilt else nullcontext()
         with context:
-            frame = bounded_frame(
-                selected,
-                tuple(column.name for column in artifact.manifest.input_schema),
-                artifact.manifest.record_key_columns,
-                max_rows,
-                max_bytes,
+            columns = tuple(column.name for column in artifact.manifest.input_schema)
+            keys = artifact.manifest.record_key_columns
+            frame = (
+                read_distributed_rows(selected, columns, keys, execution=execution)
+                if execution is not None
+                else bounded_frame(selected, columns, keys, max_rows, max_bytes)
             )
         return frame, rebuilt
     except CdfHistoryExpired as error:

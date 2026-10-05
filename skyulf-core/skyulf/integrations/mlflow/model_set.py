@@ -4,6 +4,7 @@ import inspect
 import tempfile
 from collections.abc import Iterable
 from copy import deepcopy
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,13 @@ from ._nullable_transport import (
     transport_spec,
     validated_transport,
 )
+from ._spark_environment import snapshot_worker_environment
+from ._spark_output import (
+    prepare_spark_output,
+    require_spark_output,
+    score_prediction_batches,
+    spark_output_params,
+)
 from .local_model import normalized_dtype, pip_requirements, validate_local_destination
 from .registry import (
     ResolvedModel,
@@ -41,15 +49,28 @@ from .registry import (
     validate_concrete_version,
     validate_registry_options,
 )
+from .spark_model import (
+    SAFETY_KEY,
+    SOURCE_KEY,
+    optional_partition_certificate,
+    validate_worker_certificate,
+)
 
 
 class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
     """Execute the frozen components and composition shipped in one package."""
 
-    def __init__(self, input_transport: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        input_transport: dict[str, Any] | None = None,
+        safety_certificate: dict[str, Any] | None = None,
+        source_sha256: str | None = None,
+    ) -> None:
         """Defer loading fitted assets until MLflow supplies package context."""
         self._artifact: ModelSetArtifact | None = None
         self._input_transport = deepcopy(input_transport)
+        self._safety_certificate = deepcopy(safety_certificate)
+        self._source_sha256 = source_sha256
 
     def __getstate__(self) -> dict[str, Any]:
         """Exclude process-local artifact paths and cached fitted objects."""
@@ -63,6 +84,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise ValueError("MLflow model is missing its model set artifact.") from exc
         self._artifact = load_model_set(path)
         self.input_transport()
+        validate_worker_certificate(
+            self._artifact,
+            getattr(self, "_safety_certificate", None),
+            getattr(self, "_source_sha256", None),
+        )
 
     def input_transport(self) -> dict[str, Any] | None:
         """Return the artifact-validated nullable input contract without mutable aliases."""
@@ -77,17 +103,21 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
         self, context: Any, model_input: pd.DataFrame, params: dict[str, Any] | None = None
     ) -> pd.DataFrame:
         """Score one bounded whole frame using explicit, preserved record keys."""
-        del context, params
+        del context
         if self._artifact is None:
             raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf model set pyfunc requires a pandas DataFrame.")
+        spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
         model_input = decode_frame(model_input, self.input_transport())
         model_input = restore_nullable_dtypes(
             model_input,
             ((column.name, column.dtype) for column in self._artifact.manifest.input_schema),
         )
-        return predict_model_set(model_input, self._artifact)
+        result = score_prediction_batches(
+            model_input, partial(predict_model_set, artifact=self._artifact), params, spark_output
+        )
+        return prepare_spark_output(result, model_set_output_schema(self._artifact), spark_output)
 
 
 def log_model_set(
@@ -103,8 +133,9 @@ def log_model_set(
     transport = transport_spec(
         (column.name, column.dtype) for column in artifact.manifest.input_schema
     )
-    signature = _signature(artifact)
     requirements = _set_requirements(artifact)
+    certificate = optional_partition_certificate(artifact)
+    signature = _signature(artifact, spark_certified=certificate is not None)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-set-mlflow-") as directory:
@@ -112,9 +143,15 @@ def log_model_set(
         options = {}
         if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
             options["uv_project_path"] = directory
+        source_sha256 = None
+        if certificate:
+            code_paths, requirements, source_sha256 = snapshot_worker_environment(
+                Path(directory), requirements
+            )
+            options["code_paths"] = code_paths
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfModelSetPythonModel(transport),
+            python_model=SkyulfModelSetPythonModel(transport, certificate, source_sha256),
             artifacts={"model_set": str(artifact.directory)},
             signature=signature,
             pip_requirements=requirements,
@@ -123,6 +160,7 @@ def log_model_set(
                 "skyulf_execution_scope": "whole_frame_local",
                 "model_set_digest": artifact.manifest.set_sha256,
                 **({TRANSPORT_KEY: transport} if transport else {}),
+                **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
             },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
             **options,
@@ -132,7 +170,7 @@ def log_model_set(
     return f"runs:/{run_id}/{artifact_path}"
 
 
-def _signature(artifact: ModelSetArtifact) -> Any:
+def _signature(artifact: ModelSetArtifact, *, spark_certified: bool = False) -> Any:
     """Require an exact MLflow scalar representation for every input and output."""
     from mlflow.models import ModelSignature  # noqa: PLC0415  # ty: ignore[unresolved-import]
     from mlflow.types import ColSpec, Schema  # noqa: PLC0415  # ty: ignore[unresolved-import]
@@ -156,9 +194,11 @@ def _signature(artifact: ModelSetArtifact) -> Any:
             ]
         )
 
+    options = {"params": spark_output_params()} if spark_certified else {}
     return ModelSignature(
         inputs=schema(artifact.manifest.input_schema, encode=True),
         outputs=schema(model_set_output_schema(artifact)),
+        **options,
     )
 
 

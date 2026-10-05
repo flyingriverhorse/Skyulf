@@ -198,6 +198,63 @@ def test_set_operator_never_loads_training_or_composition(
     assert operation.call_args.args[2]["model_name"] == "workspace.models.example_set_dev"
 
 
+def test_spark_approval_limits_only_functional_probe_after_global_key_check(monkeypatch):
+    """Large inference populations must not become local model-set approval inputs."""
+    from skyulf.inference import model_set_partition_safety
+    from skyulf.integrations.databricks import model_set_project as module
+    from skyulf.integrations.databricks import spark_scoring
+
+    spark = Mock()
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            input_schema=[SimpleNamespace(name="id"), SimpleNamespace(name="x")],
+            record_key_columns=("id",),
+        )
+    )
+    gate = Mock()
+    monkeypatch.setattr(model_set_partition_safety, "require_partition_safe_model_set", gate)
+    monkeypatch.setattr(module, "latest_source_version", lambda *args: {"version": 17})
+    selected = Mock()
+    distributed = Mock(return_value=SimpleNamespace(frame=selected, row_count=4096))
+    monkeypatch.setattr(spark_scoring, "read_distributed_rows", distributed)
+    bounded = Mock(return_value="probe")
+    monkeypatch.setattr(module, "bounded_frame", bounded)
+    result = module.approval_frame(
+        spark,
+        artifact,
+        {
+            "score_source_table": "a.b.source",
+            "max_rows": 80,
+            "max_input_mb": 4,
+            "inference_mode": "spark",
+        },
+    )
+    gate.assert_called_once_with(artifact)
+    distributed.assert_called_once_with(
+        spark.read.option.return_value.table.return_value, ("id", "x"), ("id",)
+    )
+    selected.orderBy.assert_called_once_with("id")
+    selected.orderBy.return_value.limit.assert_called_once_with(80)
+    assert bounded.call_args.args[0] is selected.orderBy.return_value.limit.return_value
+    assert result == "probe"
+
+
+def test_spark_approval_rejects_unsafe_set_before_source_access(monkeypatch):
+    """Functional sampling is safe only for a certified partition-independent set."""
+    from skyulf.inference import model_set_partition_safety
+    from skyulf.integrations.databricks import model_set_project as module
+
+    spark = Mock()
+    monkeypatch.setattr(
+        model_set_partition_safety,
+        "require_partition_safe_model_set",
+        Mock(side_effect=ValueError("unsafe set")),
+    )
+    with pytest.raises(ValueError, match="unsafe set"):
+        module.approval_frame(spark, object(), {"inference_mode": "spark"})
+    assert spark.mock_calls == []
+
+
 def test_set_key_schema_accepts_only_portable_types():
     """Floating keys are unsuitable for stable joins and must fail before packaging."""
     from skyulf.integrations.databricks.model_set_project import _record_key_schema

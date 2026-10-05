@@ -1,6 +1,7 @@
 """Preflight for the first bounded pandas/Polars Databricks workflow."""
 
 from dataclasses import replace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -35,7 +36,7 @@ def _artifact(tmp_path, *, steps=None, model="linear_regression"):
 
 def _config(path, **changes):
     """Keep each rejection test focused on one workflow decision."""
-    values = {
+    values: dict[str, Any] = {
         "runtime": "databricks",
         "engine": "pandas",
         "source": InputSource(kind="caller_frame"),

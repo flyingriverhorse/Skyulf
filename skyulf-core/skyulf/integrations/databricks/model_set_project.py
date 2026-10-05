@@ -335,15 +335,33 @@ def project_endpoints(config: dict[str, Any]) -> dict[str, str]:
 
 
 def approval_frame(spark: Any, artifact: Any, config: dict[str, Any]) -> Any:
-    """Read one bounded representative snapshot using only the saved input contract."""
+    """Read a bounded functional probe; Spark checks all keys before sampling.
+
+    Saved holdout quality gates still use their complete training evidence.
+    The probe exercises each component; distributed publication scores all rows.
+    """
+    distributed = config.get("inference_mode", "local") == "spark"
+    if distributed:
+        from ...inference.model_set_partition_safety import (  # noqa: PLC0415
+            require_partition_safe_model_set,
+        )
+
+        require_partition_safe_model_set(artifact)
     table = config["score_source_table"]
     source = spark.read.option(
         "versionAsOf", int(latest_source_version(spark, table)["version"])
     ).table(table)
+    columns = tuple(column.name for column in artifact.manifest.input_schema)
+    keys = artifact.manifest.record_key_columns
+    if distributed:
+        from .spark_scoring import read_distributed_rows  # noqa: PLC0415
+
+        source = read_distributed_rows(source, columns, keys).frame
+        source = source.orderBy(*keys).limit(config["max_rows"])
     return bounded_frame(
         source,
-        tuple(column.name for column in artifact.manifest.input_schema),
-        artifact.manifest.record_key_columns,
+        columns,
+        keys,
         config["max_rows"],
         input_budget_bytes(config.get("max_input_mb")),
     )
@@ -522,6 +540,11 @@ def score_model_set_payload(
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         publication=settings.get("publication"),
         source_change_policy=settings.get("source_change_policy", "reject"),
+        inference_mode=config.get("inference_mode", "local"),
+        spark_udf_env_manager=config.get("spark_udf_env_manager", "virtualenv"),
+        spark_udf_prediction_batch_rows=config.get("spark_udf_prediction_batch_rows", 10_000),
+        tracking_uri=endpoints["tracking_uri"],
+        registry_uri=endpoints["registry_uri"],
         **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
     payload = {

@@ -1,3 +1,6 @@
+{{- if and (eq .inference_mode "spark") (eq .engine "polars") -}}
+{{- template "ERROR_inference_mode_spark_requires_engine_pandas" . -}}
+{{- end -}}
 {{- $competition := eq .training_layout "model_competition" -}}
 {{- $cv_enabled := or $competition (eq .cv_enabled "true") -}}
 {{- $temporal_cv := and $cv_enabled (or (eq .cv_type "time_series_split") (and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))) -}}
@@ -16,6 +19,9 @@
 {{end}}
   "task": "{{.task}}",
   "engine": "{{.engine}}",
+  "inference_mode": "{{.inference_mode}}",
+  "spark_udf_env_manager": "{{if and (eq .inference_mode "spark") (eq .compute_mode "serverless")}}local{{else}}virtualenv{{end}}",
+  "spark_udf_prediction_batch_rows": 10000,
   "split_strategy": "{{$split}}",
   "training_window_mode": "{{$window}}",
   "lookback_days": {{if eq $window "rolling_days"}}{{.lookback_days}}{{else}}null{{end}},

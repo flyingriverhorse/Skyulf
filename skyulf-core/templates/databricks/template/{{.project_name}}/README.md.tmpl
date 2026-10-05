@@ -1,8 +1,47 @@
 # {{.project_name}}
 
-Skyulf 0.9.1 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}**, using **{{.compute_mode}}**
-compute. Spark reads bounded Delta inputs and writes predictions; preprocessing
-and model fitting run locally on the selected compute.
+Skyulf 0.9.1 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
+compute. Training and preprocessing fit locally in pandas or Polars. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses the selected local engine.{{end}}
+
+## Inference mode and capacity
+
+The setup choice is `inference_mode={{.inference_mode}}`. Estimate the rows and
+bytes in **each scoring run** and the memory available to the selected compute.
+There is no universal row threshold for Spark. Local inference uses the configured
+`max_rows` and `max_input_mb` bounds. Spark inference distributes scoring through
+`mlflow.pyfunc.spark_udf`; those bounds still apply to pandas training and do not
+cap the total scoring population. Keep training samples and budgets sized for the
+driver even when scoring runs on many workers.
+
+{{if eq .inference_mode "spark"}}Spark inference requires `engine=pandas` and a fitted artifact whose effective
+preprocessing chain is partition safe. Unsupported steps, row-changing behavior,
+custom scoring callbacks, temporal history and unsupported model-set composition
+fail before publishing predictions. The error identifies the unsupported step;
+revise the recipe and retrain, or initialize a local-inference project. Existing
+fitted Polars artifacts are not converted automatically.
+
+The first certified set is **SimpleImputer (mean/constant)** and
+**StandardScaler**, with **LinearRegression** or **LogisticRegression**, including
+their reviewed built-in tuning wrappers. Model sets may combine these independent
+components with no custom composition outputs. Other model choices, encoders,
+custom callbacks and tuning feature exclusions are not certified by this release.
+The model menus cover local inference too; successful Bundle validation does not
+certify the fitted artifact for Spark.
+
+`config/workflow.json` records `spark_udf_env_manager={{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}` and
+`spark_udf_prediction_batch_rows=10000`. The worker environment must contain
+the exact model and Skyulf dependencies recorded with the registered artifact.
+Certified packages embed an exact-source Skyulf wheel and its source hash;
+{{if eq .compute_mode "serverless"}}serverless `local` uses the declared task environment, including the same
+Skyulf wheel and dependency versions on the driver and workers. Verify those
+versions and source hash on the selected compute before deployment.{{else}}the job cluster uses `virtualenv` to install that wheel and the recorded
+dependency pins in an isolated worker environment. Verify worker startup on the
+selected compute before deployment.{{end}} The batch
+setting bounds each model prediction call (1–100000 rows), not the total input
+or incoming Arrow allocation. Databricks manages Arrow transport; serverless
+does not permit changing its Arrow batch configuration. An environment failure
+stops scoring without changing the selected manager.
+{{end}}
 
 ## Model competition for one target
 
@@ -1196,7 +1235,7 @@ to 64 MiB and is capped at 1 GiB. Generated job graphs expose no engine selector
 and contain no inline monitoring or retraining branch. Spark monitoring aggregates
 ongoing observations without applying local raw row or byte caps. Reference
 preparation replays the original training source once under the existing bounded
-training budget; training and scoring do not become distributed. A model trained
+training budget; training remains local even when inference is distributed. A model trained
 before `monitoring_source_evidence.json` was saved needs retraining or verified
 original source proof before Spark reference preparation. The job does not
 silently reconstruct missing provenance.

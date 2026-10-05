@@ -15,6 +15,20 @@ WORKFLOW = (
 )
 
 
+def test_inference_choice_precedes_training_engine_and_rejects_conflicts():
+    """The setup wizard must reject an explicit Polars/Spark contradiction."""
+    from jsonschema import Draft7Validator
+
+    schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
+    properties = schema["properties"]
+    assert properties["inference_mode"]["order"] < properties["engine"]["order"]
+    assert Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "pandas"})
+    assert not Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "polars"})
+    assert Draft7Validator(properties["engine"]["skip_prompt_if"]).is_valid(
+        {"inference_mode": "spark"}
+    )
+
+
 def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
     """Full-rescore authorization requires an explicit guided choice in every layout."""
     from jsonschema import Draft7Validator
@@ -234,7 +248,9 @@ def _output():
     return prediction_output
 
 
-def _render_default_config(record_key="entity_id", risk_category=""):
+def _render_default_config(
+    record_key="entity_id", risk_category="", inference_mode="local", compute_mode="serverless"
+):
     """Resolve default branches for offline checks; real CLI tests cover Go rendering."""
     template = WORKFLOW.parents[2] / "config/workflow.json.tmpl"
     schema = json.loads(
@@ -245,6 +261,8 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         project_name="customer_model",
         record_key_columns=record_key,
         risk_category=risk_category,
+        inference_mode=inference_mode,
+        compute_mode=compute_mode,
     )
     content = template.read_text(encoding="utf-8")
     content = re.sub(r'{{if eq \.shap_enabled "true"}}.*?{{end}}', "", content, flags=re.DOTALL)
@@ -264,6 +282,14 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         '(and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))}}false'
         '{{else if eq .cv_type "shuffle_split"}}true{{else}}{{.cv_shuffle}}{{end}}',
         "true",
+    )
+    worker_environment = (
+        "local" if inference_mode == "spark" and compute_mode == "serverless" else "virtualenv"
+    )
+    content = content.replace(
+        '{{if and (eq .inference_mode "spark") (eq .compute_mode "serverless")}}'
+        "local{{else}}virtualenv{{end}}",
+        worker_environment,
     )
     # This lightweight resolver checks non-model defaults. The actual Go CLI
     # exercises the conditional Basic/Advanced modeling block separately.
@@ -354,6 +380,19 @@ def _render_default_config(record_key="entity_id", risk_category=""):
     for name, value in values.items():
         content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)
+
+
+@pytest.mark.parametrize("inference_mode", ["local", "spark"])
+@pytest.mark.parametrize("compute_mode", ["serverless", "policy_cluster"])
+def test_generated_worker_environment_follows_compute_and_inference_mode(
+    inference_mode, compute_mode
+):
+    """Serverless Spark must use its declared task environment while other routes stay isolated."""
+    config = _render_default_config(inference_mode=inference_mode, compute_mode=compute_mode)
+    expected = (
+        "local" if inference_mode == "spark" and compute_mode == "serverless" else "virtualenv"
+    )
+    assert config["spark_udf_env_manager"] == expected
 
 
 @pytest.mark.parametrize("risk_category", ["", "Low", "High"])

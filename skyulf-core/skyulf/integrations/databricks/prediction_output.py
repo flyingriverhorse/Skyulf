@@ -219,9 +219,10 @@ def _create_prediction_table(
     generation: bool,
     generation_properties: dict[str, str],
 ) -> None:
-    """Check bootstrap size and create a target with the pinned generation properties."""
+    """Check local bootstrap size and create a target with pinned generation properties."""
     if (
-        source.select(*config["record_key_columns"], *config["input_columns"])
+        config.get("inference_mode", "local") != "spark"
+        and source.select(*config["record_key_columns"], *config["input_columns"])
         .limit(config["max_rows"] + 1)
         .count()
         > config["max_rows"]

@@ -92,7 +92,14 @@ def validate_capabilities(capabilities: tuple[ExecutionCapability, ...]) -> None
 
 
 def require_capability(
-    node_type: str, operation: str, engine: str, *, config: Mapping[str, Any]
+    node_type: str,
+    operation: str,
+    engine: str,
+    *,
+    config: Mapping[str, Any],
+    execution_kind: str | None = None,
+    row_effect: str | None = None,
+    context: str | None = None,
 ) -> None:
     """Reject undeclared execution without initializing an engine or estimator.
 
@@ -119,8 +126,22 @@ def require_capability(
             capability.engine == engine
             and capability.operation == operation
             and capability.matches_config(config)
+            and _matches_effects(capability, execution_kind, row_effect, context)
         ):
             return
     raise UnsupportedExecutionError(
         node_type, operation, engine, "No declared support for this operation and configuration."
+    )
+
+
+def _matches_effects(
+    capability: ExecutionCapability,
+    execution_kind: str | None,
+    row_effect: str | None,
+    context: str | None,
+) -> bool:
+    """Optionally constrain the execution semantics in addition to engine and config."""
+    requested = {"execution_kind": execution_kind, "row_effect": row_effect, "context": context}
+    return all(
+        value is None or getattr(capability, key) == value for key, value in requested.items()
     )

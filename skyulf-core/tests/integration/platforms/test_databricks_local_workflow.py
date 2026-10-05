@@ -1025,6 +1025,50 @@ def test_prediction_provision_creates_no_control_table(monkeypatch):
     assert all("admission" not in statement for statement in statements)
 
 
+@pytest.mark.parametrize("inference_mode", [None, "local", "spark"])
+@pytest.mark.parametrize("model_change_mode", ["incremental_append", "full_rebuild"])
+def test_initial_prediction_budget_applies_only_to_local_inference(
+    inference_mode, model_change_mode
+):
+    """Large Spark bootstraps must provision while local driver budgets remain enforced."""
+    workflow = _output()
+    config = _config()
+    config.update(max_rows=500, model_change_mode=model_change_mode)
+    if inference_mode is not None:
+        config["inference_mode"] = inference_mode
+    if model_change_mode == "full_rebuild":
+        config["prediction_table"] += "_v1"
+    source = Mock()
+    source.columns = ["entity_id", "x"]
+    source.schema = {
+        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+    }
+    source.select.return_value.limit.return_value.count.return_value = 501
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: name == config["score_source_table"]
+    spark.table.return_value = source
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
+        preflight=SimpleNamespace(
+            ready=True,
+            model_digest="a" * 64,
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
+        ),
+    )
+    if inference_mode == "spark":
+        assert workflow.provision_prediction_table(spark, config, prepared) is True
+        source.select.assert_not_called()
+    else:
+        with pytest.raises(ValueError, match="max_rows budget"):
+            workflow.provision_prediction_table(spark, config, prepared)
+        source.select.return_value.limit.assert_called_once_with(501)
+    creates = [call for call in spark.sql.call_args_list if call.args[0].startswith("CREATE TABLE")]
+    assert len(creates) == int(inference_mode == "spark")
+
+
 def test_full_rebuild_generation_records_model_identity(monkeypatch):
     """A new generation must carry enough provenance to reject unrelated tables."""
     workflow = _output()

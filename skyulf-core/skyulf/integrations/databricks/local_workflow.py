@@ -205,6 +205,9 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
     return LocalWorkflowConfig(
         runtime="databricks",
         engine=config["engine"],
+        inference_mode=config.get("inference_mode", "local"),
+        spark_udf_env_manager=config.get("spark_udf_env_manager", "virtualenv"),
+        spark_udf_prediction_batch_rows=config.get("spark_udf_prediction_batch_rows", 10_000),
         source=InputSource(
             kind="uc_table",
             table=config["score_source_table"],
@@ -664,6 +667,10 @@ def _run_scoring_action(
         managed_prediction_view_exists(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
     prepared = prepare_local_workflow(_scoring_config(score_config))
+    from .spark_scoring import validate_prepared_spark  # noqa: PLC0415
+
+    if config.get("inference_mode", "local") == "spark":
+        validate_prepared_spark(prepared)
     if recovery_request is None:
         provision_prediction_table(spark, score_config, prepared)
     result = run_incremental_local_batch(

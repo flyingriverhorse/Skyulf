@@ -137,6 +137,18 @@ class SimpleImputerApplier(BaseApplier):
         )
         for operation in ("fit", "apply")
         for strategy in ("mean", "constant")
+    )
+    + tuple(
+        ExecutionCapability(
+            "pandas",
+            "apply",
+            "python_batch",
+            "preserve",
+            "row",
+            codec_version=1,
+            config_match=(("strategy", strategy),),
+        )
+        for strategy in ("mean", "constant")
     ),
 )
 @node_meta(

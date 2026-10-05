@@ -7,6 +7,7 @@ certify row-local HTTP serving or Spark partition safety.
 import inspect
 import tempfile
 from copy import deepcopy
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -33,15 +34,35 @@ from ._nullable_transport import (
     validated_transport,
 )
 from ._nullable_transport import prepare_pyfunc_input as prepare_pyfunc_input
+from ._spark_environment import snapshot_worker_environment
+from ._spark_output import (
+    prepare_spark_output,
+    require_spark_output,
+    score_prediction_batches,
+    spark_output_params,
+)
+from .spark_model import (
+    SAFETY_KEY,
+    SOURCE_KEY,
+    optional_partition_certificate,
+    validate_worker_certificate,
+)
 
 
 class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
     """Load one fitted local pipeline and retain its recorded execution engine."""
 
-    def __init__(self, input_transport: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        input_transport: dict[str, Any] | None = None,
+        safety_certificate: dict[str, Any] | None = None,
+        source_sha256: str | None = None,
+    ) -> None:
         """Start unloaded until MLflow provides the saved artifact path."""
         self._artifact: LocalPipelineArtifact | None = None
         self._input_transport = deepcopy(input_transport)
+        self._safety_certificate = deepcopy(safety_certificate)
+        self._source_sha256 = source_sha256
 
     def __getstate__(self) -> dict[str, Any]:
         """Reload saved project classes through context in each fresh process."""
@@ -55,6 +76,11 @@ class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
             raise ValueError("MLflow model is missing the local pipeline artifact.") from exc
         self._artifact = load_local_pipeline(artifact_path)
         self.input_transport()
+        validate_worker_certificate(
+            self._artifact,
+            getattr(self, "_safety_certificate", None),
+            getattr(self, "_source_sha256", None),
+        )
 
     def input_transport(self) -> dict[str, Any] | None:
         """Return a detached transport contract checked against the loaded artifact."""
@@ -70,14 +96,21 @@ class SkyulfLocalPythonModel(mlflow.pyfunc.PythonModel):
         self, context: Any, model_input: pd.DataFrame, params: dict[str, Any] | None = None
     ) -> pd.DataFrame:
         """Apply the saved fit engine to MLflow's named pandas input columns."""
-        del context, params
+        del context
         if self._artifact is None:
             raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf local pyfunc requires a pandas DataFrame.")
+        spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
         model_input = decode_frame(model_input, self.input_transport())
         model_input = _restore_nullable_dtypes(model_input, self._artifact)
-        return score_local_pipeline(model_input, self._artifact)
+        result = score_prediction_batches(
+            model_input,
+            partial(score_local_pipeline, artifact=self._artifact),
+            params,
+            spark_output,
+        )
+        return prepare_spark_output(result, scoring_output_schema(self._artifact), spark_output)
 
 
 def log_local_model(
@@ -94,6 +127,7 @@ def log_local_model(
     transport = transport_spec(
         zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
     )
+    certificate = optional_partition_certificate(artifact)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-local-mlflow-") as directory:
@@ -101,19 +135,27 @@ def log_local_model(
         save_options: dict[str, Any] = {}
         if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
             save_options["uv_project_path"] = directory
+        requirements = pip_requirements(artifact)
+        source_sha256 = None
+        if certificate:
+            code_paths, requirements, source_sha256 = snapshot_worker_environment(
+                Path(directory), requirements
+            )
+            save_options["code_paths"] = code_paths
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfLocalPythonModel(transport),
+            python_model=SkyulfLocalPythonModel(transport, certificate, source_sha256),
             artifacts={"local_pipeline": str(local_path)},
-            signature=_signature(artifact),
+            signature=_signature(artifact, spark_certified=certificate is not None),
             input_example=_input_example(artifact),
-            pip_requirements=pip_requirements(artifact),
+            pip_requirements=requirements,
             metadata={
                 "skyulf_artifact_kind": "local_pipeline",
                 "skyulf_fitted_engine": artifact.manifest.fitted_engine,
                 "skyulf_execution_scope": "whole_frame_local",
                 "local_pipeline_digest": artifact.manifest.pipeline_sha256,
                 **({TRANSPORT_KEY: transport} if transport else {}),
+                **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
             },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
             **save_options,
@@ -131,7 +173,7 @@ def normalized_dtype(dtype: str) -> str:
     )
 
 
-def _signature(artifact: LocalPipelineArtifact) -> Any:
+def _signature(artifact: LocalPipelineArtifact, *, spark_certified: bool = False) -> Any:
     """Declare ordered raw inputs and prediction/probability output columns."""
     from mlflow.models import (  # noqa: PLC0415 - optional dependency boundary  # ty: ignore[unresolved-import]
         ModelSignature,
@@ -158,7 +200,8 @@ def _signature(artifact: LocalPipelineArtifact) -> Any:
             for column in scoring_output_schema(artifact)
         ]
     )
-    return ModelSignature(inputs=inputs, outputs=outputs)
+    options = {"params": spark_output_params()} if spark_certified else {}
+    return ModelSignature(inputs=inputs, outputs=outputs, **options)
 
 
 def _input_example(artifact: LocalPipelineArtifact) -> pd.DataFrame:

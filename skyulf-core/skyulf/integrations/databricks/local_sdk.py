@@ -116,6 +116,36 @@ class LocalWorkflowConfig(BaseModel):
     source: InputSource
     model: ModelSelection
     sink: OutputSink
+    inference_mode: Literal["local", "spark"] = "local"
+    spark_udf_env_manager: Literal["local", "virtualenv"] = "virtualenv"
+    spark_udf_prediction_batch_rows: int = Field(default=10_000, gt=0, le=100_000)
+
+    @model_validator(mode="after")
+    def validate_inference_runtime(self) -> LocalWorkflowConfig:
+        """Keep distributed inference separate from the saved local training engine."""
+        if self.inference_mode == "spark" and (
+            self.runtime != "databricks" or self.engine != "pandas"
+        ):
+            raise ValueError("Spark inference requires runtime='databricks' and engine='pandas'.")
+        if self.inference_mode == "spark":
+            self._validate_spark_source()
+        return self
+
+    def _validate_spark_source(self) -> None:
+        """Limit Spark mode to the distributed source and publication route it implements."""
+        if (
+            self.source.kind != "uc_table"
+            or self.source.read_mode != "incremental"
+            or self.source.version is not None
+            or self.sink.kind != "uc_delta"
+            or self.model.kind != "local_pipeline"
+            or self.model.path is not None
+            or self.model.version is None
+        ):
+            raise ValueError(
+                "Spark inference requires an incremental UC source, a pinned registry "
+                "local_pipeline model and a UC Delta sink."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,6 +321,8 @@ class PreparedLocalWorkflow:
 
     def predict(self, frame: pd.DataFrame | pl.DataFrame) -> pd.DataFrame:
         """Score only a bounded caller-owned batch with the selected contract."""
+        if self.config.inference_mode == "spark":
+            raise ValueError("Use the distributed incremental runner for Spark inference.")
         _check_frame_budget(frame, self.config.source)
         if isinstance(self.artifact, LocalPipelineArtifact):
             return score_local_pipeline(frame, self.artifact)

@@ -40,6 +40,9 @@ WORKFLOW_FIELDS = {
     "config_version",
     "task",
     "engine",
+    "inference_mode",
+    "spark_udf_env_manager",
+    "spark_udf_prediction_batch_rows",
     "training_table",
     "score_source_table",
     "prediction_table",
@@ -180,6 +183,22 @@ def _validate_workflow_fields(config: dict[str, Any], action: str) -> None:
         raise ValueError("auto_rebuild_on_cdf_expiry must be a boolean.")
 
 
+def _validate_inference_settings(config: dict[str, Any]) -> None:
+    """Keep inference independent of training and bound each worker prediction call."""
+    mode = (
+        _choice(config, "inference_mode", {"local", "spark"})
+        if "inference_mode" in config
+        else "local"
+    )
+    if mode == "spark" and config["engine"] != "pandas":
+        raise ValueError("inference_mode=spark requires engine=pandas.")
+    if "spark_udf_env_manager" in config:
+        _choice(config, "spark_udf_env_manager", {"local", "virtualenv"})
+    batch = config.get("spark_udf_prediction_batch_rows", 10000)
+    if type(batch) is not int or not 1 <= batch <= 100000:
+        raise ValueError("spark_udf_prediction_batch_rows must be 1..100000.")
+
+
 def _validate_workflow_sources(config: dict[str, Any]) -> None:
     """Validate source names, input limits and column roles before any reader opens."""
     for key in ("training_table", "score_source_table", "prediction_table", "model_name"):
@@ -287,6 +306,7 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     _validate_layout(config, action)
     task = _choice(config, "task", {"regression", "classification"})
     _choice(config, "engine", {"pandas", "polars"})
+    _validate_inference_settings(config)
     selection = _choice(config, "score_model_selection", {"champion", "pinned_version"})
     policy = _choice(config, "promotion_policy", {"automatic", "manual_approval"})
     _choice(config, "score_handoff", {"disabled", "after_alias_change"})
@@ -596,6 +616,7 @@ def migrate_workflow_config(
     if "score_handoff" in migrated and migrated["score_handoff"] != score_handoff:
         raise ValueError("Migration must not silently change the existing score_handoff.")
     migrated.update(config_version=1, task=task, score_handoff=score_handoff)
+    migrated.setdefault("inference_mode", "local")
     # Binding names and manual training dates remain a caller-owned step.
     _choice(migrated, "task", {"regression", "classification"})
     _choice(migrated, "score_handoff", {"disabled", "after_alias_change"})

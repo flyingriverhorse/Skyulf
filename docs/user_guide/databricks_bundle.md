@@ -1,4 +1,4 @@
-# Local-engine Databricks Bundle
+# Databricks Bundle: local training and selectable inference
 
 For job-screen instructions and lifecycle diagrams, use the
 [operator walkthrough](databricks_bundle_walkthrough.md).
@@ -7,9 +7,65 @@ For optional weight columns, class weights, SMOTE settings and supported models,
 see [Weighted Training & Support](weighted_training.md).
 
 The custom Skyulf template generates one editable Bundle with `dev`, `test`,
-`syst` and `prod` targets. It fits and predicts with pandas or Polars. Spark
-reads bounded Unity Catalog Delta rows and publishes predictions; local
-feature engineering and model prediction are not distributed Spark work.
+`syst` and `prod` targets. Training stays local. New projects independently choose
+`inference_mode=local` or `spark` based on the expected rows and bytes per scoring
+run and available memory. Local mode trains and scores with pandas or Polars.
+Spark mode trains with pandas and scores through `mlflow.pyfunc.spark_udf` on
+workers, retaining keyed predictions in Spark through Delta publication.
+Older configurations default to local inference; explicit Spark with Polars is
+rejected. Monitoring already runs on Spark and has no additional engine choice.
+
+### Distributed inference settings
+
+```json
+{
+  "engine": "pandas",
+  "inference_mode": "spark",
+  "spark_udf_env_manager": "local",
+  "spark_udf_prediction_batch_rows": 10000
+}
+```
+
+`max_rows` and `max_input_mb` continue to bound local training. They do not cap
+the distributed scoring population. `spark_udf_prediction_batch_rows` bounds
+each model prediction call to 1–100000 rows by slicing the received worker frame.
+It does not bound Arrow transport allocation: Databricks manages that separately,
+and serverless does not allow changing `spark.sql.execution.arrow.maxRecordsPerBatch`.
+Each worker needs memory for the model, incoming Arrow frame and prediction slices.
+There is no universal row threshold for choosing Spark. A failed distributed
+run does not fall back to collecting the population locally.
+
+Initial support covers SimpleImputer mean/constant and StandardScaler with
+LinearRegression or LogisticRegression, including reviewed built-in tuning
+wrappers. Single and competition layouts score the pinned model or winner.
+Model sets validate every component and support independent outputs without
+custom composition. Unsupported steps, models, callbacks, temporal history and
+tuning feature exclusions fail before predictions are published. The model menus
+also serve local projects; Bundle validation does not certify a fitted artifact.
+
+For serverless, the template selects MLflow `env_manager=local`: Spark workers use
+the declared Bundle task environment containing the exact wheel and dependencies.
+This setting concerns worker environment reuse, not driver-side scoring.
+Artifact loading checks fitted runtime versions and the certificate checks the
+exact Skyulf source hash. Verify driver/worker versions on the target compute.
+Policy-cluster projects select `virtualenv`, which installs the embedded wheel
+and saved dependency pins into an isolated worker environment. Validate that
+option on the chosen runtime: the tested serverless runtime rejects MLflow 3.16.1
+virtualenv archives containing absolute interpreter symlinks. No automatic
+environment or scoring fallback occurs.
+
+Certified MLflow packages carry a safety certificate, source hash and exact-source
+Skyulf wheel. Existing whole-frame
+packages need a newly logged certified version; a pickle alone grants no Spark
+capability. Nullable integer and Boolean transport occurs before Arrow conversion.
+
+In **Workflows → score job → score task**, inspect the concrete model/version,
+input/output counts, source watermark and receipt. Spark receipts include
+`inference_mode`, environment manager and prediction batch size. Initial snapshots,
+insert-only CDF windows, no-op replay, model-change policies and optional
+`recover_predictions` use the same guarded Delta publication lifecycle. All model
+set outputs commit together. Successful scoring retains the monitoring child-job
+and native dashboard-refresh handoff.
 
 Initialize a project from a Skyulf checkout:
 
@@ -1487,8 +1543,11 @@ scoring, approve manually or use automatic promotion gates, then run score or
 enable the optional handoff. Inspect both lifecycle and score task results. The first score
 rejects a missing source, disabled CDF, unsuitable row keys, a model output
 mismatch or an existing target schema mismatch before creating prediction
-output. It checks initial row count against `max_rows`; each score
-also checks decoded transfer size against the `max_input_mb` budget. Existing tables are
+output. Local inference checks initial row count against `max_rows` and decoded
+transfer size against `max_input_mb`. Spark inference checks keys globally and
+keeps the scoring population distributed. Model-set approval uses a deterministic,
+bounded functional probe after partition-safety and global key checks; saved
+holdout quality gates still evaluate their complete evidence. Existing tables are
 never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source

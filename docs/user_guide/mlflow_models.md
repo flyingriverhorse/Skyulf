@@ -127,18 +127,25 @@ Other model families, input dtypes, and context-dependent nodes need their own
 parity checks before production use. The manifest records the concrete model
 class so a later preflight can compare it with this evidence.
 
-This package declares `whole_frame_local` scope. It supports bounded local
+This package retains its `whole_frame_local` scope. It supports bounded local
 batch inference, including inside a Databricks Python task with the recorded
 dependencies installed. It does **not** certify independent HTTP row requests,
-Spark worker partitions, or Spark-native feature engineering; those require
-separate capability checks. It does not write Delta tables. The model URI points
+Spark worker partitions, or Spark-native feature engineering by itself. Newly
+logged, inspected pandas artifacts may additionally carry a partition-safety
+certificate for the [Spark pyfunc route](databricks_bundle.md#distributed-inference-settings).
+That adapter revalidates the loaded artifact, package signature, source hash and
+certificate before creating a named-input UDF with all output columns. Workers
+revalidate the same evidence on load. This package does not write Delta tables.
+The model URI points
 to a concrete run artifact; registering or promoting an alias is a separate,
 explicit step.
 
 Install `skyulf-core[mlflow]` in the loading environment. The MLflow model
 records exact package requirements, including the Skyulf version; provide the
-matching Skyulf wheel when the version is unpublished. The wheel is not embedded
-in the model. Only load local pipeline artifacts from trusted producers: pickle
+matching Skyulf wheel when the version is unpublished. Certified Spark packages
+embed an exact-source wheel for isolated worker installation; ordinary local
+packages retain their existing external-wheel requirement. Only load local
+pipeline artifacts from trusted producers: pickle
 can execute code while loading, and the checksum detects corruption rather than
 authenticating the source.
 

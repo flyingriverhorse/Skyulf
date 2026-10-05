@@ -8,7 +8,10 @@ Their fitted pipeline can be exported and restored across pandas, Polars and Spa
 The [standalone inference bundle](inference_bundles.md) packages this state with
 a fitted model and validates local raw/features prediction. The Spark runner
 applies native FE and runs a Python regression model in worker batches.
-Other native nodes and distributed classification remain under development.
+Other native nodes remain under development. The separate
+[certified MLflow pyfunc route](databricks_bundle.md#distributed-inference-settings)
+supports admitted pandas regression/classification pipelines and independent model
+sets while reusing the Bundle's Delta publication and monitoring lifecycle.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 [How inference works](inference_flow.md) explains how the saved FE and

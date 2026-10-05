@@ -53,7 +53,8 @@ source_change_policy below handles source corrections independently:
   including both model and combined rules. Deleted rows disappear; lag/rolling
   history is rebuilt. This replaces all earlier results, including predictions
   from older model versions. No training occurs. Inserts alone still append.
-  The full snapshot must fit max_rows/max_input_mb; exceeding limits fails.
+  Local inference requires the full snapshot to fit max_rows/max_input_mb.
+  Spark inference keeps the snapshot distributed; those limits still bound training.
   Permission errors still fail; they are not corrections. Expired CDF history
   fails unless auto_rebuild_on_cdf_expiry=true enables recovery of recognized
   history loss as a separate scoring policy.

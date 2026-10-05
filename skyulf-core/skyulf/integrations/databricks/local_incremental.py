@@ -31,6 +31,12 @@ from .delta import DeltaPublishError, history, table_identity
 from .local_history import history_receipt, incremental_history
 from .local_publish import check_target
 from .local_sdk import LocalWorkflowConfig, PreparedLocalWorkflow
+from .spark_scoring import (
+    DistributedRows,
+    read_distributed_rows,
+    score_distributed_single,
+    validate_prepared_spark,
+)
 
 
 class SourceChangeRequiresRebuild(ValueError):
@@ -168,6 +174,7 @@ def run_incremental_local_batch(
     full snapshot after CDF history loss; ordinary calls never opt in implicitly.
     """
     inputs = _validate_prepared(prepared, record_key_columns, period_column)
+    validate_prepared_spark(prepared)
     admission = validate_admission(spark, admission)
     config = prepared.config
     source_table = config.source.table
@@ -299,7 +306,7 @@ def _read_incremental_input(
     prior: int | None,
     upper: int,
     functions: Any,
-) -> tuple[Any, pd.DataFrame]:
+) -> tuple[Any, pd.DataFrame | DistributedRows]:
     """Attach pinned recovery evidence to history loss during CDF materialization only."""
     config = prepared.config
     assert config.source.table is not None
@@ -308,9 +315,7 @@ def _read_incremental_input(
             selected = select_incremental_rows(
                 spark, config.source.table, prior, upper, period, functions
             )
-            frame = bounded_frame(
-                selected, (*keys, *inputs), keys, config.source.max_rows, config.source.max_bytes
-            )
+            frame = _read_scoring_rows(selected, prepared, (*keys, *inputs), keys)
         return selected, frame
     except CdfHistoryExpired as exc:
         if prior is None:
@@ -347,6 +352,19 @@ def _single_recovery_binding(prepared: PreparedLocalWorkflow) -> dict[str, Any]:
     }
 
 
+def _read_scoring_rows(
+    selected: Any,
+    prepared: PreparedLocalWorkflow,
+    columns: tuple[str, ...],
+    keys: tuple[str, ...],
+) -> pd.DataFrame | DistributedRows:
+    """Choose one explicit execution mode without retrying a failure locally."""
+    if prepared.config.inference_mode == "spark":
+        return read_distributed_rows(selected, columns, keys)
+    source = prepared.config.source
+    return bounded_frame(selected, columns, keys, source.max_rows, source.max_bytes)
+
+
 def _recover_incremental_batch(
     spark: Any,
     prepared: PreparedLocalWorkflow,
@@ -381,13 +399,7 @@ def _recover_incremental_batch(
     selected = select_incremental_rows(
         spark, source, None, request["source_end_version"], period, functions
     )
-    frame = bounded_frame(
-        selected,
-        (*keys, *inputs),
-        keys,
-        prepared.config.source.max_rows,
-        prepared.config.source.max_bytes,
-    )
+    frame = _read_scoring_rows(selected, prepared, (*keys, *inputs), keys)
     target = spark.table(target_name)
     output_names = check_target(spark, selected, target, keys, period, prepared)
     with incremental_history(prepared, None) as temporal_session:
@@ -550,7 +562,7 @@ def select_incremental_rows(
 def _incremental_prediction_bridge(
     spark: Any,
     prepared: PreparedLocalWorkflow,
-    frame: pd.DataFrame,
+    frame: pd.DataFrame | DistributedRows,
     inputs: tuple[str, ...],
     output_names: tuple[str, ...],
     record_key_columns: tuple[str, ...],
@@ -559,6 +571,10 @@ def _incremental_prediction_bridge(
     replacing: bool = False,
 ) -> Any:
     """Score bounded rows, preserve keys and return explicit outcome counts."""
+    if isinstance(frame, DistributedRows):
+        return score_distributed_single(
+            spark, prepared, frame, record_key_columns, target, replacing=replacing
+        )
     predicted = (
         _empty_incremental_predictions(prepared, output_names)
         if frame.empty
@@ -614,7 +630,7 @@ def _incremental_manifest(
     target_id: str,
     prior_version: int | None,
     upper_version: int,
-    frame: pd.DataFrame,
+    frame: pd.DataFrame | DistributedRows,
     history_fields: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Fingerprint the exact increment, concrete model and prediction row count."""
@@ -633,6 +649,12 @@ def _incremental_manifest(
         "output_count": len(frame),
     }
     run_input |= history_fields or {}
+    if config.inference_mode == "spark":
+        run_input |= {
+            "inference_mode": "spark",
+            "spark_udf_env_manager": config.spark_udf_env_manager,
+            "spark_udf_prediction_batch_rows": config.spark_udf_prediction_batch_rows,
+        }
     digest = hashlib.sha256(
         json.dumps(run_input, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -646,7 +668,7 @@ def _complete_incremental_output(
     config: LocalWorkflowConfig,
     digest: str,
     functions: Any,
-    frame: pd.DataFrame,
+    frame: pd.DataFrame | DistributedRows,
 ) -> Any:
     """Attach model identity and validate final prediction schema and row membership."""
     for name, value in (

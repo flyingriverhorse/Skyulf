@@ -6,6 +6,68 @@ import pytest
 
 
 @pytest.mark.parametrize("action", ["train", "score", "approve"])
+def test_legacy_workflow_defaults_to_local_inference(workflow_config, action):
+    """Older Polars projects keep their local scoring route after the new choice."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    assert validate_workflow_config(workflow_config, action=action) == workflow_config
+
+
+def test_migration_records_local_inference_explicitly(workflow_config):
+    """A deliberate migration must preserve the older project's local route."""
+    from skyulf.integrations.databricks.workflow_config import migrate_workflow_config
+
+    migrated = migrate_workflow_config(
+        workflow_config, task="regression", score_handoff="after_alias_change"
+    )
+    assert migrated["inference_mode"] == "local"
+
+
+@pytest.mark.parametrize("action", ["train", "score", "approve"])
+def test_spark_inference_requires_pandas_training(workflow_config, action):
+    """Contradictory training and inference modes fail before any job side effects."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    with pytest.raises(ValueError, match="inference_mode=spark requires engine=pandas"):
+        validate_workflow_config({**workflow_config, "inference_mode": "spark"}, action=action)
+    settings = {**workflow_config, "engine": "pandas", "inference_mode": "spark"}
+    assert validate_workflow_config(settings, action=action) == settings
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("inference_mode", "distributed"),
+        ("spark_udf_env_manager", "conda"),
+        ("spark_udf_prediction_batch_rows", 0),
+        ("spark_udf_prediction_batch_rows", 100001),
+        ("spark_udf_prediction_batch_rows", True),
+    ],
+)
+def test_spark_runtime_settings_reject_invalid_values(workflow_config, field, value):
+    """Worker setup and prediction batch limits must be explicit and bounded."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    settings = {**workflow_config, "engine": "pandas", "inference_mode": "spark", field: value}
+    with pytest.raises(ValueError, match=field):
+        validate_workflow_config(settings, action="score")
+
+
+def test_spark_runtime_settings_accept_explicit_values(workflow_config):
+    """The selected worker environment and batch size reach the scoring route."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    settings = {
+        **workflow_config,
+        "engine": "pandas",
+        "inference_mode": "spark",
+        "spark_udf_env_manager": "virtualenv",
+        "spark_udf_prediction_batch_rows": 10000,
+    }
+    assert validate_workflow_config(settings, action="score") == settings
+
+
+@pytest.mark.parametrize("action", ["train", "score", "approve"])
 @pytest.mark.parametrize("enabled", [False, True])
 def test_cdf_expiry_recovery_requires_explicit_boolean(workflow_config, action, enabled):
     """Optional recovery must remain independent of model-change and lifecycle policy."""

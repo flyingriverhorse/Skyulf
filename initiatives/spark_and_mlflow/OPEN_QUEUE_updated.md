@@ -3,8 +3,9 @@
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
 > Current sequence (2026-10-05): SM-23 batch scope closed with SM-23i Overview
-> performance separation; SM-57 has started with completed SM-56 source inventory
-> and an implementation plan. Runtime/UDF delivery is still open ([Plan166](166-sm57-spark-udf-plan.md)).
+> performance separation. SM-57 is delivered for the admitted pandas-worker scope,
+> with all three serverless lifecycles, no-op parity and native refresh verified
+> ([Delivery170](170-sm57-spark-pyfunc-delivery.md)). SM-58 retains scale/memory validation.
 > SM-23b serving observability remains dependent on SM-19a; company/identity
 > gates stay in SM-37/43b. Earlier dated/uncommitted notes below are historical;
 > the shared dashboard now ships inside the existing project template, with automatic
@@ -548,7 +549,7 @@ backfills and stale/unavailable policy windows cannot appear healthy. Shared mod
 selectors work in published Chrome. All 28 datasets passed 56 live SQL checks;
 37 affected tests passed. Same dashboard ID and permission mode were preserved.
 SM-23 batch scope is closed; online SM-23b and production SM-37/43b gates remain
-separate. Next approved work: SM-57 through the SM-56 safety inventory.
+separate. SM-57 subsequently delivered its initial admitted scope through the SM-56 safety inventory ([Delivery170](170-sm57-spark-pyfunc-delivery.md)).
 [Evidence164](164-sm23i-monitoring-overview-closure.md).
 
 ### SM-23h — Native refresh and cluster utilization (DELIVERED, 2026-10-05)
@@ -782,7 +783,7 @@ describes that current implementation.
 | SM-53 | Split `local_retraining.py` | SM-36g/h/i, SM-52 | WAIT | Cohesive modules for snapshot read, split, fit and evidence; public imports and saved evidence unchanged; complexity not increased; ([report94](94-integrations-code-quality-review.md)) |
 | SM-55 | Optional prediction columns on an existing source table | SM-41 | LATER | Low priority, after the current Bundle work: separate prediction table remains the default; optional keyed updates of prediction/provenance columns on the source. Validate unique keys, column ownership, stale-row checks, CDF feedback prevention, permissions, idempotency and rollback; consider a joined view for unified reading. Not implemented. |
 | SM-56 | Spark inference for pandas/Polars-trained pipelines with row-local FE | SM-29 | INVENTORY DONE; IMPLEMENTATION LATER | Actual apply-body inventory completed for built-in FE families. Portable JSON predict_spark still supports only SimpleImputer mean/constant and StandardScaler; extending it needs codecs and capability declarations. Trusted-pickle SM-57 can transport more fitted objects but requires independent batch-safety proof. Confirmed power-transform, replacement, binning and casting hazards; fitted group_agg is a mapping candidate, not a current-batch aggregate. Effective inference skips and worker Polars dependencies are documented. No new nodes certified. [Inventory165](165-sm57-partition-safety-inventory.md). |
-| SM-57 | Project setup and Bundle pyfunc through mlflow.pyfunc.spark_udf | SM-56 inventory | IN PROGRESS - INVENTORY/PLAN | Started after SM-23 batch closure. Current driver materialization, artifact/worker contracts, CDF/receipt lifecycle and three-layout integration mapped. Actual batch-dependence counterexamples reproduced; implementation split into safety gate, UDF adapter, distributed publication, setup and live acceptance. [Inventory165](165-sm57-partition-safety-inventory.md), [Plan166](166-sm57-spark-udf-plan.md). No runtime route, setup choice or live UDF delivery claimed yet. |
+| SM-57 | Project setup and Bundle pyfunc through mlflow.pyfunc.spark_udf | SM-56 inventory | DONE - INITIAL ADMITTED SCOPE | Independent local/Spark setup, fitted partition-safety gate, exact worker package, named UDF and distributed Delta lifecycle delivered. Single/competition/model-set each published 4,096 rows with exact local parity; no-op preserved table/receipt hashes. All initial and replay monitoring/native refresh chains passed on serverless. Initial nodes: mean/constant SimpleImputer and StandardScaler; Linear/LogisticRegression with reviewed tuning wrappers, independent model sets. Cluster virtualenv runtime and large-scale benchmarks remain unverified. [Delivery170](170-sm57-spark-pyfunc-delivery.md), [Plan166](166-sm57-spark-udf-plan.md). |
 | SM-58 | Scale and memory validation of Spark inference | SM-56, SM-39 | LATER | Real cluster run on large data: throughput, executor RSS, model load cost, partition/batch-size guidance, worker wheel packaging. Compare `native_features`, `python_pipeline` and pyfunc UDF. |
 | SM-59 | Native Spark expressions for hot FE nodes (optional) | SM-58 | LATER | Only for nodes SM-58 shows as bottlenecks; not every node. |
 
