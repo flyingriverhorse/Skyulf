@@ -2022,6 +2022,68 @@
           }
         }
       ]
+    },
+    {
+      "name": "overview_performance",
+      "displayName": "Latest saved performance by enrollment",
+      "queryLines": [
+        "WITH inventory AS (\n",
+        " SELECT i.monitor_id, i.model_catalog, i.model_schema, i.model_name,\n",
+        " COALESCE(get_json_object(i.config_json, '$.model_version'), h.model_version) AS model_version,\n",
+        " i.enabled, i.config_digest, i.expected_interval_hours,\n",
+        " COALESCE(get_json_object(i.config_json, '$.performance_policy.mode'), 'off') AS policy_mode,\n",
+        " CAST(get_json_object(i.config_json, '$.performance_policy.window_hours') AS DOUBLE) * 3600 AS window_seconds,\n",
+        " CAST(get_json_object(i.config_json, '$.performance_policy.label_delay_hours') AS DOUBLE) * 3600 AS delay_seconds\n",
+        " FROM model_inventory i LEFT JOIN current_health h ON i.monitor_id = h.monitor_id\n",
+        "), ranked AS (\n",
+        " SELECT p.*, ROW_NUMBER() OVER (\n",
+        " PARTITION BY p.monitor_id, p.config_digest, p.model_version\n",
+        " ORDER BY window_end DESC, measured_at DESC, report_id DESC\n",
+        " ) AS report_rank\n",
+        " FROM performance_history p JOIN inventory i\n",
+        " ON p.monitor_id = i.monitor_id AND p.config_digest = i.config_digest\n",
+        " AND p.model_version = i.model_version\n",
+        "), evidence AS (\n",
+        " SELECT i.*, p.report_id, p.window_end, p.measured_at,\n",
+        " p.status AS saved_status, p.reason AS saved_reason,\n",
+        " FLOOR((unix_timestamp(current_timestamp()) - i.delay_seconds)\n",
+        " / NULLIF(i.window_seconds, 0)) * i.window_seconds AS mature_window_end,\n",
+        " unix_timestamp(current_timestamp()) AS now_seconds\n",
+        " FROM inventory i LEFT JOIN ranked p ON i.monitor_id = p.monitor_id AND p.report_rank = 1\n",
+        "), checked AS (\n",
+        " SELECT *, CASE\n",
+        " WHEN NOT enabled THEN 'monitoring_disabled'\n",
+        " WHEN policy_mode = 'off' THEN 'policy_off'\n",
+        " WHEN model_version IS NULL THEN 'unresolved_model_version'\n",
+        " WHEN report_id IS NULL THEN 'no_matching_report'\n",
+        " WHEN window_end IS NULL THEN 'missing_performance_window'\n",
+        " WHEN measured_at IS NULL THEN 'missing_measurement_time'\n",
+        " WHEN unix_timestamp(measured_at) > now_seconds THEN 'future_measurement'\n",
+        " WHEN mature_window_end IS NULL THEN 'missing_policy_window_configuration'\n",
+        " WHEN unix_timestamp(window_end) > mature_window_end THEN 'performance_window_not_mature'\n",
+        " WHEN mature_window_end - unix_timestamp(window_end) > expected_interval_hours * 3600\n",
+        " THEN 'stale_performance_window'\n",
+        " ELSE NULL END AS evidence_issue\n",
+        " FROM evidence\n",
+        "), classified AS (\n",
+        " SELECT *, CASE\n",
+        " WHEN NOT enabled THEN 'Monitoring disabled'\n",
+        " WHEN policy_mode = 'off' THEN 'Policy disabled'\n",
+        " WHEN evidence_issue IS NOT NULL THEN 'Insufficient evidence'\n",
+        " WHEN saved_status = 'healthy' THEN 'Within tolerance'\n",
+        " WHEN saved_status = 'degraded' THEN 'Performance loss'\n",
+        " ELSE 'Insufficient evidence' END AS performance_status,\n",
+        " COALESCE(evidence_issue, saved_reason, 'missing_policy_evidence') AS performance_reason\n",
+        " FROM checked\n",
+        ")\n",
+        "SELECT monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        " performance_status, performance_reason, report_id, window_end, measured_at, saved_status,\n",
+        " CASE WHEN performance_status = 'Within tolerance' THEN 1 ELSE 0 END AS within_tolerance_count,\n",
+        " CASE WHEN performance_status = 'Performance loss' THEN 1 ELSE 0 END AS performance_loss_count,\n",
+        " CASE WHEN performance_status = 'Insufficient evidence' THEN 1 ELSE 0 END AS insufficient_evidence_count,\n",
+        " CASE WHEN performance_status = 'Policy disabled' THEN 1 ELSE 0 END AS policy_disabled_count\n",
+        "FROM classified ORDER BY model_name, model_version, monitor_id\n"
+      ]
     }
   ],
   "pages": [
@@ -2052,7 +2114,7 @@
             "name": "overview_note",
             "multilineTextboxSpec": {
               "lines": [
-                "Enrolled models in this monitoring store. Each row is one monitoring identity; the same model can have separate project enrollments. Activation appears before the first measurement."
+                "Counts are monitoring enrollments, not unique models. Each identity can have separate project settings. Performance and drift/data quality are independent."
               ]
             }
           },
@@ -2079,6 +2141,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_performance",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2090,6 +2165,11 @@
                     "fieldName": "model_catalog",
                     "displayName": "Catalog",
                     "queryName": "filter_0"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "filter_performance"
                   }
                 ]
               },
@@ -2122,6 +2202,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_performance",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2133,6 +2226,11 @@
                     "fieldName": "model_schema",
                     "displayName": "Schema",
                     "queryName": "filter_0"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "filter_performance"
                   }
                 ]
               },
@@ -2165,6 +2263,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_performance",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2176,6 +2287,11 @@
                     "fieldName": "model_name",
                     "displayName": "Model",
                     "queryName": "filter_0"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model",
+                    "queryName": "filter_performance"
                   }
                 ]
               },
@@ -2208,6 +2324,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "filter_performance",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2219,6 +2348,11 @@
                     "fieldName": "model_version",
                     "displayName": "Version",
                     "queryName": "filter_0"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version",
+                    "queryName": "filter_performance"
                   }
                 ]
               },
@@ -2233,6 +2367,214 @@
             "y": 2,
             "width": 3,
             "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_overview_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Latest saved performance"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_overview_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Current enrollment settings and concrete version only. Old mature windows become insufficient evidence after the expected monitoring interval; label delay and policy window size are included. Disabled monitoring is excluded from these four counts."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "within_tolerance_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(within_tolerance_count)",
+                      "expression": "SUM(`within_tolerance_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(within_tolerance_count)",
+                  "displayName": "Within tolerance"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Within tolerance"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_loss_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(performance_loss_count)",
+                      "expression": "SUM(`performance_loss_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(performance_loss_count)",
+                  "displayName": "Performance loss"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Performance loss"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 7,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "insufficient_evidence_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(insufficient_evidence_count)",
+                      "expression": "SUM(`insufficient_evidence_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(insufficient_evidence_count)",
+                  "displayName": "Insufficient evidence"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Insufficient evidence"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 7,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "policy_disabled_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "sum(policy_disabled_count)",
+                      "expression": "SUM(`policy_disabled_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(policy_disabled_count)",
+                  "displayName": "Policy disabled"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Policy disabled"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 7,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "quality_overview_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Drift and data quality"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 10,
+            "width": 12,
+            "height": 1
           }
         },
         {
@@ -2270,7 +2612,7 @@
           },
           "position": {
             "x": 0,
-            "y": 4,
+            "y": 11,
             "width": 3,
             "height": 3
           }
@@ -2310,7 +2652,7 @@
           },
           "position": {
             "x": 3,
-            "y": 4,
+            "y": 11,
             "width": 3,
             "height": 3
           }
@@ -2350,7 +2692,7 @@
           },
           "position": {
             "x": 6,
-            "y": 4,
+            "y": 11,
             "width": 3,
             "height": 3
           }
@@ -2390,7 +2732,7 @@
           },
           "position": {
             "x": 9,
-            "y": 4,
+            "y": 11,
             "width": 3,
             "height": 3
           }
@@ -2419,18 +2761,20 @@
               "encodings": {
                 "value": {
                   "fieldName": "sum(degraded_count)",
-                  "displayName": "Degraded"
+                  "displayName": "Measurement issues"
                 }
               },
               "frame": {
                 "showTitle": true,
-                "title": "Degraded"
+                "title": "Measurement issues",
+                "showDescription": true,
+                "description": "Measurement or data quality problems"
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 7,
+            "y": 14,
             "width": 3,
             "height": 3
           }
@@ -2470,7 +2814,7 @@
           },
           "position": {
             "x": 3,
-            "y": 7,
+            "y": 14,
             "width": 3,
             "height": 3
           }
@@ -2510,7 +2854,7 @@
           },
           "position": {
             "x": 6,
-            "y": 7,
+            "y": 14,
             "width": 3,
             "height": 3
           }
@@ -2539,18 +2883,18 @@
               "encodings": {
                 "value": {
                   "fieldName": "sum(disabled_count)",
-                  "displayName": "Disabled"
+                  "displayName": "Monitoring disabled"
                 }
               },
               "frame": {
                 "showTitle": true,
-                "title": "Disabled"
+                "title": "Monitoring disabled"
               }
             }
           },
           "position": {
             "x": 9,
-            "y": 7,
+            "y": 14,
             "width": 3,
             "height": 3
           }
@@ -2596,13 +2940,13 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Monitoring enrollments by status"
+                "title": "Enrollments by drift / data quality status"
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 10,
+            "y": 17,
             "width": 12,
             "height": 5
           }
@@ -2718,13 +3062,119 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Current model inventory"
+                "title": "Current monitoring enrollments"
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 15,
+            "y": 22,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_evidence_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Performance evidence"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 29,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "overview_performance_evidence",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "overview_performance",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "performance_status",
+                      "expression": "`performance_status`"
+                    },
+                    {
+                      "name": "performance_reason",
+                      "expression": "`performance_reason`"
+                    },
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "performance_status",
+                    "displayName": "Performance status"
+                  },
+                  {
+                    "fieldName": "performance_reason",
+                    "displayName": "Reason"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Saved window end"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measured at"
+                  },
+                  {
+                    "fieldName": "monitor_id",
+                    "displayName": "Monitoring identity"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Latest saved performance evidence by enrollment"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 30,
             "width": 12,
             "height": 7
           }

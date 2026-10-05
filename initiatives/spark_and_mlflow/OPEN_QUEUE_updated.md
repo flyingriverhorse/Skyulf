@@ -2,6 +2,11 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> Current sequence (2026-10-05): SM-23 batch scope closed with SM-23i Overview
+> performance separation; next is SM-57 through the SM-56 safety inventory.
+> SM-23b serving observability remains dependent on SM-19a; company/identity
+> gates stay in SM-37/43b. Earlier dated/uncommitted notes below are historical;
+> the active dashboard and latest evidence are in [Delivery164](164-sm23i-monitoring-overview-closure.md).
 > SM-39 delivered (2026-10-04): centralized runtime requirements,
 > automatic optional model/Optuna dependencies, checked wheel build and target
 > compute overrides. Two clean installations and two real train-to-score jobs
@@ -477,7 +482,7 @@ Acceptance additions (details in report93):
 | SM-45 | WAIT | SM-37, SM-40; suffix-scoped dev/CI cleanup job, dry-run default, production targets refused; separate from SM-41 retention |
 | SM-46 | WAIT | SM-34, SM-38; optional `scoring_mode: on_table_update` via Jobs table-update trigger, reusing CDF/queue/no-op |
 | SM-47 | WAIT | SM-38; MLflow dataset input for UC lineage, model-version card, optional experiment resource; MLflow 3 deployment jobs investigated without a second alias writer |
-| SM-23c | PARTIAL | SM-23a, SM-37; drift and independent performance policy delivered. Local gates and isolated Databricks measurement/request/replay acceptance passed. Remaining separate-identity/company production gates belong to SM-37/43b. [Delivery158](158-sm23c-performance-policy.md). Never approves. |
+| SM-23c | FUNCTIONAL DONE | Drift and independent performance policy delivered. Local gates and isolated Databricks measurement/request/replay acceptance passed. Remaining separate-identity/company production gates belong to SM-37/43b. [Delivery158](158-sm23c-performance-policy.md). Never approves. |
 | SM-48 | PARTIAL | Local split complete; live redeploy ID/history check pending. None; split `resources/workflow.jobs.yml` into `train.job.yml`/`score.job.yml` and optionally clearer job display names; keep job keys `train`/`score` (renaming recreates jobs and loses IDs/history) |
 | SM-49 | WAIT | SM-39, SM-48; upgrade path for generated projects: regenerate from saved answers into a temporary directory, review the diff, run config migration and deployed-contract checks |
 | SM-50 | WAIT | SM-41; optional explicit period backfill operator action reusing `publish_replace_period`, separate from incremental and full rebuild |
@@ -519,12 +524,23 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 | SM-19d | LATER | SM-19a; A/B/canary routing, endpoint update/rollback; batch rollout separately explicit |
 | SM-21a | LATER | SM-43a; UC feature lookup, keys and point-in-time correctness |
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
-| SM-23a | PARTIAL | Batch quality/drift/delayed-label reporting and central AI/BI dashboard delivered after user resumed scope (2026-10-01). Reuses Core `DriftCalculator`, explicit cross-namespace enrollment, original scoring snapshots and keyed available labels. Two-schema pandas/Polars live acceptance, final Bundle job, dashboard SQL/publish/readback and stable-ID redeploy passed ([delivery142](142-sm23a-monitoring-delivery.md)). Optional native `quality_monitors` InferenceLog, slices and infrastructure cost reports remain deferred; prior removal history remains in [report129](129-reference-followups-delivery.md). |
+| SM-23a | BATCH DONE | Quality/drift/delayed outcomes, Spark measurement, shared Delta storage and native AI/BI delivered. All three producer layouts use separate monitoring jobs; native refresh and execution/cost/CPU/RAM views are delivered ([Delivery163](163-sm23h-dashboard-refresh-compute.md)). Overview independently counts current performance evidence ([Delivery164](164-sm23i-monitoring-overview-closure.md)). Optional native Data Profiling (`data_quality`, replacing deprecated `quality_monitors`) and custom slices remain separate enhancements. Company/identity acceptance stays in SM-37/43b. |
 | SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
-| SM-23c | PARTIAL | SM-23a, SM-37; opt-in performance policy and real request/replay acceptance delivered. Functional performance scope complete; inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Never approves ([report93](93-dbml-reference-recomparison.md)). |
+| SM-23c | FUNCTIONAL DONE | Opt-in drift/performance policies and real request/replay acceptance delivered. Inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Never approves ([report93](93-dbml-reference-recomparison.md)). |
 | SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
+
+### SM-23i — Overview performance and batch closure (DONE, 2026-10-05)
+
+Four separate performance counters use current enrollment/version evidence;
+drift/data-quality counters retain their independent meaning. Old configurations,
+backfills and stale/unavailable policy windows cannot appear healthy. Shared model
+selectors work in published Chrome. All 28 datasets passed 56 live SQL checks;
+37 affected tests passed. Same dashboard ID and permission mode were preserved.
+SM-23 batch scope is closed; online SM-23b and production SM-37/43b gates remain
+separate. Next approved work: SM-57 through the SM-56 safety inventory.
+[Evidence164](164-sm23i-monitoring-overview-closure.md).
 
 ### SM-23h — Native refresh and cluster utilization (DELIVERED, 2026-10-05)
 
@@ -742,8 +758,8 @@ describes that current implementation.
 | SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | DONE | Live first champion, v2 promotion, tied v3 rejection, two-job handoff, score-failure recovery, queue/no-op and restricted alias-write denial passed; [design](31-sm29-auto-champion-design.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
-| SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
-| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Independent default-off performance policy delivered: pinned metric/baseline/tolerance, mature labels, coverage, consecutive windows and shared retraining guards. Local gates, dashboard SQL/publish/readback, real training request, unchanged-data skip and replay/combined-trigger dedup passed live. Functional scope complete; inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
+| SM-23 | Monitoring and inference observability | SM-20a, relevant batch/serving adapter | BATCH DONE; ONLINE LATER | Batch measurement/policies/native dashboard, refresh and Overview separation delivered. [Delivery164](164-sm23i-monitoring-overview-closure.md). SM-23b endpoint inference-table monitoring waits for SM-19a. Production gates remain SM-37/43b. |
+| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | FUNCTIONAL DONE | Independent default-off performance policy delivered: pinned metric/baseline/tolerance, mature labels, coverage, consecutive windows and shared retraining guards. Local gates, dashboard SQL/publish/readback, real training request, unchanged-data skip and replay/combined-trigger dedup passed live. Inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 | SM-45 | Suffix-scoped dev/CI resource cleanup | SM-37, SM-40 | WAIT | Dry-run default, confirmation, production targets refused; deleted set equals preview; other suffixes untouched; [report93](93-dbml-reference-recomparison.md) |

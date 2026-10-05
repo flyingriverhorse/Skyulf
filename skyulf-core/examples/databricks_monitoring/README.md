@@ -428,6 +428,30 @@ schema, model and version filters. It includes parent model-set identity where
 available. Models registered elsewhere appear only after enrollment in this store.
 Counts represent monitoring enrollments; two projects can monitor the same model.
 
+Overview separates **Drift and data quality** from **Model performance**. The
+first group's Healthy status means the measured input checks passed; it does not
+mean accuracy met its baseline. Measurement issues (the stored `degraded` status)
+also belong to drift/quality, rather than the performance-loss counter.
+
+Performance counts compare the latest saved policy window for each enrollment's
+current configuration and concrete model version. Within tolerance and Performance
+loss require usable, sufficiently recent policy evidence. Insufficient evidence
+includes missing checks, unavailable labels/baselines and stale windows. Policy
+disabled is an explicit `off` policy, not a missing report. Disabled enrollments
+are excluded from active performance counts and remain visible in the enrollment
+inventory. The accompanying evidence table explains each result and its window.
+The catalog, schema, model and version filters apply to both groups.
+Freshness uses the latest completed UTC policy window after `label_delay_hours`:
+the saved window becomes stale when it trails that window by more than the
+enrollment's `expected_interval_hours`. Future or immature windows cannot count
+as measured success. The label is Latest saved performance; it is not a live
+assessment of outcomes that have not arrived yet.
+
+These counters do not initiate training. Performance loss may be report-only or
+still lack the required consecutive windows; retraining retains the independent
+opt-in and shared request guards described above. Historical losses remain on
+Model performance even when the newest policy window has insufficient evidence.
+
 Drift and performance use model, version and monitoring-context selectors. Choices
 come from both current inventory and saved history, including models that have not
 yet been observed. The context label includes environment/project and a short
