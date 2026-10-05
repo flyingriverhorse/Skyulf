@@ -77,6 +77,13 @@ def load_monitoring_reference(
         "training_evidence_sha256": spec.training_evidence_sha256,
         "reference_population": "training_partition_excluding_holdout",
     }
+    policy = config.performance_policy
+    if policy and policy.get("mode") != "off" and policy["baseline"]["kind"] == "training_holdout":
+        from .monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
+
+        evidence["performance_baseline"] = measure_holdout_baseline(
+            artifact, spec, holdout, config, resolved.version, model.run_id
+        )
     return artifact, spec, train, evidence | parent
 
 

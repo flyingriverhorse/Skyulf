@@ -295,12 +295,14 @@ def read_labels(
     """Read only relevant label keys from a pinned table; availability is checked by metrics."""
     if config.label_table is None:
         return None, {"label_table": None, "label_version": None}
+    label_id = table_identity(spark, config.label_table)
     version = snapshot_at(spark, config.label_table, as_of)
     columns = (*keys, target, str(config.result_available_at_column))
     if predictions.empty:
         return pd.DataFrame(columns=columns), {
             "label_table": config.label_table,
             "label_version": version,
+            "label_table_id": label_id,
         }
     source = read_snapshot(spark, config.label_table, version)
     available = str(config.result_available_at_column)
@@ -322,4 +324,10 @@ def read_labels(
     )
     if timestamp == "timestamp":
         native[available] = pd.to_datetime(native[available], unit="us", utc=True)
-    return native, {"label_table": config.label_table, "label_version": version}
+    if table_identity(spark, config.label_table) != label_id:
+        raise ValueError("Label table was replaced during monitoring.")
+    return native, {
+        "label_table": config.label_table,
+        "label_version": version,
+        "label_table_id": label_id,
+    }

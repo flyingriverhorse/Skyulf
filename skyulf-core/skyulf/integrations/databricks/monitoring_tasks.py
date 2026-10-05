@@ -111,7 +111,11 @@ def _run_scoring_monitor(spark: Any, dbutils: Any) -> dict:
     if namespace != request["namespace"] or not configs:
         raise ValueError("Monitoring destination or model differs from the scoring request.")
     _validate_requested_models(configs, workflow, values)
-    if request["noop"] and not request.get("has_saved_batch", False):
+    if (
+        request["noop"]
+        and not request.get("has_saved_batch", False)
+        and not any(_performance_enabled(config) for config in configs)
+    ):
         dbutils.jobs.taskValues.set(
             key="monitoring_reference", value={"status": "no_new_predictions"}
         )
@@ -129,7 +133,12 @@ def _observe_configs(
     values: dict,
 ) -> dict:
     """Measure only missing component reports and retain all saved-batch references."""
-    start, end = scoring_observation_window(spark, configs[0], request["commit_version"])
+    now = datetime.now(UTC)
+    performance_only = request["noop"] and not request.get("has_saved_batch", False)
+    if performance_only:
+        start, end = now - timedelta(days=1), now
+    else:
+        start, end = scoring_observation_window(spark, configs[0], request["commit_version"])
     references = [_observation_reference(namespace, config, start, end) for config in configs]
     dbutils.jobs.taskValues.set(
         key="monitoring_reference",
@@ -137,27 +146,41 @@ def _observe_configs(
         if len(references) == 1
         else {"status": "ready", "observations": references},
     )
-    pending = [
-        config.payload()
-        for config in configs
-        if not completed_observation(spark, namespace, config, start, end)
-    ]
+    pending = _pending_configs(spark, namespace, configs, start, end)
     if not pending:
         return {"status": "already_observed"}
     result = run_monitoring(
         spark,
         namespace,
         pending,
-        as_of=end,
+        as_of=now if any(_performance_enabled(config) for config in configs) else end,
         window_start=start,
         window_end=end,
         tracking_uri=workflow.get("tracking_uri", "databricks"),
         registry_uri=workflow.get("registry_uri", "databricks-uc"),
         experiment_name=values.get("monitoring_experiment_name") or None,
         enroll_models=False,
+        **({"performance_only": True} if performance_only else {}),
     )
     print(json.dumps(result, sort_keys=True))
     return result
+
+
+def _pending_configs(
+    spark: Any, namespace: str, configs: list[MonitorConfig], start: datetime, end: datetime
+) -> list[dict]:
+    """Keep immutable drift retries cached while revisiting delayed performance labels."""
+    return [
+        config.payload()
+        for config in configs
+        if _performance_enabled(config)
+        or not completed_observation(spark, namespace, config, start, end)
+    ]
+
+
+def _performance_enabled(config: MonitorConfig) -> bool:
+    """Revisit mature label windows even when scoring has no new committed predictions."""
+    return bool(config.performance_policy and config.performance_policy.get("mode") != "off")
 
 
 def _validate_requested_models(configs: list[MonitorConfig], workflow: dict, values: dict) -> None:

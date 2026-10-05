@@ -28,6 +28,8 @@ def observe_model(
     tracking_uri: str | None,
     registry_uri: str | None,
     experiment_name: str | None,
+    namespace: str | None = None,
+    performance_only: bool = False,
 ) -> dict:
     """Compare one pinned model and scored population, preserving missing-label semantics."""
     from .monitoring_metrics import build_monitoring_report  # noqa: PLC0415 - separate computation
@@ -38,6 +40,20 @@ def observe_model(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+    if performance_only:
+        return _performance_only_row(
+            spark,
+            namespace,
+            config,
+            artifact,
+            spec,
+            evidence,
+            as_of,
+            window_start,
+            window_end,
+            tracking_uri,
+            experiment_name,
+        )
     manifest = artifact.manifest
     version = evidence["model_version"]
     probabilities = len(manifest.classes) if manifest.classification_probabilities else 0
@@ -75,9 +91,49 @@ def observe_model(
         classes=manifest.classes,
         thresholds=config.thresholds,
     )
+    if config.performance_policy:
+        from .monitoring_performance import observe_performance_safely  # noqa: PLC0415
+
+        report["performance"] = observe_performance_safely(
+            spark, namespace, config, artifact, spec, evidence, as_of
+        )
+        evidence["performance"] = report["performance"]
     row = result_row(
         config, version, as_of, window_start, window_end, report, evidence, observed_at=observed_at
     )
+    row["mlflow_run_id"] = _log_observation(
+        config, row, report, evidence, tracking_uri, experiment_name
+    )
+    return row
+
+
+def _performance_only_row(
+    spark: Any,
+    namespace: str | None,
+    config: MonitorConfig,
+    artifact: Any,
+    spec: Any,
+    evidence: dict,
+    as_of: datetime,
+    start: datetime,
+    end: datetime,
+    tracking_uri: str | None,
+    experiment_name: str | None,
+) -> dict:
+    """Revisit delayed labels on no-op scores without inventing fresh feature observations."""
+    from .monitoring_performance import observe_performance_safely  # noqa: PLC0415
+
+    performance = observe_performance_safely(
+        spark, namespace, config, artifact, spec, evidence, as_of
+    )
+    report = {
+        "status": "no_data",
+        "metrics": [],
+        "performance": performance,
+        "notes": ["No new scoring batch; evaluated the mature performance window only."],
+    }
+    evidence = evidence | {"performance": performance}
+    row = result_row(config, evidence["model_version"], as_of, start, end, report, evidence)
     row["mlflow_run_id"] = _log_observation(
         config, row, report, evidence, tracking_uri, experiment_name
     )
@@ -154,6 +210,7 @@ def run_monitoring(
     registry_uri: str | None = "databricks-uc",
     experiment_name: str | None = None,
     enroll_models: bool = True,
+    performance_only: bool = False,
 ) -> dict:
     """Observe the central inventory; optionally enroll explicit SDK records first."""
     qualified_name(f"{namespace}.model_inventory")
@@ -180,6 +237,8 @@ def run_monitoring(
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
             experiment_name=experiment_name,
+            namespace=namespace,
+            performance_only=performance_only,
         )
         persist_report(spark, namespace, row)
         results.append({key: row[key] for key in ("report_id", "model_name", "status")})
@@ -205,6 +264,15 @@ def _observe_or_failure(spark: Any, config: MonitorConfig, **options: Any) -> di
         return observe_model(spark, config, **options)
     except Exception as exc:  # noqa: BLE001 - contain one model's external read/metric failure
         report = {"status": "failed", "metrics": [], "notes": [type(exc).__name__]}
+        if config.performance_policy:
+            from .monitoring_performance import unavailable_performance  # noqa: PLC0415
+
+            report["performance"] = unavailable_performance(
+                config,
+                options["as_of"],
+                f"{type(exc).__name__}: {str(exc)[:500]}",
+                config.model_version,
+            )
         return result_row(
             config,
             config.model_version,

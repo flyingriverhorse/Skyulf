@@ -61,8 +61,8 @@
       ]
     },
     {
-      "name": "performance_history",
-      "displayName": "Actual target availability",
+      "name": "performance_measurements",
+      "displayName": "Measured performance by target and report",
       "queryLines": [
         "WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, measured_at, observed_at, column_name, measurement_status,\n",
@@ -374,6 +374,67 @@
         },
         {
           "keyword": "trend_version",
+          "displayName": "Version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "performance_policy",
+      "displayName": "Saved performance policy decisions",
+      "queryLines": [
+        "SELECT report_id, monitor_id, environment, project, model_name, model_version, model_catalog, model_schema, measured_at, observed_at, window_start, window_end, status, reason, metric, direction, baseline_kind, baseline_reference, baseline_value, current_value, absolute_degradation, relative_degradation, tolerance, tolerance_mode, threshold_value, labeled_rows, label_coverage, consecutive_failures, required_windows, action, action_reason, request_id, run_id, metric AS metric_name FROM performance_history"
+      ]
+    },
+    {
+      "name": "performance_policy_series",
+      "displayName": "Performance policy current baseline and boundary",
+      "queryLines": [
+        "WITH selected AS (\n SELECT * FROM performance_history WHERE metric = :policy_metric AND model_name = :policy_model AND model_version = :policy_version\n), identity_count AS (SELECT count(DISTINCT monitor_id) AS monitors FROM selected)\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, current_value AS value, 'Current' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nUNION ALL\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, baseline_value AS value, 'Baseline' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nUNION ALL\nSELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version, measured_at, metric AS metric_name, threshold_value AS value, 'Tolerance boundary' AS series FROM selected WHERE (SELECT monitors FROM identity_count) = 1\nORDER BY measured_at, report_id, series"
+      ],
+      "parameters": [
+        {
+          "keyword": "policy_metric",
+          "displayName": "Metric",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "rmse"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "keyword": "policy_model",
+          "displayName": "Model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "keyword": "policy_version",
           "displayName": "Version",
           "dataType": "STRING",
           "defaultSelection": {
@@ -2277,7 +2338,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "model_catalog",
@@ -2312,6 +2373,32 @@
                     }
                   ]
                 }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2333,6 +2420,16 @@
                     "queryName": "q_performance_latest",
                     "fieldName": "model_catalog",
                     "displayName": "Catalog"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -2356,7 +2453,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "model_schema",
@@ -2391,6 +2488,32 @@
                     }
                   ]
                 }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2412,6 +2535,16 @@
                     "queryName": "q_performance_latest",
                     "fieldName": "model_schema",
                     "displayName": "Schema"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -2435,7 +2568,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "model_name",
@@ -2482,6 +2615,32 @@
                       "keyword": "trend_model"
                     }
                   ]
+                }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "parameters": [
+                    {
+                      "name": "policy_model",
+                      "keyword": "policy_model"
+                    }
+                  ],
+                  "disaggregated": false
                 }
               }
             ],
@@ -2507,6 +2666,15 @@
                   {
                     "queryName": "q_performance_latest",
                     "parameterName": "trend_model"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "parameterName": "policy_model",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -2530,7 +2698,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "model_version",
@@ -2578,6 +2746,32 @@
                     }
                   ]
                 }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "parameters": [
+                    {
+                      "name": "policy_version",
+                      "keyword": "policy_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2602,6 +2796,15 @@
                   {
                     "queryName": "q_performance_latest",
                     "parameterName": "trend_version"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "parameterName": "policy_version",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -2625,7 +2828,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "measured_at",
@@ -2673,6 +2876,32 @@
                     }
                   ]
                 }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2699,6 +2928,16 @@
                     "queryName": "q_performance_latest",
                     "fieldName": "measured_at",
                     "displayName": "Measurement date"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measurement date",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -2722,7 +2961,7 @@
               {
                 "name": "q0",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "column_name",
@@ -2854,6 +3093,32 @@
                     }
                   ]
                 }
+              },
+              {
+                "name": "q_policy",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "metric_name",
+                      "expression": "`metric_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q_policy_series",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "parameters": [
+                    {
+                      "name": "policy_metric",
+                      "keyword": "policy_metric"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -2873,6 +3138,15 @@
                   {
                     "queryName": "q_performance_latest",
                     "parameterName": "performance_metric"
+                  },
+                  {
+                    "fieldName": "metric_name",
+                    "displayName": "Metric to plot",
+                    "queryName": "q_policy"
+                  },
+                  {
+                    "parameterName": "policy_metric",
+                    "queryName": "q_policy_series"
                   }
                 ]
               },
@@ -3063,7 +3337,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "performance_history",
+                  "datasetName": "performance_measurements",
                   "fields": [
                     {
                       "name": "model_name",
@@ -3231,6 +3505,397 @@
             "y": 19,
             "width": 12,
             "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "policy_heading",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Performance degradation policy",
+                "The policy verdict is separate from distribution drift. Unavailable evidence is not a healthy verdict."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 25,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_policy_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_policy_series",
+                  "fields": [
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "measured_at",
+                  "displayName": "Measurement time",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "displayName": "Evidence series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Current metric against baseline and tolerance",
+                "showDescription": true,
+                "description": "Selected model, version and metric; missing values remain gaps"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 27,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_policy_evidence",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "performance_policy",
+                  "fields": [
+                    {
+                      "name": "report_id",
+                      "expression": "`report_id`"
+                    },
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    },
+                    {
+                      "name": "environment",
+                      "expression": "`environment`"
+                    },
+                    {
+                      "name": "project",
+                      "expression": "`project`"
+                    },
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "model_catalog",
+                      "expression": "`model_catalog`"
+                    },
+                    {
+                      "name": "model_schema",
+                      "expression": "`model_schema`"
+                    },
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "observed_at",
+                      "expression": "`observed_at`"
+                    },
+                    {
+                      "name": "window_start",
+                      "expression": "`window_start`"
+                    },
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "reason",
+                      "expression": "`reason`"
+                    },
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "direction",
+                      "expression": "`direction`"
+                    },
+                    {
+                      "name": "baseline_kind",
+                      "expression": "`baseline_kind`"
+                    },
+                    {
+                      "name": "baseline_reference",
+                      "expression": "`baseline_reference`"
+                    },
+                    {
+                      "name": "baseline_value",
+                      "expression": "`baseline_value`"
+                    },
+                    {
+                      "name": "current_value",
+                      "expression": "`current_value`"
+                    },
+                    {
+                      "name": "absolute_degradation",
+                      "expression": "`absolute_degradation`"
+                    },
+                    {
+                      "name": "relative_degradation",
+                      "expression": "`relative_degradation`"
+                    },
+                    {
+                      "name": "tolerance",
+                      "expression": "`tolerance`"
+                    },
+                    {
+                      "name": "tolerance_mode",
+                      "expression": "`tolerance_mode`"
+                    },
+                    {
+                      "name": "threshold_value",
+                      "expression": "`threshold_value`"
+                    },
+                    {
+                      "name": "labeled_rows",
+                      "expression": "`labeled_rows`"
+                    },
+                    {
+                      "name": "label_coverage",
+                      "expression": "`label_coverage`"
+                    },
+                    {
+                      "name": "consecutive_failures",
+                      "expression": "`consecutive_failures`"
+                    },
+                    {
+                      "name": "required_windows",
+                      "expression": "`required_windows`"
+                    },
+                    {
+                      "name": "action",
+                      "expression": "`action`"
+                    },
+                    {
+                      "name": "action_reason",
+                      "expression": "`action_reason`"
+                    },
+                    {
+                      "name": "request_id",
+                      "expression": "`request_id`"
+                    },
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "report_id",
+                    "displayName": "Report ID"
+                  },
+                  {
+                    "fieldName": "monitor_id",
+                    "displayName": "Monitor ID"
+                  },
+                  {
+                    "fieldName": "environment",
+                    "displayName": "Environment"
+                  },
+                  {
+                    "fieldName": "project",
+                    "displayName": "Project"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Version"
+                  },
+                  {
+                    "fieldName": "model_catalog",
+                    "displayName": "Catalog"
+                  },
+                  {
+                    "fieldName": "model_schema",
+                    "displayName": "Schema"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Measured at"
+                  },
+                  {
+                    "fieldName": "observed_at",
+                    "displayName": "Scoring time"
+                  },
+                  {
+                    "fieldName": "window_start",
+                    "displayName": "Window start"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Window end"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Policy status"
+                  },
+                  {
+                    "fieldName": "reason",
+                    "displayName": "Reason"
+                  },
+                  {
+                    "fieldName": "metric",
+                    "displayName": "Metric"
+                  },
+                  {
+                    "fieldName": "direction",
+                    "displayName": "Direction"
+                  },
+                  {
+                    "fieldName": "baseline_kind",
+                    "displayName": "Baseline kind"
+                  },
+                  {
+                    "fieldName": "baseline_reference",
+                    "displayName": "Baseline reference"
+                  },
+                  {
+                    "fieldName": "baseline_value",
+                    "displayName": "Baseline"
+                  },
+                  {
+                    "fieldName": "current_value",
+                    "displayName": "Current"
+                  },
+                  {
+                    "fieldName": "absolute_degradation",
+                    "displayName": "Absolute degradation"
+                  },
+                  {
+                    "fieldName": "relative_degradation",
+                    "displayName": "Relative degradation"
+                  },
+                  {
+                    "fieldName": "tolerance",
+                    "displayName": "Tolerance"
+                  },
+                  {
+                    "fieldName": "tolerance_mode",
+                    "displayName": "Tolerance mode"
+                  },
+                  {
+                    "fieldName": "threshold_value",
+                    "displayName": "Boundary"
+                  },
+                  {
+                    "fieldName": "labeled_rows",
+                    "displayName": "Labeled rows"
+                  },
+                  {
+                    "fieldName": "label_coverage",
+                    "displayName": "Label coverage"
+                  },
+                  {
+                    "fieldName": "consecutive_failures",
+                    "displayName": "Failing windows"
+                  },
+                  {
+                    "fieldName": "required_windows",
+                    "displayName": "Required windows"
+                  },
+                  {
+                    "fieldName": "action",
+                    "displayName": "Action"
+                  },
+                  {
+                    "fieldName": "action_reason",
+                    "displayName": "Action reason"
+                  },
+                  {
+                    "fieldName": "request_id",
+                    "displayName": "Request ID"
+                  },
+                  {
+                    "fieldName": "run_id",
+                    "displayName": "Run ID"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Performance policy evidence and action",
+                "showDescription": true,
+                "description": "Saved status, exact window, baseline, coverage, streak, and request IDs"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 33,
+            "width": 12,
+            "height": 8
           }
         }
       ]

@@ -479,6 +479,7 @@ def score_model_set_payload(
     from .model_set_batch import run_model_set_batch  # noqa: PLC0415 - optional Spark boundary
     from .monitoring_model_set import (  # noqa: PLC0415
         register_set_monitors,
+        validate_component_monitoring,
         validate_set_monitoring,
     )
 
@@ -508,6 +509,7 @@ def score_model_set_payload(
         raise ValueError("Approve a model-set champion before scoring.")
     resolved = resolve_model(settings["model_name"], version=version, **endpoints)
     artifact = load_registered_model_set(resolved, **endpoints)
+    validate_component_monitoring(config, values, settings, resolved, artifact)
     result = run_model_set_batch(
         spark,
         resolved,

@@ -94,6 +94,64 @@ def test_source_correction_policy_reaches_the_score_notebook(
     assert '"source_change_policy": "rebuild_on_change"' in output
 
 
+@pytest.mark.parametrize(
+    "policy_name", ["workspace.models.reveneu_dev", "workspace.models.revenue_dev"]
+)
+def test_component_performance_policy_fails_before_scoring_write(
+    tmp_path, workflow_config, monkeypatch, policy_name
+):
+    """Unknown component names and missing labels must fail before publishing predictions."""
+    from skyulf.integrations.databricks import model_set_batch
+    from skyulf.integrations.databricks import model_set_project as module
+    from skyulf.integrations.mlflow import model_set
+
+    values, _ = _project(tmp_path, workflow_config)
+    _enable(tmp_path)
+    values.update(
+        score_model_version="1",
+        monitoring_catalog="ops",
+        monitoring_schema="monitoring",
+        monitoring_environment="prod",
+        monitoring_project="risk",
+        monitoring_performance_policies=json.dumps(
+            {
+                policy_name: {
+                    "mode": "report",
+                    "metric": "f1_weighted",
+                    "direction": "higher",
+                    "baseline": {"kind": "training_holdout", "model_version": "1"},
+                    "tolerance": 0.05,
+                    "tolerance_mode": "absolute",
+                    "window_hours": 24,
+                    "label_delay_hours": 6,
+                    "minimum_labeled_rows": 20,
+                    "minimum_label_coverage": 0.8,
+                    "consecutive_windows": 3,
+                }
+            }
+        ),
+    )
+    resolved = SimpleNamespace(name="workspace.models.example_set_dev", version="1")
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            components=[
+                SimpleNamespace(
+                    reference=SimpleNamespace(name="workspace.models.revenue_dev", version="1"),
+                    branch="revenue",
+                )
+            ]
+        )
+    )
+    monkeypatch.setattr(module, "resolve_model", Mock(return_value=resolved))
+    monkeypatch.setattr(model_set, "load_registered_model_set", Mock(return_value=artifact))
+    batch = Mock(side_effect=AssertionError("batch started before performance preflight"))
+    monkeypatch.setattr(model_set_batch, "run_model_set_batch", batch)
+    config = module.read_notebook_config(values)
+    with pytest.raises(ValueError, match="component|label_table"):
+        module.score_model_set_payload(None, config, values)
+    batch.assert_not_called()
+
+
 def test_set_factory_resolves_owned_names_and_preserves_legacy(tmp_path, workflow_config):
     """Existing projects remain train only until a factory explicitly returns a set."""
     from skyulf.integrations.databricks.model_set_project import load_project_model_set

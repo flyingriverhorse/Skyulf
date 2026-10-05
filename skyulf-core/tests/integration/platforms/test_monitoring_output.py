@@ -106,3 +106,130 @@ def test_drift_report_rejects_unbound_reference():
 
     with pytest.raises(ValueError):
         load_observation(Mock(), {"status": "ready", "namespace": "bad;sql"})
+
+
+def test_drift_report_shows_saved_performance_policy_evidence():
+    """Operators must see the policy verdict and exact evidence for the saved report."""
+    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+
+    row = {
+        "report_id": "report-9",
+        "model_name": "model",
+        "model_version": "7",
+        "observed_at": "2026-10-05T00:00:00Z",
+        "measured_at": "2026-10-05T02:00:00Z",
+        "drifted_columns": 0,
+        "report_json": json.dumps(
+            {
+                "metrics": [],
+                "performance": {
+                    "status": "degraded",
+                    "reason": "Three completed failing windows",
+                    "metric": "f1",
+                    "direction": "higher",
+                    "baseline_kind": "training_holdout",
+                    "baseline_reference": "holdout-7",
+                    "baseline_value": 0.9,
+                    "current_value": 0.81,
+                    "absolute_degradation": 0.09,
+                    "relative_degradation": 0.1,
+                    "tolerance": 0.05,
+                    "tolerance_mode": "absolute",
+                    "threshold_value": 0.85,
+                    "labeled_rows": 80,
+                    "label_coverage": 0.8,
+                    "window_start": "2026-10-04T00:00:00Z",
+                    "window_end": "2026-10-05T00:00:00Z",
+                    "consecutive_failures": 3,
+                    "required_windows": 3,
+                    "evaluated_windows": ["w1", "w2", "w3"],
+                    "action": "retraining_requested",
+                    "request_id": "request-8",
+                    "run_id": "run-12",
+                },
+            }
+        ),
+    }
+    html = render_drift_output(row)
+    for evidence in (
+        "Performance policy evidence",
+        "report-9",
+        "Degraded",
+        "f1",
+        "0.9",
+        "0.81",
+        "0.09",
+        "0.85",
+        "0.8",
+        "80",
+        "2026-10-04",
+        "3 / 3",
+        "retraining_requested",
+        "request-8",
+        "run-12",
+    ):
+        assert evidence in html
+
+
+def test_drift_report_marks_missing_policy_disabled_and_escapes_reason():
+    """Absent policy and unavailable labels must never render as a healthy verdict."""
+    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+
+    row = {
+        "report_id": "r",
+        "model_name": "m",
+        "model_version": "1",
+        "observed_at": "now",
+        "measured_at": "now",
+        "drifted_columns": 0,
+    }
+    row["report_json"] = json.dumps({"metrics": []})
+    assert "Disabled" in render_drift_output(row)
+    row["report_json"] = json.dumps(
+        {
+            "metrics": [],
+            "performance": {
+                "status": "unavailable",
+                "reason": "No labels <script>alert(1)</script>",
+            },
+        }
+    )
+    html = render_drift_output(row)
+    assert "Unavailable" in html and "No labels &lt;script&gt;" in html
+    assert "<script>" not in html and "Healthy" not in html
+
+
+def test_drift_report_shows_later_saved_retraining_action():
+    """A saved action override must identify the later request without altering the metric verdict."""
+    from skyulf.integrations.databricks.monitoring_output import render_drift_output
+
+    row = {
+        "report_id": "report-10",
+        "model_name": "m",
+        "model_version": "2",
+        "observed_at": "now",
+        "measured_at": "now",
+        "drifted_columns": 0,
+        "report_json": json.dumps(
+            {
+                "metrics": [],
+                "performance": {
+                    "status": "degraded",
+                    "reason": "Metric crossed threshold",
+                    "action": "eligible",
+                },
+            }
+        ),
+        "performance_action": {
+            "action": "retraining_skipped",
+            "action_reason": "Training data unchanged <script>",
+            "request_id": "request-10",
+            "run_id": "run-20",
+        },
+    }
+    html = render_drift_output(row)
+    assert "Metric crossed threshold" in html
+    assert "retraining_skipped" in html
+    assert "Training data unchanged &lt;script&gt;" in html
+    assert "request-10" in html and "run-20" in html
+    assert "<script>" not in html

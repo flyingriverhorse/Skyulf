@@ -75,7 +75,14 @@ def load_observation(spark: Any, reference: dict) -> dict:
     )
     if row is None:
         raise ValueError("The completed scoring batch has no saved monitoring observation.")
-    return row.asDict()
+    result = row.asDict()
+    if json.loads(result["report_json"]).get("performance"):
+        from .performance_actions import load_performance_action  # noqa: PLC0415
+
+        result["performance_action"] = (
+            load_performance_action(spark, reference["namespace"], result["report_id"]) or {}
+        )
+    return result
 
 
 def _metric_cell(metric: dict) -> str:
@@ -103,10 +110,56 @@ def _reported_metric(metrics: dict[str, dict], name: str) -> dict:
     return metrics.get(name, {})
 
 
+def _performance_policy_section(report: dict, row: dict) -> str:
+    """Show the persisted policy verdict without treating absent evidence as healthy."""
+    evidence = report.get("performance")
+    heading = "<h2>Performance policy evidence</h2>"
+    if not isinstance(evidence, dict) or evidence.get("status") in {None, "off", "disabled"}:
+        return heading + "<p>Disabled: no performance degradation policy was evaluated.</p>"
+    status = evidence["status"]
+    if status not in {"healthy", "degraded", "unavailable"}:
+        status = "unavailable"
+    status_label = status.capitalize()
+    action = row.get("performance_action") or {}
+    fields = (
+        ("Report ID", row.get("report_id")),
+        ("Model", row.get("model_name")),
+        ("Version", row.get("model_version")),
+        ("Status", status_label),
+        ("Reason", evidence.get("reason")),
+        ("Metric", evidence.get("metric")),
+        ("Improvement direction", evidence.get("direction")),
+        ("Baseline kind", evidence.get("baseline_kind")),
+        ("Baseline reference", evidence.get("baseline_reference")),
+        ("Baseline value", evidence.get("baseline_value")),
+        ("Current value", evidence.get("current_value")),
+        ("Absolute degradation", evidence.get("absolute_degradation")),
+        ("Relative degradation", evidence.get("relative_degradation")),
+        ("Tolerance", evidence.get("tolerance")),
+        ("Tolerance mode", evidence.get("tolerance_mode")),
+        ("Threshold value", evidence.get("threshold_value")),
+        ("Labeled rows", evidence.get("labeled_rows")),
+        ("Label coverage", evidence.get("label_coverage")),
+        ("Window start", evidence.get("window_start")),
+        ("Window end", evidence.get("window_end")),
+        (
+            "Failure streak",
+            f"{evidence.get('consecutive_failures', 0)} / {evidence.get('required_windows', 0)}",
+        ),
+        ("Evaluated windows", json.dumps(evidence.get("evaluated_windows") or [], default=str)),
+        ("Action", action.get("action", evidence.get("action", "No action recorded"))),
+        ("Action reason", action.get("action_reason", evidence.get("action_reason"))),
+        ("Request ID", action.get("request_id", evidence.get("request_id"))),
+        ("Run ID", action.get("run_id", evidence.get("run_id"))),
+    )
+    return heading + output_table(("Evidence", "Saved value"), list(fields))
+
+
 def render_drift_output(row: dict, dashboard_url: str = "") -> str:
     """Render a compact per-feature table from the persisted report, without recalculation."""
     features: dict[str, dict] = {}
-    for metric in json.loads(row["report_json"]).get("metrics", []):
+    report = json.loads(row["report_json"])
+    for metric in report.get("metrics", []):
         if metric["category"] == "drift":
             features.setdefault(metric["column_name"], {})[metric["metric_name"]] = metric
     names = (
@@ -159,6 +212,7 @@ def render_drift_output(row: dict, dashboard_url: str = "") -> str:
         "KS p-value is diagnostic only. Timestamps use the Spark session timezone.</p>"
         + summary
         + detail
+        + _performance_policy_section(report, row)
         + _dashboard_link(dashboard_url)
     )
 

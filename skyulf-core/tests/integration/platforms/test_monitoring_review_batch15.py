@@ -48,6 +48,7 @@ def _read(monkeypatch, records, **budgets):
         **budgets,
     )
     monkeypatch.setattr(sources, "snapshot_at", lambda *args: 7)
+    monkeypatch.setattr(sources, "table_identity", lambda *args: "label-table-id")
     monkeypatch.setattr(sources, "read_snapshot", lambda *args: _selected(records))
     return sources.read_labels(
         Mock(), config, ("id",), "target", pd.DataFrame({"id": [1, 2]}), AS_OF
@@ -83,7 +84,11 @@ def test_future_label_revisions_do_not_hide_available_truth(monkeypatch, future_
     result = _report(labels)
     assert result["labeled_rows"] == 2
     assert result["label_coverage"] == 1.0
-    assert evidence == {"label_table": "a.b.labels", "label_version": 7}
+    assert evidence == {
+        "label_table": "a.b.labels",
+        "label_version": 7,
+        "label_table_id": "label-table-id",
+    }
     mae = next(item for item in result["metrics"] if item["metric_name"] == "mae")
     assert mae["value"] == 1.0
 

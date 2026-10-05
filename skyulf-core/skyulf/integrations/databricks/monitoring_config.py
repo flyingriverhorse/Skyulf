@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass, fields
 from typing import Any, Self
 
 from ._contracts import column_name, table_name
+from .performance_policy import validate_performance_policy
 
 MAX_MONITOR_ROWS = 1_000_000
 MAX_MONITOR_BYTES = 1024**3
@@ -56,6 +57,7 @@ class MonitorConfig:
     model_set_name: str | None = None
     model_set_version: str | None = None
     model_set_branch: str | None = None
+    performance_policy: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Reject ambiguous or unbounded work before registry and Spark access."""
@@ -69,6 +71,7 @@ class MonitorConfig:
         _validate_budgets(self)
         _validate_thresholds(self.thresholds)
         _validate_model_set(self)
+        _validate_performance_enrollment(self)
         if type(self.enabled) is not bool:
             raise ValueError("Monitoring enabled must be a boolean.")
 
@@ -86,7 +89,10 @@ class MonitorConfig:
 
     def payload(self) -> dict[str, Any]:
         """Return the complete enrollment policy for report identity and audit."""
-        return asdict(self)
+        payload = asdict(self)
+        if self.performance_policy is None:
+            payload.pop("performance_policy")
+        return payload
 
 
 def _validate_selection(version: str | None, alias: str | None) -> None:
@@ -143,6 +149,20 @@ def _validate_thresholds(value: dict[str, float] | None) -> None:
             raise ValueError("Drift thresholds must be finite and positive.")
 
 
+def _validate_performance_enrollment(config: MonitorConfig) -> None:
+    """Require explicit labels for active policy after ordinary enrollment checks."""
+    if config.performance_policy is None:
+        return
+    if type(config.performance_policy) is not dict or not config.performance_policy:
+        raise ValueError("performance_policy must be an explicit policy object.")
+    policy = validate_performance_policy(config.performance_policy)
+    if policy["mode"] != "off" and config.label_table is None:
+        raise ValueError(
+            "Active performance_policy requires label_table and result_available_at_column."
+        )
+    object.__setattr__(config, "performance_policy", policy)
+
+
 def parse_drift_thresholds(value: str) -> dict[str, float]:
     """Parse the Bundle policy; an empty object selects Core's default thresholds."""
     try:
@@ -153,6 +173,32 @@ def parse_drift_thresholds(value: str) -> dict[str, float]:
         raise ValueError("monitoring_drift_thresholds must be a JSON object.")
     _validate_thresholds(thresholds)
     return thresholds
+
+
+def parse_performance_policies(value: str) -> dict[str, dict]:
+    """Validate every named model policy before any model writes predictions."""
+    try:
+        policies = json.loads(value, object_pairs_hook=_unique_json_object)
+    except (TypeError, ValueError) as error:
+        raise ValueError("monitoring_performance_policies must be a JSON object.") from error
+    if type(policies) is not dict:
+        raise ValueError("monitoring_performance_policies must be a JSON object.")
+    for name, policy in policies.items():
+        qualified_name(name)
+        if type(policy) is not dict or not policy:
+            raise ValueError("Each performance policy must be an explicit policy object.")
+        validate_performance_policy(policy)
+    return policies
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Reject duplicate policy fields and model keys before JSON discards them."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate monitoring performance policy JSON key.")
+        result[key] = value
+    return result
 
 
 def _validate_model_set(config: MonitorConfig) -> None:

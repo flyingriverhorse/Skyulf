@@ -17,6 +17,8 @@ The catalog must exist. The central initializer creates the schema if missing.
 | `monitoring_results` (Delta) | Create if absent | Central job inserts immutable observations; exact retries deduplicate. |
 | `current_health` (view) | Create | Refresh definition; read inventory and latest applicable observation. |
 | `metric_history` (view) | Create | Refresh definition; expand stored report metrics for dashboard queries. |
+| `performance_actions` (Delta) | Create if absent | Append request and skip receipts without rewriting observations. |
+| `performance_history` (view) | Create | Refresh definition; join performance evidence with the latest applicable action. |
 
 One store serves all enrolled models; new models do not create new monitoring
 tables. Existing foreign objects or incompatible table schemas are rejected.
@@ -56,7 +58,43 @@ monitoring_dashboard_url: "https://<workspace-host>/dashboardsv3/<dashboard-id>/
 # Optional actual results:
 monitoring_label_table: outcomes.production.labels
 monitoring_result_available_at_column: available_at
+monitoring_performance_policies: '{}'
 ```
+
+Performance policy is disabled by default. Each producer sets an independent
+JSON mapping keyed by the exact fully qualified enrolled model name. For example,
+the policy below reports a weighted F1 drop of at least 0.05 across three distinct,
+completed windows for version 2:
+
+```yaml
+monitoring_performance_policies: >-
+  {"models.risk.churn":{"mode":"report","metric":"f1_weighted",
+  "direction":"higher","baseline":{"kind":"training_holdout",
+  "model_version":"2"},"tolerance":0.05,"tolerance_mode":"absolute",
+  "window_hours":24,"label_delay_hours":6,"minimum_labeled_rows":20,
+  "minimum_label_coverage":0.8,"consecutive_windows":3}}
+```
+
+Use `mode: "retrain"` in the JSON policy to request guarded automatic training,
+or `{"mode":"off"}` for an explicitly disabled model. An active policy needs
+the label table and UTC availability column shown above. Select a
+`training_holdout` baseline or pin an existing production observation with
+`{"kind":"production_window","model_version":"2","report_id":"<64 hex characters>"}`.
+The baseline version must match the observed version; a mismatch is unavailable
+and cannot request training. No metric, direction, tolerance or baseline is
+inferred. Fixed UTC windows wait `label_delay_hours` after their end, then count
+only labels available at the cutoff. A 00:00–24:00 UTC window with a six-hour
+delay can first be evaluated at 06:00 UTC the next day. Replays do not advance
+the consecutive-window count; missing and immature labels remain unavailable.
+Distribution drift remains controlled separately by `on_drift`. Its cooldown
+and minimum new labeled training-row settings are shared request guards for
+either retraining trigger. Model evaluation and approval rules still apply.
+
+For an existing store, run the central initializer with the updated wheel before
+updating the dashboard. This adds `performance_actions` and `performance_history`;
+the inventory and observation table schemas stay compatible. Producers using
+automatic performance retraining also need CREATE TABLE in the monitoring schema
+when the action table is absent, and SELECT/MODIFY on `performance_actions`.
 
 Monitoring is enabled by default in newly generated Bundles. Set the independent
 catalog/schema before running them; use monitoring_enabled: "false" to opt out.

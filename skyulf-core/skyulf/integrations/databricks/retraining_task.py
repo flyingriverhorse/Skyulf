@@ -11,7 +11,7 @@ from typing import Any
 from ...profiling._drift_evidence import SIGNIFICANCE_LEVEL, DriftEvidence
 from .job_output import output_table
 from .job_runtime import read_notebook_config
-from .monitoring_config import MonitorConfig, json_digest
+from .monitoring_config import MonitorConfig, json_digest, parse_performance_policies
 from .monitoring_output import load_observation
 from .monitoring_registration import monitoring_destination
 from .monitoring_store import load_enrolled_models
@@ -19,16 +19,26 @@ from .monitoring_store import load_enrolled_models
 
 def retraining_policy(values: dict[str, str]) -> dict:
     """Require an explicit opt-in and bounded finite submission controls."""
-    mode = values.get("on_drift", "disabled")
-    if values.get("monitoring_deployment_mode") == "development":
-        mode = "disabled"
+    development = values.get("monitoring_deployment_mode") == "development"
+    mode = "disabled" if development else values.get("on_drift", "disabled")
     if mode not in {"disabled", "retrain"}:
         raise ValueError("on_drift must be disabled or retrain.")
     cooldown = float(values.get("on_drift_cooldown_hours", "24"))
     minimum = int(values.get("on_drift_min_new_training_rows", "1"))
     if not math.isfinite(cooldown) or cooldown < 0 or minimum < 1:
         raise ValueError("On-drift cooldown must be finite/nonnegative and minimum rows positive.")
-    return {"mode": mode, "cooldown_hours": cooldown, "minimum_rows": minimum}
+    performance = (
+        {}
+        if development
+        else parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    )
+    performance_enabled = any(item["mode"] == "retrain" for item in performance.values())
+    return {
+        "mode": "retrain" if mode == "retrain" or performance_enabled else "disabled",
+        "drift_enabled": mode == "retrain",
+        "cooldown_hours": cooldown,
+        "minimum_rows": minimum,
+    }
 
 
 def _broken_input(item: dict) -> bool:
@@ -167,18 +177,36 @@ def _current_configs(spark: Any, namespace: str, values: dict[str, str]) -> dict
 
 
 def _candidate(
-    spark: Any, row: dict, config: MonitorConfig, workflow: dict, now: datetime, minimum: int
+    spark: Any,
+    row: dict,
+    config: MonitorConfig,
+    workflow: dict,
+    now: datetime,
+    minimum: int,
+    *,
+    drift_enabled: bool = True,
 ) -> dict:
     """Require fresh rows in the actual training partition, never fit during scoring."""
+    from .performance_retraining import performance_decision  # noqa: PLC0415
     from .retraining_data import assess_training_data  # noqa: PLC0415
 
-    status = observation_decision(row, config, now)
+    drift = observation_decision(row, config, now) if drift_enabled else "disabled"
+    performance = performance_decision(row, config, now)
+    triggers = [
+        name for name, state in (("drift", drift), ("performance", performance)) if state == "ready"
+    ]
+    status = "ready" if triggers else (drift if drift_enabled else performance)
     result = {
         "model_name": config.model_name,
         "report_id": row["report_id"],
         "status": status,
         "monitor_id": config.monitor_id,
         "config_digest": row["config_digest"],
+        "triggers": triggers,
+        "performance_reason": performance,
+        "performance_monitored": bool(
+            config.performance_policy and config.performance_policy.get("mode") != "off"
+        ),
     }
     if status != "ready":
         return result
@@ -203,7 +231,17 @@ def _collect_candidates(
         config = configs.get(row["monitor_id"])
         if config is None or config.model_name not in workflows:
             raise ValueError("On-drift observation does not belong to this training project.")
-        results.append(_candidate(spark, row, config, workflows[config.model_name], now, minimum))
+        results.append(
+            _candidate(
+                spark,
+                row,
+                config,
+                workflows[config.model_name],
+                now,
+                minimum,
+                drift_enabled=values.get("on_drift", "disabled") == "retrain",
+            )
+        )
     return results
 
 
@@ -301,7 +339,7 @@ def run_retraining_notebook(
     dbutils.jobs.taskValues.set(key="retraining_result", value=result)
     if display_html is not None:
         display_html(
-            "<h2>Retraining after drift</h2>"
+            "<h2>Retraining after drift or performance degradation</h2>"
             + output_table(
                 ("Decision", "Training run"), [(result["status"], result.get("run_id", ""))]
             )
@@ -367,7 +405,14 @@ def _run_enabled(
         now,
         policy["minimum_rows"],
     )
-    return _submit_candidates(
+    from .performance_actions import (  # noqa: PLC0415
+        initialize_performance_actions,
+        record_performance_actions,
+    )
+
+    if any(item.get("performance_monitored") for item in results):
+        initialize_performance_actions(spark, namespace)
+    result = _submit_candidates(
         spark,
         workspace or WorkspaceClient(),
         namespace,
@@ -377,3 +422,5 @@ def _run_enabled(
         now,
         preview_only=preview_only,
     )
+    record_performance_actions(spark, namespace, result, now, preview_only=preview_only)
+    return result

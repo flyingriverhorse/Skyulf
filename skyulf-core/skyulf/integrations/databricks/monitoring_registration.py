@@ -8,6 +8,7 @@ from .monitoring_config import (
     MAX_MONITOR_ROWS,
     MonitorConfig,
     parse_drift_thresholds,
+    parse_performance_policies,
     store_namespace,
 )
 from .monitoring_store import enroll_monitor
@@ -39,6 +40,7 @@ def build_monitor_enrollment_config(
     workflow: dict[str, Any], values: dict[str, str], version: str
 ) -> MonitorConfig:
     """Use resolved producer names and the physical generation of the selected version."""
+    policies = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
     return MonitorConfig(
         environment=values.get("monitoring_environment", ""),
         project=values.get("monitoring_project", ""),
@@ -56,6 +58,7 @@ def build_monitor_enrollment_config(
         ),
         enabled=values.get("monitoring_enabled", "true") == "true",
         thresholds=parse_drift_thresholds(values.get("monitoring_drift_thresholds", "{}")),
+        performance_policy=policies.get(workflow["model_name"]),
     )
 
 
@@ -63,6 +66,11 @@ def validate_monitoring_settings(values: dict[str, str], workflow: dict[str, Any
     """Validate configured registration before any scoring write or recovery request."""
     if monitoring_destination(values) is None:
         return
+    policies = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    if workflow.get("training_layout", "single_model") != "multi_target" and set(policies) - {
+        workflow["model_name"]
+    }:
+        raise ValueError("Performance policy model name does not match the workflow model.")
     build_monitor_enrollment_config(workflow, values, "1")
 
 

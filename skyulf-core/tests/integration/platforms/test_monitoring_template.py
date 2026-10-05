@@ -1,6 +1,7 @@
 """Generated repositories independently bind to the shared monitoring inventory."""
 
 import os
+from pathlib import Path
 
 import pytest
 import yaml
@@ -25,12 +26,14 @@ def test_generated_projects_bind_independent_monitoring_destination(
         if target["mode"] == "development":
             assert target["variables"]["monitoring_enabled"] == "false"
             assert target["variables"]["on_drift"] == "disabled"
+            assert target["variables"]["monitoring_performance_policies"] == "{}"
         else:
             assert target["variables"].get("monitoring_enabled", "true") == "true"
     assert variables["monitoring_enabled"]["default"] == "true"
     assert variables["monitoring_catalog"]["default"] == ""
     assert variables["monitoring_schema"]["default"] == ""
     assert variables["monitoring_drift_thresholds"]["default"] == "{}"
+    assert variables["monitoring_performance_policies"]["default"] == "{}"
     assert variables["on_drift"]["default"] == "disabled"
     job = yaml.safe_load((project / "resources/score.job.yml").read_text())["resources"]["jobs"][
         "score"
@@ -50,6 +53,7 @@ def test_generated_projects_bind_independent_monitoring_destination(
         assert params["monitoring_deployment_mode"] == "${bundle.mode}"
         assert params["monitoring_project"] == "${bundle.name}"
         assert params["monitoring_drift_thresholds"] == "${var.monitoring_drift_thresholds}"
+        assert params["monitoring_performance_policies"] == "${var.monitoring_performance_policies}"
     assert len(tasks) == (8 if recovery == "true" else 6)
     retrain = next(task for task in tasks if task["task_key"] == "retrain_on_drift")
     assert retrain["depends_on"] == [{"task_key": "retraining_needed", "outcome": "true"}]
@@ -92,10 +96,15 @@ def test_generated_projects_bind_independent_monitoring_destination(
     dependencies = (
         job["environments"][0]["spec"]["dependencies"]
         if compute == "serverless"
-        else [item.get("pypi", {}).get("package") for item in monitor["libraries"]]
+        else [item.get("requirements") for item in monitor["libraries"]]
     )
-    assert "imbalanced-learn>=0.14.1,<1.0.0" in dependencies
-    assert "sklearn-compat==0.1.5" in dependencies
+    requirements_reference = "${workspace.file_path}/deployment/requirements.txt"
+    assert (
+        "-r " + requirements_reference if compute == "serverless" else requirements_reference
+    ) in dependencies
+    requirements = (project / "deployment/requirements.txt").read_text().splitlines()
+    assert "imbalanced-learn==0.14.1" in requirements
+    assert "sklearn-compat==0.1.5" in requirements
     training = yaml.safe_load((project / "resources/train.job.yml").read_text())["resources"][
         "jobs"
     ]["train"]
@@ -120,3 +129,21 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert registration["base_parameters"]["monitoring_drift_thresholds"] == (
         "${var.monitoring_drift_thresholds}"
     )
+    assert registration["base_parameters"]["monitoring_performance_policies"] == (
+        "${var.monitoring_performance_policies}"
+    )
+
+
+def test_source_templates_propagate_performance_mapping_to_every_monitoring_task():
+    """Every producer and retraining path must receive the same mapping as drift thresholds."""
+    project = Path(__file__).parents[3] / "templates/databricks/template/{{.project_name}}"
+    for name in ("score.job.yml.tmpl", "train.job.yml.tmpl"):
+        text = (project / "resources" / name).read_text()
+        assert text.count(
+            "monitoring_performance_policies: ${var.monitoring_performance_policies}"
+        ) == (text.count("monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}"))
+    targets = (project / "deployment/targets.yml.tmpl").read_text()
+    assert targets.count("monitoring_performance_policies: '{}'") == 3
+    variables = (project / "deployment/variables.yml.tmpl").read_text()
+    assert "  monitoring_performance_policies:" in variables
+    assert "    default: '{}'" in variables

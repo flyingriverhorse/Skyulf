@@ -597,3 +597,38 @@ def build_monitoring_report(
         "metrics": metrics,
         "notes": notes,
     }
+
+
+def build_performance_report(
+    predictions: pd.DataFrame | pl.DataFrame,
+    labels: pd.DataFrame | pl.DataFrame | None,
+    *,
+    record_key_columns: tuple[str, ...],
+    target_column: str,
+    result_available_at_column: str,
+    as_of: datetime,
+    task: str,
+    classes: tuple = (),
+) -> dict:
+    """Measure saved outcomes with the same class, eligibility and Core metric rules."""
+    _validate_inputs(as_of, task, classes, None)
+    predictions = _frame(predictions, "predictions")
+    labels = None if labels is None else _frame(labels, "labels")
+    prediction_rows = _keyed_rows(predictions, record_key_columns, "predictions")
+    scored, excluded = _scored_rows(prediction_rows)
+    _validate_saved_predictions(scored, task, classes)
+    probabilities = _probability_columns(predictions, classes, task, scored)
+    eligible = _eligible_labels(
+        labels, result_available_at_column, as_of, record_key_columns, target_column
+    )
+    metrics, labeled, notes, _ = _performance_evidence(
+        task, classes, target_column, scored, eligible, probabilities
+    )
+    return {
+        "values": {item["metric_name"]: item["value"] for item in metrics},
+        "scored_rows": len(scored),
+        "excluded_rows": excluded,
+        "labeled_rows": labeled,
+        "label_coverage": labeled / len(scored) if scored else None,
+        "notes": notes,
+    }

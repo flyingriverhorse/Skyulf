@@ -124,7 +124,14 @@ def ensure_owned_object(spark: Any, name: str) -> bool:
 def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     """Provision only the explicit central namespace, preserving foreign objects."""
     namespace = store_namespace(catalog, schema)
-    names = ("model_inventory", "monitoring_results", "current_health", "metric_history")
+    names = (
+        "model_inventory",
+        "monitoring_results",
+        "current_health",
+        "metric_history",
+        "performance_actions",
+        "performance_history",
+    )
     for name in names:
         ensure_owned_object(spark, f"{namespace}.{name}")
     for name, ddl in (("model_inventory", INVENTORY_SCHEMA), ("monitoring_results", RESULT_SCHEMA)):
@@ -145,6 +152,9 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
         spark.sql(
             f"ALTER TABLE {inventory} SET TBLPROPERTIES ('delta.isolationLevel' = 'Serializable')"
         )
+    from .performance_actions import initialize_performance_actions  # noqa: PLC0415
+
+    initialize_performance_actions(spark, namespace)
     for name, query in monitoring_views(namespace).items():
         spark.sql(
             f"CREATE OR REPLACE VIEW {table_name(namespace + '.' + name)} "
@@ -192,7 +202,13 @@ def monitoring_views(namespace: str) -> dict[str, str]:
                 value:DOUBLE,threshold:DOUBLE,has_issue:BOOLEAN,status:STRING>>'
         )) metrics AS m
     """
-    return {"current_health": current, "metric_history": metrics}
+    from .performance_actions import performance_history_query  # noqa: PLC0415
+
+    return {
+        "current_health": current,
+        "metric_history": metrics,
+        "performance_history": performance_history_query(namespace),
+    }
 
 
 def enroll_monitor(

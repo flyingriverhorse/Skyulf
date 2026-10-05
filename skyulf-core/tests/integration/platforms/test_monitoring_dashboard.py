@@ -93,6 +93,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
         field["name"] not in {"environment", "project"}
         for page in dashboard["pages"]
         for widget in _widgets(page)
+        if widget["name"] != "performance_policy_evidence"
         for query in widget.get("queries", [])
         for field in query["query"].get("fields", [])
     )
@@ -102,7 +103,7 @@ def test_history_keeps_metric_identity_and_units_separate() -> None:
     """Wide rows retain observation identity and charts never mix performance units."""
     dashboard = _dashboard()
     datasets = {item["name"]: item for item in dashboard["datasets"]}
-    for name in ("metric_history", "performance_history"):
+    for name in ("metric_history", "performance_measurements"):
         sql = "".join(datasets[name]["queryLines"])
         group = sql.split("GROUP BY", 1)[1]
         for field in ("monitor_id", "report_id", "model_version", "column_name"):
@@ -137,10 +138,10 @@ def test_history_keeps_metric_identity_and_units_separate() -> None:
         if w.get("spec", {}).get("widgetType") in {"bar", "line"}
     } == {"drift_psi", "drift_trend"}
     assert (
-        sum(w.get("spec", {}).get("widgetType") == "line" for w in _widgets(performance_page)) == 1
+        sum(w.get("spec", {}).get("widgetType") == "line" for w in _widgets(performance_page)) == 2
     )
     assert "drift_chart" not in datasets and "quality_chart" not in datasets
-    assert "outcome_summary" in "".join(datasets["performance_history"]["queryLines"])
+    assert "outcome_summary" in "".join(datasets["performance_measurements"]["queryLines"])
 
 
 def test_charts_keep_model_selection_and_latest_observation_consistent() -> None:
@@ -208,3 +209,70 @@ def test_bundle_has_one_serial_manual_writer_and_stable_dashboard() -> None:
     assert dashboards["monitoring_dashboard"]["dataset_catalog"] == "${var.monitoring_catalog}"
     assert dashboards["monitoring_dashboard"]["dataset_schema"] == "${var.monitoring_schema}"
     assert dashboards["monitoring_dashboard"]["warehouse_id"] == "${var.warehouse_id}"
+
+
+def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
+    """Policy status and threshold series must come from the saved policy evidence."""
+    dashboard = _dashboard()
+    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
+    page = next(page for page in dashboard["pages"] if page["name"] == "performance")
+    widgets = {widget["name"]: widget for widget in _widgets(page)}
+    assert "FROM performance_history" in datasets["performance_policy"]
+    assert "FROM performance_history" in datasets["performance_policy_series"]
+    assert "UNION ALL" in datasets["performance_policy_series"]
+    assert all(
+        name in datasets["performance_policy_series"]
+        for name in (
+            "current_value",
+            "baseline_value",
+            "threshold_value",
+            "metric = :policy_metric",
+            "model_name = :policy_model",
+            "model_version = :policy_version",
+        )
+    )
+    assert "FROM metric_history" in datasets["performance_measurements"]
+    table = widgets["performance_policy_evidence"]
+    assert table["spec"]["widgetType"] == "table"
+    assert table["queries"][0]["query"]["datasetName"] == "performance_policy"
+    columns = {column["fieldName"] for column in table["spec"]["encodings"]["columns"]}
+    assert {
+        "status",
+        "reason",
+        "report_id",
+        "model_name",
+        "model_version",
+        "metric",
+        "baseline_kind",
+        "baseline_reference",
+        "baseline_value",
+        "current_value",
+        "absolute_degradation",
+        "relative_degradation",
+        "tolerance",
+        "tolerance_mode",
+        "threshold_value",
+        "label_coverage",
+        "labeled_rows",
+        "window_start",
+        "window_end",
+        "consecutive_failures",
+        "required_windows",
+        "action",
+        "action_reason",
+        "request_id",
+        "run_id",
+    } <= columns
+    line = widgets["performance_policy_trend"]
+    assert line["spec"]["widgetType"] == "line"
+    assert line["spec"]["encodings"]["color"]["fieldName"] == "series"
+    assert line["queries"][0]["query"]["datasetName"] == "performance_policy_series"
+    for field in ("model_name", "model_version", "metric_name"):
+        control = widgets[f"filter_{field}_performance"]
+        assert any(
+            query["query"]["datasetName"] == "performance_policy" for query in control["queries"]
+        )
+    assert any(
+        query["query"]["datasetName"] == "performance_policy_series"
+        for query in widgets["filter_measured_at_performance"]["queries"]
+    )

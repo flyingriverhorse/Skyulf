@@ -30,13 +30,16 @@ variables:
     description: "disabled or retrain; request the existing train job after usable drift and new labeled training rows"
     default: "disabled"
   on_drift_cooldown_hours:
-    description: Minimum hours between automatic training requests for this train job
+    description: Minimum hours between drift or performance training requests for this train job
     default: "24"
   on_drift_min_new_training_rows:
-    description: Minimum new or changed labeled rows in the actual training partition
+    description: Minimum new or changed labeled training rows for either automatic trigger
     default: "1"
   monitoring_drift_thresholds:
     description: 'JSON overrides for psi, ks_statistic, wasserstein, kl_divergence; {} uses Core defaults'
+    default: '{}'
+  monitoring_performance_policies:
+    description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
     default: '{}'
   monitoring_enabled:
     description: Enroll activated models and measure drift after scoring; false pauses monitoring

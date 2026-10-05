@@ -1063,7 +1063,8 @@ Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
 monitoring tables. The `monitoring_allowed` condition excludes enrollment and the
 post-scoring monitoring/drift/retraining branch in `mode: development`; training
 and scoring still run normally, including automatic scoring after activation.
-Development targets also set `monitoring_enabled: "false"` and `on_drift: disabled`.
+Development targets also set `monitoring_enabled: "false"`,
+`monitoring_performance_policies: '{}'` and `on_drift: disabled`.
 The deployment-mode guard remains effective even if shared monitoring destinations
 or an enabled flag are inherited from common settings. Deploy both updated jobs
 with the updated Skyulf wheel for this behavior to apply to an existing project.
@@ -1079,6 +1080,7 @@ monitoring_catalog: operations
 monitoring_schema: model_monitoring
 monitoring_expected_interval_hours: "24"
 monitoring_drift_thresholds: '{"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}'
+monitoring_performance_policies: '{}'
 monitoring_experiment_name: /Shared/skyulf/monitoring # Optional MLflow evidence
 monitoring_dashboard_url: "https://<workspace-host>/dashboardsv3/<dashboard-id>/published"
 # Optional actual outcomes, possibly in another catalog:
@@ -1131,6 +1133,44 @@ physical prediction table. Model-set output mode must be `all` or `separate_view
 when monitoring storage is configured. `combined_only` is rejected before scoring
 because combined business outputs cannot measure each component's performance.
 
+### Optional performance policy
+
+`monitoring_performance_policies` is a JSON object keyed by the exact, fully
+qualified model name enrolled in monitoring. It defaults to `{}`. This example
+reports a drop in weighted F1 of at least 0.05 across three consecutive
+completed UTC windows for model version 2:
+
+```yaml
+monitoring_performance_policies: >-
+  {"models.risk.churn":{"mode":"report","metric":"f1_weighted",
+  "direction":"higher","baseline":{"kind":"training_holdout",
+  "model_version":"2"},"tolerance":0.05,"tolerance_mode":"absolute",
+  "window_hours":24,"label_delay_hours":6,"minimum_labeled_rows":20,
+  "minimum_label_coverage":0.8,"consecutive_windows":3}}
+monitoring_label_table: labels.production.outcomes
+monitoring_result_available_at_column: available_at
+```
+
+Set `mode` to `off`, `report` or `retrain` per model. `off` needs only
+`{"mode":"off"}`. An active policy requires every field shown above; there is
+no default metric, direction, baseline or tolerance. For a production reference,
+use `{"kind":"production_window","model_version":"2","report_id":"<64 hex characters>"}`
+as the baseline. Choose the report explicitly and keep its metric and eligible
+population contract aligned with the current observation. A new model version
+needs its own matching baseline; an old baseline is unavailable and cannot
+trigger training. For multi-target projects, name each component model separately.
+
+Windows are fixed UTC intervals of `window_hours`. `label_delay_hours` is the
+time after a window ends before its labels can be assessed; outcomes must also
+be available by the observation cutoff. For example, a 00:00–24:00 UTC window
+with a six-hour delay is first eligible at 06:00 UTC the next day. Minimum
+labeled rows and coverage apply to each completed window. Missing, immature,
+stale or insufficient outcomes are unavailable, not healthy or degraded.
+Repeated observations of the same window do not advance the failure streak.
+`tolerance_mode` can be `absolute` or `relative`; `direction` states whether
+higher or lower metric values are better. Performance reporting and retraining
+are independent of `on_drift`, which controls only distribution drift.
+
 ## Optional training after drift
 
 Set these deployment variables to request this repository's existing train job:
@@ -1140,6 +1180,12 @@ on_drift: "retrain" # Default: disabled
 on_drift_cooldown_hours: "24"
 on_drift_min_new_training_rows: "20"
 ```
+
+These cooldown and fresh labeled training-row controls are shared by drift and
+performance retraining requests. Set a model's performance policy to
+`mode: "retrain"` inside the JSON mapping to enable its performance trigger;
+`on_drift` remains an independent setting. Either trigger uses the same guarded
+train job request. Neither trigger bypasses model evaluation or approval.
 
 The visible chain is `score -> monitor_model -> drift_report -> check_retraining`
 followed by the `retraining_needed` If/else task. Its true branch runs

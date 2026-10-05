@@ -3,7 +3,7 @@
 from dataclasses import replace
 from typing import Any
 
-from .monitoring_config import parse_drift_thresholds
+from .monitoring_config import MonitorConfig, parse_drift_thresholds, parse_performance_policies
 from .monitoring_registration import build_monitor_enrollment_config, monitoring_destination
 from .monitoring_store import enroll_monitor
 
@@ -13,27 +13,33 @@ def validate_set_monitoring(values: dict, settings: dict) -> None:
     if monitoring_destination(values) is None:
         return
     parse_drift_thresholds(values.get("monitoring_drift_thresholds", "{}"))
+    parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
     if settings.get("publication", {}).get("mode") == "combined_only":
         raise ValueError("Model-set monitoring requires all or separate_views component outputs.")
 
 
-def register_set_monitors(
-    spark: Any,
+def _validate_component_policy_names(values: dict, components: list) -> None:
+    """Reject unknown component names before writing any enrollment record."""
+    policies = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    names = {component.reference.name for component in components}
+    if set(policies) - names:
+        raise ValueError("Performance policy names must match model-set components.")
+
+
+def validate_component_monitoring(
     workflow: dict,
     values: dict,
     settings: dict,
     resolved: Any,
     artifact: Any,
-    *,
-    activation_started_ms: int | None = None,
-) -> dict | None:
-    """Enroll saved component versions; never infer them from mutable component aliases."""
-    namespace = monitoring_destination(values)
-    if namespace is None:
-        return None
+) -> list[MonitorConfig]:
+    """Validate every saved component before scoring writes its prediction batch."""
+    if monitoring_destination(values) is None:
+        return []
     validate_set_monitoring(values, settings)
     if resolved.name != settings["model_name"]:
         raise ValueError("Monitored model set differs from the project's model set.")
+    _validate_component_policy_names(values, artifact.manifest.components)
     configs = []
     for component in artifact.manifest.components:
         reference = component.reference
@@ -51,6 +57,24 @@ def register_set_monitors(
         )
     if not configs or len({config.monitor_id for config in configs}) != len(configs):
         raise ValueError("Model-set monitoring requires distinct component model identities.")
+    return configs
+
+
+def register_set_monitors(
+    spark: Any,
+    workflow: dict,
+    values: dict,
+    settings: dict,
+    resolved: Any,
+    artifact: Any,
+    *,
+    activation_started_ms: int | None = None,
+) -> dict | None:
+    """Enroll saved component versions; never infer them from mutable component aliases."""
+    namespace = monitoring_destination(values)
+    if namespace is None:
+        return None
+    configs = validate_component_monitoring(workflow, values, settings, resolved, artifact)
     for config in configs:
         enroll_monitor(
             spark,

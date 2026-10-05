@@ -1,8 +1,10 @@
 """Independent model projects enroll their actual scoring target in central Delta."""
 
+import json
 from unittest.mock import Mock
 
 import pytest
+from test_monitoring_config import performance_policy
 
 
 @pytest.mark.parametrize("enabled", ["true", "false"])
@@ -117,6 +119,60 @@ def workflow(**changes):
         "max_input_mb": 4,
         **changes,
     }
+
+
+def test_enrollment_selects_only_exact_model_performance_policy():
+    """A policy for another model cannot activate performance on this one."""
+    from skyulf.integrations.databricks.monitoring_registration import (
+        build_monitor_enrollment_config,
+    )
+
+    policies = {
+        "models.risk.model": performance_policy(),
+        "models.risk.other": {"mode": "off"},
+    }
+    values = settings(
+        monitoring_label_table="labels.risk.actuals",
+        monitoring_result_available_at_column="available_at",
+        monitoring_performance_policies=json.dumps(policies),
+    )
+    selected = build_monitor_enrollment_config(workflow(), values, "2")
+    other = build_monitor_enrollment_config(
+        workflow(model_name="models.risk.third", training_layout="model_competition"), values, "2"
+    )
+    assert selected.performance_policy == performance_policy()
+    assert "performance_policy" not in other.payload()
+
+
+def test_scoring_preflight_rejects_invalid_policy_for_other_model():
+    """Malformed Bundle settings must fail before inference even for an unselected model."""
+    from skyulf.integrations.databricks.monitoring_registration import validate_monitoring_settings
+
+    values = settings(monitoring_performance_policies='{"models.risk.other": {"mode": "report"}}')
+    with pytest.raises(ValueError):
+        validate_monitoring_settings(values, workflow())
+
+
+def test_single_model_preflight_rejects_unmatched_policy_key():
+    """A mistyped model name must not silently leave the intended policy disabled."""
+    from skyulf.integrations.databricks.monitoring_registration import validate_monitoring_settings
+
+    values = settings(monitoring_performance_policies='{"models.risk.other": {"mode": "off"}}')
+    with pytest.raises(ValueError, match="model"):
+        validate_monitoring_settings(values, workflow(training_layout="single_model"))
+
+
+def test_single_model_preflight_rejects_extra_policy_key():
+    """A valid policy must not hide a second mistyped name in a one-model project."""
+    from skyulf.integrations.databricks.monitoring_registration import validate_monitoring_settings
+
+    values = settings(
+        monitoring_performance_policies=json.dumps(
+            {"models.risk.model": {"mode": "off"}, "models.risk.modle": {"mode": "off"}}
+        )
+    )
+    with pytest.raises(ValueError, match="model"):
+        validate_monitoring_settings(values, workflow(training_layout="single_model"))
 
 
 def test_registration_pins_scored_version_not_mutable_alias(monkeypatch):
