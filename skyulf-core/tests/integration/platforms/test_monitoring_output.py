@@ -6,6 +6,16 @@ from unittest.mock import Mock
 import pytest
 
 
+def test_queued_report_retains_independent_job_navigation():
+    """Scoring output must identify the separate monitoring run before metrics are ready."""
+    from skyulf.integrations.databricks.monitoring_output import render_monitor_output
+
+    html = render_monitor_output({"status": "queued", "job_id": 123, "run_id": 456})
+    assert "separate job" in html
+    assert "123" in html and "456" in html
+    assert "latest completed" in html
+
+
 def test_monitor_report_has_safe_dashboard_link_and_preserves_plain_text():
     """Notebook output must not turn registry names or configured URLs into active markup."""
     from skyulf.integrations.databricks.monitoring_output import render_monitor_output

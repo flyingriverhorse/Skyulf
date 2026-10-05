@@ -7,7 +7,8 @@ and model fitting run locally on the selected compute.
 ## Model competition for one target
 
 Choose `training_layout=model_competition` to compare named candidates for one
-target and select one winner. It uses the existing `train` and `score` jobs and
+target and select one winner. It uses the `train` and `score` jobs plus the
+independent `monitoring` job and
 single-model promotion controls. Each candidate has its own training task. Setup asks for the
 shared target/task, source, inputs, CV policy, final metric, quality threshold and
 lifecycle settings. Choose 2-8 candidates from task-specific model lists, then
@@ -96,7 +97,7 @@ during training.
 
 The initializer's `training_layout` defaults to `single_model`. Choose
 `multi_target` to use the same `train` job with one `train_<name>` task per model; the
-project still has exactly two jobs (`train` and `score`). Setup asks shared data,
+project also has a separate `monitoring` job. Setup asks shared data,
 output selection, compute and training schedule questions, then 2-8 branches.
 For each branch choose its name, target, features, task, model, recipes, split,
 CV, tuning and quality settings. Ensemble choices open that branch's base-model
@@ -314,19 +315,20 @@ The remaining lifecycle instructions below apply to `training_layout=single_mode
 | `src/modeling/model_competition.py` | Each competition candidate owns its model, tuning/search space and preprocessing recipe in `MODELS` |
 | `src/modeling/multi_model.py` | Each target owns its model, tuning/search space, recipes and validation/quality policy |
 | `src/modeling/model_set.py` | Whole-set release/promotion policy and scoring table/view destinations |
-| `src/jobs/` | Notebook entrypoints referenced by the two jobs |
+| `src/jobs/` | Notebook entrypoints referenced by the train, score and monitoring jobs |
 | `src/tools/preview.py` | Offline configuration preview and installed-node discovery |
 | `databricks.yml` | Bundle identity, source sync and included deployment/resource files |
 | `deployment/targets.yml` | Shared environments and optional personal development targets |
 | `deployment/variables.yml` | UC bindings, run identities, optional job ACLs, schedule and compute variables |
 | `resources/train.job.yml` | Training, comparison, approval/rollback and optional scoring handoff |
 | `resources/score.job.yml` | Batch scoring job and its independent schedule/compute |
+| `resources/monitoring.job.yml` | Independent serverless monitoring job, paused UTC schedule and retry limits |
 
-`databricks.yml` includes both job files through `resources/*.yml`. Keep the
+`databricks.yml` includes all three job files through `resources/*.yml`. Keep the
 resource keys `train` and `score` stable; the training handoff references
 `${resources.jobs.score.id}` across files. When updating an older generated
-project, replace `resources/workflow.jobs.yml` with these two files; do not
-leave all three present. The job definitions and resource keys stay the same.
+project, replace `resources/workflow.jobs.yml` with the three resource files;
+do not retain the legacy file alongside them.
 
 Training captures every Python file under `src/features/` in one versioned
 64 KiB snapshot. Relative imports keep custom modules available after MLflow
@@ -837,9 +839,9 @@ The jobs use serverless Python environment 4. Policy clusters are a separate
 initialization choice.
 {{end}}
 
-Deployment creates two jobs and uploads code/configuration; input tables are
-not created. Shared targets use the configured schedule status; personal targets
-start paused. Training and scoring clocks are independent.
+Deployment creates three jobs and uploads code/configuration; input tables are
+not created. Training and scoring clocks are independent. The separate
+monitoring schedule starts paused until references are prepared and verified.
 See [deployment and schedules][schedules] and [existing-project migration][migration].
 
 ## 3. Train, inspect and approve
@@ -1078,7 +1080,9 @@ Then set these independent variables in this project's deployment target:
 ```yaml
 monitoring_catalog: operations
 monitoring_schema: model_monitoring
+monitoring_execution_engine: spark # Default; local uses bounded inline monitoring
 monitoring_expected_interval_hours: "24"
+monitoring_revisit_windows: "3" # Completed performance windows, including latest
 monitoring_drift_thresholds: '{"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}'
 monitoring_performance_policies: '{}'
 monitoring_experiment_name: /Shared/skyulf/monitoring # Optional MLflow evidence
@@ -1108,17 +1112,40 @@ visible job failure; committed predictions remain intact.
 For all three layouts, `training_report -> register_monitor`
 enrolls the activated version from its verified lifecycle receipt, before
 `scoring_requested`. Pending or rejected candidates leave enrollment unchanged.
-The `score -> monitor_model -> drift_report` task chain automatically measures each new scoring
-commit; with CDF recovery, `monitor_model` follows `scoring_report`. No-op scoring skips completed observations and repairs missing/failed ones
-from the original saved commit. A measurement failure leaves committed predictions intact and
-fails its own task after saving the error. The central inventory-wide job remains
-available for periodic checks and delayed outcomes; configure its schedule and
-window separately. External alias edits do not trigger enrollment.
-`monitor_model` computes drift, data quality and eligible labeled performance;
-`drift_report` only reads the saved observation for that scoring batch and config.
-Both notebook outputs include an **Open monitoring dashboard** link when the
-shared HTTPS `monitoring_dashboard_url` is configured. The report task needs
-SELECT on the shared results table. A monitoring failure blocks the report task.
+With the default `monitoring_execution_engine: spark`, scoring publishes a
+receipt-bound request to the independent `monitoring` job and does not wait for
+metric computation. That third job has its own serverless environment, timeout,
+retry budget and UTC schedule. The schedule starts `PAUSED`; after preparing and
+verifying references, unpause it to revisit delayed outcomes even when no new
+predictions arrive. Its `monitor_model -> drift_report -> retrain_on_drift` tasks
+measure, display and apply the guarded training decision. A failed observation
+is saved as durable evidence and fails the monitoring task; committed predictions
+remain intact. A no-op scoring retry can repair an incomplete request for its
+original commit. External alias edits do not trigger enrollment.
+
+Set `monitoring_revisit_windows` to the number of completed performance windows
+to check for late labels, from 1 to 100; the default is `3` and includes the
+latest window. Earlier windows are revisited without starting training from
+historical observations. Scoring and scheduled observations use the same central
+inventory and result tables. `drift_report` reads the saved observation rather
+than recalculating it. Task output includes an **Open monitoring dashboard** link
+when the shared HTTPS `monitoring_dashboard_url` is configured. Databricks AI/BI
+displays the durable Skyulf tables; its native profiling is a separate product,
+not the source of these metrics.
+
+For the bounded `local` execution setting, the score job retains its inline
+monitoring tasks and local row/byte safety caps. Spark monitoring aggregates
+ongoing observations without the local one-million-row monitoring cap. Reference
+preparation replays the original training source once under the existing bounded
+training budget; training and scoring do not become distributed. A model trained
+before `monitoring_source_evidence.json` was saved needs retraining or verified
+original source proof before Spark reference preparation. The job does not
+silently reconstruct missing provenance.
+
+Spark freshness checks fail explicitly when a source needs unsupported fixed
+normalizers, custom pre-split filters or custom weight generators. Supported
+source weight columns remain subject to the training contract. Inspect that
+failure and use an explicit training run for unsupported recipes.
 Existing deployed projects must adopt the updated score job/notebooks/variables
 and install the updated wheel, then validate and redeploy; changing Skyulf's
 template files does not alter a previously deployed workspace job automatically.
@@ -1141,15 +1168,47 @@ reports a drop in weighted F1 of at least 0.05 across three consecutive
 completed UTC windows for model version 2:
 
 ```yaml
-monitoring_performance_policies: >-
-  {"models.risk.churn":{"mode":"report","metric":"f1_weighted",
-  "direction":"higher","baseline":{"kind":"training_holdout",
-  "model_version":"2"},"tolerance":0.05,"tolerance_mode":"absolute",
-  "window_hours":24,"label_delay_hours":6,"minimum_labeled_rows":20,
-  "minimum_label_coverage":0.8,"consecutive_windows":3}}
 monitoring_label_table: labels.production.outcomes
 monitoring_result_available_at_column: available_at
+monitoring_performance_policies: >-
+  {"models.risk.churn":{
+    "mode":"report",
+    "metric":"f1_weighted",
+    "direction":"higher",
+    "baseline":{"kind":"training_holdout","model_version":"2"},
+    "tolerance":0.05,
+    "tolerance_mode":"absolute",
+    "window_hours":24,
+    "label_delay_hours":6,
+    "minimum_labeled_rows":20,
+    "minimum_label_coverage":0.8,
+    "consecutive_windows":3}}
 ```
+
+Place these example values under `targets.<target>.variables` in the producer
+Bundle, alongside its monitoring destination. Replace the model and table names.
+The label table must contain the saved record keys, the model's target column
+and a UTC outcome availability timestamp. `available_at` is when the actual
+outcome became available, not when scoring ran.
+
+| Setting | Interpretation |
+| --- | --- |
+| `mode: report` | Save/display the decision without requesting training. |
+| `f1_weighted`, `higher` | Class-support-weighted F1; lower values are worse. This is unrelated to training sample weights. |
+| `training_holdout`, version `2` | Compare with the saved holdout for the same concrete model version. |
+| `0.05`, `absolute` | Baseline F1 0.84 fails at 0.79 or below; five percentage points, not five percent relative. |
+| `window_hours: 24` | Separate, completed UTC days. |
+| `label_delay_hours: 6` | Wait six hours after a day ends; this does not set the job schedule. |
+| `minimum_labeled_rows: 20` | At least 20 eligible prediction/actual-outcome pairs per window. |
+| `minimum_label_coverage: 0.8` | Those pairs must cover at least 80 percent of predictions in that window. Both minimums apply. |
+| `consecutive_windows: 3` | Three adjacent eligible failing windows make the trigger eligible. A single window may already show degradation. |
+
+Single projects monitor their active model; competitions monitor the activated
+winner. Model-sets use separate entries for each component, with that component's
+target, metric and baseline. The producer's label table must expose the required
+target columns. A request starts the configured project train job, not a new
+selective component-only training flow. Start with `report`; `retrain` still
+requires fresh eligible training data and the shared request guards below.
 
 Set `mode` to `off`, `report` or `retrain` per model. `off` needs only
 `{"mode":"off"}`. An active policy requires every field shown above; there is
@@ -1187,18 +1246,20 @@ performance retraining requests. Set a model's performance policy to
 `on_drift` remains an independent setting. Either trigger uses the same guarded
 train job request. Neither trigger bypasses model evaluation or approval.
 
-The visible chain is `score -> monitor_model -> drift_report -> check_retraining`
-followed by the `retraining_needed` If/else task. Its true branch runs
-`retrain_on_drift`; its false branch runs `retraining_skipped` with the saved reason.
+With the default Spark setting, the independent monitoring job runs
+`monitor_model -> drift_report -> retrain_on_drift` after a score request or on
+its unpaused schedule. The bounded local setting retains the score job's
+`score -> monitor_model -> drift_report -> check_retraining` chain, followed by
+the `retraining_needed` If/else task and its request/skip branches.
 The check reads the saved observation, checks the current enrolled version,
 and compares actual eligible training rows with the saved model's training data.
 Feature quality/schema problems, incomplete drift checks, stale observations,
 unchanged training data, active training and cooldown prevent a new request.
-The check does not claim a request or start training. The true branch repeats
-the checks before claiming and submitting, so a concurrent run or data change
-cannot bypass the guards between the two tasks.
+The checks do not claim a request until submission; the request path repeats
+them before claiming, so a concurrent run or data change cannot bypass guards.
 One request starts the complete single, competition or model-set train job.
-It does not wait inside the scoring job or alter quality/approval policy.
+Spark monitoring and scoring do not wait for that train run or alter its
+quality/approval policy.
 The trigger resolves the unique deployed `${bundle.name}_train` job name at run
 time, preserving the actual scoring job's development prefix and avoiding a
 Bundle dependency cycle with training's scoring handoff.
@@ -1254,8 +1315,9 @@ RUN on the train job, in addition to monitoring's read permissions. Keep train
 `max_concurrent_runs: 1`. Ambiguous API failures retain the pending claim; repair
 the same scoring task to retry the same idempotency token. An unresolved request
 blocks other automatic requests instead of guessing that submission failed.
-The central periodic monitoring job measures delayed labels but does not submit
-training; this trigger runs in the model repository's scoring job.
+The independent producer monitoring job revisits delayed labels and can submit
+guarded training requests. The central inventory-wide example is a separate
+reporting/measurement deployment.
 
 ## Offline checks
 

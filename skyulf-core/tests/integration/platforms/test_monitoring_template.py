@@ -7,6 +7,17 @@ import pytest
 import yaml
 
 
+def test_separate_spark_monitoring_template_exists():
+    """New projects need independent scheduled monitoring instead of inline score compute."""
+    root = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
+    job = (root / "resources/monitoring.job.yml.tmpl").read_text(encoding="utf-8")
+    assert "monitoring_task_timeout_seconds" in job
+    assert "monitoring_cron" in job
+    assert "monitoring_request" in job
+    assert "../src/jobs/monitor_project.py" in job
+    assert "../src/jobs/retrain_on_drift.py" in job
+
+
 @pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("recovery", ["false", "true"])
@@ -35,6 +46,15 @@ def test_generated_projects_bind_independent_monitoring_destination(
     assert variables["monitoring_drift_thresholds"]["default"] == "{}"
     assert variables["monitoring_performance_policies"]["default"] == "{}"
     assert variables["on_drift"]["default"] == "disabled"
+    monitoring_job = yaml.safe_load((project / "resources/monitoring.job.yml").read_text())[
+        "resources"
+    ]["jobs"]["monitoring"]
+    monitoring_task = next(
+        task for task in monitoring_job["tasks"] if task["task_key"] == "monitor_model"
+    )
+    monitoring_params = monitoring_task["notebook_task"]["base_parameters"]
+    assert monitoring_params["as_of_unix_ms"] == "{{job.start_time.timestamp_ms}}"
+    assert "as_of" not in monitoring_params
     job = yaml.safe_load((project / "resources/score.job.yml").read_text())["resources"]["jobs"][
         "score"
     ]
@@ -86,6 +106,9 @@ def test_generated_projects_bind_independent_monitoring_destination(
         "right": "production",
     }
     assert monitor["notebook_task"]["notebook_path"] == "../src/jobs/monitor_model.py"
+    assert monitor["notebook_task"]["base_parameters"]["monitoring_invocation_id"] == (
+        "{{job.run_id}}"
+    )
     assert (
         monitor["notebook_task"]["base_parameters"]["monitoring_dashboard_url"]
         == "${var.monitoring_dashboard_url}"

@@ -12,6 +12,7 @@ from .monitoring_sources import read_current_observation, read_labels
 from .performance_policy import (
     completed_performance_window,
     evaluate_performance,
+    selected_performance_window,
     validate_performance_policy,
 )
 
@@ -41,7 +42,12 @@ def _measure(
     predictions: Any, labels: Any, artifact: Any, spec: Any, config: MonitorConfig, as_of: datetime
 ) -> dict:
     """Call the shared saved-outcome evaluator without recomputing production predictions."""
-    return build_performance_report(
+    measure = build_performance_report
+    if config.execution_engine == "spark":
+        from .spark_monitoring_metrics import build_spark_performance_report  # noqa: PLC0415
+
+        measure = build_spark_performance_report
+    return measure(
         predictions,
         labels,
         record_key_columns=spec.record_key_columns,
@@ -67,6 +73,22 @@ def measure_holdout_baseline(
     artifact: Any, spec: Any, holdout: Any, config: MonitorConfig, version: str, run_id: str
 ) -> dict:
     """Replay verified holdout membership with the same fitted scoring and metric conventions."""
+    report = measure_holdout_values(artifact, spec, holdout)
+    policy = validate_performance_policy(config.performance_policy)
+    return {
+        "model_version": version,
+        "metric": policy["metric"],
+        "contract_digest": performance_contract(artifact, spec, config),
+        "value": report["values"].get(policy["metric"]),
+        "labeled_rows": report["labeled_rows"],
+        "label_coverage": report["label_coverage"],
+        "reference": f"runs:/{run_id}/training_filter_evidence.json",
+        "kind": "training_holdout",
+    }
+
+
+def measure_holdout_values(artifact: Any, spec: Any, holdout: Any) -> dict:
+    """Prepare all saved-holdout metrics once, independently of future policy settings."""
     features = holdout.loc[:, list(artifact.manifest.input_columns)].copy()
     predictions = score_local_pipeline(features, artifact).reset_index(drop=True)
     labels = holdout.loc[:, [spec.target_column]].reset_index(drop=True).copy()
@@ -79,28 +101,20 @@ def measure_holdout_baseline(
     labels[key] = range(len(holdout))
     # These are saved training outcomes, not fabricated production availability.
     cutoff = datetime(1970, 1, 1, tzinfo=UTC)
-    labels[str(config.result_available_at_column)] = cutoff
-    report = build_performance_report(
+    available = "__skyulf_holdout_available_at"
+    while available in labels.columns:
+        available += "_"
+    labels[available] = cutoff
+    return build_performance_report(
         predictions,
         labels,
         record_key_columns=(key,),
         target_column=spec.target_column,
-        result_available_at_column=str(config.result_available_at_column),
+        result_available_at_column=available,
         as_of=cutoff,
         task=artifact.manifest.task,
         classes=artifact.manifest.classes,
     )
-    policy = validate_performance_policy(config.performance_policy)
-    return {
-        "model_version": version,
-        "metric": policy["metric"],
-        "contract_digest": performance_contract(artifact, spec, config),
-        "value": report["values"].get(policy["metric"]),
-        "labeled_rows": report["labeled_rows"],
-        "label_coverage": report["label_coverage"],
-        "reference": f"runs:/{run_id}/training_filter_evidence.json",
-        "kind": "training_holdout",
-    }
 
 
 def load_performance_history(
@@ -152,14 +166,24 @@ def observe_performance(
     spec: Any,
     reference: dict,
     now: datetime,
+    *,
+    window_end: datetime | None = None,
 ) -> dict:
     """Retain an independent verdict and all snapshot evidence for one mature window."""
     policy = validate_performance_policy(config.performance_policy)
     if policy["mode"] == "off":
         return {"status": "disabled", "reason": "policy_off", "action": "none"}
-    start, end = completed_performance_window(now, policy)
+    start, end = selected_performance_window(now, policy, window_end)
     manifest = artifact.manifest
-    _, predictions, evidence, _ = read_current_observation(
+    observation_reader, label_reader = read_current_observation, read_labels
+    if config.execution_engine == "spark":
+        from .spark_monitoring_sources import (  # noqa: PLC0415
+            read_spark_labels,
+            read_spark_observation,
+        )
+
+        observation_reader, label_reader = read_spark_observation, read_spark_labels
+    _, predictions, evidence, _ = observation_reader(
         spark,
         config,
         reference["model_version"],
@@ -170,7 +194,7 @@ def observe_performance(
         start=start,
         end=end,
     )
-    labels, label_evidence = read_labels(
+    labels, label_evidence = label_reader(
         spark, config, spec.record_key_columns, spec.target_column, predictions, now
     )
     report = _measure(predictions, labels, artifact, spec, config, now)
@@ -195,7 +219,9 @@ def observe_performance(
         # production population; production baselines must retain their own IDs.
         baseline = baseline | {"contract_digest": current["contract_digest"]}
     history = load_performance_history(spark, namespace, config, end, policy["consecutive_windows"])
-    verdict = evaluate_performance(policy, current, baseline, history, now=now)
+    verdict = evaluate_performance(
+        policy, current, baseline, history, now=now, window_end=window_end
+    )
     return verdict | {
         "measurement": current,
         "model_version": reference["model_version"],
@@ -215,6 +241,8 @@ def observe_performance_safely(
     spec: Any,
     reference: dict,
     now: datetime,
+    *,
+    window_end: datetime | None = None,
 ) -> dict:
     """Keep independent drift evidence when a performance baseline or snapshot is unavailable."""
     policy = validate_performance_policy(config.performance_policy)
@@ -223,9 +251,15 @@ def observe_performance_safely(
     try:
         if namespace is None:
             raise ValueError("Performance policy requires a monitoring namespace.")
-        return observe_performance(spark, namespace, config, artifact, spec, reference, now)
+        return observe_performance(
+            spark, namespace, config, artifact, spec, reference, now, window_end=window_end
+        )
     except Exception as error:  # noqa: BLE001 - persist independent external-read failures
-        return unavailable_performance(config, now, str(error)[:500], reference["model_version"])
+        result = unavailable_performance(config, now, str(error)[:500], reference["model_version"])
+        if window_end is not None:
+            start, end = selected_performance_window(now, policy, window_end)
+            result.update(window_start=start.isoformat(), window_end=end.isoformat())
+        return result
 
 
 def unavailable_performance(

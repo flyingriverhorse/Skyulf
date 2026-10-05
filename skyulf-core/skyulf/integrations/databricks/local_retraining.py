@@ -1046,6 +1046,8 @@ def log_fitted_candidate(
     risk_category: str | None,
 ) -> None:
     """Persist fit evidence after SDK evaluation or before a durable stage boundary."""
+    from .monitoring_source_evidence import source_evidence  # noqa: PLC0415
+
     spec, artifact = fitted.spec, fitted.artifact
     frame, holdout = fitted.source_frame, fitted.evidence_holdout
     cv_results, evidence = fitted.cv_results, fitted.evidence
@@ -1124,6 +1126,11 @@ def log_fitted_candidate(
         "pre_split_filters.json",
     )
     run.client.log_dict(run.run_id, evidence, "training_filter_evidence.json")
+    run.client.log_dict(
+        run.run_id,
+        source_evidence(frame, spec.source_columns, spec.dataset_id),
+        "monitoring_source_evidence.json",
+    )
     if spec.training_sample_rows is not None:
         run.client.log_dict(
             run.run_id,

@@ -29,6 +29,17 @@ def _dashboard_link(url: str) -> str:
 
 def render_monitor_output(result: dict, dashboard_url: str = "") -> str:
     """Show execution status and navigation without treating drift as a task failure."""
+    if result.get("status") == "queued":
+        return (
+            "<h2>Model monitoring queued</h2>"
+            "<p>Monitoring runs in a separate job. Open that job's drift_report task "
+            "for these results. The dashboard shows the latest completed calculations.</p>"
+            + output_table(
+                ("Monitoring job", "Monitoring run"),
+                [(result.get("job_id", ""), result.get("run_id", ""))],
+            )
+            + _dashboard_link(dashboard_url)
+        )
     rows = [(r.get("model_name", ""), r["status"]) for r in result.get("results", [])]
     summary = (
         output_table(("Model", "Monitoring result"), rows)
@@ -226,11 +237,12 @@ def run_drift_report_notebook(
         "ready",
         "disabled",
         "no_new_predictions",
+        "queued",
     }:
         raise ValueError("Drift report requires a completed monitoring task reference.")
     url = dbutils.widgets.getAll().get("monitoring_dashboard_url", "")
     if reference["status"] != "ready":
-        result = {"status": reference["status"]}
+        result = dict(reference)
         html = render_monitor_output(result, url)
     else:
         rows = [

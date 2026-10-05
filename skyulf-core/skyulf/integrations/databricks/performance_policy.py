@@ -216,9 +216,25 @@ def _production_reference(current: dict, baseline: dict, policy: dict) -> None:
         raise ValueError("baseline.as_of must follow baseline window and precede current.as_of.")
 
 
-def _current_window(current: dict, policy: dict, now: datetime) -> tuple[datetime, datetime]:
-    """Require the current complete window and fresh label cutoff."""
+def selected_performance_window(
+    now: datetime, policy: dict, window_end: datetime | None = None
+) -> tuple[datetime, datetime]:
+    """Permit explicit aligned completed backfills without relaxing current-window guards."""
     start, end = completed_performance_window(now, policy)
+    if window_end is None:
+        return start, end
+    selected = _utc(window_end, "window_end")
+    span = end - start
+    if selected > end or (end - selected) % span != timedelta(0):
+        raise ValueError("Historical window_end must be aligned and completed.")
+    return selected - span, selected
+
+
+def _current_window(
+    current: dict, policy: dict, now: datetime, window_end: datetime | None = None
+) -> tuple[datetime, datetime]:
+    """Require the current complete window and fresh label cutoff."""
+    start, end = selected_performance_window(now, policy, window_end)
     if _timestamp(current.get("window_start"), "current.window_start") != start:
         raise ValueError("current.window_start is not the completed window.")
     if _timestamp(current.get("window_end"), "current.window_end") != end:
@@ -416,6 +432,7 @@ def evaluate_performance(
     history: list[dict],
     *,
     now: datetime,
+    window_end: datetime | None = None,
 ) -> dict:
     """Decide degradation and eligibility from comparable, completed evidence."""
     setting = validate_performance_policy(policy)
@@ -424,12 +441,12 @@ def evaluate_performance(
     result = _empty_result(setting, current, digest)
     if setting["mode"] == "off":
         return result
-    start, end = completed_performance_window(now_utc, setting)
+    start, end = selected_performance_window(now_utc, setting, window_end)
     result.update(_window_identity(start, end))
     if not isinstance(current, dict) or not isinstance(baseline, dict):
         return result
     try:
-        _current_window(current, setting, now_utc)
+        _current_window(current, setting, now_utc, window_end)
         _comparable(current, baseline, setting)
     except ValueError as exc:
         result["reason"] = str(exc)
@@ -446,4 +463,7 @@ def evaluate_performance(
         result["reason"] = "within_tolerance"
         result["evaluated_windows"] = [_window_identity(start, end)]
         return result
-    return _degraded_result(result, setting, history, start, end)
+    verdict = _degraded_result(result, setting, history, start, end)
+    if end < completed_performance_window(now_utc, setting)[1]:
+        verdict.update(action="none", reason="historical_window")
+    return verdict

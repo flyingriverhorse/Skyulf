@@ -73,6 +73,7 @@ def _valid_statistical_evidence(row: dict, family_size: int) -> bool:
         return False
     tests = {
         "ks_2samp",
+        "ks_dkw_union_bound",
         "fisher_exact",
         "fisher_category_bonferroni",
         "chi_square",

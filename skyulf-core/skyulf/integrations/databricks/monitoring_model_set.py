@@ -83,6 +83,21 @@ def register_set_monitors(
             preserve_activation=activation_started_ms is None,
             activation_started_ms=activation_started_ms,
         )
+        if (
+            activation_started_ms is not None
+            and config.execution_engine == "spark"
+            and config.enabled
+        ):
+            from .spark_monitoring_reference import (  # noqa: PLC0415
+                prepare_spark_monitoring_reference,
+            )
+
+            prepare_spark_monitoring_reference(
+                spark,
+                config,
+                tracking_uri=workflow.get("tracking_uri", "databricks"),
+                registry_uri=workflow.get("registry_uri", "databricks-uc"),
+            )
     return {
         "inventory_table": f"{namespace}.model_inventory",
         "configs": [config.payload() for config in configs],

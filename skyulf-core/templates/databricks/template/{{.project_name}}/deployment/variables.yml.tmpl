@@ -41,6 +41,27 @@ variables:
   monitoring_performance_policies:
     description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
     default: '{}'
+  monitoring_execution_engine:
+    description: 'spark uses the separate monitoring job; local retains bounded inline monitoring'
+    default: "spark"
+  monitoring_task_timeout_seconds:
+    description: Independent Spark monitoring task timeout
+    default: 3600
+  monitoring_timeout_seconds:
+    description: Independent Spark monitoring job timeout
+    default: 7200
+  monitoring_max_retries:
+    description: Independent monitoring task retries
+    default: 1
+  monitoring_cron:
+    description: UTC monitoring schedule, including late labels without new predictions
+    default: "0 0 * * * ?"
+  monitoring_revisit_windows:
+    description: Completed performance windows to revisit for late labels, including latest; 1 to 100
+    default: "3"
+  monitoring_pause_status:
+    description: Explicitly unpause after reference preparation and verification
+    default: "PAUSED"
   monitoring_enabled:
     description: Enroll activated models and measure drift after scoring; false pauses monitoring
     default: "true"

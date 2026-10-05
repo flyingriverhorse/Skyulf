@@ -67,13 +67,60 @@ the policy below reports a weighted F1 drop of at least 0.05 across three distin
 completed windows for version 2:
 
 ```yaml
+monitoring_label_table: labels.production.outcomes
+monitoring_result_available_at_column: available_at
 monitoring_performance_policies: >-
-  {"models.risk.churn":{"mode":"report","metric":"f1_weighted",
-  "direction":"higher","baseline":{"kind":"training_holdout",
-  "model_version":"2"},"tolerance":0.05,"tolerance_mode":"absolute",
-  "window_hours":24,"label_delay_hours":6,"minimum_labeled_rows":20,
-  "minimum_label_coverage":0.8,"consecutive_windows":3}}
+  {"models.risk.churn":{
+    "mode":"report",
+    "metric":"f1_weighted",
+    "direction":"higher",
+    "baseline":{"kind":"training_holdout","model_version":"2"},
+    "tolerance":0.05,
+    "tolerance_mode":"absolute",
+    "window_hours":24,
+    "label_delay_hours":6,
+    "minimum_labeled_rows":20,
+    "minimum_label_coverage":0.8,
+    "consecutive_windows":3}}
 ```
+
+These are example values, not production defaults. Put them under the producer
+Bundle's `targets.<target>.variables`, alongside the monitoring destination.
+Replace the model and label table names with your own fully qualified names.
+The label table must expose the saved record keys, the model's target column
+and the UTC timestamp when the actual outcome became available. `available_at`
+is outcome availability, not the prediction time or the job execution time.
+
+| Setting | Meaning in this example |
+| --- | --- |
+| `monitoring_label_table` | Actual outcomes joined to original predictions by stable record keys. Predictions are never used as actual outcomes. |
+| `monitoring_result_available_at_column` | Outcome availability timestamp used to exclude labels unavailable at the observation cutoff. |
+| `models.risk.churn` | Exact enrolled model name; a component model name for a model-set. |
+| `mode: report` | Persist and display the performance decision without requesting training. |
+| `metric: f1_weighted` | Class-support-weighted F1 over eligible prediction/label pairs; this does not enable training sample weights. |
+| `direction: higher` | A decrease is worse. Regression MAE uses `lower`, where an increase is worse. |
+| `baseline` | Saved training holdout for concrete model version `2`; production-window references are also supported. |
+| `tolerance: 0.05`, `absolute` | A baseline of 0.84 is degraded at 0.79 or below: five percentage points, not a five-percent relative drop. |
+| `window_hours: 24` | Measure each completed, fixed UTC day independently. |
+| `label_delay_hours: 6` | Wait six hours after the window ends before assessing it. This is independent of the job schedule. |
+| `minimum_labeled_rows: 20` | Require at least 20 eligible labeled predictions in that window. |
+| `minimum_label_coverage: 0.8` | Require eligible labels for at least 80 percent of the window's prediction population; both minimums must pass. |
+| `consecutive_windows: 3` | Require three adjacent eligible failing windows for trigger eligibility; replaying one window does not count again. |
+
+An individual window can already be reported as degraded before the required
+streak is reached. `report` never requests training, even after three failures.
+With `retrain`, reaching the streak only makes the performance trigger eligible;
+fresh training data, cooldown, active-run and duplicate-request guards still apply.
+
+| Project layout | Policy scope |
+| --- | --- |
+| Single | One policy for the active concrete model version. |
+| Competition | Policy for the activated winner; losing candidates are not production monitors. |
+| Model-set / multi-target | A separate mapping entry and matching baseline for each component model; each keeps its own target, metric and version. |
+
+The producer's label table must contain the target columns needed by its enrolled
+components. A retraining request runs the configured project train job; it does
+not introduce selective retraining of just one model-set branch.
 
 Use `mode: "retrain"` in the JSON policy to request guarded automatic training,
 or `{"mode":"off"}` for an explicitly disabled model. An active policy needs
@@ -141,7 +188,60 @@ scoring when monitoring storage is configured. No JSON model list is required.
 
 ## Measurement and operation
 
-The central notebook reads a bounded inventory snapshot, default maximum 10,000
+### Spark execution in generated projects
+
+Generated producer Bundles default to `monitoring_execution_engine: spark`.
+Scoring publishes a receipt-bound request to the independent third `monitoring`
+job without waiting for metrics. The job uses its own serverless environment,
+timeout and retry settings, and a UTC schedule that starts `PAUSED`. Prepare and
+verify references before unpausing it. The scheduled run observes enrolled models
+and delayed labels even if no new scoring batch arrives. Its tasks run
+`monitor_model -> drift_report -> retrain_on_drift`; a guarded policy may submit
+the producer's complete train job.
+
+`monitoring_revisit_windows` controls how many completed performance windows are
+checked for late labels. It defaults to `3`, includes the latest window, and
+accepts 1 to 100. Historical windows can update saved evidence, but do not
+independently submit training. Spark joins saved predictions, pinned feature
+snapshots and eligible actual outcomes, then writes durable Delta observations.
+Ongoing Spark measurements do not use the local one-million-row monitoring cap.
+
+Spark computes regression and confusion-matrix metrics from full-population
+aggregates, and probability AUC/AP from exact tied-score counts. Numeric drift
+uses exact empirical-CDF KS/Wasserstein effects and reference percentile bins;
+rows are not sampled. Ordered CDF and probability curves use an ordered Spark
+window over distinct values, which can concentrate work on one executor for
+high-cardinality features. Removing the local row cap does not remove compute,
+shuffle or executor-memory requirements.
+
+Statistical evidence is bounded separately: KS uses the exact lattice calculation
+when the two population sizes multiply to at most 1,000,000, the Core asymptotic
+method when either size exceeds 10,000, and explicitly named
+`ks_dkw_union_bound` evidence in the remaining range. An inconclusive bound is
+unavailable rather than evidence of no drift. Categorical summaries allow at
+most 1,024 current categories and use Core's 50-category reference limit;
+classification allows at most 256 saved classes. Temporal/nested feature drift
+and unsupported cardinalities are explicit failures or unavailable checks.
+These limits bound summaries and supported algorithms, not observation rows.
+
+Reference preparation is a separate, one-time activation or explicit migration
+step. It replays the original training source under the existing bounded training
+row and byte budget, validates the original split and writes pinned reference
+populations. Models without `monitoring_source_evidence.json` need retraining or
+verified original source proof; the job never silently reconstructs provenance.
+Spark freshness checks fail explicitly for unsupported fixed normalizers, custom
+pre-split filters and custom weight generators. Supported source weight columns
+still obey the training contract. Neither training nor scoring becomes Spark
+distributed through this monitoring setting.
+
+Databricks AI/BI presents the durable Skyulf inventory and result tables. It is
+not a second metric calculator. Databricks native profiling and its generated
+dashboard are separate from these Skyulf observations; see
+[Databricks dashboards](https://docs.databricks.com/aws/en/dashboards/).
+
+### Bounded local execution
+
+The central example notebook reads a bounded inventory snapshot, default maximum 10,000
 entries. It calls run_monitoring without a model list. The SDK can also enroll
 explicit records in memory; it does not require a configuration file.
 
@@ -158,7 +258,8 @@ also enable log-loss, ROC-AUC and PR-AUC variants. Regression includes MAE, MSE,
 RMSE, R2, MAPE and explained variance. The job installs Core's optional G-score
 dependency and compatibility pin. Feature drift uses Core DriftCalculator.
 
-Generated score jobs run a visible `monitor_model` task after successful scoring
+When a producer selects `monitoring_execution_engine: local`, its score job runs
+a visible `monitor_model` task after successful scoring
 (or after the successful recovery/report branch). It measures only the saved model
 version and exact scoring commit, writes to the shared results table, and fails
 visibly after persisting a measurement error. A retry reuses that commit and does
@@ -166,7 +267,7 @@ not re-enroll an older configuration. No-op scoring retains an existing successf
 no successful measurement yet, it completes that missing observation instead.
 An exact successful monitor-task repair is also skipped, preserving its evidence. Drift itself is an observed result, not a task failure.
 
-Generated score jobs expose `score -> monitor_model -> drift_report` (with the
+In this local setting, generated score jobs expose `score -> monitor_model -> drift_report` (with the
 existing recovery/report branch before monitoring when enabled). `monitor_model`
 calculates drift, quality and available performance; `drift_report` displays the
 saved batch's feature values and limits without repeating those calculations.
@@ -175,7 +276,7 @@ model repositories use the same shared dashboard URL. Existing deployed projects
 need updated producer templates/notebooks and the wheel followed by redeployment.
 
 The central inventory-wide example remains manual; schedule it with a suitable
-observation window for delayed label arrival and periodic checks. Refreshing the dashboard does not compute
+observation window if using this bounded runner. Refreshing the dashboard does not compute
 new metrics. Each model failure is saved, other models are attempted, and the
 notebook then fails if any model failed. Inspect reports before retrying.
 
@@ -273,8 +374,9 @@ In this example, databricks.yml selects central storage and compute;
 resources/monitoring.job.yml defines the runner and dependencies;
 src/monitoring_notebook.py calls the library; resources/monitoring.dashboard.yml
 binds storage; src/monitoring.lvdash.json defines SQL, filters and three pages.
-Generated model deployment variables and score tasks pass independent monitoring
-settings. Their README documents default-enabled registration and pause behavior.
+Generated producer deployment variables and the separate monitoring job pass
+independent monitoring settings. The producer README documents Spark-default
+dispatch, the paused schedule and reference preparation.
 
 The test_monitoring_config/reference/sources/metrics/store/job/registration/dashboard
 files cover the corresponding library contracts. test_monitoring_template runs

@@ -34,7 +34,21 @@ def observe_model(
     """Compare one pinned model and scored population, preserving missing-label semantics."""
     from .monitoring_metrics import build_monitoring_report  # noqa: PLC0415 - separate computation
 
-    artifact, spec, reference, evidence = load_monitoring_reference(
+    report_builder = build_monitoring_report
+    loader = load_monitoring_reference
+    observation_reader, label_reader = read_current_observation, read_labels
+    if config.execution_engine == "spark":
+        from .spark_monitoring_metrics import build_spark_monitoring_report  # noqa: PLC0415
+        from .spark_monitoring_reference import load_spark_monitoring_reference  # noqa: PLC0415
+        from .spark_monitoring_sources import (  # noqa: PLC0415
+            read_spark_labels,
+            read_spark_observation,
+        )
+
+        loader = load_spark_monitoring_reference
+        observation_reader, label_reader = read_spark_observation, read_spark_labels
+        report_builder = build_spark_monitoring_report
+    artifact, spec, reference, evidence = loader(
         spark,
         config,
         tracking_uri=tracking_uri,
@@ -57,7 +71,7 @@ def observe_model(
     manifest = artifact.manifest
     version = evidence["model_version"]
     probabilities = len(manifest.classes) if manifest.classification_probabilities else 0
-    current, predictions, observed_evidence, observed_at = read_current_observation(
+    current, predictions, observed_evidence, observed_at = observation_reader(
         spark,
         config,
         version,
@@ -68,7 +82,7 @@ def observe_model(
         start=window_start,
         end=window_end,
     )
-    labels, label_evidence = read_labels(
+    labels, label_evidence = label_reader(
         spark,
         config,
         spec.record_key_columns,
@@ -77,7 +91,7 @@ def observe_model(
         as_of,
     )
     evidence |= observed_evidence | label_evidence | {"as_of": as_of.isoformat()}
-    report = build_monitoring_report(
+    report = report_builder(
         reference,
         current,
         predictions,

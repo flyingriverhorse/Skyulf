@@ -526,11 +526,12 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
-### SM-23d — Distributed monitoring (LATER, user approved 2026-10-04)
+### SM-23d — Distributed monitoring (DELIVERED, 2026-10-05)
 
-Training/scoring capacity and monitoring capacity are separate budgets. Batch15
-addresses producer enrollment within today's bounded monitoring implementation;
-it does not implement distributed monitoring.
+Training/scoring capacity and monitoring capacity remain separate budgets.
+The new Spark path removes the local observation cap without changing training
+budgets. Existing configurations retain their local behavior; new generated
+projects default to a separate serverless monitoring job.
 
 - Evaluate quality, drift and delayed-label metrics on Spark without collecting
   the complete observation into driver memory. Keep local pandas/Polars support.
@@ -545,9 +546,46 @@ it does not implement distributed monitoring.
   limits, and record memory/runtime evidence. Do not silently truncate input or
   raise the local safety caps to call the task complete.
 
-Status: **LATER — scope recorded, design and implementation pending**. Dependencies:
-SM-23a monitoring contracts and the current review's d10-6 capacity separation.
-This is a future task, not an additional closure in the 138-item defect audit.
+Status: **DELIVERED — implementation, focused local and isolated cloud acceptance**.
+[Implementation and evidence159](159-sm23d-spark-monitoring-plan.md): 1,100,000-row
+regression/classification measurements, prepared references, unchanged/new-data
+guards, actual independent three-task job, real training request/replay dedup and
+native AI/BI SQL/publication. All 12 generated variants passed strict validation.
+The scale deployment is single-model; model-set/competition contract coverage
+does not claim a new live deployment for every variant. Inherited SM-37/43b
+production gates remain separate. This is not another closure in the old defect audit.
+
+Design implemented 2026-10-05:
+the user prefers computing monitoring directly on Spark from the outset.
+The primary path is **Spark calculation -> Delta evidence -> Databricks
+AI/BI dashboard + existing Skyulf policy/retraining guards**. Native InferenceLog
+is not a required parallel calculator. A native profiling-generated dashboard
+remains a separate optional integration; the AI/BI dashboard can read Skyulf's
+metric tables directly.
+
+- Run monitoring as a separate job with independent compute/schedule/retry
+  budgets. Scoring publishes durable receipts; late-label changes also cause
+  affected windows to be revisited without requiring new predictions.
+- Preserve original prediction/source snapshots, physical table identity, stable
+  keys, model/component version, label availability and duplicate rejection in
+  distributed joins. Only bounded aggregate evidence reaches the driver.
+- Prepare version-bound baseline evidence without repeating full local holdout
+  replay each observation. Move fresh-training-data eligibility checks to Spark
+  as well; otherwise retraining decisions would retain the local bottleneck.
+- Establish exact regression and confusion-matrix classification parity first;
+  specify drift algorithms and any approximation before enabling their decisions.
+  No silent fallback to bounded local data or silent dropping of unsupported metrics.
+- Retain single-model, activated competition-winner and per-component model-set
+  semantics. Shared request deduplication and evaluation/approval gates remain.
+- Validate beyond one million rows on Databricks, including late labels,
+  replay/failure recovery, baseline/version changes, metric parity and measured
+  memory/runtime. Training/scoring engine capacity is a separate workstream.
+
+The current usable policy example and field explanations are in the
+[monitoring guide](../../skyulf-core/examples/databricks_monitoring/README.md#enable-each-independent-model-repository)
+and the generated producer README. The guide documents exact/bounded statistical
+methods, unsupported types/recipes, explicit reference preparation for legacy
+models, a paused-by-default independent schedule and the late-label revisit horizon.
 
 ### SM-23c performance policy acceptance - clarified 2026-10-04
 

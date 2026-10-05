@@ -195,6 +195,10 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
     Null and unavailable targets follow the existing training eligibility policy;
     invalid training inputs fail rather than silently changing that policy.
     """
+    if monitor.execution_engine == "spark":
+        from .spark_retraining_data import assess_spark_training_data  # noqa: PLC0415
+
+        return assess_spark_training_data(spark, monitor, workflow, now)
     if workflow.get("training_version") is not None:
         raise ValueError(
             "On-drift retraining requires training_version=null for the latest snapshot."

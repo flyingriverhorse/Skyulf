@@ -41,6 +41,8 @@ def build_monitor_enrollment_config(
 ) -> MonitorConfig:
     """Use resolved producer names and the physical generation of the selected version."""
     policies = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    execution = values.get("monitoring_execution_engine", "local")
+    budget = {"max_rows": 10000, "max_input_mb": 64} if execution == "spark" else workflow
     return MonitorConfig(
         environment=values.get("monitoring_environment", ""),
         project=values.get("monitoring_project", ""),
@@ -51,14 +53,22 @@ def build_monitor_enrollment_config(
         label_table=values.get("monitoring_label_table") or None,
         result_available_at_column=values.get("monitoring_result_available_at_column") or None,
         expected_interval_hours=float(values.get("monitoring_expected_interval_hours", "24")),
-        max_rows=_monitor_budget(workflow.get("max_rows", 10000), MAX_MONITOR_ROWS),
+        max_rows=_monitor_budget(budget.get("max_rows", 10000), MAX_MONITOR_ROWS),
         max_bytes=_monitor_budget(
-            workflow.get("max_bytes", input_budget_bytes(workflow.get("max_input_mb", 64))),
+            budget.get("max_bytes", input_budget_bytes(budget.get("max_input_mb", 64))),
             MAX_MONITOR_BYTES,
         ),
         enabled=values.get("monitoring_enabled", "true") == "true",
         thresholds=parse_drift_thresholds(values.get("monitoring_drift_thresholds", "{}")),
         performance_policy=policies.get(workflow["model_name"]),
+        execution_engine=execution,
+        reference_namespace=(
+            store_namespace(
+                values.get("monitoring_catalog", ""), values.get("monitoring_schema", "")
+            )
+            if execution == "spark"
+            else None
+        ),
     )
 
 
@@ -118,6 +128,15 @@ def register_deployed_monitor(
         raise ValueError("Activated model differs from the frozen workflow.")
     config = build_monitor_enrollment_config(workflow, values, receipt["new_version"])
     enroll_monitor(spark, namespace, config, activation_started_ms=activation_started_ms)
+    if config.execution_engine == "spark" and config.enabled:
+        from .spark_monitoring_reference import prepare_spark_monitoring_reference  # noqa: PLC0415
+
+        prepare_spark_monitoring_reference(
+            spark,
+            config,
+            tracking_uri=workflow.get("tracking_uri", "databricks"),
+            registry_uri=workflow.get("registry_uri", "databricks-uc"),
+        )
     return {"monitor_id": config.monitor_id, "inventory_table": f"{namespace}.model_inventory"}
 
 

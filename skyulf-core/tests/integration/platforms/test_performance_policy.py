@@ -66,6 +66,23 @@ def baseline(**changes):
     return value
 
 
+def test_historical_window_revisit_updates_evidence_without_authorizing_training():
+    """Late labels can repair an older streak window without starting stale training."""
+    end = datetime(2026, 10, 5, 10, tzinfo=UTC)
+    saved = current(window_start="2026-10-05T09:00:00Z", window_end=end.isoformat())
+    result = evaluate_performance(
+        policy(consecutive_windows=1), saved, baseline(), [], now=NOW, window_end=end
+    )
+    assert result["status"] == "degraded"
+    assert result["action"] == "none"
+    assert result["reason"] == "historical_window"
+    assert result["window_end"] == end.isoformat()
+    with pytest.raises(ValueError, match="aligned"):
+        evaluate_performance(
+            policy(), saved, baseline(), [], now=NOW, window_end=end.replace(minute=30)
+        )
+
+
 def test_off_defaults_and_active_policy_does_not_mutate_input():
     """Enrollment stays disabled unless every active choice is explicit."""
     assert validate_performance_policy(None) == {"mode": "off"}

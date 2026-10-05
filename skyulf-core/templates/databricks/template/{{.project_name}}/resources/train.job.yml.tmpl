@@ -64,6 +64,8 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -213,6 +215,8 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}

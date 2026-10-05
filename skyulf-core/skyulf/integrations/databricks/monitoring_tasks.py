@@ -111,16 +111,39 @@ def _run_scoring_monitor(spark: Any, dbutils: Any) -> dict:
     if namespace != request["namespace"] or not configs:
         raise ValueError("Monitoring destination or model differs from the scoring request.")
     _validate_requested_models(configs, workflow, values)
-    if (
-        request["noop"]
-        and not request.get("has_saved_batch", False)
-        and not any(_performance_enabled(config) for config in configs)
-    ):
+    handoff = _spark_handoff(dbutils, configs, request, values)
+    if handoff is not None:
+        return handoff
+    if _empty_scoring_request(request, configs):
         dbutils.jobs.taskValues.set(
             key="monitoring_reference", value={"status": "no_new_predictions"}
         )
         return {"status": "no_new_predictions"}
     return _observe_configs(spark, dbutils, namespace, configs, request, workflow, values)
+
+
+def _empty_scoring_request(request: dict, configs: list[MonitorConfig]) -> bool:
+    """Skip a no-op only when neither saved predictions nor delayed outcomes need observation."""
+    return (
+        request["noop"]
+        and not request.get("has_saved_batch", False)
+        and not any(_performance_enabled(config) for config in configs)
+    )
+
+
+def _spark_handoff(
+    dbutils: Any, configs: list[MonitorConfig], request: dict, values: dict
+) -> dict | None:
+    """Dispatch homogeneous Spark requests and leave local observation inline."""
+    if not any(config.execution_engine == "spark" for config in configs):
+        return None
+    from .spark_monitoring_job import dispatch_monitoring_job  # noqa: PLC0415
+
+    if not all(config.execution_engine == "spark" for config in configs):
+        raise ValueError("A monitoring request cannot mix local and Spark execution.")
+    result = dispatch_monitoring_job(request, values)
+    dbutils.jobs.taskValues.set(key="monitoring_reference", value=result)
+    return result
 
 
 def _observe_configs(

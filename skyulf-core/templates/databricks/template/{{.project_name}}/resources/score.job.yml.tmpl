@@ -47,6 +47,8 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -95,6 +97,8 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -137,6 +141,8 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -177,6 +183,7 @@ resources:
           notebook_task:
             notebook_path: ../src/jobs/monitor_model.py
             base_parameters:
+              monitoring_invocation_id: '{{"{{job.run_id}}"}}'
               workflow_contract: "3"
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
@@ -190,6 +197,8 @@ resources:
               monitoring_experiment_name: ${var.monitoring_experiment_name}
               monitoring_dashboard_url: ${var.monitoring_dashboard_url}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -260,6 +269,8 @@ resources:
               monitoring_experiment_name: ${var.monitoring_experiment_name}
               monitoring_dashboard_url: ${var.monitoring_dashboard_url}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
@@ -316,6 +327,8 @@ resources:
               monitoring_experiment_name: ${var.monitoring_experiment_name}
               monitoring_dashboard_url: ${var.monitoring_dashboard_url}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: ${var.monitoring_execution_engine}
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
               monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}

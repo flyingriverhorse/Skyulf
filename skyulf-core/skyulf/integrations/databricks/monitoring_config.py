@@ -58,6 +58,8 @@ class MonitorConfig:
     model_set_version: str | None = None
     model_set_branch: str | None = None
     performance_policy: dict[str, Any] | None = None
+    execution_engine: str = "local"
+    reference_namespace: str | None = None
 
     def __post_init__(self) -> None:
         """Reject ambiguous or unbounded work before registry and Spark access."""
@@ -72,6 +74,7 @@ class MonitorConfig:
         _validate_thresholds(self.thresholds)
         _validate_model_set(self)
         _validate_performance_enrollment(self)
+        _validate_execution(self)
         if type(self.enabled) is not bool:
             raise ValueError("Monitoring enabled must be a boolean.")
 
@@ -92,7 +95,21 @@ class MonitorConfig:
         payload = asdict(self)
         if self.performance_policy is None:
             payload.pop("performance_policy")
+        if self.execution_engine == "local":
+            payload.pop("execution_engine")
+        if self.reference_namespace is None:
+            payload.pop("reference_namespace")
         return payload
+
+
+def _validate_execution(config: MonitorConfig) -> None:
+    """Require explicit distributed reference ownership without changing legacy payloads."""
+    if config.execution_engine not in {"local", "spark"}:
+        raise ValueError("monitoring execution_engine must be local or spark.")
+    if config.execution_engine == "spark" and config.reference_namespace is None:
+        raise ValueError("Spark monitoring requires reference_namespace.")
+    if config.reference_namespace is not None:
+        qualified_name(f"{config.reference_namespace}.monitoring_references")
 
 
 def _validate_selection(version: str | None, alias: str | None) -> None:

@@ -29,6 +29,38 @@ def load_monitoring_reference(
     registry_uri: str | None,
 ) -> tuple[Any, Any, Any, dict]:
     """Resolve once, replay the saved split and verify exact training/holdout membership."""
+    artifact, spec, filters, evidence = load_monitoring_artifact(
+        config, tracking_uri=tracking_uri, registry_uri=registry_uri
+    )
+    bounded = replace(
+        spec,
+        max_rows=min(spec.max_rows, config.max_rows),
+        max_bytes=min(spec.max_bytes, config.max_bytes),
+    )
+    frame = read_training_snapshot(spark, bounded)
+    train, holdout, _ = split_labeled_snapshot(frame, spec, engine=artifact.manifest.fitted_engine)
+    validate_training_evidence(
+        filters,
+        spec,
+        project_source_sha256=artifact.manifest.project_source_sha256,
+        heldout=holdout,
+    )
+    if spec.weight_column is not None:
+        train = train.drop(columns=[spec.weight_column])
+    policy = config.performance_policy
+    if policy and policy.get("mode") != "off" and policy["baseline"]["kind"] == "training_holdout":
+        from .monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
+
+        evidence["performance_baseline"] = measure_holdout_baseline(
+            artifact, spec, holdout, config, evidence["model_version"], evidence["training_run_id"]
+        )
+    return artifact, spec, train, evidence
+
+
+def load_monitoring_artifact(
+    config: MonitorConfig, *, tracking_uri: str | None, registry_uri: str | None
+) -> tuple[Any, Any, dict, dict]:
+    """Load verified model metadata without reading or materializing training populations."""
     resolved = resolve_model(
         config.model_name,
         version=config.model_version,
@@ -51,21 +83,6 @@ def load_monitoring_reference(
     if saved.get("engine") != artifact.manifest.fitted_engine:
         raise ValueError("Monitoring reference engine differs from the saved artifact.")
     spec = phase_training_spec(saved, artifact.pipeline.config.get("project_python_source"))
-    bounded = replace(
-        spec,
-        max_rows=min(spec.max_rows, config.max_rows),
-        max_bytes=min(spec.max_bytes, config.max_bytes),
-    )
-    frame = read_training_snapshot(spark, bounded)
-    train, holdout, _ = split_labeled_snapshot(frame, spec, engine=artifact.manifest.fitted_engine)
-    validate_training_evidence(
-        filters,
-        spec,
-        project_source_sha256=artifact.manifest.project_source_sha256,
-        heldout=holdout,
-    )
-    if spec.weight_column is not None:
-        train = train.drop(columns=[spec.weight_column])
     evidence = {
         "model_name": resolved.name,
         "model_version": resolved.version,
@@ -77,14 +94,7 @@ def load_monitoring_reference(
         "training_evidence_sha256": spec.training_evidence_sha256,
         "reference_population": "training_partition_excluding_holdout",
     }
-    policy = config.performance_policy
-    if policy and policy.get("mode") != "off" and policy["baseline"]["kind"] == "training_holdout":
-        from .monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
-
-        evidence["performance_baseline"] = measure_holdout_baseline(
-            artifact, spec, holdout, config, resolved.version, model.run_id
-        )
-    return artifact, spec, train, evidence | parent
+    return artifact, spec, filters, evidence | parent
 
 
 def _verify_model_set(
