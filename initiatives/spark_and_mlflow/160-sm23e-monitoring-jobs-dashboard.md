@@ -65,8 +65,8 @@ authorized; engine choice is already decided. Do not alter reference dashboards.
 
 - [x] Task 1 implementation and review
 - [x] Task 2 implementation and review
-- [ ] Task 3 live acceptance
-- [ ] Final static gates and integrated review
+- [x] Task 3 live acceptance
+- [x] Final static gates and integrated review
 
 Independent read-only investigations: layout_live, dashboard_audit.
 
@@ -87,7 +87,7 @@ Independent read-only investigations: layout_live, dashboard_audit.
 - Old local MonitorConfig remains API-compatible; generated bundles remove engine
   choice and inline legacy nodes. Native Run Job owns child dispatch/failure state.
 
-### Verification log (ongoing)
+### Verification log
 
 - Root confusion regression test reproduced discarded cells (RED); source fixed,
   final combined confusion/store group: 9 passed. Explicit collection: 9 nodes.
@@ -155,8 +155,76 @@ Independent read-only investigations: layout_live, dashboard_audit.
 - Single actual saved report has 40 predictions, 20 eligible labels and coverage
   0.5, healthy feature evidence, regression confusion status not_applicable.
   All 12 single-context dashboard datasets passed with this exact observation.
+- All nine original generated runs completed SUCCESS, including model-set train
+  195752207318772 -> score 895616285479326 -> monitoring 878182024119180.
+  Saved Run Job trigger metadata links the children to their actual parent tasks.
+  All four component/model full reports contain 40 predictions and 20 eligible
+  labels (coverage 0.5). Classification confusion cells are 10, 0, 10, 0: this
+  demonstrates measured counts, not a claim of acceptable model performance.
+- Final live classification acceptance exposed SM23E-IR-2: mature policy-only
+  windows ranked ahead of full observations and hid health/confusion data. Exclude
+  only no_data policy reports whose report JSON omits current_rows. The physical
+  current_rows column defaults to zero, so checking physical NULL is incorrect;
+  review caught that initial attempted correction before any jobs ran on it.
+  Full no_data and failed reports still supersede older charts. Policy history
+  retains the mature windows. A real result_row regression reproduces the stored
+  zero versus absent JSON distinction; nine store tests pass and review is closed.
+- Corrected current_health view refreshed successfully; all four model contexts
+  resolve to their full report IDs, healthy feature evidence and coverage 0.5.
+  Dashboard tests now total 10; all 21 corrected deployment dataset SQLs passed.
+  Live classification matrix has four cells summing to 20. Read-only SQL probes
+  also preserve newer full no_data and failed observations.
+- Corrected dashboard source SHA256
+  `4bf91906a88ea900cec86ea145409dffc6b481ef7d4e5af34e620e00b596d682`
+  published to the same dashboard at 2026-10-05T08:40:46.132Z. Draft content and
+  published metadata readback passed. The execution timeline now contains the
+  real single train run; billing is still absent, not a zero-cost result.
+- Final runtime wheel SHA256
+  `a0869992816a403d626e0645cf1bb0e5748274892fa866d233c371fd20a122a9`.
+  All 353 Python modules matched current source; only monitoring_store.py differs
+  from the original accepted wheel. All three bundles redeployed in place with
+  the same nine job IDs and passed strict validation before the late-label replay.
+  The 25 Spark metric/drift tests remain valid for unchanged measurement modules;
+  the view change has focused store tests and fresh live SQL verification.
+- Final full CI Ruff, formatting (1334 files), Ty and backend/Core CCN<=10 passed
+  after the policy-window correction. Distinct focused local cases total 297
+  (277 producer/helper, 9 store, 1 confusion, 10 dashboard), excluding reruns.
+- Final dashboard wording review corrected latest-full-observation semantics,
+  deployment-selected execution defaults and configured-policy-metric guidance.
+  Source SHA256 `0f8c000189236c913cdc893fb490776886998a0c08d845b000f7583fcfc1d234`
+  published at 2026-10-05T08:45:03.575Z with successful readback. All 21 dataset
+  definitions and non-text bindings are identical to the passed SQL gate; ten
+  dashboard tests pass. Selecting the classification policy's accuracy metric
+  exposes policy history; unavailable metric values remain gaps with explicit
+  coverage/reason, rather than fabricated zero performance.
+- Delayed-label release 17861777311136 succeeded. Final-wheel monitoring-only
+  replays succeeded: single 672777205649499, competition 572186726575447 and
+  model-set 887999707950005. These reuse the original scoring receipts; no new
+  training or scoring job was run. All four full reports now have 40 predictions,
+  40 eligible labels and coverage 1.0 (previously 20 labels / 0.5).
+  All three prediction Delta tables remain at version 1 and the scoring source at
+  version 0; their write timestamps, operations and row counts are unchanged.
+- Final dashboard acceptance: all 48 selected-context queries passed (12 datasets
+  for each of four models/components). Classification confusion cells changed
+  from [[10, 0], [10, 0]] to [[20, 0], [20, 0]], totaling 40 eligible labels.
+  Regression confusion remains not_applicable. History retains both observations.
+  Final independent code/text review has no open findings; applicable hooks pass.
+  This completes isolated acceptance, with paused schedules, report-only policies,
+  browser interaction unverified and actual billing unavailable as stated above.
 
 ### Operator walkthrough
+
+Live acceptance jobs (all original train/score/monitor chains succeeded):
+
+| Layout | Train run | Monitoring job |
+| --- | --- | --- |
+| single | [552686286815455](https://dbc-45604623-c18b.cloud.databricks.com/jobs/742248207939853/runs/552686286815455) | [849383177102322](https://dbc-45604623-c18b.cloud.databricks.com/jobs/849383177102322) |
+| competition | [941536479335710](https://dbc-45604623-c18b.cloud.databricks.com/jobs/567475623849187/runs/941536479335710) | [382789798978890](https://dbc-45604623-c18b.cloud.databricks.com/jobs/382789798978890) |
+| model-set | [195752207318772](https://dbc-45604623-c18b.cloud.databricks.com/jobs/641485833232686/runs/195752207318772) | [52053718085306](https://dbc-45604623-c18b.cloud.databricks.com/jobs/52053718085306) |
+
+[Published monitoring dashboard](https://dbc-45604623-c18b.cloud.databricks.com/dashboardsv3/01f1c090238e1b6da5d633032ad9960b/published).
+Acceptance monitoring schedules remain paused; automatic retraining is disabled
+and performance policies use report mode.
 
 1. Open a layout's train run. `model_decision` records the actual promotion gate;
    `register_monitor` enrolls only an activated version and prepares its reference.

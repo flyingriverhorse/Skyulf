@@ -190,10 +190,11 @@ scoring when monitoring storage is configured. No JSON model list is required.
 
 ### Spark execution in generated projects
 
-Generated producer Bundles default to `monitoring_execution_engine: spark`.
-Scoring publishes a receipt-bound request to the independent third `monitoring`
-job without waiting for metrics. The job uses its own serverless environment,
-timeout and retry settings, and a UTC schedule that starts `PAUSED`. Prepare and
+Generated producer Bundles always use Spark monitoring; no engine selection is
+required. Scoring validates its exact receipt, then a native Run Job task calls
+the independent third `monitoring` job and waits for its result. Training can call
+scoring through the same native job hierarchy. Monitoring uses its own serverless
+environment, timeout and retry settings, and a UTC schedule that starts `PAUSED`. Prepare and
 verify references before unpausing it. The scheduled run observes enrolled models
 and delayed labels even if no new scoring batch arrives. Its tasks run
 `monitor_model -> drift_report -> retrain_on_drift`; a guarded policy may submit
@@ -231,15 +232,15 @@ populations. Models without `monitoring_source_evidence.json` need retraining or
 verified original source proof; the job never silently reconstructs provenance.
 Spark freshness checks fail explicitly for unsupported fixed normalizers, custom
 pre-split filters and custom weight generators. Supported source weight columns
-still obey the training contract. Neither training nor scoring becomes Spark
-distributed through this monitoring setting.
+still obey the training contract. Spark monitoring does not change the training
+or scoring engine.
 
 Databricks AI/BI presents the durable Skyulf inventory and result tables. It is
 not a second metric calculator. Databricks native profiling and its generated
 dashboard are separate from these Skyulf observations; see
 [Databricks dashboards](https://docs.databricks.com/aws/en/dashboards/).
 
-### Bounded local execution
+### Central runner and legacy local execution
 
 The central example notebook reads a bounded inventory snapshot, default maximum 10,000
 entries. It calls run_monitoring without a model list. The SDK can also enroll
@@ -247,37 +248,36 @@ explicit records in memory; it does not require a configuration file.
 
 Only saved predictions are scored. Reference loading replays the original training
 membership, and current features use the source snapshots recorded with predictions.
-The runner materializes bounded pandas/Polars inputs under each enrollment's limits;
-it is not Spark-native. Labels join by saved record keys and only count when their
-UTC availability is at or before as_of. Missing labels or fewer than two finite
+Legacy local enrollments materialize bounded pandas/Polars inputs under their
+limits; Spark enrollments use distributed readers. Labels join by saved record
+keys and only count when their UTC availability is at or before as_of.
+Missing labels or fewer than two finite
 pairs leave performance unavailable; an unavailable value is not zero accuracy.
 
-Performance reuses skyulf.modeling._evaluation.metrics. Classification includes
+Local performance reuses skyulf.modeling._evaluation.metrics. Classification includes
 G-score, accuracy, balanced accuracy, MCC and precision/recall/F1; probabilities
 also enable log-loss, ROC-AUC and PR-AUC variants. Regression includes MAE, MSE,
 RMSE, R2, MAPE and explained variance. The job installs Core's optional G-score
-dependency and compatibility pin. Feature drift uses Core DriftCalculator.
+dependency and compatibility pin. Local feature drift uses Core DriftCalculator;
+Spark enrollments use distributed metric and drift aggregations.
 
-When a producer selects `monitoring_execution_engine: local`, its score job runs
-a visible `monitor_model` task after successful scoring
-(or after the successful recovery/report branch). It measures only the saved model
-version and exact scoring commit, writes to the shared results table, and fails
-visibly after persisting a measurement error. A retry reuses that commit and does
-not re-enroll an older configuration. No-op scoring retains an existing successful report; if a committed batch has
-no successful measurement yet, it completes that missing observation instead.
-An exact successful monitor-task repair is also skipped, preserving its evidence. Drift itself is an observed result, not a task failure.
+The public local API and older deployed inline notebooks remain compatible.
+`MonitorConfig.max_rows=10000` is their default observation budget;
+`MAX_MONITOR_ROWS=1_000_000` is the local safety ceiling. Neither limits Spark
+observation rows. These are not two separate Spark limits.
 
-In this local setting, generated score jobs expose `score -> monitor_model -> drift_report` (with the
-existing recovery/report branch before monitoring when enabled). `monitor_model`
-calculates drift, quality and available performance; `drift_report` displays the
-saved batch's feature values and limits without repeating those calculations.
-Both task outputs link to `monitoring_dashboard_url` when configured. Independent
-model repositories use the same shared dashboard URL. Existing deployed projects
-need updated producer templates/notebooks and the wheel followed by redeployment.
+New generated score jobs use `prepare_monitoring -> monitoring_ready -> monitor_model`,
+where the final node is the native child-job call. Calculation, saved drift reports
+and guarded retraining belong to that child job. All projects can link to the same
+`monitoring_dashboard_url`. Existing projects need reviewed template/notebook and
+wheel updates followed by redeployment. The older asynchronous API's
+`monitoring_invocation_id` identifies a producer run for duplicate suppression;
+the new native job graph does not expose or require that setting.
 
 The central inventory-wide example remains manual; schedule it with a suitable
-observation window if using this bounded runner. Refreshing the dashboard does not compute
-new metrics. Each model failure is saved, other models are attempted, and the
+observation window when using this runner. The inventory limit bounds enrolled
+models, not prediction rows. Refreshing the dashboard does not compute new
+metrics. Each model failure is saved, other models are attempted, and the
 notebook then fails if any model failed. Inspect reports before retrying.
 
 Observation identity includes configuration, cutoff, window and snapshot evidence.
@@ -365,6 +365,8 @@ Latest PSI and performance bars use the newest saved report for that context,
 ranked by observation window and measurement time. A newer empty or failed report
 does not resurrect an older measured bar. Historical trend charts retain history.
 The context summary exposes the newest report status even when charts are empty.
+Mature performance-window-only reports stay in policy history; they do not replace
+the full feature observation, current model health or confusion matrix.
 
 The confusion matrix uses the latest report's saved bounded class counts, with
 actual classes on rows and predictions on columns. Numeric class indices preserve
@@ -415,8 +417,8 @@ resources/monitoring.job.yml defines the runner and dependencies;
 src/monitoring_notebook.py calls the library; resources/monitoring.dashboard.yml
 binds storage; src/monitoring.lvdash.json defines SQL, filters and four pages.
 Generated producer deployment variables and the separate monitoring job pass
-independent monitoring settings. The producer README documents Spark-default
-dispatch, the paused schedule and reference preparation.
+independent monitoring settings. The producer README documents Spark monitoring
+and native dispatch, the paused schedule and reference preparation.
 
 The test_monitoring_config/reference/sources/metrics/store/job/registration/dashboard
 files cover the corresponding library contracts. test_monitoring_template runs

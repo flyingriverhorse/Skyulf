@@ -332,6 +332,29 @@ def test_confusion_matrix_preserves_labels_and_missing_evidence() -> None:
     assert widgets["confusion_matrix"]["spec"]["widgetType"] == "pivot"
 
 
+def test_latest_observations_do_not_rank_policy_only_windows_as_feature_reports() -> None:
+    """A newer mature-policy window must not hide a scored report or its confusion matrix."""
+    dashboard = _dashboard()
+    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
+    for name in (
+        "context_choices",
+        "drift_context",
+        "performance_context",
+        "drift_psi_chart",
+        "performance_latest",
+        "confusion_status",
+        "confusion_cells",
+    ):
+        sql = datasets[name]
+        assert "status = 'no_data'" in sql
+        assert "get_json_object(report_json, '$.performance') IS NOT NULL" in sql
+        assert "get_json_object(report_json, '$.current_rows') IS NULL" in sql
+    assert "FROM performance_history" in datasets["performance_policy"]
+    for name in ("drift_psi_chart", "performance_latest"):
+        rank_source = datasets[name].split("AS report_rank", 1)[1]
+        assert rank_source.startswith("\n FROM monitoring_results WHERE NOT (status = 'no_data'")
+
+
 def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> None:
     """Empty portable settings must never expose arbitrary workspace spend or fake exact cost."""
     dashboard = _dashboard()

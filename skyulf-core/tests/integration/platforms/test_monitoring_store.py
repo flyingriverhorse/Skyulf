@@ -55,6 +55,30 @@ def test_current_health_exposes_pinned_inventory_version_before_observation():
     assert "'$.model_set_version'" in query
 
 
+def test_current_health_does_not_rank_policy_only_windows_as_feature_observations():
+    """Late-label policy windows must not hide a completed scoring report or its health."""
+    import json
+
+    from skyulf.integrations.databricks.monitoring_store import monitoring_views, result_row
+
+    now = datetime(2026, 10, 5, tzinfo=UTC)
+    row = result_row(
+        config(),
+        "2",
+        now,
+        now,
+        now,
+        {"status": "no_data", "metrics": [], "performance": {"status": "unavailable"}},
+        {},
+    )
+    assert row["current_rows"] == 0
+    assert "current_rows" not in json.loads(row["report_json"])
+    query = monitoring_views("ops.monitoring")["current_health"]
+    assert "WHERE NOT (status = 'no_data'" in query
+    assert "get_json_object(report_json, '$.current_rows') IS NULL" in query
+    assert "get_json_object(report_json, '$.performance') IS NOT NULL)" in query
+
+
 def test_persistence_rejects_nonfinite_report_values():
     """Invalid JSON cannot become a misleading dashboard metric."""
     from skyulf.integrations.databricks.monitoring_store import result_row

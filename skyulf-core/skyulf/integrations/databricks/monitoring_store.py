@@ -173,6 +173,9 @@ def monitoring_views(namespace: str) -> dict[str, str]:
                 PARTITION BY monitor_id, config_digest
                 ORDER BY window_end DESC, measured_at DESC, report_id DESC
             ) AS rank FROM {results}
+            WHERE NOT (status = 'no_data'
+                AND get_json_object(report_json, '$.current_rows') IS NULL
+                AND get_json_object(report_json, '$.performance') IS NOT NULL)
         )
         SELECT i.monitor_id, i.environment, i.project, i.model_name,
             i.model_catalog, i.model_schema, i.selection, i.expected_interval_hours,
