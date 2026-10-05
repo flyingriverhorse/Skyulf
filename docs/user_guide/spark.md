@@ -561,6 +561,77 @@ serverless regression parity, monthly Delta publication, writer coordination
 and restricted-principal write denial have passed the selected SM-16 workflow.
 This does not extend cloud validation to every node or classification path.
 
+## Measuring inference capacity
+
+The reproducible notebook `skyulf-core/benchmarks/bench_spark_inference.py`
+compares `native_features`, `python_pipeline` and certified MLflow pyfunc UDF
+on the same fitted SimpleImputer/StandardScaler/LinearRegression pipeline.
+It uses Spark-generated data, including nulls, and verifies every prediction
+against an independent expression. Only aggregate diagnostics reach the driver.
+
+Notebook parameters:
+
+| Parameter | Purpose |
+| --- | --- |
+| `schema` | Dedicated `catalog.schema` for benchmark models and report volume |
+| `experiment` | MLflow experiment path for benchmark artifacts |
+| `compute` | `classic` or `serverless`; must match the actual job compute |
+| `env_manager` | `virtualenv` for validated classic environments; `local` for the declared serverless worker environment |
+| `suite` | `full` for the scale matrix; `smoke` for a small runner verification |
+
+The full matrix covers 1 and 5 million rows, 2 and 64 input features, 8 and 32
+requested partitions, and 1,000/10,000-row model calls. It reports observed
+source partitions and both first/repeat action timings. Timings include source
+generation, inference and a correctness aggregate, not Delta publication.
+Preparation and model registration are outside action throughput. Fixed route
+order and managed serverless allocation mean these are workload observations,
+not a universal ranking or latency guarantee.
+
+Full reports are saved under `/Volumes/<catalog>/<schema>/benchmark/<id>.json`
+and returned from the notebook. Action checkpoints survive later scoring errors;
+the job still fails. Separate worker probes measure package restore time and
+Python-process RSS. Their process lifetime high-water mark is not an incremental
+allocation measurement or a complete executor-memory measurement.
+
+On classic compute, enable `spark.executor.processTreeMetrics.enabled=true`
+and `spark.executor.metrics.pollingInterval=1000` before starting the cluster.
+Executor peaks are cumulative across the application. Disabled or unobserved
+process counters are unknown, not zero. Serverless does not expose the executor
+status store or caller-controlled Arrow allocation; those metrics remain
+unavailable. Model-call batch size alone cannot bound worker memory.
+
+### Initial SM-58 observations
+
+The serverless comparison validated all three routes at 5 million rows with the
+two-feature linear fixture. At that width, 32 partitions were slower than 8,
+and 1,000-row model calls were slower than 10,000 at 32 partitions. Keep partition
+and batch choices tied to the measured workload rather than a row-count rule.
+This does not extend the admitted preprocessing/model list or prove memory safety
+for large estimators. Classic policy-cluster execution remains unverified because
+the validation workspace only supports serverless compute.
+
+For 5 million rows, two features, eight partitions and 10,000-row model calls:
+
+| Route | Preparation | First action | Repeat action |
+| --- | --- | --- | --- |
+| Native features | 5.69 s | 3.66 s | 3.31 s |
+| Python pipeline | 1.02 s | 3.24 s | 3.15 s |
+| Certified pyfunc | 52.51 s | 4.02 s | 3.95 s |
+
+The complete 18-configuration run checked 108 million row predictions across
+repeats, with maximum absolute error below `1.8e-13`. Runtime: Python 3.12.3,
+Spark 4.2.0, MLflow 3.16.1, sklearn 1.8.0. These are action timings, not complete
+job latency. Pyfunc preparation includes package acquisition, verification and
+UDF construction; the benchmark does not separate those substeps.
+
+Separate warm worker probes measured median package-load times of 1.73–2.22 s.
+For 64 features and 10,000 probe rows, Python-process RSS after prediction was
+662.6–665.1 MiB, against 652.2–654.1 MiB before loading. These include the Python
+environment and imported libraries. Process lifetime peaks reached 912.4 MiB,
+which can include earlier work; they cannot establish a per-case memory ceiling.
+Full raw evidence is in the validation workspace at
+`/Volumes/workspace/skyulf_sm58_20261005/benchmark/ef875e95e0c24e87a64f38a314a5c7fa.json`.
+
 ## Capability declarations
 
 ### Inspecting declared support

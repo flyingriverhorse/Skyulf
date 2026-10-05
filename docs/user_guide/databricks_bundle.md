@@ -54,6 +54,16 @@ option on the chosen runtime: the tested serverless runtime rejects MLflow 3.16.
 virtualenv archives containing absolute interpreter symlinks. No automatic
 environment or scoring fallback occurs.
 
+For measured capacity and a repeatable benchmark, see
+[Measuring inference capacity](spark.md#measuring-inference-capacity).
+SM-58 compares native FE, worker Python preprocessing and this Bundle's pyfunc
+route with 1–5 million rows. These timings include a correctness aggregate and
+exclude Delta publication; they are not complete score-job latency estimates.
+The benchmark stores reports in its own schema/volume and leaves project jobs,
+monitoring tables and the shared dashboard unchanged. The initial validation
+workspace supports only serverless, so classic executor RSS and `virtualenv`
+packaging still require a classic-enabled workspace.
+
 Certified MLflow packages carry a safety certificate, source hash and exact-source
 Skyulf wheel. Existing whole-frame
 packages need a newly logged certified version; a pickle alone grants no Spark
