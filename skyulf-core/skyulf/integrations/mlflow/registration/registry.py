@@ -7,6 +7,10 @@ MLflow remains an optional dependency and is imported only when an operation is
 requested.
 """
 
+import shutil
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING, Any
@@ -102,6 +106,123 @@ def _registered_package_uri(client: Any, name: str, version: str) -> str:
     )
 
 
+def _artifact_uri(package_uri: str, relative: str) -> str:
+    """Append a validated artifact path while retaining store query parameters."""
+    parsed = urlparse(package_uri)
+    return parsed._replace(path=parsed.path.rstrip("/") + "/" + relative).geturl()
+
+
+def _download_registered_entry(
+    mlflow: Any,
+    client: Any,
+    resolved: ResolvedModel,
+    tracking_uri: str | None,
+    uri: str,
+    destination: Path,
+) -> Path:
+    """Translate remote file transport errors using the pinned registry identity."""
+    try:
+        return Path(
+            mlflow.artifacts.download_artifacts(
+                artifact_uri=uri,
+                dst_path=str(destination),
+                tracking_uri=tracking_uri,
+                registry_uri=client._registry_uri,
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 - artifact transport boundary
+        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+
+
+def _registered_metadata(
+    mlflow: Any,
+    client: Any,
+    resolved: ResolvedModel,
+    tracking_uri: str | None,
+    root: Path,
+) -> tuple[str, Any]:
+    """Read pinned MLmodel metadata with the existing typed registry failures."""
+    try:
+        package_uri = _registered_package_uri(client, resolved.name, resolved.version)
+    except Exception as exc:  # noqa: BLE001 - explicit OSS registry lookup boundary
+        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+    metadata_path = _download_registered_entry(
+        mlflow,
+        client,
+        resolved,
+        tracking_uri,
+        _artifact_uri(package_uri, "MLmodel"),
+        root,
+    )
+    try:
+        return package_uri, mlflow.models.Model.load(metadata_path)
+    except Exception as exc:  # noqa: BLE001 - preserve metadata error translation
+        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
+
+
+def _payload_metadata(model: Any, key: str, digest: str | None) -> dict[str, Any]:
+    """Validate direct-loader identity before resolving or downloading its payload."""
+    metadata = digest_metadata(model.metadata or {})
+    expected = {f"{key}_digest": digest}
+    if key != "bundle":
+        expected.update(skyulf_artifact_kind=key, skyulf_execution_scope="whole_frame_local")
+    errors = {
+        "bundle": "Packaged Skyulf bundle digest is missing or differs from resolved digest.",
+        "local_pipeline": "Packaged Skyulf local pipeline metadata differs from resolved digest or scope.",
+        "model_set": "Packaged model set kind, scope or digest differs from resolved identity.",
+    }
+    if any(metadata.get(name) != value for name, value in expected.items()):
+        raise ValueError(errors[key])
+    return metadata
+
+
+@contextmanager
+def downloaded_registered_payload(
+    mlflow: Any,
+    client: Any,
+    resolved: ResolvedModel,
+    tracking_uri: str | None,
+    key: str,
+) -> Iterator[tuple[Path, Any]]:
+    """Fetch only metadata and its contained payload for direct Skyulf loaders.
+
+    Failed loads remove their owned temporary root. Successful roots persist,
+    matching MLflow downloads: model-set artifacts retain these paths for later
+    scoring. Pyfunc and Spark callers continue downloading the complete package.
+    """
+    root = Path(tempfile.mkdtemp(prefix="skyulf-registry-payload-")).resolve()
+    try:
+        package_uri, model = _registered_metadata(mlflow, client, resolved, tracking_uri, root)
+        _payload_metadata(model, key, resolved.digest)
+        destination = _packaged_artifact_destination(root, model.flavors, key)
+        relative = destination.relative_to(root).as_posix()
+        if any(char in relative for char in "%?#:\\") or any(ord(char) < 32 for char in relative):
+            raise ValueError("Skyulf artifact path must be a contained, unambiguous URI path.")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        # MLflow keeps the full artifact prefix for models:/, but only the
+        # basename for direct download URIs returned by OSS registries.
+        download_root = root if urlparse(package_uri).scheme == "models" else destination.parent
+        try:
+            downloaded = _download_registered_entry(
+                mlflow,
+                client,
+                resolved,
+                tracking_uri,
+                _artifact_uri(package_uri, relative),
+                download_root,
+            )
+        except RegistryModelNotFoundError as exc:
+            raise ValueError(
+                "MLflow model is missing the Skyulf bundle artifact directory."
+            ) from exc
+        if downloaded.resolve() != destination or not destination.is_dir():
+            raise ValueError("Downloaded Skyulf artifact directory differs from its declared path.")
+        yield root, model
+    except BaseException:
+        shutil.rmtree(root, ignore_errors=True)
+        raise
+
+
 def load_registered_bundle(
     resolved: ResolvedModel,
     *,
@@ -128,27 +249,19 @@ def load_registered_bundle(
         raise ValueError("resolved must include the Skyulf bundle digest.")
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
-    try:
-        local_path = download_registered_package(
-            mlflow, client, resolved.name, resolved.version, tracking_uri
+    with downloaded_registered_payload(mlflow, client, resolved, tracking_uri, "bundle") as (
+        local_path,
+        model,
+    ):
+        bundle_path = _packaged_bundle_path(local_path, model.flavors)
+        from ....inference.bundle import (  # noqa: PLC0415 - lazy bundle dependency
+            load_bundle,
         )
-        model = mlflow.models.Model.load(Path(local_path))
-    except Exception as exc:  # noqa: BLE001 - translate registry and artifact transport failures
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
-    metadata = digest_metadata(model.metadata or {})
-    if metadata.get("bundle_digest") != resolved.digest:
-        raise ValueError(
-            "Packaged Skyulf bundle digest is missing or differs from resolved digest."
-        )
-    bundle_path = _packaged_bundle_path(Path(local_path), model.flavors)
-    from ....inference.bundle import (  # noqa: PLC0415 - lazy bundle dependency
-        load_bundle,
-    )
 
-    bundle = load_bundle(bundle_path)
-    if bundle.semantic_digest != resolved.digest:
-        raise ValueError("Loaded Skyulf bundle digest differs from resolved digest.")
-    return bundle
+        bundle = load_bundle(bundle_path)
+        if bundle.semantic_digest != resolved.digest:
+            raise ValueError("Loaded Skyulf bundle digest differs from resolved digest.")
+        return bundle
 
 
 def load_registered_local_pipeline(
@@ -170,14 +283,13 @@ def load_registered_local_pipeline(
         raise ValueError("resolved must include the Skyulf local pipeline digest.")
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
-    try:
-        local_path = download_registered_package(
-            mlflow, client, resolved.name, resolved.version, tracking_uri
-        )
-        model = mlflow.models.Model.load(Path(local_path))
-    except Exception as exc:  # noqa: BLE001 - translate registry and transport failures
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
-    return load_local_package(Path(local_path), model, resolved.digest)
+    with downloaded_registered_payload(
+        mlflow, client, resolved, tracking_uri, "local_pipeline"
+    ) as (
+        local_path,
+        model,
+    ):
+        return load_local_package(local_path, model, resolved.digest)
 
 
 def load_run_local_pipeline(
@@ -201,15 +313,7 @@ def load_run_local_pipeline(
 
 def load_local_package(local_path: Path, model: Any, digest: str) -> "LocalPipelineArtifact":
     """Validate shared run and registry metadata, contained paths and fitted identity."""
-    metadata = digest_metadata(model.metadata or {})
-    if (
-        metadata.get("skyulf_artifact_kind") != "local_pipeline"
-        or metadata.get("skyulf_execution_scope") != "whole_frame_local"
-        or metadata.get("local_pipeline_digest") != digest
-    ):
-        raise ValueError(
-            "Packaged Skyulf local pipeline metadata differs from resolved digest or scope."
-        )
+    metadata = _payload_metadata(model, "local_pipeline", digest)
     artifact_path = packaged_artifact_path(Path(local_path), model.flavors, "local_pipeline")
     from ....inference.local_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
         load_local_pipeline,
@@ -231,6 +335,14 @@ def _packaged_bundle_path(package: Path, flavors: dict[str, Any]) -> Path:
 
 def packaged_artifact_path(package: Path, flavors: dict[str, Any], key: str) -> Path:
     """Locate a declared artifact directory without allowing package traversal."""
+    candidate = _packaged_artifact_destination(package, flavors, key)
+    if not candidate.is_dir():
+        raise ValueError("MLflow model is missing the Skyulf bundle artifact directory.")
+    return candidate
+
+
+def _packaged_artifact_destination(package: Path, flavors: dict[str, Any], key: str) -> Path:
+    """Validate the declared package-relative path before any payload transfer."""
     try:
         relative = flavors["python_function"]["artifacts"][key]["path"]
     except (KeyError, TypeError) as exc:
@@ -249,8 +361,6 @@ def packaged_artifact_path(package: Path, flavors: dict[str, Any], key: str) -> 
     candidate = (root / relative).resolve()
     if not candidate.is_relative_to(root) or candidate == root:
         raise ValueError("Skyulf bundle artifact path must be contained in the package.")
-    if not candidate.is_dir():
-        raise ValueError("MLflow model is missing the Skyulf bundle artifact directory.")
     return candidate
 
 

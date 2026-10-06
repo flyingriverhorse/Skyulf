@@ -9,6 +9,7 @@ import pandas as pd
 
 from .....mlflow.shared._client import make_registry_client, require_mlflow
 from ....data.delta_io.delta import table_identity
+from ....jobs.shared.notebook_diagnostics import notebook_task
 from ....shared._contracts import table_name
 from ....training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
 from ....training.shared.local_training_evidence import validate_training_evidence
@@ -159,33 +160,39 @@ def prepare_spark_monitoring_reference(
     Ordinary Spark observations never call it. Training remains a bounded local
     operation; raising a monitoring row cap is neither required nor permitted.
     """
-    artifact, spec, filters, evidence = load_monitoring_artifact(
-        config, tracking_uri=tracking_uri, registry_uri=registry_uri
-    )
+    identity = f"{config.model_name}/{config.model_version or config.model_alias}"
+    with notebook_task(f"reference.load_model {identity}", None):
+        artifact, spec, filters, evidence = load_monitoring_artifact(
+            config, tracking_uri=tracking_uri, registry_uri=registry_uri
+        )
     name = _reference_name(config, evidence, "receipt")
     if ensure_owned_object(spark, name):
-        receipt = read_reference_metadata(spark, config, evidence)
-        if receipt["evidence"] != evidence:
-            raise ValueError("Prepared monitoring reference model/training identity differs.")
-        for record in receipt["tables"].values():
-            read_reference_population(spark, record)
+        with notebook_task(f"reference.reuse {identity}", None):
+            receipt = read_reference_metadata(spark, config, evidence)
+            if receipt["evidence"] != evidence:
+                raise ValueError("Prepared monitoring reference model/training identity differs.")
+            for record in receipt["tables"].values():
+                read_reference_population(spark, record)
         return receipt
-    source_id = table_identity(spark, spec.table)
-    source = read_training_snapshot(spark, spec)
-    if table_identity(spark, spec.table) != source_id:
-        raise ValueError("Training source was replaced while preparing monitoring reference.")
-    client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
-    source_receipt = _document(
-        client, evidence["training_run_id"], "monitoring_source_evidence.json"
-    )
-    validate_source_evidence(source_receipt, source, spec.source_columns, spec.dataset_id)
-    train, holdout, _ = split_labeled_snapshot(source, spec, engine=artifact.manifest.fitted_engine)
-    validate_training_evidence(
-        filters,
-        spec,
-        project_source_sha256=artifact.manifest.project_source_sha256,
-        heldout=holdout,
-    )
+    with notebook_task(f"reference.read_training {identity}", None):
+        source_id = table_identity(spark, spec.table)
+        source = read_training_snapshot(spark, spec)
+        if table_identity(spark, spec.table) != source_id:
+            raise ValueError("Training source was replaced while preparing monitoring reference.")
+        client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
+        source_receipt = _document(
+            client, evidence["training_run_id"], "monitoring_source_evidence.json"
+        )
+        validate_source_evidence(source_receipt, source, spec.source_columns, spec.dataset_id)
+        train, holdout, _ = split_labeled_snapshot(
+            source, spec, engine=artifact.manifest.fitted_engine
+        )
+        validate_training_evidence(
+            filters,
+            spec,
+            project_source_sha256=artifact.manifest.project_source_sha256,
+            heldout=holdout,
+        )
     columns = [*spec.input_columns, spec.target_column]
     old_population = (
         train[columns]
@@ -194,25 +201,30 @@ def prepare_spark_monitoring_reference(
     )
     frames = {"train": train[columns], "source": source, "seen": old_population}
     source_schema = read_snapshot(spark, spec.table, spec.version).schema
-    tables = {
-        key: _write_population(
-            spark,
-            _reference_name(config, evidence, key),
-            _prepared_frame(spark, frame, source_schema, spec),
-        )
-        for key, frame in frames.items()
-    }
+    tables = {}
+    for key, frame in frames.items():
+        with notebook_task(f"reference.write_{key} {identity}", None):
+            tables[key] = _write_population(
+                spark,
+                _reference_name(config, evidence, key),
+                _prepared_frame(spark, frame, source_schema, spec),
+            )
+    with notebook_task(f"reference.measure_holdout {identity}", None):
+        holdout_values = measure_holdout_values(artifact, spec, holdout)
     receipt = {
         "format": 1,
         "evidence": evidence,
         "tables": tables,
         "source_table_id": source_id,
-        "holdout": measure_holdout_values(artifact, spec, holdout),
+        "holdout": holdout_values,
     }
     payload = json.dumps(receipt, sort_keys=True, allow_nan=False)
-    _write_population(
-        spark,
-        name,
-        spark.createDataFrame([(payload, json_digest(receipt))], "payload STRING, digest STRING"),
-    )
+    with notebook_task(f"reference.write_receipt {identity}", None):
+        _write_population(
+            spark,
+            name,
+            spark.createDataFrame(
+                [(payload, json_digest(receipt))], "payload STRING, digest STRING"
+            ),
+        )
     return receipt

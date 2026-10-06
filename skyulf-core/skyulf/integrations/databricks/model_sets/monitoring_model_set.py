@@ -3,6 +3,7 @@
 from dataclasses import replace
 from typing import Any
 
+from ..jobs.shared.notebook_diagnostics import notebook_task
 from ..observability.monitoring.monitoring_config import (
     MonitorConfig,
     parse_drift_thresholds,
@@ -88,15 +89,18 @@ def register_set_monitors(
     configs = validate_component_monitoring(workflow, values, settings, resolved, artifact)
     if activation_started_ms is not None:
         _validate_activation_order(activation_started_ms)
-    ensure_monitoring_store(spark, *namespace.split("."))
+    with notebook_task("monitoring.ensure_store", None):
+        ensure_monitoring_store(spark, *namespace.split("."))
     for config in configs:
-        enroll_monitor(
-            spark,
-            namespace,
-            config,
-            preserve_activation=activation_started_ms is None,
-            activation_started_ms=activation_started_ms,
-        )
+        identity = f"{config.model_name}/{config.model_version}"
+        with notebook_task(f"monitoring.enroll {identity}", None):
+            enroll_monitor(
+                spark,
+                namespace,
+                config,
+                preserve_activation=activation_started_ms is None,
+                activation_started_ms=activation_started_ms,
+            )
         if (
             activation_started_ms is not None
             and config.execution_engine == "spark"

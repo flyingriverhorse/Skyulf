@@ -84,6 +84,19 @@ def test_success_context_reports_elapsed_time(capsys):
     assert "Elapsed:" in visible
 
 
+def test_task_progress_flushes_before_slow_work(monkeypatch):
+    """Operators must see the last started stage while a remote call is still pending."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks.jobs.shared.notebook_diagnostics import notebook_task
+
+    output = Mock()
+    monkeypatch.setattr("builtins.print", output)
+    with notebook_task("reference.load_model", None):
+        assert output.call_args.kwargs.get("flush") is True
+    assert all(call.kwargs.get("flush") is True for call in output.call_args_list)
+
+
 def test_generated_training_notebook_identifies_failure_without_exiting(monkeypatch, capsys):
     """The actual deployed entrypoint must wire diagnostics before any task execution."""
     import runpy

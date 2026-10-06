@@ -96,19 +96,19 @@ def notebook_task(name: str, dbutils: Any) -> Iterator[None]:
     """
     started = monotonic()
     context = _task_context(dbutils)
-    print(f"STARTED | {name}" + (f" | {context}" if context else ""))
+    print(f"STARTED | {name}" + (f" | {context}" if context else ""), flush=True)
     try:
         yield
     except Exception as exc:  # noqa: BLE001 - annotate then re-raise the identical task failure
         location = _error_location(exc)
-        print(f"FAILED | {name} | {type(exc).__name__}: {exc}")
-        print(f"Source: {location}\nElapsed: {monotonic() - started:.2f}s")
+        print(f"FAILED | {name} | {type(exc).__name__}: {exc}", flush=True)
+        print(f"Source: {location}\nElapsed: {monotonic() - started:.2f}s", flush=True)
         if exc.__cause__ is not None:
             cause = exc.__cause__
-            print(f"Caused by: {type(cause).__name__}: {cause}")
-            print(f"Cause source: {_error_location(cause)}")
-        print("Inspect the traceback below and this task's inputs before retrying.")
+            print(f"Caused by: {type(cause).__name__}: {cause}", flush=True)
+            print(f"Cause source: {_error_location(cause)}", flush=True)
+        print("Inspect the traceback below and this task's inputs before retrying.", flush=True)
         exc.add_note(f"Skyulf task: {name}; {context}; source: {location}")
         raise
     else:
-        print(f"COMPLETED | {name} | Elapsed: {monotonic() - started:.2f}s")
+        print(f"COMPLETED | {name} | Elapsed: {monotonic() - started:.2f}s", flush=True)

@@ -17,6 +17,7 @@ from ....inference.project_code import load_project_module
 from ...mlflow.lifecycle.promotion import ExclusiveAliasWriterAdmission, controlled_champion_version
 from ...mlflow.registration.registry import (
     ResolvedModel,
+    downloaded_registered_payload,
     load_local_package,
     packaged_artifact_path,
     register_model,
@@ -225,18 +226,13 @@ def _component_directory(resolved: ResolvedModel, tracking_uri: str, registry_ur
     """Validate and reuse registered artifact bytes without reserializing fitted pipelines."""
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
-    version = client.get_model_version(resolved.name, resolved.version)
-    source = getattr(version, "source", None) or resolved.model_uri
-    package = Path(
-        mlflow.artifacts.download_artifacts(
-            artifact_uri=source, tracking_uri=tracking_uri, registry_uri=registry_uri
-        )
-    )
-    model = mlflow.models.Model.load(package)
     if not isinstance(resolved.digest, str):
         raise ValueError("Component needs a resolved digest.")
-    load_local_package(package, model, resolved.digest)
-    return packaged_artifact_path(package, model.flavors, "local_pipeline")
+    with downloaded_registered_payload(
+        mlflow, client, resolved, tracking_uri, "local_pipeline"
+    ) as (package, model):
+        load_local_package(package, model, resolved.digest)
+        return packaged_artifact_path(package, model.flavors, "local_pipeline")
 
 
 def _registered_components(

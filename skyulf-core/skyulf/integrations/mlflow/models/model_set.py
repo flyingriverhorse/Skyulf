@@ -28,10 +28,8 @@ from ....inference.project_dependencies import (
 )
 from ..registration.registry import (
     ResolvedModel,
-    digest_metadata,
-    download_registered_package,
+    downloaded_registered_payload,
     packaged_artifact_path,
-    translate_error,
     validate_concrete_version,
     validate_registry_options,
 )
@@ -240,24 +238,11 @@ def load_registered_model_set(
     if not isinstance(resolved.digest, str) or not resolved.digest.strip():
         raise ValueError("Resolved model set requires a digest.")
     client = mlflow.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
-    try:
-        local = download_registered_package(
-            mlflow, client, resolved.name, resolved.version, tracking_uri
-        )
-        model = mlflow.models.Model.load(Path(local))
-    except Exception as exc:  # noqa: BLE001 - registry artifact transport boundary
-        raise translate_error(exc, name=resolved.name, version=resolved.version) from exc
-    metadata = digest_metadata(model.metadata or {})
-    digest = metadata.get("model_set_digest")
-    expected = {
-        "skyulf_artifact_kind": "model_set",
-        "skyulf_execution_scope": "whole_frame_local",
-    }
-    if digest != resolved.digest or any(
-        metadata.get(key) != value for key, value in expected.items()
+    with downloaded_registered_payload(mlflow, client, resolved, tracking_uri, "model_set") as (
+        local,
+        model,
     ):
-        raise ValueError("Packaged model set kind, scope or digest differs from resolved identity.")
-    artifact = load_model_set(packaged_artifact_path(Path(local), model.flavors, "model_set"))
-    if artifact.manifest.set_sha256 != resolved.digest:
-        raise ValueError("Loaded model set digest differs from resolved identity.")
-    return artifact
+        artifact = load_model_set(packaged_artifact_path(local, model.flavors, "model_set"))
+        if artifact.manifest.set_sha256 != resolved.digest:
+            raise ValueError("Loaded model set digest differs from resolved identity.")
+        return artifact

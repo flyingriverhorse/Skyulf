@@ -17,6 +17,7 @@ from ...mlflow.lifecycle.validation import (
     quality_gates_pass,
 )
 from ...mlflow.registration.registry import resolve_model
+from ..jobs.shared.notebook_diagnostics import notebook_task
 from ..training.fitting import local_retraining
 from ..training.shared.local_training_evidence import (
     load_candidate_evidence,
@@ -145,19 +146,19 @@ def evaluate_model_set_quality(
         raise ValueError("Model set quality baseline differs from expected champion.")
     components = artifact.manifest.components
     previous = _counterparts(components, champion)
-    results = {
-        c.branch: _evaluate_component(
-            spark,
-            c,
-            saved["comparisons"][c.branch],
-            previous.get(c.branch),
-            max_rows=max_rows,
-            max_bytes=max_bytes,
-            tracking_uri=tracking_uri,
-            registry_uri=registry_uri,
-        )
-        for c in components
-    }
+    results = {}
+    for component in components:
+        with notebook_task(f"model_set_quality {component.branch}", None):
+            results[component.branch] = _evaluate_component(
+                spark,
+                component,
+                saved["comparisons"][component.branch],
+                previous.get(component.branch),
+                max_rows=max_rows,
+                max_bytes=max_bytes,
+                tracking_uri=tracking_uri,
+                registry_uri=registry_uri,
+            )
     return _set_decision(results, expected_champion_version)
 
 
