@@ -2,7 +2,7 @@
 # Does not imply that Skyulf nodes already support Spark execution.
 # Kept separate from base/backend dependencies and Databricks Runtime.
 -e ./skyulf-core[spark]
-pyspark==4.0.3
+pyspark==4.2.0
 pytest>=9.0.0,<10.0.0
 # Root pytest configuration declares asyncio_mode.
 pytest-asyncio>=0.21.0,<2.0.0
