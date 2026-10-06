@@ -3807,7 +3807,7 @@ See the <a href="databricks_bundle.html#choose-the-evaluation-split-and-result-a
 for the four supported combinations.</p>
 <h2 id="fit-and-score-a-small-batch">Fit and score a small batch</h2>
 <p>Candidate training also accepts <code>cv=LocalCVSpec(enabled=True, folds=3)</code> from
-<code>skyulf.integrations.databricks.local_cv</code>. It reuses Core CV on training rows,
+<code>skyulf.integrations.databricks.training.tuning.local_cv</code>. It reuses Core CV on training rows,
 refits preprocessing per fold and logs a separate report to the candidate's
 MLflow run. Use <code>method="stratified_k_fold"</code> for classification; time-series CV
 requires an explicit event window and <code>shuffle=False</code>. The saved final pipeline
@@ -3959,7 +3959,7 @@ MLflow run ID that contains the model artifact:</p>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_local_holdout</span><span class="p">,</span> <span class="n">fit_local_workflow</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
 
 <span class="c1"># `frame` is a bounded, labeled pandas or Polars frame with 1,000 rows.</span>
 <span class="n">training</span><span class="p">,</span> <span class="n">heldout</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[:</span><span class="mi">800</span><span class="p">],</span> <span class="n">frame</span><span class="p">[</span><span class="mi">800</span><span class="p">:]</span>
@@ -4058,7 +4058,7 @@ access to the source/model and write access to the target/control tables.</p>
     <span class="n">BatchSpec</span><span class="p">,</span> <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalSourceSpec</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span>
     <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span> <span class="n">prepare_local_workflow</span><span class="p">,</span> <span class="n">run_local_batch</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
 
 <span class="n">source_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.scoring_source"</span>
 <span class="n">target_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.predictions"</span>
@@ -4140,7 +4140,7 @@ control-table permissions.</p>
     <span class="n">InputSource</span><span class="p">,</span> <span class="n">LocalWorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span>
     <span class="n">prepare_local_workflow</span><span class="p">,</span> <span class="n">run_incremental_local_batch</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
 
 <span class="n">config</span> <span class="o">=</span> <span class="n">LocalWorkflowConfig</span><span class="p">(</span>
     <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>

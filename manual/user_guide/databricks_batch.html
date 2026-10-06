@@ -3669,7 +3669,7 @@ registry to verify the caller's model name/version association.</p>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.execution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionOptions</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">BatchSpec</span><span class="p">,</span> <span class="n">run_batch</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalTableLock</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocalTableLock</span>
 
 <span class="n">spec</span> <span class="o">=</span> <span class="n">BatchSpec</span><span class="p">(</span>
     <span class="n">period_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
@@ -3708,7 +3708,7 @@ Delta control table. Real local Delta tests cover independent Spark sessions and
 simultaneous claims. A live serverless test also rejected a second job while the
 first held ownership, then allowed the first job to commit. Operators must
 provision the authority once, before starting publishers:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
 
 <span class="n">target_id</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span>
     <span class="s2">"DESCRIBE DETAIL analytics.customer_predictions"</span>

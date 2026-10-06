@@ -1612,6 +1612,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#library-layout-and-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Library layout and compatibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#fitted-local-pipelines-pandas-or-polars" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3564,6 +3575,17 @@
 
 
 <h1 id="mlflow-model-packaging-development">MLflow model packaging (development)</h1>
+<h2 id="library-layout-and-compatibility">Library layout and compatibility</h2>
+<p>MLflow implementation lives under <code>skyulf.integrations.mlflow</code>: <code>models</code> owns
+pyfunc adapters, <code>spark</code> owns distributed prediction and worker environments,
+<code>lifecycle</code> owns validation and champion/challenger decisions, <code>registration</code>
+owns registry resolution, and <code>runs</code> owns tracking. Shared client, signature and
+nullable transport helpers live in <code>shared</code>.</p>
+<p>Use these grouped paths in new code. Released flat import paths remain available
+through lazy <code>_compat</code> aliases, including classes referenced in saved models.
+The root still exports <code>TrackingConfig</code>, <code>TrackingRun</code> and <code>track_run</code> without
+loading the optional MLflow dependency. Worker wheels and source certificates
+continue to cover the entire <code>skyulf</code> package.</p>
 <h2 id="fitted-local-pipelines-pandas-or-polars">Fitted local pipelines (pandas or Polars)</h2>
 <p>Use a <strong>local pipeline artifact</strong> when fitted preprocessing contains nodes that
 the portable Spark bundle does not yet support, such as categorical encoding or
@@ -3580,7 +3602,7 @@ Spark-capable <code>InferenceBundle</code> described below.</p>
     <span class="n">save_local_pipeline</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
 
 <span class="c1"># fitted_pipeline was already trained on pandas or Polars data.</span>
 <span class="n">save_local_pipeline</span><span class="p">(</span><span class="n">fitted_pipeline</span><span class="p">,</span> <span class="s2">"artifacts/local-pipeline"</span><span class="p">)</span>
@@ -3623,7 +3645,7 @@ preprocessing handles them; the adapter does not fill them or retrain an imputer
 integer or Boolean values pass their primitive signature. Floating-point
 columns keep numeric signatures and do not need this string transport.</p>
 <p>Use the public helper with a loaded model:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_pyfunc_input</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_pyfunc_input</span>
 
 <span class="n">loaded</span> <span class="o">=</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">pyfunc</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_uri</span><span class="p">)</span>
 <span class="c1"># raw_frame contains the original, typed values expected by this artifact.</span>
@@ -3691,17 +3713,24 @@ The current parity evidence is deliberately narrow:</p>
 <p>Other model families, input dtypes, and context-dependent nodes need their own
 parity checks before production use. The manifest records the concrete model
 class so a later preflight can compare it with this evidence.</p>
-<p>This package declares <code>whole_frame_local</code> scope. It supports bounded local
+<p>This package retains its <code>whole_frame_local</code> scope. It supports bounded local
 batch inference, including inside a Databricks Python task with the recorded
 dependencies installed. It does <strong>not</strong> certify independent HTTP row requests,
-Spark worker partitions, or Spark-native feature engineering; those require
-separate capability checks. It does not write Delta tables. The model URI points
+Spark worker partitions, or Spark-native feature engineering by itself. Newly
+logged, inspected pandas artifacts may additionally carry a partition-safety
+certificate for the <a href="databricks_bundle.html#distributed-inference-settings">Spark pyfunc route</a>.
+That adapter revalidates the loaded artifact, package signature, source hash and
+certificate before creating a named-input UDF with all output columns. Workers
+revalidate the same evidence on load. This package does not write Delta tables.
+The model URI points
 to a concrete run artifact; registering or promoting an alias is a separate,
 explicit step.</p>
 <p>Install <code>skyulf-core[mlflow]</code> in the loading environment. The MLflow model
 records exact package requirements, including the Skyulf version; provide the
-matching Skyulf wheel when the version is unpublished. The wheel is not embedded
-in the model. Only load local pipeline artifacts from trusted producers: pickle
+matching Skyulf wheel when the version is unpublished. Certified Spark packages
+embed an exact-source wheel for isolated worker installation; ordinary local
+packages retain their existing external-wheel requirement. Only load local
+pipeline artifacts from trusted producers: pickle
 can execute code while loading, and the checksum detects corruption rather than
 authenticating the source.</p>
 <h2 id="portable-inference-bundles">Portable inference bundles</h2>
@@ -3720,7 +3749,7 @@ MLflow's process-wide URI:</p>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.bundle</span><span class="w"> </span><span class="kn">import</span> <span class="n">build_bundle</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_model</span>
 
 <span class="n">bundle</span> <span class="o">=</span> <span class="n">build_bundle</span><span class="p">(</span>
     <span class="n">fitted_pipeline</span><span class="p">,</span>

@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#local-engine-databricks-bundle" class="md-skip">
+        <a href="#databricks-bundle-local-training-and-selectable-inference" class="md-skip">
           Skip to content
         </a>
       
@@ -1724,6 +1724,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#distributed-inference-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Distributed inference settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#guided-setup-and-offline-preview" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1972,6 +1983,17 @@
     <span class="md-ellipsis">
       
         Additional quality gates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reading-notebook-results-and-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading notebook results and failures
       
     </span>
   </a>
@@ -3823,15 +3845,72 @@
   
 
 
-<h1 id="local-engine-databricks-bundle">Local-engine Databricks Bundle</h1>
+<h1 id="databricks-bundle-local-training-and-selectable-inference">Databricks Bundle: local training and selectable inference</h1>
 <p>For job-screen instructions and lifecycle diagrams, use the
 <a href="databricks_bundle_walkthrough.html">operator walkthrough</a>.</p>
 <p>For optional weight columns, class weights, SMOTE settings and supported models,
 see <a href="weighted_training.html">Weighted Training &amp; Support</a>.</p>
 <p>The custom Skyulf template generates one editable Bundle with <code>dev</code>, <code>test</code>,
-<code>syst</code> and <code>prod</code> targets. It fits and predicts with pandas or Polars. Spark
-reads bounded Unity Catalog Delta rows and publishes predictions; local
-feature engineering and model prediction are not distributed Spark work.</p>
+<code>syst</code> and <code>prod</code> targets. Training stays local. New projects independently choose
+<code>inference_mode=local</code> or <code>spark</code> based on the expected rows and bytes per scoring
+run and available memory. Local mode trains and scores with pandas or Polars.
+Spark mode trains with pandas and scores through <code>mlflow.pyfunc.spark_udf</code> on
+workers, retaining keyed predictions in Spark through Delta publication.
+Older configurations default to local inference; explicit Spark with Polars is
+rejected. Monitoring already runs on Spark and has no additional engine choice.</p>
+<h3 id="distributed-inference-settings">Distributed inference settings</h3>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"engine"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pandas"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"inference_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"spark"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"spark_udf_env_manager"</span><span class="p">:</span><span class="w"> </span><span class="s2">"local"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"spark_udf_prediction_batch_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">10000</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>max_rows</code> and <code>max_input_mb</code> continue to bound local training. They do not cap
+the distributed scoring population. <code>spark_udf_prediction_batch_rows</code> bounds
+each model prediction call to 1–100000 rows by slicing the received worker frame.
+It does not bound Arrow transport allocation: Databricks manages that separately,
+and serverless does not allow changing <code>spark.sql.execution.arrow.maxRecordsPerBatch</code>.
+Each worker needs memory for the model, incoming Arrow frame and prediction slices.
+There is no universal row threshold for choosing Spark. A failed distributed
+run does not fall back to collecting the population locally.</p>
+<p>Initial support covers SimpleImputer mean/constant and StandardScaler with
+LinearRegression or LogisticRegression, including reviewed built-in tuning
+wrappers. Single and competition layouts score the pinned model or winner.
+Model sets validate every component and support independent outputs without
+custom composition. Unsupported steps, models, callbacks, temporal history and
+tuning feature exclusions fail before predictions are published. The model menus
+also serve local projects; Bundle validation does not certify a fitted artifact.</p>
+<p>For serverless, the template selects MLflow <code>env_manager=local</code>: Spark workers use
+the declared Bundle task environment containing the exact wheel and dependencies.
+This setting concerns worker environment reuse, not driver-side scoring.
+Artifact loading checks fitted runtime versions and the certificate checks the
+exact Skyulf source hash. Verify driver/worker versions on the target compute.
+Policy-cluster projects select <code>virtualenv</code>, which installs the embedded wheel
+and saved dependency pins into an isolated worker environment. Validate that
+option on the chosen runtime: the tested serverless runtime rejects MLflow 3.16.1
+virtualenv archives containing absolute interpreter symlinks. No automatic
+environment or scoring fallback occurs.</p>
+<p>For measured capacity and a repeatable benchmark, see
+<a href="spark.html#measuring-inference-capacity">Measuring inference capacity</a>.
+SM-58 compares native FE, worker Python preprocessing and this Bundle's pyfunc
+route with 1–5 million rows. These timings include a correctness aggregate and
+exclude Delta publication; they are not complete score-job latency estimates.
+The benchmark stores reports in its own schema/volume and leaves project jobs,
+monitoring tables and the shared dashboard unchanged. The initial validation
+workspace supports only serverless, so classic executor RSS and <code>virtualenv</code>
+packaging still require a classic-enabled workspace.</p>
+<p>Certified MLflow packages carry a safety certificate, source hash and exact-source
+Skyulf wheel. Existing whole-frame
+packages need a newly logged certified version; a pickle alone grants no Spark
+capability. Nullable integer and Boolean transport occurs before Arrow conversion.</p>
+<p>In <strong>Workflows → score job → score task</strong>, inspect the concrete model/version,
+input/output counts, source watermark and receipt. Spark receipts include
+<code>inference_mode</code>, environment manager and prediction batch size. Initial snapshots,
+insert-only CDF windows, no-op replay, model-change policies and optional
+<code>recover_predictions</code> use the same guarded Delta publication lifecycle. All model
+set outputs commit together. Successful scoring retains the monitoring child-job
+and native dashboard-refresh handoff.</p>
 <p>Initialize a project from a Skyulf checkout:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
 </code></pre></div>
@@ -4978,8 +5057,8 @@ compatibility, metric/threshold domains and action-specific snapshot inputs.
 Actual source schema, keys and artifact compatibility are checked by the
 existing data-read and scoring services against the real data.</p>
 <p>The same check can run locally, without Spark or registry access:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_target_config</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_workflow_config</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_target_config</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.projects.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_workflow_config</span>
 
 <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_target_config</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="p">{</span>
     <span class="s2">"catalog"</span><span class="p">:</span> <span class="s2">"workspace"</span><span class="p">,</span>
@@ -4991,7 +5070,7 @@ existing data-read and scoring services against the real data.</p>
 <span class="n">validate_workflow_config</span><span class="p">(</span><span class="n">resolved</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s2">"train"</span><span class="p">)</span>  <span class="c1"># Or score, approve, etc.</span>
 </code></pre></div>
 <p>For an older project's loaded JSON, migrate explicitly:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">migrate_workflow_config</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.projects.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">migrate_workflow_config</span>
 
 <span class="n">updated</span> <span class="o">=</span> <span class="n">migrate_workflow_config</span><span class="p">(</span>
     <span class="n">config</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"regression"</span><span class="p">,</span> <span class="n">score_handoff</span><span class="o">=</span><span class="s2">"after_alias_change"</span>
@@ -5166,7 +5245,7 @@ training job. Review that saved result before passing its version and digest:</p
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">asdict</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_action</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_action</span>
 
 <span class="c1"># candidate is the result of an earlier training job; no training runs here.</span>
 <span class="n">comparison</span> <span class="o">=</span> <span class="n">asdict</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">comparison</span><span class="p">)</span>
@@ -5359,7 +5438,7 @@ Approval requires the saved policy unchanged and re-evaluates it before changing
 Omitting <code>quality_gates</code> preserves the single-gate policy and historical receipt
 digests. SDK callers should use the returned <code>comparison_sha256</code>; when explicitly
 serializing a report for evidence, use <code>comparison_payload</code>/<code>comparison_digest</code>
-from <code>skyulf.integrations.mlflow.validation</code> instead of hashing <code>dataclasses.asdict</code>.</p>
+from <code>skyulf.integrations.mlflow.lifecycle.validation</code> instead of hashing <code>dataclasses.asdict</code>.</p>
 <p>In both modes, registration nominates <code>@challenger</code> before comparison. A tied
 or worse candidate retains that alias with <code>validation_status=rejected</code> and
 a reason; comparison errors retain it with <code>validation_status=error</code>.
@@ -5381,6 +5460,44 @@ and evidence hashes for rollback/recovery; their JSON fields are <code>action</c
 identifies the version previously held by the affected alias, not necessarily
 the previous champion. These are audit records,
 not settings to edit. Earlier compact receipts remain supported.</p>
+<h3 id="reading-notebook-results-and-failures">Reading notebook results and failures</h3>
+<p>Open <strong>Jobs &gt; your run &gt; the task &gt; Output</strong>. Generated notebooks print
+<code>STARTED</code>, then either <code>COMPLETED</code> with elapsed time or <code>FAILED</code> with the task
+name, exception type, message, source file and line. Available job/run/model
+identifiers appear beside the start message. Failure diagnostics preserve the
+original exception and traceback; they do not convert a failed task to success.
+Inspect the failing task's inputs and saved effects before retrying.</p>
+<p>Normal training and scoring output uses labeled text sections. Absent optional
+values are omitted from the visible summary; meaningful <code>False</code>, <code>0</code>, decisions
+and reasons remain. Long result lists are abbreviated with a notice. The full
+JSON notebook result and task values remain unchanged for automation. SHAP and
+monitoring retain their existing richer reports; the chart task lists artifact
+locations. The notebook exit stays in a separate final cell.</p>
+<p>New projects generate only the selected modeling files: <code>single_model.py</code>,
+<code>model_competition.py</code>, or <code>multi_model.py</code> plus <code>model_set.py</code>. Job notebooks are
+also limited to the selected graph, including optional SHAP/charts/recovery.
+This affects new generation; it does not delete files from existing projects.
+Reinitialize a separate project when changing layout or enabling a feature whose
+notebook was omitted, then review and merge the required resources and files.
+Do not only toggle a resource flag and reference a missing notebook.</p>
+<p>The library's <code>skyulf.integrations.databricks</code> modules are grouped under <code>jobs</code>,
+<code>training</code>, <code>scoring</code>, <code>observability</code>, <code>model_sets</code>, <code>projects</code>, <code>data</code> and
+<code>lifecycle</code>, with cross-domain contracts in <code>shared</code>. Crowded groups have smaller
+subpackages: <code>jobs/{training,monitoring,lifecycle,shared}</code>,
+<code>training/{fitting,competition,tuning,thresholds,weights,shared}</code> and
+<code>scoring/{batch,incremental,shared}</code>. Monitoring lives in
+<code>observability/monitoring</code>, with <code>local</code>, <code>spark</code> and <code>performance</code> subpackages;
+charts and reports have their own folders. For example, notebook adapters import
+<code>skyulf.integrations.databricks.jobs.shared.job_runtime</code>.
+Use these paths for new code. <code>_compat</code> preserves old module imports
+and serialized class references; it contains aliases, not a second runtime.
+The generated project's <code>src/jobs</code> directory remains unchanged.</p>
+<p>The related MLflow library follows the same organization:
+<code>skyulf.integrations.mlflow.{models,spark,lifecycle,registration,runs,shared}</code>.
+Its <code>_compat</code> aliases preserve existing model class and notebook import paths.
+Package import still leaves MLflow optional; pyfunc adapters load it when selected.
+Worker source snapshots and certificates continue to cover the entire Skyulf
+package after the files move.</p>
 <p>With <code>score_model_selection=champion</code>, score resolves the alias once to a
 concrete version per run, under either promotion policy. Only the serialized
 train job identity may write this
@@ -5499,8 +5616,11 @@ scoring, approve manually or use automatic promotion gates, then run score or
 enable the optional handoff. Inspect both lifecycle and score task results. The first score
 rejects a missing source, disabled CDF, unsuitable row keys, a model output
 mismatch or an existing target schema mismatch before creating prediction
-output. It checks initial row count against <code>max_rows</code>; each score
-also checks decoded transfer size against the <code>max_input_mb</code> budget. Existing tables are
+output. Local inference checks initial row count against <code>max_rows</code> and decoded
+transfer size against <code>max_input_mb</code>. Spark inference checks keys globally and
+keeps the scoring population distributed. Model-set approval uses a deterministic,
+bounded functional probe after partition-safety and global key checks; saved
+holdout quality gates still evaluate their complete evidence. Existing tables are
 never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source

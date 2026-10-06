@@ -3568,8 +3568,8 @@ open a client, or contact a registry.</p>
 registered-model version. It accepts a <code>runs:/&lt;run_id&gt;/&lt;artifact_path&gt;</code> URI and
 returns MLflow's model-version object. Registration never assigns an alias:
 promotion is a separate operation owned by the caller.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_model</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_model</span>
 
 <span class="n">model_uri</span> <span class="o">=</span> <span class="n">log_model</span><span class="p">(</span>
     <span class="n">bundle</span><span class="p">,</span>
@@ -3588,7 +3588,7 @@ promotion is a separate operation owned by the caller.</p>
 <p>Resolve exactly one selector at the start of a job. An alias is looked up once;
 the returned object carries the concrete version URI, so a later alias move does
 not change the model used by the running job.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_model</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_model</span>
 
 <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_model</span><span class="p">(</span>
     <span class="s2">"customer_risk"</span><span class="p">,</span>
@@ -3624,7 +3624,7 @@ mode, subject to their existing schema and FE capabilities.</p>
 declared local artifact path, scope, engine and payload digest against the
 pinned registry version. That package supports whole-frame local inference;
 it does not become a Spark bundle merely because it is registered.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_registered_bundle</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_registered_bundle</span>
 
 <span class="n">bundle</span> <span class="o">=</span> <span class="n">load_registered_bundle</span><span class="p">(</span>
     <span class="n">resolved</span><span class="p">,</span>
@@ -3645,7 +3645,7 @@ There is no separate Databricks or MLflow training algorithm.</p>
 <p>For example, a training job can log every available held-out metric to
 its own MLflow run without implementing a second evaluator:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.local_evaluation</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_local_holdout</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.tracking</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.runs.tracking</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
 
 <span class="n">metrics</span> <span class="o">=</span> <span class="n">evaluate_local_holdout</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">heldout</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
 <span class="k">with</span> <span class="n">track_run</span><span class="p">(</span>
@@ -3662,8 +3662,8 @@ identity in the report but does not verify the underlying table by itself.
 The report also records the running Skyulf Core version and both model digests.
 The comparison uses the saved FE, model, class order and tuned thresholds.
 It accepts a row/memory budget and rejects incompatible tasks or class labels.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_registered_local_models</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.lifecycle.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_registered_local_models</span>
 
 <span class="n">candidate</span> <span class="o">=</span> <span class="n">resolve_model</span><span class="p">(</span>
     <span class="s2">"catalog.schema.customer_risk"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"2"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span>
@@ -3713,7 +3713,7 @@ not move <code>@champion</code>. A replacement challenger requires an explicit
 <code>expected_challenger_version</code>; staging cannot silently overwrite another
 candidate. Merely registering or comparing a model never assigns an alias.</p>
 <p>An orchestrator can explicitly create <code>ChallengerLifecycle</code> from
-<code>skyulf.integrations.mlflow.challenger</code> and pass its <code>registered</code> method as
+<code>skyulf.integrations.mlflow.lifecycle.challenger</code> and pass its <code>registered</code> method as
 <code>train_local_candidate(..., on_registered=...)</code>. This nominates a registered
 contender before comparison, with <code>validation_status=pending</code>. After evaluation,
 <code>stage_challenger</code> records <code>passed</code> or <code>rejected</code>; <code>lifecycle.failed()</code> records
@@ -3731,7 +3731,7 @@ first-champion initialization.</p>
 must use the same non-expiring admission authority, and registry write
 permissions must be restricted to that controlled path. A local development
 store can use LocalAliasAdmission with a shared lock directory:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.promotion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.lifecycle.promotion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">LocalAliasAdmission</span><span class="p">,</span>
     <span class="n">promote_candidate</span><span class="p">,</span>
     <span class="n">rollback_promotion</span><span class="p">,</span>
@@ -3774,7 +3774,7 @@ separate, preprovisioned Delta control table containing exactly one row:
 target_id = alias_resource_id(model_name, "champion") and nullable owner = NULL.
 Provision it once with a plain CREATE TABLE statement so an existing authority
 cannot be overwritten:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.promotion</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaAliasAdmission</span><span class="p">,</span> <span class="n">alias_resource_id</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.lifecycle.promotion</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaAliasAdmission</span><span class="p">,</span> <span class="n">alias_resource_id</span>
 
 <span class="n">key</span> <span class="o">=</span> <span class="n">alias_resource_id</span><span class="p">(</span><span class="s2">"catalog.schema.customer_risk"</span><span class="p">,</span> <span class="s2">"champion"</span><span class="p">)</span>
 <span class="n">spark</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span>
@@ -3814,7 +3814,7 @@ is not proof that promotion completed. Registry tags are audit records for
 controlled writers, not tamper-proof authorization tokens.
 The event tag key uses underscores, and its compact value stays within Unity
 Catalog's 256-byte tag-value limit.</p>
-<p><code>skyulf.integrations.mlflow.rejection.reject_candidate(report, reason=...,
+<p><code>skyulf.integrations.mlflow.lifecycle.rejection.reject_candidate(report, reason=...,
 expected_champion_version=..., admission=..., tracking_uri=..., registry_uri=...)</code>
 records an explicit operator decision against the exact staged comparison.
 It leaves aliases and evaluation metrics/status unchanged, adding
