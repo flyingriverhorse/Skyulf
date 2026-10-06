@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from .....mlflow.runs.tracking import TrackingConfig, track_run
@@ -16,6 +17,7 @@ from ..monitoring_store import (
     persist_report,
     result_row,
 )
+from ..serving.serving_observation import observation_keys, read_serving_observation
 
 
 def observe_model(
@@ -71,13 +73,16 @@ def observe_model(
             experiment_name,
         )
     manifest = artifact.manifest
+    keys = observation_keys(config, spec)
+    if config.serving_endpoint:
+        observation_reader = partial(read_serving_observation, artifact=artifact)
     version = evidence["model_version"]
     probabilities = len(manifest.classes) if manifest.classification_probabilities else 0
     current, predictions, observed_evidence, observed_at = observation_reader(
         spark,
         config,
         version,
-        spec.record_key_columns,
+        keys,
         manifest.input_columns,
         probabilities=probabilities,
         as_of=as_of,
@@ -87,7 +92,7 @@ def observe_model(
     labels, label_evidence = label_reader(
         spark,
         config,
-        spec.record_key_columns,
+        keys,
         spec.target_column,
         predictions,
         as_of,
@@ -99,7 +104,7 @@ def observe_model(
         predictions,
         labels,
         feature_columns=manifest.input_columns,
-        record_key_columns=spec.record_key_columns,
+        record_key_columns=keys,
         target_column=spec.target_column,
         result_available_at_column=config.result_available_at_column or "result_available_at",
         as_of=as_of,
@@ -107,6 +112,12 @@ def observe_model(
         classes=manifest.classes,
         thresholds=config.thresholds,
     )
+    if config.serving_endpoint:
+        report["serving"] = observed_evidence["serving"]
+        report.setdefault("notes", []).append(
+            "Serving observations describe captured requests; platform logging is asynchronous "
+            "and may omit HTTP error responses. Counts are not total endpoint traffic."
+        )
     if config.performance_policy:
         from .monitoring_performance import observe_performance_safely  # noqa: PLC0415
 

@@ -1,1303 +1,630 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Skyulf turns scikit-learn into pipelines you can trust. Build them visually on a canvas or with the Apache-2.0 skyulf-core Python library. Automated EDA, tuning, deployment and monitoring - self-hosted.">
-    <meta name="keywords" content="Machine Learning Pipeline, Visual ML, scikit-learn, AutoML, Data Leakage Prevention, Feature Engineering, Model Registry, MLOps, Python, FastAPI, Polars, Self-Hosted, Data Science, Optuna, SHAP">
-    <meta name="author" content="Skyulf Team">
-    <link rel="canonical" href="https://www.skyulf.com/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · Open-source visual MLOps for scikit-learn — self-hosted ML pipelines</title>
+<meta name="description" content="Skyulf turns scikit-learn into pipelines you can trust. Build them visually on a canvas or with the Apache-2.0 skyulf-core Python library. Automated EDA, tuning, deployment and monitoring - self-hosted.">
+<meta name="keywords" content="Machine Learning Pipeline, Visual ML, scikit-learn, AutoML, Data Leakage Prevention, Feature Engineering, Model Registry, MLOps, Python, FastAPI, Polars, Self-Hosted, Data Science, Optuna, SHAP, MLflow, Databricks, open source MLOps, visual machine learning, no-code ML, low-code ML, ML pipeline builder, sklearn pipeline, data drift monitoring, automated EDA, Jupyter notebook export, model deployment, self-hosted AutoML, KNIME alternative, Dataiku alternative">
+<meta name="author" content="Skyulf Team">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="theme-color" content="#12081f">
+<meta name="application-name" content="Skyulf">
+<meta name="apple-mobile-web-app-title" content="Skyulf">
+<link rel="canonical" href="https://www.skyulf.com/">
+<link rel="alternate" hreflang="en" href="https://www.skyulf.com/">
+<link rel="alternate" hreflang="x-default" href="https://www.skyulf.com/">
+<link rel="icon" type="image/png" href="./static/img/logo.png">
+<link rel="apple-touch-icon" href="./static/img/logo.png">
 
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://www.skyulf.com/">
-    <meta property="og:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
-    <meta property="og:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core. Skyulf catches the data leakage that quietly inflates your scores.">
-    <meta property="og:image" content="https://www.skyulf.com/static/img/og-image.jpg">
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
-    <meta property="twitter:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Skyulf">
+<meta property="og:locale" content="en_US">
+<meta property="og:url" content="https://www.skyulf.com/">
+<meta property="og:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
+<meta property="og:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core. Skyulf catches the data leakage that quietly inflates your scores.">
+<meta property="og:image" content="https://www.skyulf.com/static/img/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Skyulf — visual ML pipeline canvas over scikit-learn">
+<meta property="og:video" content="https://www.skyulf.com/static/video/wolf.mp4">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
+<meta name="twitter:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core.">
+<meta name="twitter:image" content="https://www.skyulf.com/static/img/og-image.jpg">
+<meta name="twitter:image:alt" content="Skyulf — visual ML pipeline canvas over scikit-learn">
 
-    <title>Skyulf · Stop trusting your pipeline. Verify it.</title>
-    <link rel="icon" type="image/png" href="./static/img/logo.png">
-    <link rel="preload" as="image" href="./static/img/wolf-hero.png">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://www.skyulf.com/#org","name":"Skyulf","url":"https://www.skyulf.com/","logo":"https://www.skyulf.com/static/img/logo.png","founder":{"@type":"Person","name":"Murat Unsal","sameAs":["https://www.linkedin.com/in/murat-u/"]},"sameAs":["https://github.com/flyingriverhorse/Skyulf","https://pypi.org/project/skyulf-core/","https://flyingriverhorse.github.io/Skyulf/"]},{"@type":"WebSite","@id":"https://www.skyulf.com/#website","url":"https://www.skyulf.com/","name":"Skyulf","description":"Open-source, self-hosted visual MLOps platform and Python library for scikit-learn pipelines.","publisher":{"@id":"https://www.skyulf.com/#org"},"inLanguage":"en"},{"@type":"SoftwareApplication","name":"Skyulf","operatingSystem":"Windows, Linux, macOS","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR","availability":"https://schema.org/InStock"},"description":"Skyulf turns scikit-learn into pipelines you can trust. Build them visually on a canvas or with the Apache-2.0 skyulf-core Python library.","author":{"@id":"https://www.skyulf.com/#org"},"featureList":"Visual ML Canvas, 36 pipeline nodes, Automated EDA, Data Leakage Detection, Hyperparameter Tuning, Optuna, SHAP Explainability, Model Registry, Model Deployment, Drift Monitoring, Notebook Export, Multi-Branch Pipelines, Audit Log, Ensembles, Text and NLP nodes, MLflow and Databricks templates","softwareRequirements":"Python 3.12","screenshot":"https://www.skyulf.com/static/img/canvas.jpg","sameAs":["https://github.com/flyingriverhorse/Skyulf","https://pypi.org/project/skyulf-core/"]},{"@type":"SoftwareSourceCode","name":"skyulf-core","codeRepository":"https://github.com/flyingriverhorse/Skyulf","programmingLanguage":"Python","runtimePlatform":"Python 3.12","license":"https://www.apache.org/licenses/LICENSE-2.0","keywords":"mlops, scikit-learn, machine learning pipeline, data leakage, automl, eda, polars, fastapi, mlflow, databricks","author":{"@id":"https://www.skyulf.com/#org"}},{"@type":"VideoObject","name":"Skyulf","description":"Skyulf hero video","thumbnailUrl":"https://www.skyulf.com/static/img/wolf-hero.png","contentUrl":"https://www.skyulf.com/static/video/wolf.mp4","uploadDate":"2026-01-01"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is Skyulf?","acceptedAnswer":{"@type":"Answer","text":"Skyulf is two things that share one engine: skyulf-core, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift."}},{"@type":"Question","name":"What is the meaning of Skyulf?","acceptedAnswer":{"@type":"Answer","text":"Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means \"wolf\", with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven."}},{"@type":"Question","name":"Do I have to self-host Skyulf?","acceptedAnswer":{"@type":"Answer","text":"You can try the hosted demo first, with nothing to install. For real work you run it yourself with docker compose up, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it, which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party."}},{"@type":"Question","name":"How is Skyulf different from cloud MLOps platforms?","acceptedAnswer":{"@type":"Answer","text":"Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow."}},{"@type":"Question","name":"Is Skyulf really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. Skyulf is open source under a split license. skyulf-core, the Python library, is Apache 2.0, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is AGPLv3, so improvements to the application itself are shared back."}},{"@type":"Question","name":"Can I use Skyulf in production?","acceptedAnswer":{"@type":"Answer","text":"It is perfect for internal tools, research, and experimentation. The team is working towards a stable v1.0 for critical production workloads."}},{"@type":"Question","name":"How can I contribute to Skyulf?","acceptedAnswer":{"@type":"Answer","text":"Contributions are welcome on GitHub at github.com/flyingriverhorse/Skyulf. Whether it is code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf."}},{"@type":"Question","name":"Does Skyulf offer a commercial license?","acceptedAnswer":{"@type":"Answer","text":"Building on skyulf-core (Apache 2.0) is free for any use, commercial included. The platform is AGPLv3: running it internally, unmodified, needs nothing from you, but offering a modified version as a public network service means publishing your source, or asking for a commercial exception."}}]}</script>
 
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "Skyulf",
-      "operatingSystem": "Windows, Linux, macOS",
-      "applicationCategory": "DeveloperApplication",
-      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock" },
-      "description": "Skyulf turns scikit-learn into pipelines you can trust. Build them visually on a canvas or with the Apache-2.0 skyulf-core Python library.",
-      "author": { "@type": "Organization", "name": "Skyulf", "url": "https://www.skyulf.com" },
-      "featureList": "Visual ML Canvas, 35 pipeline nodes, Automated EDA, Data Leakage Detection, Hyperparameter Tuning, Optuna, SHAP Explainability, Model Registry, Model Deployment, Drift Monitoring, Notebook Export, Multi-Branch Pipelines, Audit Log, Ensembles, Text and NLP nodes",
-      "softwareRequirements": "Python 3.12",
-      "sameAs": [
-        "https://github.com/flyingriverhorse/Skyulf",
-        "https://pypi.org/project/skyulf-core/"
-      ]
-    }
-    </script>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is Skyulf?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Skyulf is two things that share one engine: skyulf-core, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift." }
-        },
-        {
-          "@type": "Question",
-          "name": "What is the meaning of Skyulf?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means \"wolf\", with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven." }
-        },
-        {
-          "@type": "Question",
-          "name": "Do I have to self-host Skyulf?",
-          "acceptedAnswer": { "@type": "Answer", "text": "You can try the hosted demo first, with nothing to install. For real work you run it yourself with docker compose up, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it, which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party." }
-        },
-        {
-          "@type": "Question",
-          "name": "How is Skyulf different from cloud MLOps platforms?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow." }
-        },
-        {
-          "@type": "Question",
-          "name": "Is Skyulf really free?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Skyulf is open source under a split license. skyulf-core, the Python library, is Apache 2.0, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is AGPLv3, so improvements to the application itself are shared back." }
-        },
-        {
-          "@type": "Question",
-          "name": "Can I use Skyulf in production?",
-          "acceptedAnswer": { "@type": "Answer", "text": "It is perfect for internal tools, research, and experimentation. The team is working towards a stable v1.0 for critical production workloads." }
-        },
-        {
-          "@type": "Question",
-          "name": "How can I contribute to Skyulf?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Contributions are welcome on GitHub at github.com/flyingriverhorse/Skyulf. Whether it is code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf." }
-        },
-        {
-          "@type": "Question",
-          "name": "Does Skyulf offer a commercial license?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Building on skyulf-core (Apache 2.0) is free for any use, commercial included. The platform is AGPLv3: running it internally, unmodified, needs nothing from you, but offering a modified version as a public network service means publishing your source, or asking for a commercial exception." }
-        }
-      ]
-    }
-    </script>
+<script>
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem('skyulf-theme'); } catch (e) {}
+  var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  if (saved === 'light' || (!saved && prefersLight)) document.documentElement.classList.add('light');
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600;1,700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="preload" as="image" href="./static/img/wolf-hero.png">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600;1,700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght@20..48,300..600&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Applied before first paint so a light-theme visitor never sees a dark flash.
-        (function () {
-            var saved = null;
-            try { saved = localStorage.getItem('skyulf-theme'); } catch (e) { /* private mode */ }
-            var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-            if (saved === 'light' || (!saved && prefersLight)) {
-                document.documentElement.classList.add('light');
-            }
-        })();
-    </script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Hanken Grotesk"', 'system-ui', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-                    },
-                }
-            }
-        }
-    </script>
-
-    <style>
-        /* ---------- Palette: galaxy night (dark) / dawn above the clouds (light) ---------- */
-        :root {
-            --bg: #12081f;
-            --bg-soft: #1a0b2e;
-            --panel: #1d1033;
-            --panel-60: rgba(26, 11, 46, 0.62);
-            --line: rgba(237, 220, 255, 0.14);
-            --ink: #f5f5ff;
-            --soft: #c9bde4;
-            --faint: #9a8fb8;
-            --gold: #f2c025;
-            --gold-text: #ffd75e;
-            --rose: #ffdad9;
-            --peri: #c7d0ff;
-            --hero-shade-top: rgba(18, 8, 31, 0.50);
-            --hero-shade-mid: rgba(18, 8, 31, 0.22);
-            --hero-shadow: rgba(18, 8, 31, 0.35);
-            --scroll-track: #12081f;
-            --scroll-thumb: #3d2e52;
-        }
-        html.light {
-            --bg: #f5f6fc;
-            --bg-soft: #ffffff;
-            --panel: #ffffff;
-            --panel-60: rgba(255, 255, 255, 0.72);
-            --line: rgba(23, 16, 43, 0.12);
-            --ink: #17102b;
-            --soft: #4c4560;
-            --faint: #6b6485;
-            --gold: #96690a;
-            --gold-text: #8a5b00;
-            --rose: #b4455c;
-            --peri: #3b4bc4;
-            --hero-shade-top: rgba(245, 246, 252, 0.30);
-            --hero-shade-mid: rgba(245, 246, 252, 0.08);
-            --hero-shadow: rgba(255, 255, 255, 0.65);
-            --scroll-track: #eef0f8;
-            --scroll-thumb: #b9bed6;
-        }
-
-        body { font-family: 'Hanken Grotesk', system-ui, sans-serif; background: var(--bg); color: var(--soft); }
-        .msi { font-family: 'Material Symbols Outlined'; font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-        .text-ink { color: var(--ink); }
-        .text-soft { color: var(--soft); }
-        .text-faint { color: var(--faint); }
-        .text-gold { color: var(--gold-text); }
-        .text-rose { color: var(--rose); }
-        .text-peri { color: var(--peri); }
-        .border-line { border-color: var(--line); }
-        .bg-night { background-color: var(--bg); }
-        .bg-night-soft { background-color: var(--bg-soft); }
-
-        ::selection { background: var(--gold); color: #17102b; }
-        ::-webkit-scrollbar { width: 9px; }
-        ::-webkit-scrollbar-track { background: var(--scroll-track); }
-        ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 5px; }
-        :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
-
-        /* ---------- Glass ---------- */
-        .glass-panel {
-            background: var(--panel-60);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid var(--line);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.25);
-        }
-        html.light .glass-panel { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 32px rgba(23, 16, 43, 0.08); }
-
-        /* Gradient hairline border (gold -> rose) */
-        .aurora-border {
-            border: 1px solid transparent;
-            background-image: linear-gradient(var(--panel-60), var(--panel-60)),
-                linear-gradient(135deg, rgba(242, 192, 37, 0.45), rgba(255, 218, 217, 0.12) 55%, rgba(199, 208, 255, 0.25));
-            background-origin: border-box;
-            background-clip: padding-box, border-box;
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-        }
-
-        /* ---------- Buttons ---------- */
-        .btn-gold {
-            position: relative; overflow: hidden;
-            background: #f2c025; color: #17102b;
-            transition: transform .2s ease, box-shadow .3s ease;
-        }
-        .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 0 28px rgba(242, 192, 37, 0.45); }
-        .btn-gold::after {
-            content: ''; position: absolute; top: -60%; left: -80%; width: 50%; height: 220%;
-            background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.75), transparent);
-            transform: rotate(20deg); transition: left .7s ease;
-        }
-        .btn-gold:hover::after { left: 130%; }
-
-        .btn-ghost { border: 1px solid var(--line); color: var(--ink); transition: border-color .25s ease, background .25s ease, transform .2s ease; }
-        .btn-ghost:hover { border-color: rgba(242, 192, 37, 0.55); transform: translateY(-2px); }
-
-        /* ---------- Hero ---------- */
-        .hero-bg {
-            position: absolute; inset: -12% 0 0 0;
-            background-image: url('./static/img/wolf-hero.png');
-            background-size: cover; background-position: center 30%;
-            will-change: transform;
-        }
-        .hero-shade {
-            position: absolute; inset: 0;
-            background: linear-gradient(to bottom, var(--hero-shade-top), var(--hero-shade-mid) 45%, var(--bg) 98%);
-        }
-        html.light .hero-shade {
-            background: linear-gradient(to bottom, var(--hero-shade-top), var(--hero-shade-mid) 40%, var(--bg) 96%);
-        }
-
-        /* Line-mask headline reveal */
-        .line { display: block; overflow: hidden; padding-bottom: .12em; margin-bottom: -.12em; }
-        html.js .line-in { display: inline-block; transform: translateY(115%); transition: transform 1.1s cubic-bezier(.16, 1, .3, 1); }
-        html.js .line:nth-child(2) .line-in { transition-delay: .14s; }
-        html.js body.loaded .line-in, html.js .loaded .line-in { transform: none; }
-
-        /* Scroll reveal */
-        html.js .rv { opacity: 0; transform: translateY(28px); transition: opacity .8s ease, transform .8s cubic-bezier(.2, .8, .2, 1); }
-        html.js .rv.in { opacity: 1; transform: none; }
-
-        /* Card hover glow */
-        .hover-lift { transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease; }
-        .hover-lift:hover { transform: translateY(-4px); border-color: rgba(242, 192, 37, 0.4); box-shadow: 0 12px 44px rgba(242, 192, 37, 0.10); }
-
-        /* Marquee */
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .animate-marquee { animation: marquee 42s linear infinite; }
-        .marquee-wrap:hover .animate-marquee { animation-play-state: paused; }
-
-        /* Scroll cue */
-        @keyframes cue { 0%, 100% { transform: translateY(0); opacity: .9; } 50% { transform: translateY(9px); opacity: .4; } }
-        .scroll-cue { animation: cue 2.2s ease-in-out infinite; }
-
-        /* Pulsing dot */
-        @keyframes ping-soft { 0% { transform: scale(1); opacity: .8; } 70%, 100% { transform: scale(2.4); opacity: 0; } }
-        .dot-ping::before { content: ''; position: absolute; inset: 0; border-radius: 9999px; background: #f2c025; animation: ping-soft 1.8s cubic-bezier(0, 0, .2, 1) infinite; }
-
-        /* Timeline */
-        .timeline-line { background: linear-gradient(to bottom, rgba(242, 192, 37, 0), rgba(242, 192, 37, .7) 12%, rgba(255, 218, 217, .6) 50%, rgba(199, 208, 255, .6) 88%, rgba(199, 208, 255, 0)); }
-
-        /* Code surface stays dark in both themes, like an editor */
-        .code-surface { background: #150629; border: 1px solid rgba(237, 220, 255, 0.12); color: #d8cdf0; }
-
-        /* Lightbox */
-        #lightbox { opacity: 0; pointer-events: none; transition: opacity .3s ease; }
-        #lightbox.active { opacity: 1; pointer-events: all; }
-        .lightbox-content { transform: scale(.92); transition: transform .3s ease; }
-        #lightbox.active .lightbox-content { transform: scale(1); }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        @media (prefers-reduced-motion: reduce) {
-            html { scroll-behavior: auto; }
-            html.js .rv, html.js .line-in { opacity: 1 !important; transform: none !important; transition: none !important; }
-            .animate-marquee, .scroll-cue, .dot-ping::before { animation: none !important; }
-            .hero-bg { transform: none !important; }
-        }
-    </style>
+<style>
+:root{--bg:#12081f;--bg-soft:#1a0b2e;--panel:#1d1033;--panel-60:rgba(26,11,46,.62);--line:rgba(237,220,255,.14);--ink:#f5f5ff;--soft:#c9bde4;--faint:#9a8fb8;--gold:#f2c025;--gold-text:#ffd75e;--rose:#ffdad9;--peri:#c7d0ff;--code-bg:#150629;--glow:rgba(242,192,37,.10);--shade-top:rgba(18,8,31,.50);--shade-mid:rgba(18,8,31,.22);--edge:clamp(20px,5vw,72px);--mono:'JetBrains Mono',ui-monospace,monospace}
+html.light{--bg:#f5f6fc;--bg-soft:#fff;--panel:#fff;--panel-60:rgba(255,255,255,.72);--line:rgba(23,16,43,.12);--ink:#17102b;--soft:#4c4560;--faint:#6b6485;--gold:#96690a;--gold-text:#8a5b00;--rose:#b4455c;--peri:#3b4bc4;--glow:rgba(150,105,10,.08);--shade-top:rgba(245,246,252,.30);--shade-mid:rgba(245,246,252,.08)}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(1100px 700px at 85% -120px,var(--glow),transparent 60%),var(--bg);color:var(--soft);font:16px/1.6 'Hanken Grotesk',system-ui,sans-serif;text-wrap:pretty;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{color:var(--ink);margin:0;font-weight:700}
+p{margin:0}
+img{display:block;max-width:100%}
+a{color:var(--gold-text);text-decoration:none}
+a:hover{color:var(--rose)}
+::selection{background:#f2c025;color:#17102b}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.skip:focus{position:fixed;top:8px;left:8px;width:auto;height:auto;clip:auto;z-index:200;padding:8px 14px;background:var(--panel);border-radius:8px}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:var(--edge)}
+.section{padding-block:clamp(72px,9vw,120px)}
+.soft-bg{background:var(--bg-soft)}
+.rule{height:1px;background:linear-gradient(to right,transparent,var(--line) 48px calc(100% - 48px),transparent)}
+.rule-top{background:linear-gradient(to right,transparent,var(--line) 48px calc(100% - 48px),transparent) no-repeat top/100% 1px}
+.mono{font-family:var(--mono)}
+.kicker{display:flex;align-items:center;gap:12px;font:11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--rose);margin-bottom:14px}
+.kicker::before{content:"";width:28px;height:1px;background:currentColor}
+.h2{font-weight:800;font-size:clamp(30px,4.2vw,52px);line-height:1.08;letter-spacing:-.025em;margin-bottom:16px}
+.lede{max-width:58ch;margin-bottom:56px}
+.gold{color:var(--gold-text)}.rose{color:var(--rose)}.peri{color:var(--peri)}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--min,420px)),1fr));gap:var(--gap,clamp(32px,4vw,64px));align-items:start}
+/* buttons (Nocturne: outlined primary) */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 14px/1.2 'Hanken Grotesk',sans-serif;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:8px;padding:9px 14px;cursor:pointer;text-decoration:none;transition:background .2s ease,border-color .2s ease}
+.btn i{font-size:18px}
+.btn-lg{padding:12px 20px;font-size:15px}
+.btn-primary{color:var(--gold-text);border-color:var(--gold)}
+.btn-primary:hover{color:var(--gold-text);background:color-mix(in srgb,var(--gold) 12%,transparent)}
+.btn-primary:active{background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.btn-secondary{border-color:var(--line)}
+.btn-secondary:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 7%,transparent)}
+.btn-ghost{color:var(--soft);padding-inline:8px}
+.btn-ghost:hover{color:var(--gold-text);background:color-mix(in srgb,var(--gold) 10%,transparent)}
+.btn-icon{width:38px;height:38px;padding:0}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.tag{display:inline-flex;align-items:center;font:11px var(--mono);letter-spacing:.08em;padding:3px 10px;border-radius:6px}
+/* nav */
+.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:28px;padding:14px var(--edge);background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700;font-size:19px;letter-spacing:-.01em}
+.brand img{width:28px;height:28px;border-radius:7px}
+.nav-links{flex:1 1 0;min-width:0;height:24px;overflow:hidden;display:flex;flex-wrap:wrap;gap:0 28px;font-size:14px}
+.nav-links a{color:var(--soft);line-height:24px}
+.nav-links a:hover{color:var(--gold-text)}
+.nav-actions{display:flex;align-items:center;gap:8px;flex:none}
+html.light .icon-sun,html:not(.light) .icon-moon{display:none}
+/* hero */
+.hero{position:relative;overflow:hidden;min-height:calc(100vh - 66px);display:flex;align-items:center}
+.hero-video,.hero-shade{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.hero-video{object-fit:cover;object-position:center 30%}
+.hero-shade{background:linear-gradient(to bottom,var(--shade-top),var(--shade-mid) 45%,var(--bg) 98%),linear-gradient(to right,var(--shade-top),transparent 65%)}
+.hero-inner{position:relative;width:100%;padding-block:clamp(72px,10vw,140px) clamp(64px,8vw,112px)}
+.badge{display:inline-flex;align-items:center;gap:10px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin-bottom:32px}
+.badge:hover{color:var(--rose)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px var(--gold)}
+.hero h1{font-weight:800;font-size:clamp(42px,6.6vw,88px);line-height:1.08;letter-spacing:-.03em;margin-bottom:28px;max-width:14ch}
+.hero h1 span{display:block}
+.hero h1 em{color:var(--gold-text)}
+.hero .sub{max-width:56ch;font-size:clamp(16px,1.4vw,19px);margin-bottom:32px}
+.hero .note{font-size:14px;color:var(--faint);margin:14px 0 40px;max-width:60ch}
+.install{display:flex;align-items:center;gap:14px;background:var(--code-bg);border:1px solid rgba(237,220,255,.12);border-radius:8px;padding:10px 12px 10px 16px;min-width:min(100%,320px)}
+.install code{font:14px var(--mono);color:#d8cdf0;flex:1}
+.install .btn{color:#c9bde4;font-size:12px}
+.stats-pills{display:flex;flex-wrap:wrap;gap:18px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.stats-pills a{display:inline-flex;align-items:center;gap:6px;color:var(--soft)}
+.stats-pills a:hover{color:var(--ink)}
+.trust{display:inline-flex;align-items:center;gap:8px;margin-top:22px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+/* proof */
+.proof{background:radial-gradient(800px 360px at 85% -40%,color-mix(in srgb,var(--gold) 14%,transparent),transparent 64%),var(--bg-soft)}
+.proof dl{margin:0 auto;padding-block:48px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px}
+.proof dd{margin:0;font-size:clamp(36px,3.6vw,52px);font-weight:800;line-height:1.05;letter-spacing:-.02em;color:var(--gold-text);white-space:nowrap}
+.proof dt{margin-top:8px;font:11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.proof div{display:flex;flex-direction:column-reverse}
+/* products */
+.product{display:flex;flex-direction:column;gap:20px}
+.product-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.product-head i{font-size:22px}
+.product-head h3{font-size:24px}
+.checks{list-style:none;padding:0;margin:0;display:grid;gap:8px;font-size:15px}
+.checks li{display:flex;gap:10px}
+.checks i{margin-top:4px}
+.shot{display:block;padding:0;border:0;background:none;cursor:zoom-in;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px var(--line),0 16px 40px rgba(0,0,0,.35);width:100%}
+.shot img{width:100%}
+.code{margin:0;background:var(--code-bg);border:1px solid rgba(237,220,255,.12);border-radius:8px;padding:16px 18px;font:12.5px/1.7 var(--mono);color:#d8cdf0;overflow-x:auto}
+.code .c{color:#9a8fb8}.code .k{color:#c7d0ff}.code .s{color:#ffd75e}
+/* path stepper */
+.steps{list-style:none;padding:0;margin:0;display:flex;flex-direction:column}
+.step-btn{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:40px 1fr;gap:4px 12px;width:100%;padding:14px 16px;border-left:2px solid var(--line);border-radius:0 8px 8px 0;transition:background .2s ease}
+.step-btn:hover{background:color-mix(in srgb,var(--gold) 6%,transparent)}
+.step-btn:focus-visible{outline:2px solid var(--gold)}
+.step-num{font:600 12px var(--mono);color:var(--faint);padding-top:4px}
+.step-title{font-size:17px;font-weight:700;color:var(--soft);line-height:1.35}
+.step-copy{grid-column:2;font-size:14.5px;display:none}
+.step.active .step-btn{border-left-color:var(--gold);background:color-mix(in srgb,var(--gold) 7%,transparent)}
+.step.active .step-num{color:var(--gold-text)}
+.step.active .step-title{color:var(--ink)}
+.step.active .step-copy{display:block}
+.stage-view{position:sticky;top:96px}
+.panel{display:none;gap:10px}
+.panel.active{display:grid}
+.thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.thumbs .shot{border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+.thumbs img{aspect-ratio:16/10;object-fit:cover;object-position:top}
+/* why */
+.why-title{font-weight:800;font-size:clamp(32px,5vw,64px);line-height:1.06;letter-spacing:-.03em;margin-bottom:18px}
+.why-title span{display:block}
+.warn{background:var(--code-bg);border:1px solid rgba(242,192,37,.35);border-left:2px solid #f2c025;border-radius:8px;padding:18px 20px;font:13.5px/1.7 var(--mono);color:#d8cdf0}
+.warn .s{color:#ffd75e}
+.warn-head{display:flex;align-items:center;gap:8px;color:#ffd75e;font-weight:600;margin-bottom:10px}
+.point{display:grid;grid-template-columns:32px 1fr;gap:6px 12px;padding:26px 0}
+.point:first-child{padding-top:0}
+.point i{font-size:22px}
+.point h4{font-size:18px}
+.point p{grid-column:2;font-size:15px}
+.table{width:100%;border-collapse:collapse;font-size:15px}
+.table th{text-align:left;font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:12px 8px}
+.table td{padding:18px 8px;vertical-align:top}
+.table td:first-child{color:var(--ink);font-weight:700;width:30%}
+.table tr{background:linear-gradient(to right,transparent,var(--line) 48px calc(100% - 48px),transparent) no-repeat bottom/100% 1px}
+/* features */
+.features{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:0 40px}
+.feature{display:grid;grid-template-columns:28px 1fr;gap:4px 12px;padding:22px 0}
+.feature i{font-size:20px;margin-top:2px}
+.feature h3{font-size:16.5px}
+.feature p{grid-column:2;font-size:14.5px}
+/* evidence */
+.card{display:flex;flex-direction:column;gap:10px;padding:24px;border-radius:8px;background:var(--panel-60);box-shadow:0 0 0 1px var(--line)}
+.card-head{display:flex;align-items:center;gap:10px}
+.card-head i{font-size:20px}
+.card h3{font-size:17px}
+.card p{font-size:14.5px}
+.card code{color:var(--gold-text);font:13px var(--mono)}
+/* updates */
+.release{display:grid;grid-template-columns:110px 90px minmax(0,1fr) 20px;gap:16px;align-items:baseline;padding:16px 8px;color:var(--soft)}
+.release:hover{color:var(--soft);background-color:color-mix(in srgb,var(--gold) 5%,transparent)}
+.release .tagname{font:600 14px var(--mono);color:var(--gold-text)}
+.release .date{font-size:13px;color:var(--faint)}
+.release .sum{font-size:14.5px;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:640px){.release{grid-template-columns:1fr auto}.release .sum{grid-column:1/-1}.release i{display:none}}
+/* faq */
+.faq-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:40px clamp(32px,5vw,80px);align-items:start}
+@media (max-width:860px){.faq-grid{grid-template-columns:1fr}}
+.faq details summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 4px;font-size:17px;font-weight:700;color:var(--ink)}
+.faq details summary::-webkit-details-marker{display:none}
+.faq details summary:hover,.faq details[open] summary{color:var(--gold-text)}
+.faq summary i{font-size:18px;color:var(--faint);flex:none;transition:transform .2s ease}
+.faq details[open] summary i{transform:rotate(45deg)}
+.faq details p{padding:0 4px 22px;max-width:68ch}
+.faq strong{color:var(--ink)}
+/* stack + cta + footer */
+.stack{display:flex;flex-wrap:wrap;gap:8px 28px;font:600 17px var(--mono)}
+.cta{position:relative;overflow:hidden;margin-top:72px}
+.cta-bg{position:absolute;inset:0;background:url('./static/img/wolf-hero.png') center 65%/cover no-repeat;opacity:.5}
+.cta-shade{position:absolute;inset:0;background:linear-gradient(to bottom,var(--bg),color-mix(in srgb,var(--bg) 30%,transparent) 45%,var(--bg)),linear-gradient(to right,var(--bg) 10%,transparent 70%)}
+.cta-inner{position:relative;padding-block:clamp(88px,11vw,150px)}
+footer h3{font:500 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:14px}
+.foot-links{display:flex;flex-direction:column;gap:8px;font-size:14px}
+.foot-links a{color:var(--soft)}
+.foot-links a:hover{color:var(--gold-text)}
+/* lightbox */
+.lightbox{position:fixed;inset:0;z-index:100;display:none;place-items:center;padding:24px;background:rgba(10,4,18,.88);backdrop-filter:blur(6px)}
+.lightbox.open{display:grid}
+.lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 0 0 1px rgba(237,220,255,.14),0 16px 40px rgba(0,0,0,.65)}
+.lightbox .btn{position:absolute;top:20px;right:20px;color:#f5f5ff}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+</style>
 </head>
-<body class="antialiased overflow-x-hidden">
-<a href="#content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg btn-gold font-semibold">Skip to content</a>
+<body>
+<a href="#content" class="sr-only skip">Skip to content</a>
 
-    <!-- Floating pill nav -->
-    <nav class="fixed z-50 top-4 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-6xl rounded-full glass-panel">
-        <div class="flex justify-between items-center px-5 sm:px-8 py-3">
-            <a href="#" class="flex items-center gap-2 text-ink font-extrabold text-xl tracking-tight">
-                <img src="./static/img/logo.png" alt="Skyulf Logo" class="w-8 h-8 rounded-lg">
-                Skyulf
-            </a>
-            <div class="hidden md:flex items-center gap-8 text-sm font-semibold">
-                <a href="#products" class="text-soft hover:text-gold transition-colors">Canvas or code</a>
-                <a href="#how" class="text-soft hover:text-gold transition-colors">How it works</a>
-                <a href="#why" class="text-soft hover:text-gold transition-colors">Why Skyulf</a>
-                <a href="#features" class="text-soft hover:text-gold transition-colors">Features</a>
-                <a href="#updates" class="text-soft hover:text-gold transition-colors">Updates</a>
-                <a href="#faq" class="text-soft hover:text-gold transition-colors">FAQ</a>
-            </div>
-            <div class="flex items-center gap-3">
-                <button type="button" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu" class="md:hidden w-10 h-10 rounded-full flex items-center justify-center border border-line text-soft hover:text-gold transition-colors">
-                    <span class="msi text-[20px]">menu</span>
-                </button>
-                <a href="./manual/index.html" class="hidden sm:block text-sm font-semibold text-soft hover:text-gold transition-colors">Docs</a>
-                <button type="button" id="theme-toggle" aria-label="Switch to light theme" class="w-10 h-10 rounded-full flex items-center justify-center border border-line text-soft hover:text-gold transition-colors">
-                    <span class="msi text-[20px] theme-icon-dark">light_mode</span>
-                    <span class="msi text-[20px] theme-icon-light hidden">dark_mode</span>
-                </button>
-                <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold px-4 sm:px-5 py-2 rounded-full text-sm font-bold">Live demo</a>
-            </div>
+<nav class="nav" aria-label="Main">
+  <a href="#" class="brand"><img src="./static/img/logo.png" alt="Skyulf Logo" width="28" height="28">Skyulf</a>
+  <div class="nav-links">
+    <a href="#products">Canvas or code</a>
+    <a href="#how">How it works</a>
+    <a href="#why">Why Skyulf</a>
+    <a href="#features">Features</a>
+    <a href="#updates">Updates</a>
+    <a href="#faq">FAQ</a>
+  </div>
+  <div class="nav-actions">
+    <a href="./manual/index.html" class="btn btn-ghost">Docs</a>
+    <button type="button" id="theme-toggle" class="btn btn-secondary btn-icon" aria-label="Switch theme"><i class="ph ph-sun icon-sun"></i><i class="ph ph-moon icon-moon"></i></button>
+    <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn btn-primary">Live demo</a>
+  </div>
+</nav>
+
+<main id="content">
+  <section class="hero" aria-label="Introduction">
+    <video class="hero-video" src="./static/video/wolf.mp4" poster="./static/img/wolf-hero.png" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
+    <div class="hero-shade" aria-hidden="true"></div>
+    <div class="wrap hero-inner">
+      <a id="version-badge" href="https://github.com/flyingriverhorse/Skyulf/releases" target="_blank" rel="noopener" class="badge"><span class="dot"></span><span data-version-label>v0.8.11 — live now</span></a>
+      <h1><span>Stop trusting your pipeline.</span><span><em>Verify</em> it.</span></h1>
+      <p class="sub">Draw it. Code it. Ship it. Skyulf keeps scikit-learn as the engine and adds what notebooks never gave you: reproducible artifacts, honest validation scores, and a path to production.</p>
+      <div class="row">
+        <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn btn-primary btn-lg"><i class="ph ph-play-circle"></i>Try the live demo</a>
+        <a href="#run-locally" class="btn btn-secondary btn-lg"><i class="ph ph-terminal-window"></i>Run it locally</a>
+        <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="btn btn-ghost btn-lg"><i class="ph ph-github-logo"></i>GitHub</a>
+      </div>
+      <p class="note">No signup and no install — the demo runs the real app in your browser. (Free instance, so the first load can take ~30s to wake.)</p>
+      <div class="row" style="align-items:center;gap:20px">
+        <div class="install">
+          <code><span style="color:#9a8fb8">$ </span>pip install skyulf-core</code>
+          <button type="button" class="btn btn-ghost" data-copy="pip install skyulf-core" aria-label="Copy install command"><i class="ph ph-copy"></i><span>Copy</span></button>
         </div>
-    </nav>
-
-    <div id="mobile-menu" class="hidden md:hidden fixed top-20 left-4 right-4 z-40 glass-panel rounded-2xl p-5">
-        <nav aria-label="Mobile" class="grid gap-1 text-sm font-semibold">
-            <a href="#products" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Canvas or code</a>
-            <a href="#how" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">How it works</a>
-            <a href="#why" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Why Skyulf</a>
-            <a href="#features" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Features</a>
-            <a href="#updates" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Updates</a>
-            <a href="#faq" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">FAQ</a>
-            <a href="./manual/index.html" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Docs</a>
-        </nav>
+        <div class="stats-pills">
+          <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener"><i class="ph ph-star gold"></i><span data-github-stars>47</span> stars</a>
+          <a href="https://pypistats.org/packages/skyulf-core" target="_blank" rel="noopener"><i class="ph ph-download-simple peri"></i><span data-pypi-monthly>1.1k</span> / month</a>
+          <a href="https://pepy.tech/projects/skyulf-core" target="_blank" rel="noopener"><i class="ph ph-cloud-arrow-down rose"></i><span data-pepy-total>22k</span> total</a>
+        </div>
+      </div>
+      <div class="trust"><i class="ph ph-lock-simple peri"></i>Self-hosted · Apache-2.0 library · your data stays on your machine</div>
     </div>
+  </section>
 
-    <main id="content">
-    <!-- ============ HERO ============ -->
-    <section class="relative min-h-screen flex items-center justify-center overflow-hidden pt-28 pb-24">
-        <video class="hero-bg" src="./static/video/wolf.mp4" autoplay muted loop playsinline preload="metadata" style="width: 100%; height: 112%; object-fit: cover;" aria-hidden="true"></video>
-        <canvas id="constellation" class="absolute inset-0 w-full h-full z-[2] opacity-80" aria-hidden="true"></canvas>
-        <div class="hero-shade z-[3]" aria-hidden="true"></div>
+  <section id="proof" class="proof" aria-label="Skyulf in numbers">
+    <div class="rule"></div>
+    <dl class="wrap">
+      <div><dt>built-in pipeline nodes</dt><dd>36</dd></div>
+      <div><dt>workspaces, EDA to audit log</dt><dd>11</dd></div>
+      <div><dt>skyulf-core, use it anywhere</dt><dd>Apache&#8209;2.0</dd></div>
+      <div><dt>on scikit-learn, pandas &amp; Polars</dt><dd>Python&nbsp;3.12</dd></div>
+    </dl>
+    <div class="rule"></div>
+  </section>
 
-        <div class="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 text-center">
-            <a id="version-badge" href="https://github.com/flyingriverhorse/Skyulf/releases" target="_blank" rel="noopener" class="rv in inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-8 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: rgba(255,218,217,.4); color: var(--ink); background: var(--panel-60); backdrop-filter: blur(12px);">
-                <span class="relative w-2 h-2 rounded-full bg-[#f2c025] dot-ping"></span>
-                <span data-version-label>v0.8.11 — live now</span>
-            </a>
-
-            <h1 class="text-ink font-extrabold tracking-tight leading-[1.04] text-4xl sm:text-6xl lg:text-7xl mb-6 drop-shadow-xl">
-                <span class="line"><span class="line-in">Stop trusting your pipeline.</span></span>
-                <span class="line"><span class="line-in"><em class="text-gold not-italic sm:italic">Verify</em> it.</span></span>
-            </h1>
-
-            <p class="rv max-w-2xl mx-auto text-base sm:text-lg leading-relaxed mb-4" style="color: var(--soft); text-shadow: 0 1px 12px var(--hero-shadow);">
-                Draw it. Code it. Ship it. Skyulf keeps scikit-learn as the engine and adds
-                what notebooks never gave you: reproducible artifacts, honest validation
-                scores, and a path to production.
-            </p>
-            <div class="rv inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-9 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase" style="border-color: rgba(199,208,255,.35); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
-                <span class="msi text-[14px]" style="color: var(--peri);">lock</span>
-                Self-hosted &middot; Apache-2.0 library &middot; your data stays on your machine
-            </div>
-
-            <div class="rv flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base flex items-center justify-center gap-2">
-                    <span class="msi text-[20px]">play_circle</span> Try the live demo
-                </a>
-                <a href="#run-locally" class="btn-ghost glass-panel w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base flex items-center justify-center gap-2">
-                    <span class="msi text-[20px]">terminal</span> Run it locally
-                </a>
-                <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="btn-ghost w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base flex items-center justify-center gap-2">
-                    <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-                    GitHub
-                </a>
-            </div>
-
-            <p class="rv text-sm text-faint -mt-4 mb-8">
-                No signup and no install &mdash; the demo runs the real app in your browser.
-                <span class="opacity-80">(Free instance, so the first load can take ~30s to wake.)</span>
-            </p>
-
-            <div class="rv max-w-md mx-auto flex flex-col items-center gap-3">
-                <div class="w-full glass-panel rounded-xl px-5 py-3 flex items-center justify-between gap-3">
-                    <code class="font-mono text-sm text-ink">pip install skyulf-core</code>
-                    <button type="button" aria-label="Copy install command" data-copy="pip install skyulf-core" class="text-faint hover:text-gold transition-colors" title="Copy">
-                        <span class="msi text-[18px]">content_copy</span>
-                    </button>
-                </div>
-                <div class="flex flex-wrap items-center justify-center gap-3">
-                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" title="GitHub stars" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
-                        <span class="msi text-[14px]" style="color: var(--gold-text);">star</span>
-                        <span data-github-stars>47</span> stars
-                    </a>
-                    <a href="https://pypistats.org/packages/skyulf-core" target="_blank" rel="noopener" title="PyPI downloads per month" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(199,208,255,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
-                        <span class="msi text-[14px]" style="color: var(--peri);">download</span>
-                        <span data-pypi-monthly>1.1k</span> / month
-                    </a>
-                    <a href="https://pepy.tech/projects/skyulf-core" target="_blank" rel="noopener" title="Total PyPI downloads" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
-                        <span class="msi text-[14px]" style="color: var(--rose);">cloud_download</span>
-                        <span data-pepy-total>22k</span> total
-                    </a>
-                </div>
-            </div>
+  <section id="products" class="wrap section">
+    <p class="kicker">One engine</p>
+    <h2 class="h2">Two ways to drive it.</h2>
+    <p class="lede">Prefer clicking or typing? Both produce the same kind of pipeline, and the canvas exports to a notebook whenever you want to drop back into code.</p>
+    <div class="grid-auto" style="--min:440px">
+      <article class="product">
+        <div class="product-head"><i class="ph ph-tree-structure gold"></i><h3>Skyulf Platform</h3><span class="tag" style="background:color-mix(in srgb,var(--gold) 14%,transparent);color:var(--gold-text)">Self-hosted workspace · AGPLv3</span></div>
+        <p style="max-width:52ch">The full application: a node canvas, automated EDA, background training, experiment comparison, a model registry, deployment and monitoring, all running on your own machine or server.</p>
+        <ul class="checks">
+          <li><i class="ph ph-check gold"></i>Drag, connect and configure 36 node types</li>
+          <li><i class="ph ph-check gold"></i>Training runs in the background while you keep working</li>
+          <li><i class="ph ph-check gold"></i>Export any pipeline to a runnable Jupyter notebook</li>
+        </ul>
+        <button type="button" class="shot zoomable"><img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" loading="lazy" decoding="async"></button>
+        <div id="run-locally" style="scroll-margin-top:96px;display:grid;gap:14px">
+          <div class="code" style="font-size:13.5px;line-height:1.8;white-space:nowrap"><span class="c">$</span> git clone https://github.com/flyingriverhorse/Skyulf<br><span class="c">$</span> docker compose up</div>
+          <div class="row">
+            <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn btn-primary">Open the live demo</a>
+            <a href="./manual/guides/platform_setup.html" class="btn btn-secondary">Setup guide</a>
+          </div>
         </div>
-
-        <a href="#proof" class="scroll-cue absolute bottom-6 left-1/2 -translate-x-1/2 z-10 text-faint hover:text-gold transition-colors" aria-label="Scroll to content">
-            <span class="msi text-[28px]">expand_more</span>
-        </a>
-    </section>
-
-    <!-- ============ PROOF BAR ============ -->
-    <section id="proof" class="py-12 border-y border-line bg-night-soft relative">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <dl class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                <div class="rv flex flex-col-reverse">
-                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">built-in pipeline nodes</dt>
-                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold" data-count="36">36</dd>
-                </div>
-                <div class="rv flex flex-col-reverse">
-                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">workspaces, EDA to audit log</dt>
-                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold" data-count="11">11</dd>
-                </div>
-                <div class="rv flex flex-col-reverse">
-                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">skyulf-core, use it anywhere</dt>
-                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold">Apache&#8209;2.0</dd>
-                </div>
-                <div class="rv flex flex-col-reverse">
-                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">on scikit-learn, pandas &amp; Polars</dt>
-                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold">Python&nbsp;3.12</dd>
-                </div>
-            </dl>
-        </div>
-    </section>
-
-    <!-- ============ TWO WAYS ============ -->
-    <section id="products" class="py-24 relative">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <p class="rv font-mono text-[11px] tracking-[0.16em] uppercase text-rose mb-3">One engine</p>
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Two ways to drive it.</h2>
-                <p class="rv text-soft max-w-2xl mx-auto">
-                    Prefer clicking or typing? Both produce the same kind of pipeline, and the canvas
-                    exports to a notebook whenever you want to drop back into code.
-                </p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                <!-- Platform -->
-                <article class="rv aurora-border rounded-2xl p-8 hover-lift h-full flex flex-col">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background: rgba(242,192,37,.12);">
-                            <span class="msi text-gold text-[22px]">account_tree</span>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-ink">Skyulf Platform</h3>
-                            <p class="font-mono text-[11px] tracking-[0.12em] uppercase text-faint">Self-hosted workspace &middot; AGPLv3</p>
-                        </div>
-                    </div>
-                    <p class="text-soft leading-relaxed mb-5">
-                        The full application: a node canvas, automated EDA, background training,
-                        experiment comparison, a model registry, deployment and monitoring, all
-                        running on your own machine or server.
-                    </p>
-                    <ul class="space-y-2.5 text-sm text-soft mb-6">
-                        <li class="flex gap-2.5"><span class="msi text-gold text-[18px]">check</span> Drag, connect and configure 36 node types</li>
-                        <li class="flex gap-2.5"><span class="msi text-gold text-[18px]">check</span> Training runs in the background while you keep working</li>
-                        <li class="flex gap-2.5"><span class="msi text-gold text-[18px]">check</span> Export any pipeline to a runnable Jupyter notebook</li>
-                    </ul>
-                    <div class="grid gap-2 mb-6">
-                        <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/dashboard.jpg" alt="Skyulf dashboard with jobs, deployments and success rate" class="w-full h-auto object-cover" loading="lazy" decoding="async"></div>
-                        <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" class="w-full h-auto object-cover" loading="lazy" decoding="async"></div>
-                    </div>
-                    <div id="run-locally" class="mt-auto scroll-mt-28">
-                        <div class="code-surface rounded-xl p-4 font-mono text-sm mb-4 overflow-x-auto">
-                            <span class="text-faint">$</span> git clone https://github.com/flyingriverhorse/Skyulf<br>
-                            <span class="text-faint">$</span> docker compose up
-                        </div>
-                        <div class="flex flex-wrap gap-3">
-                            <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold px-5 py-2.5 rounded-full text-sm font-bold">Open the live demo</a>
-                            <a href="./manual/guides/platform_setup.html" class="btn-ghost px-5 py-2.5 rounded-full text-sm font-bold">Setup guide</a>
-                        </div>
-                    </div>
-                </article>
-
-                <!-- Core -->
-                <article class="rv aurora-border rounded-2xl p-8 hover-lift h-full flex flex-col">
-                    <div class="flex items-center gap-3 mb-4">
-                        <div class="w-11 h-11 rounded-xl flex items-center justify-center" style="background: rgba(199,208,255,.12);">
-                            <span class="msi text-peri text-[22px]">package_2</span>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-ink">skyulf-core</h3>
-                            <p class="font-mono text-[11px] tracking-[0.12em] uppercase text-faint">Standalone Python library &middot; Apache-2.0</p>
-                        </div>
-                    </div>
-                    <p class="text-soft leading-relaxed mb-5">
-                        No server, no UI, no lock-in. A pip-installable library that gives your
-                        scripts and notebooks one consistent pipeline API over scikit-learn,
-                        with the leakage checks and artifacts built in.
-                    </p>
-                    <ul class="space-y-2.5 text-sm text-soft mb-6">
-                        <li class="flex gap-2.5"><span class="msi text-peri text-[18px]">check</span> Works standalone in any notebook or script</li>
-                        <li class="flex gap-2.5"><span class="msi text-peri text-[18px]">check</span> Accepts pandas or Polars frames directly</li>
-                        <li class="flex gap-2.5"><span class="msi text-peri text-[18px]">check</span> Permissive license, ship it inside your own product</li>
-                    </ul>
-                    <details class="mb-6 group" open>
-                        <summary class="flex items-center justify-between gap-3 cursor-pointer select-none rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink hover:border-[rgba(242,192,37,.5)] transition list-none">
-                            <span>See a runnable example</span>
-                            <span class="msi text-[18px] text-faint transition-transform duration-200 group-open:rotate-180">expand_more</span>
-                        </summary>
-                        <pre class="code-surface rounded-xl p-4 font-mono text-xs sm:text-sm mt-3 overflow-x-auto leading-relaxed whitespace-pre"><code><span class="text-faint"># Runs as-is: the dataset ships with scikit-learn.</span>
-<span class="text-peri">from</span> sklearn.datasets <span class="text-peri">import</span> load_breast_cancer
-<span class="text-peri">from</span> skyulf <span class="text-peri">import</span> SkyulfPipeline
+      </article>
+      <article class="product">
+        <div class="product-head"><i class="ph ph-package peri"></i><h3>skyulf-core</h3><span class="tag" style="background:color-mix(in srgb,var(--peri) 14%,transparent);color:var(--peri)">Standalone Python library · Apache-2.0</span></div>
+        <p style="max-width:52ch">No server, no UI, no lock-in. A pip-installable library that gives your scripts and notebooks one consistent pipeline API over scikit-learn, with the leakage checks and artifacts built in.</p>
+        <ul class="checks">
+          <li><i class="ph ph-check peri"></i>Works standalone in any notebook or script</li>
+          <li><i class="ph ph-check peri"></i>Accepts pandas or Polars frames directly</li>
+          <li><i class="ph ph-check peri"></i>Permissive license, ship it inside your own product</li>
+        </ul>
+<pre class="code"><code><span class="c"># Runs as-is: the dataset ships with scikit-learn.</span>
+<span class="k">from</span> sklearn.datasets <span class="k">import</span> load_breast_cancer
+<span class="k">from</span> skyulf <span class="k">import</span> SkyulfPipeline
 
 df = load_breast_cancer(as_frame=True).frame
 
-<span class="text-faint"># The pipeline is a dict, so you can version it, diff it in</span>
-<span class="text-faint"># review, or build it in a loop.</span>
+<span class="c"># The pipeline is a dict, so you can version it, diff it in</span>
+<span class="c"># review, or build it in a loop.</span>
 pipeline = SkyulfPipeline({
-    <span class="text-gold">"preprocessing"</span>: [
-        {<span class="text-gold">"name"</span>: <span class="text-gold">"split"</span>,  <span class="text-gold">"transformer"</span>: <span class="text-gold">"TrainTestSplitter"</span>},
-        {<span class="text-gold">"name"</span>: <span class="text-gold">"impute"</span>, <span class="text-gold">"transformer"</span>: <span class="text-gold">"SimpleImputer"</span>},
-        {<span class="text-gold">"name"</span>: <span class="text-gold">"scale"</span>,  <span class="text-gold">"transformer"</span>: <span class="text-gold">"StandardScaler"</span>},
+    <span class="s">"preprocessing"</span>: [
+        {<span class="s">"name"</span>: <span class="s">"split"</span>,  <span class="s">"transformer"</span>: <span class="s">"TrainTestSplitter"</span>},
+        {<span class="s">"name"</span>: <span class="s">"impute"</span>, <span class="s">"transformer"</span>: <span class="s">"SimpleImputer"</span>},
+        {<span class="s">"name"</span>: <span class="s">"scale"</span>,  <span class="s">"transformer"</span>: <span class="s">"StandardScaler"</span>},
     ],
-    <span class="text-gold">"modeling"</span>: {<span class="text-gold">"type"</span>: <span class="text-gold">"random_forest_classifier"</span>},
+    <span class="s">"modeling"</span>: {<span class="s">"type"</span>: <span class="s">"random_forest_classifier"</span>},
 })
 
-<span class="text-faint"># Move the imputer above the splitter and it tells you so, by name.</span>
-print(pipeline.validate_leakage_safety())   <span class="text-faint"># []</span>
+<span class="c"># Move the imputer above the splitter and it tells you so, by name.</span>
+print(pipeline.validate_leakage_safety())   <span class="c"># []</span>
 
-results = pipeline.fit(df, target_column=<span class="text-gold">"target"</span>)
-print(results[<span class="text-gold">"modeling"</span>][<span class="text-gold">"splits"</span>][<span class="text-gold">"test"</span>].metrics)
-<span class="text-faint"># {'roc_auc': 0.9954, 'f1': 0.9722, 'pr_auc': 0.9972, ...}</span>
+results = pipeline.fit(df, target_column=<span class="s">"target"</span>)
+print(results[<span class="s">"modeling"</span>][<span class="s">"splits"</span>][<span class="s">"test"</span>].metrics)
+<span class="c"># {'roc_auc': 0.9954, 'f1': 0.9722, 'pr_auc': 0.9972, ...}</span>
 
-pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-faint"># one hash for data + steps + model</span></code></pre>
-                    </details>
-                    <div class="mt-auto flex flex-wrap gap-3">
-                        <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener" class="btn-gold px-5 py-2.5 rounded-full text-sm font-bold">pip install skyulf-core</a>
-                        <a href="./manual/index.html" class="btn-ghost px-5 py-2.5 rounded-full text-sm font-bold">Library docs</a>
-                    </div>
-                </article>
-            </div>
+pipeline.save(<span class="s">"tumour.pkl"</span>)  <span class="c"># one hash for data + steps + model</span></code></pre>
+        <div class="row">
+          <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener" class="btn btn-primary">pip install skyulf-core</a>
+          <a href="./manual/index.html" class="btn btn-secondary">Library docs</a>
         </div>
-    </section>
-
-    <!-- ============ LIFECYCLE TIMELINE ============ -->
-    <section id="how" class="py-24 relative overflow-hidden bg-night-soft border-y border-line">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-16">
-                <p class="rv font-mono text-[11px] tracking-[0.16em] uppercase text-rose mb-3">The path</p>
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">From a raw file to a monitored model.</h2>
-                <p class="rv text-soft max-w-2xl mx-auto">
-                    Every stage lives in one workspace, so nothing gets lost between a notebook,
-                    a spreadsheet of results and whatever is actually running in production.
-                </p>
-            </div>
-
-            <div class="relative flex flex-col gap-20">
-                <div class="timeline-line absolute left-[27px] md:left-1/2 md:-translate-x-1/2 top-0 bottom-0 w-[2px] hidden sm:block" aria-hidden="true"></div>
-
-                <!-- 01 Ingest -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#f2c025] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-gold shadow-[0_0_18px_rgba(242,192,37,.5)]">01</span>
-                    <div class="mb-5 sm:mb-0 sm:text-right sm:pr-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Point it at a file and start working</h3>
-                        <p class="text-soft leading-relaxed">Upload CSV, Excel, JSON or Parquet, or connect an S3-compatible bucket. Skyulf reads it with Polars, profiles the columns and keeps every version you load, so you can always tell which data produced which model.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/datasource.jpg" alt="Skyulf data sources screen listing uploaded datasets" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                </div>
-
-                <!-- 02 Explore -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#ffdad9] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-rose shadow-[0_0_18px_rgba(255,218,217,.4)]">02</span>
-                    <div class="mb-5 sm:mb-0 sm:order-2 sm:pl-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Understand the data before you model it</h3>
-                        <p class="text-soft leading-relaxed">One click profiles every column: distributions, correlations, outliers, interactions and clusters. Surrogate decision trees and causal discovery show which relationships actually drive your target.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:order-1 sm:mr-4"><img src="./static/img/eda/dashboardeda.jpg" alt="EDA overview dashboard" class="w-full h-auto" loading="lazy" decoding="async">
-                        <div class="grid grid-cols-3 gap-2 mt-2">
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/correlations.jpg" alt="Correlation matrix" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/decisiontree.jpg" alt="Surrogate decision tree" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/causal.jpg" alt="Causal discovery graph" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 03 Build -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#f2c025] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-gold shadow-[0_0_18px_rgba(242,192,37,.5)]">03</span>
-                    <div class="mb-5 sm:mb-0 sm:text-right sm:pr-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Design the pipeline instead of retyping it</h3>
-                        <p class="text-soft leading-relaxed">Drag nodes onto the canvas and connect them. Branch a pipeline to try two feature strategies side by side, preview any node's output as a table, and let validation block a run before it wastes your time.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                </div>
-
-                <!-- 04 Train -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#ffdad9] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-rose shadow-[0_0_18px_rgba(255,218,217,.4)]">04</span>
-                    <div class="mb-5 sm:mb-0 sm:order-2 sm:pl-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Train in the background, tune when it matters</h3>
-                        <p class="text-soft leading-relaxed">Runs execute as background jobs, so a long training run never freezes the UI. Switch on hyperparameter search — grid, random, halving or Optuna — and watch each trial report as it finishes.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:order-1 sm:mr-4"><img src="./static/img/jobs.jpg" alt="Skyulf jobs list showing background training runs" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                </div>
-
-                <!-- 05 Compare -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#f2c025] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-gold shadow-[0_0_18px_rgba(242,192,37,.5)]">05</span>
-                    <div class="mb-5 sm:mb-0 sm:text-right sm:pr-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Compare runs and pick a winner on evidence</h3>
-                        <p class="text-soft leading-relaxed">Every run keeps its metrics, curves and confusion matrix. Put runs next to each other, see which change actually helped, and tune decision thresholds rather than accepting whatever 0.5 gives you.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/experiments.jpg" alt="Experiment comparison view with metrics and charts" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                </div>
-
-                <!-- 06 Deploy -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#ffdad9] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-rose shadow-[0_0_18px_rgba(255,218,217,.4)]">06</span>
-                    <div class="mb-5 sm:mb-0 sm:order-2 sm:pl-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Promote a version, serve predictions</h3>
-                        <p class="text-soft leading-relaxed">Trained models land in a registry with their versions and artifacts. Promote one to active and it is served behind a REST endpoint you can call from anything. The full deployment history is kept for audit.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:order-1 sm:mr-4"><img src="./static/img/deployments.jpg" alt="Deployments screen with the active model version and history" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                </div>
-
-                <!-- 07 Monitor -->
-                <div class="rv relative sm:grid sm:grid-cols-2 sm:gap-14 items-center">
-                    <span class="hidden sm:flex absolute left-[27px] md:left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-2 border-[#c7d0ff] bg-night-soft z-10 items-center justify-center font-mono text-xs font-semibold text-peri shadow-[0_0_18px_rgba(199,208,255,.4)]">07</span>
-                    <div class="mb-5 sm:mb-0 sm:text-right sm:pr-4">
-                        <h3 class="text-2xl font-bold text-ink mb-3">Find out before your users do</h3>
-                        <p class="text-soft leading-relaxed">Models decay because the world moves. Skyulf compares live data against the training baseline column by column and flags what shifted — plus an error log, a slow-node profiler and an audit trail.</p>
-                    </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/drift/drift.jpg" alt="Drift monitoring dashboard" class="w-full h-auto" loading="lazy" decoding="async">
-                        <div class="grid grid-cols-3 gap-2 mt-2">
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/drift/drift_report.jpg" alt="Detailed drift report per column" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/errors.jpg" alt="Error log with pipeline failures" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/slow_nodes.jpg" alt="Slow node profiling view" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ WHY / LEAKAGE ============ -->
-    <section id="why" class="py-24 relative overflow-hidden">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Your model says 94%.<br class="hidden sm:block"> <span class="text-rose">Production says 71%.</span></h2>
-                <p class="rv text-soft max-w-2xl mx-auto">Usually nothing is broken. The score was just measured wrong, and nothing in a normal notebook tells you that.</p>
-            </div>
-
-            <div class="grid lg:grid-cols-2 gap-10 items-start mb-14">
-                <div class="rv">
-                    <h3 class="text-2xl font-bold text-ink mb-4">The bug that doesn't raise an error</h3>
-                    <p class="text-soft leading-relaxed mb-4">
-                        Fill missing values, scale a column or encode a category <em>before</em> you split
-                        into train and test, and those steps quietly learn from the test rows. Your
-                        validation score now includes answers it was supposed to be guessing. The code
-                        runs fine. The number just isn't real.
-                    </p>
-                    <p class="text-soft leading-relaxed mb-6">Skyulf checks the order of your pipeline and tells you in plain language, both on the canvas and in the library:</p>
-                    <div class="code-surface rounded-xl p-5 font-mono text-sm leading-relaxed" style="border-color: rgba(242,192,37,.35);">
-                        <div class="flex items-start gap-2 text-gold mb-3">
-                            <span class="msi text-[18px]">warning</span>
-                            <span class="font-semibold">validate_leakage_safety()</span>
-                        </div>
-                        <p>Step 0 (<span class="text-gold">'SimpleImputer'</span>) is configured before the train/test split (step 1, <span class="text-gold">'TrainTestSplitter'</span>) and will fit its statistics on the full dataset including the test set &mdash; move it after the splitter.</p>
-                    </div>
-                </div>
-                <div class="space-y-5">
-                    <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                        <div class="flex items-center gap-3 mb-2">
-                            <span class="msi text-gold text-[22px]">verified</span>
-                            <h4 class="text-lg font-bold text-ink">Honest scores by construction</h4>
-                        </div>
-                        <p class="text-soft text-sm leading-relaxed">Every node is split into a part that <em>learns</em> and a part that <em>applies</em>. Learning only ever sees training data, and what it learned is saved as explicit parameters, so inference can never accidentally refit on new data.</p>
-                    </div>
-                    <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                        <div class="flex items-center gap-3 mb-2">
-                            <span class="msi text-rose text-[22px]">fingerprint</span>
-                            <h4 class="text-lg font-bold text-ink">Reproducible six months later</h4>
-                        </div>
-                        <p class="text-soft text-sm leading-relaxed">Each pipeline gets a fingerprint and an exportable model card. When someone asks which preprocessing produced a prediction, you answer with a record instead of a guess, and hand over a notebook that re-runs it.</p>
-                    </div>
-                    <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                        <div class="flex items-center gap-3 mb-2">
-                            <span class="msi text-peri text-[22px]">vitals</span>
-                            <h4 class="text-lg font-bold text-ink">Operations, not just training</h4>
-                        </div>
-                        <p class="text-soft text-sm leading-relaxed">Most visual ML tools stop at the model. Skyulf keeps going: drift reports, an error log that links to the failing node, slow-node profiling and an audit trail of every pipeline change.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-6">
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <h4 class="text-ink font-bold mb-2">vs. hand-written scikit-learn</h4>
-                    <p class="text-soft text-sm leading-relaxed">Same estimators, none of the glue. You stop re-implementing split-transform-fit wiring for every project, and the ordering mistakes get caught for you.</p>
-                </div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <h4 class="text-ink font-bold mb-2">vs. cloud AutoML</h4>
-                    <p class="text-soft text-sm leading-relaxed">No upload, no per-prediction bill, no black box. You keep the data, you can read every step of the pipeline, and you can export it and walk away.</p>
-                </div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <h4 class="text-ink font-bold mb-2">vs. other visual tools</h4>
-                    <p class="text-soft text-sm leading-relaxed">The canvas isn't a dead end. It exports to a real notebook, and the same pipelines run from the Apache-2.0 library with no UI at all.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ FEATURES ============ -->
-    <section id="features" class="py-24 bg-night-soft border-y border-line relative overflow-hidden">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Everything else <span class="text-gold">in the box</span></h2>
-                <p class="rv text-soft max-w-2xl mx-auto">Shipped and documented, not on a roadmap.</p>
-            </div>
-
-            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-gold text-[22px] mb-3">inventory_2</span><h3 class="text-ink font-bold mb-2">Model registry</h3><p class="text-soft text-sm leading-relaxed">Versioned models with their artifacts and history, so you always know what is live.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-peri text-[22px] mb-3">tune</span><h3 class="text-ink font-bold mb-2">Hyperparameter tuning</h3><p class="text-soft text-sm leading-relaxed">Grid, random and halving search built in; Optuna available as an optional extra with live trial output.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-rose text-[22px] mb-3">insights</span><h3 class="text-ink font-bold mb-2">SHAP explanations</h3><p class="text-soft text-sm leading-relaxed">Optional explainability extra: see which features moved a prediction, globally or row by row.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-gold text-[22px] mb-3">menu_book</span><h3 class="text-ink font-bold mb-2">Notebook export</h3><p class="text-soft text-sm leading-relaxed">Turn any pipeline into a runnable Jupyter notebook, compact or full, including a serving snippet.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-peri text-[22px] mb-3">alt_route</span><h3 class="text-ink font-bold mb-2">Multi-branch pipelines</h3><p class="text-soft text-sm leading-relaxed">Split one canvas into independent paths and run them as parallel jobs to compare approaches.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-rose text-[22px] mb-3">layers</span><h3 class="text-ink font-bold mb-2">Ensembles</h3><p class="text-soft text-sm leading-relaxed">Voting and stacking for classification and regression, with nested tuning of the base models.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-gold text-[22px] mb-3">text_fields</span><h3 class="text-ink font-bold mb-2">Text &amp; NLP nodes</h3><p class="text-soft text-sm leading-relaxed">TF-IDF, count and hashing vectorizers, tokenisation, and optional dense sentence embeddings.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-peri text-[22px] mb-3">public</span><h3 class="text-ink font-bold mb-2">Time-series &amp; geo features</h3><p class="text-soft text-sm leading-relaxed">Lag and rolling windows, date parts, H3 indexing and distance features for spatial data.</p></div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift"><span class="msi text-rose text-[22px] mb-3">receipt_long</span><h3 class="text-ink font-bold mb-2">Audit log</h3><p class="text-soft text-sm leading-relaxed">Every pipeline save recorded with what was added, removed or changed, and by whom.</p></div>
-            </div>
-
-            <div class="mt-10 grid sm:grid-cols-2 gap-5">
-                <div class="rv rounded-2xl overflow-hidden border border-line cursor-pointer zoomable hover-lift"><img src="./static/img/registry.jpg" alt="Model registry listing models and versions" class="w-full h-auto" loading="lazy" decoding="async"></div>
-                <div class="rv rounded-2xl overflow-hidden border border-line cursor-pointer zoomable hover-lift"><img src="./static/img/audit.jpg" alt="Audit log of pipeline changes" class="w-full h-auto" loading="lazy" decoding="async"></div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ UPDATES ============ -->
-    <section id="updates" class="py-24 relative overflow-hidden">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Always <span class="text-gold">shipping</span></h2>
-                <p class="rv text-soft max-w-2xl mx-auto">Live from the GitHub releases feed, every version, newest first.</p>
-            </div>
-            <div id="updates-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="font-mono text-sm font-bold text-gold">v0.8.11</span>
-                        <span class="text-faint text-xs">Sep 2026</span>
-                    </div>
-                    <p class="text-soft text-sm leading-relaxed">Latest release — see the full notes on GitHub.</p>
-                    <a href="https://github.com/flyingriverhorse/skyulf/releases" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm font-semibold text-gold hover:underline mt-3">All releases <span class="msi text-[16px]">open_in_new</span></a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ EVIDENCE ============ -->
-    <section id="evidence" class="py-24 relative overflow-hidden">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-3">Claims are cheap. Here is the evidence.</h2>
-                <p class="rv text-soft max-w-2xl mx-auto">Every number here comes from the repository, and the counts are yours to re-run.</p>
-            </div>
-            <div class="grid md:grid-cols-2 gap-6">
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <div class="flex items-center gap-3 mb-3"><span class="msi text-gold text-[22px]">fact_check</span><h3 class="text-lg font-bold text-ink">Tested where it matters</h3></div>
-                    <p class="text-soft text-sm leading-relaxed">5,787 tests in total: 3,512 in the library, 1,427 in the backend and 848 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p>
-                </div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <div class="flex items-center gap-3 mb-3"><span class="msi text-peri text-[22px]">monitoring</span><h3 class="text-lg font-bold text-ink">Drift is measured four ways</h3></div>
-                    <p class="text-soft text-sm leading-relaxed">A shifted column is caught with the Kolmogorov-Smirnov test, Population Stability Index, Wasserstein distance and KL divergence, each with its own threshold, instead of one number that either fires or does not.</p>
-                </div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <div class="flex items-center gap-3 mb-3"><span class="msi text-rose text-[22px]">rule</span><h3 class="text-lg font-bold text-ink">Say what your data must look like</h3></div>
-                    <p class="text-soft text-sm leading-relaxed">Available expectations <code class="text-gold">expect_columns_exist</code>, <code class="text-gold">expect_no_nulls</code>, <code class="text-gold">expect_value_range</code> and <code class="text-gold">expect_unique</code> stop the run with a clear <code class="text-gold">ExpectationError</code> before a bad column reaches a model.</p>
-                </div>
-                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
-                    <div class="flex items-center gap-3 mb-3"><span class="msi text-gold text-[22px]">dashboard_customize</span><h3 class="text-lg font-bold text-ink">Start from a working pipeline</h3></div>
-                    <p class="text-soft text-sm leading-relaxed">Five templates drop a wired graph onto the canvas: Tabular Classification, Tabular Regression, Text Classification, Customer Segmentation and Ensemble Classification. You adjust instead of assemble.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ FAQ ============ -->
-    <section id="faq" class="py-24 bg-night-soft border-y border-line relative overflow-hidden">
-        <div class="max-w-3xl mx-auto px-5 sm:px-8">
-            <div class="text-center mb-14">
-                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Questions, answered.</h2>
-                <p class="rv text-soft">The questions people actually ask before trying it.</p>
-            </div>
-
-            <div class="space-y-4">
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">What is Skyulf?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Skyulf is two things that share one engine: <strong class="text-ink">skyulf-core</strong>, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">What is the meaning of Skyulf?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">Do I have to self-host it?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">You can try the hosted demo first, with nothing to install. For real work you run it yourself with <code class="text-peri">docker compose up</code>, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it — which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">How is this different from cloud MLOps platforms?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">Is this really free?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Yes. Skyulf is open source under a split license. <strong class="text-ink">skyulf-core</strong>, the Python library, is <strong class="text-ink">Apache&nbsp;2.0</strong>, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is <strong class="text-ink">AGPLv3</strong>, so improvements to the application itself are shared back.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">Can I use this in production?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">It is perfect for internal tools, research, and experimentation. We are working towards a stable v1.0 for critical production workloads.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">How can I contribute?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Contributions are welcome. Start at <a href="https://github.com/flyingriverhorse/skyulf" class="text-peri hover:underline">GitHub</a>. Whether it's code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf.</p></div>
-                </div>
-                <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
-                        <span class="font-bold text-ink group-hover:text-gold transition-colors">Do you offer a commercial license?</span>
-                        <span class="msi text-faint transition-transform duration-300">expand_more</span>
-                    </button>
-                    <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Building on <strong class="text-ink">skyulf-core</strong> (Apache&nbsp;2.0) is free for any use, commercial included. The platform is AGPLv3: running it internally, unmodified, needs nothing from you, but offering a modified version as a public network service means publishing your source, or asking for a commercial exception.</p></div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ STACK MARQUEE ============ -->
-    <section class="py-14 overflow-hidden marquee-wrap">
-        <p class="text-center font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-8">Powered by modern open source</p>
-        <div class="relative flex overflow-x-hidden">
-            <div class="animate-marquee whitespace-nowrap flex items-center [&>span]:mr-16 font-mono text-xl font-semibold">
-                <span class="text-gold">Scikit-learn</span><span class="text-peri">Pandas</span><span class="text-rose">FastAPI</span><span class="text-gold">React</span><span class="text-peri">Optuna</span><span class="text-rose">Celery</span><span class="text-gold">Redis</span><span class="text-peri">Polars</span><span class="text-rose">NumPy</span><span class="text-gold">Imbalanced-learn</span><span class="text-peri">SQLAlchemy</span>
-                <span class="text-gold" aria-hidden="true">Scikit-learn</span><span class="text-peri" aria-hidden="true">Pandas</span><span class="text-rose" aria-hidden="true">FastAPI</span><span class="text-gold" aria-hidden="true">React</span><span class="text-peri" aria-hidden="true">Optuna</span><span class="text-rose" aria-hidden="true">Celery</span><span class="text-gold" aria-hidden="true">Redis</span><span class="text-peri" aria-hidden="true">Polars</span><span class="text-rose" aria-hidden="true">NumPy</span><span class="text-gold" aria-hidden="true">Imbalanced-learn</span><span class="text-peri" aria-hidden="true">SQLAlchemy</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============ CTA ============ -->
-    <section class="relative py-28 overflow-hidden">
-        <div class="absolute inset-0 hero-bg" style="background-position: center 65%;" aria-hidden="true"></div>
-        <div class="absolute inset-0" style="background: linear-gradient(to bottom, var(--bg), var(--hero-shade-mid) 40%, var(--bg));" aria-hidden="true"></div>
-        <div class="relative z-10 max-w-3xl mx-auto px-5 text-center">
-            <h2 class="rv text-4xl sm:text-5xl font-extrabold text-ink tracking-tight mb-5 drop-shadow-xl">Ready to build?</h2>
-            <p class="rv text-lg text-soft mb-9" style="text-shadow: 0 1px 12px var(--hero-shadow);">Try the demo in your browser, or install the library and start from your next notebook.</p>
-            <div class="rv flex flex-wrap gap-4 justify-center">
-                <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold px-10 py-4 rounded-full font-bold text-lg">Try the live demo</a>
-                <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="btn-ghost glass-panel px-10 py-4 rounded-full font-bold text-lg">View on GitHub</a>
-            </div>
-        </div>
-    </section>
-    </main>
-
-    <!-- ============ FOOTER ============ -->
-    <footer class="py-14 border-t border-line bg-night-soft">
-        <div class="max-w-6xl mx-auto px-5 sm:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-                <div>
-                    <div class="flex items-center gap-2 mb-4">
-                        <img src="./static/img/logo.png" alt="Skyulf Logo" class="w-8 h-8 rounded-lg">
-                        <span class="font-extrabold text-xl text-ink tracking-tight">Skyulf</span>
-                    </div>
-                    <p class="text-soft text-sm leading-relaxed">Build ML pipelines you can trust, visually or in plain Python.</p>
-                </div>
-                <div>
-                    <h3 class="font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-4">Product</h3>
-                    <ul class="space-y-2 text-sm text-soft">
-                        <li><a href="#features" class="hover:text-gold transition-colors">Features</a></li>
-                        <li><a href="#how" class="hover:text-gold transition-colors">Workflow</a></li>
-                        <li><a href="#faq" class="hover:text-gold transition-colors">FAQ</a></li>
-                        <li><a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener" class="hover:text-gold transition-colors">PyPI package</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-4">Resources</h3>
-                    <ul class="space-y-2 text-sm text-soft">
-                        <li><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="hover:text-gold transition-colors">GitHub repository</a></li>
-                        <li><a href="./manual/index.html" class="hover:text-gold transition-colors">Documentation</a></li>
-                        <li><a href="./manual/guides/platform_setup.html" class="hover:text-gold transition-colors">Quick start</a></li>
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Community</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-4">Project</h3>
-                    <ul class="space-y-2 text-sm text-soft">
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Contributing</a></li>
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Security</a></li>
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" rel="noopener" class="hover:text-gold transition-colors">License</a></li>
-                    </ul>
-                </div>
-            </div>
-            <div class="pt-8 border-t border-line flex flex-col md:flex-row justify-between items-center gap-4">
-                <div class="text-soft text-sm">&copy; 2025–2026 Murat Unsal. Platform AGPLv3 &middot; skyulf-core Apache&nbsp;2.0.</div>
-                <div class="flex gap-5">
-                    <a href="https://www.linkedin.com/in/murat-u/" target="_blank" rel="noopener" aria-label="Skyulf author on LinkedIn" class="text-soft hover:text-gold transition-colors"><span class="msi text-[20px]">link</span></a>
-                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" aria-label="Skyulf on GitHub" class="text-soft hover:text-gold transition-colors"><svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Lightbox -->
-    <div id="lightbox" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-sm" aria-hidden="true" inert role="dialog" aria-label="Image preview">
-        <button id="lightbox-close" aria-label="Close image preview" class="absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-50">
-            <span class="msi text-[40px]">close</span>
-        </button>
-        <button id="lightbox-prev" aria-label="Previous image" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-colors z-50">
-            <span class="msi text-[28px]">chevron_left</span>
-        </button>
-        <button id="lightbox-next" aria-label="Next image" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-colors z-50">
-            <span class="msi text-[28px]">chevron_right</span>
-        </button>
-        <div id="lightbox-counter" aria-live="polite" class="absolute bottom-6 left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.2em] text-white/70"></div>
-        <div id="lightbox-container" class="lightbox-content relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center px-14"></div>
+      </article>
     </div>
+  </section>
 
-    <script>
-        document.documentElement.classList.add('js');
-        window.requestAnimationFrame = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+  <section id="how" class="soft-bg">
+    <div class="rule"></div>
+    <div class="wrap section">
+      <p class="kicker">The path</p>
+      <h2 class="h2" style="max-width:20ch">From a raw file to a monitored model.</h2>
+      <p class="lede">Every stage lives in one workspace, so nothing gets lost between a notebook, a spreadsheet of results and whatever is actually running in production.</p>
+      <div class="grid-auto" style="--min:340px">
+        <ol class="steps" id="steps">
+          <li class="step active"><button type="button" class="step-btn" aria-controls="panel-1" aria-expanded="true"><span class="step-num">01</span><h3 class="step-title">Point it at a file and start working</h3><p class="step-copy">Upload CSV, Excel, JSON or Parquet, or connect an S3-compatible bucket. Skyulf reads it with Polars, profiles the columns and keeps every version you load, so you can always tell which data produced which model.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-2" aria-expanded="false"><span class="step-num">02</span><h3 class="step-title">Understand the data before you model it</h3><p class="step-copy">One click profiles every column: distributions, correlations, outliers, interactions and clusters. Surrogate decision trees and causal discovery show which relationships actually drive your target.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-3" aria-expanded="false"><span class="step-num">03</span><h3 class="step-title">Design the pipeline instead of retyping it</h3><p class="step-copy">Drag nodes onto the canvas and connect them. Branch a pipeline to try two feature strategies side by side, preview any node's output as a table, and let validation block a run before it wastes your time.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-4" aria-expanded="false"><span class="step-num">04</span><h3 class="step-title">Train in the background, tune when it matters</h3><p class="step-copy">Runs execute as background jobs, so a long training run never freezes the UI. Switch on hyperparameter search — grid, random, halving or Optuna — and watch each trial report as it finishes.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-5" aria-expanded="false"><span class="step-num">05</span><h3 class="step-title">Compare runs and pick a winner on evidence</h3><p class="step-copy">Every run keeps its metrics, curves and confusion matrix. Put runs next to each other, see which change actually helped, and tune decision thresholds rather than accepting whatever 0.5 gives you.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-6" aria-expanded="false"><span class="step-num">06</span><h3 class="step-title">Promote a version, serve predictions</h3><p class="step-copy">Trained models land in a registry with their versions and artifacts. Promote one to active and it is served behind a REST endpoint you can call from anything. The full deployment history is kept for audit.</p></button></li>
+          <li class="step"><button type="button" class="step-btn" aria-controls="panel-7" aria-expanded="false"><span class="step-num">07</span><h3 class="step-title">Find out before your users do</h3><p class="step-copy">Models decay because the world moves. Skyulf compares live data against the training baseline column by column and flags what shifted — plus an error log, a slow-node profiler and an audit trail.</p></button></li>
+        </ol>
+        <div class="stage-view">
+          <div class="panel active" id="panel-1"><button type="button" class="shot zoomable"><img src="./static/img/datasource.jpg" alt="Skyulf data sources screen listing uploaded datasets" loading="lazy" decoding="async"></button></div>
+          <div class="panel" id="panel-2"><button type="button" class="shot zoomable"><img src="./static/img/eda/dashboardeda.jpg" alt="EDA overview dashboard" loading="lazy" decoding="async"></button>
+            <div class="thumbs"><button type="button" class="shot zoomable"><img src="./static/img/eda/correlations.jpg" alt="Correlation matrix" loading="lazy"></button><button type="button" class="shot zoomable"><img src="./static/img/eda/decisiontree.jpg" alt="Surrogate decision tree" loading="lazy"></button><button type="button" class="shot zoomable"><img src="./static/img/eda/causal.jpg" alt="Causal discovery graph" loading="lazy"></button></div></div>
+          <div class="panel" id="panel-3"><button type="button" class="shot zoomable"><img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" loading="lazy" decoding="async"></button></div>
+          <div class="panel" id="panel-4"><button type="button" class="shot zoomable"><img src="./static/img/jobs.jpg" alt="Skyulf jobs list showing background training runs" loading="lazy" decoding="async"></button></div>
+          <div class="panel" id="panel-5"><button type="button" class="shot zoomable"><img src="./static/img/experiments.jpg" alt="Experiment comparison view with metrics and charts" loading="lazy" decoding="async"></button></div>
+          <div class="panel" id="panel-6"><button type="button" class="shot zoomable"><img src="./static/img/deployments.jpg" alt="Deployments screen with the active model version and history" loading="lazy" decoding="async"></button></div>
+          <div class="panel" id="panel-7"><button type="button" class="shot zoomable"><img src="./static/img/drift/drift.jpg" alt="Drift monitoring dashboard" loading="lazy" decoding="async"></button>
+            <div class="thumbs"><button type="button" class="shot zoomable"><img src="./static/img/drift/drift_report.jpg" alt="Detailed drift report per column" loading="lazy"></button><button type="button" class="shot zoomable"><img src="./static/img/errors.jpg" alt="Error log with pipeline failures" loading="lazy"></button><button type="button" class="shot zoomable"><img src="./static/img/slow_nodes.jpg" alt="Slow node profiling view" loading="lazy"></button></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="rule"></div>
+  </section>
 
-        document.addEventListener('DOMContentLoaded', function () {
-            var root = document.documentElement;
-            var reduce = false;
-            try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* older engines */ }
+  <section id="why" class="wrap section">
+    <h2 class="why-title"><span>Your model says 94%.</span><span class="rose">Production says 71%.</span></h2>
+    <p style="max-width:56ch;margin-bottom:64px;font-size:18px">Usually nothing is broken. The score was just measured wrong, and nothing in a normal notebook tells you that.</p>
+    <div class="grid-auto" style="--gap:clamp(32px,5vw,80px);margin-bottom:72px">
+      <div>
+        <h3 style="font-size:24px;margin-bottom:14px">The bug that doesn't raise an error</h3>
+        <p style="margin-bottom:14px">Fill missing values, scale a column or encode a category <em>before</em> you split into train and test, and those steps quietly learn from the test rows. Your validation score now includes answers it was supposed to be guessing. The code runs fine. The number just isn't real.</p>
+        <p style="margin-bottom:22px">Skyulf checks the order of your pipeline and tells you in plain language, both on the canvas and in the library:</p>
+        <div class="warn">
+          <div class="warn-head"><i class="ph ph-warning" style="font-size:18px"></i>validate_leakage_safety()</div>
+          Step 0 (<span class="s">'SimpleImputer'</span>) is configured before the train/test split (step 1, <span class="s">'TrainTestSplitter'</span>) and will fit its statistics on the full dataset including the test set &mdash; move it after the splitter.
+        </div>
+      </div>
+      <div>
+        <div class="point"><i class="ph ph-seal-check gold"></i><h4>Honest scores by construction</h4><p>Every node is split into a part that <em>learns</em> and a part that <em>applies</em>. Learning only ever sees training data, and what it learned is saved as explicit parameters, so inference can never accidentally refit on new data.</p></div>
+        <div class="point rule-top"><i class="ph ph-fingerprint rose"></i><h4>Reproducible six months later</h4><p>Each pipeline gets a fingerprint and an exportable model card. When someone asks which preprocessing produced a prediction, you answer with a record instead of a guess, and hand over a notebook that re-runs it.</p></div>
+        <div class="point rule-top"><i class="ph ph-heartbeat peri"></i><h4>Operations, not just training</h4><p>Most visual ML tools stop at the model. Skyulf keeps going: drift reports, an error log that links to the failing node, slow-node profiling and an audit trail of every pipeline change.</p></div>
+      </div>
+    </div>
+    <table class="table">
+      <thead><tr><th scope="col">Compared with</th><th scope="col">What changes</th></tr></thead>
+      <tbody>
+        <tr><td>vs. hand-written scikit-learn</td><td>Same estimators, none of the glue. You stop re-implementing split-transform-fit wiring for every project, and the ordering mistakes get caught for you.</td></tr>
+        <tr><td>vs. cloud AutoML</td><td>No upload, no per-prediction bill, no black box. You keep the data, you can read every step of the pipeline, and you can export it and walk away.</td></tr>
+        <tr><td>vs. other visual tools</td><td>The canvas isn't a dead end. It exports to a real notebook, and the same pipelines run from the Apache-2.0 library with no UI at all.</td></tr>
+      </tbody>
+    </table>
+  </section>
 
-            // --- Hero line reveal ---
-            requestAnimationFrame(function () { requestAnimationFrame(function () { document.body.classList.add('loaded'); }); });
+  <section id="features" class="soft-bg">
+    <div class="rule"></div>
+    <div class="wrap section">
+      <h2 class="h2">Everything else <span class="gold">in the box</span></h2>
+      <p style="margin-bottom:48px">Shipped and documented, not on a roadmap.</p>
+      <div class="features">
+        <div class="feature rule-top"><i class="ph ph-archive-box gold"></i><h3>Model registry</h3><p>Versioned models with their artifacts and history, so you always know what is live.</p></div>
+        <div class="feature rule-top"><i class="ph ph-sliders-horizontal peri"></i><h3>Hyperparameter tuning</h3><p>Grid, random and halving search built in; Optuna available as an optional extra with live trial output.</p></div>
+        <div class="feature rule-top"><i class="ph ph-chart-bar-horizontal rose"></i><h3>SHAP explanations</h3><p>Optional explainability extra: see which features moved a prediction, globally or row by row.</p></div>
+        <div class="feature rule-top"><i class="ph ph-notebook gold"></i><h3>Notebook export</h3><p>Turn any pipeline into a runnable Jupyter notebook, compact or full, including a serving snippet.</p></div>
+        <div class="feature rule-top"><i class="ph ph-git-fork peri"></i><h3>Multi-branch pipelines</h3><p>Split one canvas into independent paths and run them as parallel jobs to compare approaches.</p></div>
+        <div class="feature rule-top"><i class="ph ph-stack rose"></i><h3>Ensembles</h3><p>Voting and stacking for classification and regression, with nested tuning of the base models.</p></div>
+        <div class="feature rule-top"><i class="ph ph-text-aa gold"></i><h3>Text &amp; NLP nodes</h3><p>TF-IDF, count and hashing vectorizers, tokenisation, and optional dense sentence embeddings.</p></div>
+        <div class="feature rule-top"><i class="ph ph-globe-hemisphere-west peri"></i><h3>Time-series &amp; geo features</h3><p>Lag and rolling windows, date parts, H3 indexing and distance features for spatial data.</p></div>
+        <div class="feature rule-top"><i class="ph ph-receipt rose"></i><h3>Audit log</h3><p>Every pipeline save recorded with what was added, removed or changed, and by whom.</p></div>
+        <div class="feature rule-top"><i class="ph ph-plugs-connected gold"></i><h3>MLflow &amp; Databricks</h3><p>Integration templates for MLflow and Databricks, with more on the way.</p></div>
+      </div>
+      <div class="grid-auto" style="--min:380px;--gap:20px;margin-top:40px">
+        <button type="button" class="shot zoomable"><img src="./static/img/registry.jpg" alt="Model registry listing models and versions" loading="lazy" decoding="async"></button>
+        <button type="button" class="shot zoomable"><img src="./static/img/audit.jpg" alt="Audit log of pipeline changes" loading="lazy" decoding="async"></button>
+      </div>
+    </div>
+    <div class="rule"></div>
+  </section>
 
-            // --- Theme toggle ---
-            var themeToggle = document.getElementById('theme-toggle');
-            var iconDark = document.querySelector('.theme-icon-dark');
-            var iconLight = document.querySelector('.theme-icon-light');
-            if (themeToggle) {
-                function paintTheme() {
-                    var isLight = root.classList.contains('light');
-                    themeToggle.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
-                    if (iconDark) iconDark.classList.toggle('hidden', isLight);
-                    if (iconLight) iconLight.classList.toggle('hidden', !isLight);
-                    if (window.__constellationPalette) window.__constellationPalette();
-                }
-                themeToggle.addEventListener('click', function () {
-                    root.classList.toggle('light');
-                    try { localStorage.setItem('skyulf-theme', root.classList.contains('light') ? 'light' : 'dark'); } catch (e) { /* private mode */ }
-                    paintTheme();
-                });
-                paintTheme();
-            }
+  <section id="evidence" class="wrap section">
+    <h2 class="h2" style="max-width:22ch;margin-bottom:12px">Claims are cheap. Here is the evidence.</h2>
+    <p style="max-width:58ch;margin-bottom:48px">Every number here comes from the repository, and the counts are yours to re-run.</p>
+    <div class="grid-auto" style="--gap:16px">
+      <div class="card"><div class="card-head"><i class="ph ph-list-checks gold"></i><h3>Tested where it matters</h3></div><p>5,787 tests in total: 3,512 in the library, 1,427 in the backend and 848 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p></div>
+      <div class="card"><div class="card-head"><i class="ph ph-chart-line peri"></i><h3>Drift is measured four ways</h3></div><p>A shifted column is caught with the Kolmogorov-Smirnov test, Population Stability Index, Wasserstein distance and KL divergence, each with its own threshold, instead of one number that either fires or does not.</p></div>
+      <div class="card"><div class="card-head"><i class="ph ph-ruler rose"></i><h3>Say what your data must look like</h3></div><p>Available expectations <code>expect_columns_exist</code>, <code>expect_no_nulls</code>, <code>expect_value_range</code> and <code>expect_unique</code> stop the run with a clear <code>ExpectationError</code> before a bad column reaches a model.</p></div>
+      <div class="card"><div class="card-head"><i class="ph ph-squares-four gold"></i><h3>Start from a working pipeline</h3></div><p>Five templates drop a wired graph onto the canvas: Tabular Classification, Tabular Regression, Text Classification, Customer Segmentation and Ensemble Classification. You adjust instead of assemble.</p></div>
+    </div>
+  </section>
 
-            // --- Mobile menu ---
-            var menuToggle = document.getElementById('menu-toggle');
-            var mobileMenu = document.getElementById('mobile-menu');
-            if (menuToggle && mobileMenu) {
-                function setMenu(open) {
-                    mobileMenu.classList.toggle('hidden', !open);
-                    menuToggle.setAttribute('aria-expanded', String(open));
-                    menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-                    var icon = menuToggle.querySelector('.msi');
-                    if (icon) icon.textContent = open ? 'close' : 'menu';
-                }
-                menuToggle.addEventListener('click', function (event) {
-                    event.stopPropagation();
-                    setMenu(mobileMenu.classList.contains('hidden'));
-                });
-                mobileMenu.querySelectorAll('a').forEach(function (link) {
-                    link.addEventListener('click', function () { setMenu(false); });
-                });
-                document.addEventListener('keydown', function (event) {
-                    if (event.key === 'Escape' && !mobileMenu.classList.contains('hidden')) setMenu(false);
-                });
-                document.addEventListener('click', function (event) {
-                    if (!mobileMenu.classList.contains('hidden') && !mobileMenu.contains(event.target)) setMenu(false);
-                });
-            }
+  <section id="updates" class="wrap" style="padding-bottom:clamp(72px,9vw,120px)">
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:28px">
+      <div>
+        <h2 style="font-weight:800;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin-bottom:8px">Always <span class="gold">shipping</span></h2>
+        <p>Live from the GitHub releases feed, every version, newest first.</p>
+      </div>
+      <a href="https://github.com/flyingriverhorse/skyulf/releases" target="_blank" rel="noopener" class="btn btn-ghost" style="color:var(--gold-text)">All releases <i class="ph ph-arrow-up-right"></i></a>
+    </div>
+    <div id="updates-list">
+      <a class="release rule-top" href="https://github.com/flyingriverhorse/skyulf/releases" target="_blank" rel="noopener"><span class="tagname">v0.8.11</span><span class="date">Sep 2026</span><span class="sum">Latest release — see the full notes on GitHub.</span><i class="ph ph-arrow-up-right" style="color:var(--faint)"></i></a>
+    </div>
+  </section>
 
-            // --- Version badge: refresh from PyPI, keep static fallback on failure ---
-            var badge = document.getElementById('version-badge');
-            if (badge && window.fetch) {
-                fetch('https://pypi.org/pypi/skyulf-core/json')
-                    .then(function (res) { return res.ok ? res.json() : null; })
-                    .then(function (data) {
-                        var version = data && data.info && data.info.version;
-                        if (!version) return;
-                        var label = badge.querySelector('[data-version-label]');
-                        if (label) label.textContent = 'v' + version + ' — live on PyPI';
-                    })
-                    .catch(function () { /* offline or blocked: static fallback stays */ });
-            }
+  <section id="faq" class="soft-bg faq">
+    <div class="rule"></div>
+    <div class="wrap section faq-grid">
+      <div>
+        <h2 class="h2" style="margin-bottom:12px">Questions, answered.</h2>
+        <p>The questions people actually ask before trying it.</p>
+      </div>
+      <div>
+        <details class="rule-top"><summary>What is Skyulf?<i class="ph ph-plus"></i></summary><p>Skyulf is two things that share one engine: <strong>skyulf-core</strong>, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift.</p></details>
+        <details class="rule-top"><summary>What is the meaning of Skyulf?<i class="ph ph-plus"></i></summary><p>Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.</p></details>
+        <details class="rule-top"><summary>Do I have to self-host it?<i class="ph ph-plus"></i></summary><p>You can try the hosted demo first, with nothing to install. For real work you run it yourself with <code class="peri mono">docker compose up</code>, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it — which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party.</p></details>
+        <details class="rule-top"><summary>How is this different from cloud MLOps platforms?<i class="ph ph-plus"></i></summary><p>Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.</p></details>
+        <details class="rule-top"><summary>Is this really free?<i class="ph ph-plus"></i></summary><p>Yes. Skyulf is open source under a split license. <strong>skyulf-core</strong>, the Python library, is <strong>Apache&nbsp;2.0</strong>, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is <strong>AGPLv3</strong>, so improvements to the application itself are shared back.</p></details>
+        <details class="rule-top"><summary>Can I use this in production?<i class="ph ph-plus"></i></summary><p>It is perfect for internal tools, research, and experimentation. We are working towards a stable v1.0 for critical production workloads.</p></details>
+        <details class="rule-top"><summary>How can I contribute?<i class="ph ph-plus"></i></summary><p>Contributions are welcome. Start at <a href="https://github.com/flyingriverhorse/skyulf" class="peri">GitHub</a>. Whether it's code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf.</p></details>
+        <details class="rule-top"><summary>Do you offer a commercial license?<i class="ph ph-plus"></i></summary><p>Building on <strong>skyulf-core</strong> (Apache&nbsp;2.0) is free for any use, commercial included. The platform is AGPLv3: running it internally, unmodified, needs nothing from you, but offering a modified version as a public network service means publishing your source, or asking for a commercial exception.</p></details>
+      </div>
+    </div>
+  </section>
 
-            // --- Stat pills: refresh stars + monthly downloads, keep static fallback on failure ---
-            function formatStat(value) {
-                try {
-                    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-                } catch (e) { return String(value); }
-            }
-            var starsLabel = document.querySelector('[data-github-stars]');
-            if (starsLabel && window.fetch) {
-                fetch('https://api.github.com/repos/flyingriverhorse/skyulf')
-                    .then(function (res) { return res.ok ? res.json() : null; })
-                    .then(function (data) {
-                        var stars = data && data.stargazers_count;
-                        if (typeof stars !== 'number') return;
-                        starsLabel.textContent = formatStat(stars);
-                    })
-                    .catch(function () { /* offline or blocked: static fallback stays */ });
-            }
-            var monthlyLabel = document.querySelector('[data-pypi-monthly]');
-            if (monthlyLabel && window.fetch) {
-                fetch('https://pypistats.org/api/packages/skyulf-core/recent')
-                    .then(function (res) { return res.ok ? res.json() : null; })
-                    .then(function (data) {
-                        var payload = (data && data.data) || data;
-                        var monthly = payload && payload.last_month;
-                        if (typeof monthly !== 'number') return;
-                        monthlyLabel.textContent = formatStat(monthly);
-                    })
-                    .catch(function () { /* offline or blocked: static fallback stays */ });
-            }
-            var totalLabel = document.querySelector('[data-pepy-total]');
-            if (totalLabel && window.fetch) {
-                // pepy serves the badge as a CORS-enabled SVG; the last text node is the count
-                fetch('https://static.pepy.tech/personalized-badge/skyulf-core?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=Total_Downloads')
-                    .then(function (res) { return res.ok ? res.text() : null; })
-                    .then(function (svg) {
-                        if (!svg) return;
-                        // capture each <text> node's inner content; the last one is the count
-                        var re = /<text[^>]*>([^<]*)<\/text>/g;
-                        var match, value = null;
-                        while ((match = re.exec(svg)) !== null) value = match[1];
-                        if (value && value.trim()) totalLabel.textContent = value.trim();
-                    })
-                    .catch(function () { /* offline or blocked: static fallback stays */ });
-            }
+  <section class="wrap" style="padding-top:56px" aria-label="Technology stack">
+    <p class="mono" style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:16px">Powered by modern open source</p>
+    <div class="stack">
+      <span class="gold">Scikit-learn</span><span class="peri">Pandas</span><span class="rose">FastAPI</span><span class="gold">React</span><span class="peri">Optuna</span><span class="rose">Celery</span><span class="gold">Redis</span><span class="peri">Polars</span><span class="rose">NumPy</span><span class="gold">Imbalanced-learn</span><span class="peri">SQLAlchemy</span><span class="rose">MLflow</span><span class="gold">Databricks</span>
+    </div>
+  </section>
 
-            // --- Updates: render recent GitHub releases, keep static fallback on failure ---
-            var updatesList = document.getElementById('updates-list');
-            if (updatesList && window.fetch) {
-                fetch('https://api.github.com/repos/flyingriverhorse/skyulf/releases?per_page=6')
-                    .then(function (res) { return res.ok ? res.json() : null; })
-                    .then(function (releases) {
-                        if (!Array.isArray(releases) || !releases.length) return;
-                        var monthFmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
-                        updatesList.innerHTML = '';
-                        releases.forEach(function (rel) {
-                            var card = document.createElement('div');
-                            card.className = 'rv in glass-panel rounded-2xl p-6 hover-lift';
-                            var head = document.createElement('div');
-                            head.className = 'flex items-center justify-between mb-3';
-                            var tag = document.createElement('span');
-                            tag.className = 'font-mono text-sm font-bold text-gold';
-                            tag.textContent = rel.tag_name || rel.name || 'release';
-                            var date = document.createElement('span');
-                            date.className = 'text-faint text-xs';
-                            try { date.textContent = monthFmt.format(new Date(rel.published_at)); } catch (e) { date.textContent = ''; }
-                            head.appendChild(tag);
-                            head.appendChild(date);
-                            var body = document.createElement('p');
-                            body.className = 'text-soft text-sm leading-relaxed';
-                            body.textContent = summarizeRelease(rel.body);
-                            var link = document.createElement('a');
-                            link.href = rel.html_url;
-                            link.target = '_blank';
-                            link.rel = 'noopener';
-                            link.className = 'inline-flex items-center gap-1 text-sm font-semibold text-gold hover:underline mt-3';
-                            link.innerHTML = 'Full notes <span class="msi text-[16px]">open_in_new</span>';
-                            card.appendChild(head);
-                            card.appendChild(body);
-                            card.appendChild(link);
-                            updatesList.appendChild(card);
-                        });
-                    })
-                    .catch(function () { /* offline or blocked: static fallback stays */ });
-            }
-            function summarizeRelease(body) {
-                if (!body) return 'See the full notes on GitHub.';
-                // strip markdown, keep the first meaningful line, truncate
-                var line = String(body)
-                    .replace(/```[\s\S]*?```/g, ' ')
-                    .replace(/`([^`]*)`/g, '$1')
-                    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-                    .replace(/[*_#>|]/g, ' ')
-                    .split('\n')
-                    .map(function (l) { return l.replace(/^[-\d.\s]+/, '').trim(); })
-                    .filter(function (l) { return l.length > 15; })[0];
-                if (!line) return 'See the full notes on GitHub.';
-                return line.length > 140 ? line.slice(0, 137).trimEnd() + '…' : line;
-            }
+  <section class="cta" aria-label="Get started">
+    <div class="cta-bg" aria-hidden="true"></div>
+    <div class="cta-shade" aria-hidden="true"></div>
+    <div class="wrap cta-inner">
+      <h2 style="font-weight:800;font-size:clamp(36px,5vw,64px);line-height:1.04;letter-spacing:-.03em;margin-bottom:16px">Ready to build?</h2>
+      <p style="margin-bottom:32px;font-size:18px;max-width:46ch">Try the demo in your browser, or install the library and start from your next notebook.</p>
+      <div class="row">
+        <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn btn-primary btn-lg">Try the live demo</a>
+        <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="btn btn-secondary btn-lg" style="background:var(--panel-60)">View on GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
 
-            // --- Constellation canvas over the hero ---
-            var canvas = document.getElementById('constellation');
-            var ctx = null;
-            try { if (canvas && !reduce && canvas.getContext) ctx = canvas.getContext('2d'); } catch (e) { /* canvas unavailable */ }
-            if (ctx && 'IntersectionObserver' in window) {
-                var hero = canvas.parentElement;
-                var palette = { star: '255, 214, 90', glow: '255, 218, 217', line: '255, 218, 217' };
-                window.__constellationPalette = function () {
-                    palette = root.classList.contains('light')
-                        ? { star: '150, 105, 10', glow: '59, 75, 196', line: '59, 75, 196' }
-                        : { star: '255, 214, 90', glow: '255, 218, 217', line: '255, 218, 217' };
-                };
-                window.__constellationPalette();
+<footer class="soft-bg">
+  <div class="rule"></div>
+  <div class="wrap" style="padding-block:56px 40px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:40px;margin-bottom:48px">
+      <div>
+        <div class="brand" style="margin-bottom:14px"><img src="./static/img/logo.png" alt="Skyulf Logo" width="28" height="28"><span style="font-weight:800">Skyulf</span></div>
+        <p style="font-size:14px;max-width:30ch">Build ML pipelines you can trust, visually or in plain Python.</p>
+      </div>
+      <nav aria-label="Product"><h3>Product</h3><div class="foot-links"><a href="#features">Features</a><a href="#how">Workflow</a><a href="#faq">FAQ</a><a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">PyPI package</a></div></nav>
+      <nav aria-label="Resources"><h3>Resources</h3><div class="foot-links"><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub repository</a><a href="./manual/index.html">Documentation</a><a href="./manual/guides/platform_setup.html">Quick start</a><a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" rel="noopener">Community</a></div></nav>
+      <nav aria-label="Project"><h3>Project</h3><div class="foot-links"><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" rel="noopener">Security</a><a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" rel="noopener">License</a></div></nav>
+    </div>
+    <div class="rule-top" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding-top:24px">
+      <span style="font-size:14px">&copy; 2025–2026 Murat Unsal. Platform AGPLv3 &middot; skyulf-core Apache&nbsp;2.0.</span>
+      <div style="display:flex;gap:6px">
+        <a href="https://www.linkedin.com/in/murat-u/" target="_blank" rel="noopener" aria-label="Skyulf author on LinkedIn" class="btn btn-ghost btn-icon"><i class="ph ph-linkedin-logo" style="font-size:20px"></i></a>
+        <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" aria-label="Skyulf on GitHub" class="btn btn-ghost btn-icon"><i class="ph ph-github-logo" style="font-size:20px"></i></a>
+      </div>
+    </div>
+  </div>
+</footer>
 
-                function resize() { canvas.width = hero.clientWidth; canvas.height = hero.clientHeight; }
-                window.addEventListener('resize', resize);
-                resize();
+<div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Image preview">
+  <button type="button" class="btn btn-ghost btn-icon" id="lightbox-close" aria-label="Close image preview"><i class="ph ph-x" style="font-size:26px"></i></button>
+  <img id="lightbox-img" alt="">
+</div>
 
-                var stars = Array.from({ length: 70 }, function () {
-                    return {
-                        x: Math.random() * canvas.width,
-                        y: Math.random() * canvas.height,
-                        r: Math.random() * 1.8 + 1,
-                        vx: (Math.random() - 0.5) * 0.35,
-                        vy: (Math.random() - 0.5) * 0.35,
-                        phase: Math.random() * Math.PI * 2
-                    };
-                });
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var root = document.documentElement;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-                var running = true;
-                new IntersectionObserver(function (entries) { running = entries[0].isIntersecting; }, { threshold: 0 }).observe(hero);
+  // Theme
+  var tt = document.getElementById('theme-toggle');
+  function paint() { tt.setAttribute('aria-label', root.classList.contains('light') ? 'Switch to dark theme' : 'Switch to light theme'); }
+  tt.addEventListener('click', function () {
+    root.classList.toggle('light');
+    try { localStorage.setItem('skyulf-theme', root.classList.contains('light') ? 'light' : 'dark'); } catch (e) {}
+    paint();
+  });
+  paint();
 
-                (function draw() {
-                    requestAnimationFrame(draw);
-                    if (!running || document.hidden) return;
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.lineWidth = 1;
-                    for (var i = 0; i < stars.length; i++) {
-                        for (var j = i + 1; j < stars.length; j++) {
-                            var dx = stars[i].x - stars[j].x, dy = stars[i].y - stars[j].y;
-                            var dist = Math.sqrt(dx * dx + dy * dy);
-                            if (dist < 150) {
-                                ctx.strokeStyle = 'rgba(' + palette.line + ',' + ((1 - dist / 150) * 0.22).toFixed(3) + ')';
-                                ctx.beginPath();
-                                ctx.moveTo(stars[i].x, stars[i].y);
-                                ctx.lineTo(stars[j].x, stars[j].y);
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                    stars.forEach(function (s) {
-                        s.x += s.vx; s.y += s.vy;
-                        if (s.x < 0 || s.x > canvas.width) s.vx *= -1;
-                        if (s.y < 0 || s.y > canvas.height) s.vy *= -1;
-                        s.phase += 0.02;
-                        var alpha = 0.35 + (Math.sin(s.phase) + 1) * 0.3;
-                        ctx.beginPath();
-                        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                        ctx.fillStyle = 'rgba(' + palette.star + ',' + alpha.toFixed(3) + ')';
-                        if (s.r > 2.2) { ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(' + palette.glow + ',0.9)'; } else { ctx.shadowBlur = 0; }
-                        ctx.fill();
-                    });
-                    ctx.shadowBlur = 0;
-                })();
-            }
+  // Hero video
+  var v = document.querySelector('.hero-video');
+  if (v) { v.muted = true; if (reduce) { v.removeAttribute('autoplay'); v.pause(); } else { var p = v.play(); if (p && p.catch) p.catch(function () {}); } }
 
-            // --- Parallax on the hero background ---
-            var heroBg = document.querySelector('.hero-bg');
-            if (heroBg && !reduce) {
-                window.addEventListener('scroll', function () {
-                    heroBg.style.transform = 'translateY(' + (window.scrollY * 0.22).toFixed(1) + 'px)';
-                }, { passive: true });
-            }
-            if (heroBg && reduce && heroBg.tagName === 'VIDEO') {
-                heroBg.removeAttribute('autoplay');
-                heroBg.pause();
-            }
+  // Stepper
+  var steps = Array.prototype.slice.call(document.querySelectorAll('#steps .step'));
+  steps.forEach(function (li) {
+    var btn = li.querySelector('.step-btn');
+    btn.addEventListener('click', function () {
+      steps.forEach(function (o) {
+        var on = o === li, b = o.querySelector('.step-btn');
+        o.classList.toggle('active', on); b.setAttribute('aria-expanded', String(on));
+        document.getElementById(b.getAttribute('aria-controls')).classList.toggle('active', on);
+      });
+    });
+  });
 
-            // --- Scroll reveals ---
-            var rv = document.querySelectorAll('.rv');
-            if (!reduce && 'IntersectionObserver' in window) {
-                var io = new IntersectionObserver(function (entries) {
-                    entries.forEach(function (e) {
-                        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-                    });
-                }, { threshold: 0.12 });
-                rv.forEach(function (el) { io.observe(el); });
-            } else {
-                rv.forEach(function (el) { el.classList.add('in'); });
-            }
+  // Lightbox
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lightbox-img');
+  var lbClose = document.getElementById('lightbox-close'), lbTrigger = null;
+  var lbBackground = document.querySelectorAll('body > nav, body > main, body > footer, body > .skip');
+  function closeLb() {
+    if (!lb.classList.contains('open')) return;
+    lb.classList.remove('open');
+    lbBackground.forEach(function (el) { el.inert = false; });
+    if (lbTrigger) lbTrigger.focus();
+  }
+  document.querySelectorAll('.zoomable').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var img = el.querySelector('img');
+      lbTrigger = el; lbImg.src = img.currentSrc || img.src; lbImg.alt = img.alt;
+      lb.classList.add('open');
+      lbBackground.forEach(function (background) { background.inert = true; });
+      lbClose.focus();
+    });
+  });
+  lb.addEventListener('click', function (e) { if (e.target !== lbImg) closeLb(); });
+  document.addEventListener('keydown', function (e) {
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape') closeLb();
+    if (e.key === 'Tab') { e.preventDefault(); lbClose.focus(); }
+  });
 
-            // --- Count-up stats ---
-            var counters = document.querySelectorAll('[data-count]');
-            if (!reduce && 'IntersectionObserver' in window) {
-                var cio = new IntersectionObserver(function (entries) {
-                    entries.forEach(function (e) {
-                        if (!e.isIntersecting) return;
-                        cio.unobserve(e.target);
-                        var target = parseInt(e.target.getAttribute('data-count'), 10);
-                        var t0 = null;
-                        (function step(ts) {
-                            if (!t0) t0 = ts;
-                            var p = Math.min((ts - t0) / 900, 1);
-                            e.target.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString('en-US');
-                            if (p < 1) requestAnimationFrame(step);
-                        })(performance.now());
-                    });
-                }, { threshold: 0.6 });
-                counters.forEach(function (el) { cio.observe(el); });
-            }
+  // Copy
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      try { navigator.clipboard.writeText(btn.getAttribute('data-copy')); } catch (e) {}
+      var label = btn.querySelector('span'), icon = btn.querySelector('i');
+      label.textContent = 'Copied'; icon.className = 'ph ph-check';
+      setTimeout(function () { label.textContent = 'Copy'; icon.className = 'ph ph-copy'; }, 1600);
+    });
+  });
 
-            // --- Copy buttons ---
-            document.querySelectorAll('[data-copy]').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    var text = btn.getAttribute('data-copy');
-                    var icon = btn.querySelector('.msi');
-                    function done() { if (icon) { icon.textContent = 'check'; setTimeout(function () { icon.textContent = 'content_copy'; }, 1400); } }
-                    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, done); } else { done(); }
-                });
-            });
+  // Live stats (static fallbacks stay on failure)
+  if (!window.fetch) return;
+  function compact(n) { try { return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(n); } }
+  function json(u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }); }
+  json('https://pypi.org/pypi/skyulf-core/json').then(function (d) { var ver = d && d.info && d.info.version; if (ver) document.querySelector('[data-version-label]').textContent = 'v' + ver + ' — live on PyPI'; });
+  json('https://api.github.com/repos/flyingriverhorse/skyulf').then(function (d) { if (d && typeof d.stargazers_count === 'number') document.querySelector('[data-github-stars]').textContent = compact(d.stargazers_count); });
+  json('https://pypistats.org/api/packages/skyulf-core/recent').then(function (d) { var p = (d && d.data) || d; if (p && typeof p.last_month === 'number') document.querySelector('[data-pypi-monthly]').textContent = compact(p.last_month); });
+  fetch('https://static.pepy.tech/personalized-badge/skyulf-core?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=Total_Downloads')
+    .then(function (r) { return r.ok ? r.text() : null; })
+    .then(function (svg) { if (!svg) return; var re = /<text[^>]*>([^<]*)<\/text>/g, m, val = null; while ((m = re.exec(svg)) !== null) val = m[1]; if (val && val.trim()) document.querySelector('[data-pepy-total]').textContent = val.trim(); })
+    .catch(function () {});
 
-            // --- Lightbox with gallery navigation ---
-            var lightbox = document.getElementById('lightbox');
-            var lightboxContainer = document.getElementById('lightbox-container');
-            var lightboxClose = document.getElementById('lightbox-close');
-            var lightboxPrev = document.getElementById('lightbox-prev');
-            var lightboxNext = document.getElementById('lightbox-next');
-            var lightboxCounter = document.getElementById('lightbox-counter');
-            var lastFocused = null;
-            var gallery = [];
-            var currentIndex = -1;
-
-            function renderLightbox(index) {
-                if (!gallery.length) return;
-                currentIndex = (index + gallery.length) % gallery.length;
-                var clone = gallery[currentIndex].cloneNode(true);
-                clone.className = 'max-w-full max-h-[85vh] object-contain rounded-lg';
-                clone.removeAttribute('loading');
-                lightboxContainer.innerHTML = '';
-                lightboxContainer.appendChild(clone);
-                if (lightboxCounter) lightboxCounter.textContent = (currentIndex + 1) + ' / ' + gallery.length;
-            }
-            function openLightbox(image) {
-                var idx = gallery.indexOf(image);
-                if (idx === -1) return;
-                lastFocused = document.activeElement;
-                renderLightbox(idx);
-                lightbox.classList.add('active');
-                lightbox.removeAttribute('inert');
-                lightbox.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
-                lightboxClose.focus();
-            }
-            function closeLightbox() {
-                lightbox.classList.remove('active');
-                lightbox.setAttribute('inert', '');
-                lightbox.setAttribute('aria-hidden', 'true');
-                document.body.style.overflow = '';
-                lightboxContainer.innerHTML = '';
-                if (lightboxCounter) lightboxCounter.textContent = '';
-                currentIndex = -1;
-                if (lastFocused) lastFocused.focus();
-            }
-            document.querySelectorAll('.zoomable').forEach(function (wrapper) {
-                var image = wrapper.tagName === 'IMG' ? wrapper : wrapper.querySelector('img');
-                if (!image) return;
-                gallery.push(image);
-                wrapper.setAttribute('tabindex', '0');
-                wrapper.setAttribute('role', 'button');
-                wrapper.setAttribute('aria-label', 'Enlarge: ' + (image.getAttribute('alt') || 'screenshot'));
-                wrapper.addEventListener('click', function () { openLightbox(image); });
-                wrapper.addEventListener('keydown', function (event) {
-                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openLightbox(image); }
-                });
-            });
-            lightboxClose.addEventListener('click', closeLightbox);
-            if (lightboxPrev) lightboxPrev.addEventListener('click', function () { renderLightbox(currentIndex - 1); });
-            if (lightboxNext) lightboxNext.addEventListener('click', function () { renderLightbox(currentIndex + 1); });
-            lightbox.addEventListener('click', function (event) { if (event.target === lightbox) closeLightbox(); });
-            document.addEventListener('keydown', function (event) {
-                if (!lightbox.classList.contains('active')) return;
-                if (event.key === 'Escape') closeLightbox();
-                else if (event.key === 'ArrowLeft') renderLightbox(currentIndex - 1);
-                else if (event.key === 'ArrowRight') renderLightbox(currentIndex + 1);
-                else if (event.key === 'Tab') {
-                    event.preventDefault();
-                    var focusables = [lightboxClose, lightboxPrev, lightboxNext];
-                    var pos = focusables.indexOf(document.activeElement);
-                    var next = event.shiftKey ? (pos - 1 + focusables.length) % focusables.length : (pos + 1) % focusables.length;
-                    focusables[next].focus();
-                }
-            });
-        });
-    </script>
+  function summarize(body) {
+    if (!body) return 'See the full notes on GitHub.';
+    var line = String(body).replace(/```[\s\S]*?```/g, ' ').replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_#>|]/g, ' ')
+      .split('\n').map(function (l) { return l.replace(/^[-\d.\s]+/, '').trim(); }).filter(function (l) { return l.length > 15; })[0];
+    if (!line) return 'See the full notes on GitHub.';
+    return line.length > 140 ? line.slice(0, 137).trimEnd() + '…' : line;
+  }
+  json('https://api.github.com/repos/flyingriverhorse/skyulf/releases?per_page=6').then(function (rs) {
+    if (!Array.isArray(rs) || !rs.length) return;
+    var list = document.getElementById('updates-list'), fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+    list.innerHTML = '';
+    rs.forEach(function (r) {
+      var a = document.createElement('a');
+      a.className = 'release rule-top'; a.href = r.html_url; a.target = '_blank'; a.rel = 'noopener';
+      var t = document.createElement('span'); t.className = 'tagname'; t.textContent = r.tag_name || r.name || 'release';
+      var d = document.createElement('span'); d.className = 'date'; try { d.textContent = fmt.format(new Date(r.published_at)); } catch (e) {}
+      var s = document.createElement('span'); s.className = 'sum'; s.textContent = summarize(r.body);
+      var i = document.createElement('i'); i.className = 'ph ph-arrow-up-right'; i.style.color = 'var(--faint)';
+      a.append(t, d, s, i); list.appendChild(a);
+    });
+  });
+});
+</script>
 </body>
 </html>

@@ -27,14 +27,15 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Review the three initiatives/REVIEW-skyulf-core-091-*-2026-10-04.md reports
-against current code; fix confirmed defects with regression tests.
-Durable progress: initiatives/REVIEW-skyulf-core-091-fixes-2026-10-04.md.
+SM-23 functionally complete; durable evidence: initiatives/spark_and_mlflow/177-sm23b-online-monitoring.md.
 
 ## Open messages
 
-### task176-dual-bundles | 2026-10-05T20:00:54.4890268Z | Codex -> peers | CLAIM
-User requested fresh four-target training and complete lifecycle in reference Bundle at Desktop/dans and Skyulf Bundle at Desktop/sky, shared CompanyMonthly.csv uploaded to Databricks skyulf profile. Root owns initiatives/spark_and_mlflow/176-company-dual-bundles.md and tmp_repro_artifacts/company_dual_bundles shared data preparation/live orchestration. Delegated project owners will be recorded here. No existing production resources or previous refactor files to mutate.
+### sm23b-final-release | 2026-10-06T17:05:29.8179337Z | Codex -> peers | RESULT/RELEASE
+All SM-23 claims released. Delivery177 and queue record native HTTP10, parser33, delayed-label healthy/degraded, replay, native refresh and9 dashboard queries. Seven exact reader environments passed native run1057743313713804; wheel-only migration verified, all12 train/score settings preserved. Final519 Python files match deployed wheel df3c5bee. Ruff/Ty/Lizard and affected tests passed; no new commit/push. Detailed evidence and API migration notes persisted in Delivery177. No pending peer question.
 
-### task176-owners | 2026-10-05T20:43:52.3537987Z | Codex -> peers | CLAIM
-Active /root/sky_bundle owns C:/Users/Murat/Desktop/sky/** and tmp_repro_artifacts/company_dual_bundles/sky/** until final live train/score/monitor verification. Reference owner and core-admission implementer/reviewer completed; evidence preserved in task176. Root owns shared data and final comparison. No overlapping edits.
+### pr092-root | 2026-10-06T17:09:07.9858851Z | Codex -> peers | CLAIM
+User authorizes committing all project changes, pushing092, opening PR against verified origin/master and fixing failed checks until settled. Root owns .gitignore, AGENT_CHAT.md, index.html, llms.txt, SM23 serving/monitoring code and tests, README/dashboard template, initiatives/spark_and_mlflow/{177-sm23b-online-monitoring.md,OPEN_QUEUE_updated.md}, changelog/0.9.x.md and tmp_repro_artifacts/pr092/ evidence. Temporary model/test output and personal .claude/settings.local.json excluded by repository policy. Earlier task evidence retained in Delivery177. No merge requested.
+
+### pr092-preflight-fixes | 2026-10-06T17:13:19.7299826Z | Codex -> peers | CLAIM
+Root additionally claims .github/workflows/docs.yml. Independent read-only review found missing llms.txt deployment and root-page lightbox focus isolation; fixes are bounded to those verified issues. Native SM23 code unchanged,141 affected local tests passed after correcting a missing harness temp parent; full Ruff/format/Ty passed. Reviewer found no additional optional dependency or packaging blockers.

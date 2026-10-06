@@ -66,6 +66,7 @@ class MonitorConfig:
     performance_policy: dict[str, Any] | None = None
     execution_engine: str = "local"
     reference_namespace: str | None = None
+    serving_endpoint: str | None = None
 
     def __post_init__(self) -> None:
         """Reject ambiguous or unbounded work before registry and Spark access."""
@@ -81,6 +82,7 @@ class MonitorConfig:
         _validate_model_set(self)
         _validate_performance_enrollment(self)
         _validate_execution(self)
+        _validate_serving(self)
         if type(self.enabled) is not bool:
             raise ValueError("Monitoring enabled must be a boolean.")
 
@@ -94,7 +96,16 @@ class MonitorConfig:
     @property
     def monitor_id(self) -> str:
         """Retain history across version upgrades without colliding across namespaces."""
-        return json_digest([self.environment, self.project, self.model_name.lower()])
+        identity: list[str | None] = [self.environment, self.project, self.model_name.lower()]
+        if self.serving_endpoint is not None:
+            identity += [
+                self.serving_endpoint,
+                self.model_version,
+                self.model_set_name,
+                self.model_set_version,
+                self.model_set_branch,
+            ]
+        return json_digest(identity)
 
     def payload(self) -> dict[str, Any]:
         """Return the complete enrollment policy for report identity and audit."""
@@ -105,7 +116,24 @@ class MonitorConfig:
             payload.pop("execution_engine")
         if self.reference_namespace is None:
             payload.pop("reference_namespace")
+        if self.serving_endpoint is None:
+            payload.pop("serving_endpoint")
         return payload
+
+
+def _validate_serving(config: MonitorConfig) -> None:
+    """Require immutable attribution and native payload storage for online observations."""
+    endpoint = config.serving_endpoint
+    if endpoint is None:
+        return
+    if type(endpoint) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,62}", endpoint):
+        raise ValueError("serving_endpoint must be a valid endpoint name.")
+    if config.execution_engine != "spark":
+        raise ValueError("Serving monitoring requires Spark execution.")
+    if config.model_version is None:
+        raise ValueError("Serving monitoring requires a concrete model version.")
+    if config.source_table != config.prediction_table:
+        raise ValueError("Serving source and predictions must use the same inference table.")
 
 
 def _validate_execution(config: MonitorConfig) -> None:

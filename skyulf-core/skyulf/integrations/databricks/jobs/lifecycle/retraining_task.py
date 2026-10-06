@@ -279,13 +279,15 @@ def _submit_candidates(
         return {"status": "superseded", "models": results}
     job_id = _training_job_id(workspace, values)
     identity = sorted(
-        (
-            item["model_name"],
-            item["baseline_model_version"],
-            item["source_table"],
-            item["content_sha256"],
-        )
-        for item in ready
+        {
+            (
+                item["model_name"],
+                item["baseline_model_version"],
+                item["source_table"],
+                item["content_sha256"],
+            )
+            for item in ready
+        }
     )
     request_id = json_digest({"job_id": job_id, "training_data": identity})
     result = submit_retraining(

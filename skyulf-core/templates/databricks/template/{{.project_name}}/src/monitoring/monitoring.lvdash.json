@@ -2215,6 +2215,31 @@
         " CASE WHEN status IN ('healthy', 'degraded') THEN 0 ELSE 1 END AS context_count FROM daily\n",
         "ORDER BY window_day, monitor_id, series\n"
       ]
+    },
+    {
+      "name": "serving_current",
+      "displayName": "Latest serving status",
+      "queryLines": [
+        "WITH serving_inventory AS (\n SELECT monitor_id, model_name, enabled, updated_at, config_digest,\n",
+        " get_json_object(config_json, '$.serving_endpoint') AS endpoint,\n COALESCE(get_json_object(config_json, '$.model_set_version'), get_json_object(config_json, '$.model_version')) AS served_version,\n",
+        " get_json_object(config_json, '$.model_set_branch') AS served_branch\n FROM model_inventory WHERE get_json_object(config_json, '$.serving_endpoint') IS NOT NULL\n",
+        "), ranked_reports AS (\n SELECT r.*, ROW_NUMBER() OVER (PARTITION BY r.monitor_id ORDER BY r.window_end DESC, r.measured_at DESC, r.report_id DESC) AS report_rank\n",
+        " FROM monitoring_results r JOIN serving_inventory i ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest\n WHERE NOT (r.status = 'no_data' AND get_json_object(r.report_json, '$.performance') IS NOT NULL AND get_json_object(r.report_json, '$.current_rows') IS NULL)\n",
+        ")\nSELECT i.monitor_id, i.model_name, i.endpoint, i.served_version, i.served_branch, r.report_id, r.window_start, r.window_end, r.measured_at, COALESCE(r.status, 'awaiting_logs') AS status, CAST(get_json_object(r.report_json, '$.serving.request_count') AS BIGINT) AS request_count, CAST(get_json_object(r.report_json, '$.serving.success_count') AS BIGINT) AS success_count, CAST(get_json_object(r.report_json, '$.serving.error_count') AS BIGINT) AS error_count, CAST(get_json_object(r.report_json, '$.serving.latency_mean_ms') AS DOUBLE) AS latency_mean_ms, CAST(get_json_object(r.report_json, '$.serving.latency_max_ms') AS DOUBLE) AS latency_max_ms\n",
+        "FROM serving_inventory i LEFT JOIN ranked_reports r ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest AND r.report_rank = 1\nWHERE i.enabled = true ORDER BY i.model_name, i.endpoint, i.served_version, i.monitor_id"
+      ]
+    },
+    {
+      "name": "serving_windows",
+      "displayName": "Serving observation windows",
+      "queryLines": [
+        "WITH serving_inventory AS (\n SELECT monitor_id, model_name, enabled, updated_at, config_digest,\n",
+        " get_json_object(config_json, '$.serving_endpoint') AS endpoint,\n COALESCE(get_json_object(config_json, '$.model_set_version'), get_json_object(config_json, '$.model_version')) AS served_version,\n",
+        " get_json_object(config_json, '$.model_set_branch') AS served_branch\n FROM model_inventory WHERE get_json_object(config_json, '$.serving_endpoint') IS NOT NULL\n",
+        ")\nSELECT i.monitor_id, i.model_name, i.endpoint, i.served_version, i.served_branch, r.report_id, r.window_start, r.window_end, r.measured_at, COALESCE(r.status, 'awaiting_logs') AS status, CAST(get_json_object(r.report_json, '$.serving.request_count') AS BIGINT) AS request_count, CAST(get_json_object(r.report_json, '$.serving.success_count') AS BIGINT) AS success_count, CAST(get_json_object(r.report_json, '$.serving.error_count') AS BIGINT) AS error_count, CAST(get_json_object(r.report_json, '$.serving.latency_mean_ms') AS DOUBLE) AS latency_mean_ms, CAST(get_json_object(r.report_json, '$.serving.latency_max_ms') AS DOUBLE) AS latency_max_ms\n",
+        "FROM monitoring_results r JOIN serving_inventory i ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest\nWHERE i.enabled = true AND NOT (r.status = 'no_data' AND get_json_object(r.report_json, '$.performance') IS NOT NULL AND get_json_object(r.report_json, '$.current_rows') IS NULL)\n",
+        "ORDER BY r.window_end DESC, r.measured_at DESC, r.report_id DESC LIMIT 100"
+      ]
     }
   ],
   "pages": [
@@ -7974,6 +7999,302 @@
             "y": 41,
             "width": 6,
             "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "serving",
+      "displayName": "Online serving",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "serving_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# Online serving"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "serving_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Inference logging is asynchronous. These counts describe captured rows from the payload view, not all HTTP traffic: custom-model 4xx/5xx errors may be absent. Empty windows are not healthy evidence; check endpoint telemetry."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "serving_current",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "serving_current",
+                  "fields": [
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    },
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "endpoint",
+                      "expression": "`endpoint`"
+                    },
+                    {
+                      "name": "served_version",
+                      "expression": "`served_version`"
+                    },
+                    {
+                      "name": "served_branch",
+                      "expression": "`served_branch`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "success_count",
+                      "expression": "`success_count`"
+                    },
+                    {
+                      "name": "error_count",
+                      "expression": "`error_count`"
+                    },
+                    {
+                      "name": "latency_mean_ms",
+                      "expression": "`latency_mean_ms`"
+                    },
+                    {
+                      "name": "latency_max_ms",
+                      "expression": "`latency_max_ms`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Latest serving status",
+                "showDescription": true,
+                "description": "One row per enrolled monitor; a failed latest observation clears earlier counts."
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "monitor_id",
+                    "displayName": "Monitor ID"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "endpoint",
+                    "displayName": "Endpoint"
+                  },
+                  {
+                    "fieldName": "served_version",
+                    "displayName": "Served version"
+                  },
+                  {
+                    "fieldName": "served_branch",
+                    "displayName": "Branch"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Status"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Window end"
+                  },
+                  {
+                    "fieldName": "success_count",
+                    "displayName": "Successful requests"
+                  },
+                  {
+                    "fieldName": "error_count",
+                    "displayName": "Failed requests"
+                  },
+                  {
+                    "fieldName": "latency_mean_ms",
+                    "displayName": "Mean latency (ms)"
+                  },
+                  {
+                    "fieldName": "latency_max_ms",
+                    "displayName": "Max latency (ms)"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "serving_windows",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "serving_windows",
+                  "fields": [
+                    {
+                      "name": "monitor_id",
+                      "expression": "`monitor_id`"
+                    },
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "endpoint",
+                      "expression": "`endpoint`"
+                    },
+                    {
+                      "name": "served_version",
+                      "expression": "`served_version`"
+                    },
+                    {
+                      "name": "served_branch",
+                      "expression": "`served_branch`"
+                    },
+                    {
+                      "name": "report_id",
+                      "expression": "`report_id`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "success_count",
+                      "expression": "`success_count`"
+                    },
+                    {
+                      "name": "error_count",
+                      "expression": "`error_count`"
+                    },
+                    {
+                      "name": "latency_mean_ms",
+                      "expression": "`latency_mean_ms`"
+                    },
+                    {
+                      "name": "latency_max_ms",
+                      "expression": "`latency_max_ms`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Observed windows",
+                "showDescription": true,
+                "description": "Saved aggregate request counts and latency for the latest 100 windows, with each monitor identity kept separate."
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "monitor_id",
+                    "displayName": "Monitor ID"
+                  },
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Model"
+                  },
+                  {
+                    "fieldName": "endpoint",
+                    "displayName": "Endpoint"
+                  },
+                  {
+                    "fieldName": "served_version",
+                    "displayName": "Served version"
+                  },
+                  {
+                    "fieldName": "served_branch",
+                    "displayName": "Branch"
+                  },
+                  {
+                    "fieldName": "report_id",
+                    "displayName": "Report ID"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Status"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Window end"
+                  },
+                  {
+                    "fieldName": "success_count",
+                    "displayName": "Successful requests"
+                  },
+                  {
+                    "fieldName": "error_count",
+                    "displayName": "Failed requests"
+                  },
+                  {
+                    "fieldName": "latency_mean_ms",
+                    "displayName": "Mean latency (ms)"
+                  },
+                  {
+                    "fieldName": "latency_max_ms",
+                    "displayName": "Max latency (ms)"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 7
           }
         }
       ]

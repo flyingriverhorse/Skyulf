@@ -210,6 +210,79 @@ def test_multiple_ready_models_submit_one_training_job(monkeypatch):
     assert result == {"status": "submitted", "run_id": 456, "models": candidates}
 
 
+def _serving_monitor(endpoint):
+    """Represent another captured population for the same pinned fitted model."""
+    return replace(
+        monitor(),
+        serving_endpoint=endpoint,
+        execution_engine="spark",
+        reference_namespace="cat.monitoring",
+        source_table="cat.logs.payload",
+        prediction_table="cat.logs.payload",
+    )
+
+
+def _submission_ids(monkeypatch, configs, candidates):
+    """Compare actual request identities while retaining the complete submission evidence."""
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
+
+    monkeypatch.setattr(
+        retraining_task,
+        "_current_configs",
+        Mock(return_value={config.monitor_id: config for config in configs}),
+    )
+    monkeypatch.setattr(retraining_task, "_training_job_id", Mock(return_value=123))
+    submit = Mock(return_value={"status": "submitted"})
+    monkeypatch.setattr(retraining_requests, "submit_retraining", submit)
+    for selected in (candidates[:1], candidates):
+        retraining_task._submit_candidates(
+            Mock(),
+            Mock(),
+            "cat.monitoring",
+            {},
+            {"cooldown_hours": 24},
+            selected,
+            datetime(2026, 10, 6, tzinfo=UTC),
+        )
+    return [entry.kwargs["request_id"] for entry in submit.call_args_list], submit
+
+
+@pytest.mark.parametrize("layout", ["batch_online", "two_endpoints"])
+def test_same_training_request_identity_survives_duplicate_monitors(monkeypatch, layout):
+    """Additional captured populations must not request the same training input twice."""
+    first = monitor() if layout == "batch_online" else _serving_monitor("endpoint-one")
+    second = _serving_monitor("endpoint-two")
+    candidates = [_ready_candidate(config) for config in (first, second)]
+    ids, submit = _submission_ids(monkeypatch, [first, second], candidates)
+    legacy = json_digest(
+        {
+            "job_id": 123,
+            "training_data": [(first.model_name, "2", "cat.input.training", "a" * 64)],
+        }
+    )
+    assert ids == [legacy, legacy]
+    assert submit.call_args.kwargs["evidence"] == {"models": candidates}
+
+
+@pytest.mark.parametrize("difference", ["model", "version", "source", "content"])
+def test_distinct_training_inputs_retain_distinct_request_identity(monkeypatch, difference):
+    """Deduplication must preserve different models, baselines, sources and training content."""
+    first, second = _serving_monitor("endpoint-one"), _serving_monitor("endpoint-two")
+    if difference == "model":
+        second = replace(second, model_name="cat.models.other")
+    if difference == "version":
+        second = replace(second, model_version="3")
+    candidates = [_ready_candidate(config) for config in (first, second)]
+    if difference == "source":
+        candidates[1]["source_table"] = "cat.input.other_training"
+    if difference == "content":
+        candidates[1]["content_sha256"] = "b" * 64
+    ids, submit = _submission_ids(monkeypatch, [first, second], candidates)
+    assert ids[0] != ids[1]
+    assert submit.call_args.kwargs["evidence"] == {"models": candidates}
+
+
 @pytest.mark.parametrize("change", ["removed", "promoted", "disabled", "threshold"])
 def test_enrollment_reread_blocks_superseded_candidates(monkeypatch, change):
     """Changes during data assessment must stop obsolete observations before Jobs lookup."""

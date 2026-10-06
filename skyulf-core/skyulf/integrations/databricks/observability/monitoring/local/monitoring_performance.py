@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 from ......inference.local_scoring import score_local_pipeline
@@ -13,6 +14,11 @@ from ..performance.performance_policy import (
     evaluate_performance,
     selected_performance_window,
     validate_performance_policy,
+)
+from ..serving.serving_observation import (
+    observation_keys,
+    read_serving_observation,
+    serving_identity,
 )
 from .monitoring_metrics import build_performance_report
 
@@ -27,13 +33,14 @@ def performance_contract(artifact: Any, spec: Any, config: MonitorConfig) -> str
             "classes": list(artifact.manifest.classes),
             "model_digest": artifact.manifest.pipeline_sha256,
             "target": spec.target_column,
-            "keys": list(spec.record_key_columns),
+            "keys": list(observation_keys(config, spec)),
             "source": config.source_table,
             "labels": config.label_table,
             "available": config.result_available_at_column,
             "window_hours": policy.get("window_hours"),
             "label_delay_hours": policy.get("label_delay_hours"),
             "population": "predicted_rows_with_finite_available_keyed_labels",
+            **serving_identity(config),
         }
     )
 
@@ -50,7 +57,7 @@ def _measure(
     return measure(
         predictions,
         labels,
-        record_key_columns=spec.record_key_columns,
+        record_key_columns=observation_keys(config, spec),
         target_column=spec.target_column,
         result_available_at_column=str(config.result_available_at_column),
         as_of=as_of,
@@ -183,20 +190,21 @@ def observe_performance(
         )
 
         observation_reader, label_reader = read_spark_observation, read_spark_labels
+    keys = observation_keys(config, spec)
+    if config.serving_endpoint:
+        observation_reader = partial(read_serving_observation, artifact=artifact)
     _, predictions, evidence, _ = observation_reader(
         spark,
         config,
         reference["model_version"],
-        spec.record_key_columns,
+        keys,
         manifest.input_columns,
         probabilities=len(manifest.classes) if manifest.classification_probabilities else 0,
         as_of=now,
         start=start,
         end=end,
     )
-    labels, label_evidence = label_reader(
-        spark, config, spec.record_key_columns, spec.target_column, predictions, now
-    )
+    labels, label_evidence = label_reader(spark, config, keys, spec.target_column, predictions, now)
     report = _measure(predictions, labels, artifact, spec, config, now)
     metric_digest = performance_contract(artifact, spec, config)
     current = {

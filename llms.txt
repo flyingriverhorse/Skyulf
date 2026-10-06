@@ -1,0 +1,16 @@
+# Skyulf
+
+> Skyulf is an open-source, self-hosted visual MLOps platform and Python library (skyulf-core, Apache-2.0) for building scikit-learn pipelines you can trust: automated EDA, data-leakage checks, background training and tuning, experiment comparison, model registry, deployment and drift monitoring.
+
+- Website: https://www.skyulf.com/
+- Live demo (no signup): https://api.skyulf.com/
+- Source: https://github.com/flyingriverhorse/Skyulf
+- Library on PyPI: https://pypi.org/project/skyulf-core/  (`pip install skyulf-core`)
+- Docs: https://www.skyulf.com/manual/index.html
+
+## Key facts
+- Platform (backend + canvas): AGPLv3. Library (skyulf-core): Apache 2.0.
+- Python 3.12; built on scikit-learn, Polars, pandas, FastAPI, Celery, Redis, Optuna.
+- 36 built-in pipeline nodes; exports any canvas pipeline to a Jupyter notebook.
+- Integration templates for MLflow and Databricks.
+- Runs locally with `docker compose up`; data never leaves your machine.

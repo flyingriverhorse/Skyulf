@@ -1113,6 +1113,108 @@ clock or filesystem state. Use the saved asset helper for lookup data.
 
 ## Shared model monitoring
 
+### Pinned serving and online enrollment
+
+For optional online monitoring, create a pinned endpoint from a concrete
+registered model version with the Skyulf public serving API. For example,
+`skyulf.integrations.databricks.serving.PinnedEndpointSpec` selects the endpoint,
+model version, and telemetry catalog/schema/table prefix;
+`prepare_pinned_endpoint(spec, tracking_uri="databricks",
+registry_uri="databricks-uc")` verifies the fitted artifact and returns a plan.
+Run preparation with the same Skyulf runtime source used to package that model;
+admission rejects mismatched source provenance instead of silently adapting it.
+Pass that plan and a `databricks.sdk.WorkspaceClient()` to
+`create_pinned_endpoint(client, plan)`, then check
+`require_pinned_endpoint_ready(client, plan)` before sending named
+`dataframe_records` through `query_named_records`. Creation rejects an existing
+endpoint name. For CPU custom models, the helper configures endpoint
+`telemetry_config` with `sampling_fraction: 1.0`. Databricks creates the
+`<prefix>_payload` inference **view** over its managed `<prefix>_otel_logs` Delta
+table. The older `ai_gateway.inference_table_config` path may be rejected by the
+workspace; use the pinned helper's verified endpoint plan,
+or explicitly select `logging_mode="ai_gateway"` for a workspace that supports
+the legacy mode. The helper never falls back automatically. Keep the endpoint,
+concrete model version and view name together; a registry alias can move
+independently of requests already logged. See the Databricks guides to
+[custom-model telemetry](https://docs.databricks.com/aws/en/machine-learning/model-serving/custom-model-serving-uc-logs)
+and [fast inference tables](https://docs.databricks.com/aws/en/ai-gateway/inference-tables-serving-endpoints).
+
+Before the first serving enrollment, upgrade **every inventory reader** sharing
+that monitoring namespace to a Skyulf runtime with serving support. This includes
+other projects' monitoring jobs and any custom inventory readers. The generated
+score-job `prepare_monitoring` task validates its scoring receipt without loading
+the shared inventory, so it does not need this reader-only runtime upgrade.
+Older runtimes reject the new configuration field even for another project's
+entry. Deploy compatible reader environments first; a dashboard update alone
+does not upgrade them. Keep training/scoring runtime changes separate when their
+saved artifact certificates require the original packaged source.
+
+Run this project's existing **monitoring** job once with job parameter
+`monitoring_action=enroll_serving` and
+`monitoring_serving_enrollments` set to a JSON list. One entry, for an endpoint
+whose telemetry prefix is `risk`, can be:
+
+```json
+[{"environment":"prod","project":"risk","model_name":"models.risk.churn","model_version":"2","serving_endpoint":"risk-v2","source_table":"logs.serving.risk_payload","prediction_table":"logs.serving.risk_payload","execution_engine":"spark","reference_namespace":"ops.monitoring","label_table":"labels.production.serving_outcomes","result_available_at_column":"available_at","performance_policy":{"mode":"report","metric":"f1_weighted","direction":"higher","baseline":{"kind":"training_holdout","model_version":"2"},"tolerance":0.05,"tolerance_mode":"absolute","window_hours":24,"label_delay_hours":6,"minimum_labeled_rows":20,"minimum_label_coverage":0.8,"consecutive_windows":3}}]
+```
+
+Match `environment` and `project` to this job's target and bundle name; set
+`reference_namespace` to its configured monitoring catalog and schema. The
+source and prediction names are the **same inference payload view**.
+For CPU custom models that object is the Databricks-managed `risk_payload` view;
+its backing `risk_otel_logs` is a managed Delta table. Grant the monitoring job
+read access to both the view and its backing Delta table, plus
+`system.serving.served_entities` for actual model-version attribution. The job
+also needs the usual catalog/schema usage privileges and read access to the
+configured labels and saved training references. Do not rename, replace, alter or
+delete either Databricks-owned object, including its schema or internal
+checkpoints. Monitoring verifies the pinned view and backing Delta identity
+before reading; enrollment does not copy or modify the serving logs.
+Enrollment validates the entire list (1–100 distinct models), prepares verified
+training references, and saves the enrollments to the shared inventory. It does
+not observe, publish an observation reference, or request training in that run.
+Later scheduled `monitoring_action=observe` runs select active batch and online
+enrollments together and use the existing report, policy and dashboard.
+Unpause the dedicated Spark monitoring schedule after enrollment. Individual HTTP
+requests do not launch monitoring jobs; observation reads asynchronously delivered
+logs on that schedule. Completed performance windows are revisited according to
+`monitoring_revisit_windows` so late logs and outcomes can update their evidence.
+The configured native Dashboard task refreshes the published dashboard after the
+monitoring flow completes; new Delta rows alone do not invalidate its cached view.
+`sampling_fraction: 1.0` requests full payload capture, but it does not make
+recorded counts a complete HTTP request count: custom-model 4xx or 5xx errors
+may produce no inference-log row. The dashboard reports **captured** successes,
+failures and latency. Empty or late windows can reflect asynchronous delivery;
+check serving endpoint telemetry separately before interpreting them.
+
+For two served versions, add a separate entry for each concrete version and
+endpoint. A model-set branch needs its own entry with `model_set_name`,
+`model_set_version` and `model_set_branch` identifying the parent release and
+output. Labels are provided independently in a Delta table keyed by
+`databricks_request_id` and zero-based `request_row_index`, with the actual target
+column and UTC `available_at`. Skyulf does not generate outcomes or write them
+back to the training table. Missing or late labels remain unavailable until an
+eligible observation; choose `mode: report` first and make any retraining policy
+an explicit later decision. To enable serving performance retraining, set the
+enrollment's inline `performance_policy.mode` to `retrain` and explicitly enable
+the job-level gate: add a `mode: retrain` policy for the same fully qualified model
+in the deployment variable `monitoring_performance_policies`, then redeploy the
+monitoring job. The inline policy determines the measured online verdict; the
+job-level mapping enables evaluation of guarded training requests. Setting only
+the inline policy leaves automatic requests disabled when `on_drift` is disabled
+and the job-level mapping remains `{}`. Existing data freshness, ownership,
+cooldown and promotion checks still apply; retraining does not update the endpoint.
+
+To retire or pause one online enrollment, resubmit its complete JSON entry with
+`enabled: false` using `monitoring_action=enroll_serving`. Keep the endpoint,
+model/version and parent branch identity unchanged. Disabling does not require
+loading its model or preparing references, so an unavailable model or reference
+cannot prevent the pause. Other batch and online enrollments remain active.
+
+This optional bridge covers pinned serving and
+monitoring; it does not imply that every serving or feature lookup flow is
+automatically deployed.
+
 Monitoring runs only for shared `mode: production` deployments (`test`, `syst`,
 `prod`). Personal development targets do not enroll temporary models or create
 monitoring tables. The `monitoring_allowed` condition excludes enrollment and the

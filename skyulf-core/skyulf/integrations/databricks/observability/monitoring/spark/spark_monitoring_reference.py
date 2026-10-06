@@ -2,6 +2,7 @@
 
 import importlib
 import json
+from dataclasses import replace
 from typing import Any
 from uuid import uuid4
 
@@ -23,7 +24,10 @@ from ..monitoring_store import OWNER, PROPERTY, ensure_owned_object
 
 def reference_id(config: MonitorConfig, evidence: dict) -> str:
     """Bind prepared populations to immutable model and verified training identities."""
-    return json_digest({"monitor_id": config.monitor_id, "evidence": evidence, "format": 1})
+    reference_config = replace(config, serving_endpoint=None) if config.serving_endpoint else config
+    return json_digest(
+        {"monitor_id": reference_config.monitor_id, "evidence": evidence, "format": 1}
+    )
 
 
 def _reference_name(config: MonitorConfig, evidence: dict, suffix: str) -> str:

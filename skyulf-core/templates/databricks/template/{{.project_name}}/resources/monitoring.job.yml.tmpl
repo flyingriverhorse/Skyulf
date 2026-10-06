@@ -16,6 +16,8 @@ resources:
           default: ""
         - name: monitoring_action
           default: observe
+        - name: monitoring_serving_enrollments
+          default: '[]'
         - name: score_model_version
           default: ""
       tasks:
@@ -58,6 +60,7 @@ resources:
               monitoring_request: '{{"{{job.parameters.monitoring_request}}"}}'
               monitoring_revisit_windows: ${var.monitoring_revisit_windows}
               monitoring_action: '{{"{{job.parameters.monitoring_action}}"}}'
+              monitoring_serving_enrollments: '{{"{{job.parameters.monitoring_serving_enrollments}}"}}'
               as_of_unix_ms: '{{"{{job.start_time.timestamp_ms}}"}}'
         - task_key: monitoring_report
           description: Show independent feature drift, observed performance and performance loss evidence

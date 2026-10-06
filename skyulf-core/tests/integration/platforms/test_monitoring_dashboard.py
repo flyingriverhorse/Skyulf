@@ -28,7 +28,7 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
     dashboard = _dashboard()
     datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
     pages = {page["name"]: page for page in dashboard["pages"]}
-    assert set(pages) == {"overview", "drift_quality", "performance", "execution"}
+    assert set(pages) == {"overview", "drift_quality", "performance", "execution", "serving"}
     assert "FROM current_health" in datasets["current_health"]
     assert "FROM metric_history" in datasets["metric_history"]
     assert "WHERE measured_at" not in datasets["current_health"]
