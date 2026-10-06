@@ -9,10 +9,12 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import job_runtime, local_retraining, local_workflow
-from skyulf.integrations.databricks.training_dates import TrainingDateSpec
-from skyulf.integrations.mlflow.promotion import AliasConflictError
-from skyulf.integrations.mlflow.validation import comparison_payload
+from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
+from skyulf.integrations.databricks.jobs.shared import job_runtime
+from skyulf.integrations.databricks.lifecycle import local_workflow
+from skyulf.integrations.databricks.training.fitting import local_retraining
+from skyulf.integrations.mlflow.lifecycle.promotion import AliasConflictError
+from skyulf.integrations.mlflow.lifecycle.validation import comparison_payload
 
 mlflow = pytest.importorskip("mlflow")
 
@@ -321,7 +323,7 @@ def test_approval_refuses_automatic_policy_before_registry_access(selection):
 
 def test_direct_approval_service_requires_explicit_manual_policy():
     """Calling the public service directly must not bypass its operator-action policy."""
-    from skyulf.integrations.databricks.local_approval import approve_local_candidate
+    from skyulf.integrations.databricks.lifecycle.local_approval import approve_local_candidate
 
     with pytest.raises(ValueError, match="manual_approval"):
         approve_local_candidate(

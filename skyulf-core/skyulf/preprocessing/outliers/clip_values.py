@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import is_decimal_series
@@ -115,7 +116,13 @@ class ClipValuesApplier(BaseApplier):
         return out, y
 
 
-@NodeRegistry.register("ClipValues", ClipValuesApplier)
+@NodeRegistry.register(
+    "ClipValues",
+    ClipValuesApplier,
+    execution_capabilities=(
+        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+    ),
+)
 @node_meta(
     id="ClipValues",
     name="Clip Values",

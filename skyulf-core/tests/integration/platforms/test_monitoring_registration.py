@@ -1,14 +1,26 @@
 """Independent model projects enroll their actual scoring target in central Delta."""
 
+import json
 from unittest.mock import Mock
 
 import pytest
+from test_monitoring_config import performance_policy
+
+
+@pytest.fixture(autouse=True)
+def existing_monitoring_store(monkeypatch):
+    """Isolate configuration assertions from the separately tested shared-store bootstrap."""
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
+
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
 
 
 @pytest.mark.parametrize("enabled", ["true", "false"])
 def test_development_mode_never_registers_in_shared_monitoring(enabled):
     """Ephemeral dev models must not create or pause central inventory entries."""
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         monitoring_destination,
         register_deployed_monitor,
         register_scoring_monitor,
@@ -28,7 +40,9 @@ def test_development_mode_never_registers_in_shared_monitoring(enabled):
 @pytest.mark.parametrize("version", ["2", "7"])
 def test_automatic_enrollment_preserves_custom_drift_thresholds(monkeypatch, version):
     """Activation and scoring must use the same custom policy across model upgrades."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enroll = Mock()
     monkeypatch.setattr(registration, "enroll_monitor", enroll)
@@ -82,7 +96,7 @@ def test_automatic_enrollment_preserves_custom_drift_thresholds(monkeypatch, ver
 )
 def test_invalid_thresholds_block_scoring_before_inference(monkeypatch, raw):
     """Invalid policies cannot be discovered after writing model predictions."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings(monitoring_drift_thresholds=raw)
@@ -119,9 +133,71 @@ def workflow(**changes):
     }
 
 
+def test_enrollment_selects_only_exact_model_performance_policy():
+    """A policy for another model cannot activate performance on this one."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        build_monitor_enrollment_config,
+    )
+
+    policies = {
+        "models.risk.model": performance_policy(),
+        "models.risk.other": {"mode": "off"},
+    }
+    values = settings(
+        monitoring_label_table="labels.risk.actuals",
+        monitoring_result_available_at_column="available_at",
+        monitoring_performance_policies=json.dumps(policies),
+    )
+    selected = build_monitor_enrollment_config(workflow(), values, "2")
+    other = build_monitor_enrollment_config(
+        workflow(model_name="models.risk.third", training_layout="model_competition"), values, "2"
+    )
+    assert selected.performance_policy == performance_policy()
+    assert "performance_policy" not in other.payload()
+
+
+def test_scoring_preflight_rejects_invalid_policy_for_other_model():
+    """Malformed Bundle settings must fail before inference even for an unselected model."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        validate_monitoring_settings,
+    )
+
+    values = settings(monitoring_performance_policies='{"models.risk.other": {"mode": "report"}}')
+    with pytest.raises(ValueError):
+        validate_monitoring_settings(values, workflow())
+
+
+def test_single_model_preflight_rejects_unmatched_policy_key():
+    """A mistyped model name must not silently leave the intended policy disabled."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        validate_monitoring_settings,
+    )
+
+    values = settings(monitoring_performance_policies='{"models.risk.other": {"mode": "off"}}')
+    with pytest.raises(ValueError, match="model"):
+        validate_monitoring_settings(values, workflow(training_layout="single_model"))
+
+
+def test_single_model_preflight_rejects_extra_policy_key():
+    """A valid policy must not hide a second mistyped name in a one-model project."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        validate_monitoring_settings,
+    )
+
+    values = settings(
+        monitoring_performance_policies=json.dumps(
+            {"models.risk.model": {"mode": "off"}, "models.risk.modle": {"mode": "off"}}
+        )
+    )
+    with pytest.raises(ValueError, match="model"):
+        validate_monitoring_settings(values, workflow(training_layout="single_model"))
+
+
 def test_registration_pins_scored_version_not_mutable_alias(monkeypatch):
     """Alias movement after scoring cannot enroll a different model or logical output view."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enrolled = []
     monkeypatch.setattr(
@@ -147,7 +223,9 @@ def test_registration_pins_scored_version_not_mutable_alias(monkeypatch):
 
 def test_default_opt_out_and_pending_recovery_do_not_register(monkeypatch):
     """Unconfigured projects and unsuccessful scoring branches cannot create inventory rows."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enroll = Mock(side_effect=AssertionError("Unexpected registration"))
     monkeypatch.setattr(registration, "enroll_monitor", enroll)
@@ -172,7 +250,9 @@ def test_default_opt_out_and_pending_recovery_do_not_register(monkeypatch):
 )
 def test_invalid_monitoring_settings_fail_before_scoring(changes):
     """Explicit invalid monitoring settings cannot fail only after predictions are committed."""
-    from skyulf.integrations.databricks.monitoring_registration import validate_monitoring_settings
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
+        validate_monitoring_settings,
+    )
 
     with pytest.raises(ValueError):
         validate_monitoring_settings(settings(**changes), workflow())
@@ -180,7 +260,9 @@ def test_invalid_monitoring_settings_fail_before_scoring(changes):
 
 def test_explicit_disable_keeps_enrollment_history(monkeypatch):
     """A configured destination plus disabled flag must pause an existing monitor."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     saved = []
     monkeypatch.setattr(
@@ -197,7 +279,9 @@ def test_explicit_disable_keeps_enrollment_history(monkeypatch):
 
 def test_configured_storage_enables_monitoring_without_a_flag(monkeypatch):
     """A model using the shared store must not silently enroll as disabled by default."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     values = settings()
     values.pop("monitoring_enabled")
@@ -214,7 +298,9 @@ def test_configured_storage_enables_monitoring_without_a_flag(monkeypatch):
 
 def test_wrong_scored_model_cannot_replace_enrollment(monkeypatch):
     """The producer must not register an outcome from an unrelated model project."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     monkeypatch.setattr(registration, "enroll_monitor", Mock(side_effect=AssertionError))
     with pytest.raises(ValueError, match="scored model"):
@@ -233,7 +319,9 @@ def test_wrong_scored_model_cannot_replace_enrollment(monkeypatch):
 
 def test_model_set_monitoring_requires_component_outputs():
     """Combined business outputs cannot substitute for individual model predictions."""
-    from skyulf.integrations.databricks.monitoring_model_set import validate_set_monitoring
+    from skyulf.integrations.databricks.model_sets.monitoring_model_set import (
+        validate_set_monitoring,
+    )
 
     with pytest.raises(ValueError, match="component"):
         validate_set_monitoring(settings(), {"publication": {"mode": "combined_only"}})
@@ -243,9 +331,11 @@ def test_score_notebook_registers_actual_result(monkeypatch):
     """Successful scoring must automatically enroll even when no new prediction rows were needed."""
     import json
 
-    from skyulf.integrations.databricks import job_runtime
-    from skyulf.integrations.databricks.local_incremental import IncrementalBatchResult
-    from skyulf.integrations.databricks.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+        IncrementalBatchResult,
+    )
 
     values = settings()
     dbutils = Mock()
@@ -257,7 +347,9 @@ def test_score_notebook_registers_actual_result(monkeypatch):
         "run_bundle_action",
         lambda *args, **kwargs: BundleActionResult("score", outcome, False, {}),
     )
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     saved = []
     monkeypatch.setattr(
@@ -270,7 +362,7 @@ def test_score_notebook_registers_actual_result(monkeypatch):
 
 def test_invalid_destination_blocks_score_notebook_before_inference(monkeypatch):
     """A missing monitoring location must not be discovered after a scoring commit."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings(monitoring_schema="")
@@ -286,7 +378,8 @@ def test_recovery_notebook_registers_completed_branch(monkeypatch):
     """A recovered batch must enroll the same pinned version after recovery succeeds."""
     import json
 
-    from skyulf.integrations.databricks import monitoring_registration, scoring_recovery
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_registration
+    from skyulf.integrations.databricks.scoring.incremental import scoring_recovery
 
     monkeypatch.setattr(scoring_recovery, "_enabled_config", lambda _: (settings(), workflow()))
     monkeypatch.setattr(scoring_recovery, "_recovery_needed", lambda _: True)
@@ -312,7 +405,7 @@ def test_recovery_notebook_registers_completed_branch(monkeypatch):
 
 def test_inventory_conflict_retry_is_bounded_and_does_not_swallow_permission_errors(monkeypatch):
     """Cross-repo write conflicts retry, while access failures remain visible immediately."""
-    from skyulf.integrations.databricks import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
 
     monkeypatch.setattr(store.time, "sleep", lambda _: None)
     spark = Mock()

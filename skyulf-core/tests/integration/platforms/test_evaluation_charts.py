@@ -7,7 +7,10 @@ import pandas as pd
 import pytest
 
 pytest.importorskip("matplotlib")
-from skyulf.integrations.databricks.evaluation_charts import diagnostic_charts, model_charts
+from skyulf.integrations.databricks.observability.charts.evaluation_charts import (
+    diagnostic_charts,
+    model_charts,
+)
 
 
 def test_regression_charts_use_paired_holdout_errors():

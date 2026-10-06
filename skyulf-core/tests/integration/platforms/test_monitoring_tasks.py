@@ -10,12 +10,12 @@ from test_monitoring_registration import settings, workflow
 
 def test_development_monitoring_tasks_exit_before_reading_models_or_tables(monkeypatch):
     """Direct notebook retries in dev must not access the central monitoring store."""
-    from skyulf.integrations.databricks import monitoring_model_set as sets
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
-    from skyulf.integrations.databricks.retraining_task import (
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
         run_retraining_check_notebook,
         run_retraining_notebook,
     )
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.model_sets import monitoring_model_set as sets
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings(
@@ -38,9 +38,13 @@ def test_development_monitoring_tasks_exit_before_reading_models_or_tables(monke
 @pytest.fixture(autouse=True)
 def no_previous_observation(monkeypatch):
     """Keep task unit tests independent of a real Delta results table."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     monkeypatch.setattr(tasks, "completed_observation", lambda *args: False)
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
 
 
 @pytest.mark.parametrize(
@@ -48,7 +52,9 @@ def no_previous_observation(monkeypatch):
 )
 def test_deployment_enrolls_actual_activated_version(monkeypatch, action, kind):
     """A promoted model must be visible before its first prediction table exists."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     saved = []
     monkeypatch.setattr(
@@ -76,7 +82,9 @@ def test_deployment_enrolls_actual_activated_version(monkeypatch, action, kind):
 )
 def test_pending_or_rejected_candidates_do_not_replace_active_monitor(monkeypatch, payload):
     """Training and registration alone must not replace the deployed model's enrollment."""
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enroll = Mock()
     monkeypatch.setattr(registration, "enroll_monitor", enroll)
@@ -91,7 +99,7 @@ def test_pending_or_rejected_candidates_do_not_replace_active_monitor(monkeypatc
 
 def request(**changes):
     """Represent the immutable handoff saved by the successful score task."""
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
     )
 
@@ -110,7 +118,7 @@ def test_monitor_task_uses_successful_branch_and_pinned_commit(
     monkeypatch, recovery, explicit_enabled
 ):
     """Monitoring observes just this batch and never resolves a moved alias or re-enrolls it."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -143,7 +151,7 @@ def test_monitor_task_uses_successful_branch_and_pinned_commit(
 
 def test_noop_monitor_task_preserves_previous_observation(monkeypatch):
     """An empty scoring retry must not replace prior health with an empty-window report."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -157,7 +165,7 @@ def test_noop_monitor_task_preserves_previous_observation(monkeypatch):
 
 def test_failed_measurement_fails_task_after_report_is_saved(monkeypatch):
     """Monitoring errors remain visible without asking scoring to publish predictions again."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -176,7 +184,7 @@ def test_failed_measurement_fails_task_after_report_is_saved(monkeypatch):
 
 def test_enrollment_notebook_uses_verified_result_and_frozen_workflow(monkeypatch):
     """A later edit to workflow.json cannot alter the completed deployment's enrollment."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -197,9 +205,12 @@ def test_enrollment_notebook_uses_verified_result_and_frozen_workflow(monkeypatc
 
 def test_successful_scoring_publishes_monitor_request_without_recovery(monkeypatch):
     """The visible monitor task needs a pinned handoff even when CDF recovery is disabled."""
-    from skyulf.integrations.databricks import job_runtime, monitoring_registration
-    from skyulf.integrations.databricks.local_incremental import IncrementalBatchResult
-    from skyulf.integrations.databricks.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_registration
+    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+        IncrementalBatchResult,
+    )
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -225,8 +236,10 @@ def test_scoring_window_uses_delta_commit_time_without_timezone_guessing():
     """A repaired task must find its old batch even after the daily monitoring window closes."""
     from unittest.mock import patch
 
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     spark = Mock()
     delta_history = Mock()
@@ -243,7 +256,7 @@ def test_scoring_window_uses_delta_commit_time_without_timezone_guessing():
 
 def test_post_score_observation_does_not_reenroll_old_config(monkeypatch):
     """A delayed measurement cannot overwrite a newer deployment's inventory record."""
-    from skyulf.integrations.databricks import monitoring
+    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
 
     enroll = Mock()
     monkeypatch.setattr(monitoring, "enroll_monitor", enroll)
@@ -267,7 +280,7 @@ def test_post_score_observation_does_not_reenroll_old_config(monkeypatch):
 @pytest.mark.parametrize("measured", [False, True])
 def test_noop_repairs_missing_measurement_without_repeating_completed_report(monkeypatch, measured):
     """A retry after scoring commits but monitoring fails must still recover the observation."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -287,7 +300,7 @@ def test_noop_repairs_missing_measurement_without_repeating_completed_report(mon
 
 def test_successful_monitor_only_repair_does_not_recalculate(monkeypatch):
     """An exact successful observation cannot become failed due to a later transient read error."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
@@ -306,7 +319,7 @@ def test_successful_monitor_only_repair_does_not_recalculate(monkeypatch):
 
 def test_enrollment_repair_retains_original_lifecycle_identity(monkeypatch):
     """Repairing enrollment must not repeat activation or weaken cross-run receipt binding."""
-    from skyulf.integrations.databricks import monitoring_tasks as tasks
+    from skyulf.integrations.databricks.jobs.monitoring import monitoring_tasks as tasks
 
     store = Mock()
     factory = Mock(return_value=store)
@@ -329,8 +342,10 @@ def test_enrollment_repair_retains_original_lifecycle_identity(monkeypatch):
 
 def test_activation_metadata_preserves_legacy_config_identity():
     """Existing tables and report digests remain valid when activation ordering is added."""
-    from skyulf.integrations.databricks import monitoring_store as store
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     config = MonitorConfig.from_dict(request()["config"])
     row = store.inventory_row(config, datetime.now(UTC))
@@ -343,8 +358,10 @@ def test_activation_metadata_preserves_legacy_config_identity():
 
 def test_scoring_merge_protects_active_selection_and_preserves_activation_order(monkeypatch):
     """The version guard must execute inside Delta MERGE, not through a racy read-before-write."""
-    from skyulf.integrations.databricks import monitoring_store as store
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     monkeypatch.setattr(store, "ensure_owned_object", lambda *args: True)
     monkeypatch.setattr(store, "_inventory_isolation", lambda *args: "Serializable")
@@ -363,8 +380,10 @@ def test_scoring_merge_protects_active_selection_and_preserves_activation_order(
 
 def test_old_activation_repair_cannot_replace_a_later_activation(monkeypatch):
     """Rollback versions remain supported while old invocation replays cannot regress ownership."""
-    from skyulf.integrations.databricks import monitoring_store as store
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     monkeypatch.setattr(store, "ensure_owned_object", lambda *args: True)
     monkeypatch.setattr(store, "_inventory_isolation", lambda *args: "Serializable")

@@ -1612,7 +1612,7 @@ class _FakeSearcher:
 
 def _run_with_fake_halving_grid_searcher(monkeypatch, fake_searcher):
     """Force the halving_grid branch to use `fake_searcher` and run tune()."""
-    monkeypatch.setattr(halving_mod, "HalvingGridSearchCV", lambda **kwargs: fake_searcher)
+    monkeypatch.setattr(halving_mod, "_CoverageHalvingGridSearchCV", lambda **kwargs: fake_searcher)
     X, y = _clf_xy(n=60)
     tuner = _tuner_clf()
     cfg = TuningConfig(

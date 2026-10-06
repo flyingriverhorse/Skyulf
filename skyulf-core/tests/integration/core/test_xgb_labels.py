@@ -212,8 +212,8 @@ def test_xgb_local_mlflow_artifact_preserves_original_labels(tmp_path, monkeypat
     """The real MLflow pyfunc package must reload the encoded estimator and original class axis."""
     mlflow = pytest.importorskip("mlflow")
     from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
     X, y = _data(LABELS[0])

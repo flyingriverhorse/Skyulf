@@ -1,3 +1,6 @@
 {
-  "welcome_message": "Create a Skyulf training project. Choose single_model for one model, model_competition for 2-8 candidates sharing one target, or multi_target for 2-8 independent target branches. Select models, ensemble members and training settings in setup; editable model-owned settings and Core-derived search spaces are generated automatically. Model and combined business rules live in src/features/scoring.py. Initialization creates local files only."
+  "welcome_message": "Create a Skyulf training project. Choose single_model for one model, model_competition for 2-8 candidates sharing one target, or multi_target for 2-8 independent target branches. Select local or Spark inference based on expected rows and bytes per scoring run and available compute. Spark inference trains with pandas and requires partition-safe steps. Select models, ensemble members and training settings in setup; editable model-owned settings and Core-derived search spaces are generated automatically. Model and combined business rules live in src/features/scoring.py. Initialization creates local files only.",
+  "allOf": [
+    {"not": {"properties": {"inference_mode": {"const": "spark"}, "engine": {"const": "polars"}}, "required": ["inference_mode", "engine"]}}
+  ]
 }

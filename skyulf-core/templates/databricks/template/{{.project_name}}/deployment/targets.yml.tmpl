@@ -68,6 +68,7 @@ targets:
       resource_suffix: _test_dev_${workspace.current_user.id}
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
+      monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
@@ -143,6 +144,7 @@ targets:
       resource_suffix: _syst_dev_${workspace.current_user.id}
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
+      monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED
@@ -218,6 +220,7 @@ targets:
       resource_suffix: _prod_dev_${workspace.current_user.id}
       # Ephemeral dev models never enter the shared monitoring inventory.
       monitoring_enabled: "false"
+      monitoring_performance_policies: '{}'
       on_drift: disabled
 {{if eq .retraining_mode "scheduled"}}
       retraining_pause_status: PAUSED

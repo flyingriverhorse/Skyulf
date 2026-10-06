@@ -15,7 +15,7 @@ from skyulf.inference.local_pipeline import (
     predict_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
 from skyulf.pipeline import SkyulfPipeline
 
 SOURCE = """
@@ -100,7 +100,7 @@ def test_mlflow_signature_and_pyfunc_apply_saved_rules(tmp_path):
     pytest.importorskip("mlflow")
     from types import SimpleNamespace
 
-    from skyulf.integrations.mlflow.local_model import SkyulfLocalPythonModel, _signature
+    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel, _signature
 
     artifact = fitted_scoring_artifact(tmp_path)
     model = SkyulfLocalPythonModel()
@@ -124,7 +124,7 @@ def test_scoring_configuration_is_bound_to_artifact(tmp_path):
 def test_preflight_probe_exercises_saved_output_rule(tmp_path):
     """A model-only probe must not hide an invalid declared scoring output."""
     from skyulf.inference.project_code import load_project_module
-    from skyulf.integrations.databricks.local_sdk import (
+    from skyulf.integrations.databricks.scoring.local_sdk import (
         InputSource,
         LocalWorkflowConfig,
         ModelSelection,
@@ -235,7 +235,7 @@ def test_template_scoring_rules_are_usable_from_saved_package():
 
     from skyulf.inference.project_code import load_project_module
     from skyulf.inference.project_scoring import run_project_scoring
-    from skyulf.integrations.databricks._project_files import project_source
+    from skyulf.integrations.databricks.projects._project_files import project_source
 
     root = (
         Path(__file__).resolve().parents[3]
@@ -285,7 +285,7 @@ def test_template_scoring_sections_reject_invalid_inputs_and_add_bands(engine, t
 
     from skyulf.inference.project_code import load_project_module
     from skyulf.inference.project_scoring import run_project_scoring
-    from skyulf.integrations.databricks._project_files import project_source
+    from skyulf.integrations.databricks.projects._project_files import project_source
 
     root = (
         Path(__file__).resolve().parents[3]
@@ -353,7 +353,7 @@ def test_template_scoring_range_rejects_invalid_limits(limits):
     from pathlib import Path
 
     from skyulf.inference.project_code import load_project_module
-    from skyulf.integrations.databricks._project_files import project_source
+    from skyulf.integrations.databricks.projects._project_files import project_source
 
     root = (
         Path(__file__).resolve().parents[3]

@@ -141,12 +141,16 @@ def _polars_one_col_expr(
         # Reuse fitted category keys; old artifacts retain their edge rendering.
         labels = range_labels or _range_edge_labels(sorted_edges, include_lowest, precision)
 
+    ordinal_labels = label_format in ("ordinal", "bin_index") and not has_valid_custom_labels
+    if ordinal_labels:
+        labels = list(map(str, range(len(sorted_edges) - 1)))
+
     cut_expr = _polars_cut_expr(col, sorted_edges, labels, include_lowest)
     target_col_name = f"{col}{output_suffix}"
-    if label_format in ("ordinal", "bin_index") and not has_valid_custom_labels:
-        # Match pandas' labels=False output dtype, including when no values are
-        # missing and pandas can retain a native int64 series.
-        return cut_expr.cast(pl.Int64).alias(target_col_name)
+    if ordinal_labels:
+        # Decode explicit bin numbers independently of categorical physical codes.
+        # Polars 2 also requires casting categorical values through their text.
+        return cut_expr.cast(pl.String).cast(pl.Int64).alias(target_col_name)
     return cut_expr.alias(target_col_name)
 
 

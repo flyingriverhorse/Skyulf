@@ -4,8 +4,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.admission import BatchConflictError
-from skyulf.integrations.databricks.local_incremental import select_incremental_rows
+from skyulf.integrations.databricks.data.admission import BatchConflictError
+from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    select_incremental_rows,
+)
 
 
 class StructuredError(RuntimeError):
@@ -71,7 +73,7 @@ def request_fields():
 @pytest.mark.parametrize("stage", ["read", "action"])
 def test_only_structured_history_errors_normalize_during_cdf(condition, recoverable, stage):
     """Permission, corruption and disabled CDF failures cannot trigger destructive recovery."""
-    from skyulf.integrations.databricks.cdf_recovery import CdfHistoryExpired
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import CdfHistoryExpired
 
     spark = Mock()
     reader = spark.read.format.return_value
@@ -107,7 +109,10 @@ def test_snapshot_failure_is_never_reclassified_as_cdf_expiry(condition):
 
 def test_nested_structured_cause_is_recognized_without_message_matching():
     """Spark wrappers may carry the precise Delta condition only on their nested cause."""
-    from skyulf.integrations.databricks.cdf_recovery import CdfHistoryExpired, normalize_cdf_error
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
+        CdfHistoryExpired,
+        normalize_cdf_error,
+    )
 
     outer = StructuredError("FAILED_READ_FILE.DBR_FILE_NOT_EXIST")
     outer.__cause__ = StructuredError("DELTA_CHANGE_DATA_FILE_NOT_FOUND")
@@ -138,7 +143,7 @@ def test_nested_structured_cause_is_recognized_without_message_matching():
 )
 def test_recovery_request_rejects_unpinned_or_unbounded_input(changes):
     """Notebook task values cannot weaken pinned model and source identity checks."""
-    from skyulf.integrations.databricks.cdf_recovery import validate_recovery_request
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import validate_recovery_request
 
     with pytest.raises(ValueError):
         validate_recovery_request(request_fields() | changes)
@@ -146,7 +151,7 @@ def test_recovery_request_rejects_unpinned_or_unbounded_input(changes):
 
 def test_request_error_copies_input_and_hashes_canonical_content():
     """The routed request must survive serialization without mutable caller state."""
-    from skyulf.integrations.databricks.cdf_recovery import (
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
         CdfRecoveryRequired,
         recovery_request_digest,
     )
@@ -164,7 +169,7 @@ def test_request_error_copies_input_and_hashes_canonical_content():
 @pytest.mark.parametrize("layout", ["single_model", "model_set"])
 def test_recovery_state_accepts_only_pinned_base_or_exact_committed_request(layout):
     """A foreign publication cannot be overwritten or mistaken for this recovery retry."""
-    from skyulf.integrations.databricks.cdf_recovery import (
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
         check_recovery_state,
         recovery_receipt_fields,
     )
@@ -206,7 +211,7 @@ def test_recovery_state_accepts_only_pinned_base_or_exact_committed_request(layo
 @pytest.mark.parametrize("bad_previous", [None, {"source_end_version": 6}])
 def test_recovery_state_requires_trusted_prior_watermark(bad_previous):
     """An absent or unrelated receipt cannot authorize an overwrite of existing predictions."""
-    from skyulf.integrations.databricks.cdf_recovery import check_recovery_state
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import check_recovery_state
 
     with pytest.raises(BatchConflictError):
         check_recovery_state(request_fields(), bad_previous, 4)
@@ -214,7 +219,7 @@ def test_recovery_state_requires_trusted_prior_watermark(bad_previous):
 
 def test_new_selected_model_may_recover_after_older_model_receipt():
     """Incremental model selection may advance independently of a source-history outage."""
-    from skyulf.integrations.databricks.cdf_recovery import check_recovery_state
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import check_recovery_state
 
     previous = {
         "source_table_id": "source-id",
@@ -232,7 +237,10 @@ def test_new_selected_model_may_recover_after_older_model_receipt():
 )
 def test_connect_read_wrapper_recovers_structured_java_history_cause(namespace):
     """Serverless transports the exact Delta condition in a Java cause header, not Python causes."""
-    from skyulf.integrations.databricks.cdf_recovery import CdfHistoryExpired, normalize_cdf_error
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import (
+        CdfHistoryExpired,
+        normalize_cdf_error,
+    )
 
     error = SparkConnectGrpcException(
         "FAILED_READ_FILE.DBR_FILE_NOT_EXIST",
@@ -257,7 +265,7 @@ def test_connect_read_wrapper_recovers_structured_java_history_cause(namespace):
 )
 def test_connect_generic_or_freeform_missing_file_causes_still_fail(header):
     """A file path or free-form message containing an error token cannot trigger replacement."""
-    from skyulf.integrations.databricks.cdf_recovery import normalize_cdf_error
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import normalize_cdf_error
 
     error = SparkConnectGrpcException("FAILED_READ_FILE.DBR_FILE_NOT_EXIST", "Caused by: " + header)
     with pytest.raises(SparkConnectGrpcException) as failure, normalize_cdf_error():
@@ -267,7 +275,7 @@ def test_connect_generic_or_freeform_missing_file_causes_still_fail(header):
 
 def test_nonconnect_stacktrace_and_connect_permission_wrapper_are_not_recoverable():
     """A known cause token cannot override a different transport's error or permissions."""
-    from skyulf.integrations.databricks.cdf_recovery import normalize_cdf_error
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import normalize_cdf_error
 
     trace = "Caused by: org.apache.spark.sql.delta.DeltaFileNotFoundException: [DELTA_CHANGE_DATA_FILE_NOT_FOUND] missing"
     permission = SparkConnectGrpcException("INSUFFICIENT_PERMISSIONS", trace)

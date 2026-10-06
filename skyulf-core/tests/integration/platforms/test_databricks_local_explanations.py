@@ -12,7 +12,7 @@ from skyulf.inference.local_pipeline import (
     load_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.databricks.local_explanations import (
+from skyulf.integrations.databricks.observability.reports.local_explanations import (
     explain_training_artifact,
     validate_explanation_config,
 )
@@ -77,7 +77,8 @@ def test_explanation_projects_training_features_and_reuses_fitted_transform(
         }
 
     monkeypatch.setattr(
-        "skyulf.integrations.databricks.local_explanations.compute_shap_explanation", fake_shap
+        "skyulf.integrations.databricks.observability.reports.local_explanations.compute_shap_explanation",
+        fake_shap,
     )
     native = pl.from_pandas(frame) if input_engine == "polars" else frame
     result = explain_training_artifact(artifact, native)
@@ -99,7 +100,7 @@ def test_absent_explanation_does_not_compute(tmp_path, monkeypatch) -> None:
     """Default training must avoid optional SHAP work entirely."""
     artifact, frame = _artifact(tmp_path, "pandas", None)
     monkeypatch.setattr(
-        "skyulf.integrations.databricks.local_explanations.compute_shap_explanation",
+        "skyulf.integrations.databricks.observability.reports.local_explanations.compute_shap_explanation",
         lambda *a, **k: pytest.fail("SHAP must stay off"),
     )
     assert explain_training_artifact(artifact, frame) is None
@@ -142,7 +143,7 @@ def test_unavailable_shap_is_explicit(tmp_path, monkeypatch) -> None:
     """A missing or unsupported SHAP backend cannot look completed."""
     artifact, frame = _artifact(tmp_path, "pandas", {"method": "shap"})
     monkeypatch.setattr(
-        "skyulf.integrations.databricks.local_explanations.compute_shap_explanation",
+        "skyulf.integrations.databricks.observability.reports.local_explanations.compute_shap_explanation",
         lambda *a, **k: None,
     )
     result = explain_training_artifact(artifact, frame)
@@ -221,7 +222,7 @@ def test_explanation_failures_preserve_evidence(tmp_path, monkeypatch, failure) 
         if failure == "shap_schema":
             explanation["feature_names"] = ["wrong"]
         monkeypatch.setattr(
-            "skyulf.integrations.databricks.local_explanations.compute_shap_explanation",
+            "skyulf.integrations.databricks.observability.reports.local_explanations.compute_shap_explanation",
             lambda *a, **k: explanation,
         )
     result = explain_training_artifact(artifact, frame)

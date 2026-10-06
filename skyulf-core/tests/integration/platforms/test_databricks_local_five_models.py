@@ -7,7 +7,7 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
 CASES = [
     (

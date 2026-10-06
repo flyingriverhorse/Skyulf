@@ -12,7 +12,7 @@ def _saved_set(tmp_path, source="", config=None):
     from skyulf.inference._manifest import ColumnSpec
     from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
-    from skyulf.integrations.mlflow.registry import ResolvedModel
+    from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     pipeline, query = _fitted_pipeline("pandas")
     path = tmp_path / "component"
@@ -48,7 +48,7 @@ def _transport(monkeypatch, query, previous=None):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import model_set_batch as batch
+    from skyulf.integrations.databricks.model_sets import model_set_batch as batch
 
     monkeypatch.setattr(
         batch,
@@ -141,8 +141,8 @@ def test_foreign_receipt_is_not_a_set_watermark():
     """An ordinary model's table must not be adopted as a model-set target."""
     import json
 
-    from skyulf.integrations.databricks.admission import BatchConflictError
-    from skyulf.integrations.databricks.model_set_batch import _previous_set_receipt
+    from skyulf.integrations.databricks.data.admission import BatchConflictError
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _previous_set_receipt
 
     previous = {
         "skyulf_mode": "incremental_append",
@@ -192,7 +192,7 @@ def test_append_cannot_bootstrap_new_temporal_set_from_only_new_rows(tmp_path):
     import pandas as pd
     from tests.integration.platforms.test_model_set_scoring import temporal_set
 
-    from skyulf.integrations.databricks.model_set_batch import _score_increment
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _score_increment
 
     artifact = cast(Any, temporal_set).__wrapped__(tmp_path)
     previous = {"model_set_digest": "previous-stateless-set", "set_history": {}}
@@ -209,7 +209,7 @@ def test_append_cannot_bootstrap_new_temporal_set_from_only_new_rows(tmp_path):
 
 def test_new_set_rebuilds_without_new_source_rows():
     """Changing a complete set must recompute the snapshot in full-rebuild mode."""
-    from skyulf.integrations.databricks.model_set_batch import _plan_publication
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _plan_publication
 
     previous = {"source_end_version": 3, "model_set_digest": "old"}
     assert _plan_publication(previous, set_digest="new", mode="full_rebuild", source_version=3) == (
@@ -221,7 +221,7 @@ def test_new_set_rebuilds_without_new_source_rows():
 
 def test_same_set_and_snapshot_is_a_noop():
     """A successful repeated scoring invocation must not duplicate output rows."""
-    from skyulf.integrations.databricks.model_set_batch import _plan_publication
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _plan_publication
 
     previous = {"source_end_version": 3, "model_set_digest": "same"}
     assert _plan_publication(
@@ -262,7 +262,7 @@ def test_new_registry_version_rebuilds_identical_package(tmp_path, monkeypatch):
 
 def test_append_set_change_keeps_prior_row_provenance():
     """Append mode starts after the committed watermark even when a new set is selected."""
-    from skyulf.integrations.databricks.model_set_batch import _plan_publication
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _plan_publication
 
     previous = {"source_end_version": 3, "model_set_digest": "old"}
     assert _plan_publication(
@@ -272,8 +272,8 @@ def test_append_set_change_keeps_prior_row_provenance():
 
 def test_watermark_cannot_move_backwards():
     """A recreated or rewound source must never silently replace a prior source identity."""
-    from skyulf.integrations.databricks.admission import BatchConflictError
-    from skyulf.integrations.databricks.model_set_batch import _plan_publication
+    from skyulf.integrations.databricks.data.admission import BatchConflictError
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _plan_publication
 
     with pytest.raises(BatchConflictError, match="behind"):
         _plan_publication(
@@ -287,7 +287,7 @@ def test_watermark_cannot_move_backwards():
 @pytest.mark.parametrize("mode", ["overwrite", "typo", None])
 def test_unknown_publication_policy_fails(mode):
     """Misspelled policies cannot silently select a destructive overwrite."""
-    from skyulf.integrations.databricks.model_set_batch import _plan_publication
+    from skyulf.integrations.databricks.model_sets.model_set_batch import _plan_publication
 
     with pytest.raises(ValueError, match="mode"):
         _plan_publication(None, set_digest="new", mode=mode, source_version=0)
@@ -295,7 +295,7 @@ def test_unknown_publication_policy_fails(mode):
 
 def test_batch_rejects_unpinned_models_before_spark():
     """Scoring cannot provision or read tables before its set identity is concrete."""
-    from skyulf.integrations.databricks.model_set_batch import run_model_set_batch
+    from skyulf.integrations.databricks.model_sets.model_set_batch import run_model_set_batch
 
     with pytest.raises(TypeError, match="ResolvedModel"):
         run_model_set_batch(

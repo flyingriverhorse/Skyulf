@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft7Validator
 
-from skyulf.integrations.databricks.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
 
 ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
 

@@ -8,12 +8,12 @@ from types import SimpleNamespace
 
 def test_independent_process_cannot_enter_held_table_lock(tmp_path):
     """Different local drivers must serialize even when periods overlap partially."""
-    from skyulf.integrations.databricks.admission import LocalTableLock
+    from skyulf.integrations.databricks.data.admission import LocalTableLock
 
     lock = LocalTableLock(tmp_path / "locks")
     script = """
 import sys
-from skyulf.integrations.databricks.admission import LocalTableLock, BatchConflictError
+from skyulf.integrations.databricks.data.admission import LocalTableLock, BatchConflictError
 try:
     with LocalTableLock(sys.argv[1]).hold("table-id"): pass
 except BatchConflictError:
@@ -36,7 +36,7 @@ else:
 
 def test_explicit_single_writer_path_needs_no_control_table(tmp_path):
     """A caller-controlled sole writer can publish without provisioning lock state."""
-    from skyulf.integrations.databricks.admission import (
+    from skyulf.integrations.databricks.data.admission import (
         SingleWriterAdmission,
         validate_admission,
     )

@@ -28,7 +28,9 @@ def _previous(model, history=None):
 
 def _changed_source(monkeypatch, batch, previous, snapshot, error=None):
     """Simulate the remote CDF boundary while keeping actual scoring and receipts."""
-    from skyulf.integrations.databricks.local_incremental import SourceChangeRequiresRebuild
+    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+        SourceChangeRequiresRebuild,
+    )
 
     def select(spark, source, prior, upper, period, functions):
         """Require the correction fallback to re-read the pinned complete snapshot."""
@@ -153,7 +155,7 @@ def test_unapproved_or_unreadable_changes_never_publish(tmp_path, monkeypatch, p
 
 def test_invalid_policy_fails_before_spark_or_catalog_mutations(tmp_path):
     """Misspelled policies must never create output resources or silently choose recovery."""
-    from skyulf.integrations.databricks.model_set_batch import run_model_set_batch
+    from skyulf.integrations.databricks.model_sets.model_set_batch import run_model_set_batch
 
     artifact, model, _ = _saved_set(tmp_path)
     spark = Mock()
@@ -173,7 +175,7 @@ def test_invalid_policy_fails_before_spark_or_catalog_mutations(tmp_path):
 def test_temporal_correction_resets_history_and_preserves_next_append(tmp_path, monkeypatch):
     """Corrected history must match fresh scoring and drive the next prediction causally."""
     from skyulf.inference.model_set_scoring import score_model_set
-    from skyulf.integrations.mlflow.registry import ResolvedModel
+    from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     artifact = cast(Any, temporal_set).__wrapped__(tmp_path)
     model = ResolvedModel("db.set", "1", "models:/db.set/1", None, artifact.manifest.set_sha256)

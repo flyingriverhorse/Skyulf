@@ -11,13 +11,16 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_evaluation import evaluate_local_holdout
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.training.tuning.local_cv import (
+    LocalCVSpec,
+    evaluate_training_cv,
+)
 from skyulf.registry import NodeRegistry
 
 CASES = [

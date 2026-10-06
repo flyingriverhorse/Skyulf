@@ -30,7 +30,9 @@ def _evidence():
 def test_report_contains_exportable_charts_and_signed_waterfall():
     """A report must show actual charts, escaped labels and base plus signed contributions."""
     pytest.importorskip("matplotlib")
-    from skyulf.integrations.databricks.explanation_report import render_explanation_report
+    from skyulf.integrations.databricks.observability.reports.explanation_report import (
+        render_explanation_report,
+    )
 
     report = render_explanation_report(_evidence())
     assert report.count("data:image/png;base64,") == 2
@@ -43,7 +45,7 @@ def test_report_contains_exportable_charts_and_signed_waterfall():
 @pytest.mark.parametrize("status", ["disabled", "unavailable"])
 def test_unavailable_reports_do_not_import_plotting(status, monkeypatch):
     """Disabled or failed SHAP still has a readable status without plotting dependencies."""
-    from skyulf.integrations.databricks import explanation_report
+    from skyulf.integrations.databricks.observability.reports import explanation_report
 
     monkeypatch.setattr(explanation_report, "_figure", lambda *args: pytest.fail("no plotting"))
     report = explanation_report.render_explanation_report(
@@ -55,7 +57,9 @@ def test_unavailable_reports_do_not_import_plotting(status, monkeypatch):
 
 def test_notebook_displays_each_training_run_once(tmp_path):
     """Multi-model outputs must show each child's evidence without duplicate reports."""
-    from skyulf.integrations.databricks.explanation_report import display_explanation_reports
+    from skyulf.integrations.databricks.observability.reports.explanation_report import (
+        display_explanation_reports,
+    )
 
     report = tmp_path / "explanations.html"
     report.write_text("<h2>Model explanations</h2>")
@@ -78,7 +82,7 @@ def test_notebook_displays_each_training_run_once(tmp_path):
 def test_training_persists_report_and_json(monkeypatch):
     """The HTML and JSON must describe the same bounded explanation, linked to its run."""
     pytest.importorskip("matplotlib")
-    from skyulf.integrations.databricks import local_explanations
+    from skyulf.integrations.databricks.observability.reports import local_explanations
 
     monkeypatch.setattr(local_explanations, "explain_training_artifact", lambda *args: _evidence())
     run = Mock(run_id="run123")
@@ -113,8 +117,10 @@ def test_real_models_and_ensembles_explain_fitted_features(tmp_path, engine, mod
     import polars as pl
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_explanations import explain_training_artifact
+    from skyulf.integrations.databricks.observability.reports.local_explanations import (
+        explain_training_artifact,
+    )
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     classification = model_type.endswith("classifier") or model_type == "logistic_regression"
     x = np.arange(30, dtype=float)

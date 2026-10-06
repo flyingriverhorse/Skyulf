@@ -63,11 +63,13 @@ def test_competition_group_policy_shares_one_group_column(method):
 
 @pytest.mark.parametrize("task", ["classification", "regression"])
 @pytest.mark.parametrize("compute_mode", ["serverless", "policy_cluster"])
-def test_cli_competition_keeps_two_jobs_and_task_matching_placeholder(tmp_path, task, compute_mode):
+def test_cli_competition_keeps_three_jobs_and_task_matching_placeholder(
+    tmp_path, task, compute_mode
+):
     """Real CLI rendering must enable common CV and retain the existing lifecycle graph."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project, _read_jobs
 
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE to opt into installed CLI generation.")
@@ -87,10 +89,13 @@ def test_cli_competition_keeps_two_jobs_and_task_matching_placeholder(tmp_path, 
         "logistic_regression" if task == "classification" else "ridge_regression"
     )
     jobs = _read_jobs(project)
-    assert "train_and_tune" in {task["task_key"] for task in jobs["train"]["tasks"]}
+    assert set(jobs) == {"train", "score", "monitoring"}
     assert all(task["task_key"] != "train_models" for task in jobs["train"]["tasks"])
     assert (project / "src/modeling/model_competition.py").is_file()
     loaded = load_project_workflow(config, project / "src/features")
+    assert {
+        item["task_key"] for item in jobs["train"]["tasks"] if item["task_key"].startswith("train_")
+    } == {"train_" + name for name in loaded["competition"]["candidates"]}
     suffix = "classifier" if task == "classification" else "regressor"
     first = "logistic_regression" if task == "classification" else "ridge_regression"
     assert set(loaded["competition"]["candidates"]) == {

@@ -2,6 +2,20 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> Current sequence (2026-10-05): SM-23 batch scope closed with SM-23i Overview
+> performance separation. SM-57 is delivered for the admitted pandas-worker scope,
+> with all three serverless lifecycles, no-op parity and native refresh verified
+> ([Delivery170](170-sm57-spark-pyfunc-delivery.md)). SM-58 scale/memory validation
+> has passed its serverless matrix ([Validation171](171-sm58-scale-memory-validation.md)); classic-compute
+> acceptance is blocked because this workspace supports only serverless.
+> SM-23 online observability is functionally complete (2026-10-06): real HTTP
+> parity, Spark telemetry/late labels, independent performance verdicts and native
+> dashboard refresh passed ([Delivery177](177-sm23b-online-monitoring.md)). Full SM-19a load/cold-start gates remain separate; company/identity
+> gates stay in SM-37/43b. Earlier dated/uncommitted notes below are historical;
+> the shared dashboard now ships inside the existing project template, with automatic
+> create/reuse storage and Overview summaries ([Delivery168](168-sm23k-monitoring-home-overview.md)).
+> Overview now puts current drift/performance summaries before trends and explains
+> monitoring registrations ([Delivery169](169-sm23l-overview-order.md)).
 > SM-39 delivered (2026-10-04): centralized runtime requirements,
 > automatic optional model/Optuna dependencies, checked wheel build and target
 > compute overrides. Two clean installations and two real train-to-score jobs
@@ -477,7 +491,7 @@ Acceptance additions (details in report93):
 | SM-45 | WAIT | SM-37, SM-40; suffix-scoped dev/CI cleanup job, dry-run default, production targets refused; separate from SM-41 retention |
 | SM-46 | WAIT | SM-34, SM-38; optional `scoring_mode: on_table_update` via Jobs table-update trigger, reusing CDF/queue/no-op |
 | SM-47 | WAIT | SM-38; MLflow dataset input for UC lineage, model-version card, optional experiment resource; MLflow 3 deployment jobs investigated without a second alias writer |
-| SM-23c | PARTIAL | SM-23a, SM-37; drift-triggered retraining delivered. Performance measurement exists; degradation policy/retraining remains open with metric, baseline, minimum labeled coverage and consecutive-window acceptance below. Never approves. |
+| SM-23c | FUNCTIONAL DONE | Drift and independent performance policy delivered. Local gates and isolated Databricks measurement/request/replay acceptance passed. Remaining separate-identity/company production gates belong to SM-37/43b. [Delivery158](158-sm23c-performance-policy.md). Never approves. |
 | SM-48 | PARTIAL | Local split complete; live redeploy ID/history check pending. None; split `resources/workflow.jobs.yml` into `train.job.yml`/`score.job.yml` and optionally clearer job display names; keep job keys `train`/`score` (renaming recreates jobs and loses IDs/history) |
 | SM-49 | WAIT | SM-39, SM-48; upgrade path for generated projects: regenerate from saved answers into a temporary directory, review the diff, run config migration and deployed-contract checks |
 | SM-50 | WAIT | SM-41; optional explicit period backfill operator action reusing `publish_replace_period`, separate from incremental and full rebuild |
@@ -514,23 +528,98 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 
 | Task | Status | Dependency / scope |
 | --- | --- | --- |
-| SM-19a | LATER | SM-43a; HTTP serving, fitted artifact parity, readiness and load/cold-start checks |
+| SM-19a | PARTIAL | Minimum pinned HTTP bridge, readiness and real classifier HTTP/local parity delivered for SM-23b. Full supported-artifact, authentication/error-input, warm/cold and bounded-load acceptance remains separate. [Delivery177](177-sm23b-online-monitoring.md). |
 | SM-19b | LATER | SM-19a; SQL ai_query invocation, named inputs, privileges and failure behavior |
 | SM-19d | LATER | SM-19a; A/B/canary routing, endpoint update/rollback; batch rollout separately explicit |
 | SM-21a | LATER | SM-43a; UC feature lookup, keys and point-in-time correctness |
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
-| SM-23a | PARTIAL | Batch quality/drift/delayed-label reporting and central AI/BI dashboard delivered after user resumed scope (2026-10-01). Reuses Core `DriftCalculator`, explicit cross-namespace enrollment, original scoring snapshots and keyed available labels. Two-schema pandas/Polars live acceptance, final Bundle job, dashboard SQL/publish/readback and stable-ID redeploy passed ([delivery142](142-sm23a-monitoring-delivery.md)). Optional native `quality_monitors` InferenceLog, slices and infrastructure cost reports remain deferred; prior removal history remains in [report129](129-reference-followups-delivery.md). |
-| SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
-| SM-23c | PARTIAL | SM-23a, SM-37; drift trigger delivered; separate opt-in performance-degradation policy remains open. Use the acceptance below, preserve training/approval gates, never approves ([report93](93-dbml-reference-recomparison.md)). |
+| SM-23a | BATCH DONE | Quality/drift/delayed outcomes, Spark measurement, shared Delta storage and native AI/BI delivered. All three producer layouts use separate monitoring jobs; native refresh and execution/cost/CPU/RAM views are delivered ([Delivery163](163-sm23h-dashboard-refresh-compute.md)). Overview independently counts current performance evidence ([Delivery164](164-sm23i-monitoring-overview-closure.md)). Optional native Data Profiling (`data_quality`, replacing deprecated `quality_monitors`) and custom slices remain separate enhancements. Company/identity acceptance stays in SM-37/43b. |
+| SM-23b | FUNCTIONAL DONE | Actual native telemetry VIEW/backing Delta, pinned endpoint/model versions, Spark drift and delayed-label performance, shared inventory/dashboard and retraining dedup delivered. Native parser: 33 passed; HTTP: 10 predictions matched; two late-label verdicts healthy/degraded, report replay, native refresh and 9 synthetic dashboard queries passed. Seven legacy monitoring readers passed native compatibility and received a wheel-only upgrade; all 12 train/score jobs stayed unchanged. [Delivery177](177-sm23b-online-monitoring.md). Full SM-19a and SM-37/43b acceptance stays separate. |
+| SM-23c | FUNCTIONAL DONE | Opt-in drift/performance policies and real request/replay acceptance delivered. Inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Never approves ([report93](93-dbml-reference-recomparison.md)). |
 | SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
 
 SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
 
-### SM-23d — Distributed monitoring (LATER, user approved 2026-10-04)
+### SM-23i — Overview performance and batch closure (DONE, 2026-10-05)
 
-Training/scoring capacity and monitoring capacity are separate budgets. Batch15
-addresses producer enrollment within today's bounded monitoring implementation;
-it does not implement distributed monitoring.
+Presentation follow-up: Current monitoring enrollments moves to Drift and data
+quality without the displayed Monitoring identity column; Overview retains
+counters and removes its duplicate performance evidence table. Dataset and
+monitoring semantics are unchanged. [Record167](167-sm23j-overview-layout-cleanup.md).
+
+Four separate performance counters use current enrollment/version evidence;
+drift/data-quality counters retain their independent meaning. Old configurations,
+backfills and stale/unavailable policy windows cannot appear healthy. Shared model
+selectors work in published Chrome. All 28 datasets passed 56 live SQL checks;
+37 affected tests passed. Same dashboard ID and permission mode were preserved.
+SM-23 batch scope closed here; online SM-23b subsequently completed on 2026-10-06
+([Delivery177](177-sm23b-online-monitoring.md)). Production SM-37/43b gates remain
+separate. SM-57 subsequently delivered its initial admitted scope through the SM-56 safety inventory ([Delivery170](170-sm57-spark-pyfunc-delivery.md)).
+[Evidence164](164-sm23i-monitoring-overview-closure.md).
+
+### SM-23h — Native refresh and cluster utilization (DELIVERED, 2026-10-05)
+
+Native post-monitoring dashboard refresh is deployed to all three existing
+producer layouts. Competition run `825802718768390` passed all five tasks,
+including `refresh_monitoring_dashboard`, without requesting training.
+CPU/RAM cards and trends use scoped classic-node telemetry; current serverless
+workloads correctly show unavailable metrics. The redundant Selected model table
+is removed; Performance checks separates the measured result from training action.
+All 27 datasets passed 54 live SQL checks; 55 distinct focused tests passed.
+[Evidence163](163-sm23h-dashboard-refresh-compute.md).
+
+### SM-23g — Performance presentation and template cleanup (DELIVERED, 2026-10-05)
+
+Native performance page now separates latest batch counts, measured metrics,
+latest policy decision, historical loss and classification evidence. All 26
+datasets passed 52 default/NULL SQL checks; the same dashboard ID was published.
+Six unreferenced template notebooks were removed. All three existing layouts
+redeployed with nine unchanged job IDs; competition monitoring run
+`844667177339309` passed the current three-task graph without requesting training.
+Documentation distinguishes Spark calculation, Delta storage, native AI/BI,
+separate dashboard refresh, and independently enabled drift/performance triggers.
+[Evidence162](162-sm23g-monitoring-presentation-cleanup.md).
+
+### SM-23f — Dashboard interaction and monitoring report (DELIVERED, 2026-10-05)
+
+User-reported empty selectors were reproduced in authenticated Chrome. Independent
+option datasets and NULL-safe defaults fix their mutual filtering and blank results.
+All 24 datasets passed 48 default/NULL query checks before same-ID publication;
+published drift charts, model selection, real RMSE degradation, confusion counts
+and job execution rows were verified in Chrome. Attributed billing has no rows.
+Runtime reports now separate drift, measured performance and performance loss;
+the generated graph is `monitor_model -> monitoring_report -> evaluate_retraining`.
+All three layouts redeployed in place; a final model-set monitoring run passed
+all three tasks. Historical real-label comparisons show regression degradation
+without changing policies or requesting training. All 142 distinct focused cases,
+independent review, full CI static gates and applicable pre-commit hooks passed.
+[Evidence161](161-sm23f-monitoring-dashboard-runtime-repair.md).
+
+### SM-23e — Native job handoff and dashboard acceptance (DELIVERED, 2026-10-05)
+
+Approved follow-up: generated jobs use Spark directly, with visible native
+train -> score -> monitoring job handoff. Remove the redundant inline score
+report/retraining graph and engine choice. Repair dashboard model/context
+selection, preserve missing-latest-result semantics, expose confusion counts,
+and add explicitly scoped native execution/list-price billing views.
+
+[Implementation and evidence160](160-sm23e-monitoring-jobs-dashboard.md) records
+297 focused local tests, 25 real Spark cases, all nine original generated
+single/competition/model-set train/score/monitor runs and three successful
+monitoring-only late-label replays. Coverage rose from 0.5 to 1.0 without changing
+prediction snapshots; classification confusion counts rose from 20 to 40.
+The existing dashboard is published with 21 validated datasets and 48 successful
+selected-context queries. Independent review and static gates passed. Isolated
+acceptance schedules remain paused; browser interaction and actual billing data
+remain unverified/unavailable respectively, rather than claimed as proven.
+This follow-up does not relax the inherited production identity/approval gates.
+
+### SM-23d — Distributed monitoring (DELIVERED, 2026-10-05)
+
+Training/scoring capacity and monitoring capacity remain separate budgets.
+The new Spark path removes the local observation cap without changing training
+budgets. Existing configurations retain their local behavior; new generated
+projects default to a separate serverless monitoring job.
 
 - Evaluate quality, drift and delayed-label metrics on Spark without collecting
   the complete observation into driver memory. Keep local pandas/Polars support.
@@ -545,15 +634,53 @@ it does not implement distributed monitoring.
   limits, and record memory/runtime evidence. Do not silently truncate input or
   raise the local safety caps to call the task complete.
 
-Status: **LATER — scope recorded, design and implementation pending**. Dependencies:
-SM-23a monitoring contracts and the current review's d10-6 capacity separation.
-This is a future task, not an additional closure in the 138-item defect audit.
+Status: **DELIVERED — implementation, focused local and isolated cloud acceptance**.
+[Implementation and evidence159](159-sm23d-spark-monitoring-plan.md): 1,100,000-row
+regression/classification measurements, prepared references, unchanged/new-data
+guards, actual independent three-task job, real training request/replay dedup and
+native AI/BI SQL/publication. All 12 generated variants passed strict validation.
+The scale deployment is single-model; model-set/competition contract coverage
+does not claim a new live deployment for every variant. Inherited SM-37/43b
+production gates remain separate. This is not another closure in the old defect audit.
+
+Design implemented 2026-10-05:
+the user prefers computing monitoring directly on Spark from the outset.
+The primary path is **Spark calculation -> Delta evidence -> Databricks
+AI/BI dashboard + existing Skyulf policy/retraining guards**. Native InferenceLog
+is not a required parallel calculator. A native profiling-generated dashboard
+remains a separate optional integration; the AI/BI dashboard can read Skyulf's
+metric tables directly.
+
+- Run monitoring as a separate job with independent compute/schedule/retry
+  budgets. Scoring publishes durable receipts; late-label changes also cause
+  affected windows to be revisited without requiring new predictions.
+- Preserve original prediction/source snapshots, physical table identity, stable
+  keys, model/component version, label availability and duplicate rejection in
+  distributed joins. Only bounded aggregate evidence reaches the driver.
+- Prepare version-bound baseline evidence without repeating full local holdout
+  replay each observation. Move fresh-training-data eligibility checks to Spark
+  as well; otherwise retraining decisions would retain the local bottleneck.
+- Establish exact regression and confusion-matrix classification parity first;
+  specify drift algorithms and any approximation before enabling their decisions.
+  No silent fallback to bounded local data or silent dropping of unsupported metrics.
+- Retain single-model, activated competition-winner and per-component model-set
+  semantics. Shared request deduplication and evaluation/approval gates remain.
+- Validate beyond one million rows on Databricks, including late labels,
+  replay/failure recovery, baseline/version changes, metric parity and measured
+  memory/runtime. Training/scoring engine capacity is a separate workstream.
+
+The current usable policy example and field explanations are in the
+[monitoring guide](../../skyulf-core/examples/databricks_monitoring/README.md#enable-each-independent-model-repository)
+and the generated producer README. The guide documents exact/bounded statistical
+methods, unsupported types/recipes, explicit reference preparation for legacy
+models, a paused-by-default independent schedule and the late-label revisit horizon.
 
 ### SM-23c performance policy acceptance - clarified 2026-10-04
 
-The user explicitly requested this remaining policy. It is planned, not implemented.
-Current code measures prediction performance against eligible actual outcomes;
-`on_drift` only reacts to usable distribution drift. These are separate signals.
+The user explicitly requested this policy. Implementation, local gates and isolated
+live measurement/request/replay acceptance passed on 2026-10-05. The performance
+scope is complete; evidence is in [Delivery158](158-sm23c-performance-policy.md).
+`on_drift` and performance policy remain independent signals.
 
 - Add an independent, default-disabled performance policy with off/report/retrain
   behavior; retain independent drift controls. Reuse existing Core metric
@@ -644,10 +771,10 @@ describes that current implementation.
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
 | SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | DONE | Live append retained 160 v1 rows and added ten v2 rows; full view exposes 170 v2 rows, retains v1 and its SELECT grant; [plan](29-sm27-model-change-scoring-plan.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
 | SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | DONE | Live first champion, v2 promotion, tied v3 rejection, two-job handoff, score-failure recovery, queue/no-op and restricted alias-write denial passed; [design](31-sm29-auto-champion-design.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
-| SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
+| SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | PARTIAL | Minimum pinned HTTP bridge delivered with SM-23b; full SM-19a acceptance, SQL invocation and endpoint rollout remain open. Streaming remains parked. |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
-| SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
-| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | PARTIAL | Optional `on_drift` mode delivered. Separate default-disabled performance-degradation policy remains open: explicit metric/baseline/tolerance, label coverage, consecutive completed windows and shared retraining guards; see clarified acceptance above. Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
+| SM-23 | Monitoring and inference observability | SM-20a, relevant batch/serving adapter | FUNCTIONAL DONE | Batch and online Spark measurement, independent drift/performance, delayed labels, shared native dashboard and refresh delivered. Online HTTP/log/version/replay acceptance passed on 2026-10-06. [Delivery177](177-sm23b-online-monitoring.md). Full serving acceptance remains SM-19a; production gates remain SM-37/43b. |
+| SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | FUNCTIONAL DONE | Independent default-off performance policy delivered: pinned metric/baseline/tolerance, mature labels, coverage, consecutive windows and shared retraining guards. Local gates, dashboard SQL/publish/readback, real training request, unchanged-data skip and replay/combined-trigger dedup passed live. Inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 | SM-45 | Suffix-scoped dev/CI resource cleanup | SM-37, SM-40 | WAIT | Dry-run default, confirmation, production targets refused; deleted set equals preview; other suffixes untouched; [report93](93-dbml-reference-recomparison.md) |
@@ -660,9 +787,9 @@ describes that current implementation.
 | SM-52 | Integrations internal-helper boundary | — | DONE | Shared primitives and directly named domain helpers without aliases; 2,149 passed, 256 skipped; Ruff, full CI Ty, Lizard and installed wheel passed. [Delivery129](129-reference-followups-delivery.md); original [report94](94-integrations-code-quality-review.md) |
 | SM-53 | Split `local_retraining.py` | SM-36g/h/i, SM-52 | WAIT | Cohesive modules for snapshot read, split, fit and evidence; public imports and saved evidence unchanged; complexity not increased; ([report94](94-integrations-code-quality-review.md)) |
 | SM-55 | Optional prediction columns on an existing source table | SM-41 | LATER | Low priority, after the current Bundle work: separate prediction table remains the default; optional keyed updates of prediction/provenance columns on the source. Validate unique keys, column ownership, stale-row checks, CDF feedback prevention, permissions, idempotency and rollback; consider a joined view for unified reading. Not implemented. |
-| SM-56 | Spark inference for pandas/Polars-trained pipelines with any row-local FE | SM-29 | LATER | Goal: score large data in Spark without rewriting every FE node as Spark code. Training stays pandas/Polars; at inference Spark only splits the data and runs the existing pandas Applier on each worker batch (`predict_spark(mode="python_pipeline")`). Today `_validate_python_pipeline` (`skyulf/inference/spark.py`) allows only SimpleImputer(mean/constant) and StandardScaler. Work: (a) inventory FE nodes: row-independent, row-preserving, portable state, and whether Polars-trained state has a pandas Applier equivalent on workers (workers run pandas FE, Polars is not required on the cluster); (b) replace the hard-coded set with a per-node capability flag in `execution_capabilities`; (c) portable state codec for encoders, power/log, row-local feature generation, median/mode imputer; (d) per-node local-vs-Spark parity tests (null, unknown category, dtype, repartition). Not in scope: group aggregates on new data, rolling/lag, row-changing nodes. Findings 2026-10-04 (code review): the gate is not only the allowlist. FE state is frozen through the portable JSON codec (`core/portable_state.py` `_NODE_TYPES`, `preprocessing/_feature_state.py` `_APPLIERS`), which has exactly two nodes (StandardScaler, SimpleImputer), so each new node needs its own codec, not just a set entry. Only SimpleImputer and StandardScaler declare `ExecutionCapability`. Small-work candidates (row-local, JSON-friendly state): MinMax/MaxAbs/Robust scalers, median/most_frequent imputer, ClipValues/Winsorize, power and simple transformations, Dummy/Hash encoders, binning, feature selection (column-list state), DateFeatures, FeatureMath. Real work: OneHot/Ordinal/Target encoders (pickle state), GroupImputer and group_agg (key-type fidelity), KNN/Iterative imputers (training-matrix state), vectorizers. Never partition-safe: LagFeatures, RollingAggregate (history carry), row filters (IQR/ZScore/ManualBounds/Elliptic outliers, DropMissingRows, Deduplicate, RowFilterFunction). The `local_pipeline` artifact pickles the whole pipeline and bypasses the codec, but its manifest scope is `whole_frame_local` and `local_model.py` does not certify Spark partition safety, so the same per-node partition-safety declaration is required for SM-57. Apply bodies of encoders, casting, binning, vectorizers and geo nodes were inferred from artifact types, not read; verify during the inventory. Only SimpleImputer/StandardScaler have Spark parity tests (`skyulf-core/tests/spark`). Not implemented. |
-| SM-57 | Project setup and Bundle pyfunc through `mlflow.pyfunc.spark_udf` | SM-56 inventory | LATER | At new-project setup, ask whether each inference run exceeds suitable local capacity. Large-data choice selects pandas training/preprocessing and generates Spark pyfunc UDF scoring; local-data choice retains local scoring with pandas/Polars selection. Persist training engine and inference mode separately. Run the trusted bundle (raw input, supported pandas FE, model) on worker batches, with explicit preprocessing batch-safety validation. See acceptance criteria below. Registry/UC/Spark UDF delivery remains a separate gate in the 0.9.x changelog. Not implemented. |
-| SM-58 | Scale and memory validation of Spark inference | SM-56, SM-39 | LATER | Real cluster run on large data: throughput, executor RSS, model load cost, partition/batch-size guidance, worker wheel packaging. Compare `native_features`, `python_pipeline` and pyfunc UDF. |
+| SM-56 | Spark inference for pandas/Polars-trained pipelines with row-local FE | SM-29 | INVENTORY DONE; IMPLEMENTATION LATER | Actual apply-body inventory completed for built-in FE families. Portable JSON predict_spark still supports only SimpleImputer mean/constant and StandardScaler; extending it needs codecs and capability declarations. Trusted-pickle SM-57 can transport more fitted objects but requires independent batch-safety proof. Confirmed power-transform, replacement, binning and casting hazards; fitted group_agg is a mapping candidate, not a current-batch aggregate. Effective inference skips and worker Polars dependencies are documented. No new nodes certified. [Inventory165](165-sm57-partition-safety-inventory.md). |
+| SM-57 | Project setup and Bundle pyfunc through mlflow.pyfunc.spark_udf | SM-56 inventory | DONE - INITIAL ADMITTED SCOPE | Independent local/Spark setup, fitted partition-safety gate, exact worker package, named UDF and distributed Delta lifecycle delivered. Single/competition/model-set each published 4,096 rows with exact local parity; no-op preserved table/receipt hashes. All initial and replay monitoring/native refresh chains passed on serverless. Initial nodes: mean/constant SimpleImputer and StandardScaler; Linear/LogisticRegression with reviewed tuning wrappers, independent model sets. Cluster virtualenv remains unverified; SM-58 now records the successful serverless scale matrix. [Delivery170](170-sm57-spark-pyfunc-delivery.md), [Plan166](166-sm57-spark-udf-plan.md). |
+| SM-58 | Scale and memory validation of Spark inference | SM-56, SM-39 | PARTIAL — SERVERLESS PASSED; CLASSIC BLOCKED | [Validation171](171-sm58-scale-memory-validation.md): 18 serverless 1M/5M configurations, 108M verified predictions, worker load/RSS probes and operator guidance. Classic job creation rejected: workspace supports only serverless. Full executor RSS and policy-cluster virtualenv acceptance remain open. |
 | SM-59 | Native Spark expressions for hot FE nodes (optional) | SM-58 | LATER | Only for nodes SM-58 shows as bottlenecks; not every node. |
 
 SM-57 acceptance criteria (user-agreed setup flow, 2026-10-04):

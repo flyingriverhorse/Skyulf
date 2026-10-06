@@ -4,15 +4,15 @@ import json
 
 import pytest
 
-from skyulf.integrations.databricks import job_runtime
+from skyulf.integrations.databricks.jobs.shared import job_runtime
 
 
 @pytest.mark.parametrize("noop", [False, True])
 @pytest.mark.parametrize("model_set", [False, True])
 def test_scoring_summary_shows_current_source_without_reusing_old_write(noop, model_set):
     """A no-op must show the current source watermark and keep old provenance clearly labeled."""
-    from skyulf.integrations.databricks.job_output import render_bundle_output
-    from skyulf.integrations.databricks.model_set_project import render_model_set_result
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_bundle_output
+    from skyulf.integrations.databricks.model_sets.model_set_project import render_model_set_result
 
     result = {
         "source_end_version": 12,
@@ -53,7 +53,7 @@ def test_scoring_summary_shows_current_source_without_reusing_old_write(noop, mo
 
 def test_comparison_output_explains_each_quality_gate():
     """Operators must see every failed bound even when the selected metric passes."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     html = render_lifecycle_output(
         "compare_decide",
@@ -80,7 +80,7 @@ def test_comparison_output_explains_each_quality_gate():
 
 def test_promotion_summary_separates_handoff_request_from_score_completion():
     """A successful alias change must not claim that prediction already succeeded."""
-    from skyulf.integrations.databricks.job_output import render_bundle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_bundle_output
 
     payload = {
         "action": "approve",
@@ -115,7 +115,7 @@ def test_promotion_summary_separates_handoff_request_from_score_completion():
 
 def test_output_escapes_model_names_and_explains_noop_manifest():
     """Registry text cannot inject HTML and a no-op must not mislabel old write provenance."""
-    from skyulf.integrations.databricks.job_output import render_bundle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_bundle_output
 
     html = render_bundle_output(
         {
@@ -140,7 +140,7 @@ def test_output_escapes_model_names_and_explains_noop_manifest():
 
 def test_manual_training_output_shows_metrics_and_simple_action_fields():
     """Operators can review quality and see usable fields without finding a digest."""
-    from skyulf.integrations.databricks.job_output import render_bundle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_bundle_output
 
     html = render_bundle_output(
         {
@@ -208,7 +208,7 @@ def test_notebook_renders_summary_and_preserves_machine_result(
     assert "No new predictions written" in display.call_args.args[0]
     if display_fails:
         warning.assert_called_once_with("Readable output unavailable; see JSON result.")
-        assert json.loads(capsys.readouterr().out)["result"] == {"noop": True}
+        assert "Noop: True" in capsys.readouterr().out
     else:
         warning.assert_not_called()
     assert json.loads(notebook.exit.call_args.args[0])["result"] == {"noop": True}
@@ -256,7 +256,7 @@ def test_legacy_notebook_converts_result_before_publishing_score_request(monkeyp
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     class Uncopyable:
         """Represent a result that fails dataclass conversion before JSON rendering."""
@@ -280,7 +280,7 @@ def test_legacy_notebook_converts_result_before_publishing_score_request(monkeyp
 
 def test_nested_search_output_explains_independent_outer_scores():
     """Notebook summaries must distinguish outer evaluation from final search scores."""
-    from skyulf.integrations.databricks.job_output import render_lifecycle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_lifecycle_output
 
     report = {
         "status": "nested_cv",
@@ -302,7 +302,7 @@ def test_nested_search_output_explains_independent_outer_scores():
 
 def test_scoring_coverage_is_visible_only_for_current_write():
     """A no-op must not present prior prediction/exclusion counts as new work."""
-    from skyulf.integrations.databricks.job_output import render_bundle_output
+    from skyulf.integrations.databricks.jobs.shared.job_output import render_bundle_output
 
     result = {
         "noop": False,

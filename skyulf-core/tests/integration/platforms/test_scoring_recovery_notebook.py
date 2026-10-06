@@ -35,8 +35,8 @@ def task_utils():
 @pytest.mark.parametrize("enabled", [False, True])
 def test_only_opted_in_expiry_requests_a_separate_recovery_task(enabled):
     """Disabled projects must fail instead of silently replacing old predictions."""
-    from skyulf.integrations.databricks.cdf_recovery import CdfRecoveryRequired
-    from skyulf.integrations.databricks.scoring_recovery import run_scoring_step
+    from skyulf.integrations.databricks.data.delta_io.cdf_recovery import CdfRecoveryRequired
+    from skyulf.integrations.databricks.scoring.incremental.scoring_recovery import run_scoring_step
 
     dbutils, values = task_utils()
     callback = Mock(side_effect=CdfRecoveryRequired(recovery_request()))
@@ -58,7 +58,7 @@ def test_only_opted_in_expiry_requests_a_separate_recovery_task(enabled):
 )
 def test_ordinary_errors_never_request_recovery(error):
     """Automatic recovery must not turn configuration or infrastructure failures into writes."""
-    from skyulf.integrations.databricks.scoring_recovery import run_scoring_step
+    from skyulf.integrations.databricks.scoring.incremental.scoring_recovery import run_scoring_step
 
     dbutils, values = task_utils()
     with pytest.raises(type(error), match=str(error)):
@@ -68,7 +68,7 @@ def test_ordinary_errors_never_request_recovery(error):
 
 def test_normal_result_is_preserved_and_large_temporal_state_is_not_a_task_value():
     """Task-value limits must not fail an otherwise committed scoring batch."""
-    from skyulf.integrations.databricks.scoring_recovery import run_scoring_step
+    from skyulf.integrations.databricks.scoring.incremental.scoring_recovery import run_scoring_step
 
     dbutils, values = task_utils()
     payload = {
@@ -85,7 +85,7 @@ def test_normal_result_is_preserved_and_large_temporal_state_is_not_a_task_value
 @pytest.mark.parametrize("recovered", [False, True])
 def test_report_reads_only_the_branch_that_ran(monkeypatch, recovered):
     """Skipped recovery tasks must not break successful normal score summaries."""
-    from skyulf.integrations.databricks import scoring_recovery as module
+    from skyulf.integrations.databricks.scoring.incremental import scoring_recovery as module
 
     dbutils, _ = task_utils()
     dbutils.widgets = SimpleNamespace(getAll=lambda: {})
@@ -110,7 +110,7 @@ def test_report_reads_only_the_branch_that_ran(monkeypatch, recovered):
 
 def test_recovery_node_refuses_disabled_config_before_reading_task_values(monkeypatch):
     """A stale graph must not grant recovery permission when the project disables it."""
-    from skyulf.integrations.databricks import scoring_recovery as module
+    from skyulf.integrations.databricks.scoring.incremental import scoring_recovery as module
 
     dbutils, _ = task_utils()
     dbutils.widgets = SimpleNamespace(getAll=lambda: {})
@@ -123,7 +123,9 @@ def test_recovery_node_refuses_disabled_config_before_reading_task_values(monkey
 @pytest.mark.parametrize("active_generation", ["predictions_v2", "predictions_v1", None])
 def test_empty_recovered_generation_remains_readable_without_new_view_activation(active_generation):
     """A recovered empty active generation is valid, but a new empty generation cannot replace it."""
-    from skyulf.integrations.databricks.prediction_output import activate_prediction_view
+    from skyulf.integrations.databricks.scoring.shared.prediction_output import (
+        activate_prediction_view,
+    )
 
     spark = Mock()
     spark.table.return_value.limit.return_value.count.return_value = 0
@@ -152,8 +154,8 @@ def test_empty_recovered_generation_remains_readable_without_new_view_activation
 
 def test_recovery_notebook_pins_version_and_publishes_only_completed_result(monkeypatch):
     """An alias change between tasks cannot redirect the saved recovery request."""
-    from skyulf.integrations.databricks import scoring_recovery as module
-    from skyulf.integrations.databricks.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.scoring.incremental import scoring_recovery as module
 
     dbutils, values = task_utils()
     dbutils.widgets = SimpleNamespace(getAll=lambda: {})
@@ -175,8 +177,10 @@ def test_full_rebuild_empty_recovery_replay_and_normal_noop_reach_report(monkeyp
     """Workflow activation must not turn a valid empty committed snapshot into a failed job."""
     from tests.integration.platforms.test_databricks_local_workflow import _config
 
-    from skyulf.integrations.databricks import local_workflow as workflow
-    from skyulf.integrations.databricks.local_incremental import IncrementalBatchResult
+    from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
+    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+        IncrementalBatchResult,
+    )
 
     config = _config()
     config.update(model_change_mode="full_rebuild", model_version="2")
@@ -221,9 +225,9 @@ def test_model_set_recovery_uses_saved_version_without_resolving_champion(
     pytest.importorskip("mlflow")
     from tests.integration.platforms.test_model_set_project import _enable, _project
 
-    from skyulf.integrations.databricks import model_set_batch, model_set_project
-    from skyulf.integrations.mlflow import model_set
-    from skyulf.integrations.mlflow.registry import ResolvedModel
+    from skyulf.integrations.databricks.model_sets import model_set_batch, model_set_project
+    from skyulf.integrations.mlflow.models import model_set
+    from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     values, _ = _project(tmp_path, workflow_config)
     _enable(tmp_path)

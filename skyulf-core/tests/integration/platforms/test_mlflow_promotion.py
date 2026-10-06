@@ -16,8 +16,7 @@ from skyulf.inference.local_pipeline import save_local_pipeline
 
 mlflow = pytest.importorskip("mlflow")
 
-from skyulf.integrations.mlflow.local_model import log_local_model
-from skyulf.integrations.mlflow.promotion import (
+from skyulf.integrations.mlflow.lifecycle.promotion import (
     AliasChangeReceipt,
     AliasConflictError,
     AliasOutcomeUnknownError,
@@ -29,24 +28,25 @@ from skyulf.integrations.mlflow.promotion import (
     stage_challenger,
     validate_admission,
 )
-from skyulf.integrations.mlflow.registry import (
+from skyulf.integrations.mlflow.lifecycle.validation import (
+    ModelComparisonReport,
+    compare_registered_local_models,
+)
+from skyulf.integrations.mlflow.models.local_model import log_local_model
+from skyulf.integrations.mlflow.registration.registry import (
     RegistryAccessError,
     RegistryModelNotFoundError,
     register_model,
     resolve_model,
 )
-from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
-from skyulf.integrations.mlflow.validation import (
-    ModelComparisonReport,
-    compare_registered_local_models,
-)
+from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 from skyulf.pipeline import SkyulfPipeline
 
 
 @pytest.fixture
 def champion_reader_client(monkeypatch):
     """Isolate receipt reads from registry transport without bypassing reader checks."""
-    from skyulf.integrations.mlflow import promotion
+    from skyulf.integrations.mlflow.lifecycle import promotion
 
     client = Mock()
     client.get_registered_model.return_value = SimpleNamespace(
@@ -82,7 +82,7 @@ def champion_reader_client(monkeypatch):
 )
 def test_controlled_champion_rejects_uncommitted_event(champion_reader_client, raw) -> None:
     """A current marker alone cannot establish a committed champion transition."""
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     tags = {} if raw is None else {"promotion_event": raw}
     champion_reader_client.get_model_version.return_value = SimpleNamespace(tags=tags)
@@ -96,7 +96,7 @@ def test_controlled_champion_accepts_committed_event(
     champion_reader_client, kind, readable
 ) -> None:
     """Both historical compact and readable champion lifecycle receipts remain valid."""
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     payload = {"action": kind, "state": "committed"} if readable else {"k": kind, "s": "committed"}
     champion_reader_client.get_model_version.return_value = SimpleNamespace(
@@ -107,7 +107,7 @@ def test_controlled_champion_accepts_committed_event(
 
 def test_controlled_champion_receipt_transport_failure_is_typed(champion_reader_client) -> None:
     """Receipt verification must preserve actionable registry permission failures."""
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     error = mlflow.exceptions.MlflowException("denied")
     error.error_code = "PERMISSION_DENIED"
@@ -196,7 +196,7 @@ def _stage(case, **changes):
 
 def _reject(case, reason="Business review declined deployment", **changes):
     """Reject the staged comparison through the same explicit alias admission."""
-    from skyulf.integrations.mlflow.rejection import reject_candidate
+    from skyulf.integrations.mlflow.lifecycle.rejection import reject_candidate
 
     _, uri, _, _, report, admission = case
     options = {
@@ -233,9 +233,9 @@ def test_manual_rejection_retains_aliases_and_cannot_be_erased_by_recheck(case):
 
 def test_rejected_first_candidate_cannot_initialize_or_renominate(case):
     """Bootstrap and nomination must not bypass a recorded operator rejection."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
-    from skyulf.integrations.mlflow.promotion import initialize_champion
-    from skyulf.integrations.mlflow.rejection import reject_candidate
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.promotion import initialize_champion
+    from skyulf.integrations.mlflow.lifecycle.rejection import reject_candidate
 
     client, uri, name, heldout, _, admission = case
     client.delete_registered_model_alias(name, "champion")
@@ -409,7 +409,7 @@ def test_rejected_challenger_is_visible_but_cannot_promote(case) -> None:
 
 def test_nomination_precedes_evaluation_and_failure_keeps_challenger(case) -> None:
     """An evaluation failure remains inspectable without moving production aliases."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     client, uri, name, _, _, admission = case
     lifecycle = ChallengerLifecycle(
@@ -433,7 +433,7 @@ def test_nomination_precedes_evaluation_and_failure_keeps_challenger(case) -> No
 
 def test_tied_v3_remains_challenger_through_rollback_and_v4_replaces_it(case) -> None:
     """Retaining an unsuccessful contender must not block safe rollback or later training."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     client, uri, name, heldout, _, admission = case
     _stage(case)
@@ -497,7 +497,7 @@ def test_tied_v3_remains_challenger_through_rollback_and_v4_replaces_it(case) ->
 
 def _replace_challenger(case, *, replacement="nomination"):
     """Displace an evaluated contender using the real registration lifecycle."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     client, uri, name, _, _, admission = case
     _stage(case)
@@ -574,7 +574,7 @@ def test_challenger_history_survives_staging_promotion_and_rollback(case, replac
 
 def test_rollback_clears_challenger_history_that_becomes_champion(case):
     """A restored champion cannot simultaneously appear as a historical challenger."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     client, uri, name, _, _, admission = case
     _stage(case)
@@ -638,7 +638,7 @@ def test_challenger_history_disagreement_blocks_nomination_retry(case, corruptio
 @pytest.mark.parametrize("failed_write", ["alias", "marker"])
 def test_partial_challenger_history_write_keeps_pending_event(case, monkeypatch, failed_write):
     """A moved contender and failed history alias must remain an explicit unknown outcome."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     client, uri, name, _, _, admission = case
     _stage(case)
@@ -679,8 +679,8 @@ def test_partial_challenger_history_write_keeps_pending_event(case, monkeypatch,
 
 def test_first_nominee_is_removed_from_challenger_when_initialized(case) -> None:
     """The first champion must still pass quality and stop being its own challenger."""
-    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
-    from skyulf.integrations.mlflow.promotion import initialize_champion
+    from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.lifecycle.promotion import initialize_champion
 
     client, uri, name, heldout, _, admission = case
     client.delete_registered_model_alias(name, "champion")
@@ -726,7 +726,7 @@ def test_first_nominee_is_removed_from_challenger_when_initialized(case) -> None
 
 def test_partial_challenger_status_write_keeps_pending_receipt(case, monkeypatch) -> None:
     """Partial UI status must never be reported as a completed registry transition."""
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     client, uri, name, _, _, _ = case
     original = client.set_model_version_tag
@@ -739,7 +739,7 @@ def test_partial_challenger_status_write_keeps_pending_receipt(case, monkeypatch
 
     monkeypatch.setattr(client, "set_model_version_tag", fail_reason)
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.promotion.make_registry_client", lambda *args: client
+        "skyulf.integrations.mlflow.lifecycle.promotion.make_registry_client", lambda *args: client
     )
     with pytest.raises(AliasOutcomeUnknownError, match="Alias may have changed"):
         _stage(case)
@@ -900,7 +900,7 @@ def test_partial_promotion_reports_unknown_outcome(case, monkeypatch) -> None:
 
     monkeypatch.setattr(client, "set_registered_model_alias", deny_champion)
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.promotion.make_registry_client", lambda *args: client
+        "skyulf.integrations.mlflow.lifecycle.promotion.make_registry_client", lambda *args: client
     )
     with pytest.raises(AliasOutcomeUnknownError, match="inspect prepared event"):
         _promote(case)
@@ -939,7 +939,7 @@ def test_missing_champion_and_contention_refuse_promotion(case) -> None:
 
 def test_first_champion_needs_absolute_quality_and_verified_receipt(case) -> None:
     """An unseeded registry must select only a rechecked, good first model."""
-    from skyulf.integrations.mlflow.promotion import (
+    from skyulf.integrations.mlflow.lifecycle.promotion import (
         controlled_champion_version,
         initialize_champion,
     )
@@ -993,7 +993,7 @@ def test_first_champion_needs_absolute_quality_and_verified_receipt(case) -> Non
 
 def test_first_champion_rejects_missing_or_failed_quality_threshold(case) -> None:
     """Automatic bootstrap cannot use improvement alone without a baseline."""
-    from skyulf.integrations.mlflow.promotion import initialize_champion
+    from skyulf.integrations.mlflow.lifecycle.promotion import initialize_champion
 
     client, uri, name, heldout, _, admission = case
     client.delete_registered_model_alias(name, "champion")
@@ -1030,7 +1030,7 @@ def test_first_champion_rejects_missing_or_failed_quality_threshold(case) -> Non
 
 def test_first_champion_cannot_bypass_secondary_gate(case):
     """Bootstrap must honor secondary bounds even when the selected metric passes."""
-    from skyulf.integrations.mlflow.promotion import initialize_champion
+    from skyulf.integrations.mlflow.lifecycle.promotion import initialize_champion
 
     client, uri, name, heldout, _, admission = case
     client.delete_registered_model_alias(name, "champion")
@@ -1089,7 +1089,7 @@ def test_restage_gate_evidence_identifies_its_comparison_event(case):
 
 def test_controlled_champion_rejects_alias_without_receipt(case) -> None:
     """An alias set outside the guarded lifecycle must not feed automatic scoring."""
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     client, uri, name, _, _, _ = case
     with pytest.raises(AliasConflictError, match="committed receipt"):
@@ -1138,7 +1138,7 @@ def test_permission_denial_does_not_move_alias(case, monkeypatch) -> None:
     _stage(case)
     monkeypatch.setattr(client, "set_registered_model_alias", denied)
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.promotion.make_registry_client", lambda *args: client
+        "skyulf.integrations.mlflow.lifecycle.promotion.make_registry_client", lambda *args: client
     )
     with pytest.raises(RegistryAccessError):
         _promote(case)
@@ -1159,13 +1159,13 @@ def test_lost_alias_write_response_is_reported_as_unknown(case, monkeypatch) -> 
 
     monkeypatch.setattr(client, "set_registered_model_alias", move_then_fail)
     monkeypatch.setattr(
-        "skyulf.integrations.mlflow.promotion.make_registry_client", lambda *args: client
+        "skyulf.integrations.mlflow.lifecycle.promotion.make_registry_client", lambda *args: client
     )
     with pytest.raises(AliasOutcomeUnknownError, match="inspect prepared event"):
         _promote(case)
     assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
     assert client.get_registered_model(name).tags.get("pending_alias_event")
-    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+    from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version
 
     with pytest.raises(AliasConflictError, match="pending"):
         controlled_champion_version(name, tracking_uri=case[1], registry_uri=case[1])
@@ -1206,7 +1206,7 @@ def test_global_uc_registry_rejects_local_admission(tmp_path, monkeypatch) -> No
 
 def test_receipt_rejects_conflicting_version_field_names() -> None:
     """Legacy and current field names must never silently choose different prior versions."""
-    from skyulf.integrations.mlflow.promotion import read_event
+    from skyulf.integrations.mlflow.lifecycle.promotion import read_event
 
     with pytest.raises(ValueError, match="[Dd]uplicate|[Aa]mbiguous"):
         read_event(json.dumps({"action": "promotion", "from": "1", "from_version": "2"}))

@@ -14,17 +14,19 @@ import pytest
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared real-store fixture
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.local_training_evidence import (
+from skyulf.integrations.databricks.training.shared.local_training_evidence import (
     build_training_evidence,
     evidence_digest,
     validate_training_evidence,
 )
-from skyulf.integrations.databricks.training_parameters import log_training_parameters
+from skyulf.integrations.databricks.training.shared.training_parameters import (
+    log_training_parameters,
+)
 
 
 def _spec(weighted=True):
@@ -167,8 +169,11 @@ def test_cli_generates_optional_weight_declaration_for_each_layout(tmp_path, lay
 def test_weighted_lifecycle_preserves_snapshot_and_cleans_monitoring(staged, monkeypatch, engine):
     """Frozen Parquet retains weights while verified drift references and scoring exclude them."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks import local_retraining, monitoring_reference
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_reference
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     _, client, config, _, frame = staged
     explained_columns = []

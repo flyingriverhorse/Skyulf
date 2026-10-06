@@ -7,9 +7,12 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_search import base_model_config, prepare_search_pipeline
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import (
+    base_model_config,
+    prepare_search_pipeline,
+)
 
 
 def _pipeline(**changes):

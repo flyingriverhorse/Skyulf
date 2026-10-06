@@ -10,8 +10,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import local_branches as branches
-from skyulf.integrations.databricks import local_retraining as training
+from skyulf.integrations.databricks.training import local_branches as branches
+from skyulf.integrations.databricks.training.fitting import local_retraining as training
 
 
 def _configs(workflow_config, *, engine="pandas", store=None):

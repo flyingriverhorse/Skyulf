@@ -2,6 +2,8 @@
 
 Each workflow overlays config/workflow.json. Top-level values are replaced,
 including the entire pipeline; nested settings are never implicitly merged.
+None overrides below clear inherited shared values; keep these explicit resets
+when a branch does not use the shared window, date or cross-validation setting.
 Select preprocessing_recipe and pre_split_recipe independently from named
 builders in src/features. Use features_path for a separate feature package.
 Keep every known target column out of every branch's input_columns.
@@ -111,7 +113,7 @@ MODELS = _unique_object([
             "cv_inner_folds": {{if and (eq (index $ (print $prefix "cv_type")) "nested_cv") (index $ (print $prefix "cv_inner_folds"))}}{{template "python_value" (index $ (print $prefix "cv_inner_folds"))}}{{else}}None{{end}},
             "quality_gates": {{template "python_value" (index $ (print $prefix "quality_gates"))}},
             "pipeline": {
-                # Optional classification policy per target; see single_model.py examples.
+                # Optional classification policy: off, manual or auto per target.
                 "decision_threshold": {"mode": "off"},
                 "preprocessing": [],
 {{if eq $.shap_enabled "true"}}                "explainability": {

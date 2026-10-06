@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-from skyulf.integrations.databricks.admission import BatchConflictError
+from skyulf.integrations.databricks.data.admission import BatchConflictError
 
 
 class ServerlessRefreshError(Exception):
@@ -23,7 +23,7 @@ def test_serverless_refresh_restriction_preserves_identity_read(monkeypatch):
     """Serverless must still read the Delta identity when explicit refresh is unavailable."""
     from types import SimpleNamespace
 
-    module = importlib.import_module("skyulf.integrations.databricks.delta_admission")
+    module = importlib.import_module("skyulf.integrations.databricks.data.delta_io.delta_admission")
     reads = []
 
     def sql(statement):
@@ -56,7 +56,7 @@ def test_refresh_permission_failure_is_not_suppressed():
 
 def _provider(spark, table):
     """Load the optional provider without importing Spark in the base test lane."""
-    module = importlib.import_module("skyulf.integrations.databricks.delta_admission")
+    module = importlib.import_module("skyulf.integrations.databricks.data.delta_io.delta_admission")
     return module.DeltaTableAdmission(spark, table)
 
 
@@ -76,7 +76,10 @@ def control(delta_spark):
 
 def test_provider_is_available():
     """Distributed batch callers need a concrete provider they can import."""
-    assert importlib.util.find_spec("skyulf.integrations.databricks.delta_admission") is not None
+    assert (
+        importlib.util.find_spec("skyulf.integrations.databricks.data.delta_io.delta_admission")
+        is not None
+    )
 
 
 def test_held_claim_rejects_second_session_then_releases(control):

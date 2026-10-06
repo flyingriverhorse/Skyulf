@@ -6,10 +6,12 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import monitoring_sources as sources
-from skyulf.integrations.databricks.local_incremental import bounded_frame
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
+from skyulf.integrations.databricks.observability.monitoring import monitoring_sources as sources
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.scoring.incremental.local_incremental import bounded_frame
 
 AS_OF = datetime(2026, 10, 4, 12, tzinfo=UTC)
 
@@ -48,6 +50,7 @@ def _read(monkeypatch, records, **budgets):
         **budgets,
     )
     monkeypatch.setattr(sources, "snapshot_at", lambda *args: 7)
+    monkeypatch.setattr(sources, "table_identity", lambda *args: "label-table-id")
     monkeypatch.setattr(sources, "read_snapshot", lambda *args: _selected(records))
     return sources.read_labels(
         Mock(), config, ("id",), "target", pd.DataFrame({"id": [1, 2]}), AS_OF
@@ -83,7 +86,11 @@ def test_future_label_revisions_do_not_hide_available_truth(monkeypatch, future_
     result = _report(labels)
     assert result["labeled_rows"] == 2
     assert result["label_coverage"] == 1.0
-    assert evidence == {"label_table": "a.b.labels", "label_version": 7}
+    assert evidence == {
+        "label_table": "a.b.labels",
+        "label_version": 7,
+        "label_table_id": "label-table-id",
+    }
     mae = next(item for item in result["metrics"] if item["metric_name"] == "mae")
     assert mae["value"] == 1.0
 
@@ -135,7 +142,7 @@ def test_enrollment_caps_monitor_budgets_without_reducing_producer(changes, rows
 
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
         validate_monitoring_settings,
     )
@@ -165,7 +172,7 @@ def test_enrollment_does_not_hide_invalid_producer_budget_types(changes):
     """Clamping must never convert booleans, floats or invalid bounds into valid integers."""
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks.monitoring_registration import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_registration import (
         build_monitor_enrollment_config,
     )
 
@@ -194,9 +201,12 @@ def test_large_producer_can_register_or_pause_monitor(monkeypatch, enabled, acti
     """Both activation and scoring retain explicit enable/disable semantics with large producers."""
     from test_monitoring_registration import settings, workflow
 
-    from skyulf.integrations.databricks import monitoring_registration as registration
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
 
     enroll = Mock()
+    monkeypatch.setattr(registration, "ensure_monitoring_store", Mock())
     monkeypatch.setattr(registration, "enroll_monitor", enroll)
     producer = workflow(max_rows=2_000_000, max_input_mb=2048)
     values = settings(monitoring_enabled=enabled)

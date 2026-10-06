@@ -14,9 +14,9 @@ def test_weighted_competition_preserves_recipe_and_registers(
     staged, monkeypatch, engine, separate_tasks
 ):
     """Weight evidence must not change recipe identity across training task boundaries."""
-    from skyulf.integrations.databricks import local_retraining
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
-    from skyulf.integrations.mlflow.registry import load_run_local_pipeline
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
 
     _, client, config, context, frame = staged
     _competition(config, engine)
@@ -71,7 +71,7 @@ def test_weighted_competition_preserves_recipe_and_registers(
 @pytest.mark.parametrize("changed_section", ["training_weights", "modeling"])
 def test_weighted_competition_rejects_changed_winner_config(staged, monkeypatch, changed_section):
     """Adoption must check weight evidence and model settings against the pinned request."""
-    from skyulf.integrations.databricks import training_nodes
+    from skyulf.integrations.databricks.jobs.training import training_nodes
 
     _, client, config, context, frame = staged
     _competition(config)
@@ -105,7 +105,7 @@ def test_weighted_competition_rejects_changed_winner_config(staged, monkeypatch,
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_competition_tasks_register_only_complete_winner(staged, engine):
     """Real separate fits must preserve the winner's evidence and ordinary alias lifecycle."""
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
 
     _, client, config, context, _ = staged
     _competition(config, engine)
@@ -119,7 +119,9 @@ def test_competition_tasks_register_only_complete_winner(staged, engine):
     }
     strong = run_competition_training(None, name="strong", **options)
     assert strong.output["run_id"] != prepared.reference["run_id"]
-    from skyulf.integrations.databricks.training_node_output import render_training_node
+    from skyulf.integrations.databricks.observability.reports.training_node_output import (
+        render_training_node,
+    )
 
     report = render_training_node(client, strong.output["run_id"], strong.output)
     assert "Preprocessing and model settings" in report
@@ -143,7 +145,7 @@ def test_competition_tasks_register_only_complete_winner(staged, engine):
 
 def test_competition_missing_training_blocks_selection(staged):
     """A successful subset cannot silently win when another task has not finished."""
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
 
     _, client, config, context, _ = staged
     _competition(config)
@@ -164,8 +166,8 @@ def test_competition_missing_training_blocks_selection(staged):
 
 def test_changed_child_receipt_blocks_selection(staged):
     """A modified candidate score must not be accepted by the complete-results join."""
-    from skyulf.integrations.databricks._lifecycle_state import PhaseStore
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import PhaseStore
 
     _, client, config, context, _ = staged
     _competition(config)
@@ -192,8 +194,8 @@ def test_changed_child_receipt_blocks_selection(staged):
 
 def test_named_task_rejects_other_invocation_and_unknown_model(staged):
     """A task name or saved reference cannot escape the frozen invocation's candidate set."""
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
 
     _, client, config, context, _ = staged
     _competition(config)
@@ -229,7 +231,9 @@ def test_shap_leaf_reads_finished_training_without_mutating_models(staged):
 
     pytest.importorskip("shap")
     pytest.importorskip("matplotlib")
-    from skyulf.integrations.databricks.training_node_notebook import run_shap_notebook
+    from skyulf.integrations.databricks.jobs.training.training_node_notebook import (
+        run_shap_notebook,
+    )
 
     _, client, config, _, _ = staged
     config["pipeline"]["explainability"] = {
@@ -263,7 +267,9 @@ def test_shap_leaf_reads_finished_training_without_mutating_models(staged):
 
 def test_changed_model_list_requires_graph_refresh():
     """Editing Python declarations alone cannot silently run a stale deployed graph."""
-    from skyulf.integrations.databricks.training_node_notebook import validate_model_task_names
+    from skyulf.integrations.databricks.jobs.training.training_node_notebook import (
+        validate_model_task_names,
+    )
 
     with pytest.raises(ValueError, match="refresh_training_graph"):
         validate_model_task_names({"model_keys_json": '["old"]'}, {"new"})

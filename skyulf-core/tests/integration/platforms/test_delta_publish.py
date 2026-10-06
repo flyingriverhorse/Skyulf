@@ -14,14 +14,14 @@ import pytest
 from skyulf.core.execution import ExecutionOptions
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.bundle import build_bundle
-from skyulf.integrations.databricks.batch import BatchSpec, run_batch
+from skyulf.integrations.databricks.scoring.batch.batch import BatchSpec, run_batch
 from skyulf.pipeline import SkyulfPipeline
 
 
 @pytest.fixture
 def harness(delta_spark, tmp_path):
     """Create test-owned source and output tables with a separate prior period."""
-    from skyulf.integrations.databricks.admission import LocalTableLock
+    from skyulf.integrations.databricks.data.admission import LocalTableLock
 
     spark = delta_spark
     name = uuid4().hex
@@ -103,7 +103,7 @@ def test_retry_preserves_other_periods_and_predictions(harness, mode):
 
 def test_delta_admission_publishes_and_replays_with_released_owner(harness):
     """Public batch publication and replay release shared admission and preserve prior rows."""
-    from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+    from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
     h = harness
     control = "default.batch_admission_" + uuid4().hex
@@ -134,7 +134,7 @@ def test_delta_admission_publishes_and_replays_with_released_owner(harness):
 
 def test_stale_writer_and_reused_run_identity_fail(harness):
     """Stale expectations and changed requests cannot silently replace a committed month."""
-    from skyulf.integrations.databricks.delta import BatchConflictError
+    from skyulf.integrations.databricks.data.delta_io.delta import BatchConflictError
 
     h = harness
     _run(h)
@@ -226,7 +226,7 @@ def test_non_utc_session_preserves_period_instants(harness):
 @pytest.mark.parametrize("violation", ["before", "end", "null", "metadata", "count"])
 def test_sink_rejects_invalid_rows_without_modifying_target(harness, violation):
     """Invalid output must fail before the real Delta transaction changes any period."""
-    from skyulf.integrations.databricks.delta import publish_replace_period
+    from skyulf.integrations.databricks.data.delta_io.delta import publish_replace_period
 
     functions = importlib.import_module("pyspark.sql.functions")
     h = harness
@@ -252,8 +252,8 @@ def test_sink_rejects_invalid_rows_without_modifying_target(harness, violation):
 
 def test_held_admission_rejects_publish_without_modifying_target(harness):
     """A competing logical publisher cannot write while another owns the table lock."""
-    from skyulf.integrations.databricks.admission import BatchConflictError
-    from skyulf.integrations.databricks.delta import table_identity
+    from skyulf.integrations.databricks.data.admission import BatchConflictError
+    from skyulf.integrations.databricks.data.delta_io.delta import table_identity
 
     h = harness
     with (
@@ -352,7 +352,7 @@ def test_other_cache_errors_propagate_before_target_mutation(harness, monkeypatc
 
 def test_classic_cache_is_released_after_success_and_conflict(harness, monkeypatch):
     """Classic runtimes retain caching but release real persisted frames on every exit."""
-    from skyulf.integrations.databricks.admission import BatchConflictError
+    from skyulf.integrations.databricks.data.admission import BatchConflictError
 
     h = harness
     frame_type = type(h.spark.table(h.source))

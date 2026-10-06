@@ -15,17 +15,20 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
     mlflow = pytest.importorskip("mlflow")
     from test_local_branches import _configs, _data
 
-    from skyulf.integrations.databricks import local_branches, local_retraining
-    from skyulf.integrations.databricks import model_set_project as project
-    from skyulf.integrations.databricks import model_set_release as release
-    from skyulf.integrations.databricks.model_set_quality import evaluate_model_set_quality
-    from skyulf.integrations.mlflow.model_set import load_registered_model_set
-    from skyulf.integrations.mlflow.model_set_challenger import reject_model_set
-    from skyulf.integrations.mlflow.model_set_lifecycle import rollback_model_set
-    from skyulf.integrations.mlflow.promotion import (
+    from skyulf.integrations.databricks.model_sets import model_set_project as project
+    from skyulf.integrations.databricks.model_sets import model_set_release as release
+    from skyulf.integrations.databricks.model_sets.model_set_quality import (
+        evaluate_model_set_quality,
+    )
+    from skyulf.integrations.databricks.training import local_branches
+    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.mlflow.lifecycle.model_set_challenger import reject_model_set
+    from skyulf.integrations.mlflow.lifecycle.model_set_lifecycle import rollback_model_set
+    from skyulf.integrations.mlflow.lifecycle.promotion import (
         AliasChangeReceipt,
         ExclusiveAliasWriterAdmission,
     )
+    from skyulf.integrations.mlflow.models.model_set import load_registered_model_set
 
     monkeypatch.chdir(tmp_path)
     uri = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"

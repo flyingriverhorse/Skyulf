@@ -133,7 +133,7 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
         first["variables"]["resource_suffix"]["value"]
         != second["variables"]["resource_suffix"]["value"]
     )
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
 
     config = json.loads((project / "config/workflow.json").read_text())
     names = []
@@ -161,8 +161,10 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
 
 def _model_set_destinations(project, config, bindings):
     """Resolve actual branch models and consumer views through the notebook loaders."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
-    from skyulf.integrations.databricks.model_set_project import load_project_model_set
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values = {
         "config_path": str(project / "config/workflow.json"),

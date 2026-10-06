@@ -11,12 +11,17 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_retraining import LocalTrainingSpec
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.local_search_results import post_selection_cv, tuning_evidence
-from skyulf.integrations.databricks.training_parameters import log_training_parameters
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+from skyulf.integrations.databricks.training.shared.training_parameters import (
+    log_training_parameters,
+)
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.local_search_results import (
+    post_selection_cv,
+    tuning_evidence,
+)
 
 _FAMILIES = ("voting_classifier", "stacking_classifier", "voting_regressor", "stacking_regressor")
 _STRATEGIES = ("grid", "random", "halving_grid", "halving_random", "optuna")
@@ -37,7 +42,7 @@ def test_nested_cv_ensemble_returns_independent_search_evidence(tmp_path, monkey
         max_rows=50,
         max_bytes=100000,
     )
-    import skyulf.integrations.databricks.local_search_results as results
+    import skyulf.integrations.databricks.training.tuning.local_search_results as results
 
     def unexpected_fit(*args, **kwargs):
         """Fail if reporting retrains the already evaluated artifact."""

@@ -5,7 +5,7 @@ from dataclasses import asdict
 
 import pytest
 
-from skyulf.integrations.mlflow.promotion import AliasChangeReceipt
+from skyulf.integrations.mlflow.lifecycle.promotion import AliasChangeReceipt
 
 
 def _config(**changes):
@@ -39,7 +39,7 @@ def test_score_version_override_is_run_scoped(monkeypatch, version):
     """An operator can select a version without changing the saved policy or champion."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     execute = Mock(return_value={})
     monkeypatch.setattr(job_runtime, "run_action", execute)
@@ -56,7 +56,7 @@ def test_invalid_score_override_never_reaches_core(monkeypatch, version):
     """Only explicit positive versions can bypass the configured scoring selector."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     execute = Mock()
     monkeypatch.setattr(job_runtime, "run_action", execute)
@@ -71,7 +71,7 @@ def test_lifecycle_refuses_scoring_override(monkeypatch):
     """A lifecycle run cannot silently pass an accidental model pin to child scoring."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     execute = Mock()
     monkeypatch.setattr(job_runtime, "run_action", execute)
@@ -88,7 +88,7 @@ def test_lifecycle_refuses_scoring_override(monkeypatch):
 @pytest.mark.parametrize("action", ["approve", "reject", "rollback"])
 def test_score_role_refuses_lifecycle_inputs_before_calling_core(action):
     """The score notebook cannot serve as an independent concurrent alias writer."""
-    from skyulf.integrations.databricks.job_runtime import run_bundle_action
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import run_bundle_action
 
     with pytest.raises(ValueError, match="score|Score"):
         run_bundle_action(None, _config(), {"lifecycle_action": action}, task_role="score")
@@ -106,7 +106,7 @@ def test_score_role_refuses_lifecycle_inputs_before_calling_core(action):
 )
 def test_bad_operator_parameters_fail_without_spark_or_registry(parameters):
     """Incomplete or stale form inputs must not fall through to training or alias mutation."""
-    from skyulf.integrations.databricks.job_runtime import run_bundle_action
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import run_bundle_action
 
     with pytest.raises(ValueError):
         run_bundle_action(None, _config(), parameters, task_role=parameters.pop("task_role"))
@@ -122,7 +122,7 @@ def test_bad_operator_parameters_fail_without_spark_or_registry(parameters):
 )
 def test_bundle_rejects_partial_policy_and_handoff_migration(config):
     """A new job graph must not silently inherit the old coupled policy semantics."""
-    from skyulf.integrations.databricks.job_runtime import run_bundle_action
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import run_bundle_action
 
     with pytest.raises(ValueError):
         run_bundle_action(None, config, {"lifecycle_action": "train"}, task_role="lifecycle")
@@ -131,7 +131,7 @@ def test_bundle_rejects_partial_policy_and_handoff_migration(config):
 @pytest.mark.parametrize("field", ["task_role", "action"])
 def test_job_parameters_cannot_override_deployed_notebook_role(field):
     """User parameters cannot turn the score entrypoint into an alias writer."""
-    from skyulf.integrations.databricks.job_runtime import run_bundle_action
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import run_bundle_action
 
     with pytest.raises(ValueError, match="cannot be overridden"):
         run_bundle_action(None, _config(), {field: "approve"}, task_role="score")
@@ -154,7 +154,7 @@ def test_job_parameters_cannot_override_deployed_notebook_role(field):
 )
 def test_invalid_rollback_receipt_fails_after_expected_version_validation(payload):
     """A valid expected version must not let malformed transition evidence reach Core."""
-    from skyulf.integrations.databricks.job_runtime import run_bundle_action
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import run_bundle_action
 
     with pytest.raises(ValueError, match="complete promotion_receipt_json"):
         run_bundle_action(
@@ -176,7 +176,7 @@ def test_operator_handoff_depends_on_committed_transition_not_score_selector(
     monkeypatch, action, selection, handoff
 ):
     """Rejected candidates never score; approved or reversed transitions respect explicit handoff."""
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     receipt = _receipt(
         "rejection" if action == "reject" else "rollback" if action == "rollback" else "promotion"
@@ -215,8 +215,8 @@ def test_operator_handoff_depends_on_committed_transition_not_score_selector(
 
 def test_unknown_alias_outcome_never_yields_score_handoff(monkeypatch):
     """A failed alias action cannot produce a success envelope that triggers score."""
-    from skyulf.integrations.databricks import job_runtime
-    from skyulf.integrations.mlflow.promotion import AliasOutcomeUnknownError
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+    from skyulf.integrations.mlflow.lifecycle.promotion import AliasOutcomeUnknownError
 
     def uncertain(*args, **kwargs):
         """Represent a real remote write whose final state is unknown."""
@@ -252,8 +252,8 @@ def test_saved_proof_lookup_refuses_missing_uncommitted_or_malformed_receipts(mo
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import local_approval
-    from skyulf.integrations.mlflow.promotion import AliasConflictError
+    from skyulf.integrations.databricks.lifecycle import local_approval
+    from skyulf.integrations.mlflow.lifecycle.promotion import AliasConflictError
 
     client = Mock()
     raw = event if isinstance(event, str) else json.dumps(event)
@@ -271,7 +271,7 @@ def test_simple_operator_form_passes_full_saved_digest_to_strict_service(monkeyp
     """The UI convenience must preserve the full evidence pin at the mutation boundary."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import job_runtime
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     resolver = Mock(return_value="b" * 64)
     execute = Mock(return_value=_receipt("rejection" if action == "reject" else "promotion"))

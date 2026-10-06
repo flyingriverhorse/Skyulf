@@ -14,7 +14,7 @@ from test_competition_lifecycle import _competition
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared fixture
 from test_local_branches import _configs, _data, tracked  # noqa: F401 - shared fixture
 
-from skyulf.integrations.databricks.evaluation_chart_task import (
+from skyulf.integrations.databricks.jobs.evaluation_chart_task import (
     generate_evaluation_charts,
     render_chart_report,
     run_evaluation_charts_notebook,
@@ -23,7 +23,7 @@ from skyulf.integrations.databricks.evaluation_chart_task import (
 
 def _evaluated(staged, competition=False, enabled=True):
     """Use real staged fit/registration/comparison without changing the test source snapshot."""
-    from skyulf.integrations.databricks.training_nodes import run_competition_training
+    from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
 
     _, _, config, context, _ = staged
     if competition:
@@ -151,7 +151,7 @@ def test_disabled_task_does_not_save_holdout_or_images(staged):
 
 def test_chart_failure_does_not_rewrite_successful_training(staged, monkeypatch):
     """A report error must not change promotion or tempt a training retry."""
-    from skyulf.integrations.databricks import evaluation_chart_report
+    from skyulf.integrations.databricks.observability.charts import evaluation_chart_report
 
     _, client, config, context, _ = staged
     prepared, evaluated = _evaluated(staged)
@@ -188,8 +188,10 @@ def test_chart_failure_does_not_rewrite_successful_training(staged, monkeypatch)
 
 def test_model_set_images_belong_to_each_independent_child(workflow_config, tracked, monkeypatch):
     """Each model and the set overview need their own parameter-free Charts child."""
-    from skyulf.integrations.databricks import branch_tasks, local_retraining, model_set_stages
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.model_sets import model_set_stages
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     uri, client = tracked
     configs = _configs(workflow_config, store=uri)
@@ -248,7 +250,7 @@ def test_model_set_images_belong_to_each_independent_child(workflow_config, trac
 
 def test_chart_upload_failure_does_not_block_registration(staged, monkeypatch):
     """Optional sample storage failure must be disclosed without failing core model work."""
-    from skyulf.integrations.databricks import evaluation_chart_data
+    from skyulf.integrations.databricks.observability.charts import evaluation_chart_data
 
     _, client, config, context, _ = staged
 
@@ -272,7 +274,7 @@ def test_chart_upload_failure_does_not_block_registration(staged, monkeypatch):
 
 def test_chart_task_restores_custom_recipe_in_fresh_process(staged, tmp_path, monkeypatch):
     """Saved custom pre-split identities must be restored before validating the reporting spec."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.registry import NodeRegistry
 
     _, _, config, context, frame = staged

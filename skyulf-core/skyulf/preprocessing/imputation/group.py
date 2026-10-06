@@ -7,6 +7,7 @@ import pandas as pd
 import polars as pl
 
 from ..._validation import raise_invalid_choice
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, resolve_columns
@@ -218,7 +219,21 @@ def _polars_fill(
     return values.alias(column)
 
 
-@NodeRegistry.register("GroupImputer", GroupImputerApplier)
+@NodeRegistry.register(
+    "GroupImputer",
+    GroupImputerApplier,
+    execution_capabilities=tuple(
+        ExecutionCapability(
+            "pandas",
+            "apply",
+            "python_batch",
+            "preserve",
+            "row",
+            config_match=(("strategy", strategy),),
+        )
+        for strategy in ("mean", "most_frequent")
+    ),
+)
 @node_meta(
     id="GroupImputer",
     name="Group Imputer",

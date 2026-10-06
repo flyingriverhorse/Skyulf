@@ -32,7 +32,7 @@ def test_combined_only_publishes_values_without_component_predictions(tmp_path, 
 
 def test_combined_only_requires_saved_rules(tmp_path):
     """A result selection must not silently publish only keys when no rule exists."""
-    from skyulf.integrations.databricks.model_set_output import publication_columns
+    from skyulf.integrations.databricks.model_sets.model_set_output import publication_columns
 
     artifact, _, _ = _saved_set(tmp_path)
     with pytest.raises(ValueError, match="combined.*rules"):
@@ -41,7 +41,7 @@ def test_combined_only_requires_saved_rules(tmp_path):
 
 def test_named_views_select_components_and_combined_results(tmp_path):
     """Consumer names and columns must reference one shared physical prediction table."""
-    from skyulf.integrations.databricks.model_set_output import publication_views
+    from skyulf.integrations.databricks.model_sets.model_set_output import publication_views
 
     artifact, _, _ = _saved_set(tmp_path, _SOURCE, _rule(1))
     views = publication_views(
@@ -75,7 +75,7 @@ def test_named_views_select_components_and_combined_results(tmp_path):
 )
 def test_invalid_view_names_fail_before_spark(tmp_path, options):
     """Unknown branches and ambiguous destinations must never reach catalog mutation."""
-    from skyulf.integrations.databricks.model_set_output import publication_views
+    from skyulf.integrations.databricks.model_sets.model_set_output import publication_views
 
     artifact, _, _ = _saved_set(tmp_path, _SOURCE, _rule(1))
     with pytest.raises(ValueError):
@@ -93,7 +93,7 @@ def test_invalid_view_names_fail_before_spark(tmp_path, options):
 )
 def test_invalid_publication_policy_is_not_ignored(policy):
     """Misspelled output options must fail rather than accidentally persist extra values."""
-    from skyulf.integrations.databricks.model_set_output import publication_policy
+    from skyulf.integrations.databricks.model_sets.model_set_output import publication_policy
 
     with pytest.raises(ValueError):
         publication_policy(policy)
@@ -104,7 +104,7 @@ def test_unrelated_existing_view_stops_setup_before_creating_any_views():
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.model_set_output import (
+    from skyulf.integrations.databricks.model_sets.model_set_output import (
         PredictionView,
         provision_publication_views,
     )
@@ -123,7 +123,7 @@ def test_unrelated_existing_view_stops_setup_before_creating_any_views():
 
 def test_separate_views_without_rules_still_exposes_each_model(tmp_path):
     """Multi-model scoring must remain usable when no cross-model rule is configured."""
-    from skyulf.integrations.databricks.model_set_output import publication_views
+    from skyulf.integrations.databricks.model_sets.model_set_output import publication_views
 
     artifact, _, _ = _saved_set(tmp_path)
     views = publication_views(artifact, "db.output", {"mode": "separate_views"})

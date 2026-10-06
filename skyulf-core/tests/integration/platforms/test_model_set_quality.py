@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.mlflow.validation import ModelComparisonReport
+from skyulf.integrations.mlflow.lifecycle.validation import ModelComparisonReport
 
 
 def _report(**overrides):
@@ -39,7 +39,7 @@ def _report(**overrides):
 )
 def test_initial_set_requires_absolute_quality(score, threshold, passed):
     """A measured first model cannot become champion without an explicit passing floor."""
-    from skyulf.integrations.databricks.model_set_quality import component_quality
+    from skyulf.integrations.databricks.model_sets.model_set_quality import component_quality
 
     report = _report(candidate_metrics={"heldout_rmse": score}, quality_threshold=threshold)
     result = component_quality(report)
@@ -60,7 +60,7 @@ def test_initial_set_requires_absolute_quality(score, threshold, passed):
 )
 def test_replacement_requires_no_regression_and_additional_gates(improvement, eligible, passed):
     """Tied peers may join an improving set, but regression or invalid evidence cannot."""
-    from skyulf.integrations.databricks.model_set_quality import component_quality
+    from skyulf.integrations.databricks.model_sets.model_set_quality import component_quality
 
     report = _report(
         champion_version="1",
@@ -81,7 +81,7 @@ def test_replacement_requires_no_regression_and_additional_gates(improvement, el
 
 def test_quality_uses_set_components_and_all_failures(monkeypatch):
     """Mutable component champion aliases must never decide set replacement."""
-    from skyulf.integrations.databricks import model_set_quality as module
+    from skyulf.integrations.databricks.model_sets import model_set_quality as module
 
     components = [SimpleNamespace(branch=name) for name in ("amount", "risk")]
     artifact = SimpleNamespace(
@@ -130,8 +130,11 @@ def test_set_requires_one_meaningful_improvement_without_regression(
     monkeypatch, revenue_gain, risk_gain, minimum, passed, reason
 ):
     """Whole-set activation needs one eligible improvement and no worsening peer."""
-    from skyulf.integrations.databricks import model_set_quality as module
-    from skyulf.integrations.mlflow.validation import _comparison_decision, _metric_improvement
+    from skyulf.integrations.databricks.model_sets import model_set_quality as module
+    from skyulf.integrations.mlflow.lifecycle.validation import (
+        _comparison_decision,
+        _metric_improvement,
+    )
 
     results = []
     for metric, candidate, baseline, direction in (
@@ -190,7 +193,9 @@ def test_set_requires_one_meaningful_improvement_without_regression(
 
 def test_quality_rejects_stale_baseline_before_loading_models():
     """An approval against a newer set must require a fresh candidate comparison."""
-    from skyulf.integrations.databricks.model_set_quality import evaluate_model_set_quality
+    from skyulf.integrations.databricks.model_sets.model_set_quality import (
+        evaluate_model_set_quality,
+    )
 
     artifact = SimpleNamespace(
         manifest=SimpleNamespace(
@@ -239,7 +244,7 @@ def test_quality_evidence_is_part_of_frozen_set_identity(tmp_path):
 def test_automatic_failure_preserves_candidate_without_alias_change(monkeypatch):
     """A failed quality decision must be returned for inspection without an activation."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks import model_set_release as module
+    from skyulf.integrations.databricks.model_sets import model_set_release as module
 
     decision = {"passed": False, "failed_components": ["risk"]}
     approve = Mock(side_effect=module.ModelSetQualityError(decision))
@@ -260,7 +265,7 @@ def test_automatic_failure_preserves_candidate_without_alias_change(monkeypatch)
 def test_automatic_policy_requires_all_thresholds_before_registry(monkeypatch):
     """A missing branch threshold must fail preflight rather than waste training work."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks import model_set_release as module
+    from skyulf.integrations.databricks.model_sets import model_set_release as module
 
     read = Mock()
     monkeypatch.setattr(module, "controlled_champion_version", read)
@@ -272,7 +277,7 @@ def test_automatic_policy_requires_all_thresholds_before_registry(monkeypatch):
 def test_set_baseline_overrides_independent_component_aliases(monkeypatch):
     """Set comparisons must carry the release's exact versions into branch training."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks import model_set_release as module
+    from skyulf.integrations.databricks.model_sets import model_set_release as module
 
     champion = SimpleNamespace(
         manifest=SimpleNamespace(
@@ -295,7 +300,7 @@ def test_set_baseline_overrides_independent_component_aliases(monkeypatch):
 def test_quality_bound_set_cannot_use_functional_only_approval():
     """Low-level approval must not bypass a newly packaged set's required quality proof."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.model_set_lifecycle import _quality_validation
+    from skyulf.integrations.mlflow.lifecycle.model_set_lifecycle import _quality_validation
 
     artifact = SimpleNamespace(manifest=SimpleNamespace(quality_evidence={"comparisons": {}}))
     with pytest.raises(ValueError, match="requires a quality validator"):
@@ -336,7 +341,7 @@ def test_set_promotion_prompt_is_independent_of_branch_policies(layout, visible)
 def test_quality_proof_cannot_omit_or_contradict_a_component(result):
     """Approval and rollback must reject incomplete or contradictory saved decisions."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.model_set_lifecycle import _validate_quality_result
+    from skyulf.integrations.mlflow.lifecycle.model_set_lifecycle import _validate_quality_result
 
     artifact = SimpleNamespace(
         manifest=SimpleNamespace(components=[SimpleNamespace(branch="risk")])
@@ -347,7 +352,7 @@ def test_quality_proof_cannot_omit_or_contradict_a_component(result):
 
 def test_failed_release_next_actions_require_new_training():
     """A failed candidate must not be presented as manually approvable without new evidence."""
-    from skyulf.integrations.databricks.branch_notebook import set_next_actions
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import set_next_actions
 
     actions = set_next_actions({"quality": {"passed": False}, "alias_change": None})
     assert any("train a new candidate" in action for action in actions)

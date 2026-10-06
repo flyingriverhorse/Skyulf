@@ -10,12 +10,15 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import local_retraining as training
-from skyulf.integrations.databricks import local_training_evidence as evidence
-from skyulf.integrations.databricks import local_workflow as workflow
-from skyulf.integrations.databricks.training_dates import TrainingDateSpec
-from skyulf.integrations.mlflow.promotion import AliasChangeReceipt
-from skyulf.integrations.mlflow.validation import ModelComparisonReport, comparison_payload
+from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
+from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
+from skyulf.integrations.databricks.training.fitting import local_retraining as training
+from skyulf.integrations.databricks.training.shared import local_training_evidence as evidence
+from skyulf.integrations.mlflow.lifecycle.promotion import AliasChangeReceipt
+from skyulf.integrations.mlflow.lifecycle.validation import (
+    ModelComparisonReport,
+    comparison_payload,
+)
 
 
 def _spec(temporal=False):
@@ -157,7 +160,7 @@ def test_shared_result_preserves_operator_receipt_and_score_policy(action, kind,
 
 def test_first_candidate_output_keeps_legacy_result_type():
     """Notebook callers retain their result class and copyable first-model approval inputs."""
-    from skyulf.integrations.databricks.job_runtime import BundleActionResult
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import BundleActionResult
 
     spec = _spec()
     candidate = training.LocalCandidateResult(

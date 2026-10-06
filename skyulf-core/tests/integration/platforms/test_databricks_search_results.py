@@ -10,8 +10,8 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_search_results import (
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search_results import (
     post_selection_cv,
     tuning_evidence,
     tuning_run_params,
@@ -159,8 +159,10 @@ def test_run_params_preserve_large_spaces_in_artifact_without_oversized_previews
 def test_fitted_tuning_parameters_persist_in_mlflow_experiment(tmp_path) -> None:
     """Parameters visible in Experiments must match the saved fitted result, not a mock."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks.local_retraining import _log_tuning_evidence
-    from skyulf.integrations.mlflow.tracking import TrackingRun
+    from skyulf.integrations.databricks.training.fitting.local_retraining import (
+        _log_tuning_evidence,
+    )
+    from skyulf.integrations.mlflow.runs.tracking import TrackingRun
 
     artifact, _frame = _artifact(tmp_path)
     client = mlflow.tracking.MlflowClient(tracking_uri=f"sqlite:///{tmp_path.as_posix()}/runs.db")

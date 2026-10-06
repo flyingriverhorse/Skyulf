@@ -16,9 +16,9 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks import local_retraining as retraining
-from skyulf.integrations.databricks.training_dates import TrainingDateSpec
-from skyulf.integrations.mlflow.validation import comparison_payload
+from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
+from skyulf.integrations.databricks.training.fitting import local_retraining as retraining
+from skyulf.integrations.mlflow.lifecycle.validation import comparison_payload
 
 
 def _spec(**changes):
@@ -361,9 +361,9 @@ def test_saved_filter_evidence_replays_after_project_file_changes(monkeypatch, t
 
     import mlflow
 
-    from skyulf.integrations.databricks import local_approval
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.lifecycle import local_approval
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     source = tmp_path / "preprocessing.py"
     source.write_text(
@@ -521,7 +521,7 @@ def test_failed_training_retains_pin_before_risky_work(monkeypatch, tmp_path, en
     """Runtime failures retain replay inputs without publishing a candidate or alias."""
     import mlflow
 
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     original_source = "def build_preprocessing():\n    return []\n"

@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from skyulf.core.execution import ExecutionOptions
-from skyulf.integrations.databricks.batch import BatchSpec, run_batch
+from skyulf.integrations.databricks.scoring.batch.batch import BatchSpec, run_batch
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def test_local_engine_rejected_before_reading_source(spec):
 @pytest.mark.parametrize("master", ["local-cluster[2,1,1024]", "spark://cluster:7077"])
 def test_local_admission_cannot_protect_distributed_drivers(spec, tmp_path, master):
     """A driver's local lock file must never imply distributed writer exclusion."""
-    from skyulf.integrations.databricks.admission import LocalTableLock
+    from skyulf.integrations.databricks.data.admission import LocalTableLock
 
     spark = SimpleNamespace(sparkContext=SimpleNamespace(master=master))
     with pytest.raises(ValueError, match="distributed drivers"):
@@ -116,8 +116,8 @@ def test_nonexistent_local_boundary_is_rejected(spec):
 
 def test_direct_sink_rejects_local_admission_on_distributed_runtime(spec, tmp_path):
     """The lower-level writer must enforce the same admission boundary as the runner."""
-    from skyulf.integrations.databricks.admission import LocalTableLock
-    from skyulf.integrations.databricks.delta import publish_replace_period
+    from skyulf.integrations.databricks.data.admission import LocalTableLock
+    from skyulf.integrations.databricks.data.delta_io.delta import publish_replace_period
 
     spark = SimpleNamespace(sparkContext=SimpleNamespace(master="spark://cluster:7077"))
     with pytest.raises(ValueError, match="distributed drivers"):

@@ -13,6 +13,7 @@ from pathlib import Path
 def validate_wheel(wheel: Path, expected_version: str) -> None:
     """Reject the wrong distribution or release before changing deployment files."""
     with zipfile.ZipFile(wheel) as archive:
+        _validate_runtime_layout(archive.namelist())
         metadata = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
         if len(metadata) != 1:
             raise ValueError("Core wheel must contain exactly one package metadata record.")
@@ -25,6 +26,49 @@ def validate_wheel(wheel: Path, expected_version: str) -> None:
         )
     if wheel.name != f"skyulf_core-{expected_version}-py3-none-any.whl":
         raise ValueError("Core wheel filename differs from its declared release.")
+
+
+def _validate_runtime_layout(names: list[str]) -> None:
+    """Reject cached flat modules that would shadow compatibility aliases after a move."""
+    _validate_integration_layout(
+        names, "databricks", "Databricks", ("jobs/job_runtime.py", "jobs/shared/job_runtime.py")
+    )
+    _validate_integration_layout(names, "mlflow", "MLflow", ("runs/tracking.py",))
+
+
+def _validate_integration_layout(
+    names: list[str], package: str, label: str, markers: tuple[str, ...]
+) -> None:
+    """Keep legacy releases valid while rejecting mixed layouts in reorganized wheels."""
+    prefix = f"skyulf/integrations/{package}/"
+    if not any(prefix + marker in names for marker in markers):
+        return
+    flat = [name.removeprefix(prefix) for name in names if name.startswith(prefix)]
+    if any(
+        "/" not in name and name != "__init__.py" and name.endswith((".py", ".pyc"))
+        for name in flat
+    ):
+        raise ValueError(
+            f"Core wheel contains stale flat {label} modules. Clean the source checkout's "
+            "generated build directory and rebuild the wheel before deployment."
+        )
+    _validate_unique_runtime_modules(flat, label)
+
+
+def _validate_unique_runtime_modules(names: list[str], label: str) -> None:
+    """Reject previous package locations retained by an incremental wheel build."""
+    modules = [
+        Path(name).stem
+        for name in names
+        if name.endswith((".py", ".pyc"))
+        and not name.startswith("_compat/")
+        and Path(name).stem != "__init__"
+    ]
+    if len(modules) != len(set(modules)):
+        raise ValueError(
+            f"Core wheel contains stale duplicate {label} modules. Clean the source "
+            "checkout's generated build directory and rebuild the wheel before deployment."
+        )
 
 
 def prepare_source(source: Path, staging: Path) -> Path:

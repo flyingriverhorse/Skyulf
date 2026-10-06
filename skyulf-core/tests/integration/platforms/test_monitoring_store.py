@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
 
 
 def config():
@@ -22,7 +22,7 @@ def config():
 
 def test_result_identity_retries_and_late_labels():
     """Retrying exact evidence deduplicates, while a new label snapshot retains new history."""
-    from skyulf.integrations.databricks.monitoring_store import result_row
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
 
     now = datetime(2026, 10, 1, tzinfo=UTC)
     report = {"status": "healthy", "current_rows": 4, "metrics": [], "notes": []}
@@ -37,7 +37,9 @@ def test_result_identity_retries_and_late_labels():
 
 def test_inventory_keeps_namespace_and_selection():
     """The dashboard must distinguish same-named models in different catalogs."""
-    from skyulf.integrations.databricks.monitoring_store import inventory_row
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        inventory_row,
+    )
 
     row = inventory_row(config(), datetime(2026, 10, 1, tzinfo=UTC))
     assert row["model_catalog"] == "models"
@@ -45,9 +47,48 @@ def test_inventory_keeps_namespace_and_selection():
     assert row["selection"] == "version:2"
 
 
+def test_current_health_exposes_pinned_inventory_version_before_observation():
+    """A newly enrolled model must remain selectable before its first report arrives."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        monitoring_views,
+    )
+
+    query = monitoring_views("ops.monitoring")["current_health"]
+    assert "COALESCE(r.model_version, get_json_object(i.config_json, '$.model_version'))" in query
+    assert "'$.model_set_name'" in query
+    assert "'$.model_set_version'" in query
+
+
+def test_current_health_does_not_rank_policy_only_windows_as_feature_observations():
+    """Late-label policy windows must not hide a completed scoring report or its health."""
+    import json
+
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        monitoring_views,
+        result_row,
+    )
+
+    now = datetime(2026, 10, 5, tzinfo=UTC)
+    row = result_row(
+        config(),
+        "2",
+        now,
+        now,
+        now,
+        {"status": "no_data", "metrics": [], "performance": {"status": "unavailable"}},
+        {},
+    )
+    assert row["current_rows"] == 0
+    assert "current_rows" not in json.loads(row["report_json"])
+    query = monitoring_views("ops.monitoring")["current_health"]
+    assert "WHERE NOT (status = 'no_data'" in query
+    assert "get_json_object(report_json, '$.current_rows') IS NULL" in query
+    assert "get_json_object(report_json, '$.performance') IS NOT NULL)" in query
+
+
 def test_persistence_rejects_nonfinite_report_values():
     """Invalid JSON cannot become a misleading dashboard metric."""
-    from skyulf.integrations.databricks.monitoring_store import result_row
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
 
     now = datetime(2026, 10, 1, tzinfo=UTC)
     with pytest.raises(ValueError):
@@ -58,7 +99,9 @@ def test_existing_foreign_table_is_not_adopted():
     """Central setup cannot overwrite a table just because its name matches."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.monitoring_store import ensure_owned_object
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        ensure_owned_object,
+    )
 
     spark = Mock()
     spark.catalog.tableExists.return_value = True
@@ -72,7 +115,10 @@ def test_owned_incompatible_schema_requires_explicit_migration():
     """A stale central table must fail before views are replaced or reports are written."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.monitoring_store import OWNER, initialize_monitoring_store
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+        OWNER,
+        initialize_monitoring_store,
+    )
 
     spark = Mock()
     spark.catalog.tableExists.return_value = True
@@ -86,7 +132,7 @@ def test_owned_incompatible_schema_requires_explicit_migration():
 
 def test_inventory_reads_other_repositories_without_file_input(monkeypatch):
     """The central runner discovers all registered projects from one bounded Delta snapshot."""
-    from skyulf.integrations.databricks import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
 
     first = config()
     second = MonitorConfig.from_dict(
@@ -103,7 +149,7 @@ def test_inventory_reads_other_repositories_without_file_input(monkeypatch):
 
 def test_inventory_read_is_bounded_and_rejects_tampered_config(monkeypatch):
     """An oversized or inconsistent inventory must fail instead of silently dropping monitors."""
-    from skyulf.integrations.databricks import monitoring_store as store
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
 
     monkeypatch.setattr(store, "ensure_owned_object", lambda *args: True)
     row = store.inventory_row(config(), datetime.now(UTC))

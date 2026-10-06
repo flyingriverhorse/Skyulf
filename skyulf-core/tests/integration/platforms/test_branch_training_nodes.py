@@ -8,8 +8,9 @@ from test_local_branches import _configs, _data, tracked  # noqa: F401 - shared 
 
 def test_branch_tasks_join_only_when_every_model_finished(workflow_config, tracked, monkeypatch):
     """Regression, classification and ensemble branches must share one immutable parent plan."""
-    from skyulf.integrations.databricks import branch_tasks, local_retraining
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     uri, client = tracked
     configs = _configs(workflow_config, store=uri)
@@ -54,9 +55,11 @@ def test_branch_failure_finalizes_parent_without_partial_set(workflow_config, tr
     import json
     from types import SimpleNamespace
 
-    from skyulf.integrations.databricks import branch_tasks
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
-    from skyulf.integrations.databricks.training_node_notebook import run_models_report_notebook
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.jobs.training.training_node_notebook import (
+        run_models_report_notebook,
+    )
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
 
     uri, client = tracked
     initialized = branch_tasks.initialize_branch_training(
@@ -103,13 +106,10 @@ def test_branch_operator_uses_frozen_configuration(workflow_config, tracked, mon
     """The operator branch must keep existing controls without reloading training recipes."""
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks import (
-        branch_tasks,
-        job_runtime,
-        model_set_project,
-        model_set_stages,
-    )
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.model_sets import model_set_project, model_set_stages
 
     uri, client = tracked
     configs = _configs(workflow_config, store=uri)
@@ -146,8 +146,10 @@ def test_set_registration_evaluation_and_decision_are_separate(
     """The graph must expose real lifecycle work in each node without early promotion."""
     from types import SimpleNamespace
 
-    from skyulf.integrations.databricks import branch_tasks, local_retraining, model_set_stages
-    from skyulf.integrations.databricks._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.jobs.training import branch_tasks
+    from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
+    from skyulf.integrations.databricks.model_sets import model_set_stages
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     uri, client = tracked
     configs = _configs(workflow_config, store=uri)

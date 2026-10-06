@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks import local_retraining as training
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.training.fitting import local_retraining as training
 from skyulf.registry import NodeRegistry
 
 SOURCE = """
@@ -369,7 +369,7 @@ def test_registered_custom_recipe_reloads_from_saved_source_in_fresh_process(tmp
     """Approval and score replay must work after project code changes on disk."""
     mlflow = pytest.importorskip("mlflow")
     from skyulf.inference.local_pipeline import load_local_pipeline
-    from skyulf.integrations.databricks.local_approval import load_candidate_evidence
+    from skyulf.integrations.databricks.lifecycle.local_approval import load_candidate_evidence
 
     monkeypatch.chdir(tmp_path)
     workflow = _project(tmp_path)
@@ -401,7 +401,7 @@ def test_registered_custom_recipe_reloads_from_saved_source_in_fresh_process(tmp
     )
     code = """
 import json, sys, mlflow, pandas as pd
-from skyulf.integrations.databricks.local_approval import load_candidate_evidence
+from skyulf.integrations.databricks.lifecycle.local_approval import load_candidate_evidence
 mlflow.set_tracking_uri(sys.argv[1])
 mlflow.set_registry_uri(sys.argv[1])
 client = mlflow.MlflowClient(tracking_uri=sys.argv[1], registry_uri=sys.argv[1])

@@ -11,7 +11,7 @@ def test_promotion_can_import_before_branch_orchestration():
             sys.executable,
             "-c",
             (
-                "from skyulf.integrations.mlflow.promotion import controlled_champion_version; "
+                "from skyulf.integrations.mlflow.lifecycle.promotion import controlled_champion_version; "
                 "from skyulf.integrations.databricks import TrainingBranch, train_local_branches; "
                 "assert callable(controlled_champion_version) and callable(train_local_branches); "
                 "assert TrainingBranch.__name__ == 'TrainingBranch'"

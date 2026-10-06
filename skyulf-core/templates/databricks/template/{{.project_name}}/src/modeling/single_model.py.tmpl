@@ -8,9 +8,8 @@ Set search_space to {} to rebuild automatic ranges from the installed Core.
 After changing ensemble members or calibration, update nested search keys or
 clear the space. Fixed model parameters must not contradict searched axes.
 
-model_competition.py describes competitors for one target. multi_model.py
-describes independent targets; model_set.py governs their joint publication.
-Those layouts do not use this file. Scoring replays the saved fitted artifact.
+This is the selected layout's model configuration. Scoring replays the saved
+fitted artifact; it does not rebuild this model definition.
 """
 
 from copy import deepcopy

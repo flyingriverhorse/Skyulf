@@ -5,6 +5,34 @@ or existing CI/CD service account. No GitHub workflow or company adapter is
 required or generated. Authentication stays in the CLI/CI environment; do not
 put tokens or passwords in these files.
 
+## Inference runtime
+
+This project uses `inference_mode={{.inference_mode}}` with `engine={{.engine}}`
+for training. The `train` job remains bounded by `max_rows` and `max_input_mb` in
+`config/workflow.json`. {{if eq .inference_mode "spark"}}The `score` job runs the `score` task for single-model and competition layouts,
+or `score` using `src/jobs/score_models.py` for a model set. That task calls
+`mlflow.pyfunc.spark_udf` and writes keyed predictions through the existing Delta
+receipt path. Review its selected model/version/digest, source end version,
+prediction table, row counts and receipt in the task output. The optional
+`recover_predictions` task uses the same inference mode. The separate monitoring
+job already uses Spark and needs no inference-mode choice.
+
+The generated workflow requests `spark_udf_env_manager={{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}` and a prediction
+batch size of 10000 rows. Certified packages carry their exact-source Skyulf
+wheel, dependency pins and worker safety certificate. {{if eq .compute_mode "serverless"}}Serverless `local` uses the
+declared task environment; verify exact Skyulf source hash and dependency versions
+on both driver and workers.{{else}}The job-cluster `virtualenv` installs the recorded
+wheel and dependency pins in an isolated worker environment; verify startup on
+the selected compute.{{end}} An environment failure stops scoring without changing
+the selected manager. Initial admission covers
+SimpleImputer mean/constant, StandardScaler, LinearRegression and
+LogisticRegression, including reviewed built-in tuning wrappers. Model sets must
+use independent components without custom composition outputs. Custom scoring,
+other models/steps and tuning feature exclusions fail before prediction
+publication. Bundle validation alone does not certify a fitted artifact.{{else}}The
+`score` task uses local pandas or Polars inference under the same row/byte bounds.
+{{end}}
+
 ## Files and environments
 
 `databricks.yml` includes `deployment/variables.yml`, `deployment/targets.yml`

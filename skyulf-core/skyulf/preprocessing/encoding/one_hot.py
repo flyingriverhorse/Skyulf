@@ -9,6 +9,7 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import OneHotEncoder
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
@@ -299,7 +300,13 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     return _build_onehot_artifact(X, encoder, cols, opts)
 
 
-@NodeRegistry.register("OneHotEncoder", OneHotEncoderApplier)
+@NodeRegistry.register(
+    "OneHotEncoder",
+    OneHotEncoderApplier,
+    execution_capabilities=(
+        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+    ),
+)
 @node_meta(
     id="OneHotEncoder",
     name="One-Hot Encoder",

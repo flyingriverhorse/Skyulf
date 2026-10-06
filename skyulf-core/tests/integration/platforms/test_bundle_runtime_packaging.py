@@ -63,6 +63,73 @@ def test_build_copies_matching_wheel_and_records_its_digest(tmp_path):
     assert receipt["version"] == "0.9.1"
 
 
+@pytest.mark.parametrize("suffix", [".py", ".pyc"])
+def test_reorganized_wheel_rejects_shadowing_build_cache(tmp_path, suffix):
+    """Old build files must not shadow the relocated runtime compatibility aliases."""
+    import runpy
+
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/databricks/jobs/shared/job_runtime.py", "")
+        archive.writestr(f"skyulf/integrations/databricks/job_runtime{suffix}", "")
+    validate = runpy.run_path(str(TEMPLATE / "src/tools/build_wheel.py"))["validate_wheel"]
+    with pytest.raises(ValueError, match="stale flat Databricks modules"):
+        validate(source, "0.9.1")
+
+
+def test_reorganized_wheel_keeps_private_compatibility_aliases(tmp_path):
+    """A clean package with compatibility aliases must remain deployable."""
+    import runpy
+
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/databricks/__init__.py", "")
+        archive.writestr("skyulf/integrations/databricks/jobs/shared/job_runtime.py", "")
+        archive.writestr("skyulf/integrations/databricks/_compat/job_runtime.py", "")
+    validate = runpy.run_path(str(TEMPLATE / "src/tools/build_wheel.py"))["validate_wheel"]
+    assert validate(source, "0.9.1") is None
+
+
+@pytest.mark.parametrize("suffix", [".py", ".pyc"])
+def test_nested_wheel_rejects_previous_group_build_cache(tmp_path, suffix):
+    """Intermediate build files must not create a second copy of runtime globals."""
+    import runpy
+
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/databricks/jobs/shared/job_runtime.py", "")
+        archive.writestr(f"skyulf/integrations/databricks/jobs/job_runtime{suffix}", "")
+    validate = runpy.run_path(str(TEMPLATE / "src/tools/build_wheel.py"))["validate_wheel"]
+    with pytest.raises(ValueError, match="stale duplicate Databricks modules"):
+        validate(source, "0.9.1")
+
+
+@pytest.mark.parametrize("suffix", [".py", ".pyc"])
+def test_reorganized_mlflow_wheel_rejects_shadowing_build_cache(tmp_path, suffix):
+    """Stale MLflow adapters must not bypass the released-path compatibility aliases."""
+    import runpy
+
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/mlflow/runs/tracking.py", "")
+        archive.writestr(f"skyulf/integrations/mlflow/tracking{suffix}", "")
+    validate = runpy.run_path(str(TEMPLATE / "src/tools/build_wheel.py"))["validate_wheel"]
+    with pytest.raises(ValueError, match="stale flat MLflow modules"):
+        validate(source, "0.9.1")
+
+
+def test_reorganized_mlflow_wheel_accepts_private_aliases(tmp_path):
+    """Compatibility modules belong in a clean wheel alongside canonical adapters."""
+    import runpy
+
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/mlflow/runs/tracking.py", "")
+        archive.writestr("skyulf/integrations/mlflow/_compat/tracking.py", "")
+    validate = runpy.run_path(str(TEMPLATE / "src/tools/build_wheel.py"))["validate_wheel"]
+    assert validate(source, "0.9.1") is None
+
+
 def test_changed_release_bytes_get_distinct_deployment_identity(tmp_path):
     """Same-version code changes must invalidate caches without breaking saved model requirements."""
     from packaging.utils import parse_wheel_filename
@@ -186,7 +253,7 @@ def test_selected_runtime_dependencies_reach_both_job_types(
     for role, job in jobs.items():
         requirements_file = "train-requirements.txt" if role == "train" else "requirements.txt"
         requirements_path = "${workspace.file_path}/deployment/" + requirements_file
-        if compute == "serverless":
+        if compute == "serverless" or role == "monitoring":
             dependencies = job["environments"][0]["spec"]["dependencies"]
             assert "-r " + requirements_path in dependencies
             assert "../dist/skyulf/*.whl" in dependencies

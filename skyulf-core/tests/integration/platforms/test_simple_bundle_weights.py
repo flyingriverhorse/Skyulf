@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     split_labeled_snapshot,
     training_spec_payload,
@@ -70,9 +70,9 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
     from test_simple_bundle_weight_config import _load, _project
 
     from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_retraining import fit_candidate
-    from skyulf.integrations.databricks.local_workflow import training_spec
+    from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
+    from skyulf.integrations.databricks.training.fitting.local_retraining import fit_candidate
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     workflow_config.update(
         training_window_mode="fixed_window" if strategy == "temporal" else "full_snapshot",
@@ -151,8 +151,10 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
             prepared_data=(frame, train, heldout, skipped),
         )
         if layout == "model_competition":
-            from skyulf.integrations.databricks import local_retraining
-            from skyulf.integrations.databricks.competition_training import fit_training_pipeline
+            from skyulf.integrations.databricks.training.competition.competition_training import (
+                fit_training_pipeline,
+            )
+            from skyulf.integrations.databricks.training.fitting import local_retraining
 
             monkeypatch.setattr(local_retraining, "log_fitted_candidate", MagicMock())
             monkeypatch.setattr(
@@ -187,9 +189,11 @@ def test_competition_temporal_folds_use_actual_weight_permutation(
     import polars as pl
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.competition_evaluation import evaluate_competition_candidate
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.training.competition.competition_evaluation import (
+        evaluate_competition_candidate,
+    )
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     frame = pd.DataFrame({"x": np.arange(80, dtype=float), "y": np.arange(80) * 2.0})
     config = {"preprocessing": [], "modeling": {"type": "linear_regression", "params": {}}}
@@ -237,7 +241,7 @@ def test_competition_temporal_folds_use_actual_weight_permutation(
     )
     assert len(seen) >= 3
     assert report["mean"] == pytest.approx(0, abs=1e-8)
-    from skyulf.integrations.databricks.local_cv import evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.local_cv import evaluate_training_cv
 
     diagnostics = evaluate_training_cv(
         native, config, cv, target_column="y", event_column="event", sample_weight=weights
@@ -295,7 +299,7 @@ def test_weight_only_changes_are_not_fresh_but_manual_split_uses_new_weights(mon
     """Weight edits must not trigger automatic data freshness but must affect manual training."""
     from test_retraining_data import _assess, freshness
 
-    from skyulf.integrations.databricks.local_workflow import training_spec
+    from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
 
     fixture: Any = freshness
     state = fixture.__wrapped__(monkeypatch)
@@ -340,9 +344,9 @@ def test_bundle_search_transports_weights_through_temporal_refits(tmp_path, monk
     """Bundle search and final refit must receive row weights without exposing the source column."""
     from datetime import UTC, datetime
 
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_retraining import fit_candidate
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.fitting.local_retraining import fit_candidate
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     spec = _spec(
         split_strategy="temporal",
@@ -409,7 +413,7 @@ def test_bundle_search_transports_weights_through_temporal_refits(tmp_path, monk
 
 def test_legacy_pinned_request_accepts_new_inactive_spec_defaults():
     """Resuming an old frozen request must tolerate newly introduced inactive optional fields."""
-    from skyulf.integrations.databricks.lifecycle_tasks import _validate_pinned_spec
+    from skyulf.integrations.databricks.jobs.lifecycle.lifecycle_tasks import _validate_pinned_spec
 
     current = training_spec_payload(_spec(weight_column=None, reserved_weight_columns=()), "pandas")
     current["reserved_weight_columns"] = []

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.workflow_config import preview_workflow_config
+from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
 
 
 def test_preview_preserves_step_order_and_separates_cv_from_holdout(workflow_config):

@@ -1,3 +1,6 @@
+{{- if and (eq .inference_mode "spark") (eq .engine "polars") -}}
+{{- template "ERROR_inference_mode_spark_requires_engine_pandas" . -}}
+{{- end -}}
 {{- $competition := eq .training_layout "model_competition" -}}
 {{- $cv_enabled := or $competition (eq .cv_enabled "true") -}}
 {{- $temporal_cv := and $cv_enabled (or (eq .cv_type "time_series_split") (and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))) -}}
@@ -16,13 +19,17 @@
 {{end}}
   "task": "{{.task}}",
   "engine": "{{.engine}}",
+  "inference_mode": "{{.inference_mode}}",
+  "spark_udf_env_manager": "{{if and (eq .inference_mode "spark") (eq .compute_mode "serverless")}}local{{else}}virtualenv{{end}}",
+  "spark_udf_prediction_batch_rows": 10000,
   "split_strategy": "{{$split}}",
   "training_window_mode": "{{$window}}",
-  "lookback_days": {{if eq $window "rolling_days"}}{{.lookback_days}}{{else}}null{{end}},
-  "holdout_days": {{if and (eq $window "rolling_days") (eq $split "temporal")}}{{.holdout_days}}{{else}}null{{end}},
-  "window_timezone": {{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}},
-  "holdout_months": {{if and (eq $window "rolling_calendar") (eq $split "temporal")}}{{.holdout_months}}{{else}}null{{end}},
-  "result_availability_lag_hours": {{if eq .filter_unavailable_results "true"}}{{.result_availability_lag_hours}}{{else}}null{{end}},
+{{if eq $window "rolling_days"}}  "lookback_days": {{.lookback_days}},
+{{end}}{{if and (eq $window "rolling_days") (eq $split "temporal")}}  "holdout_days": {{.holdout_days}},
+{{end}}{{if eq $window "rolling_calendar"}}  "window_timezone": "{{.window_timezone}}",
+{{end}}{{if and (eq $window "rolling_calendar") (eq $split "temporal")}}  "holdout_months": {{.holdout_months}},
+{{end}}{{if and (eq .filter_unavailable_results "true") (ne .result_availability_lag_hours "null")}}  "result_availability_lag_hours": {{.result_availability_lag_hours}},
+{{end}}
   "test_size": {{.test_size}},
   "random_state": {{.random_state}},
   "stratify": {{.stratify}},
@@ -32,10 +39,12 @@
 {{end}}
   "cv_type": "{{.cv_type}}",
   "cv_nested_type": "{{.cv_nested_type}}",
-  "cv_group_column": {{if .cv_group_column}}"{{.cv_group_column}}"{{else}}null{{end}},
+{{if .cv_group_column}}  "cv_group_column": "{{.cv_group_column}}",
+{{end}}
   "cv_gap": {{.cv_gap}},
-  "cv_test_size": {{.cv_test_size}},
-  "cv_max_train_size": {{.cv_max_train_size}},
+{{if ne .cv_test_size "null"}}  "cv_test_size": {{.cv_test_size}},
+{{end}}{{if ne .cv_max_train_size "null"}}  "cv_max_train_size": {{.cv_max_train_size}},
+{{end}}
   "cv_shuffle": {{if or (eq .cv_type "time_series_split") (and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))}}false{{else if eq .cv_type "shuffle_split"}}true{{else}}{{.cv_shuffle}}{{end}},
   "cv_random_state": {{.cv_random_state}},
   "training_sample_rows": {{.training_sample_rows}},
@@ -43,7 +52,8 @@
   "filter_unavailable_results": {{.filter_unavailable_results}},
   "training_table": "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}",
   "training_version": {{.training_version}},
-  "monthly_lookback_months": {{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}},
+{{if eq $window "rolling_calendar"}}  "monthly_lookback_months": {{.monthly_lookback_months}},
+{{end}}
   "score_source_table": "{catalog}.{input_schema}.{{if .score_source_table_name}}{{.score_source_table_name}}{{else}}{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}{{end}}",
   "prediction_table": "{catalog}.{output_schema}.{{if .prediction_table_name}}{{.prediction_table_name}}{{else}}{{.project_name}}_predictions{{end}}{resource_suffix}",
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
@@ -58,14 +68,16 @@
   "record_key_columns": [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .record_key_columns -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}],
   "input_columns": [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .input_columns -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}],
   "target_column": "{{.target_column}}",
-  "event_column": {{if .event_column}}"{{.event_column}}"{{else}}null{{end}},
-  "result_available_at_column": {{if .result_available_at_column}}"{{.result_available_at_column}}"{{else}}null{{end}},
+{{if .event_column}}  "event_column": "{{.event_column}}",
+{{end}}{{if .result_available_at_column}}  "result_available_at_column": "{{.result_available_at_column}}",
+{{end}}
   "event_time_parsing": {"format": {{if .event_time_format}}"{{.event_time_format}}"{{else}}null{{end}}, "timezone": {{if .event_time_timezone}}"{{.event_time_timezone}}"{{else}}null{{end}}, "date_only": "{{.event_date_only}}"},
   "result_time_parsing": {"format": {{if .result_time_format}}"{{.result_time_format}}"{{else}}null{{end}}, "timezone": {{if .result_time_timezone}}"{{.result_time_timezone}}"{{else}}null{{end}}, "date_only": "{{.result_date_only}}"},
-  "start": {{if .start}}"{{.start}}"{{else}}null{{end}},
-  "holdout_start": {{if .holdout_start}}"{{.holdout_start}}"{{else}}null{{end}},
-  "cutoff": {{if .cutoff}}"{{.cutoff}}"{{else}}null{{end}},
-  "result_cutoff": {{if .result_cutoff}}"{{.result_cutoff}}"{{else}}null{{end}},
+{{if .start}}  "start": "{{.start}}",
+{{end}}{{if .holdout_start}}  "holdout_start": "{{.holdout_start}}",
+{{end}}{{if .cutoff}}  "cutoff": "{{.cutoff}}",
+{{end}}{{if .result_cutoff}}  "result_cutoff": "{{.result_cutoff}}",
+{{end}}
   "max_rows": {{.max_rows}},
   "max_input_mb": {{.max_input_mb}},
   "metric": "{{if eq .task "classification"}}{{.classification_metric}}{{else}}{{.regression_metric}}{{end}}",

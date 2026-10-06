@@ -10,12 +10,12 @@ from uuid import uuid4
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     read_training_snapshot,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.training_dates import TrainingDateSpec
 
 
 def _spec(table, **changes):

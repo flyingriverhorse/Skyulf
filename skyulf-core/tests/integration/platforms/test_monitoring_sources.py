@@ -8,7 +8,9 @@ import pytest
 
 def test_cutoff_requires_aware_utc_and_half_open_window():
     """Host timezone and future windows must not silently change observed populations."""
-    from skyulf.integrations.databricks.monitoring_sources import observation_window
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        observation_window,
+    )
 
     end = datetime(2026, 10, 1, tzinfo=UTC)
     assert observation_window(end, None, end)[0].day == 30
@@ -20,7 +22,9 @@ def test_cutoff_requires_aware_utc_and_half_open_window():
 
 def test_receipts_require_exact_source_target_and_model():
     """A matching run id from another source or model cannot provide feature provenance."""
-    from skyulf.integrations.databricks.monitoring_sources import validate_receipt
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        validate_receipt,
+    )
 
     receipt = {
         "run_id": "abc",
@@ -43,7 +47,9 @@ def test_receipts_require_exact_source_target_and_model():
 
 def test_duplicate_receipts_are_rejected():
     """One prediction run must resolve to exactly one source snapshot."""
-    from skyulf.integrations.databricks.monitoring_sources import receipt_index
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        receipt_index,
+    )
 
     rows = [
         {"version": 1, "timestamp": datetime(2026, 10, 1), "userMetadata": '{"run_id":"x"}'},
@@ -55,7 +61,9 @@ def test_duplicate_receipts_are_rejected():
 
 def test_maintenance_metadata_is_ignored_but_unreceipted_writes_fail():
     """Opaque maintenance text cannot hide data changes or prevent valid receipt reads."""
-    from skyulf.integrations.databricks.monitoring_sources import receipt_index
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        receipt_index,
+    )
 
     maintenance = {"version": 2, "operation": "OPTIMIZE", "userMetadata": "compaction"}
     receipt = {
@@ -75,8 +83,12 @@ def test_late_labels_do_not_move_prediction_snapshot_past_window(monkeypatch):
     """Later prediction replacement cannot erase the population selected for an earlier window."""
     import pandas as pd
 
-    from skyulf.integrations.databricks import monitoring_sources as sources
-    from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_sources as sources,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
 
     end = datetime(2026, 10, 1, tzinfo=UTC)
     snapshot = Mock(return_value=4)

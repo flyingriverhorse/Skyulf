@@ -1,0 +1,480 @@
+"""Request one guarded training workflow for eligible drift or performance loss."""
+
+import json
+import math
+from collections.abc import Callable
+from datetime import UTC, datetime
+from itertools import islice
+from pathlib import Path
+from typing import Any
+
+from .....profiling._drift_evidence import SIGNIFICANCE_LEVEL, DriftEvidence
+from ...observability.monitoring.monitoring_config import (
+    MonitorConfig,
+    json_digest,
+    parse_performance_policies,
+)
+from ...observability.monitoring.monitoring_output import load_observation
+from ...observability.monitoring.monitoring_registration import monitoring_destination
+from ...observability.monitoring.monitoring_store import load_enrolled_models
+from ..shared.job_output import output_table
+from ..shared.job_runtime import read_notebook_config
+
+
+def retraining_policy(values: dict[str, str]) -> dict:
+    """Require an explicit opt-in and bounded finite submission controls."""
+    development = values.get("monitoring_deployment_mode") == "development"
+    mode = "disabled" if development else values.get("on_drift", "disabled")
+    if mode not in {"disabled", "retrain"}:
+        raise ValueError("on_drift must be disabled or retrain.")
+    cooldown = float(values.get("on_drift_cooldown_hours", "24"))
+    minimum = int(values.get("on_drift_min_new_training_rows", "1"))
+    if not math.isfinite(cooldown) or cooldown < 0 or minimum < 1:
+        raise ValueError("On-drift cooldown must be finite/nonnegative and minimum rows positive.")
+    performance = (
+        {}
+        if development
+        else parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    )
+    performance_enabled = any(item["mode"] == "retrain" for item in performance.values())
+    return {
+        "mode": "retrain" if mode == "retrain" or performance_enabled else "disabled",
+        "drift_enabled": mode == "retrain",
+        "cooldown_hours": cooldown,
+        "minimum_rows": minimum,
+    }
+
+
+def _broken_input(item: dict) -> bool:
+    """Identify corruption independently of performance and distribution changes."""
+    return bool(item.get("has_issue")) and (
+        item.get("category") == "quality"
+        or item.get("metric_name") in {"schema_missing", "type_drift"}
+    )
+
+
+def _evidence_probabilities_match(evidence: DriftEvidence, family_size: int) -> bool:
+    """Require finite probabilities and the current report's declared correction semantics."""
+    probabilities = (evidence.p_value, evidence.adjusted_p_value)
+    if any(
+        value is None or not math.isfinite(value) or not 0 <= value <= 1 for value in probabilities
+    ):
+        return False
+    assert evidence.p_value is not None and evidence.adjusted_p_value is not None
+    expected = min(1.0, evidence.p_value * family_size)
+    return (
+        evidence.significance_level == SIGNIFICANCE_LEVEL
+        and math.isclose(evidence.adjusted_p_value, expected, rel_tol=1e-12, abs_tol=0.0)
+        and (evidence.status == "supported") == (evidence.adjusted_p_value <= SIGNIFICANCE_LEVEL)
+    )
+
+
+def _valid_statistical_evidence(row: dict, family_size: int) -> bool:
+    """Validate complete known evidence rather than accepting an old OR-only issue flag."""
+    try:
+        evidence = DriftEvidence.model_validate(row.get("evidence"), strict=True)
+    except ValueError:
+        return False
+    tests = {
+        "ks_2samp",
+        "ks_dkw_union_bound",
+        "fisher_exact",
+        "fisher_category_bonferroni",
+        "chi_square",
+        "constant_categories",
+    }
+    if evidence.test not in tests or evidence.status not in {"supported", "not_detected"}:
+        return False
+    return (
+        min(evidence.reference_count, evidence.current_count) >= 2
+        and _evidence_probabilities_match(evidence, family_size)
+        and row.get("value") == evidence.adjusted_p_value
+        and row.get("threshold") == SIGNIFICANCE_LEVEL
+        and row.get("has_issue") is False
+    )
+
+
+def _statistical_rows(checks: list[dict]) -> dict[str, dict] | None:
+    """Match exactly one statistical result to each feature without accepting duplicate rows."""
+    names = [item.get("column_name") for item in checks]
+    if any(not isinstance(column, str) or not column for column in names):
+        return None
+    columns = set(names)
+    rows = [item for item in checks if item.get("metric_name") == "statistical_evidence"]
+    evidence = {item["column_name"]: item for item in rows}
+    if len(rows) != len(columns) or set(evidence) != columns:
+        return None
+    return evidence
+
+
+def _complete_statistical_evidence(checks: list[dict]) -> bool:
+    """Require one supported or explicitly nonsignificant test for every measured feature."""
+    if not checks or any(item.get("status") != "measured" for item in checks):
+        return False
+    evidence = _statistical_rows(checks)
+    if not evidence:
+        return False
+    if not all(_valid_statistical_evidence(item, len(evidence)) for item in evidence.values()):
+        return False
+    return all(
+        not item.get("has_issue")
+        or evidence[item["column_name"]]["evidence"]["status"] == "supported"
+        for item in checks
+    )
+
+
+def _drift_metrics_decision(metrics: list[dict]) -> str:
+    """Separate distribution changes from broken or unmeasured feature inputs."""
+    if any(_broken_input(item) for item in metrics):
+        return "quality_issue"
+    checks = [item for item in metrics if item.get("category") == "drift"]
+    if not _complete_statistical_evidence(checks):
+        return "incomplete_drift"
+    return "ready" if any(item.get("has_issue") for item in checks) else "no_drift"
+
+
+def observation_decision(row: dict, config: MonitorConfig, now: datetime) -> str:
+    """Admit only a recent observation for the currently enrolled concrete model."""
+    if not config.enabled:
+        return "disabled"
+    if (
+        row["config_digest"] != json_digest(config.payload())
+        or row["model_version"] != config.model_version
+        or row["monitor_id"] != config.monitor_id
+    ):
+        return "superseded"
+    observed = row.get("observed_at")
+    if observed is None:
+        return "stale_observation"
+    # Spark TIMESTAMP values returned to Python are naive UTC in these notebooks.
+    observed = observed.replace(tzinfo=UTC) if observed.tzinfo is None else observed
+    age = (now - observed).total_seconds()
+    if age < 0 or age > config.expected_interval_hours * 3600:
+        return "stale_observation"
+    if row["status"] != "drift":
+        return {"degraded": "incomplete_drift"}.get(row["status"], "no_drift")
+    return _drift_metrics_decision(json.loads(row["report_json"])["metrics"])
+
+
+def _training_workflows(values: dict[str, str]) -> dict[str, dict]:
+    """Load the same target-bound Python recipes used by the training job."""
+    from ...projects.project import load_project_workflow  # noqa: PLC0415
+    from ..training.branch_notebook import load_training_branch_configs  # noqa: PLC0415
+
+    base = read_notebook_config(values)
+    if base.get("training_layout") == "multi_target":
+        branches = load_training_branch_configs(values)
+        return {config["model_name"]: config for config in branches.values()}
+    path = Path(values["config_path"]).parent.parent / "src/features"
+    config = load_project_workflow(base, path)
+    return {config["model_name"]: config}
+
+
+def _current_configs(spark: Any, namespace: str, values: dict[str, str]) -> dict:
+    """Keep independent repositories and environments outside this job's ownership."""
+    configs = [MonitorConfig.from_dict(item) for item in load_enrolled_models(spark, namespace)]
+    return {
+        item.monitor_id: item
+        for item in configs
+        if (item.environment, item.project)
+        == (values["monitoring_environment"], values["monitoring_project"])
+    }
+
+
+def _candidate(
+    spark: Any,
+    row: dict,
+    config: MonitorConfig,
+    workflow: dict,
+    now: datetime,
+    minimum: int,
+    *,
+    drift_enabled: bool = True,
+) -> dict:
+    """Require fresh rows in the actual training partition, never fit during scoring."""
+    from ...data.training.retraining_data import assess_training_data  # noqa: PLC0415
+    from ...observability.monitoring.performance.performance_retraining import (  # noqa: PLC0415
+        performance_decision,
+    )
+
+    drift = observation_decision(row, config, now) if drift_enabled else "disabled"
+    performance = performance_decision(row, config, now)
+    triggers = [
+        name for name, state in (("drift", drift), ("performance", performance)) if state == "ready"
+    ]
+    status = "ready" if triggers else (drift if drift_enabled else performance)
+    result = {
+        "model_name": config.model_name,
+        "report_id": row["report_id"],
+        "status": status,
+        "monitor_id": config.monitor_id,
+        "config_digest": row["config_digest"],
+        "triggers": triggers,
+        "drift_reason": drift,
+        "performance_reason": performance,
+        "performance_monitored": bool(
+            config.performance_policy and config.performance_policy.get("mode") != "off"
+        ),
+    }
+    if status != "ready":
+        return result
+    evidence = assess_training_data(spark, config, workflow, now)
+    result.update(evidence)
+    if evidence["changed_rows"] < minimum:
+        result["status"] = "no_new_training_data"
+    return result
+
+
+def _collect_candidates(
+    spark: Any, references: list[dict], namespace: str, values: dict, now: datetime, minimum: int
+) -> list[dict]:
+    """Bind every observation to this project's current inventory and training recipe."""
+    configs = _current_configs(spark, namespace, values)
+    workflows = _training_workflows(values)
+    results = []
+    for reference in references:
+        if reference.get("namespace") != namespace:
+            raise ValueError("On-drift observation belongs to a different monitoring namespace.")
+        row = load_observation(spark, reference)
+        config = configs.get(row["monitor_id"])
+        if config is None or config.model_name not in workflows:
+            raise ValueError("On-drift observation does not belong to this training project.")
+        results.append(
+            _candidate(
+                spark,
+                row,
+                config,
+                workflows[config.model_name],
+                now,
+                minimum,
+                drift_enabled=values.get("on_drift", "disabled") == "retrain",
+            )
+        )
+    return results
+
+
+def _submit_candidates(
+    spark: Any,
+    workspace: Any,
+    namespace: str,
+    values: dict,
+    policy: dict,
+    results: list[dict],
+    now: datetime,
+    *,
+    preview_only: bool = False,
+) -> dict:
+    """Submit the whole configured train job once even when several branches drift."""
+    from ...lifecycle.retraining_requests import submit_retraining  # noqa: PLC0415
+
+    ready = [item for item in results if item["status"] == "ready"]
+    if not ready:
+        return {"status": "not_requested", "models": results}
+    current = _current_configs(spark, namespace, values)
+    if any(
+        item["monitor_id"] not in current
+        or json_digest(current[item["monitor_id"]].payload()) != item["config_digest"]
+        for item in ready
+    ):
+        return {"status": "superseded", "models": results}
+    job_id = _training_job_id(workspace, values)
+    identity = sorted(
+        {
+            (
+                item["model_name"],
+                item["baseline_model_version"],
+                item["source_table"],
+                item["content_sha256"],
+            )
+            for item in ready
+        }
+    )
+    request_id = json_digest({"job_id": job_id, "training_data": identity})
+    result = submit_retraining(
+        spark,
+        workspace,
+        namespace=namespace,
+        job_id=job_id,
+        request_id=request_id,
+        evidence={"models": results},
+        cooldown_hours=policy["cooldown_hours"],
+        now=now,
+        **({"preview_only": True} if preview_only else {}),
+    )
+    return {**result, "models": results}
+
+
+def _training_job_name(values: dict[str, str]) -> str:
+    """Retain the current target's actual prefix when locating its paired train job."""
+    name = values["train_job_name"]
+    score_name = values.get("score_job_name")
+    if score_name is None:
+        return name
+    score_suffix = name.removesuffix("_train") + "_score"
+    if not name.endswith("_train") or not score_name.endswith(score_suffix):
+        raise ValueError("On-drift requires the paired generated score/train job names.")
+    return score_name[: -len(score_suffix)] + name
+
+
+def _training_job_id(workspace: Any, values: dict[str, str]) -> int:
+    """Resolve a unique deployed name without making the Bundle job graph cyclic."""
+    name = _training_job_name(values)
+    matches = list(islice(workspace.jobs.list(name=name, limit=2), 2))
+    if len(matches) != 1:
+        raise ValueError("On-drift requires exactly one train job with the configured name.")
+    job = matches[0]
+    if (
+        type(job.job_id) is not int
+        or job.job_id <= 0
+        or job.settings is None
+        or job.settings.name != name
+    ):
+        raise ValueError("On-drift requires the exact train job name and a positive job ID.")
+    return job.job_id
+
+
+def run_retraining_notebook(
+    spark: Any,
+    dbutils: Any,
+    *,
+    workspace: Any = None,
+    display_html: Callable[[str], Any] | None = None,
+) -> dict:
+    """Evaluate both trigger policies and expose one guarded asynchronous training request."""
+    values = dbutils.widgets.getAll()
+    policy = retraining_policy(values)
+    result: dict = {"status": "disabled"}
+    if policy["mode"] == "retrain":
+        result = _run_enabled(spark, dbutils, workspace, values, policy)
+    dbutils.jobs.taskValues.set(key="retraining_result", value=result)
+    if display_html is not None:
+        display_html(
+            "<h2>Retraining after drift or performance degradation</h2>"
+            + output_table(
+                ("Decision", "Training run"), [(result["status"], result.get("run_id", ""))]
+            )
+            + _retraining_policy_explanation(values, policy)
+            + _retraining_model_table(result)
+            + "<p>Training uses the existing quality and approval policy. "
+            "Actual targets must already be present in the configured training source.</p>"
+        )
+    return result
+
+
+def _retraining_policy_explanation(values: dict, policy: dict) -> str:
+    """Explain disabled automation from local settings without evaluating model eligibility."""
+    if policy["mode"] != "disabled":
+        return ""
+    if values.get("monitoring_deployment_mode") == "development":
+        return "<p>Automatic retraining is disabled in development mode.</p>"
+    performance = parse_performance_policies(values.get("monitoring_performance_policies", "{}"))
+    if any(item["mode"] == "report" for item in performance.values()):
+        return (
+            "<p>Performance monitoring is report-only and automatic retraining for drift is disabled. "
+            "Open monitoring_report for the saved evidence. No training request is made.</p>"
+        )
+    return "<p>Both automatic retraining triggers are disabled. No training request is made.</p>"
+
+
+def _retraining_model_table(result: dict) -> str:
+    """Show each signal's eligibility separately from the shared submission guard."""
+    if not result.get("models"):
+        return ""
+    return output_table(
+        (
+            "Model",
+            "Drift eligibility",
+            "Performance loss eligibility",
+            "Eligible triggers",
+            "Model decision",
+            "New or changed training rows",
+        ),
+        [
+            (
+                item["model_name"],
+                item.get("drift_reason", "unavailable"),
+                item.get("performance_reason", "unavailable"),
+                ", ".join(item.get("triggers", [])),
+                item["status"],
+                item.get("changed_rows", ""),
+            )
+            for item in result.get("models", [])
+        ],
+    )
+
+
+def run_retraining_check_notebook(
+    spark: Any,
+    dbutils: Any,
+    *,
+    workspace: Any = None,
+    display_html: Callable[[str], Any] | None = None,
+) -> dict:
+    """Publish advisory eligibility for a visible If/else task without starting training."""
+    values = dbutils.widgets.getAll()
+    policy = retraining_policy(values)
+    result: dict = {"status": "disabled"}
+    if policy["mode"] == "retrain":
+        result = _run_enabled(spark, dbutils, workspace, values, policy, preview_only=True)
+    dbutils.jobs.taskValues.set(key="retraining_needed", value=result["status"] == "ready")
+    dbutils.jobs.taskValues.set(key="retraining_check", value=result)
+    if display_html is not None:
+        rows = [
+            (item["model_name"], item["status"], item.get("changed_rows", ""))
+            for item in result.get("models", [])
+        ]
+        display_html(
+            "<h2>Retraining eligibility</h2>"
+            + output_table(("Decision",), [(result["status"],)])
+            + output_table(("Model", "Reason", "New training rows"), rows)
+            + "<p>The true branch rechecks these guards before submitting training.</p>"
+        )
+    return result
+
+
+def _run_enabled(
+    spark: Any,
+    dbutils: Any,
+    workspace: Any,
+    values: dict,
+    policy: dict,
+    *,
+    preview_only: bool = False,
+) -> dict:
+    """Validate the completed monitoring task before any remote training request."""
+    from databricks.sdk import WorkspaceClient  # noqa: PLC0415
+
+    namespace = monitoring_destination(values)
+    if namespace is None or values.get("monitoring_enabled") != "true":
+        raise ValueError("on_drift=retrain requires enabled monitoring and a central namespace.")
+    reference = dbutils.jobs.taskValues.get(taskKey="monitor_model", key="monitoring_reference")
+    if reference.get("status") != "ready":
+        return {"status": reference.get("status", "no_observation")}
+    now = datetime.now(UTC)
+    results = _collect_candidates(
+        spark,
+        reference.get("observations", [reference]),
+        namespace,
+        values,
+        now,
+        policy["minimum_rows"],
+    )
+    from ...observability.monitoring.performance.performance_actions import (  # noqa: PLC0415
+        initialize_performance_actions,
+        record_performance_actions,
+    )
+
+    if any(item.get("performance_monitored") for item in results):
+        initialize_performance_actions(spark, namespace)
+    result = _submit_candidates(
+        spark,
+        workspace or WorkspaceClient(),
+        namespace,
+        values,
+        policy,
+        results,
+        now,
+        preview_only=preview_only,
+    )
+    record_performance_actions(spark, namespace, result, now, preview_only=preview_only)
+    return result

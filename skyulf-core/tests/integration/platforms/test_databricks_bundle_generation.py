@@ -1,4 +1,4 @@
-"""Opt-in real CLI generation checks for the deployable two-job operator graph."""
+"""Opt-in real CLI generation checks for the deployable three-job operator graph."""
 
 import json
 import os
@@ -122,18 +122,15 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
     config = _read_validated_config(project)
     assert config["auto_rebuild_on_cdf_expiry"] is (enabled == "true")
     jobs = _read_jobs(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
     if enabled == "false":
         assert set(tasks) == {
             "score",
             "monitoring_allowed",
+            "prepare_monitoring",
+            "monitoring_ready",
             "monitor_model",
-            "drift_report",
-            "check_retraining",
-            "retraining_needed",
-            "retrain_on_drift",
-            "retraining_skipped",
         }
         return
     assert set(tasks) == {
@@ -142,12 +139,9 @@ def test_cdf_recovery_generates_conditional_score_graph(tmp_path, layout, comput
         "recover_predictions",
         "scoring_report",
         "monitoring_allowed",
+        "prepare_monitoring",
+        "monitoring_ready",
         "monitor_model",
-        "drift_report",
-        "retrain_on_drift",
-        "check_retraining",
-        "retraining_needed",
-        "retraining_skipped",
     }
     assert tasks["recovery_needed"]["depends_on"] == [{"task_key": "score"}]
     assert tasks["recovery_needed"]["condition_task"] == {
@@ -358,7 +352,7 @@ def test_shap_generation_matches_training_dependencies(tmp_path, layout, compute
 def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mode):
     """Initializer choices must produce callable settings with usable custom consumer names."""
     from skyulf.inference.project_code import load_project_module
-    from skyulf.integrations.databricks.model_set_project import (
+    from skyulf.integrations.databricks.model_sets.model_set_project import (
         capture_set_rules,
         load_project_model_set,
     )
@@ -444,8 +438,12 @@ def _read_jobs(project):
     """Keep each job independently parseable with stable resource keys and no duplicates."""
     jobs = {}
     resources = project / "resources"
-    assert {path.name for path in resources.glob("*.yml")} == {"train.job.yml", "score.job.yml"}
-    for name in ("train", "score"):
+    assert {path.name for path in resources.glob("*.yml")} == {
+        "train.job.yml",
+        "score.job.yml",
+        "monitoring.job.yml",
+    }
+    for name in ("train", "score", "monitoring"):
         document = yaml.safe_load((resources / f"{name}.job.yml").read_text())
         resource_jobs = document["resources"]["jobs"]
         assert set(resource_jobs) == {name}
@@ -466,7 +464,7 @@ def _synced_sources(project, bundle):
 
 def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
     """Generated relative imports, preview, hooks and all job paths must agree."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.preprocessing.function_steps import FITTED_STEP
 
     project = _generate_project(tmp_path)
@@ -609,7 +607,7 @@ def test_cli_rejects_invalid_limits_and_column_text(tmp_path, field, value):
 
 def _read_modeling(project):
     """Resolve the generated Python settings through the actual project loader."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     config = json.loads((project / "config/workflow.json").read_text())
     return load_project_workflow(config, project / "src/features")["pipeline"]["modeling"]
@@ -617,15 +615,15 @@ def _read_modeling(project):
 
 def _load_project_config(project, config):
     """Resolve the model file before checking the training contract, as notebooks do."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     return load_project_workflow(config, project / "src/features")
 
 
 def _read_validated_config(project, *, action="score"):
     """Check generated settings against the same preflight used by the notebook."""
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = json.loads((project / "config/workflow.json").read_text())
     resolved = resolve_target_config(
@@ -638,7 +636,7 @@ def _read_validated_config(project, *, action="score"):
             "resource_suffix": "_dev",
         },
     )
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     loaded = load_project_workflow(resolved, project / "src/features")
     validate_workflow_config(loaded, action=action)
@@ -647,7 +645,9 @@ def _read_validated_config(project, *, action="score"):
 
 @pytest.mark.parametrize("train_mode", ["manual", "scheduled"])
 @pytest.mark.parametrize("score_mode", ["manual", "scheduled"])
-def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train_mode, score_mode):
+def test_cli_independent_schedules_preserve_shared_three_job_graph(
+    tmp_path, train_mode, score_mode
+):
     """Each clock is optional and target-overridable without duplicating score handoff."""
     project = _generate_project(
         tmp_path,
@@ -663,7 +663,7 @@ def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train
     variables = _read_bundle(project)["variables"]
     jobs = _read_jobs(project)
     config = _read_validated_config(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     synced_notebooks = _synced_sources(project, bundle)
     assert all((project / path).is_file() for path in synced_notebooks)
@@ -709,7 +709,7 @@ def test_cli_independent_schedules_preserve_shared_two_job_graph(tmp_path, train
 
 @pytest.mark.parametrize("strategy,holdout", [("random", None), ("temporal", 2)])
 def test_cli_emits_integer_window_controls_only_when_active(tmp_path, strategy, holdout):
-    """Initializer numeric text must render as integer policy values or inactive nulls."""
+    """Initializer numeric text renders integer policies only when they are active."""
     project = _generate_project(
         tmp_path,
         training_window_mode="rolling_calendar",
@@ -722,7 +722,10 @@ def test_cli_emits_integer_window_controls_only_when_active(tmp_path, strategy, 
         result_availability_lag_hours="48",
     )
     config = _read_validated_config(project)
-    assert config["holdout_months"] == holdout
+    if holdout is None:
+        assert "holdout_months" not in config
+    else:
+        assert config["holdout_months"] == holdout
     assert config["result_availability_lag_hours"] == 48
     assert type(config["result_availability_lag_hours"]) is int
 
@@ -730,8 +733,8 @@ def test_cli_emits_integer_window_controls_only_when_active(tmp_path, strategy, 
 def test_cli_default_window_controls_are_inactive(tmp_path):
     """Date-free default projects must not activate irrelevant holdout or maturity policies."""
     config = _read_validated_config(_generate_project(tmp_path))
-    assert config["holdout_months"] is None
-    assert config["result_availability_lag_hours"] is None
+    assert "holdout_months" not in config
+    assert "result_availability_lag_hours" not in config
 
 
 def test_cli_plain_column_lists_preserve_order_and_empty_preprocessing(tmp_path):
@@ -815,7 +818,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
 
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-    from skyulf.integrations.databricks.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
     model = "random_forest_classifier" if task == "classification" else "random_forest_regressor"
     project = _generate_project(
@@ -833,7 +836,8 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     )
     config = _read_validated_config(project)
     jobs = _read_jobs(project)
-    for role, job in jobs.items():
+    for role in ("train", "score"):
+        job = jobs[role]
         for entry in job["tasks"]:
             if "notebook_task" in entry:
                 assert entry["max_retries"] == (
@@ -861,7 +865,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     source_path = project / "src/features/preprocessing.py"
     with source_path.open("a", encoding="utf-8") as stream:
         stream.write("\n\ndef build_preprocessing():\n    return " + repr(steps) + "\n")
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     config = load_project_workflow(config, source_path.parent)
     assert config["cv_enabled"] is True and config["cv_folds"] == 3
@@ -926,7 +930,7 @@ def test_cli_random_window_and_non_utc_source_rules(tmp_path):
     )
     config = _read_validated_config(project)
     assert config["training_window_mode"] == "fixed_window"
-    assert config["monthly_lookback_months"] is None and config["window_timezone"] is None
+    assert "monthly_lookback_months" not in config and "window_timezone" not in config
     assert config["event_time_parsing"] == {
         "format": "%d/%m/%Y %H:%M",
         "timezone": "Europe/Copenhagen",
@@ -952,7 +956,7 @@ def test_cli_initializes_task_without_stale_training_inputs(tmp_path, task, mode
     assert _read_modeling(project)["base_model"] == {"type": model, "params": {}}
     assert config["metric"] == metric
     assert config["training_version"] is None
-    assert all(config[key] is None for key in ("start", "holdout_start", "cutoff"))
+    assert all(key not in config for key in ("start", "holdout_start", "cutoff"))
     assert config["record_key_columns"] == ["entity_id"]
     assert config["input_columns"] == ["feature_value"]
     assert config["training_table"] == "{catalog}.{input_schema}.sm33_generated_source"
@@ -1035,7 +1039,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     )
     jobs = _read_jobs(project)
     config = _read_validated_config(project)
-    assert set(jobs) == {"train", "score"}
+    assert set(jobs) == {"train", "score", "monitoring"}
     for job in jobs.values():
         assert job["max_concurrent_runs"] == 1 and job["queue"]["enabled"] is True
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
@@ -1157,8 +1161,8 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
 @pytest.mark.parametrize("availability", [False, True])
 def test_cli_generates_date_free_training_contract(tmp_path, engine, task, availability):
     """The real initializer must support date-free training and independent delayed results."""
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     project = _generate_project(
         tmp_path,
@@ -1184,25 +1188,27 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
     validate_workflow_config(_load_project_config(project, resolved), action="train")
     assert config["split_strategy"] == "random"
     assert config["training_window_mode"] == "full_snapshot"
-    assert config["window_timezone"] is None
+    assert "window_timezone" not in config
     assert config["cv_enabled"] is False and config["cv_folds"] == 5
     assert config["training_sample_rows"] is None
     assert config["engine"] == engine
     assert config["test_size"] == 0.2 and config["random_state"] == 42
     assert config["stratify"] == (task == "classification")
-    assert config["event_column"] is None
+    assert "event_column" not in config
     assert all(
-        config[key] is None
-        for key in ("start", "holdout_start", "cutoff", "monthly_lookback_months")
+        key not in config for key in ("start", "holdout_start", "cutoff", "monthly_lookback_months")
     )
     assert config["filter_unavailable_results"] == availability
-    assert config["result_available_at_column"] == ("confirmed_at" if availability else None)
+    if availability:
+        assert config["result_available_at_column"] == "confirmed_at"
+    else:
+        assert "result_available_at_column" not in config
 
 
 def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
     """Initialization must not silently discard a supplied date mapping in random mode."""
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
     config = json.loads((project / "config/workflow.json").read_text())
@@ -1236,8 +1242,8 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
 )
 def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
     """Published examples must render and validate as usable manual training policies."""
-    from skyulf.integrations.databricks.local_workflow import resolve_target_config
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     root = Path(__file__).resolve().parents[3] / "templates/databricks/examples"
     inputs = json.loads((root / filename).read_text())
@@ -1275,8 +1281,8 @@ def test_generated_nested_search_preserves_separate_inner_folds(tmp_path):
         tmp_path, cv_enabled="true", cv_type="nested_cv", cv_folds="4", cv_inner_folds="2"
     )
     config = json.loads((project / "config/workflow.json").read_text(encoding="utf-8"))
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     config = _load_project_config(project, config)
     cv = LocalCVSpec.from_workflow(config)
@@ -1307,10 +1313,10 @@ def test_temporal_cv_initializes_a_usable_default_holdout(tmp_path, method):
 
 
 @pytest.mark.parametrize("policy", ["time_series_split", "stratified_group_k_fold"])
-def test_generated_nested_policies_preserve_controls_and_two_jobs(tmp_path, policy):
+def test_generated_nested_policies_preserve_controls_and_three_jobs(tmp_path, policy):
     """Real template expansion must carry split metadata and threshold opt-in into Core."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
     settings = {"cv_enabled": "true", "cv_type": "nested_cv", "cv_nested_type": policy}
     temporal = policy == "time_series_split"
@@ -1339,7 +1345,7 @@ def test_generated_nested_policies_preserve_controls_and_two_jobs(tmp_path, poli
         target_column=config["target_column"],
         event_column=config.get("event_column"),
     )
-    assert set(_read_jobs(project)) == {"train", "score"}
+    assert set(_read_jobs(project)) == {"train", "score", "monitoring"}
     assert recipe["modeling"]["cv_nested_type"] == policy
     if temporal:
         assert recipe["modeling"]["cv_time_column"] == "event"
@@ -1357,7 +1363,7 @@ def test_generated_model_weight_declarations(tmp_path, layout, enabled, task):
     """Real CLI output must run all layouts without a separate weight hook."""
     import runpy
 
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     overrides = {
         "training_layout": layout,
@@ -1390,7 +1396,7 @@ def test_generated_model_weight_declarations(tmp_path, layout, enabled, task):
 )
 def test_weighted_ensemble_uses_selected_members_and_search_space(tmp_path, model):
     """Weighted menus must control both resolved members and their generated tuning axes."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.modeling.capabilities import ensure_model_sample_weight_support
 
     task = "classification" if model.endswith("classifier") else "regression"

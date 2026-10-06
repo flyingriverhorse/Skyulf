@@ -4,8 +4,8 @@ from copy import deepcopy
 
 import pytest
 
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
 
 def _prepare(params, model="voting_regressor", **modeling):

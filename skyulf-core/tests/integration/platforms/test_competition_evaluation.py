@@ -9,14 +9,14 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.competition_evaluation import (
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.training.competition.competition_evaluation import (
     competition_metric,
     evaluate_competition_candidate,
     validate_competition_preprocessing,
 )
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
 
 def _frame(engine="pandas", classification=False):
@@ -316,7 +316,7 @@ def test_nested_rejects_incompatible_reports(tmp_path, mutation):
 
 def test_ordinary_rejects_one_failed_fold(tmp_path, monkeypatch):
     """Ranking must never average only the surviving successful folds."""
-    from skyulf.integrations.databricks import competition_evaluation
+    from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame()
     cv = LocalCVSpec(enabled=True, folds=3)
@@ -425,7 +425,7 @@ def test_fold_preprocessing_sees_training_members_only(tmp_path, monkeypatch, en
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_nested_threshold_reuses_outer_scores_without_refitting(tmp_path, monkeypatch, engine):
     """Final threshold or best-score values must not replace honest nested outer scores."""
-    from skyulf.integrations.databricks import competition_evaluation
+    from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame(engine, classification=True)
     cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
@@ -492,7 +492,7 @@ def test_evaluator_rejects_validation_row_filtering(tmp_path):
 
 def test_aggregate_overflow_cannot_produce_nonfinite_evidence(tmp_path, monkeypatch):
     """Individually finite extreme folds must not serialize an infinite aggregate."""
-    from skyulf.integrations.databricks import competition_evaluation
+    from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame()
     cv = LocalCVSpec(enabled=True, folds=2)

@@ -8,10 +8,13 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
-from skyulf.integrations.databricks.local_retraining import (
+from skyulf.integrations.databricks.training.fitting.local_retraining import (
     LocalTrainingSpec,
     split_labeled_snapshot,
+)
+from skyulf.integrations.databricks.training.tuning.local_cv import (
+    LocalCVSpec,
+    evaluate_training_cv,
 )
 from skyulf.modeling.base import BaseModelCalculator
 from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter
@@ -188,7 +191,7 @@ def test_temporal_cv_rejects_missing_or_tied_boundary_times():
 
 def test_workflow_rejects_cv_before_monthly_source_or_registry_access(monkeypatch, tmp_path):
     """Invalid CV must fail before a direct workflow invocation resolves external state."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     history = Mock(side_effect=AssertionError("source history accessed"))
     monkeypatch.setattr(local_workflow, "resolve_training_spec", history)
@@ -212,7 +215,7 @@ def test_workflow_rejects_cv_before_monthly_source_or_registry_access(monkeypatc
 
 def test_offline_cv_validation_uses_core_model_and_split_contract(workflow_config):
     """Editable Bundle settings must be accepted and invalid combinations rejected offline."""
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {**workflow_config, "cv_enabled": True, "cv_folds": 2}
     assert validate_workflow_config(config, action="train") == config
@@ -284,7 +287,7 @@ def test_temporal_cv_publishes_same_final_pipeline_and_separate_metrics(
     import mlflow
 
     from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     frame = pd.DataFrame(
         {

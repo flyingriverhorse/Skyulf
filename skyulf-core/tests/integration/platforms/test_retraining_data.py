@@ -8,14 +8,15 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import local_retraining, local_workflow
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.lifecycle import local_workflow
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.training.fitting import local_retraining
 
 
 @pytest.fixture
 def freshness(monkeypatch):
     """Exercise the production split while replacing only cloud snapshot and registry reads."""
-    from skyulf.integrations.databricks import retraining_data
+    from skyulf.integrations.databricks.data.training import retraining_data
 
     now = datetime(2026, 10, 1, tzinfo=UTC)
     config = {
@@ -77,7 +78,7 @@ def freshness(monkeypatch):
 
 def _assess(state):
     """Run the public assessment with the fixture's current source and clock."""
-    from skyulf.integrations.databricks.retraining_data import assess_training_data
+    from skyulf.integrations.databricks.data.training.retraining_data import assess_training_data
 
     return assess_training_data(state["spark"], state["monitor"], state["config"], state["now"])
 

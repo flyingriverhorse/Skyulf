@@ -10,10 +10,12 @@ from tests.integration.platforms.test_model_set_batch import _saved_set
 from tests.integration.platforms.test_model_set_scoring import temporal_set as temporal_set
 
 from skyulf.inference.model_set_scoring import score_model_set
-from skyulf.integrations.databricks.admission import BatchConflictError, SingleWriterAdmission
-from skyulf.integrations.databricks.local_incremental import SourceChangeRequiresRebuild
-from skyulf.integrations.databricks.model_set_batch import run_model_set_batch
-from skyulf.integrations.mlflow.registry import ResolvedModel
+from skyulf.integrations.databricks.data.admission import BatchConflictError, SingleWriterAdmission
+from skyulf.integrations.databricks.model_sets.model_set_batch import run_model_set_batch
+from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    SourceChangeRequiresRebuild,
+)
+from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
 
 @pytest.fixture

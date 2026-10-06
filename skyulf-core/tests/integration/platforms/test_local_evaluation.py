@@ -8,7 +8,7 @@ from joblib import effective_n_jobs, parallel_config
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference import local_evaluation
 from skyulf.inference.local_pipeline import load_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

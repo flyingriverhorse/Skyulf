@@ -88,7 +88,7 @@ from importlib.metadata import version
 
 from skyulf.core.execution import ExecutionOptions
 from skyulf.integrations.databricks import BatchSpec, run_batch
-from skyulf.integrations.databricks.admission import LocalTableLock
+from skyulf.integrations.databricks.data.admission import LocalTableLock
 
 spec = BatchSpec(
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -132,7 +132,7 @@ first held ownership, then allowed the first job to commit. Operators must
 provision the authority once, before starting publishers:
 
 ```python
-from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
 target_id = spark.sql(
     "DESCRIBE DETAIL analytics.customer_predictions"

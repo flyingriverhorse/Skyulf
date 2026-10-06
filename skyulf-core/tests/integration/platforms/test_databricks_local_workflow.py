@@ -18,7 +18,7 @@ def test_training_failure_retains_once_selected_version_and_window(
     """Later clock and history changes cannot replace an invocation's persisted pin."""
     import mlflow
 
-    from skyulf.integrations.databricks import local_retraining
+    from skyulf.integrations.databricks.training.fitting import local_retraining
 
     workflow = _workflow()
     config = _config()
@@ -89,14 +89,14 @@ def test_training_failure_retains_once_selected_version_and_window(
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     return local_workflow
 
 
 def _output():
     """Inspect output publication independently of notebook widgets."""
-    from skyulf.integrations.databricks import prediction_output
+    from skyulf.integrations.databricks.scoring.shared import prediction_output
 
     return prediction_output
 
@@ -420,7 +420,7 @@ def test_train_compares_pinned_champion_without_activation(monkeypatch, tmp_path
 def test_train_allows_first_model_but_propagates_registry_errors(monkeypatch):
     """Only a missing champion alias is a valid first-training condition."""
     workflow = _workflow()
-    from skyulf.integrations.mlflow.registry import RegistryModelNotFoundError
+    from skyulf.integrations.mlflow.registration.registry import RegistryModelNotFoundError
 
     def missing(*args, **kwargs):
         """Represent a registry without a champion alias."""
@@ -1023,6 +1023,50 @@ def test_prediction_provision_creates_no_control_table(monkeypatch):
     assert created is True
     assert len([statement for statement in statements if statement.startswith("CREATE TABLE")]) == 1
     assert all("admission" not in statement for statement in statements)
+
+
+@pytest.mark.parametrize("inference_mode", [None, "local", "spark"])
+@pytest.mark.parametrize("model_change_mode", ["incremental_append", "full_rebuild"])
+def test_initial_prediction_budget_applies_only_to_local_inference(
+    inference_mode, model_change_mode
+):
+    """Large Spark bootstraps must provision while local driver budgets remain enforced."""
+    workflow = _output()
+    config = _config()
+    config.update(max_rows=500, model_change_mode=model_change_mode)
+    if inference_mode is not None:
+        config["inference_mode"] = inference_mode
+    if model_change_mode == "full_rebuild":
+        config["prediction_table"] += "_v1"
+    source = Mock()
+    source.columns = ["entity_id", "x"]
+    source.schema = {
+        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+    }
+    source.select.return_value.limit.return_value.count.return_value = 501
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: name == config["score_source_table"]
+    spark.table.return_value = source
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
+        preflight=SimpleNamespace(
+            ready=True,
+            model_digest="a" * 64,
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
+        ),
+    )
+    if inference_mode == "spark":
+        assert workflow.provision_prediction_table(spark, config, prepared) is True
+        source.select.assert_not_called()
+    else:
+        with pytest.raises(ValueError, match="max_rows budget"):
+            workflow.provision_prediction_table(spark, config, prepared)
+        source.select.return_value.limit.assert_called_once_with(501)
+    creates = [call for call in spark.sql.call_args_list if call.args[0].startswith("CREATE TABLE")]
+    assert len(creates) == int(inference_mode == "spark")
 
 
 def test_full_rebuild_generation_records_model_identity(monkeypatch):

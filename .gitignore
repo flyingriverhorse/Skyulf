@@ -180,3 +180,6 @@ sast/xss-results.md
 .qoder/skills/modern-coding-standards/SKILL.md
 docs/reports/2026-09-21-spark-core-inventory.md
 docs/reports/2026-09-21-spark-databricks-readiness.md
+*mlruns
+.tmp-review-model/
+.claude/settings.local.json

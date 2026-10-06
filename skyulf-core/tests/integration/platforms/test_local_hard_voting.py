@@ -12,7 +12,7 @@ from skyulf.inference.local_pipeline import (
     predict_local_pipeline,
     save_local_pipeline,
 )
-from skyulf.integrations.databricks.local_sdk import (
+from skyulf.integrations.databricks.scoring.local_sdk import (
     InputSource,
     LocalWorkflowConfig,
     ModelSelection,
@@ -86,7 +86,7 @@ def test_probability_capability_preserves_soft_voting_and_legacy_manifests(tmp_p
 def test_mlflow_voting_signature_matches_pyfunc_predictions(tmp_path, voting):
     """Optional MLflow exposes only the probabilities supported by each voting mode."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.local_model import SkyulfLocalPythonModel, _signature
+    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel, _signature
 
     _, artifact, holdout = _fit(tmp_path, voting=voting)
     expected = ["prediction"]

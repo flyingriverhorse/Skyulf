@@ -15,6 +15,20 @@ WORKFLOW = (
 )
 
 
+def test_inference_choice_precedes_training_engine_and_rejects_conflicts():
+    """The setup wizard must reject an explicit Polars/Spark contradiction."""
+    from jsonschema import Draft7Validator
+
+    schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
+    properties = schema["properties"]
+    assert properties["inference_mode"]["order"] < properties["engine"]["order"]
+    assert Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "pandas"})
+    assert not Draft7Validator(schema).is_valid({"inference_mode": "spark", "engine": "polars"})
+    assert Draft7Validator(properties["engine"]["skip_prompt_if"]).is_valid(
+        {"inference_mode": "spark"}
+    )
+
+
 def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
     """Full-rescore authorization requires an explicit guided choice in every layout."""
     from jsonschema import Draft7Validator
@@ -34,7 +48,7 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
     """Changing task must change visible menus while keeping them aligned with Core."""
     from jsonschema import Draft7Validator
 
-    from skyulf.integrations.mlflow.validation import _CLASSIFICATION, _REGRESSION
+    from skyulf.integrations.mlflow.lifecycle.validation import _CLASSIFICATION, _REGRESSION
     from skyulf.modeling.base import BaseModelCalculator
     from skyulf.registry import NodeRegistry
 
@@ -62,7 +76,7 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     return local_workflow
 
@@ -229,12 +243,14 @@ def test_explicit_boundary_questions_only_apply_to_fixed_windows(window, strateg
 
 def _output():
     """Inspect output publication independently of notebook widgets."""
-    from skyulf.integrations.databricks import prediction_output
+    from skyulf.integrations.databricks.scoring.shared import prediction_output
 
     return prediction_output
 
 
-def _render_default_config(record_key="entity_id", risk_category=""):
+def _render_default_config(
+    record_key="entity_id", risk_category="", inference_mode="local", compute_mode="serverless"
+):
     """Resolve default branches for offline checks; real CLI tests cover Go rendering."""
     template = WORKFLOW.parents[2] / "config/workflow.json.tmpl"
     schema = json.loads(
@@ -245,8 +261,30 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         project_name="customer_model",
         record_key_columns=record_key,
         risk_category=risk_category,
+        inference_mode=inference_mode,
+        compute_mode=compute_mode,
     )
     content = template.read_text(encoding="utf-8")
+    # These optional fields are absent for this helper's default full-snapshot
+    # configuration. Actual CLI cases cover their selected, non-default forms.
+    for name in (
+        "lookback_days",
+        "holdout_days",
+        "window_timezone",
+        "holdout_months",
+        "result_availability_lag_hours",
+        "cv_group_column",
+        "cv_test_size",
+        "cv_max_train_size",
+        "monthly_lookback_months",
+        "event_column",
+        "result_available_at_column",
+        "start",
+        "holdout_start",
+        "cutoff",
+        "result_cutoff",
+    ):
+        content = re.sub(r'{{if [^{}]+}}  "' + name + r'": [^\n]*,\n{{end}}', "", content)
     content = re.sub(r'{{if eq \.shap_enabled "true"}}.*?{{end}}', "", content, flags=re.DOTALL)
     content = (
         content[content.index("{\n") :]
@@ -264,6 +302,14 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         '(and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))}}false'
         '{{else if eq .cv_type "shuffle_split"}}true{{else}}{{.cv_shuffle}}{{end}}',
         "true",
+    )
+    worker_environment = (
+        "local" if inference_mode == "spark" and compute_mode == "serverless" else "virtualenv"
+    )
+    content = content.replace(
+        '{{if and (eq .inference_mode "spark") (eq .compute_mode "serverless")}}'
+        "local{{else}}virtualenv{{end}}",
+        worker_environment,
     )
     # This lightweight resolver checks non-model defaults. The actual Go CLI
     # exercises the conditional Basic/Advanced modeling block separately.
@@ -354,6 +400,19 @@ def _render_default_config(record_key="entity_id", risk_category=""):
     for name, value in values.items():
         content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)
+
+
+@pytest.mark.parametrize("inference_mode", ["local", "spark"])
+@pytest.mark.parametrize("compute_mode", ["serverless", "policy_cluster"])
+def test_generated_worker_environment_follows_compute_and_inference_mode(
+    inference_mode, compute_mode
+):
+    """Serverless Spark must use its declared task environment while other routes stay isolated."""
+    config = _render_default_config(inference_mode=inference_mode, compute_mode=compute_mode)
+    expected = (
+        "local" if inference_mode == "spark" and compute_mode == "serverless" else "virtualenv"
+    )
+    assert config["spark_udf_env_manager"] == expected
 
 
 @pytest.mark.parametrize("risk_category", ["", "Low", "High"])
@@ -546,7 +605,7 @@ def test_generated_default_training_does_not_require_dates():
     assert config["stratify"] is False
     assert config["filter_unavailable_results"] is False
     assert all(
-        config[key] is None
+        key not in config
         for key in (
             "event_column",
             "result_available_at_column",

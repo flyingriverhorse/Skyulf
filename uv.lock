@@ -1379,11 +1379,11 @@ wheels = [
 
 [[package]]
 name = "fsspec"
-version = "2026.4.0"
+version = "2026.9.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d5/8d/1c51c094345df128ca4a990d633fe1a0ff28726c9e6b3c41ba65087bba1d/fsspec-2026.4.0.tar.gz", hash = "sha256:301d8ac70ae90ef3ad05dcf94d6c3754a097f9b5fe4667d2787aa359ec7df7e4", size = 312760, upload-time = "2026-04-29T20:42:38.635Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/cd/9be253869fc42e764de7f3dedd6969af7d44ff9c3375214a3442a6f3fc08/fsspec-2026.9.0.tar.gz", hash = "sha256:0f08147951c8cb31d844c3547d631053b127863b60be04cf06e121333ee0e2fe", size = 333545, upload-time = "2026-09-18T17:50:42.825Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/0c/043d5e551459da400957a1395e0febbf771446ff34291afcbe3d8be2a279/fsspec-2026.4.0-py3-none-any.whl", hash = "sha256:11ef7bb35dab8a394fde6e608221d5cf3e8499401c249bebaeaad760a1a8dec2", size = 203402, upload-time = "2026-04-29T20:42:36.842Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/c0/a98505f18594f1bce828bb159cec0fcf9860562f1a2c85913409fc8f3d9e/fsspec-2026.9.0-py3-none-any.whl", hash = "sha256:8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f", size = 221738, upload-time = "2026-09-18T17:50:41.341Z" },
 ]
 
 [[package]]
@@ -2427,14 +2427,14 @@ wheels = [
 
 [[package]]
 name = "mako"
-version = "1.3.12"
+version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/62/791b31e69ae182791ec67f04850f2f062716bbd205483d63a215f3e062d3/mako-1.3.12.tar.gz", hash = "sha256:9f778e93289bd410bb35daadeb4fc66d95a746f0b75777b942088b7fd7af550a", size = 400219, upload-time = "2026-04-28T19:01:08.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/09/e07c4b5579a79f4b16f8d4f29f6c54514ac787c4ad506b8c4f28a0e6b0bf/mako-1.4.3.tar.gz", hash = "sha256:cd6537fe88d5fec315c55c2f8529bc4ce7a9a352ad7db3eeaa6a66e2dd4ec37a", size = 412799, upload-time = "2026-09-22T20:54:31.509Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/b1/a0ec7a5a9db730a08daef1fdfb8090435b82465abbf758a596f0ea88727e/mako-1.3.12-py3-none-any.whl", hash = "sha256:8f61569480282dbf557145ce441e4ba888be453c30989f879f0d652e39f53ea9", size = 78521, upload-time = "2026-04-28T19:01:10.393Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/a0/053d6af3e8f871e0073b4a36732d9e65be77a72e5434c31b94f6af78a6bb/mako-1.4.3-py3-none-any.whl", hash = "sha256:723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f", size = 80164, upload-time = "2026-09-22T20:54:33.128Z" },
 ]
 
 [[package]]
@@ -4620,16 +4620,16 @@ wheels = [
 
 [[package]]
 name = "s3fs"
-version = "2026.4.0"
+version = "2026.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiobotocore" },
     { name = "aiohttp" },
     { name = "fsspec" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/d8/76f3dc1558bdf4494b117a9f7a9cc0a5d9d34edadc9e5d7ceabc5a6a7c37/s3fs-2026.4.0.tar.gz", hash = "sha256:5bdce0abb00b0435ee150807a45fea727451dbc22de4cbc116464f8504ab9d37", size = 85986, upload-time = "2026-04-29T20:52:51.748Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/fe/ab89ab94cc1293849bc1a60876b589007bdd43f59a06ca309e717bd45dc7/s3fs-2026.9.0.tar.gz", hash = "sha256:ec078ff0122d28fd21d36ea4987794e4f42ecd6e8785eeaa083208771c1464e5", size = 89163, upload-time = "2026-09-18T19:02:54.117Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/a4/9d1ea10ebc9e028a289a72fec84da170689549a8102c8aacfcad26bc5035/s3fs-2026.4.0-py3-none-any.whl", hash = "sha256:de0d2a1f33cdf03831fd2382d278c6e4e31fe57c3bf2f703c61f8aec6b703e2a", size = 32392, upload-time = "2026-04-29T20:52:50.295Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/9c/15fb18bd708949dc953fe120be8d3c7a1b1b140c2592a9c81ce7961e9ecf/s3fs-2026.9.0-py3-none-any.whl", hash = "sha256:eb185fd98e20a1c9375087d9b2a6ef506f0cd01ae0c0c94efc79f88403fb81fe", size = 33126, upload-time = "2026-09-18T19:02:52.933Z" },
 ]
 
 [[package]]
@@ -4936,7 +4936,7 @@ wheels = [
 
 [[package]]
 name = "skyulf"
-version = "0.9.1"
+version = "0.9.2"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -4949,10 +4949,12 @@ dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "cmaes" },
     { name = "fastapi" },
+    { name = "fsspec" },
     { name = "httpx" },
     { name = "imbalanced-learn" },
     { name = "joblib" },
     { name = "lightgbm" },
+    { name = "mako" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "optuna" },
@@ -5058,6 +5060,7 @@ dev = [
     { name = "ruff" },
     { name = "syrupy" },
     { name = "tornado" },
+    { name = "werkzeug" },
 ]
 
 [package.metadata]
@@ -5074,6 +5077,7 @@ requires-dist = [
     { name = "cmaes", specifier = ">=0.10" },
     { name = "esda", marker = "extra == 'geo'", specifier = ">=2.5.0,<3.0.0" },
     { name = "fastapi", specifier = ">=0.104.0,<1.0.0" },
+    { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "geopandas", marker = "extra == 'geo'", specifier = ">=1.1.2,<1.2.0" },
     { name = "httpx", specifier = ">=0.25.0,<1.0.0" },
     { name = "imbalanced-learn", specifier = ">=0.14.1,<1.0.0" },
@@ -5081,6 +5085,7 @@ requires-dist = [
     { name = "langid", marker = "extra == 'nlp'", specifier = ">=1.1.6" },
     { name = "libpysal", marker = "extra == 'geo'", specifier = ">=4.10.0,<5.0.0" },
     { name = "lightgbm", specifier = ">=4.0.0" },
+    { name = "mako", specifier = ">=1.4.2" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.9.4" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
@@ -5156,6 +5161,7 @@ dev = [
     { name = "ruff", specifier = ">=0.15,<1.0" },
     { name = "syrupy", specifier = ">=4.0.0" },
     { name = "tornado", specifier = ">=6.5.9,<7.0.0" },
+    { name = "werkzeug", specifier = ">=3.1.9" },
 ]
 
 [[package]]
@@ -5177,8 +5183,10 @@ dependencies = [
 all = [
     { name = "causal-learn" },
     { name = "cmaes" },
+    { name = "fsspec" },
     { name = "imbalanced-learn" },
     { name = "lightgbm" },
+    { name = "mako" },
     { name = "matplotlib" },
     { name = "mlflow" },
     { name = "optuna" },
@@ -5188,6 +5196,7 @@ all = [
     { name = "shap" },
     { name = "sklearn-compat" },
     { name = "vadersentiment" },
+    { name = "werkzeug" },
     { name = "xgboost" },
 ]
 delta = [
@@ -5222,7 +5231,9 @@ geo = [
     { name = "shapely" },
 ]
 mlflow = [
+    { name = "mako" },
     { name = "mlflow" },
+    { name = "werkzeug" },
 ]
 modeling-lightgbm = [
     { name = "lightgbm" },
@@ -5231,6 +5242,7 @@ modeling-xgboost = [
     { name = "xgboost" },
 ]
 nlp = [
+    { name = "fsspec" },
     { name = "sentence-transformers" },
 ]
 preprocessing-imbalanced = [
@@ -5246,6 +5258,7 @@ text = [
 ]
 tuning = [
     { name = "cmaes" },
+    { name = "mako" },
     { name = "optuna" },
     { name = "optuna-integration" },
 ]
@@ -5263,6 +5276,8 @@ requires-dist = [
     { name = "cmaes", marker = "extra == 'tuning'", specifier = ">=0.10.0" },
     { name = "delta-spark", marker = "extra == 'delta'", specifier = ">=4.0.0,<4.1.0" },
     { name = "esda", marker = "extra == 'geo'", specifier = ">=2.5.0,<3.0.0" },
+    { name = "fsspec", marker = "extra == 'all'", specifier = ">=2026.6.0" },
+    { name = "fsspec", marker = "extra == 'nlp'", specifier = ">=2026.6.0" },
     { name = "geopandas", marker = "extra == 'geo'", specifier = ">=0.14.0,<1.2.0" },
     { name = "h3", marker = "extra == 'geo'", specifier = ">=4.0.0,<5.0.0" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
@@ -5274,6 +5289,9 @@ requires-dist = [
     { name = "lightgbm", marker = "extra == 'all'", specifier = ">=4.0.0" },
     { name = "lightgbm", marker = "extra == 'modeling-lightgbm'", specifier = ">=4.0.0" },
     { name = "lizard", marker = "extra == 'dev'", specifier = ">=1.17.0" },
+    { name = "mako", marker = "extra == 'all'", specifier = ">=1.4.2" },
+    { name = "mako", marker = "extra == 'mlflow'", specifier = ">=1.4.2" },
+    { name = "mako", marker = "extra == 'tuning'", specifier = ">=1.4.2" },
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7.0" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.7.0" },
     { name = "mlflow", marker = "extra == 'all'", specifier = ">=3.10,<4.0" },
@@ -5312,6 +5330,8 @@ requires-dist = [
     { name = "vadersentiment", marker = "extra == 'all'", specifier = ">=3.3.2" },
     { name = "vadersentiment", marker = "extra == 'eda'", specifier = ">=3.3.2" },
     { name = "vadersentiment", marker = "extra == 'text'", specifier = ">=3.3.2" },
+    { name = "werkzeug", marker = "extra == 'all'", specifier = ">=3.1.9" },
+    { name = "werkzeug", marker = "extra == 'mlflow'", specifier = ">=3.1.9" },
     { name = "xgboost", marker = "extra == 'all'", specifier = ">=2.1.4" },
     { name = "xgboost", marker = "extra == 'modeling-xgboost'", specifier = ">=2.1.4" },
 ]
@@ -6007,14 +6027,14 @@ wheels = [
 
 [[package]]
 name = "werkzeug"
-version = "3.1.8"
+version = "3.1.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dd/b2/381be8cfdee792dd117872481b6e378f85c957dd7c5bca38897b08f765fd/werkzeug-3.1.8.tar.gz", hash = "sha256:9bad61a4268dac112f1c5cd4630a56ede601b6ed420300677a869083d70a4c44", size = 875852, upload-time = "2026-04-02T18:49:14.268Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/34/4dd12fc8bb7d61c91467ec3efe415ffa7d5456f799954b40c5bbaeae470e/werkzeug-3.1.9.tar.gz", hash = "sha256:55ca7c70a75689be937aa27f8ff4b018f06ff4838fc73045560bf0f5a1291060", size = 940188, upload-time = "2026-09-27T18:33:41.637Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/8c/2e650f2afeb7ee576912636c23ddb621c91ac6a98e66dc8d29c3c69446e1/werkzeug-3.1.8-py3-none-any.whl", hash = "sha256:63a77fb8892bf28ebc3178683445222aa500e48ebad5ec77b0ad80f8726b1f50", size = 226459, upload-time = "2026-04-02T18:49:12.72Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/38/df03f564f43cec2684823f3cccae1a652ee7face1cbaa76fb223096e64d7/werkzeug-3.1.9-py3-none-any.whl", hash = "sha256:6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab", size = 228700, upload-time = "2026-09-27T18:33:39.685Z" },
 ]
 
 [[package]]

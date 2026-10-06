@@ -196,6 +196,73 @@ def test_apply_ordinal_dtype_matches_between_pandas_and_polars() -> None:
     assert result_pl["x_binned"].dtype == result_pd["x_binned"].dtype
 
 
+@pytest.mark.parametrize("label_format", ["ordinal", "bin_index"])
+@pytest.mark.parametrize("include_lowest", [False, True])
+@pytest.mark.parametrize(
+    "values",
+    [
+        [10.0, 3.0, -1.0, 0.0, 1.0, 1.01, 6.0, 6.01, 11.0, None, float("nan")],
+        [8.5, 0.5, 8.5],
+        [None, None],
+        [],
+    ],
+    ids=["boundaries-and-nulls", "sparse-reversed-bins", "all-null", "empty"],
+)
+def test_polars_ordinal_values_follow_fitted_edges(values, label_format, include_lowest):
+    """Ordinal values must match pandas even when bins are absent or visited out of order."""
+    edges = [0.0, 1.0, 3.0, 6.0, 10.0]
+    params = {
+        "bin_edges": {"x": edges},
+        "label_format": label_format,
+        "include_lowest": include_lowest,
+    }
+    frame = pl.DataFrame({"x": pl.Series(values, dtype=pl.Float64)})
+    expected = pd.cut(
+        pd.Series(values, dtype=float), bins=edges, labels=False, include_lowest=include_lowest
+    )
+    expected_values = [None if pd.isna(value) else int(value) for value in expected]
+
+    result = GeneralBinningApplier().apply(frame, params)["x_binned"]
+
+    assert result.dtype == pl.Int64
+    assert result.to_list() == expected_values
+
+
+@pytest.mark.parametrize("label_format", ["ordinal", "bin_index"])
+def test_polars_ordinal_missing_labels_preserve_bin_numbers(label_format):
+    """A missing-value sentinel must widen ordinal bins without changing their numbers."""
+    frame = pl.DataFrame({"x": [5.0, -1.0, 0.0, 1.0, 3.01, None, float("nan")]})
+    params = {
+        "bin_edges": {"x": [0.0, 1.0, 3.0, 5.0]},
+        "label_format": label_format,
+        "missing_strategy": "label",
+        "missing_label": "Missing",
+    }
+
+    result = GeneralBinningApplier().apply(frame, params)["x_binned"]
+
+    assert result.dtype == pl.String
+    assert result.to_list() == ["2", "Missing", "0", "0", "2", "Missing", "Missing"]
+
+
+@pytest.mark.parametrize("labels", [["9", "2", "0"], ["high", "middle", "low"]])
+def test_polars_custom_labels_override_ordinal_numbers(labels):
+    """Custom label text and order must survive the ordinal compatibility conversion."""
+    values = [5.0, -1.0, 0.0, 1.0, 2.0, None]
+    edges = [0.0, 1.0, 3.0, 5.0]
+    params = {
+        "bin_edges": {"x": edges},
+        "label_format": "ordinal",
+        "custom_labels": {"x": labels},
+    }
+    expected = pd.cut(pd.Series(values), bins=edges, labels=labels, include_lowest=True)
+    expected_values = [None if pd.isna(value) else value for value in expected]
+
+    result = GeneralBinningApplier().apply(pl.DataFrame({"x": values}), params)["x_binned"]
+
+    assert result.cast(pl.String).to_list() == expected_values
+
+
 def test_apply_range_label_format_produces_interval_strings() -> None:
     """label_format='range' must produce '[a, b]'/'(a, b]' style string labels."""
     df = _series_0_to_9()

@@ -8,7 +8,9 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.monitoring_metrics import build_monitoring_report
+from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    build_monitoring_report,
+)
 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 
@@ -457,7 +459,9 @@ def test_processed_baseline_missingness_allows_other_feature_drift(
     engine, missing, current_missing, shift
 ):
     """Missingness already handled by the model must not suppress valid drift decisions."""
-    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
+        _drift_metrics_decision,
+    )
 
     reference = [{"value": missing if i < 10 else i % 10, "kind": i % 10} for i in range(100)]
     current = [
@@ -485,7 +489,9 @@ def test_processed_baseline_missingness_allows_other_feature_drift(
 @pytest.mark.parametrize("case", ["increased", "new", "excluded", "unpredicted", "infinity"])
 def test_missingness_policy_retains_input_quality_guards(engine, case):
     """New or significantly increased missingness and unhandled rows still block training."""
-    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
+        _drift_metrics_decision,
+    )
 
     reference_missing = 0 if case == "new" else 10
     current_missing = 30 if case == "increased" else 10
@@ -521,7 +527,9 @@ def test_missingness_distinguishes_sampling_variation_from_increase(
     engine, current_missing, expected
 ):
     """A 10% to 10.2% sampling change must not block drift, but 10% to 25% must."""
-    from skyulf.integrations.databricks.retraining_task import _drift_metrics_decision
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
+        _drift_metrics_decision,
+    )
 
     reference = [{"value": None if i < 200 else i % 10, "kind": i % 10} for i in range(2000)]
     current = [
@@ -543,7 +551,9 @@ def test_same_missingness_process_rarely_flags_sampling_noise():
     """Independent samples from the same process must not systematically block retraining."""
     import numpy as np
 
-    from skyulf.integrations.databricks.monitoring_metrics import _feature_quality
+    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+        _feature_quality,
+    )
 
     rng = np.random.default_rng(42)
     flagged = 0

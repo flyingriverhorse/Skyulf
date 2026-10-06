@@ -137,6 +137,19 @@ class StandardScalerApplier(BaseApplier):
         for operation in ("fit", "apply")
         for with_mean in (True, False)
         for with_std in (True, False)
+    )
+    + tuple(
+        ExecutionCapability(
+            "pandas",
+            "apply",
+            "python_batch",
+            "preserve",
+            "row",
+            codec_version=1,
+            config_match=(("with_mean", with_mean), ("with_std", with_std)),
+        )
+        for with_mean in (True, False)
+        for with_std in (True, False)
     ),
 )
 @node_meta(

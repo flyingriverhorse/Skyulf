@@ -15,8 +15,8 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.project import load_project_workflow
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
 
 _FEATURE_SOURCE = '''"""A saved asset and external library define the nonlinear feature."""
 import json
@@ -146,7 +146,7 @@ def test_preloaded_mlflow_adapter_unpickles_before_project_context(tmp_path):
     """MLflow may serialize after loading context, but fresh workers need context first."""
     pytest.importorskip("mlflow")
     cloudpickle = pytest.importorskip("cloudpickle")
-    from skyulf.integrations.mlflow.local_model import SkyulfLocalPythonModel
+    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel
 
     root, path, _, _ = _fit_saved_package(tmp_path)
     model = SkyulfLocalPythonModel()
@@ -181,8 +181,8 @@ def test_preloaded_mlflow_adapter_unpickles_before_project_context(tmp_path):
 def test_mlflow_delivers_saved_assets_and_exact_external_pins(tmp_path, monkeypatch):
     """A real logged pyfunc must carry dependency pins and replay without original assets."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.local_model import log_local_model
-    from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))

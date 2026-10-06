@@ -8,10 +8,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.monitoring_config import MonitorConfig, json_digest
-from skyulf.integrations.databricks.retraining_task import (
+from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
     observation_decision,
     retraining_policy,
+)
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+    MonitorConfig,
+    json_digest,
 )
 
 
@@ -21,7 +24,7 @@ def test_train_lookup_preserves_development_name_prefix(prefix):
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter(
@@ -169,7 +172,8 @@ def _job(name="demo_train", job_id=123):
 
 def test_multiple_ready_models_submit_one_training_job(monkeypatch):
     """Several drifting components must produce one idempotent whole-job request."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     first = monitor()
     second = replace(first, model_name="cat.models.other")
@@ -206,10 +210,84 @@ def test_multiple_ready_models_submit_one_training_job(monkeypatch):
     assert result == {"status": "submitted", "run_id": 456, "models": candidates}
 
 
+def _serving_monitor(endpoint):
+    """Represent another captured population for the same pinned fitted model."""
+    return replace(
+        monitor(),
+        serving_endpoint=endpoint,
+        execution_engine="spark",
+        reference_namespace="cat.monitoring",
+        source_table="cat.logs.payload",
+        prediction_table="cat.logs.payload",
+    )
+
+
+def _submission_ids(monkeypatch, configs, candidates):
+    """Compare actual request identities while retaining the complete submission evidence."""
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
+
+    monkeypatch.setattr(
+        retraining_task,
+        "_current_configs",
+        Mock(return_value={config.monitor_id: config for config in configs}),
+    )
+    monkeypatch.setattr(retraining_task, "_training_job_id", Mock(return_value=123))
+    submit = Mock(return_value={"status": "submitted"})
+    monkeypatch.setattr(retraining_requests, "submit_retraining", submit)
+    for selected in (candidates[:1], candidates):
+        retraining_task._submit_candidates(
+            Mock(),
+            Mock(),
+            "cat.monitoring",
+            {},
+            {"cooldown_hours": 24},
+            selected,
+            datetime(2026, 10, 6, tzinfo=UTC),
+        )
+    return [entry.kwargs["request_id"] for entry in submit.call_args_list], submit
+
+
+@pytest.mark.parametrize("layout", ["batch_online", "two_endpoints"])
+def test_same_training_request_identity_survives_duplicate_monitors(monkeypatch, layout):
+    """Additional captured populations must not request the same training input twice."""
+    first = monitor() if layout == "batch_online" else _serving_monitor("endpoint-one")
+    second = _serving_monitor("endpoint-two")
+    candidates = [_ready_candidate(config) for config in (first, second)]
+    ids, submit = _submission_ids(monkeypatch, [first, second], candidates)
+    legacy = json_digest(
+        {
+            "job_id": 123,
+            "training_data": [(first.model_name, "2", "cat.input.training", "a" * 64)],
+        }
+    )
+    assert ids == [legacy, legacy]
+    assert submit.call_args.kwargs["evidence"] == {"models": candidates}
+
+
+@pytest.mark.parametrize("difference", ["model", "version", "source", "content"])
+def test_distinct_training_inputs_retain_distinct_request_identity(monkeypatch, difference):
+    """Deduplication must preserve different models, baselines, sources and training content."""
+    first, second = _serving_monitor("endpoint-one"), _serving_monitor("endpoint-two")
+    if difference == "model":
+        second = replace(second, model_name="cat.models.other")
+    if difference == "version":
+        second = replace(second, model_version="3")
+    candidates = [_ready_candidate(config) for config in (first, second)]
+    if difference == "source":
+        candidates[1]["source_table"] = "cat.input.other_training"
+    if difference == "content":
+        candidates[1]["content_sha256"] = "b" * 64
+    ids, submit = _submission_ids(monkeypatch, [first, second], candidates)
+    assert ids[0] != ids[1]
+    assert submit.call_args.kwargs["evidence"] == {"models": candidates}
+
+
 @pytest.mark.parametrize("change", ["removed", "promoted", "disabled", "threshold"])
 def test_enrollment_reread_blocks_superseded_candidates(monkeypatch, change):
     """Changes during data assessment must stop obsolete observations before Jobs lookup."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     original = monitor()
     changes = {
@@ -238,7 +316,8 @@ def test_enrollment_reread_blocks_superseded_candidates(monkeypatch, change):
 
 def test_no_eligible_candidates_do_not_contact_jobs_or_inventory(monkeypatch):
     """Healthy or unchanged data must return without creating cloud submission work."""
-    from skyulf.integrations.databricks import retraining_requests, retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+    from skyulf.integrations.databricks.lifecycle import retraining_requests
 
     current = Mock()
     submit = Mock()
@@ -263,7 +342,7 @@ def test_no_eligible_candidates_do_not_contact_jobs_or_inventory(monkeypatch):
 
 def test_disabled_notebook_publishes_status_without_cloud_work(monkeypatch):
     """The default-disabled task must only publish its local decision and optional display."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock()
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -287,7 +366,7 @@ def test_disabled_notebook_publishes_status_without_cloud_work(monkeypatch):
 
 def test_training_job_lookup_accepts_one_exact_positive_identity():
     """Only one exactly named deployed train job can own the automatic request."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter([_job()])
@@ -310,7 +389,7 @@ def test_training_job_lookup_accepts_one_exact_positive_identity():
 )
 def test_training_job_lookup_rejects_missing_ambiguous_or_inexact_jobs(jobs):
     """API filters and malformed identities must not redirect the training mutation."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     workspace = Mock()
     workspace.jobs.list.return_value = iter(jobs)
@@ -320,7 +399,7 @@ def test_training_job_lookup_rejects_missing_ambiguous_or_inexact_jobs(jobs):
 
 def test_training_job_lookup_stops_after_second_match():
     """The SDK limit controls page size, so ambiguity must stop further pagination locally."""
-    from skyulf.integrations.databricks.retraining_task import _training_job_id
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import _training_job_id
 
     def matches():
         """Fail if the lookup requests another page after duplicate ownership is proven."""
@@ -339,7 +418,7 @@ def test_training_job_lookup_stops_after_second_match():
 )
 def test_check_notebook_publishes_boolean_without_submission(monkeypatch, status, expected):
     """The Databricks condition consumes an explicit Boolean eligibility result."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock(return_value={"status": status})
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -353,7 +432,7 @@ def test_check_notebook_publishes_boolean_without_submission(monkeypatch, status
 
 def test_disabled_check_publishes_false_without_cloud_work(monkeypatch):
     """Disabled automation must visibly take the false branch without remote reads."""
-    from skyulf.integrations.databricks import retraining_task
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
 
     enabled = Mock()
     monkeypatch.setattr(retraining_task, "_run_enabled", enabled)
@@ -362,4 +441,79 @@ def test_disabled_check_publishes_false_without_cloud_work(monkeypatch):
     result = retraining_task.run_retraining_check_notebook(Mock(), dbutils)
     enabled.assert_not_called()
     dbutils.jobs.taskValues.set.assert_any_call(key="retraining_needed", value=False)
+    assert result == {"status": "disabled"}
+
+
+def test_retraining_output_displays_both_reasons_and_shared_guard(monkeypatch):
+    """An operator must see why each trigger qualified and why one shared request was skipped."""
+    from skyulf.integrations.databricks.jobs.lifecycle import retraining_task
+
+    outcome = {
+        "status": "cooldown",
+        "models": [
+            {
+                "model_name": "model<script>",
+                "status": "ready",
+                "drift_reason": "no_drift",
+                "performance_reason": "ready",
+                "triggers": ["performance"],
+                "changed_rows": 3,
+            }
+        ],
+    }
+    monkeypatch.setattr(retraining_task, "_run_enabled", lambda *args: outcome)
+    dbutils, display = Mock(), Mock()
+    dbutils.widgets.getAll.return_value = {"on_drift": "retrain"}
+    result = retraining_task.run_retraining_notebook(Mock(), dbutils, display_html=display)
+    html = display.call_args.args[0]
+    assert "Drift eligibility" in html and "Performance loss eligibility" in html
+    assert "no_drift" in html and "performance" in html and "cooldown" in html
+    assert "model&lt;script&gt;" in html and "<script>" not in html
+    assert result == outcome
+
+
+@pytest.mark.parametrize(
+    "deployment,performance_mode,explanation",
+    [
+        ("production", "off", "Both automatic retraining triggers are disabled"),
+        ("production", "report", "Performance monitoring is report-only"),
+        ("development", "retrain", "Automatic retraining is disabled in development mode"),
+    ],
+)
+def test_disabled_output_explains_policy_without_empty_model_table(
+    deployment, performance_mode, explanation
+):
+    """Skipped automation must explain its policy without inventing model eligibility or reading data."""
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import (
+        run_retraining_notebook,
+    )
+
+    performance = {
+        "mode": performance_mode,
+        "metric": "mae",
+        "direction": "lower",
+        "baseline": {"kind": "training_holdout", "model_version": "2"},
+        "tolerance": 1.0,
+        "tolerance_mode": "absolute",
+        "window_hours": 24,
+        "label_delay_hours": 24,
+        "minimum_labeled_rows": 2,
+        "minimum_label_coverage": 0.5,
+        "consecutive_windows": 1,
+    }
+    if performance_mode == "off":
+        performance = {"mode": "off"}
+    spark, workspace, dbutils, display = Mock(), Mock(), Mock(), Mock()
+    dbutils.widgets.getAll.return_value = {
+        "monitoring_deployment_mode": deployment,
+        "on_drift": "retrain" if deployment == "development" else "disabled",
+        "monitoring_performance_policies": json.dumps({"cat.models.model": performance}),
+    }
+    result = run_retraining_notebook(spark, dbutils, workspace=workspace, display_html=display)
+    html = display.call_args.args[0]
+    assert explanation in html
+    assert "Drift eligibility" not in html
+    assert "<tbody></tbody>" not in html
+    dbutils.jobs.taskValues.get.assert_not_called()
+    assert spark.mock_calls == workspace.mock_calls == []
     assert result == {"status": "disabled"}

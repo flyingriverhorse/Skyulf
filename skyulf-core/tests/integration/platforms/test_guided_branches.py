@@ -110,7 +110,9 @@ def _factory(project):
 
 def _load_configs(project):
     """Resolve real project recipes with explicit deployment bindings and no cloud calls."""
-    from skyulf.integrations.databricks.branch_notebook import load_training_branch_configs
+    from skyulf.integrations.databricks.jobs.training.branch_notebook import (
+        load_training_branch_configs,
+    )
 
     return load_training_branch_configs(
         {
@@ -129,8 +131,8 @@ def _load_configs(project):
 @pytest.mark.parametrize("count", ["2", "8"])
 def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, count):
     """Initialized multi-target projects must contain every requested independent branch."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     project = _generate(tmp_path, branch_count=count)
     factory = _factory(project)
@@ -151,7 +153,7 @@ def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, 
 @pytest.mark.parametrize("strategy", ["grid", "random", "halving_grid", "halving_random", "optuna"])
 def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_path, strategy):
     """Changing one branch's tuning must preserve its sibling's model, space and recipe."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     project = _generate(
         tmp_path,
@@ -208,8 +210,8 @@ def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_pa
 @pytest.mark.parametrize("policy", ["k_fold", "group_k_fold", "time_series_split"])
 def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
     """Ordinary siblings must not inherit a nested branch's group or temporal metadata."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     settings = {"branch_1_cv_group_column": "customer"} if policy == "group_k_fold" else {}
     if policy == "time_series_split":

@@ -64,7 +64,10 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: spark
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}
@@ -212,7 +215,10 @@ resources:
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
               monitoring_enabled: ${var.monitoring_enabled}
+              monitoring_execution_engine: spark
+              monitoring_job_id: ${resources.jobs.monitoring.id}
               monitoring_drift_thresholds: ${var.monitoring_drift_thresholds}
+              monitoring_performance_policies: ${var.monitoring_performance_policies}
               monitoring_catalog: ${var.monitoring_catalog}
               monitoring_schema: ${var.monitoring_schema}
               monitoring_label_table: ${var.monitoring_label_table}

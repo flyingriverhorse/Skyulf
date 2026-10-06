@@ -12,7 +12,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks import local_retraining as training
+from skyulf.integrations.databricks.training.fitting import local_retraining as training
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ def test_candidate_training_filters_before_split_and_model_fit(
 )
 def test_training_rejects_unsafe_recipe_before_source_read(monkeypatch, transformer, params):
     """A bad pre-split recipe must fail before a candidate reads or fits data."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     config = {
         "training_table": "workspace.test.labels",
@@ -342,7 +342,7 @@ def test_pre_split_recipe_does_not_hide_invalid_keys_or_mutation():
 
 def test_project_loader_owns_optional_recipe_and_returns_fresh_steps(tmp_path):
     """Removing the Python recipe clears it and JSON cannot override it."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
@@ -366,7 +366,10 @@ def test_project_loader_owns_optional_recipe_and_returns_fresh_steps(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_temporal_filtering_precedes_fold_local_cv(engine):
     """Time-series folds see only surviving training rows and retain event metadata."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec, evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.local_cv import (
+        LocalCVSpec,
+        evaluate_training_cv,
+    )
 
     frame = pd.DataFrame(
         {
@@ -411,7 +414,7 @@ def test_temporal_filtering_precedes_fold_local_cv(engine):
 
 def test_offline_preview_names_filter_phase_and_project_recipe(workflow_config):
     """Users can inspect filter order offline without a source read or model fit."""
-    from skyulf.integrations.databricks.workflow_config import preview_workflow_config
+    from skyulf.integrations.databricks.projects.workflow_config import preview_workflow_config
 
     config = dict(workflow_config)
     config["pre_split_steps"] = [
@@ -494,7 +497,7 @@ def test_fixed_cast_prepares_numeric_manual_bounds_on_working_frame(engine):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
     """Promotion rechecks the filtered holdout rather than the raw population."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     steps = ({"name": "known", "transformer": "DropMissingRows", "params": {"subset": ["target"]}},)
     original = _spec(steps=steps)
@@ -551,7 +554,7 @@ def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
 
 def test_automatic_replay_refuses_candidate_without_saved_receipt(monkeypatch):
     """Automatic staging cannot replay an unsaved in-memory filter specification."""
-    from skyulf.integrations.databricks import local_workflow
+    from skyulf.integrations.databricks.lifecycle import local_workflow
 
     spec = _spec()
     candidate = SimpleNamespace(
@@ -795,7 +798,7 @@ def test_target_text_normalization_precedes_stratification(engine):
 
 def test_pair_recipe_survives_project_source_and_json_roundtrip(tmp_path):
     """Saved Python source and JSON evidence retain numeric replacement-pair types."""
-    from skyulf.integrations.databricks.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     source = tmp_path / "preprocessing.py"
     source.write_text(
@@ -820,7 +823,7 @@ def test_cv_receives_raw_values_with_fixed_prefix_before_learned_suffix(
     monkeypatch, tmp_path, engine, local_tracking_store
 ):
     """Each CV fold fits fixed replay before its own learned scaler on raw rows."""
-    from skyulf.integrations.databricks.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
 
     frame = pd.DataFrame(
         {
@@ -1045,7 +1048,7 @@ def test_saved_pipeline_replays_fixed_features_once_from_raw_values(
 
 def test_target_contract_ignores_step_names_and_feature_only_maps():
     """Only the target operation affects whether two model scores are comparable."""
-    from skyulf.integrations.databricks.local_pre_split import target_contract
+    from skyulf.integrations.databricks.training.fitting.local_pre_split import target_contract
 
     step = {
         "name": "one",
@@ -1078,7 +1081,7 @@ def test_target_contract_ignores_step_names_and_feature_only_maps():
 
 def test_nested_feature_only_replacement_has_identity_target_contract():
     """A mixed selection does not imply a target edit without a target mapping."""
-    from skyulf.integrations.databricks.local_pre_split import (
+    from skyulf.integrations.databricks.training.fitting.local_pre_split import (
         projected_fixed_steps,
         target_contract,
     )
@@ -1100,8 +1103,8 @@ def test_nested_feature_only_replacement_has_identity_target_contract():
 
 def test_champion_target_contract_mismatch_stops_before_metrics(monkeypatch):
     """Class-preserving relabels cannot be compared on one normalized holdout."""
-    from skyulf.integrations.mlflow import validation
-    from skyulf.integrations.mlflow.registry import ResolvedModel
+    from skyulf.integrations.mlflow.lifecycle import validation
+    from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     candidate = ResolvedModel(
         "workspace.test.model", "2", "models:/workspace.test.model/2", None, "a"
