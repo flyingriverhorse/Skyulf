@@ -34,7 +34,9 @@ from ..shared._nullable_transport import (
     transport_spec,
     validated_transport,
 )
-from ..shared._nullable_transport import prepare_pyfunc_input as prepare_pyfunc_input
+from ..shared._nullable_transport import (  # noqa: F401 - public compatibility re-export
+    prepare_pyfunc_input as prepare_pyfunc_input,
+)
 from ..spark._spark_environment import snapshot_worker_environment
 from ..spark._spark_output import (
     prepare_spark_output,

@@ -334,7 +334,8 @@ def worker_load_probe(spark, fixture, batch_rows):
                 started = time.perf_counter()
                 output = model.predict(query)
                 predict_seconds = time.perf_counter() - started
-                assert len(output) == batch_rows and output.prediction.notna().all()
+                if len(output) != batch_rows or not output.prediction.notna().all():
+                    raise ValueError("Invalid worker benchmark predictions.")
                 yield pd.DataFrame(
                     [
                         {

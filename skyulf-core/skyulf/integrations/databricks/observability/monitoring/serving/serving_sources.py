@@ -66,7 +66,8 @@ def _view_definition(spark: Any, source_table: str, backing: str) -> str:
     if not isinstance(definition, str) or not definition:
         raise ValueError("Serving view definition is unavailable.")
     tokens = _sql_tokens(definition)
-    expected = f"SELECT {', '.join(_PROJECTION)} FROM {table_name(backing)} WHERE {_FILTER}"
+    # This canonical text is token-compared only; it is never submitted to Spark.
+    expected = f"SELECT {', '.join(_PROJECTION)} FROM {table_name(backing)} WHERE {_FILTER}"  # nosec B608
     if _view_select(tokens) != _sql_tokens(expected):
         raise ValueError("Serving view does not match the canonical telemetry projection/filter.")
     return json_digest(tokens)

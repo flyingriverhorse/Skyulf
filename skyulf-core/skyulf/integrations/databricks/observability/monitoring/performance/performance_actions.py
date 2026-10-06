@@ -130,6 +130,7 @@ def performance_history_query(namespace: str) -> str:
         f"CAST(get_json_object(r.report_json, '$.performance.{key}') AS DOUBLE) AS {key}"
         for key in numbers
     ]
+    # Dynamic table names are validated/quoted above; all projected keys are constants.
     return f"""
         WITH decisions AS (
             SELECT *, row_number() OVER (
@@ -148,4 +149,4 @@ def performance_history_query(namespace: str) -> str:
             COALESCE(a.action, get_json_object(r.report_json, '$.performance.action'), 'none') AS action,
             a.action_reason, a.request_id, a.run_id
         FROM {results} r LEFT JOIN decisions a ON r.report_id = a.report_id AND a.rank = 1
-    """
+    """  # nosec B608 - validated identifiers and fixed projection keys only

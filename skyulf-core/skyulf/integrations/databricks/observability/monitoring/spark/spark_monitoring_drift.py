@@ -129,6 +129,18 @@ def _metric_result(name: str, value: float, threshold: float) -> DriftMetric:
     return DriftMetric(metric=name, value=value, threshold=threshold, has_drift=value > threshold)
 
 
+def _ks_p_value_metric(evidence: DriftEvidence, statistic: float, threshold: float) -> DriftMetric:
+    """Require a measured probability before constructing the diagnostic KS metric."""
+    if evidence.p_value is None:
+        raise ValueError("KS evidence requires a p-value.")
+    return DriftMetric(
+        metric="ks_test_p_value",
+        value=evidence.p_value,
+        threshold=threshold,
+        has_drift=statistic > threshold,
+    )
+
+
 def _numeric_result(
     reference: Any, current: Any, column: str, thresholds: dict
 ) -> ColumnDrift | None:
@@ -160,15 +172,9 @@ def _numeric_result(
         _metric_result("kl_divergence", kl, thresholds["kl_divergence"]),
     ]
     if evidence.test == "ks_2samp":
-        assert evidence.p_value is not None
         metrics.insert(
             2,
-            DriftMetric(
-                metric="ks_test_p_value",
-                value=evidence.p_value,
-                threshold=thresholds["ks_statistic"],
-                has_drift=statistic > thresholds["ks_statistic"],
-            ),
+            _ks_p_value_metric(evidence, statistic, thresholds["ks_statistic"]),
         )
     return ColumnDrift(
         column=column,

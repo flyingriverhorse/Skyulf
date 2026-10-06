@@ -3,7 +3,7 @@
 import hashlib
 import importlib
 import json
-import pickle
+import pickle  # nosec B403 - Spark row byte sizing only; no pickle deserialization
 from dataclasses import replace
 from datetime import datetime
 from typing import Any, cast
@@ -211,6 +211,8 @@ def _source_size(record: Any, spec: LocalTrainingSpec) -> int:
     for name in (spec.event_column, spec.result_available_at_column):
         if name:
             values[name] = instant_from_microseconds(values[name])
+    # Match the local trainer's serialized byte budget; these bytes are never loaded.
+    # nosemgrep: python.lang.security.deserialization.pickle.avoid-pickle
     serialized = len(pickle.dumps(values, protocol=pickle.HIGHEST_PROTOCOL))
     allocation = int(pd.DataFrame([values]).memory_usage(index=False, deep=True).sum())
     return max(serialized, allocation)

@@ -14,3 +14,4 @@
 # download (hundreds of MB). Install only when you need embeddings.
 
 sentence-transformers>=6.0.0,<7.0.0  # Enforce trust_remote_code for local models
+fsspec>=2026.6.0                    # Patched reference-filesystem template handling

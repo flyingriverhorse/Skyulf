@@ -130,6 +130,8 @@ def load_performance_history(
     """Read at most one latest observation per completed window, bounded in Spark."""
     name = table_name(qualified_name(f"{namespace}.monitoring_results"))
     digest = json_digest(config.payload())
+    # Identifiers are validated/quoted; both IDs are SHA-256 hex, end is datetime,
+    # and the row limit is rendered through int rather than accepting SQL text.
     rows = spark.sql(f"""
         WITH observations AS (
             SELECT report_id, measured_at,
@@ -143,7 +145,7 @@ def load_performance_history(
             ) AS rank FROM observations
             WHERE ending < TIMESTAMP '{end.isoformat()}'
         ) SELECT performance FROM ranked WHERE rank = 1 ORDER BY ending DESC LIMIT {int(count)}
-    """).collect()
+    """).collect()  # nosec B608 - bounded typed values and validated identifiers above
     return [json.loads(row["performance"]) for row in rows]
 
 

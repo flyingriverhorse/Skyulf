@@ -56,8 +56,10 @@ def _write_population(spark: Any, name: str, frame: Any) -> dict:
     view = f"skyulf_reference_{uuid4().hex}"
     frame.createOrReplaceTempView(view)
     try:
+        # Table identifiers are validated/quoted, properties are constants, and
+        # the temporary view suffix is generated UUID hex rather than input text.
         spark.sql(
-            f"CREATE TABLE {table_name(name)} USING DELTA "
+            f"CREATE TABLE {table_name(name)} USING DELTA "  # nosec B608
             f"TBLPROPERTIES ('{PROPERTY}' = '{OWNER}', 'delta.appendOnly' = 'true') "
             f"AS SELECT * FROM {view}"
         )

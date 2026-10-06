@@ -31,6 +31,7 @@ asyncpg>=0.29.0,<1.0.0              # Async PostgreSQL support (optional)
 pyarrow>=23.0.1                      # Parquet support for Pandas/Polars
 boto3>=1.34.0                        # AWS SDK (transitive via s3fs, pinned for stability)
 s3fs>=2023.12.0                      # S3 Filesystem for Pandas
+fsspec>=2026.6.0                     # Patched reference-filesystem template handling
 aiohttp>=3.13.4,<4.0.0              # Pinned to avoid pip backtracking (transitive via s3fs)
 aiofiles>=24.1.0                     # Async file operations
 
@@ -69,6 +70,7 @@ seaborn>=0.13.2                      # Statistical visualizations
 plotly>=6.3.0                        # Interactive charts
 # Dense sentence embeddings (pulls PyTorch) are optional: requirements-nlp.txt
 optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
+Mako>=1.4.2                          # Patched Windows template lookup via Alembic
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
 cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
 imbalanced-learn>=0.14.1,<1.0.0     # Sampling strategies for imbalanced datasets

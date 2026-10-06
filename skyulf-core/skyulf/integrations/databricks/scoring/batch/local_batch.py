@@ -17,7 +17,9 @@ import polars as pl
 from skyulf.integrations.databricks.shared._local_frames import frame_bytes
 
 from .....data.dataset import SplitDataset
-from .....inference.local_evaluation import evaluate_local_holdout as evaluate_local_holdout
+from .....inference.local_evaluation import (  # noqa: F401 - public compatibility re-export
+    evaluate_local_holdout as evaluate_local_holdout,
+)
 from .....inference.local_pipeline import (
     LocalPipelineArtifact,
     load_local_pipeline,

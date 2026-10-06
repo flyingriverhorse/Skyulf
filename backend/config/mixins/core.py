@@ -1,13 +1,34 @@
 """Core application metadata and server settings."""
 
+import tomllib
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Literal
 
-try:
-    _APP_VERSION = version("skyulf")
-except PackageNotFoundError:
-    # Fallback for dev environments where the package is not installed
-    _APP_VERSION = "0.0.0-dev"
+
+def _application_version() -> str:
+    """Prefer installed release metadata, then the version of this source checkout."""
+    try:
+        installed_version = version("skyulf")
+    except PackageNotFoundError:
+        installed_version = None
+    if isinstance(installed_version, str) and installed_version.strip():
+        return installed_version
+
+    try:
+        manifest = Path(__file__).resolve().parents[3] / "pyproject.toml"
+        with manifest.open("rb") as source:
+            source_version = tomllib.load(source)["project"]["version"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return "0.0.0-dev"
+    return (
+        source_version
+        if isinstance(source_version, str) and source_version.strip()
+        else "0.0.0-dev"
+    )
+
+
+_APP_VERSION = _application_version()
 
 
 class CoreMixin:

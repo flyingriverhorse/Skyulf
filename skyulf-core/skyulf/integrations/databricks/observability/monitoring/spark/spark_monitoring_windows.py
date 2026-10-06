@@ -39,7 +39,8 @@ def _revisit_model(
     except Exception:  # noqa: BLE001 - latest observation persists the reference failure
         return
     policy = config.performance_policy
-    assert policy is not None
+    if policy is None:
+        raise ValueError("Performance window revisit requires a policy.")
     start, end = completed_performance_window(now, policy)
     span = end - start
     for offset in range(windows - 1, 0, -1):

@@ -16,7 +16,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.9.1",
+    version="0.9.2",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -45,7 +45,7 @@ setup(
         "spark": ["pyspark>=4.0.3,<4.1.0", "pandas>=2.0.0,<3.0.0"],
         # Local Delta harness only; Databricks Runtime supplies its own Delta engine.
         "delta": ["delta-spark>=4.0.0,<4.1.0", "pyspark>=4.0.3,<4.1.0"],
-        "mlflow": ["mlflow>=3.10,<4.0"],
+        "mlflow": ["mlflow>=3.10,<4.0", "Mako>=1.4.2", "Werkzeug>=3.1.9"],
         "dev": [
             "pytest",
             "pytest-cov>=4.1.0,<5.0.0",
@@ -63,7 +63,7 @@ setup(
             "causal-learn>=0.1.3.0",
         ],
         "text": ["vaderSentiment>=3.3.2"],
-        "nlp": ["sentence-transformers>=6.0.0,<7.0.0"],
+        "nlp": ["sentence-transformers>=6.0.0,<7.0.0", "fsspec>=2026.6.0"],
         "geo": [
             "geopandas>=0.14.0,<1.2.0",
             "shapely>=2.0.2,<2.2.0",
@@ -75,6 +75,7 @@ setup(
         ],
         "tuning": [
             "optuna>=3.0.0",
+            "Mako>=1.4.2",
             "optuna-integration>=3.0.0",
             "cmaes>=0.10.0",  # Required by optuna's CmaEsSampler (not bundled with optuna itself)
         ],
@@ -92,6 +93,7 @@ setup(
             "vaderSentiment>=3.3.2",
             "causal-learn>=0.1.3.0",
             "optuna>=3.0.0",
+            "Mako>=1.4.2",
             "optuna-integration>=3.0.0",
             "cmaes>=0.10.0",
             "imbalanced-learn>=0.13.0",
@@ -99,8 +101,10 @@ setup(
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
             "sentence-transformers>=6.0.0,<7.0.0",
+            "fsspec>=2026.6.0",
             "shap>=0.46.0,<1.0.0",
             "mlflow>=3.10,<4.0",
+            "Werkzeug>=3.1.9",
         ],
     },
     python_requires=">=3.12",
