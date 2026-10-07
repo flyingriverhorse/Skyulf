@@ -1,22 +1,27 @@
 """Credential-free project checks that never import or execute project hooks."""
 
 import ast
-import json
 from pathlib import Path
 
 from ..lifecycle.local_workflow import resolve_target_config
 from ._project_files import project_source
 from .workflow_config import validate_project_settings
+from .yaml_config import read_training_config, read_workflow_config
+from .yaml_models import static_workflows
 
 
 def _check_config(root: Path, bindings: dict[str, str]) -> dict:
     """Attach the editable file path to invalid or incomplete workflow settings."""
     try:
-        config = json.loads((root / "config/workflow.json").read_text(encoding="utf-8"))
+        config = read_workflow_config(root / "config/workflow.json")
         if not isinstance(config, dict):
             raise ValueError("Workflow configuration must be an object.")
-        resolved = resolve_target_config(config, bindings)
-        return validate_project_settings(resolved)
+        yaml = read_training_config(root / "config")
+        configs = static_workflows(yaml, config) if yaml is not None else [config]
+        checked = [
+            validate_project_settings(resolve_target_config(item, bindings)) for item in configs
+        ]
+        return checked[0]
     except KeyError as exc:
         raise ValueError(f"config/workflow.json: missing required setting {exc}.") from exc
     except (OSError, TypeError, ValueError) as exc:

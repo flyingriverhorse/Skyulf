@@ -20,17 +20,20 @@ from ..preprocessing.outliers.clip_values import (
     ClipValuesCalculator,
     _clean_bound,
 )
+from ..preprocessing.scaling.minmax import MinMaxScalerApplier, MinMaxScalerCalculator
 from ..registry import NodeRegistry
 
 APPLIERS = {
     "ClipValues": ClipValuesApplier,
     "GroupImputer": GroupImputerApplier,
     "OneHotEncoder": OneHotEncoderApplier,
+    "MinMaxScaler": MinMaxScalerApplier,
 }
 CALCULATORS = {
     "ClipValues": ClipValuesCalculator,
     "GroupImputer": GroupImputerCalculator,
     "OneHotEncoder": OneHotEncoderCalculator,
+    "MinMaxScaler": MinMaxScalerCalculator,
 }
 
 
@@ -227,6 +230,65 @@ def _onehot_state(raw: dict) -> dict:
     return {**scalar, "encoder_object": encoder}
 
 
+def _minmax_values(raw: dict) -> dict:
+    """Normalize only the exact tuple range emitted by the built-in scaler fit."""
+    if type(raw) is not dict:
+        raise ValueError("MinMax state and configuration require a plain mapping.")
+    values = dict(raw)
+    bounds = values.get("feature_range")
+    if type(bounds) is tuple:
+        values["feature_range"] = list(bounds)
+    return _normalize(values)
+
+
+def _finite_vector(values: Any, size: int) -> None:
+    """Require aligned finite numeric coefficients without coercion or custom arrays."""
+    if type(values) is not list or len(values) != size:
+        raise ValueError("MinMax statistic vectors must align with fitted columns.")
+    if any(type(value) not in (int, float) for value in values):
+        raise ValueError("MinMax statistics require finite numeric scalars.")
+    try:
+        finite = all(math.isfinite(value) for value in values)
+    except OverflowError as exc:
+        raise ValueError("MinMax statistics exceed finite numeric bounds.") from exc
+    if not finite:
+        raise ValueError("MinMax statistics require finite numeric scalars.")
+
+
+def _minmax_range(bounds: Any) -> None:
+    """Keep the fitted affine range explicit, finite and strictly increasing."""
+    _finite_vector(bounds, 2)
+    if bounds[0] >= bounds[1]:
+        raise ValueError("MinMax feature_range must be strictly increasing.")
+
+
+def _minmax_state(raw: dict) -> dict:
+    """Inspect the scalar artifact actually executed instead of admitting a native scaler."""
+    state = _minmax_values(raw)
+    _fields(state, {"type", "columns", "min", "scale", "data_min", "data_max", "feature_range"})
+    columns = _columns(state["columns"])
+    if state["type"] != "minmax_scaler" or not columns:
+        raise ValueError("MinMax requires nonempty fitted affine state.")
+    _minmax_range(state["feature_range"])
+    for name in ("min", "scale", "data_min", "data_max"):
+        _finite_vector(state[name], len(columns))
+    if any(value <= 0 for value in state["scale"]):
+        raise ValueError("MinMax fitted scales must be positive.")
+    if any(low > high for low, high in zip(state["data_min"], state["data_max"], strict=True)):
+        raise ValueError("MinMax fitted extrema are inverted.")
+    return state
+
+
+def _minmax_config(params: dict, state: dict) -> dict:
+    """Bind defaults and explicit range options to the saved fitted column contract."""
+    resolved = {"feature_range": [0, 1], **params}
+    _fields(resolved, {"columns", "feature_range"})
+    _minmax_range(resolved["feature_range"])
+    if resolved["feature_range"] != state["feature_range"]:
+        raise ValueError("Configured MinMax range disagrees with fitted state.")
+    return resolved
+
+
 def batch_state(node: str, raw: dict) -> dict:
     """Inspect the narrow Python object vocabulary independently of JSON codecs."""
     validators = {
@@ -234,13 +296,14 @@ def batch_state(node: str, raw: dict) -> dict:
         "GroupImputer": _group_state,
         "OneHotEncoder": _onehot_state,
         "SimpleImputer": _mode_state,
+        "MinMaxScaler": _minmax_state,
     }
     return validators[node](raw)
 
 
 def batch_config(node: str, raw: dict, state: dict) -> dict:
     """Resolve defaults and bind configured behavior to the saved fitted state."""
-    params = _normalize(raw)
+    params = _minmax_values(raw) if node == "MinMaxScaler" else _normalize(raw)
     params.pop("target_column", None)
     auto = params.pop("_auto_columns", False)
     if node == "ClipValues":
@@ -253,6 +316,8 @@ def batch_config(node: str, raw: dict, state: dict) -> dict:
     if columns is not None and not auto and columns != state["columns"]:
         raise ValueError("Configured columns disagree with fitted columns.")
     params["columns"] = state["columns"]
+    if node == "MinMaxScaler":
+        return _minmax_config(params, state)
     return (
         _imputation_config(node, params, state)
         if node != "OneHotEncoder"

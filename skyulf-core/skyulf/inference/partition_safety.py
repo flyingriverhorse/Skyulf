@@ -30,6 +30,7 @@ from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
 from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
+from . import _partition_trees as batch_trees
 from .local_pipeline import LocalPipelineArtifact
 from .local_scoring import prediction_output_schema
 
@@ -144,10 +145,15 @@ def _check_model(artifact: LocalPipelineArtifact) -> Any:
         raise _reject("model", "Custom or absent model estimator is unsupported.")
     _check_instance_methods(estimator)
     model, actual_applier, tuning_result = _model_parts(estimator)
-    applier = _MODELS.get(type(model)) or batch_nodes.xgboost_applier(model)
+    applier = (
+        _MODELS.get(type(model))
+        or batch_trees.tree_applier(model)
+        or batch_nodes.xgboost_applier(model)
+    )
     if applier is None or type(actual_applier) is not applier:
         raise _reject(
-            "model", "Only reviewed exact linear, logistic and XGBRegressor models are admitted."
+            "model",
+            "Only reviewed exact linear, logistic, sklearn tree and XGBRegressor models are admitted.",
         )
     _check_instance_methods(model)
     if vars(actual_applier):
@@ -186,9 +192,12 @@ def _check_tuning_result(result: TuningResult, model: Any) -> None:
     thresholds = result.decision_thresholds
     if thresholds is None:
         return
-    if type(model) is not LogisticRegression or type(thresholds) is not dict:
+    if (
+        type(model) not in {LogisticRegression, *batch_trees.CLASSIFIERS}
+        or type(thresholds) is not dict
+    ):
         raise _reject(
-            "model", "Tuned thresholds require a LogisticRegression class-weight mapping."
+            "model", "Tuned thresholds require a reviewed classifier class-weight mapping."
         )
     if any(type(value) not in (int, float) for value in thresholds.values()):
         raise _reject("model", "Tuned thresholds must contain numeric scalar values.")

@@ -6,6 +6,7 @@ import numpy as np
 import polars as pl
 from sklearn.preprocessing import MinMaxScaler
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
@@ -64,7 +65,13 @@ class MinMaxScalerApplier(BaseApplier):
         return X_out, _y
 
 
-@NodeRegistry.register("MinMaxScaler", MinMaxScalerApplier)
+@NodeRegistry.register(
+    "MinMaxScaler",
+    MinMaxScalerApplier,
+    execution_capabilities=(
+        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+    ),
+)
 @node_meta(
     id="MinMaxScaler",
     name="Min-Max Scaler",

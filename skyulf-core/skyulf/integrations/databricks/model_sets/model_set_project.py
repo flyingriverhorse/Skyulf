@@ -35,6 +35,7 @@ from ..jobs.shared.job_runtime import (
 from ..lifecycle.local_workflow import bind_target_name, resolve_target_config
 from ..projects._project_files import project_source, read_source
 from ..projects.workflow_config import validate_workflow_config
+from ..projects.yaml_config import read_inference_config
 from ..scoring.incremental.local_incremental import (
     bounded_frame,
     latest_source_version,
@@ -50,14 +51,11 @@ def load_project_model_set(
     values: dict[str, str], base_config: dict[str, Any] | None = None
 ) -> dict[str, Any] | None:
     """Resolve optional set destinations without loading training or composition source."""
-    path = Path(values["config_path"]).parent.parent / "src/modeling/model_set.py"
-    if not path.exists():
+    path, declared = _project_set_declaration(values)
+    if path is None:
         return None
     base = read_notebook_config(values) if base_config is None else base_config
-    factory = getattr(load_project_module(read_source(path)), "build_model_set", None)
-    if not callable(factory):
-        raise ValueError("model_set.py must define build_model_set().")
-    settings = factory()
+    settings = declared if declared is not None else _python_set_settings(path)
     if settings is None:
         return None
     _validate_set_settings(settings)
@@ -76,6 +74,26 @@ def load_project_model_set(
     result = {key: bound[key] for key in settings}
     result["publication"] = _bind_publication(settings.get("publication"), bindings)
     return result
+
+
+def _project_set_declaration(values: dict[str, str]) -> tuple[Path | None, dict[str, Any] | None]:
+    """Choose the optional YAML or legacy Python owner without ambiguous precedence."""
+    path = Path(values["config_path"]).parent.parent / "src/modeling/model_set.py"
+    yaml = read_inference_config(Path(values["config_path"]).parent)
+    declared = yaml.get("model_set") if yaml is not None else None
+    if declared is not None and path.exists():
+        raise ValueError("Model set settings defined in both inference.yml and model_set.py.")
+    if declared is None and not path.exists():
+        return None, None
+    return path, declared
+
+
+def _python_set_settings(path: Path) -> dict[str, Any] | None:
+    """Retain the legacy trusted Python model-set builder contract."""
+    factory = getattr(load_project_module(read_source(path)), "build_model_set", None)
+    if not callable(factory):
+        raise ValueError("model_set.py must define build_model_set().")
+    return factory()
 
 
 def _validate_set_settings(settings: Any) -> None:

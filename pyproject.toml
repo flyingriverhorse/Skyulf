@@ -111,6 +111,7 @@ dev = [
     "pytest-benchmark>=5.0.0,<6.0.0",
     "jsonschema>=4.0.0,<5.0.0",  # Databricks template prompt visibility tests
     "mlflow>=3.10,<4.0",  # Tracking integration tests and type checking
+    "PyYAML>=6.0.3,<7",  # Optional Bundle configuration and template checks
     "Werkzeug>=3.1.9",  # Reject Windows device paths in safe_join
 
     # Linters/formatters/typecheckers (>=0.15: PLC0415 rule, audit finding F-11)

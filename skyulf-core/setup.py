@@ -45,7 +45,9 @@ setup(
         "spark": ["pyspark>=4.0.3,<4.1.0", "pandas>=2.0.0,<3.0.0"],
         # Local Delta harness only; Databricks Runtime supplies its own Delta engine.
         "delta": ["delta-spark>=4.0.0,<4.1.0", "pyspark>=4.0.3,<4.1.0"],
-        "mlflow": ["mlflow>=3.10,<4.0", "Mako>=1.4.2", "Werkzeug>=3.1.9"],
+        "mlflow": ["mlflow>=3.10,<4.0", "Mako>=1.4.2", "Werkzeug>=3.1.9", "PyYAML>=6.0.3,<7"],
+        # Optional UC lookups; 0.11 introduced support for the MLflow 3 runtime.
+        "feature-store": ["databricks-feature-engineering>=0.11,<1.0"],
         "dev": [
             "pytest",
             "pytest-cov>=4.1.0,<5.0.0",
@@ -86,7 +88,8 @@ setup(
         "explainability": ["shap>=0.46.0,<1.0.0"],
         # Convenience aggregate: every optional runtime feature (excludes dev/geo
         # which carry heavy native deps and are opt-in on their own). Spark
-        # also stays separate: it requires Java and is experimental.
+        # also stays separate: it requires Java and is experimental. The
+        # Databricks-only feature-store SDK is a separate runtime opt-in.
         "all": [
             "matplotlib>=3.7.0",
             "rich>=13.0.0",
@@ -104,6 +107,7 @@ setup(
             "fsspec>=2026.6.0",
             "shap>=0.46.0,<1.0.0",
             "mlflow>=3.10,<4.0",
+            "PyYAML>=6.0.3,<7",
             "Werkzeug>=3.1.9",
         ],
     },

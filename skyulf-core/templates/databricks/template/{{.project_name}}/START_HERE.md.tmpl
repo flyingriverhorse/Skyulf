@@ -6,6 +6,13 @@ beside `databricks.yml`. Replace `YOUR_PROFILE` with your authenticated CLI prof
 
 ## Where to make a change
 
+For optional Spark feature domains, checked merged tables and a migration to
+`training.yml`/`inference.yml`, follow [FEATURE_TABLES.md](FEATURE_TABLES.md).
+Ready-table projects can keep their current flow; empty feature groups add no job.
+The table below describes the original Python/JSON layout. After YAML migration,
+edit model/training settings in `config/training.yml` and scoring/model-set
+settings in `config/inference.yml`; do not recreate the removed Python declarations.
+
 | Change | Edit | Check afterwards |
 | --- | --- | --- |
 | Input tables, record keys and shared input limits | `config/workflow.json` | Preview the resolved table names and selected columns. Source tables must already exist. |

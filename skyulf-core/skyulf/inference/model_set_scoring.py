@@ -13,6 +13,7 @@ import polars as pl
 
 from ..preprocessing.time_series.history import TemporalHistorySession
 from ._manifest import ColumnSpec
+from ._model_set_operations import apply_operation, validate_operation
 from .local_pipeline import load_local_pipeline, validate_local_input
 from .local_scoring import _preserve_history, score_local_pipeline
 from .project_code import load_project_module
@@ -89,23 +90,28 @@ def _dependencies(rule: dict, branches: set[str]) -> None:
 def validate_model_set_composition(
     config: Any, source: str, components: Any, record_key_schema: Any
 ) -> dict[str, Any]:
-    """Validate saved output callbacks and explicit per-rule component eligibility."""
+    """Validate saved callbacks or declarative arithmetic and explicit rule eligibility."""
     config = _composition_config(config)
     if not config["outputs"]:
         model_set_schema(components, record_key_schema, config)
         return config
-    module = load_project_module(source)
+    module = None
     branches = {component.branch for component in components}
     names: set[str] = set()
     for rule in config["outputs"]:
         if type(rule) is not dict:
             raise ValueError("Model-set composition rules must be objects.")
         _dependencies(rule, branches)
-        _validate_rule(
-            {k: v for k, v in rule.items() if k != "required_components"},
-            output=True,
-            module=module,
-        )
+        if "operation" in rule:
+            validate_operation(rule, components)
+        else:
+            if module is None:
+                module = load_project_module(source)
+            _validate_rule(
+                {k: v for k, v in rule.items() if k != "required_components"},
+                output=True,
+                module=module,
+            )
         name = rule["name"].casefold()
         if name in names:
             raise ValueError("Composition rule names must be unique.")
@@ -176,7 +182,6 @@ def compose_model_set_outputs(
     result = predictions.copy(deep=True)
     if not config["outputs"]:
         return result
-    module = load_project_module(source)
     for rule in config["outputs"]:
         reasons = _rule_reasons(predictions, rule)
         eligible = reasons.isna()
@@ -186,11 +191,7 @@ def compose_model_set_outputs(
             )
         if eligible.any():
             selected = raw.loc[eligible].reset_index(drop=True)
-            values = _resolve(module, rule["function"])(
-                selected.copy(deep=True),
-                predictions.loc[eligible].reset_index(drop=True).copy(deep=True),
-                deepcopy(rule["params"]),
-            )
+            values = _composition_values(selected, predictions.loc[eligible], rule, source)
             _check_rows(values, selected, pd.DataFrame)
             _bounded(values, max_rows, max_bytes)
             if list(values.columns) != [col["name"] for col in rule["columns"]]:
@@ -208,6 +209,19 @@ def compose_model_set_outputs(
         result[f"{rule['name']}__exclusion_reason"] = reasons
         _bounded(result, max_rows, max_bytes)
     return result
+
+
+def _composition_values(
+    selected: pd.DataFrame, predictions: pd.DataFrame, rule: dict, source: str
+) -> pd.DataFrame:
+    """Keep declarative arithmetic independent of saved callback source loading."""
+    predictions = predictions.reset_index(drop=True).copy(deep=True)
+    if "operation" in rule:
+        return apply_operation(predictions, rule)
+    module = load_project_module(source)
+    return _resolve(module, rule["function"])(
+        selected.copy(deep=True), predictions, deepcopy(rule["params"])
+    )
 
 
 def _bounded(frame: pd.DataFrame | pl.DataFrame, max_rows: int, max_bytes: int) -> None:

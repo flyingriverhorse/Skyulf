@@ -12,15 +12,25 @@ import re
 import runpy
 from pathlib import Path
 
+from skyulf.integrations.databricks.projects.yaml_config import (
+    read_training_config,
+    read_workflow_config,
+)
+
 
 def refresh(project):
     """Synchronize the generated graph with the project's trusted model declarations."""
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/workflow.json")
     layout = config["training_layout"]
     if layout == "single_model":
         return []
     module = "multi_model" if layout == "multi_target" else "model_competition"
-    names = list(runpy.run_path(str(project / f"src/modeling/{module}.py"))["MODELS"])
+    yaml = read_training_config(project / "config")
+    names = list(
+        yaml["models"]
+        if yaml is not None
+        else runpy.run_path(str(project / f"src/modeling/{module}.py"))["MODELS"]
+    )
     if not names or any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,89}", name) for name in names):
         raise ValueError("Use 1-90 character model identifiers for named job tasks.")
     path = project / "resources/train.job.yml"

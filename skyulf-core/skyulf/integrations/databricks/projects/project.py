@@ -18,6 +18,8 @@ from ..training.tuning.local_search import bounded_space
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
 from ._project_files import modeling_hook, project_source, read_source
 from ._project_recipes import bind_recipe_source, recipe_label, recipe_steps
+from .yaml_config import project_training_config
+from .yaml_models import model_entries, single_model
 
 
 def strict_json_value(value: Any, filename: str = "ensemble.py") -> Any:
@@ -44,6 +46,9 @@ def _load_single_model(config: dict[str, Any], path: Path) -> dict[str, Any]:
     """Resolve editable model parameters once, keeping saved pipelines self-contained."""
     if config.get("training_layout", "single_model") != "single_model":
         return config
+    yaml = project_training_config(path)
+    if yaml is not None:
+        return single_model(yaml, config)
     hook = modeling_hook(path, "single_model.py")
     if not hook.is_file():
         return config
@@ -172,6 +177,12 @@ def load_project_workflow(
     config = {**deepcopy(config), **deepcopy(weight_settings or {})}
     config = _load_single_model(config, Path(path))
     validate_weight_roles(config)
+    if config.get("training_layout", "single_model") == "single_model":
+        declarations = project_training_config(Path(path))
+        if declarations is not None:
+            entry = next(iter(model_entries(declarations).values()))
+            preprocessing_recipe = entry.get("preprocessing_recipe", preprocessing_recipe)
+            pre_split_recipe = entry.get("pre_split_recipe", pre_split_recipe)
     return resolve_project_workflow(
         config,
         path,

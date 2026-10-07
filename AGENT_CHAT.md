@@ -27,15 +27,18 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch093 contains reference-review delivery179 and offline-check follow-up180.
-User requested more improvements; local implementation and review are complete.
-Evidence is in initiatives/spark_and_mlflow/179-reference-template-improvements.md
-and 180-offline-package-checks.md. SM-40 remains PARTIAL. Root owns commit/push/PR
-follow-through; implementation claims are released, no pending peer request.
-GitHub writes recovered: bcd30ea1 pushed; PR197 open. Root is repairing CI failures.
-Fresh native Databricks testing remains explicitly user-deferred.
+Branch 093: optional feature lifecycle delivery181 is implemented and verified
+locally; user requests a local DCO commit. No push/deploy. User defers Databricks
+execution. Usage, review findings, final tests and remaining work are recorded in
+initiatives/spark_and_mlflow/181-feature-lifecycle-delivery.md and its YAML/SDK
+companions. SM-21a remains PARTIAL: offline temporal joins and SDK helpers exist;
+automatic native training/logging/score_batch wiring and cloud acceptance remain
+open. SM-21b remains LATER. Previous PR197 status is historical, not rechecked here.
 
 ## Open messages
 
-### task180-spark-mlflow-ready | 2026-10-07T16:30:26.4597186Z | Codex root -> peers | RELEASE
-All claims released. Delivery180 records native coverage implementation/review and CI53 Delta plus419 Spark/1 skip. Fixed skipped pyfunc module by combining existing MLflow requirements only in Spark CI and requiring imports; Python3.12 uv resolution, actionlint and independent review passed. Root owns commit/push/PR197 follow-through. Native Databricks testing user-deferred. Separate GitHub Advanced Security agent has monthly-quota HTTP402 failure; CodeQL and dependency scan passed, no billing/security-setting changes. No pending peer question.
+### task181-delivered | 2026-10-07 | Codex root -> peers | RELEASE
+Acknowledged uc-ready/uc-review/uc-notebook-results, partition-ready/minmax-ready and yaml-ready. Their useful findings are recorded in delivery181; all listed defects fixed and affected tests rerun. Final current-source local Spark12, Delta2, migrated CLI3 passed; feature/SDK union98, graph5, affected template82/10 opt-in skips, YAML27 and inference271 passed at their relevant final states. Ruff/format/full Ty/CCN/schema/lock/diff passed; wheel536 Python paths match source. No cloud/commit/push. All task181 file claims released, no pending peer question. Four task documents are included in the requested commit.
+
+### task181-commit-verified | 2026-10-07T18:28:03.8080439Z | Codex root -> peers | RELEASE
+User requested local commit. Staged scope reviewed: 63 intended files, no temporary/model artifacts. All applicable pre-commit hooks passed; no production changes since delivery181 tests. Updated delivery/queue and clarified YAML edit locations in START_HERE; restored protocol header from HEAD. Claims released. The requested local DCO commit was created with all applicable hooks passing; root is correcting only the message encoding and this status in the unpublished commit. No push/cloud execution. Next task remains SM21a lifecycle wiring and native acceptance; SM21b conditional.

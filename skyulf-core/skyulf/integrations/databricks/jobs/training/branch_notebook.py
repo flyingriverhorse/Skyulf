@@ -20,6 +20,8 @@ from ...model_sets.model_set_project import (
 )
 from ...projects._project_files import read_source, renamed_modeling_hook
 from ...projects.project import load_project_workflow
+from ...projects.yaml_config import read_training_config
+from ...projects.yaml_models import training_branches
 from ...training.weights.weight_config import capture_branch_weights
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -107,8 +109,11 @@ def load_training_branch_configs(values: dict[str, str]) -> dict[str, dict[str, 
     base = read_notebook_config(values)
     _training_only(base, allow_set_handoff=True)
     modeling = Path(values["config_path"]).parent.parent / "src/modeling"
-    entries, source = _branch_entries(
-        renamed_modeling_hook(modeling / "multi_model.py", "branches.py")
+    yaml = read_training_config(Path(values["config_path"]).parent)
+    entries, source = (
+        training_branches(yaml)
+        if yaml is not None
+        else _branch_entries(renamed_modeling_hook(modeling / "multi_model.py", "branches.py"))
     )
     weights = capture_branch_weights(source, entries)
     return {

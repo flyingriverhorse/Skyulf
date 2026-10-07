@@ -21,6 +21,8 @@ from ..training.weights.weight_config import capture_model_weights, validate_wei
 from ._project_files import modeling_hook, project_source, read_source, renamed_modeling_hook
 from .project import resolve_project_workflow, strict_json_value, validate_project_steps
 from .workflow_config import WORKFLOW_FIELDS, validate_workflow_pipeline
+from .yaml_config import project_training_config
+from .yaml_models import competition_candidates
 
 _CANDIDATE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 
@@ -57,7 +59,7 @@ def _candidate_definition(value: Any) -> dict[str, Any]:
     """Keep candidate overrides limited to the model and a preprocessing recipe."""
     if type(value) is not dict or "modeling" not in value:
         raise ValueError("Each candidate must define modeling.")
-    if set(value) - {"modeling", "preprocessing_recipe", "decision_threshold"}:
+    if set(value) - {"modeling", "preprocessing_recipe", "decision_threshold", "explainability"}:
         raise ValueError(
             "Unknown candidate setting; shared workflow settings cannot be overridden."
         )
@@ -115,6 +117,10 @@ def _load_candidates(
     path: Path, task: str, limit: int
 ) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Capture and execute one bounded candidates hook with strict JSON output."""
+    yaml = project_training_config(path)
+    if yaml is not None:
+        candidates, source, weights = competition_candidates(yaml)
+        return _candidate_mapping(candidates, limit), source, weights
     hook = renamed_modeling_hook(modeling_hook(path, "model_competition.py"), "candidates.py")
     source = read_source(hook)
     module = load_project_module(source)
@@ -146,6 +152,8 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
         local["pipeline"]["modeling"] = deepcopy(candidate["modeling"])
         if "decision_threshold" in candidate:
             local["pipeline"]["decision_threshold"] = deepcopy(candidate["decision_threshold"])
+        if "explainability" in candidate:
+            local["pipeline"]["explainability"] = deepcopy(candidate["explainability"])
         _bind_candidate_metric(local["pipeline"], metric)
         loaded = resolve_project_workflow(
             local,
