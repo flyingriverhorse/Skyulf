@@ -164,3 +164,18 @@ CLI generation/resolution against a loopback fixture is not cloud validation.
 Separate existing issue: master demo promotion has cherry-pick conflicts against
 the intentionally divergent `deploy/demo-mode` branch. This work does not modify
 that branch or its deployment.
+
+## Remote delivery blocker
+
+Implementation committed with DCO sign-off as `39cdbbf2`. Pre-commit passed and
+the working tree was clean. On 2026-10-07 at 15:09–15:11 UTC, three push attempts
+to `origin/093` failed with GitHub `Internal Server Error`, including a full-pack
+HTTP/1.1 retry. PR creation also returned a GraphQL server error. Repository API
+access reports push/admin permission; no authorization change was requested.
+
+Final readback returned 404 for the commit and branch, and no matching PR.
+Consequently no new remote CI result exists. Native testing remains deferred.
+Retry the normal push and PR creation after GitHub writes recover; first recheck
+the current local head, remote branch and existing PR to avoid duplicates.
+
+Last GitHub push request ID: `F4AE:246D9C:254BCAF:23F6D5C:6AC6610B`.
