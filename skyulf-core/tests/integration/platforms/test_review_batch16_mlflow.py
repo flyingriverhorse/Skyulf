@@ -45,12 +45,12 @@ def test_local_artifact_drops_training_weights_without_mutating_fit(tmp_path):
 def test_resolve_uses_bound_registry_transport(
     monkeypatch, tmp_path, bound_uri, explicit_uri, expected
 ):
-    """UC copies need scoped registry credentials; OSS copies need the explicitly bound store."""
+    """Resolve metadata once using bound registry credentials without fetching model payloads."""
     client = Mock()
     client._registry_uri = bound_uri
     client.get_model_version.return_value = SimpleNamespace(version="7", source="runs:/old/model")
     client.get_model_version_download_uri.return_value = "registered-copy:/model/7"
-    download = Mock(return_value=str(tmp_path))
+    download = Mock(return_value=str(tmp_path / "MLmodel"))
     monkeypatch.setattr(registry, "make_registry_client", lambda *args: client)
     monkeypatch.setattr(
         mlflow, "get_registry_uri", lambda: pytest.fail("Unrelated global registry")
@@ -68,8 +68,10 @@ def test_resolve_uses_bound_registry_transport(
         client.get_model_version_download_uri.assert_not_called()
     else:
         client.get_model_version_download_uri.assert_called_once_with("catalog.schema.model", "7")
-    assert download.call_args.kwargs["artifact_uri"] == expected
-    assert download.call_args.kwargs["registry_uri"] == bound_uri
+    download.assert_called_once_with(
+        artifact_uri=f"{expected}/MLmodel", tracking_uri=None, registry_uri=bound_uri
+    )
+    assert resolved.model_uri == "models:/catalog.schema.model/7"
     assert resolved.digest == "digest"
 
 

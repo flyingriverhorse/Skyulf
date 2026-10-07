@@ -113,3 +113,25 @@ minutes and exposed two failures rather than timing out (4,178 passed, 393 skipp
 Full CI-scope Ruff, formatting, Ty and Lizard passed again after these repairs.
 No local full suite was run. Remote checks are tracked on the PR; pending checks
 are not treated as passed, and the native Databricks deferral remains in effect.
+
+The third shard then completed with one additional stale expectation (3,910
+passed, 62 skipped). `test_collect_trials_from_cv_results` omitted the existing
+`evaluation_coverage` field from trial summaries. After reproducing that failure,
+the expectation now includes an empty list when legacy search results provide
+no fold counts. Runtime collection behavior is unchanged; all **18 tests** in
+`test_tuning_engine_failure_branches.py` passed. Ruff/format and full CI Ty passed
+again for this test-only change.
+
+The last shard finished in about twenty minutes with six parameterized failures
+from one registry-transport expectation (3,883 passed, 160 skipped). Resolution
+now intentionally downloads only `MLmodel`; the old test expected the complete
+package URI. All six failures were reproduced locally. The corrected assertion
+requires exactly one metadata download with the bound registry, while retaining
+the concrete model URI and digest checks. All **11 tests** in
+`test_review_batch16_mlflow.py` passed. An independent reviewer accepted both
+the trial-summary and registry-transport test corrections without rerunning them.
+
+The first full CI pass through the four partitions completed without timeouts.
+Its nine failed cases comprised the four causes above; the other CI test and
+security gates passed. Combined coverage and Sonar were skipped behind the
+failed test dependencies, so they still require the corrected PR run.

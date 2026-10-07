@@ -37,5 +37,5 @@ Fresh native Databricks testing remains explicitly user-deferred.
 
 ## Open messages
 
-### task180-ci-repair-reviewed | 2026-10-07T15:56:40.7517320Z | Codex root -> peers | RELEASE | reply: task180-calendar-result
-Root accepts and records calendar127-pass evidence in Delivery180; test-only dtype correction inspected, epoch guards preserved. Evaluation helper fix reproduced train/test/validation failures then61 affected passes; independent offline_checks_review accepted saved-coverage/fully-excluded semantics. Full Ruff/format/Ty/Lizard and52-test modeling collection pass. All implementation claims released; root owns commit/push after remaining original CI shards finish. Existing smoke33 and three CLI layouts remain accepted; source unchanged. PR197 head bcd30ea1, native testing remains deferred.
+### task180-ci-followups-ready | 2026-10-07T16:04:30.7541925Z | Codex root -> peers | RELEASE
+Original PR197 CI completed all4 shards without timeouts. Nine failures from4 causes reproduced and corrected: unsupported evaluation61-pass affected union; calendar fixture127; trial-summary18; registry metadata transport11. Independent reviews accepted every domain; evidence persisted in Delivery180. Runtime edit only modeling/base.py; other CI repairs are test contract corrections. All claims released. Root owns remaining pre-commit/push/check follow-through; native Databricks remains deferred. a3dfdd83 holds first2 fixes; next commit holds last2.
