@@ -27,6 +27,13 @@ from ...data.delta_io.cdf_recovery import (
     validate_recovery_binding,
 )
 from ...data.delta_io.delta import DeltaPublishError, history, table_identity
+from ...feature_store.scoring import (
+    feature_source_columns,
+    validate_feature_continuation,
+    validate_feature_receipt,
+    validate_feature_snapshot,
+    validate_feature_source,
+)
 from ...shared._contracts import PREDICTION_METADATA_COLUMNS, column_name, table_name
 from ..batch.spark_scoring import (
     DistributedRows,
@@ -114,7 +121,7 @@ def _validate_prepared(
         raise ValueError("Model inputs must be distinct from keys and event time.")
     if any(name in {"_change_type", "_commit_version", "_commit_timestamp"} for name in inputs):
         raise ValueError("Model inputs collide with Delta change metadata.")
-    return inputs
+    return feature_source_columns(artifact)
 
 
 def bounded_frame(
@@ -175,6 +182,7 @@ def run_incremental_local_batch(
     """
     inputs = _validate_prepared(prepared, record_key_columns, period_column)
     validate_prepared_spark(prepared)
+    validate_feature_snapshot(spark, prepared.artifact)
     admission = validate_admission(spark, admission)
     config = prepared.config
     source_table = config.source.table
@@ -193,6 +201,7 @@ def run_incremental_local_batch(
             )
 
     with admission.hold(target_id):
+        feature_evidence = validate_feature_snapshot(spark, prepared.artifact)
         if (
             table_identity(spark, source_table) != source_id
             or table_identity(spark, target_table) != target_id
@@ -200,6 +209,7 @@ def run_incremental_local_batch(
             raise BatchConflictError("Source or target table identity changed during admission.")
         target_latest = latest_source_version(spark, target_table)
         previous = last_receipt(target_latest, source_id, target_id)
+        validate_feature_continuation(previous, feature_evidence)
         check_incremental_bootstrap(spark, target_table, previous, functions)
         prior_version = int(previous["source_end_version"]) if previous else None
         upper_version = int(latest_source_version(spark, source_table)["version"])
@@ -360,7 +370,8 @@ def _read_scoring_rows(
 ) -> pd.DataFrame | DistributedRows:
     """Choose one explicit execution mode without retrying a failure locally."""
     if prepared.config.inference_mode == "spark":
-        return read_distributed_rows(selected, columns, keys)
+        validate_feature_source(selected, prepared.artifact)
+        return read_distributed_rows(selected, tuple(dict.fromkeys(columns)), keys)
     source = prepared.config.source
     return bounded_frame(selected, columns, keys, source.max_rows, source.max_bytes)
 
@@ -375,6 +386,7 @@ def _recover_incremental_batch(
     functions: Any,
 ) -> IncrementalBatchResult:
     """Verify the admitted request and replace one complete pinned snapshot atomically."""
+    validate_feature_snapshot(spark, prepared.artifact)
     source, target_name = request["source_table"], request["target_table"]
     source_id, target_id = request["source_table_id"], request["target_table_id"]
     if (
@@ -709,6 +721,7 @@ def _commit_increment(
         raise BatchConflictError("Source or target table identity changed while scoring.")
     if int(latest_source_version(spark, target_table)["version"]) != int(target_latest["version"]):
         raise BatchConflictError("Target changed while scoring; retry from the latest receipt.")
+    validate_feature_receipt(spark, manifest)
     app_id = f"skyulf-incremental:{source_id}:{target_id}"
     transaction_version = upper_version
     if write_mode == "overwrite":

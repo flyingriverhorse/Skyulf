@@ -92,6 +92,16 @@ class FeatureTrainingSpec:
         _columns(self.feature_names, "feature_names")
         self._validate_label()
         self._validate_lookup_columns()
+        self._validate_table_windows()
+
+    def _validate_table_windows(self) -> None:
+        """Reject windows the SDK's single per-table lookback field cannot represent."""
+        windows: dict[str, timedelta | None] = {}
+        for lookup in self.lookups:
+            table = lookup.table_name.casefold()
+            if table in windows and windows[table] != lookup.lookback_window:
+                raise ValueError("Lookups of the same table must use one lookback_window.")
+            windows[table] = lookup.lookback_window
 
     @property
     def feature_names(self) -> tuple[str, ...]:

@@ -6,14 +6,15 @@ from pathlib import Path
 from ..lifecycle.local_workflow import resolve_target_config
 from ._project_files import project_source
 from .workflow_config import validate_project_settings
-from .yaml_config import read_training_config, read_workflow_config
+from .yaml_config import project_config_path, read_training_config, read_workflow_config
 from .yaml_models import static_workflows
 
 
 def _check_config(root: Path, bindings: dict[str, str]) -> dict:
     """Attach the editable file path to invalid or incomplete workflow settings."""
+    path = project_config_path(root)
     try:
-        config = read_workflow_config(root / "config/workflow.json")
+        config = read_workflow_config(path)
         if not isinstance(config, dict):
             raise ValueError("Workflow configuration must be an object.")
         yaml = read_training_config(root / "config")
@@ -23,9 +24,9 @@ def _check_config(root: Path, bindings: dict[str, str]) -> dict:
         ]
         return checked[0]
     except KeyError as exc:
-        raise ValueError(f"config/workflow.json: missing required setting {exc}.") from exc
+        raise ValueError(f"config/{path.name}: missing required setting {exc}.") from exc
     except (OSError, TypeError, ValueError) as exc:
-        raise ValueError(f"config/workflow.json: {exc}") from exc
+        raise ValueError(f"config/{path.name}: {exc}") from exc
 
 
 def _check_packages(root: Path) -> list[str]:
@@ -38,7 +39,7 @@ def _check_packages(root: Path) -> list[str]:
         try:
             if not path.is_dir() or not path.resolve().is_relative_to(root):
                 raise ValueError("Project package must be a directory inside the project.")
-            project_source(path)
+            project_source(path, exclude_feature_groups=relative == "src/features")
         except (OSError, ValueError) as exc:
             raise ValueError(f"{relative}: {exc}") from exc
         checked.append(relative)

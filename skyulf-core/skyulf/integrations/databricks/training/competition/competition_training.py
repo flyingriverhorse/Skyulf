@@ -113,7 +113,10 @@ def fit_training_pipeline(
             risk_category=config.get("risk_category"),
         )
         model_uri = training.log_local_model(
-            path, run_id=created.info.run_id, tracking_uri=config["tracking_uri"]
+            path,
+            run_id=created.info.run_id,
+            tracking_uri=config["tracking_uri"],
+            **training.feature_log_options(spark, fitted.spec),
         )
         frame = pl.from_pandas(partitions[1]) if config["engine"] == "polars" else partitions[1]
         frame, sample_weight = extract_training_weights(frame, spec.weight_column)

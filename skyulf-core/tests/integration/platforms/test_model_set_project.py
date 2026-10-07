@@ -48,6 +48,8 @@ def test_combined_rules_capture_uses_shared_features_only_during_training(
     )
     features = tmp_path / "src/features"
     (features / "__init__.py").write_text("def build_combined_rules():\n    return []\n")
+    (features / "groups").mkdir()
+    (features / "groups/company.py").write_text("raise AssertionError('Spark producer')\n")
     loaded = load_project_model_set(values)
     assert loaded is not None
     assert loaded["publication"]["combined_view"] == "workspace.outputs.profit_dev"

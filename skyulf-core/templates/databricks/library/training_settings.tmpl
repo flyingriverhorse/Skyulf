@@ -1,0 +1,63 @@
+{{- define "training_settings" -}}
+{{- $v := .values -}}{{- $p := .prefix -}}{{- $i := .indent -}}{{- $task := .task -}}
+{{- $cv := or (eq $v.training_layout "model_competition") (eq (index $v (print $p "cv_enabled")) "true") -}}
+{{- $cv_type := index $v (print $p "cv_type") -}}{{- $nested := index $v (print $p "cv_nested_type") -}}
+{{- $temporal := and $cv (or (eq $cv_type "time_series_split") (and (eq $cv_type "nested_cv") (eq $nested "time_series_split"))) -}}
+{{- $group := or (eq $cv_type "group_k_fold") (eq $cv_type "stratified_group_k_fold") (and (eq $cv_type "nested_cv") (or (eq $nested "group_k_fold") (eq $nested "stratified_group_k_fold"))) -}}
+{{- $split := index $v (print $p "split_strategy") -}}{{- if $temporal -}}{{- $split = "temporal" -}}{{- end -}}
+{{- $window := index $v (print $p "training_window_mode") -}}
+{{- if eq $window "auto" -}}{{- if eq $split "temporal" -}}{{- $window = "rolling_calendar" -}}{{- else -}}{{- $window = "full_snapshot" -}}{{- end -}}{{- end -}}
+{{$i}}task: {{$task}}
+{{$i}}input_columns: [{{range $n, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString (index $v (print $p "input_columns")) -1}}{{if $n}}, {{end}}{{printf "%q" $column}}{{end}}]
+{{$i}}target_column: {{printf "%q" (index $v (print $p "target_column"))}}
+{{$i}}split_strategy: {{$split}}
+{{$i}}training_window_mode: {{$window}}
+{{$i}}test_size: {{index $v (print $p "test_size")}}
+{{$i}}random_state: {{index $v (print $p "random_state")}}
+{{$i}}stratify: {{if and (eq $task "classification") (ne $split "temporal")}}{{index $v (print $p "stratify")}}{{else}}false{{end}}
+{{if eq $window "rolling_days"}}{{$i}}lookback_days: {{index $v (print $p "lookback_days")}}
+{{if eq $split "temporal"}}{{$i}}holdout_days: {{index $v (print $p "holdout_days")}}
+{{end}}{{end -}}
+{{if eq $window "rolling_calendar"}}{{$i}}window_timezone: {{printf "%q" (index $v (print $p "window_timezone"))}}
+{{$i}}monthly_lookback_months: {{index $v (print $p "monthly_lookback_months")}}
+{{if eq $split "temporal"}}{{$i}}holdout_months: {{index $v (print $p "holdout_months")}}
+{{end}}{{end -}}
+{{$i}}cv_enabled: {{$cv}}
+{{if $cv}}{{$i}}cv_folds: {{index $v (print $p "cv_folds")}}
+{{$i}}cv_type: {{$cv_type}}
+{{$i}}cv_shuffle: {{if $temporal}}false{{else if eq $cv_type "shuffle_split"}}true{{else}}{{index $v (print $p "cv_shuffle")}}{{end}}
+{{$i}}cv_random_state: {{index $v (print $p "cv_random_state")}}
+{{if eq $cv_type "nested_cv"}}{{$i}}cv_nested_type: {{$nested}}
+{{if index $v (print $p "cv_inner_folds")}}{{$i}}cv_inner_folds: {{index $v (print $p "cv_inner_folds")}}
+{{end}}{{end -}}
+{{if and $group (index $v (print $p "cv_group_column"))}}{{$i}}cv_group_column: {{printf "%q" (index $v (print $p "cv_group_column"))}}
+{{end -}}
+{{if $temporal}}{{$i}}cv_gap: {{index $v (print $p "cv_gap")}}
+{{if ne (index $v (print $p "cv_test_size")) "null"}}{{$i}}cv_test_size: {{index $v (print $p "cv_test_size")}}
+{{end}}{{if ne (index $v (print $p "cv_max_train_size")) "null"}}{{$i}}cv_max_train_size: {{index $v (print $p "cv_max_train_size")}}
+{{end}}{{end}}{{end -}}
+{{if ne (index $v (print $p "training_sample_rows")) "null"}}{{$i}}training_sample_rows: {{index $v (print $p "training_sample_rows")}}
+{{$i}}training_sample_seed: {{index $v (print $p "training_sample_seed")}}
+{{end -}}
+{{$i}}filter_unavailable_results: {{index $v (print $p "filter_unavailable_results")}}
+{{if and (eq (index $v (print $p "filter_unavailable_results")) "true") (ne (index $v (print $p "result_availability_lag_hours")) "null")}}{{$i}}result_availability_lag_hours: {{index $v (print $p "result_availability_lag_hours")}}
+{{end -}}
+{{if index $v (print $p "event_column")}}{{$i}}event_column: {{printf "%q" (index $v (print $p "event_column"))}}
+{{$i}}event_time_parsing: {format: {{if index $v (print $p "event_time_format")}}{{printf "%q" (index $v (print $p "event_time_format"))}}{{else}}null{{end}}, timezone: {{if index $v (print $p "event_time_timezone")}}{{printf "%q" (index $v (print $p "event_time_timezone"))}}{{else}}null{{end}}, date_only: {{index $v (print $p "event_date_only")}}}
+{{end -}}
+{{if index $v (print $p "result_available_at_column")}}{{$i}}result_available_at_column: {{printf "%q" (index $v (print $p "result_available_at_column"))}}
+{{$i}}result_time_parsing: {format: {{if index $v (print $p "result_time_format")}}{{printf "%q" (index $v (print $p "result_time_format"))}}{{else}}null{{end}}, timezone: {{if index $v (print $p "result_time_timezone")}}{{printf "%q" (index $v (print $p "result_time_timezone"))}}{{else}}null{{end}}, date_only: {{index $v (print $p "result_date_only")}}}
+{{end -}}
+{{range $key := (regexp "[a-z_]+").FindAllString "start holdout_start cutoff result_cutoff" -1}}{{if index $v (print $p $key)}}{{$i}}{{$key}}: {{printf "%q" (index $v (print $p $key))}}
+{{end}}{{end -}}
+{{$i}}max_rows: {{index $v (print $p "max_rows")}}
+{{$i}}max_input_mb: {{index $v (print $p "max_input_mb")}}
+{{$i}}metric: {{index $v (print $p $task "_metric")}}
+{{$i}}min_improvement: {{index $v (print $p "min_improvement")}}
+{{if ne (index $v (print $p "quality_threshold")) "null"}}{{$i}}quality_threshold: {{index $v (print $p "quality_threshold")}}
+{{end -}}
+{{if and $p (ne (index $v (print $p "quality_gates")) "null")}}{{$i}}quality_gates: {{index $v (print $p "quality_gates")}}
+{{end -}}
+{{if eq (index $v (print $p "sample_weight_enabled")) "true"}}{{$i}}weight_column: {{printf "%q" (index $v (print $p "weight_column"))}}
+{{end -}}
+{{end -}}

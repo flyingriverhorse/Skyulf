@@ -118,13 +118,28 @@ def _validate_package_files(files: dict[str, str]) -> None:
             raise ValueError(f"Project module conflicts with its package: {filename}.")
 
 
-def project_source(path: Path) -> str:
-    """Keep single-file snapshots compatible or archive a complete Python package."""
+def _package_sources(path: Path, exclude_feature_groups: bool) -> list[Path]:
+    """Separate upstream Spark producers from the model's executable feature package."""
+    candidates = (
+        filename
+        for filename in path.rglob("*.py")
+        if not (exclude_feature_groups and filename.relative_to(path).parts[0] == "groups")
+    )
+    return sorted(candidates, key=lambda item: item.relative_to(path).as_posix())
+
+
+def project_source(path: Path, *, exclude_feature_groups: bool = False) -> str:
+    """Archive model source, optionally excluding the reserved top-level groups folder.
+
+    Feature recipe callers exclude ``groups/``, whose Spark producers are pinned
+    by the upstream feature job. Other package callers retain every Python file.
+    Single-file snapshots and previously saved package replay remain unchanged.
+    """
     if not path.is_dir():
         return read_source(path)
     files = {}
     size = 0
-    for filename in sorted(path.rglob("*.py"), key=lambda item: item.relative_to(path).as_posix()):
+    for filename in _package_sources(path, exclude_feature_groups):
         relative = _module_path(filename, path)
         source = read_source(filename)
         size += len(source.encode("utf-8"))

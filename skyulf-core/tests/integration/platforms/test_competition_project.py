@@ -62,6 +62,8 @@ def _config():
 def test_candidates_resolve_named_recipes_and_capture_source(tmp_path):
     """Each saved candidate must replay its own preprocessing without editable files."""
     root = _project(tmp_path)
+    (root / "groups").mkdir()
+    (root / "groups/company.py").write_text("raise AssertionError('Spark producer')\n")
     config = _config()
     original = deepcopy(config)
     resolved = load_project_workflow(config, root)

@@ -66,14 +66,14 @@ def _plan() -> FeaturePlan:
                 "company",
                 "catalog.demo.raw_company",
                 "catalog.demo.company_features",
-                "src/feature_groups/company.py:compute",
+                "src/features/groups/company.py:compute",
                 ("size",),
             ),
             FeatureGroup(
                 "activity",
                 "catalog.demo.raw_activity",
                 "catalog.demo.activity_features",
-                "src/feature_groups/activity.py:compute",
+                "src/features/groups/activity.py:compute",
                 ("spend",),
                 lookup="asof",
             ),
@@ -95,12 +95,12 @@ def notebook(tmp_path):
         "  company:\n"
         "    source_table: catalog.demo.raw_company\n"
         "    output_table: catalog.demo.company_features\n"
-        "    transform: src/feature_groups/company.py:compute\n"
+        "    transform: src/features/groups/company.py:compute\n"
         "    columns: [size]\n"
         "  activity:\n"
         "    source_table: catalog.demo.raw_activity\n"
         "    output_table: catalog.demo.activity_features\n"
-        "    transform: src/feature_groups/activity.py:compute\n"
+        "    transform: src/features/groups/activity.py:compute\n"
         "    columns: [spend]\n    lookup: asof\n",
         encoding="utf-8",
     )

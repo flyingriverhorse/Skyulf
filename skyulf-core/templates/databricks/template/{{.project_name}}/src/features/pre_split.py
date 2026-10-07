@@ -15,8 +15,8 @@ HOW TO USE
   2. Check: python src/tools/preview.py --action train
 
 RECIPES
-  A recipe is a named list of filters. Single-model training always uses
-  "default". multi_model.py chooses one per model with "pre_split_recipe".
+  A recipe is a named list of filters. config/training.yml selects one with
+  pre_split_recipe; the default is "default". Competition shares that recipe.
   Recipes starting with "example_" are ready-made lists to read or copy from.
   "none" means no filters.
 

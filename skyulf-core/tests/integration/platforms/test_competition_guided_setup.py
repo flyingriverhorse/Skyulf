@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft7Validator
 
+from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
 ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
 
 
@@ -93,11 +95,9 @@ def test_other_layouts_hide_competition_questions(layout):
 @pytest.mark.parametrize("task,count", [("classification", "13"), ("regression", "14")])
 def test_cli_renders_all_base_positions_for_eighth_candidate(tmp_path, task, count):
     """Two-digit base positions and the final candidate slot must retain every selected model."""
-    import runpy
+    from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
-    from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
-
-    if not CLI or not PROFILE:
+    if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
     model = "voting_classifier" if task == "classification" else "voting_regressor"
     project = _generate_project(
@@ -110,9 +110,12 @@ def test_cli_renders_all_base_positions_for_eighth_candidate(tmp_path, task, cou
             f"competition_ensemble_8_{task}_base_count": count,
         },
     )
-    candidates = runpy.run_path(str(project / "src/modeling/model_competition.py"))[
-        "build_candidates"
-    ](task)
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+    from skyulf.integrations.databricks.projects.yaml_models import competition_candidates
+
+    declarations = read_training_config(project / "config")
+    assert declarations is not None
+    candidates, _, _ = competition_candidates(declarations)
     params = candidates[f"{model}_8"]["modeling"]["base_model"]["params"]
     assert len(candidates) == 8
     assert len(params["base_estimators"]) == len(set(params["base_estimators"])) == int(count)
@@ -124,13 +127,13 @@ def test_cli_renders_all_base_positions_for_eighth_candidate(tmp_path, task, cou
 @pytest.mark.parametrize("strategy", ["random", "grid", "halving_random", "halving_grid", "optuna"])
 def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy):
     """Real CLI output must freeze selected models, strategy controls and ensemble composition."""
-    from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
+    from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
     from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
-    if not CLI or not PROFILE:
+    if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
     classifier = task == "classification"
     first = "logistic_regression" if classifier else "ridge_regression"
@@ -158,7 +161,7 @@ def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy)
         competition_ensemble_2_regression_final="linear_regression",
         **overrides,
     )
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     assert config["competition_max_trials"] == 2000
     loaded = load_project_workflow(config, project / "src/features")
     candidates = loaded["competition"]["candidates"]
@@ -197,7 +200,7 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
     import numpy as np
     import pandas as pd
     import polars as pl
-    from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
+    from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.data.dataset import SplitDataset
     from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
@@ -211,7 +214,7 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
     from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
     from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
-    if not CLI or not PROFILE:
+    if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
     classification = task == "classification"
     first = "logistic_regression" if classification else "ridge_regression"
@@ -236,7 +239,7 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
         },
     )
     config = load_project_workflow(
-        json.loads((project / "config/workflow.json").read_text()), project / "src/features"
+        read_workflow_config(project / "config/training.yml"), project / "src/features"
     )
     resolved = resolve_target_config(
         config,
@@ -288,13 +291,13 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
 @pytest.mark.parametrize("task", ["classification", "regression"])
 def test_cli_keeps_each_ensemble_composition_and_controls(tmp_path, task):
     """Two voting and two stacking candidates must not inherit each other's answers."""
-    from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
+    from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
     from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
-    if not CLI or not PROFILE:
+    if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
     classifier = task == "classification"
     suffix = "classifier" if classifier else "regressor"
@@ -324,7 +327,7 @@ def test_cli_keeps_each_ensemble_composition_and_controls(tmp_path, task):
         **overrides,
     )
     loaded = load_project_workflow(
-        json.loads((project / "config/workflow.json").read_text()), project / "src/features"
+        read_workflow_config(project / "config/training.yml"), project / "src/features"
     )
     candidates = loaded["competition"]["candidates"]
     params = [

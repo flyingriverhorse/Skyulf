@@ -13,6 +13,7 @@ import runpy
 from pathlib import Path
 
 from skyulf.integrations.databricks.projects.yaml_config import (
+    project_config_path,
     read_training_config,
     read_workflow_config,
 )
@@ -20,7 +21,7 @@ from skyulf.integrations.databricks.projects.yaml_config import (
 
 def refresh(project):
     """Synchronize the generated graph with the project's trusted model declarations."""
-    config = read_workflow_config(project / "config/workflow.json")
+    config = read_workflow_config(project_config_path(project))
     layout = config["training_layout"]
     if layout == "single_model":
         return []

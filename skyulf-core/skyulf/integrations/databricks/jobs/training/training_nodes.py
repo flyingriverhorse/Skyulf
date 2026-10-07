@@ -128,6 +128,15 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
         raise ValueError("Winning model configuration differs from its frozen recipe.")
     with TemporaryDirectory(prefix="skyulf-winner-adoption-") as directory:
         package = Path(store.client.download_artifacts(winner["run_id"], "model", directory))
+        if artifact.feature_lookup_json is not None:
+            from ....mlflow.models.local_feature_model import copy_feature_package  # noqa: PLC0415
+
+            return copy_feature_package(
+                package,
+                run_id=store.run_id,
+                artifact_path="model",
+                tracking_uri=config["tracking_uri"],
+            )
         model = require_mlflow().models.Model.load(package)
         path = packaged_artifact_path(package, model.flavors, "local_pipeline")
         return training.log_local_model(

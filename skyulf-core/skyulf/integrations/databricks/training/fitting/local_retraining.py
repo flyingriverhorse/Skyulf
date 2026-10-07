@@ -48,6 +48,16 @@ from ...data.training.training_dates import (
     parse_training_date,
     training_date_spec,
 )
+from ...feature_store.training import (
+    enrich_training_source,
+    feature_log_options,
+    lookup_controls,
+    pin_fit_lookup,
+    pin_training_lookup,
+    retain_training_binding,
+    training_lookup,
+    validate_training_frame,
+)
 from ...observability.charts.evaluation_chart_data import chart_recorder, chart_settings
 from ...observability.reports.local_explanations import (
     log_training_explanations,
@@ -118,6 +128,8 @@ class LocalTrainingSpec:
     pre_split_steps: tuple[dict[str, Any], ...] = ()
     survivor_key_sha256: str | None = None
     training_evidence_sha256: str | None = None
+    feature_lookup_json: str | None = None
+    feature_binding_json: str | None = None
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> LocalTrainingSpec:
@@ -159,6 +171,7 @@ class LocalTrainingSpec:
         self._validate_columns()
         self._validate_budgets_and_sampling()
         self._validate_evidence_digests()
+        training_lookup(self)
 
     def _validate_label_policy(self) -> None:
         """Require explicit boolean values for both independent label eligibility policies."""
@@ -288,6 +301,7 @@ class LocalTrainingSpec:
             *metadata_columns,
             *self.input_columns,
             self.target_column,
+            *lookup_controls(self),
         )
         extra = _pre_split_columns(
             self.pre_split_steps,
@@ -302,14 +316,22 @@ class LocalTrainingSpec:
             ),
         )
         return (
-            *base,
+            *dict.fromkeys(base),
             *(name for name in extra if name.casefold() not in {item.casefold() for item in base}),
         )
+
+    def _identity_settings(self) -> dict[str, Any]:
+        """Keep optional lookup and weight controls out of older unbound identities."""
+        settings = asdict(self)
+        for field in ("feature_lookup_json", "feature_binding_json"):
+            if settings[field] is None:
+                settings.pop(field)
+        return settings
 
     @property
     def dataset_id(self) -> str:
         """Pin source, selection, split and seed independently of mutable driver limits."""
-        settings = asdict(self)
+        settings = self._identity_settings()
         if self.weight_column is None:
             for field in (
                 "weight_column",
@@ -477,6 +499,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     """Project and cap a versioned Delta read before materializing driver rows."""
     if not isinstance(spec, LocalTrainingSpec):
         raise TypeError("spec must be LocalTrainingSpec.")
+    spec = pin_training_lookup(spark, spec)
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
@@ -491,6 +514,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     )
     names = spec.source_columns
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
+    source = enrich_training_source(spark, source, spec)
     source = normalize_training_dates(
         source.select(*names),
         event_column=spec.event_column,
@@ -511,6 +535,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
+    retain_training_binding(spark, frame, spec)
     if selection is not None:
         frame.attrs["training_selection"] = {**selection, "selected_rows": len(frame)}
     return frame
@@ -779,10 +804,23 @@ def split_labeled_snapshot(
     return train_frame, holdout_frame, unavailable
 
 
-def log_local_model(artifact_path: str | Path, *, run_id: str, tracking_uri: str) -> str:
+def log_local_model(
+    artifact_path: str | Path,
+    *,
+    run_id: str,
+    tracking_uri: str,
+    spark: Any = None,
+    spec: LocalTrainingSpec | None = None,
+) -> str:
     """Import the optional MLflow pyfunc package only for a tracked run."""
     from ....mlflow.models.local_model import log_local_model  # noqa: PLC0415
 
+    if spec is not None and spec.feature_lookup_json is not None:
+        from ...feature_store.training import log_training_feature_model  # noqa: PLC0415
+
+        return log_training_feature_model(
+            artifact_path, spark=spark, spec=spec, run_id=run_id, tracking_uri=tracking_uri
+        )
     return log_local_model(
         artifact_path, run_id=run_id, artifact_path="model", tracking_uri=tracking_uri
     )
@@ -954,6 +992,7 @@ def fit_candidate(
     evaluate_cv: bool = True,
 ) -> _FittedCandidate:
     """Fit CV and final training rows, persisting selection and provenance evidence."""
+    spec = pin_fit_lookup(spark, spec, engine)
     run.log_config(pipeline_config, artifact_file="pipeline_config.json")
     run.client.log_dict(run.run_id, config, "training_pipeline_config.json")
     run.log_params({key: getattr(cv, field) for key, field in CV_FIELDS.items()})
@@ -963,6 +1002,7 @@ def fit_candidate(
     frame, train_frame, holdout, unavailable = prepared_data or read_training_partitions(
         spark, spec, temporal_cv=temporal_cv, engine=engine
     )
+    validate_training_frame(frame, spec)
     spec = replace(
         spec,
         holdout_key_sha256=holdout.attrs["holdout_key_sha256"],
@@ -1348,7 +1388,12 @@ def train_local_candidate(
             risk_category=risk_category,
         )
         run.log_metrics(metrics)
-        model_uri = log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
+        model_uri = log_local_model(
+            artifact_path,
+            run_id=run.run_id,
+            tracking_uri=tracking_uri,
+            **feature_log_options(spark, fitted.spec),
+        )
     registered = register_candidate(
         model_uri,
         model_name,

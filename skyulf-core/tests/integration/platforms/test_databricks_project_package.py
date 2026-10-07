@@ -50,6 +50,8 @@ def _config():
 def test_package_artifact_loads_without_editable_modules(tmp_path, engine):
     """Relative-imported custom classes must load from saved code in a fresh interpreter."""
     root = _package(tmp_path / "features")
+    (root / "groups").mkdir()
+    (root / "groups/company.py").write_text("raise AssertionError('Spark producer')\n")
     config = load_project_workflow(_config(), root)
     assert config["pre_split_steps"][0]["pre_split"]["required_columns"] == ["is_test"]
     rows = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
@@ -96,6 +98,50 @@ def test_package_helper_changes_isolate_registered_versions(tmp_path):
         before["pipeline"]["preprocessing"][0]["transformer"]
         != after["pipeline"]["preprocessing"][0]["transformer"]
     )
+
+
+def test_spark_groups_do_not_change_model_source_or_consume_its_budget(tmp_path):
+    """Upstream producers must not enter saved inference code or its source-size limit."""
+    root = _package(tmp_path / "features")
+    before = load_project_workflow(_config(), root)
+    (root / "groups").mkdir()
+    (root / "groups/company.py").write_text(
+        "raise AssertionError('Spark producer is not a model hook')\n#" + "x" * 65536,
+        encoding="utf-8",
+    )
+    after = load_project_workflow(_config(), root)
+    assert after["pipeline"]["project_python_source"] == before["pipeline"]["project_python_source"]
+    assert after["pipeline"]["preprocessing"] == before["pipeline"]["preprocessing"]
+
+
+def test_model_helpers_can_still_use_nested_groups_packages(tmp_path):
+    """Only the reserved top-level producer directory is excluded from feature snapshots."""
+    from skyulf.inference.project_code import load_project_module
+
+    root = _package(tmp_path / "features")
+    helpers = root / "custom/groups"
+    helpers.mkdir()
+    (helpers / "__init__.py").write_text("VALUE = 7\n", encoding="utf-8")
+    init = root / "__init__.py"
+    init.write_text(init.read_text(encoding="utf-8") + "\nfrom .custom.groups import VALUE\n")
+    config = load_project_workflow(_config(), root)
+    saved = load_project_module(config["pipeline"]["project_python_source"])
+    assert saved.VALUE == 7
+
+
+def test_non_feature_package_still_captures_groups_modules(tmp_path):
+    """Composition and generic callers must not silently lose helpers named groups."""
+    from skyulf.inference.project_code import load_project_module
+    from skyulf.integrations.databricks.model_sets.model_set_project import (
+        capture_set_composition,
+    )
+
+    root = tmp_path / "src/composition"
+    (root / "groups").mkdir(parents=True)
+    (root / "__init__.py").write_text("from .groups import VALUE\n")
+    (root / "groups/__init__.py").write_text("VALUE = 11\n")
+    source = capture_set_composition({"config_path": str(tmp_path / "config/training.yml")})
+    assert load_project_module(source).VALUE == 11
 
 
 def test_package_snapshot_rejects_missing_init_and_oversize(tmp_path):

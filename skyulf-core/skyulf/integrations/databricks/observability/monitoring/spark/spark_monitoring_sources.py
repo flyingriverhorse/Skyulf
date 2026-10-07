@@ -6,6 +6,7 @@ from functools import reduce
 from typing import Any
 
 from ....data.delta_io.delta import table_identity
+from ....feature_store.monitoring import enrich_observation, validate_observation_snapshot
 from ..monitoring_config import MonitorConfig
 from ..monitoring_sources import (
     model_predictions,
@@ -54,6 +55,7 @@ def _matching_features(
     features: tuple[str, ...],
     source_id: str,
     target_id: str,
+    feature_binding: dict | None = None,
 ) -> tuple[Any, list[dict]]:
     """Join each saved batch against its own source version using distributed keys."""
     functions = importlib.import_module("pyspark.sql.functions")
@@ -66,12 +68,19 @@ def _matching_features(
             item["receipt"], config, version, source_id, target_id
         )
         source = read_snapshot(spark, config.source_table, source_version)
-        joined = source.join(batch_keys, list(keys), "inner").select(
-            *dict.fromkeys((*keys, *features))
+        source = enrich_observation(
+            spark,
+            source.join(batch_keys, list(keys), "inner"),
+            keys,
+            features,
+            feature_binding,
+            item["receipt"],
         )
+        joined = source.select(*dict.fromkeys((*keys, *features)))
         require_unique_keys(joined, keys, "current")
         if joined.count() != batch_keys.count():
             raise ValueError("Prediction keys differ from their pinned source snapshot.")
+        validate_observation_snapshot(spark, feature_binding)
         frames.append(joined)
         used.append(
             {
@@ -83,7 +92,9 @@ def _matching_features(
         )
     if frames:
         return reduce(lambda left, right: left.unionByName(right), frames), used
-    empty = spark.table(config.source_table).select(*dict.fromkeys((*keys, *features))).limit(0)
+    empty = enrich_observation(
+        spark, spark.table(config.source_table).limit(0), keys, features, feature_binding, None
+    ).select(*dict.fromkeys((*keys, *features)))
     return empty, used
 
 
@@ -98,6 +109,7 @@ def read_spark_observation(
     as_of: datetime,
     start: datetime,
     end: datetime,
+    feature_binding: dict | None = None,
 ) -> tuple[Any, Any, dict, datetime | None]:
     """Return distributed current features/predictions and bounded provenance receipts."""
     observation_window(as_of, start, end)
@@ -129,6 +141,7 @@ def read_spark_observation(
         features,
         source_id,
         target_id,
+        feature_binding,
     )
     _unchanged_identity(spark, config.source_table, source_id)
     _unchanged_identity(spark, config.prediction_table, target_id)
@@ -142,6 +155,8 @@ def read_spark_observation(
         "window_basis": "prediction_commit_timestamp",
         "execution_engine": "spark",
     }
+    if feature_binding is not None:
+        evidence["feature_lookup"] = feature_binding
     observed = (
         datetime.fromtimestamp(max(item["committed_us"] for item in used) / 1e6, UTC)
         if used

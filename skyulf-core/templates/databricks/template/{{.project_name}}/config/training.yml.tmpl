@@ -1,0 +1,48 @@
+{{- if and (eq .inference_mode "spark") (eq .engine "polars") -}}
+{{- template "ERROR_inference_mode_spark_requires_engine_pandas" . -}}
+{{- end -}}
+# Shared training settings; model entries override whole values from defaults.
+# Custom transformations stay in src/features. Scoring uses the saved fitted model.
+version: 1
+defaults:
+  config_version: 1
+  training_layout: {{.training_layout}}
+  engine: {{.engine}}
+  training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
+{{if ne .training_version "null"}}  training_version: {{.training_version}}
+{{end}}  record_key_columns: [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .record_key_columns -1}}{{if $i}}, {{end}}{{printf "%q" $column}}{{end}}]
+  model_name: "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}"
+  promotion_policy: {{.promotion_policy}}
+{{if .risk_category}}  risk_category: {{printf "%q" .risk_category}}
+{{end}}  evaluation_charts: {enabled: {{.evaluation_charts_enabled}}}
+{{if eq .shap_enabled "true"}}  explainability: {method: shap, max_samples: {{.shap_max_samples}}, max_features: {{.shap_max_features}}, max_display_samples: {{.shap_max_display_samples}}}
+{{end -}}
+{{if ne .training_layout "multi_target"}}{{template "training_settings" (map (pair "values" .) (pair "prefix" "") (pair "indent" "  ") (pair "task" .task))}}{{end -}}
+{{if eq .training_layout "model_competition"}}  competition_max_trials: {{.competition_max_trials}}
+  competition_max_candidates: 8
+  preprocessing_recipe: {{.competition_preprocessing_recipe}}
+{{end}}models:
+{{if eq .training_layout "single_model" -}}
+{{- $model := index . (printf "%s_model" .task) -}}
+{{- if eq .sample_weight_enabled "true" -}}{{- $model = index . (printf "%s_model_weighted" .task) -}}{{- end}}
+  main:
+{{template "modeling" (map (pair "values" .) (pair "prefix" "") (pair "indent" "    ") (pair "model" $model) (pair "task" .task) (pair "ensemble_prefix" "single_ensemble_"))}}
+{{- else if eq .training_layout "model_competition" -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.competition_candidate_count -}}
+{{- $model := index $ (printf "competition_%s_model_%s" $.task $slot) -}}
+{{- if eq $.sample_weight_enabled "true" -}}{{- $model = index $ (printf "competition_%s_model_%s_weighted" $.task $slot) -}}{{- end}}
+  {{$model}}_{{$slot}}:
+{{template "modeling" (map (pair "values" $) (pair "prefix" "") (pair "indent" "    ") (pair "model" $model) (pair "task" $.task) (pair "ensemble_prefix" (printf "competition_ensemble_%s_" $slot)))}}
+{{- end -}}{{- end -}}
+{{- else -}}
+{{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.branch_count -}}
+{{- $p := printf "branch_%s_" $slot -}}{{- $task := index $ (print $p "task") -}}
+{{- $model := index $ (print $p $task "_model") -}}
+{{- if eq (index $ (print $p "sample_weight_enabled")) "true" -}}{{- $model = index $ (print $p $task "_model_weighted") -}}{{- end}}
+  {{printf "%q" (index $ (print $p "name"))}}:
+    model_name: "{catalog}.{metadata_schema}.{{$.project_name}}_{{index $ (print $p "name")}}{resource_suffix}"
+    preprocessing_recipe: {{index $ (print $p "preprocessing_recipe")}}
+    pre_split_recipe: {{index $ (print $p "pre_split_recipe")}}
+{{template "training_settings" (map (pair "values" $) (pair "prefix" $p) (pair "indent" "    ") (pair "task" $task))}}
+{{template "modeling" (map (pair "values" $) (pair "prefix" $p) (pair "indent" "    ") (pair "model" $model) (pair "task" $task) (pair "ensemble_prefix" (printf "branch_%s_ensemble_" $slot)))}}
+{{- end -}}{{- end -}}{{- end}}

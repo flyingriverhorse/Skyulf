@@ -56,6 +56,23 @@ def test_smoke_reports_syntax_and_config_errors(tmp_path, workflow_config):
         check_project(root, _bindings())
 
 
+def test_smoke_checks_spark_group_syntax_outside_model_package(tmp_path, workflow_config):
+    """Producers need syntax checks but no model-package init or source-budget allocation."""
+    root = _project(tmp_path, workflow_config)
+    features = root / "src/features"
+    groups = features / "groups"
+    groups.mkdir(parents=True)
+    (features / "__init__.py").write_text("raise AssertionError('must not execute')\n")
+    producer = groups / "company.py"
+    producer.write_text("raise AssertionError('must not execute')\n#" + "x" * 65536)
+    result = check_project(root, _bindings())
+    assert result["status"] == "passed"
+    assert result["python_files"] == 3
+    producer.write_text("def broken(\n")
+    with pytest.raises(SyntaxError, match="never closed"):
+        check_project(root, _bindings())
+
+
 def test_smoke_validates_real_training_dates_without_running_model_hooks(tmp_path, workflow_config):
     """Scoring substitutes saved dates, but project smoke must reject invalid training dates."""
     settings = {

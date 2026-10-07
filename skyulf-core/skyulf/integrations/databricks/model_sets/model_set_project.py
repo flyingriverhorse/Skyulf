@@ -22,8 +22,22 @@ from ...mlflow.registration.registry import (
     packaged_artifact_path,
     register_model,
     resolve_model,
+    unwrap_feature_package,
 )
 from ..data.admission import SingleWriterAdmission
+from ..feature_store.lifecycle_config import deserialize_feature_spec
+from ..feature_store.model_sets import (
+    enrich_approval_source,
+    model_set_training_set,
+    union_feature_binding,
+    validate_component_bindings,
+)
+from ..feature_store.scoring import (
+    feature_binding,
+    feature_source_columns,
+    validate_feature_snapshot,
+    validate_feature_source,
+)
 from ..jobs.shared.job_output import render_bundle_output, render_scoring_summary
 from ..jobs.shared.job_runtime import (
     OPERATOR_FIELDS,
@@ -171,7 +185,7 @@ def capture_set_rules(values: dict[str, str], settings: dict) -> tuple[dict, str
     path = (root / "modeling" / relative).resolve()
     if not path.is_relative_to(root.resolve()):
         raise ValueError("combined_rules_path must stay within src.")
-    source = project_source(path)
+    source = project_source(path, exclude_feature_groups=True)
     factory = getattr(load_project_module(source), "build_combined_rules", None)
     if not callable(factory):
         raise ValueError("The shared feature package must export build_combined_rules().")
@@ -242,6 +256,13 @@ def _verify_training_plan(
 
 def _component_directory(resolved: ResolvedModel, tracking_uri: str, registry_uri: str) -> Path:
     """Validate and reuse registered artifact bytes without reserializing fitted pipelines."""
+    return _component_payload(resolved, tracking_uri, registry_uri)[0]
+
+
+def _component_payload(
+    resolved: ResolvedModel, tracking_uri: str, registry_uri: str
+) -> tuple[Path, Any]:
+    """Retain verified native lookup lineage before extracting the raw fitted payload."""
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
     if not isinstance(resolved.digest, str):
@@ -249,12 +270,17 @@ def _component_directory(resolved: ResolvedModel, tracking_uri: str, registry_ur
     with downloaded_registered_payload(
         mlflow, client, resolved, tracking_uri, "local_pipeline"
     ) as (package, model):
-        load_local_package(package, model, resolved.digest)
-        return packaged_artifact_path(package, model.flavors, "local_pipeline")
+        artifact = load_local_package(package, model, resolved.digest)
+        raw_path, raw, _ = unwrap_feature_package(package, model)
+        return packaged_artifact_path(raw_path, raw.flavors, "local_pipeline"), artifact
 
 
 def _registered_components(
-    outcome: BranchTrainingResult, tracking_uri: str, registry_uri: str
+    outcome: BranchTrainingResult,
+    tracking_uri: str,
+    registry_uri: str,
+    *,
+    component_artifacts: dict[str, Any] | None = None,
 ) -> dict[str, tuple[ComponentReference, Path]]:
     """Resolve only concrete candidate versions and require the saved component digest."""
     components = {}
@@ -270,7 +296,10 @@ def _registered_components(
         reference = ComponentReference(
             name=resolved.name, version=resolved.version, digest=result.model_digest
         )
-        components[branch] = (reference, _component_directory(resolved, tracking_uri, registry_uri))
+        path, artifact = _component_payload(resolved, tracking_uri, registry_uri)
+        components[branch] = (reference, path)
+        if component_artifacts is not None:
+            component_artifacts[branch] = artifact
     return components
 
 
@@ -302,12 +331,17 @@ def package_training_model_set(
     registry_uri: str,
 ) -> ResolvedModel:
     """Register one frozen candidate from a fully completed multi-target training run."""
-    from ...mlflow.models.model_set import log_model_set  # noqa: PLC0415 - optional MLflow boundary
-
     _completed_parent(outcome, branches, tracking_uri, registry_uri)
     source = spark.read.option("versionAsOf", outcome.source_version).table(outcome.source_table)
     keys = _record_key_schema(source, branches[0].spec.record_key_columns)
-    components = _registered_components(outcome, tracking_uri, registry_uri)
+    component_artifacts: dict[str, Any] = {}
+    components = _registered_components(
+        outcome,
+        tracking_uri,
+        registry_uri,
+        component_artifacts=component_artifacts,
+    )
+    validate_component_bindings(branches, component_artifacts)
     with tempfile.TemporaryDirectory(prefix="skyulf-model-set-") as directory:
         path = Path(directory) / "set"
         saved = save_model_set(
@@ -323,11 +357,19 @@ def package_training_model_set(
                 },
             },
         )
-        uri = log_model_set(
+        binding = union_feature_binding(
+            component_artifacts,
+            tuple(column.name for column in saved.manifest.input_schema),
+        )
+        uri = _log_training_set_package(
+            spark,
+            source,
+            saved,
             path,
-            run_id=outcome.parent_run_id,
-            artifact_path=f"model_sets/{saved.manifest.set_sha256}",
-            tracking_uri=tracking_uri,
+            binding,
+            outcome.parent_run_id,
+            f"model_sets/{saved.manifest.set_sha256}",
+            tracking_uri,
         )
         version = register_model(
             uri,
@@ -342,6 +384,40 @@ def package_training_model_set(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+
+
+def _log_training_set_package(
+    spark: Any,
+    source: Any,
+    artifact: Any,
+    path: Path,
+    binding: dict[str, Any] | None,
+    run_id: str,
+    artifact_path: str,
+    tracking_uri: str,
+) -> str:
+    """Choose one complete ordinary or native feature envelope from inspected lineage."""
+    if binding is None:
+        from ...mlflow.models.model_set import log_model_set  # noqa: PLC0415
+
+        return log_model_set(
+            path, run_id=run_id, artifact_path=artifact_path, tracking_uri=tracking_uri
+        )
+    from ...mlflow.models.local_feature_model import log_feature_model_set  # noqa: PLC0415
+    from ..feature_store.snapshots import validate_snapshots  # noqa: PLC0415
+
+    training_set = model_set_training_set(spark, source, artifact, binding)
+    uri = log_feature_model_set(
+        path,
+        training_set=training_set,
+        lookup_spec=deserialize_feature_spec(binding["lookup_spec"]),
+        lookup_binding=binding,
+        run_id=run_id,
+        artifact_path=artifact_path,
+        tracking_uri=tracking_uri,
+    )
+    validate_snapshots(spark, binding["lookup_evidence"]["feature_tables"])
+    return uri
 
 
 def project_endpoints(config: dict[str, Any]) -> dict[str, str]:
@@ -370,19 +446,24 @@ def approval_frame(spark: Any, artifact: Any, config: dict[str, Any]) -> Any:
         "versionAsOf", int(latest_source_version(spark, table)["version"])
     ).table(table)
     columns = tuple(column.name for column in artifact.manifest.input_schema)
+    source_columns = feature_source_columns(artifact) if feature_binding(artifact) else columns
+    validate_feature_source(source, artifact)
     keys = artifact.manifest.record_key_columns
     if distributed:
         from ..scoring.batch.spark_scoring import read_distributed_rows  # noqa: PLC0415
 
-        source = read_distributed_rows(source, columns, keys).frame
+        source = read_distributed_rows(source, source_columns, keys).frame
         source = source.orderBy(*keys).limit(config["max_rows"])
-    return bounded_frame(
+    source = enrich_approval_source(spark, source, artifact)
+    result = bounded_frame(
         source,
         columns,
         keys,
         config["max_rows"],
         input_budget_bytes(config.get("max_input_mb")),
     )
+    validate_feature_snapshot(spark, artifact)
+    return result
 
 
 def run_model_set_operator(

@@ -93,6 +93,13 @@ def read_yaml_mapping(path: str | Path) -> dict[str, Any]:
     class UniqueLoader(yaml.SafeLoader):
         """Reject all duplicate keys, including nested model parameter declarations."""
 
+        def construct_scalar(self, node: Any) -> Any:
+            """Preserve escaped JSON surrogate pairs as their original Unicode character."""
+            value = super().construct_scalar(node)
+            if isinstance(value, str):
+                return value.encode("utf-16-le", "surrogatepass").decode("utf-16-le")
+            return value
+
         def construct_mapping(self, node: Any, deep: bool = False) -> dict[str, Any]:
             """Build a mapping without silently replacing an earlier declaration."""
             return _unique_mapping(
@@ -102,6 +109,11 @@ def read_yaml_mapping(path: str | Path) -> dict[str, Any]:
                 ]
             )
 
+    UniqueLoader.add_implicit_resolver(
+        "tag:yaml.org,2002:float",
+        re.compile(r"^[-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)[eE][-+]?[0-9]+$"),
+        list("-+0123456789."),
+    )
     source = read_source(Path(path))
     try:
         _check_tokens(yaml, source)
@@ -170,7 +182,9 @@ def read_training_config(directory: str | Path) -> dict[str, Any] | None:
     path = Path(directory) / "training.yml"
     if not path.exists():
         return None
-    document = _fields(read_yaml_mapping(path), {"version", "defaults", "models"}, path.name)
+    document = _fields(
+        read_yaml_mapping(path), {"version", "defaults", "models", "pipeline"}, path.name
+    )
     _version(document, path.name)
     defaults = _model_entry(document.get("defaults", {}), "training defaults")
     models = document.get("models")
@@ -182,7 +196,29 @@ def read_training_config(directory: str | Path) -> dict[str, Any] | None:
         entry = _model_entry(value, f"model {name}")
         if "model" not in defaults and "model" not in entry:
             raise ValueError(f"model {name} requires model.type or a shared default model.")
-    return {"version": 1, "defaults": defaults, "models": models}
+    pipeline = _training_pipeline(document, [defaults, *models.values()])
+    return {"version": 1, "defaults": defaults, "models": models, "pipeline": pipeline}
+
+
+def _training_pipeline(document: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Keep optional pipeline structure explicit without duplicating model-level settings."""
+    pipeline = _fields(
+        document.get("pipeline", {}),
+        {"preprocessing", "modeling", "explainability"},
+        "training pipeline",
+    )
+    for entry in entries:
+        if set(entry) & set(pipeline):
+            raise ValueError("Settings defined in both pipeline and training.yml models/defaults.")
+    if "preprocessing" in pipeline and type(pipeline["preprocessing"]) is not list:
+        raise ValueError("training pipeline.preprocessing must be an empty list.")
+    if "modeling" in pipeline and type(pipeline["modeling"]) is not dict:
+        raise ValueError("training pipeline.modeling must be an empty mapping.")
+    if pipeline.get("modeling"):
+        raise ValueError("Model settings defined in both pipeline and training.yml models.")
+    if pipeline.get("preprocessing"):
+        raise ValueError("Configure preprocessing in Python; leave the YAML pipeline list empty.")
+    return pipeline
 
 
 def read_inference_config(directory: str | Path) -> dict[str, Any] | None:
@@ -260,21 +296,62 @@ def _check_model_owners(config: dict[str, Any], training: dict[str, Any]) -> Non
             )
 
 
+def project_config_path(project: str | Path) -> Path:
+    """Select a direct YAML project or the legacy JSON configuration boundary."""
+    directory = Path(project) / "config"
+    return directory / (
+        "training.yml" if (directory / "training.yml").is_file() else "workflow.json"
+    )
+
+
+def _base_config(path: Path) -> dict[str, Any]:
+    """Keep JSON available for existing public consumers while new projects start in YAML."""
+    source = path if path.suffix == ".json" else path.with_name("workflow.json")
+    if not source.exists() and path.suffix == ".yml":
+        return {}
+    config = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=_unique_mapping)
+    if type(config) is not dict:
+        raise ValueError("Workflow configuration must be an object.")
+    return config
+
+
+def _yaml_workflow(config: dict[str, Any], training: dict[str, Any]) -> dict[str, Any]:
+    """Resolve shared YAML fields and supply a representative view for branch lifecycle tasks."""
+    from .yaml_models import model_entries, model_pipeline  # noqa: PLC0415
+
+    _check_model_owners(config, training)
+    settings = training["defaults"]
+    if (
+        settings.get("training_layout", config.get("training_layout", "single_model"))
+        == "single_model"
+    ):
+        settings = next(iter(model_entries(training).values()))
+    _merge_owner(
+        config,
+        {key: value for key, value in settings.items() if key not in MODEL_FIELDS},
+        "training.yml",
+    )
+    pipeline = {"preprocessing": [], "modeling": {}, **training["pipeline"]}
+    if "pipeline" in config and training["pipeline"]:
+        raise ValueError("Pipeline settings defined in both workflow.json and training.yml.")
+    config.setdefault("pipeline", pipeline)
+    if config.get("training_layout") == "multi_target":
+        entry = next(iter(model_entries(training).values()))
+        for key, value in entry.items():
+            if key not in MODEL_FIELDS:
+                config.setdefault(key, deepcopy(value))
+        config["pipeline"] = {**config["pipeline"], **model_pipeline(entry)}
+    return config
+
+
 def read_workflow_config(path: str | Path) -> dict[str, Any]:
     """Combine disjoint JSON/YAML owners at the shared job, preview and smoke boundary."""
     path = Path(path)
-    config = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_mapping)
-    if type(config) is not dict:
-        raise ValueError("Workflow configuration must be an object.")
+    config = _base_config(path)
     training = read_training_config(path.parent)
     if training is not None:
         _training_python_owners(path.parent.parent)
-        _check_model_owners(config, training)
-        _merge_owner(
-            config,
-            {key: value for key, value in training["defaults"].items() if key not in MODEL_FIELDS},
-            "training.yml",
-        )
+        config = _yaml_workflow(config, training)
     inference = read_inference_config(path.parent)
     if inference is not None:
         _merge_owner(

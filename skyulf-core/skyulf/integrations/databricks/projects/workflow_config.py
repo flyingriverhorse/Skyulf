@@ -25,6 +25,7 @@ from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_role
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    "feature_lookup",
     *WEIGHT_FIELDS,
     "evaluation_charts",
     "training_layout",

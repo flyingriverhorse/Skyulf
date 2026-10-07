@@ -47,7 +47,7 @@ setup(
         "delta": ["delta-spark>=4.0.0,<4.1.0", "pyspark>=4.0.3,<4.1.0"],
         "mlflow": ["mlflow>=3.10,<4.0", "Mako>=1.4.2", "Werkzeug>=3.1.9", "PyYAML>=6.0.3,<7"],
         # Optional UC lookups; 0.11 introduced support for the MLflow 3 runtime.
-        "feature-store": ["databricks-feature-engineering>=0.11,<1.0"],
+        "feature-store": ["databricks-feature-engineering>=0.18.1,<1.0"],
         "dev": [
             "pytest",
             "pytest-cov>=4.1.0,<5.0.0",

@@ -3,7 +3,7 @@
     "order": 0,
     "type": "string",
     "default": "single_model",
-    "description": "Training layout: single_model = guided model setup; multi_target = shared setup, then define target/model recipes in src/modeling/multi_model.py and score them as one versioned model set; model_competition = compare candidates for one target using shared CV, then select one winner; select models below and generate editable src/modeling/model_competition.py",
+    "description": "Training layout: single_model = guided model setup; multi_target = shared setup, then define target/model recipes in config/training.yml and score them as one versioned model set; model_competition = compare candidates for one target using shared CV, then select one winner; select models below and generate editable config/training.yml",
     "enum": [
       "single_model",
       "multi_target",

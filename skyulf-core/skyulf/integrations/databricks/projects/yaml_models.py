@@ -13,8 +13,11 @@ def declaration_source(document: dict[str, Any]) -> str:
 
 def model_entries(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Apply shallow explicit overrides; nested model parameters belong to one entry."""
+    pipeline = document.get("pipeline", {})
+    shared = {key: value for key, value in pipeline.items() if key == "explainability"}
+    defaults = {**shared, **document["defaults"]}
     return {
-        name: {**deepcopy(document["defaults"]), **deepcopy(entry)}
+        name: {**deepcopy(defaults), **deepcopy(entry)}
         for name, entry in document["models"].items()
     }
 
@@ -22,6 +25,7 @@ def model_entries(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def model_pipeline(entry: dict[str, Any]) -> dict[str, Any]:
     """Translate model plus optional tuning into the existing Core representation."""
     modeling = deepcopy(entry["model"])
+    modeling.setdefault("params", {})
     if "tuning" in entry:
         modeling = {
             "type": "hyperparameter_tuner",
@@ -47,12 +51,16 @@ def single_model(document: dict[str, Any], config: dict[str, Any]) -> dict[str, 
     entry = next(iter(entries.values()))
     if "features_path" in entry:
         raise ValueError("features_path is supported only for multi_target YAML models.")
-    result = {
-        **deepcopy(config),
-        **{key: value for key, value in entry.items() if key not in MODEL_FIELDS},
-    }
+    result = deepcopy(config)
+    for key, value in entry.items():
+        if key not in MODEL_FIELDS:
+            result.setdefault(key, deepcopy(value))
     result["pipeline"] = {**deepcopy(config["pipeline"]), **model_pipeline(entry)}
-    result.update(capture_model_weights(declaration_source(document), entry))
+    result.update(
+        capture_model_weights(
+            declaration_source(document), {"weight_column": entry.get("weight_column")}
+        )
+    )
     return result
 
 
@@ -65,12 +73,13 @@ def competition_candidates(document: dict[str, Any]) -> tuple[dict[str, Any], st
     if unsupported:
         raise ValueError(f"Competition does not support YAML defaults: {sorted(unsupported)}.")
     candidates = {}
+    entries = model_entries(document)
     for name, overrides in document["models"].items():
         if set(overrides) - allowed:
             raise ValueError(
                 "Competition model overrides must not change shared workflow settings."
             )
-        entry = {**deepcopy(document["defaults"]), **deepcopy(overrides)}
+        entry = entries[name]
         pipeline = model_pipeline(entry)
         candidates[name] = {
             key: pipeline[key]
@@ -79,7 +88,11 @@ def competition_candidates(document: dict[str, Any]) -> tuple[dict[str, Any], st
         }
         candidates[name]["preprocessing_recipe"] = entry.get("preprocessing_recipe", "default")
     source = declaration_source(document)
-    return candidates, source, capture_model_weights(source, document["defaults"])
+    return (
+        candidates,
+        source,
+        capture_model_weights(source, {"weight_column": document["defaults"].get("weight_column")}),
+    )
 
 
 def training_branches(document: dict[str, Any]) -> tuple[dict[str, Any], str]:
@@ -97,6 +110,12 @@ def training_branches(document: dict[str, Any]) -> tuple[dict[str, Any], str]:
             },
         }
     return branches, declaration_source(document)
+
+
+def branch_base(config: dict[str, Any], document: dict[str, Any]) -> dict[str, Any]:
+    """Remove representative model overrides before applying independent branch declarations."""
+    overrides = set().union(*(set(entry) for entry in document["models"].values())) - MODEL_FIELDS
+    return {key: deepcopy(value) for key, value in config.items() if key not in overrides}
 
 
 def static_workflows(document: dict[str, Any], config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -121,4 +140,5 @@ def static_workflows(document: dict[str, Any], config: dict[str, Any]) -> list[d
             for candidate in candidates.values()
         ]
     branches, _ = training_branches(document)
-    return [{**deepcopy(config), **entry["workflow"]} for entry in branches.values()]
+    base = branch_base(config, document)
+    return [{**deepcopy(base), **entry["workflow"]} for entry in branches.values()]

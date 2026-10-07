@@ -1,5 +1,6 @@
 # Optional Spark data domains, shared by any number of models.
 # Empty groups keep the existing ready-table workflow and create no feature job.
+# Spark functions belong in src/features/groups/; model recipes stay beside it.
 # See FEATURE_TABLES.md for a complete example, then run:
 #   python src/tools/refresh_feature_graph.py
 version: 1

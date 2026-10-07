@@ -11,10 +11,13 @@ from pathlib import Path
 import pytest
 import yaml
 
+from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
 PROFILE = os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
+OFFLINE_CLI = os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
 CLI = shutil.which("databricks")
 pytestmark = pytest.mark.skipif(
-    not PROFILE or not CLI,
+    not (PROFILE or OFFLINE_CLI) or not CLI,
     reason="Set SKYULF_BUNDLE_CLI_TEST_PROFILE to explicitly opt into installed CLI generation.",
 )
 
@@ -71,19 +74,28 @@ def _initialize_project(tmp_path, *, omit_fields=(), **overrides):
         values.pop(name)
     inputs = tmp_path / "init.json"
     inputs.write_text(json.dumps(values), encoding="utf-8")
+    command = [
+        str(CLI),
+        "bundle",
+        "init",
+        str(root),
+        "--config-file",
+        str(inputs),
+        "--output-dir",
+        str(tmp_path / "output"),
+    ]
+    environment = os.environ.copy()
+    if OFFLINE_CLI:
+        environment.update(
+            DATABRICKS_HOST="https://127.0.0.1",
+            DATABRICKS_TOKEN="local-render-only",
+            DATABRICKS_AUTH_TYPE="pat",
+        )
+    else:
+        command.extend(["--profile", str(PROFILE)])
     generated = subprocess.run(
-        [
-            str(CLI),
-            "bundle",
-            "init",
-            str(root),
-            "--config-file",
-            str(inputs),
-            "--output-dir",
-            str(tmp_path / "output"),
-            "--profile",
-            str(PROFILE),
-        ],
+        command,
+        env=environment,
         capture_output=True,
         text=True,
         timeout=60,
@@ -323,8 +335,6 @@ def test_smoke_renders_without_cloud_operations(tmp_path, layout):
 @pytest.mark.parametrize("enabled", ["false", "true"])
 def test_shap_generation_matches_training_dependencies(tmp_path, layout, compute, enabled):
     """Every layout must opt in consistently without adding explanation packages to scoring."""
-    import runpy
-
     project = _generate_project(
         tmp_path,
         training_layout=layout,
@@ -333,11 +343,13 @@ def test_shap_generation_matches_training_dependencies(tmp_path, layout, compute
         shap_max_samples="4",
         shap_max_display_samples="2",
     )
-    workflow = json.loads((project / "config/workflow.json").read_text())
-    pipelines = [workflow["pipeline"]]
-    if layout == "multi_target":
-        module = runpy.run_path(str(project / "src/modeling/multi_model.py"))
-        pipelines.extend(item["workflow"]["pipeline"] for item in module["MODELS"].values())
+    workflow = read_workflow_config(project / "config/training.yml")
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+    from skyulf.integrations.databricks.projects.yaml_models import static_workflows
+
+    declarations = read_training_config(project / "config")
+    assert declarations is not None
+    pipelines = [item["pipeline"] for item in static_workflows(declarations, workflow)]
     for pipeline in pipelines:
         if enabled == "true":
             assert pipeline["explainability"] == {
@@ -374,16 +386,14 @@ def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mod
         combined_view_name="profit_results",
     )
     values = {
-        "config_path": str(project / "config/workflow.json"),
+        "config_path": str(project / "config/training.yml"),
         "catalog": "workspace",
         "input_schema": "default",
         "output_schema": "default",
         "metadata_schema": "default",
         "resource_suffix": "_dev",
     }
-    settings = load_project_model_set(
-        values, json.loads((project / "config/workflow.json").read_text())
-    )
+    settings = load_project_model_set(values, read_workflow_config(project / "config/training.yml"))
     assert settings is not None
     assert settings["model_name"] == "workspace.default.business_models_dev"
     assert settings["source_change_policy"] == "rebuild_on_change"
@@ -418,7 +428,7 @@ def test_cli_multi_target_setup_defaults_omitted_branch_settings(tmp_path):
     )
     config = _read_validated_config(project, action="train")
     assert config["task"] == "regression"
-    assert config["target_column"] == "target"
+    assert config["target_column"] == "target_1"
     assert config["input_columns"] == ["feature_value"]
     assert config["split_strategy"] == "random" and config["cv_enabled"] is False
     assert config["promotion_policy"] == "manual_approval"
@@ -477,7 +487,7 @@ def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
     assert {path.name for path in (project / "src").iterdir()} == {
         "jobs",
         "features",
-        "modeling",
+        "monitoring",
         "tools",
     }
     for job in _read_jobs(project).values():
@@ -513,7 +523,10 @@ def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
         path.write_text(text.replace(f"# {shown},", f"{configured},"), encoding="utf-8")
     # Default scoring reuses pre-split checks, so their inputs must be declared too.
     config["input_columns"] = ["category", "amount", "quality_a", "quality_b"]
-    (project / "config/workflow.json").write_text(json.dumps(config), encoding="utf-8")
+    training_path = project / "config/training.yml"
+    declarations = yaml.safe_load(training_path.read_text())
+    declarations["defaults"]["input_columns"] = config["input_columns"]
+    training_path.write_text(yaml.safe_dump(declarations, sort_keys=False), encoding="utf-8")
     enabled = load_project_workflow(config, features)
     assert enabled["pre_split_steps"][0]["pre_split"]["effect"] == "filter"
     frequency_step = enabled["pipeline"]["preprocessing"][0]
@@ -615,7 +628,7 @@ def _read_modeling(project):
     """Resolve the generated Python settings through the actual project loader."""
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     return load_project_workflow(config, project / "src/features")["pipeline"]["modeling"]
 
 
@@ -631,7 +644,7 @@ def _read_validated_config(project, *, action="score"):
     from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     resolved = resolve_target_config(
         config,
         {
@@ -961,7 +974,7 @@ def test_cli_initializes_task_without_stale_training_inputs(tmp_path, task, mode
     assert _read_modeling(project)["type"] == "hyperparameter_tuner"
     assert _read_modeling(project)["base_model"] == {"type": model, "params": {}}
     assert config["metric"] == metric
-    assert config["training_version"] is None
+    assert config.get("training_version") is None
     assert all(key not in config for key in ("start", "holdout_start", "cutoff"))
     assert config["record_key_columns"] == ["entity_id"]
     assert config["input_columns"] == ["feature_value"]
@@ -1195,8 +1208,10 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
     assert config["split_strategy"] == "random"
     assert config["training_window_mode"] == "full_snapshot"
     assert "window_timezone" not in config
-    assert config["cv_enabled"] is False and config["cv_folds"] == 5
-    assert config["training_sample_rows"] is None
+    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+
+    assert config["cv_enabled"] is False and LocalCVSpec.from_workflow(config).folds == 5
+    assert config.get("training_sample_rows") is None
     assert config["engine"] == engine
     assert config["test_size"] == 0.2 and config["random_state"] == 42
     assert config["stratify"] == (task == "classification")
@@ -1217,7 +1232,7 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     assert config["event_column"] == "observed_at"
     resolved = resolve_target_config(
         config,
@@ -1267,7 +1282,7 @@ def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
         },
     )
     checked = validate_workflow_config(_load_project_config(project, resolved), action="train")
-    assert checked["training_version"] == json.loads(inputs.get("training_version", "null"))
+    assert checked.get("training_version") == json.loads(inputs.get("training_version", "null"))
     assert checked["split_strategy"] == inputs.get("split_strategy", "random")
     if inputs.get("start"):
         assert checked["training_window_mode"] == "fixed_window"
@@ -1286,7 +1301,7 @@ def test_generated_nested_search_preserves_separate_inner_folds(tmp_path):
     project = _generate_project(
         tmp_path, cv_enabled="true", cv_type="nested_cv", cv_folds="4", cv_inner_folds="2"
     )
-    config = json.loads((project / "config/workflow.json").read_text(encoding="utf-8"))
+    config = read_workflow_config(project / "config/training.yml")
     from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
     from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
 
@@ -1367,8 +1382,6 @@ def test_generated_nested_policies_preserve_controls_and_three_jobs(tmp_path, po
 @pytest.mark.parametrize("task", ["classification", "regression"])
 def test_generated_model_weight_declarations(tmp_path, layout, enabled, task):
     """Real CLI output must run all layouts without a separate weight hook."""
-    import runpy
-
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     overrides = {
@@ -1385,16 +1398,20 @@ def test_generated_model_weight_declarations(tmp_path, layout, enabled, task):
     assert not (modeling / "weights.py").exists()
     expected = "importance" if enabled == "true" else None
     if layout == "multi_target":
-        entries = runpy.run_path(str(modeling / "multi_model.py"))["build_training_branches"]()
-        assert entries["branch_1"]["workflow"]["weight_column"] == expected
-        assert entries["branch_2"]["workflow"]["weight_column"] is None
+        from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+        from skyulf.integrations.databricks.projects.yaml_models import training_branches
+
+        declarations = read_training_config(project / "config")
+        assert declarations is not None
+        entries, _ = training_branches(declarations)
+        assert entries["branch_1"]["workflow"].get("weight_column") == expected
+        assert entries["branch_2"]["workflow"].get("weight_column") is None
     else:
-        config = json.loads((project / "config/workflow.json").read_text())
+        config = read_workflow_config(project / "config/training.yml")
         loaded = load_project_workflow(config, project / "src/features")
-        assert loaded["weight_column"] == expected
+        assert loaded.get("weight_column") == expected
         assert loaded["reserved_weight_columns"] == ([] if expected is None else [expected])
-        filename = "single_model.py" if layout == "single_model" else "model_competition.py"
-        assert loaded["weights_python_source"] == (modeling / filename).read_bytes().decode()
+        assert loaded["weights_python_source"].startswith("YAML_DECLARATIONS =")
 
 
 @pytest.mark.parametrize(
@@ -1417,7 +1434,7 @@ def test_weighted_ensemble_uses_selected_members_and_search_space(tmp_path, mode
             f"single_ensemble_{task}_base_2_weighted": "decision_tree",
         },
     )
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     loaded = load_project_workflow(config, project / "src/features")
     modeling = loaded["pipeline"]["modeling"]
     params = modeling["base_model"]["params"]

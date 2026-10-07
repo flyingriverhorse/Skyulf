@@ -58,6 +58,7 @@ class LocalPipelineArtifact:
 
     manifest: LocalPipelineManifest
     pipeline: SkyulfPipeline
+    feature_lookup_json: str | None = None
 
 
 def _recorded_schemas(pipeline: SkyulfPipeline) -> tuple[SkyulfSchema, SkyulfSchema]:

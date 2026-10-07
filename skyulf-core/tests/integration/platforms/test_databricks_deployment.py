@@ -8,9 +8,13 @@ from typing import Any
 
 import pytest
 import yaml
-from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
+from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
-pytestmark = pytest.mark.skipif(not CLI or not PROFILE, reason="Requires opt-in installed CLI.")
+from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
+pytestmark = pytest.mark.skipif(
+    not CLI or not (PROFILE or OFFLINE_CLI), reason="Requires opt-in installed CLI."
+)
 
 
 @pytest.fixture
@@ -141,7 +145,7 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
     )
     from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
 
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     names = []
     model_set_names = []
     for bundle in (first, second):
@@ -173,7 +177,7 @@ def _model_set_destinations(project, config, bindings):
     from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
 
     values = {
-        "config_path": str(project / "config/workflow.json"),
+        "config_path": str(project / "config/training.yml"),
         "workflow_contract": "3",
         "deployed_score_handoff": config["score_handoff"],
         **bindings,

@@ -56,7 +56,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -207,7 +207,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}

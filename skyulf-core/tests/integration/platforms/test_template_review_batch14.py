@@ -1,11 +1,11 @@
 """Real CLI regressions for weighted competition graphs and policy-cluster YAML."""
 
 import json
-import runpy
 
 import pytest
 from test_databricks_bundle_generation import (
     CLI,
+    OFFLINE_CLI,
     PROFILE,
     _generate_project,
     _read_bundle,
@@ -13,7 +13,7 @@ from test_databricks_bundle_generation import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not PROFILE or not CLI,
+    not (PROFILE or OFFLINE_CLI) or not CLI,
     reason="Set SKYULF_BUNDLE_CLI_TEST_PROFILE for installed CLI generation.",
 )
 
@@ -46,15 +46,20 @@ def test_competition_graph_uses_selected_candidate_names(tmp_path, task, weighte
         shap_enabled="true",
         **answers,
     )
-    definitions = runpy.run_path(str(project / "src/modeling/model_competition.py"))
-    names = list(definitions["build_candidates"](task))
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+    definitions = read_training_config(project / "config")
+    assert definitions is not None
+    names = list(definitions["models"])
     suffix = "_weighted" if weighted == "true" else ""
     expected = [
         f"{answers[f'competition_{task}_model_{slot}{suffix}']}_{slot}"
         for slot in range(1, count + 1)
     ]
     assert names == expected
-    assert definitions["WEIGHT_COLUMN"] == ("training_weight" if weighted == "true" else None)
+    assert definitions["defaults"].get("weight_column") == (
+        "training_weight" if weighted == "true" else None
+    )
     tasks = {item["task_key"]: item for item in _read_jobs(project)["train"]["tasks"]}
     initialize = tasks["initialize_run"]["notebook_task"]["base_parameters"]
     validate_model_task_names(initialize, set(names))

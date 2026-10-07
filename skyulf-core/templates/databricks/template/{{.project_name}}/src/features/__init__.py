@@ -1,8 +1,10 @@
 """Export the independent recipes and optional scoring policy captured with each trained model.
 
-Use relative imports within this package. All Python files are saved together
-under the 64 KiB source budget. Third-party dependencies must be installed in the
-training and scoring environments. Existing model versions use their saved code.
+Use relative imports within this package. Model Python files are saved together
+under the 64 KiB source budget. The groups/ folder is reserved for upstream Spark
+table producers and excluded from model snapshots; do not import it here.
+Third-party model dependencies must be installed in training and scoring.
+Existing model versions use their saved code.
 """
 
 from .pre_split import build_pre_split_steps

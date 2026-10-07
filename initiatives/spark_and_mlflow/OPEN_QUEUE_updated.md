@@ -2,14 +2,15 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
-> Feature lifecycle follow-up (2026-10-07, locally verified): optional parallel
-> feature tasks, checked exact/as-of Delta merge, explicit single-source YAML
-> migration, sklearn tree/MinMax worker scoring and weighted model-set composition
-> are implemented. Current-source Spark12, Delta2 and three migrated Bundle CLI
-> cases passed locally; no fresh Databricks execution. SM-21a remains PARTIAL:
-> optional SDK adapters exist, but automatic training/logging/score_batch wiring
-> and native acceptance remain open. SM-21b remains optional/LATER.
-> [Delivery181](181-feature-lifecycle-delivery.md) records usage, evidence and limits.
+> Feature lifecycle continuation (2026-10-07): new Bundles generate authoritative
+> training/inference YAML directly; the unused migration tool is removed. Optional
+> native feature lookup now connects training, single/competition/model-set
+> packaging, score_batch and Spark monitoring with frozen feature-table evidence.
+> SM-21a remains PARTIAL until native workspace acceptance (user-deferred); the
+> initial training_snapshot policy and concurrency limits are explicit.
+> SM-21b stays optional/LATER. [Delivery182](182-native-feature-lifecycle-delivery.md)
+> records current usage/evidence. [Delivery181](181-feature-lifecycle-delivery.md)
+> retains the earlier feature-group/tree-scoring delivery and historical tests.
 > Reference follow-up (2026-10-07): all 99 supplied documentation files reviewed;
 > selected changes cover a layout-specific first-run guide, monitoring Run-as/ACL
 > parity and independent runtime/budget settings, current-release packaging, and
@@ -546,7 +547,7 @@ See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
 | SM-19a | PARTIAL | Minimum pinned HTTP bridge, readiness and real classifier HTTP/local parity delivered for SM-23b. Full supported-artifact, authentication/error-input, warm/cold and bounded-load acceptance remains separate. [Delivery177](177-sm23b-online-monitoring.md). |
 | SM-19b | LATER | SM-19a; SQL ai_query invocation, named inputs, privileges and failure behavior |
 | SM-19d | LATER | SM-19a; A/B/canary routing, endpoint update/rollback; batch rollout separately explicit |
-| SM-21a | PARTIAL | SM-43a; offline temporal joins and optional UC lookup/TrainingSet/log_model/score_batch helpers delivered locally. Automatic Skyulf lifecycle wiring and native point-in-time/lineage acceptance remain open. [Delivery181](181-feature-lifecycle-delivery.md) |
+| SM-21a | PARTIAL — NATIVE ACCEPTANCE | SM-43a; optional native lookup now wires bounded training, single/competition/compatible model-set logging, score_batch and Spark monitoring. Strict training_snapshot policy, worker admission and receipt checks are implemented; native point-in-time/lineage/serverless acceptance remains user-deferred. [Delivery182](182-native-feature-lifecycle-delivery.md) |
 | SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
 | SM-23a | BATCH DONE | Quality/drift/delayed outcomes, Spark measurement, shared Delta storage and native AI/BI delivered. All three producer layouts use separate monitoring jobs; native refresh and execution/cost/CPU/RAM views are delivered ([Delivery163](163-sm23h-dashboard-refresh-compute.md)). Overview independently counts current performance evidence ([Delivery164](164-sm23i-monitoring-overview-closure.md)). Optional native Data Profiling (`data_quality`, replacing deprecated `quality_monitors`) and custom slices remain separate enhancements. Company/identity acceptance stays in SM-37/43b. |
 | SM-23b | FUNCTIONAL DONE | Actual native telemetry VIEW/backing Delta, pinned endpoint/model versions, Spark drift and delayed-label performance, shared inventory/dashboard and retraining dedup delivered. Native parser: 33 passed; HTTP: 10 predictions matched; two late-label verdicts healthy/degraded, report replay, native refresh and 9 synthetic dashboard queries passed. Seven legacy monitoring readers passed native compatibility and received a wheel-only upgrade; all 12 train/score jobs stayed unchanged. [Delivery177](177-sm23b-online-monitoring.md). Full SM-19a and SM-37/43b acceptance stays separate. |
@@ -787,7 +788,7 @@ describes that current implementation.
 | SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | DONE | Live append retained 160 v1 rows and added ten v2 rows; full view exposes 170 v2 rows, retains v1 and its SELECT grant; [plan](29-sm27-model-change-scoring-plan.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
 | SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | DONE | Live first champion, v2 promotion, tied v3 rejection, two-job handoff, score-failure recovery, queue/no-op and restricted alias-write denial passed; [design](31-sm29-auto-champion-design.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | PARTIAL | Minimum pinned HTTP bridge delivered with SM-23b; full SM-19a acceptance, SQL invocation and endpoint rollout remain open. Streaming remains parked. |
-| SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | PARTIAL | Offline feature production/as-of joins and optional UC SDK adapters are implemented; SM-21a automatic lifecycle/native acceptance and SM-21b online lookup remain open. [Delivery181](181-feature-lifecycle-delivery.md). |
+| SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | PARTIAL | Offline feature production/as-of joins and optional native lifecycle wiring are implemented. SM-21a native workspace acceptance and SM-21b online lookup remain open. [Delivery182](182-native-feature-lifecycle-delivery.md). |
 | SM-23 | Monitoring and inference observability | SM-20a, relevant batch/serving adapter | FUNCTIONAL DONE | Batch and online Spark measurement, independent drift/performance, delayed labels, shared native dashboard and refresh delivered. Online HTTP/log/version/replay acceptance passed on 2026-10-06. [Delivery177](177-sm23b-online-monitoring.md). Full serving acceptance remains SM-19a; production gates remain SM-37/43b. |
 | SM-23c | Drift/performance-triggered retraining | SM-23a, SM-37 | FUNCTIONAL DONE | Independent default-off performance policy delivered: pinned metric/baseline/tolerance, mature labels, coverage, consecutive windows and shared retraining guards. Local gates, dashboard SQL/publish/readback, real training request, unchanged-data skip and replay/combined-trigger dedup passed live. Inherited SM-37/43b production gates remain separate. [Delivery158](158-sm23c-performance-policy.md). Gates unchanged, never approves; [report93](93-dbml-reference-recomparison.md). |
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |

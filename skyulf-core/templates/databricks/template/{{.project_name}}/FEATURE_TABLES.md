@@ -36,12 +36,12 @@ groups:
   company:
     source_table: workspace.demo.company_source
     output_table: workspace.demo.company_features
-    transform: src/feature_groups/company.py:compute_features
+    transform: src/features/groups/company.py:compute_features
     columns: [employee_count]
   activity:
     source_table: workspace.demo.activity_source
     output_table: workspace.demo.activity_features
-    transform: src/feature_groups/activity.py:compute_features
+    transform: src/features/groups/activity.py:compute_features
     columns: [monthly_amount]
     lookup: asof
     allow_missing: false
@@ -66,7 +66,27 @@ count, so losses or multiplication stop publication.
 
 ## Write Spark transformations
 
-Create `src/feature_groups/company.py`:
+All feature code lives under `src/features/`, with separate execution stages:
+
+```text
+src/features/
+  groups/             Spark functions that produce shared Delta feature tables
+    company.py        Your company-domain features (create when needed)
+    activity.py       Your activity-domain features (create when needed)
+  pre_split.py        Fixed training-row eligibility
+  preprocessing.py    Model recipes fitted on training rows only
+  scoring.py          Prediction eligibility and business outputs
+  custom/             Custom implementations used by those model recipes/rules
+```
+
+`base_table` supplies the observation rows, keys, timestamp and optional labels;
+it is an existing input table, not a Python feature function. A group can select
+existing columns or compute many new features from its `source_table`. Its
+function returns the complete group DataFrame, and the feature job writes the
+configured output table. You do not need one Python file per feature column.
+The group name and filename need not match: `transform` connects them explicitly.
+
+Create `src/features/groups/company.py`:
 
 ```python
 def compute_features(frame):
@@ -74,7 +94,7 @@ def compute_features(frame):
     return frame.select("company_id", "observed_at", "employee_count")
 ```
 
-Create `src/feature_groups/activity.py`:
+Create `src/features/groups/activity.py`:
 
 ```python
 from pyspark.sql import functions as F
@@ -94,8 +114,25 @@ inside your function; package/version dependencies accordingly. The current
 entry point is one contained Python module, not a general dependency graph.
 
 Use these transformations for source joins, aggregations and fixed formulas.
-Fit imputers, scalers, encoders and feature selectors inside training folds in
-`src/features/`; do not learn their state from the entire merged table.
+Fixed operations such as type conversions or a known unit conversion may run here.
+For historical features, use only information available at the observation time.
+Fit imputers, scalers, learned encoders and feature selectors through
+`src/features/preprocessing.py` inside training folds; do not learn their state
+from the entire merged table. For example, a missing-value mean learned from
+both training and holdout rows would leak holdout information into the model.
+
+A fixed formula used only by one model can instead be a preprocessing step.
+Choose one owner for each transformation: do not compute the same conversion
+again inside the model when the input table already contains it. Model recipes
+can combine built-in steps and functions from `custom/`.
+
+Only the root `groups/` directory is excluded from saved model source. Its
+functions are executed and hashed by the feature job, not imported by the
+model's recipe package. Keep model helpers in `custom/`, do not import from
+`groups/` in preprocessing or scoring, and keep Spark job dependencies in
+`deployment/requirements.txt`. Groups do not need `__init__.py`. Static smoke
+still checks their Python syntax. Existing saved model versions keep their
+original source snapshots.
 
 ## Generate, deploy and run
 
@@ -140,26 +177,21 @@ serializes its own runs, but does not lock unrelated producers.
 
 ## Simplify training and inference settings
 
-To convert an existing generated project to authoritative YAML files:
+New projects already use `config/training.yml` and `config/inference.yml`.
+There is no migration step and no generated Python model declaration file.
+`training.yml` owns training/model/tuning settings; `inference.yml` owns scoring
+settings and model-set publication. Python preprocessing and business functions
+remain editable in `src/features/`. Duplicate setting owners fail validation.
 
 ```powershell
-python src/tools/migrate_config.py
 python src/tools/smoke.py
 python src/tools/preview.py --action train
 python src/tools/refresh_training_graph.py
 ```
 
-`training.yml` owns training/model/tuning settings and `inference.yml` owns
-scoring settings. Common defaults can be shared by named models. Remaining
-structural settings stay in `workflow.json`; moved settings must not also exist
-there or in old Python model declarations. Migration preserves a byte-exact
-`.skyulf-yaml-backup` and refuses custom factories it cannot safely translate.
-Your Python preprocessing and business functions remain editable Python.
-Existing JSON/Python projects continue to load until explicitly migrated.
-
 For several models, keep shared values in `defaults` and list only differences.
 For example, the following is an excerpt of a multi-target training configuration;
-retain the source, split and registry settings created by migration:
+retain the source, split and registry settings created by initialization:
 
 ```yaml
 version: 1
@@ -190,7 +222,7 @@ the next training run; saved models retain their original fitted configuration.
 ## Understand the scaling boundary
 
 Use `engine: pandas` for training and `inference_mode: spark` for distributed
-scoring (each setting belongs in its corresponding migrated YAML file).
+scoring (each setting belongs in its corresponding YAML file).
 The Bundle uses `mlflow.pyfunc.spark_udf`; model inputs arrive as pandas batches
 on Spark workers. Saved preprocessing runs with fitted state before prediction;
 it is not re-fitted on each batch. The library also has the separately scoped
@@ -231,27 +263,84 @@ outputs:
     required_components: [revenue, value]
 ```
 
-In a migrated project, put this mapping under
+Put this mapping under
 `config/inference.yml` -> `model_set` -> `composition_config`, retaining the other
 model-set destination/policy fields. Remove `combined_rules_path` when selecting
-this declarative composition: both definitions cannot coexist. In a legacy
-project, use the same `composition_config` in `src/modeling/model_set.py`.
-Input names reference actual component keys; numeric weights cannot mix units into a
+this declarative composition: both definitions cannot coexist. Input names reference actual component keys; numeric weights cannot mix units into a
 meaningful score automatically. Validate the business meaning of the combination.
 
 ## Unity Catalog lookup and online stores
 
-The optional `skyulf-core[feature-store]` API exposes strict lookup specifications,
-`create_feature_training_set`, `log_feature_model` and `score_feature_model`.
-It uses the native Feature Engineering client and preserves TrainingSet lineage.
-Time-series tables need the correct primary/TIMESERIES keys before SDK lookup.
+Native feature lookup is optional. Without `feature_lookup`, the project continues
+to train from its ready or merged Delta table and score through the ordinary
+Skyulf pyfunc route. With `feature_lookup`, training uses Databricks Feature
+Engineering and the saved model uses native `score_batch` for lookup and inference.
+This is separate from the explicit merged-table workflow described above.
 
-These adapters are an initial SM-21a integration boundary. The generated lifecycle
-still trains from its configured Delta table and uses its existing pyfunc scoring
-route; it does not automatically switch to native Feature Engineering logging or
-`score_batch`. Offline as-of joins above are separate from that service. Native
-Feature Engineering acceptance remains pending. SM-21b online-store publication
-and online serving lookup are not enabled by this change.
+To enable it, add the following fields under `defaults` in `config/training.yml`
+(or under an individual model for a multi-target project):
+
+```yaml
+engine: pandas
+training_table: "{catalog}.{input_schema}.observations"
+input_columns: [account_balance, recent_transactions]
+feature_lookup:
+  lookups:
+    - table_name: "{catalog}.{input_schema}.customer_history"
+      lookup_key: [customer_id]
+      feature_names: [account_balance, recent_transactions]
+      timestamp_lookup_key: observed_at
+      timestamp_type: timestamp
+      lookback_seconds: 2592000
+```
+
+Keep the model's target and record keys in the training configuration. The base
+table must contain those columns plus `customer_id` and `observed_at`; it must
+not already contain the fetched feature columns. Direct model inputs not listed
+in a lookup must remain in the base table. Set `inference_mode: spark` in
+`config/inference.yml` and point its `score_source_table` at the corresponding
+unlabeled observations. For exact lookup, omit the timestamp and lookback fields.
+
+Add `databricks-feature-engineering==0.18.1` to `deployment/requirements.txt`,
+which all generated jobs share. The library's optional `feature-store` extra
+requires SDK 0.18.1 or later within major version zero. The selected Databricks
+runtime must support that SDK. Feature tables must already have real Unity
+Catalog primary keys and, for historical lookup, a TIMESERIES primary key.
+The feature-group job creates ordinary Delta tables; it does not declare these
+catalog constraints automatically. Refer to the platform's
+[point-in-time lookup setup](https://docs.databricks.com/aws/en/machine-learning/feature-store/time-series).
+
+The lifecycle records the base Delta version and each feature table's ID/version
+at preparation. It validates actual null/duplicate feature keys, key types and
+timestamp types before SDK joins. Training keeps record/time/weight metadata for
+splitting, then excludes it from the logged model's inputs. Separate tasks
+reconstruct native TrainingSet lineage from the same frozen declaration. Fitted
+preprocessing remains inside the model and is not fitted again during scoring.
+Driver training row/byte limits still apply; lookup and batch scoring run in Spark.
+
+Single-model and competition training retain this lineage when publishing the
+winner. A model set combines compatible component lookups into one native package;
+conflicting table versions, key/time semantics, or direct/fetched input meanings
+are rejected. Scoring validates the complete package, exact named prediction
+schema and record-key/cardinality preservation. Spark monitoring reconstructs
+the feature values for scored keys from the same saved lookup evidence.
+
+Current limits are explicit:
+
+- The initial `training_snapshot` policy requires feature tables to remain at
+  their training IDs/versions. Feature updates require refreshed training and an
+  explicit prediction rebuild/new target; a base-table no-op cannot hide them.
+- Prevent concurrent feature-table writes during training, scoring and monitoring.
+  The native SDK has no lookup `versionAsOf` argument. Before/after guards detect
+  changes but do not lock tables.
+- Nullable integer/boolean transport requiring Skyulf's post-lookup encoder is
+  rejected. The SDK currently provides no hook for that encoder.
+- Configure the active MLflow tracking/registry URIs to match the project's
+  explicit URIs before native scoring. The SDK downloads the concrete model URI
+  in that context; aliases are resolved before execution.
+- Local SDK and Spark checks are separate from native workspace acceptance,
+  which is still pending. SM-21b online-store publication and serving lookup
+  remain disabled. Native-feature monitoring currently supports Spark batch only.
 
 Platform references: [task dependencies and parallel execution](https://docs.databricks.com/aws/en/jobs/run-if),
 [repairing selected tasks](https://docs.databricks.com/aws/en/jobs/repair-job-failures),

@@ -129,39 +129,25 @@ def test_saved_weight_summary_and_configured_class_weight_are_logged(tmp_path, c
 
 def test_template_has_no_separate_weight_hook():
     """New bundles keep the weight declaration beside the selected model settings."""
-    modeling = (
-        Path(__file__).resolve().parents[3]
-        / "templates/databricks/template"
-        / "{{.project_name}}/src/modeling"
-    )
-    assert not (modeling / "weights.py").exists()
-    assert "WEIGHT_COLUMN = " in (modeling / "single_model.py.tmpl").read_text()
-    assert "WEIGHT_COLUMN = " in (modeling / "model_competition.py.tmpl").read_text()
-    assert '"weight_column": ' in (modeling / "multi_model.py.tmpl").read_text()
+    template = Path(__file__).resolve().parents[3] / "templates/databricks"
+    assert not (template / "template/{{.project_name}}/src/modeling").exists()
+    assert "weight_column:" in (template / "library/training_settings.tmpl").read_text()
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 def test_cli_generates_optional_weight_declaration_for_each_layout(tmp_path, layout):
-    """Default initialization must emit an explicit disabled setting in the model file."""
-    import runpy
-
+    """Default initialization omits inactive weights while retaining unweighted runtime behavior."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE to opt into installed CLI generation.")
     project = _generate_project(tmp_path, training_layout=layout)
-    filename = {
-        "single_model": "single_model.py",
-        "model_competition": "model_competition.py",
-        "multi_target": "multi_model.py",
-    }[layout]
-    settings = runpy.run_path(str(project / "src/modeling" / filename))
-    if layout == "multi_target":
-        assert all(
-            entry["workflow"]["weight_column"] is None for entry in settings["MODELS"].values()
-        )
-    else:
-        assert settings["WEIGHT_COLUMN"] is None
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+    from skyulf.integrations.databricks.projects.yaml_models import model_entries
+
+    document = read_training_config(project / "config")
+    assert document is not None
+    assert all(entry.get("weight_column") is None for entry in model_entries(document).values())
     assert not (project / "src/modeling/weights.py").exists()
 
 

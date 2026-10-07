@@ -141,7 +141,7 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
     candidates, source, weights = _load_candidates(Path(path), config["task"], limit)
     config = {**deepcopy(config), **weights}
     validate_weight_roles(config)
-    shared_source = _competition_source(project_source(Path(path)))
+    shared_source = _competition_source(project_source(Path(path), exclude_feature_groups=True))
     result = deepcopy(config)
     resolved = {}
     common_steps = None

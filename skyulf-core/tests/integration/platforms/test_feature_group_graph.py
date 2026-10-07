@@ -103,7 +103,7 @@ def _plan():
                 name: {
                     "source_table": f"workspace.demo.raw_{name}",
                     "output_table": f"workspace.demo.features_{name}",
-                    "transform": f"src/feature_groups/{name}.py:compute",
+                    "transform": f"src/features/groups/{name}.py:compute",
                     "columns": [f"value_{name}"],
                 }
                 for name in ("company", "activity")
@@ -174,7 +174,7 @@ groups:
   activity:
     source_table: workspace.demo.raw
     output_table: workspace.demo.features
-    transform: src/feature_groups/activity.py:compute
+    transform: src/features/groups/activity.py:compute
     columns: [value]
 """
     (root / "config/features.yml").write_text(config, encoding="utf-8")

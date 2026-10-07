@@ -110,7 +110,7 @@ def build_output_rules():
 def build_combined_rules():
     """Return cross-model rules; the profit example stays disabled until configured."""
     return [
-        # Adapt these names to keys in modeling/multi_model.py, then uncomment.
+        # Adapt these names to model keys in config/training.yml, then uncomment.
         # required_components lists only the models this rule needs. A filtered
         # revenue or cost row excludes profit for that row; an unrelated model's
         # exclusion does not. Exceptions fail the job before new results are saved.

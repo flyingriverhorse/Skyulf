@@ -2,6 +2,8 @@
 
 Runs AFTER the train/test split. A step that learns something (an average,
 a mapping) learns it from training rows only; scoring reuses what was learned.
+Shared Spark table calculations belong in groups/. Do not fit this recipe on
+the entire merged table or repeat a transformation already applied upstream.
 
 HOW TO USE
   1. Put steps in the list of _default_recipe() below. They run top to bottom.
@@ -16,9 +18,9 @@ HOW TO USE
   2. Check: python src/tools/preview.py --action train
 
 RECIPES
-  A recipe is a named list of steps. Single-model training always uses
-  "default". multi_model.py and model_competition.py choose a recipe per model,
-  e.g. "preprocessing_recipe": "example_all".
+  A recipe is a named list of steps. config/training.yml selects it through
+  preprocessing_recipe in defaults or a model entry; the default is "default".
+  For example: preprocessing_recipe: example_all.
   Recipes starting with "example_" are ready-made lists to read or copy from;
   they do nothing unless a model selects them. "none" means no steps.
 """

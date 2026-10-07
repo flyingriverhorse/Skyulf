@@ -9,6 +9,10 @@ import pytest
 
 mlflow = pytest.importorskip("mlflow")
 
+from tests.integration.platforms.test_local_feature_model import (  # noqa: E402
+    package_inputs as package_inputs,
+)
+
 from skyulf.data.dataset import SplitDataset  # noqa: E402
 from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
 from skyulf.integrations.mlflow.spark import spark_model  # noqa: E402
@@ -296,6 +300,45 @@ def test_missing_inputs_rejected_before_udf(artifact, monkeypatch):
             env_manager="local",
         )
     udf.assert_not_called()
+
+
+def test_feature_package_routes_missing_features_to_native_lookup(artifact, monkeypatch):
+    """Feature packages require lookup keys before prediction rather than fetched columns."""
+    binding = {"version": 1}
+    monkeypatch.setattr(spark_model, "feature_binding", lambda artifact: binding, raising=False)
+    monkeypatch.setattr(
+        spark_model, "feature_source_columns", lambda *args: ("entity",), raising=False
+    )
+    monkeypatch.setattr(spark_model, "validate_feature_source", lambda *args: None, raising=False)
+    outer, raw = object(), object()
+    monkeypatch.setattr(spark_model, "_download_package", lambda *args: ("package", outer))
+    package = Mock(return_value=raw)
+    monkeypatch.setattr(spark_model, "_scoring_package", package, raising=False)
+    validate = Mock()
+    monkeypatch.setattr(spark_model, "_validate_package", validate)
+    predict = Mock(return_value="native-output")
+    monkeypatch.setattr(spark_model, "_predict_feature_frame", predict, raising=False)
+    output = spark_model.predict_spark_pyfunc(
+        None,
+        SimpleNamespace(columns=["id", "entity"]),
+        model_uri="models:/model/1",
+        artifact=artifact,
+        record_key_columns=("id",),
+        env_manager="local",
+    )
+    assert output == "native-output"
+    assert validate.call_args.args[0] is raw
+    package.assert_called_once_with(artifact, "package", outer)
+
+
+def test_feature_envelope_cannot_be_missing_from_loaded_artifact(artifact):
+    """A package cannot activate lookup through metadata the driver never admitted."""
+    with pytest.raises(ValueError, match="lookup.*binding"):
+        spark_model._scoring_package(
+            artifact,
+            "package",
+            SimpleNamespace(metadata={"skyulf_feature_store": {"version": 1}}),
+        )
 
 
 def test_invalid_environment_rejected_before_udf(artifact, monkeypatch):
@@ -607,3 +650,40 @@ def test_prediction_chunk_rejects_changed_row_identity():
     query = pd.DataFrame({"x": [1.0, 2.0]}, index=[7, 3])
     with pytest.raises(ValueError, match="row identity"):
         score_prediction_batches(query, lambda frame: frame.reset_index(drop=True), None, True)
+
+
+def test_real_feature_envelope_passes_raw_spark_contract_and_rejects_binding_drift(package_inputs):
+    """Native lookup envelopes must still satisfy every fitted raw Spark package gate."""
+    from dataclasses import replace
+
+    from skyulf.integrations.databricks.feature_store.lifecycle_config import binding_json
+    from skyulf.integrations.mlflow.models.local_feature_model import log_local_feature_model
+
+    path, options, _ = package_inputs
+    uri = log_local_feature_model(path, **options)
+    local = mlflow.artifacts.download_artifacts(
+        artifact_uri=uri, tracking_uri=options["tracking_uri"]
+    )
+    artifact = replace(
+        load_local_pipeline(path), feature_lookup_json=binding_json(options["lookup_binding"])
+    )
+    package = mlflow.models.Model.load(local)
+    raw = spark_model._scoring_package(artifact, local, package)
+    inputs, outputs = spark_model._contract(artifact)
+    spark_model._validate_package(
+        raw, spark_model.partition_safety_certificate(artifact), inputs, outputs
+    )
+    assert raw.signature.inputs.input_names() == list(artifact.manifest.input_columns)
+    changed = binding_json(
+        {
+            **options["lookup_binding"],
+            "lookup_evidence": {
+                "policy": "training_snapshot",
+                "feature_tables": [
+                    {"table_name": "main.features.values", "table_id": "other", "version": 4}
+                ],
+            },
+        }
+    )
+    with pytest.raises(ValueError, match="lookup differs"):
+        spark_model._scoring_package(replace(artifact, feature_lookup_json=changed), local, package)

@@ -9,7 +9,7 @@ put tokens or passwords in these files.
 
 This project uses `inference_mode={{.inference_mode}}` with `engine={{.engine}}`
 for training. The `train` job remains bounded by `max_rows` and `max_input_mb` in
-`config/workflow.json`. {{if eq .inference_mode "spark"}}The `score` job runs the `score` task for single-model and competition layouts,
+`config/inference.yml`. {{if eq .inference_mode "spark"}}The `score` job runs the `score` task for single-model and competition layouts,
 or `score` using `src/jobs/score_models.py` for a model set. That task calls
 `mlflow.pyfunc.spark_udf` and writes keyed predictions through the existing Delta
 receipt path. Review its selected model/version/digest, source end version,

@@ -4,14 +4,15 @@ import os
 
 import pytest
 import yaml
-from test_databricks_bundle_generation import CLI, _generate_project
+from test_databricks_bundle_generation import CLI, OFFLINE_CLI, _generate_project
 from test_databricks_deployment import _resolve, offline_workspace  # noqa: F401 - pytest fixture
 
 from skyulf.integrations.databricks.features.graph import refresh_feature_graph
-from skyulf.integrations.databricks.projects.yaml_migration import migrate_project_yaml
+from skyulf.integrations.databricks.projects.project_checks import check_project
 
 pytestmark = pytest.mark.skipif(
-    not CLI or not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in"
+    not CLI or not (os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE") or OFFLINE_CLI),
+    reason="CLI opt-in",
 )
 
 
@@ -27,7 +28,22 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
         personal_development_targets="true",
     )
     assert not (project / "src/jobs/feature_task.py").exists()
-    assert migrate_project_yaml(project)["status"] == "migrated"
+    assert (project / "config/training.yml").is_file()
+    for name in ("company", "activity"):
+        (project / f"src/features/groups/{name}.py").write_text(
+            "def compute(frame):\n    return frame\n", encoding="utf-8"
+        )
+    smoke = check_project(
+        project,
+        {
+            "catalog": "workspace",
+            "input_schema": "test",
+            "output_schema": "test",
+            "metadata_schema": "test",
+            "resource_suffix": "",
+        },
+    )
+    assert smoke["status"] == "passed"
     config = {
         "version": 1,
         "base_table": "workspace.test.observations",
@@ -38,7 +54,7 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
             name: {
                 "source_table": f"workspace.test.raw_{name}",
                 "output_table": f"workspace.test.features_{name}",
-                "transform": f"src/feature_groups/{name}.py:compute",
+                "transform": f"src/features/groups/{name}.py:compute",
                 "columns": [f"value_{name}"],
             }
             for name in ("company", "activity")

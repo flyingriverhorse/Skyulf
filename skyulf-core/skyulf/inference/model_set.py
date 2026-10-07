@@ -41,6 +41,7 @@ class ModelSetArtifact:
 
     manifest: ModelSetManifest
     directory: Path
+    feature_lookup_json: str | None = None
 
 
 def _safe_directory(path: Path) -> Path:

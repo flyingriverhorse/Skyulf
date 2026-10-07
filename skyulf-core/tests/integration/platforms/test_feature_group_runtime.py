@@ -11,7 +11,7 @@ from skyulf.integrations.databricks.features.runtime import selected_groups, tra
 def _plan():
     """A selected group has one project-contained transform and output table."""
     group = FeatureGroup(
-        "company", "raw", "features", "src/feature_groups/company.py:compute", ("size",)
+        "company", "raw", "features", "src/features/groups/company.py:compute", ("size",)
     )
     return FeaturePlan("base", "merged", ("id",), "at", (group,))
 
@@ -27,7 +27,7 @@ def test_selective_run_has_explicit_subset():
 
 def test_transform_source_is_read_without_execution(tmp_path):
     """Initialize must pin project code without triggering a transformation early."""
-    path = tmp_path / "src/feature_groups/company.py"
+    path = tmp_path / "src/features/groups/company.py"
     path.parent.mkdir(parents=True)
     path.write_text("raise AssertionError('not now')\n")
     source, digest = transform_source(tmp_path, _plan().groups[0])

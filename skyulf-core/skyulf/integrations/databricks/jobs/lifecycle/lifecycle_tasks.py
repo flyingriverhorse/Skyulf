@@ -243,7 +243,10 @@ def _train(spark: Any, store: PhaseStore) -> dict[str, Any]:
         if selection is not None:
             fitted.tags["competition_winner"] = selection["winner"]
         model_uri = training.log_local_model(
-            path, run_id=store.run_id, tracking_uri=config["tracking_uri"]
+            path,
+            run_id=store.run_id,
+            tracking_uri=config["tracking_uri"],
+            **training.feature_log_options(spark, fitted.spec),
         )
     output = {
         "model_uri": model_uri,

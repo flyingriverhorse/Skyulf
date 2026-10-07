@@ -127,45 +127,54 @@ def log_local_model(
     validate_local_destination(run_id, artifact_path, tracking_uri)
     local_path = Path(local_artifact_path).resolve()
     artifact = load_local_pipeline(local_path)
-    transport = transport_spec(
-        zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
-    )
-    certificate = optional_partition_certificate(artifact)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-local-mlflow-") as directory:
         model_path = Path(directory) / "model"
-        save_options: dict[str, Any] = {}
-        if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
-            save_options["uv_project_path"] = directory
-        requirements = pip_requirements(artifact)
-        source_sha256 = None
-        if certificate:
-            code_paths, requirements, source_sha256 = snapshot_worker_environment(
-                Path(directory), requirements
-            )
-            save_options["code_paths"] = code_paths
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfLocalPythonModel(transport, certificate, source_sha256),
-            artifacts={"local_pipeline": str(local_path)},
-            signature=_signature(artifact, spark_certified=certificate is not None),
-            input_example=_input_example(artifact),
-            pip_requirements=requirements,
-            metadata={
-                "skyulf_artifact_kind": "local_pipeline",
-                "skyulf_fitted_engine": artifact.manifest.fitted_engine,
-                "skyulf_execution_scope": "whole_frame_local",
-                "local_pipeline_digest": artifact.manifest.pipeline_sha256,
-                **({TRANSPORT_KEY: transport} if transport else {}),
-                **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
-            },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
-            **save_options,
+            **local_model_save_options(artifact, local_path, Path(directory)),
         )
         scrub_local_artifact_uri(model_path, "local_pipeline")
         client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
+
+
+def local_model_save_options(
+    artifact: LocalPipelineArtifact, local_path: Path, directory: Path
+) -> dict[str, Any]:
+    """Share the exact fitted pyfunc, schema and worker evidence across loggers."""
+    transport = transport_spec(
+        zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
+    )
+    certificate = optional_partition_certificate(artifact)
+    requirements = pip_requirements(artifact)
+    options: dict[str, Any] = {}
+    if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
+        options["uv_project_path"] = str(directory)
+    source_sha256 = None
+    if certificate:
+        code_paths, requirements, source_sha256 = snapshot_worker_environment(
+            directory, requirements
+        )
+        options["code_paths"] = code_paths
+    return {
+        **options,
+        "python_model": SkyulfLocalPythonModel(transport, certificate, source_sha256),
+        "artifacts": {"local_pipeline": str(local_path)},
+        "signature": _signature(artifact, spark_certified=certificate is not None),
+        "input_example": _input_example(artifact),
+        "pip_requirements": requirements,
+        "metadata": {
+            "skyulf_artifact_kind": "local_pipeline",
+            "skyulf_fitted_engine": artifact.manifest.fitted_engine,
+            "skyulf_execution_scope": "whole_frame_local",
+            "local_pipeline_digest": artifact.manifest.pipeline_sha256,
+            **({TRANSPORT_KEY: transport} if transport else {}),
+            **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
+        },
+    }
 
 
 def normalized_dtype(dtype: str) -> str:

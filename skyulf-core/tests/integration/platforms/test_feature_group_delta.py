@@ -40,11 +40,11 @@ def test_separate_group_tasks_reuse_pinned_versions(delta_spark, tmp_path):
         f"spark_catalog.default.feature_{name}_{suffix}"
         for name in ("base", "raw", "group", "merged")
     ]
-    path = tmp_path / "src/feature_groups/company.py"
+    path = tmp_path / "src/features/groups/company.py"
     path.parent.mkdir(parents=True)
     path.write_text("def compute(frame):\n    return frame.select('id', 'at', 'value')\n")
     group = FeatureGroup(
-        "company", source, output, "src/feature_groups/company.py:compute", ("value",)
+        "company", source, output, "src/features/groups/company.py:compute", ("value",)
     )
     plan = FeaturePlan(base, merged, ("id",), "at", (group,))
     schema = "id long, at timestamp, value double"

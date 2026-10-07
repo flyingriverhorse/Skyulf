@@ -4,6 +4,7 @@ import inspect
 import tempfile
 from collections.abc import Iterable
 from copy import deepcopy
+from dataclasses import replace
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,7 @@ from ..registration.registry import (
     ResolvedModel,
     downloaded_registered_payload,
     packaged_artifact_path,
+    unwrap_feature_package,
     validate_concrete_version,
     validate_registry_options,
 )
@@ -129,44 +131,50 @@ def log_model_set(
     """Log a complete model set without selecting aliases or retaining producer paths."""
     validate_local_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
-    transport = transport_spec(
-        (column.name, column.dtype) for column in artifact.manifest.input_schema
-    )
-    requirements = _set_requirements(artifact)
-    certificate = optional_partition_certificate(artifact)
-    signature = _signature(artifact, spark_certified=certificate is not None)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-set-mlflow-") as directory:
         model_path = Path(directory) / "model"
-        options = {}
-        if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
-            options["uv_project_path"] = directory
-        source_sha256 = None
-        if certificate:
-            code_paths, requirements, source_sha256 = snapshot_worker_environment(
-                Path(directory), requirements
-            )
-            options["code_paths"] = code_paths
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfModelSetPythonModel(transport, certificate, source_sha256),
-            artifacts={"model_set": str(artifact.directory)},
-            signature=signature,
-            pip_requirements=requirements,
-            metadata={
-                "skyulf_artifact_kind": "model_set",
-                "skyulf_execution_scope": "whole_frame_local",
-                "model_set_digest": artifact.manifest.set_sha256,
-                **({TRANSPORT_KEY: transport} if transport else {}),
-                **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
-            },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
-            **options,
+            **model_set_save_options(artifact, Path(directory)),
         )
         scrub_local_artifact_uri(model_path, "model_set")
         client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
+
+
+def model_set_save_options(artifact: ModelSetArtifact, directory: Path) -> dict[str, Any]:
+    """Build the identical set wrapper and immutable evidence for every logger."""
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
+    certificate = optional_partition_certificate(artifact)
+    requirements = _set_requirements(artifact)
+    options: dict[str, Any] = {}
+    if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
+        options["uv_project_path"] = str(directory)
+    source_sha256 = None
+    if certificate:
+        code_paths, requirements, source_sha256 = snapshot_worker_environment(
+            directory, requirements
+        )
+        options["code_paths"] = code_paths
+    return {
+        **options,
+        "python_model": SkyulfModelSetPythonModel(transport, certificate, source_sha256),
+        "artifacts": {"model_set": str(artifact.directory)},
+        "signature": _signature(artifact, spark_certified=certificate is not None),
+        "pip_requirements": requirements,
+        "metadata": {
+            "skyulf_artifact_kind": "model_set",
+            "skyulf_execution_scope": "whole_frame_local",
+            "model_set_digest": artifact.manifest.set_sha256,
+            **({TRANSPORT_KEY: transport} if transport else {}),
+            **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
+        },
+    }
 
 
 def _signature(artifact: ModelSetArtifact, *, spark_certified: bool = False) -> Any:
@@ -242,7 +250,8 @@ def load_registered_model_set(
         local,
         model,
     ):
+        local, model, feature_lookup_json = unwrap_feature_package(local, model)
         artifact = load_model_set(packaged_artifact_path(local, model.flavors, "model_set"))
         if artifact.manifest.set_sha256 != resolved.digest:
             raise ValueError("Loaded model set digest differs from resolved identity.")
-        return artifact
+        return replace(artifact, feature_lookup_json=feature_lookup_json)

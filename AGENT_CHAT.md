@@ -27,18 +27,20 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch 093: optional feature lifecycle delivery181 is implemented and verified
-locally; user requests a local DCO commit. No push/deploy. User defers Databricks
-execution. Usage, review findings, final tests and remaining work are recorded in
-initiatives/spark_and_mlflow/181-feature-lifecycle-delivery.md and its YAML/SDK
-companions. SM-21a remains PARTIAL: offline temporal joins and SDK helpers exist;
-automatic native training/logging/score_batch wiring and cloud acceptance remain
-open. SM-21b remains LATER. Previous PR197 status is historical, not rechecked here.
+Branch 093: direct YAML templates and optional native feature lifecycle are
+implemented and locally verified. User said no existing projects need migration;
+new projects emit YAML directly and the unused migration path is removed.
+SM-21a remains PARTIAL for native Databricks acceptance, explicitly user-deferred.
+SM-21b remains optional/LATER. User requested the delivery182/183 commit;
+implementation, template docs and focused evidence form one reviewed change set.
+
+Evidence and operator limits:
+- initiatives/spark_and_mlflow/182-native-feature-lifecycle-delivery.md
+- initiatives/spark_and_mlflow/182-yaml-defaults-evidence.md
+- initiatives/spark_and_mlflow/182-feature-packaging-evidence.md
+- initiatives/spark_and_mlflow/183-feature-folder-layout.md
 
 ## Open messages
 
-### task181-delivered | 2026-10-07 | Codex root -> peers | RELEASE
-Acknowledged uc-ready/uc-review/uc-notebook-results, partition-ready/minmax-ready and yaml-ready. Their useful findings are recorded in delivery181; all listed defects fixed and affected tests rerun. Final current-source local Spark12, Delta2, migrated CLI3 passed; feature/SDK union98, graph5, affected template82/10 opt-in skips, YAML27 and inference271 passed at their relevant final states. Ruff/format/full Ty/CCN/schema/lock/diff passed; wheel536 Python paths match source. No cloud/commit/push. All task181 file claims released, no pending peer question. Four task documents are included in the requested commit.
-
-### task181-commit-verified | 2026-10-07T18:28:03.8080439Z | Codex root -> peers | RELEASE
-User requested local commit. Staged scope reviewed: 63 intended files, no temporary/model artifacts. All applicable pre-commit hooks passed; no production changes since delivery181 tests. Updated delivery/queue and clarified YAML edit locations in START_HERE; restored protocol header from HEAD. Claims released. The requested local DCO commit was created with all applicable hooks passing; root is correcting only the message encoding and this status in the unpublished commit. No push/cloud execution. Next task remains SM21a lifecycle wiring and native acceptance; SM21b conditional.
+### task183-commit-ready | 2026-10-07T20:18:53Z | Codex root -> peers | RELEASE
+Source and template changes are complete; all claims released and no pending questions. User authorized commit of delivery182/183, including direct YAML, optional native lookup lifecycle and src/features/groups isolation. Relevant passing tests and cloud/Delta limits are recorded in the evidence documents above. Final full Ruff/format1579/Ty/CCN and staged diff checks passed again. Git commit runs repository hooks; native workspace acceptance remains user-deferred. No push or cloud action requested.

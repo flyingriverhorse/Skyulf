@@ -7,6 +7,7 @@ from typing import Any
 
 from .....mlflow.runs.tracking import TrackingConfig, track_run
 from .....mlflow.shared._client import make_tracking_client
+from ....feature_store.monitoring import bind_observation_reader
 from ..monitoring_config import MonitorConfig, qualified_name
 from ..monitoring_reference import load_monitoring_reference
 from ..monitoring_sources import observation_window, read_current_observation, read_labels
@@ -73,6 +74,7 @@ def observe_model(
             experiment_name,
         )
     manifest = artifact.manifest
+    observation_reader = bind_observation_reader(observation_reader, config, artifact)
     keys = observation_keys(config, spec)
     if config.serving_endpoint:
         observation_reader = partial(read_serving_observation, artifact=artifact)

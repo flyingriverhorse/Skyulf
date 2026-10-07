@@ -186,7 +186,7 @@ def load_project_workflow(
     return resolve_project_workflow(
         config,
         path,
-        project_source(Path(path)),
+        project_source(Path(path), exclude_feature_groups=True),
         preprocessing_recipe=preprocessing_recipe,
         pre_split_recipe=pre_split_recipe,
     )

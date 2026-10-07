@@ -73,6 +73,17 @@ def population_contract(metric_digest: str, evidence: dict) -> str:
     }
     if any(not isinstance(value, str) or not value for value in identity.values()):
         raise ValueError("Performance requires concrete source, prediction and label table IDs.")
+    if evidence.get("feature_lookup") is not None:
+        from ....feature_store.lifecycle_config import parse_feature_binding  # noqa: PLC0415
+
+        binding = parse_feature_binding(evidence["feature_lookup"])
+        identity["feature_lookup"] = {
+            "lookup_spec": binding["lookup_spec"],
+            "tables": {
+                row["table_name"]: row["table_id"]
+                for row in binding["lookup_evidence"]["feature_tables"]
+            },
+        }
     return json_digest({"metric_contract": metric_digest, "population": identity})
 
 
@@ -192,6 +203,9 @@ def observe_performance(
         )
 
         observation_reader, label_reader = read_spark_observation, read_spark_labels
+    from ....feature_store.monitoring import bind_observation_reader  # noqa: PLC0415
+
+    observation_reader = bind_observation_reader(observation_reader, config, artifact)
     keys = observation_keys(config, spec)
     if config.serving_endpoint:
         observation_reader = partial(read_serving_observation, artifact=artifact)

@@ -76,9 +76,9 @@ def _group(name: str, value: Any) -> FeatureGroup:
         _feature_table(data[field])
     transform = data["transform"]
     if type(transform) is not str or not re.fullmatch(
-        r"src/feature_groups/[A-Za-z_]\w*\.py:[A-Za-z_]\w*", transform
+        r"src/features/groups/[A-Za-z_]\w*\.py:[A-Za-z_]\w*", transform
     ):
-        raise ValueError("Feature transform must be src/feature_groups/module.py:function.")
+        raise ValueError("Feature transform must be src/features/groups/module.py:function.")
     lookup = data.get("lookup", "exact")
     if type(lookup) is not str or lookup not in {"exact", "asof"}:
         raise ValueError("Feature lookup must be exact or asof.")
