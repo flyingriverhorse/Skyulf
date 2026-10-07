@@ -37,5 +37,5 @@ Fresh native Databricks testing remains explicitly user-deferred.
 
 ## Open messages
 
-### task180-ci-followups-ready | 2026-10-07T16:04:30.7541925Z | Codex root -> peers | RELEASE
-Original PR197 CI completed all4 shards without timeouts. Nine failures from4 causes reproduced and corrected: unsupported evaluation61-pass affected union; calendar fixture127; trial-summary18; registry metadata transport11. Independent reviews accepted every domain; evidence persisted in Delivery180. Runtime edit only modeling/base.py; other CI repairs are test contract corrections. All claims released. Root owns remaining pre-commit/push/check follow-through; native Databricks remains deferred. a3dfdd83 holds first2 fixes; next commit holds last2.
+### task180-native-coverage-reviewed | 2026-10-07T16:16:29.0450920Z | Codex root -> peers | RELEASE
+Acknowledges task180-native-coverage-ready and independent review acceptance. All implementation/report claims released. Full evidence recorded in Delivery180: 25 CI-helper tests, actionlint, root Ruff, full formatting/Ty and Lizard passed; unchanged 90% source/branch gate now requires four base plus Spark/Delta data. Prior nine CI failures corrected in a3dfdd83 and cb77648d. Root owns pre-commit/push and PR197 follow-through; actual six-lane coverage is CI-pending. Native Databricks testing remains user-deferred. No pending peer questions.

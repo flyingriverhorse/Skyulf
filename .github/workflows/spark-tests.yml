@@ -1,20 +1,15 @@
+# Called by Core Tests so native branch coverage belongs to the same run.
 name: Spark Runtime Tests
 
 on:
-  pull_request:
-    branches: [main, master]
-    paths:
-      - "skyulf-core/**"
-      - "requirements-spark.txt"
-      - "requirements-delta.txt"
-      - ".github/workflows/spark-tests.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: spark-tests-${{ github.ref }}
+  group: spark-tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,6 +18,7 @@ jobs:
     timeout-minutes: 15
     env:
       SKYULF_REQUIRE_SPARK: "1"
+      COVERAGE_FILE: .coverage.shard-spark
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
@@ -36,13 +32,24 @@ jobs:
       - name: Install optional Spark test dependencies
         run: uv pip install --system -r requirements-spark.txt
       - name: Exercise Spark JVM and Python workers
-        run: python -m pytest skyulf-core/tests/spark -q -o addopts=
+        run: >-
+          python -m pytest skyulf-core/tests/spark -q -o addopts=
+          --cov=skyulf-core/skyulf --cov-branch --cov-report=
+      - name: Upload Spark coverage data
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-core-shard-spark
+          path: .coverage.shard-spark
+          include-hidden-files: true
+          if-no-files-found: error
 
   delta:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       SKYULF_REQUIRE_DELTA: "1"
+      COVERAGE_FILE: .coverage.shard-delta
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
@@ -61,3 +68,12 @@ jobs:
           skyulf-core/tests/integration/platforms/test_batch_contract.py
           skyulf-core/tests/integration/platforms/test_batch_admission.py
           skyulf-core/tests/integration/platforms/test_delta_publish.py -q -o addopts=
+          --cov=skyulf-core/skyulf --cov-branch --cov-report=
+      - name: Upload Delta coverage data
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-core-shard-delta
+          path: .coverage.shard-delta
+          include-hidden-files: true
+          if-no-files-found: error

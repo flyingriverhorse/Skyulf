@@ -135,3 +135,29 @@ The first full CI pass through the four partitions completed without timeouts.
 Its nine failed cases comprised the four causes above; the other CI test and
 security gates passed. Combined coverage and Sonar were skipped behind the
 failed test dependencies, so they still require the corrected PR run.
+
+## Include native runtime tests in the coverage aggregate
+
+The first CI run's four coverage databases were downloaded and combined against
+their exact source revision, `bcd30ea1`. Combined statement/branch coverage was
+**88.48%**, below the existing 90% floor. The separate Spark/Delta workflow passed,
+but did not record coverage for that aggregate; the missing measurements were
+concentrated in Spark execution, preprocessing and monitoring modules.
+
+Core CI now calls that existing workflow and waits for its two runtime lanes.
+Each records branch coverage for the same complete Core source scope. The
+combiner requires exactly six nonempty, valid branch databases: partitions
+`0` through `3`, `spark` and `delta`. Missing or corrupt runtime data cannot
+silently disappear. The 90% floor and production source scope are unchanged.
+The old independent PR trigger is removed to avoid duplicate native executions;
+manual Spark/Delta workflow dispatch remains available. These are JVM tests on
+GitHub runners, not cloud Databricks jobs.
+
+Both new native-contribution cases failed against the four-input combiner.
+The final CI-helper test file passed **25 tests**, covering each runtime's unique
+branch contribution and missing/corrupt/empty/statement-only data. Targeted Ruff
+and formatting, full workflow actionlint, root Ruff and full CI Ty passed.
+The root CI formatting scope and Lizard CCN 10 also passed. Independent review
+accepted workflow dependencies/concurrency, six artifact identities, input guards
+and the unchanged coverage scope and floor without repeating the test batch.
+Actual aggregate production coverage is still pending the six-lane CI run.

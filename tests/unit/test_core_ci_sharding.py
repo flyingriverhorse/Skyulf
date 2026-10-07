@@ -128,6 +128,8 @@ def coverage_checkout(tmp_path, monkeypatch):
     )
     for index in range(4):
         _write_branch_shard(index, source.as_posix(), taken=3 if index % 2 else 4)
+    _write_branch_shard("spark", source.as_posix(), taken=3)
+    _write_branch_shard("delta", source.as_posix(), taken=4)
     return source
 
 
@@ -160,23 +162,32 @@ def test_coverage_combines_complementary_arcs_and_preserves_xml_paths(coverage_c
     assert f"skyulf-core/skyulf/{classes[0].attrib['filename']}" == coverage_checkout.as_posix()
 
 
-@pytest.mark.parametrize("invalid", ["missing", "extra", "corrupt", "empty", "statement_only"])
-def test_coverage_rejects_incomplete_or_invalid_shard_data(coverage_checkout, invalid):
+@pytest.mark.parametrize("native", ["spark", "delta"])
+def test_coverage_includes_native_runtime_branch_contributions(coverage_checkout, native):
+    """Each optional runtime lane must contribute branches absent from the base shards."""
+    for index in [0, 1, 2, 3, "spark", "delta"]:
+        Path(f".coverage.shard-{index}").unlink()
+        _write_branch_shard(index, coverage_checkout.as_posix(), taken=4 if index == native else 3)
+    functions = _coverage_functions()
+    assert functions["combine_core_coverage"]() == 100.0
+    assert ET.parse("coverage-core.xml").getroot().attrib["branch-rate"] == "1"
+
+
+@pytest.mark.parametrize("index", [3, "spark", "delta"])
+@pytest.mark.parametrize("invalid", ["missing", "corrupt", "empty", "statement_only"])
+def test_coverage_rejects_incomplete_or_invalid_shard_data(coverage_checkout, index, invalid):
     """An unusable shard must fail before a partial aggregate can satisfy the gate."""
-    shard = Path(".coverage.shard-3")
-    if invalid == "extra":
-        _write_branch_shard(4, coverage_checkout.as_posix(), taken=3)
-    else:
-        shard.unlink()
-        if invalid == "corrupt":
-            shard.write_bytes(b"not a coverage database")
-        elif invalid in {"empty", "statement_only"}:
-            data = CoverageData(basename=str(shard))
-            if invalid == "empty":
-                data.add_arcs({})
-            else:
-                data.add_lines({coverage_checkout.as_posix(): [1, 2, 3, 4]})
-            data.write()
+    shard = Path(f".coverage.shard-{index}")
+    shard.unlink()
+    if invalid == "corrupt":
+        shard.write_bytes(b"not a coverage database")
+    elif invalid in {"empty", "statement_only"}:
+        data = CoverageData(basename=str(shard))
+        if invalid == "empty":
+            data.add_arcs({})
+        else:
+            data.add_lines({coverage_checkout.as_posix(): [1, 2, 3, 4]})
+        data.write()
     functions = _coverage_functions()
     with pytest.raises((ValueError, CoverageException)):
         functions["combine_core_coverage"]()
@@ -184,9 +195,19 @@ def test_coverage_rejects_incomplete_or_invalid_shard_data(coverage_checkout, in
     assert not Path(".coverage").exists()
 
 
+def test_coverage_rejects_unexpected_shard_data(coverage_checkout):
+    """A stray coverage input must not silently change the combined measurements."""
+    _write_branch_shard(4, coverage_checkout.as_posix(), taken=3)
+    functions = _coverage_functions()
+    with pytest.raises(ValueError):
+        functions["combine_core_coverage"]()
+    assert not Path("coverage-core.xml").exists()
+    assert not Path(".coverage").exists()
+
+
 def test_coverage_cli_keeps_the_90_percent_branch_floor(coverage_checkout):
-    """Four valid databases cannot pass the gate when every shard misses the same branch."""
-    for index in range(4):
+    """Valid base and native data cannot pass when every lane misses the same branch."""
+    for index in [0, 1, 2, 3, "spark", "delta"]:
         shard = Path(f".coverage.shard-{index}")
         shard.unlink()
         _write_branch_shard(index, coverage_checkout.as_posix(), taken=3)

@@ -1,4 +1,4 @@
-"""Validate all four Core coverage shards and enforce combined branch coverage."""
+"""Validate base and native Core coverage shards and enforce combined branch coverage."""
 
 from pathlib import Path
 
@@ -7,9 +7,11 @@ from coverage import Coverage, CoverageData
 
 def combine_core_coverage() -> float:
     """Reject unusable shards before merging data and preserve source-relative XML paths."""
-    expected = [Path(f".coverage.shard-{index}") for index in range(4)]
+    expected = [Path(f".coverage.shard-{index}") for index in (0, 1, 2, 3, "spark", "delta")]
     if set(Path(".").glob(".coverage.shard-*")) != set(expected):
-        raise ValueError("Exactly four Core coverage shards, numbered 0 through 3, are required.")
+        raise ValueError(
+            "Exactly six Core coverage shards are required: 0 through 3, spark, and delta."
+        )
 
     # Coverage.combine warns and skips corrupt inputs. Read and merge explicitly
     # so no unusable shard can silently disappear from the coverage denominator.

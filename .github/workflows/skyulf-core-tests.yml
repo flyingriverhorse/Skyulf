@@ -57,7 +57,7 @@ jobs:
       - name: Run skyulf-core tests
         # Collect the complete suite normally, then assign whole files to four
         # stable shards. The coverage job enforces the unchanged 90% floor only
-        # after every shard passes and all four branch-coverage files combine.
+        # after every base shard and native runtime lane passes and combines.
         run: |
           bash .github/scripts/run_check.sh "pytest skyulf-core/tests shard ${{ matrix.shard }}/4" \
             python .github/scripts/run_core_shard.py \
@@ -74,9 +74,13 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  runtime-tests:
+    name: Native Spark and Delta tests
+    uses: ./.github/workflows/spark-tests.yml
+
   coverage:
     name: skyulf-core combined coverage
-    needs: test
+    needs: [test, runtime-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
