@@ -374,7 +374,7 @@ def _register_in_fresh_process(tmp_path, config, frame, reference):
     code = (
         "import json, sys, pandas as pd\n"
         "from pathlib import Path\n"
-        "from skyulf.integrations.databricks.training import local_retraining\n"
+        "from skyulf.integrations.databricks.training.fitting import local_retraining\n"
         "from skyulf.integrations.databricks.jobs.lifecycle.lifecycle_tasks import LifecycleContext, run_lifecycle_phase\n"
         "frame=pd.read_json(sys.argv[1], orient='table')\n"
         "local_retraining.read_training_snapshot=lambda spark,spec: frame.copy()\n"

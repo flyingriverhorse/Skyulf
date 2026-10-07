@@ -260,7 +260,8 @@ def test_worker_wheel_carries_exact_source_and_dependency_metadata(tmp_path):
 
     from skyulf.integrations.mlflow.spark._spark_environment import snapshot_worker_environment
 
-    pins = ["skyulf-core==0.9.1", "numpy==2.2.6", "pandas==2.3.3"]
+    package = distribution("skyulf-core")
+    pins = [f"skyulf-core=={package.version}", "numpy==2.2.6", "pandas==2.3.3"]
     paths, requirements, digest = snapshot_worker_environment(tmp_path, pins)
     assert requirements[1:] == pins[1:]
     assert requirements[0].startswith("code/skyulf_core-")
@@ -268,7 +269,6 @@ def test_worker_wheel_carries_exact_source_and_dependency_metadata(tmp_path):
     assert digest == spark_model.runtime_source_digest()
     with zipfile.ZipFile(paths[1]) as wheel:
         metadata = next(name for name in wheel.namelist() if name.endswith("/METADATA"))
-        package = distribution("skyulf-core")
         assert wheel.read(metadata).decode() == (
             package.read_text("METADATA") or package.read_text("PKG-INFO")
         )

@@ -418,19 +418,23 @@ Keep the Delta retention needed for source replay and audit history.
 | --- | --- |
 | healthy | Measured drift/quality checks passed; model accuracy is not an acceptance gate. |
 | drift | Distribution or declared feature-schema checks detected drift. |
-| stale | The scoring commit is older than expected_interval_hours, regardless of the last monitoring run. |
+| stale | The latest scoring commit (batch) or captured request (online) is older than expected_interval_hours, regardless of the last monitoring run. |
 | never_observed | No observation exists for the current enrollment configuration. |
 | degraded | Quality/measurement issues, no usable predicted outputs, or a nonfinite calculated metric. |
 | failed | Monitoring raised a saved error. |
 | no_data | The selected reference or current population is empty. |
 | disabled | Enrollment explicitly paused. |
-| unavailable | A result exists but scoring time is unavailable. |
+| unavailable | A result exists but the scoring or captured-request time is unavailable. |
 
 Counts represent enrollments, not prediction rows. measurement_status retains the
 underlying measured verdict when freshness changes. No retraining, performance
 acceptance thresholds or notifications are enabled by the dashboard.
 
 ## Dashboard layout
+
+The five pages are Overview, Drift and data quality, Model performance, Execution
+and compute, and Online serving. Start with Overview for enrolled model health;
+use the detailed pages to inspect the evidence behind a status.
 
 Overview summarizes enrollments in the configured monitoring store, with catalog,
 schema, model and version filters. Models registered elsewhere appear only after
@@ -607,26 +611,65 @@ cover classic compute; serverless usage and very short-lived nodes may have no
 node samples. Availability explains the absence; the cards remain NULL rather
 than displaying zero CPU or memory. CPU and memory trends show averages over time.
 
+### Online serving
+
+This page shows saved aggregate observations for enabled serving enrollments.
+Locate the Endpoint, Served version, Branch and Monitor ID columns to identify the
+exact serving context. The same model can have several separate enrollments.
+
+| Table | Scope |
+| --- | --- |
+| Latest serving status | One latest full observation per enrollment and current configuration, ordered by window end, measurement time and report ID. |
+| Observed windows | The latest 100 saved full observations across enabled serving enrollments and their current configurations. |
+
+Both tables show Successful requests, Failed requests, Mean latency (ms) and
+Max latency (ms). These come from captured inference logs; a request can contain
+multiple prediction rows. Logging is asynchronous and custom-model HTTP 4xx/5xx
+errors may be absent, so these counts do not measure all endpoint traffic.
+Latency describes captured execution durations, not an end-to-end latency SLA.
+
+| What you see | Next check |
+| --- | --- |
+| `awaiting_logs` | No applicable saved report exists. Check enrollment, the monitoring job and asynchronous log arrival; this is not a healthy measurement. |
+| `failed` | Inspect the saved report and monitoring task error. A failed latest observation clears earlier counts instead of showing an older success. |
+| Blank counts or latency | Check the report status and log coverage. Unavailable measurements are not zero requests or zero latency. |
+| `no_data` | Inspect the selected request window and captured logs. An empty window does not prove endpoint health or absence of HTTP traffic. |
+| Captured failures or unexpected latency | Inspect endpoint telemetry and serving logs for that endpoint/version. A healthy input-drift status does not certify request success or latency. |
+
+Window end describes the request-time observation window; `measured_at` in the
+saved dataset is when monitoring calculated the report. Shared health freshness
+uses the latest captured request time for online serving and the scoring commit
+time for batch predictions. Neither proves that the feature values themselves
+are recent: a new request or scoring run can use old source data. Refreshing the
+dashboard rereads saved results and does not obtain new measurements.
+
+For accuracy, open Model performance and select the matching model, version and
+monitoring context. Missing or immature actual outcomes remain insufficient
+evidence; successful HTTP requests alone do not establish prediction quality.
+
 ## File responsibilities
 
-Library files live under skyulf/integrations/databricks/:
+Canonical library paths below are relative to `skyulf/integrations/databricks/`.
+The `_compat/` modules retain old import paths; make implementation changes in
+the corresponding domain files.
 
 | File | Responsibility |
 | --- | --- |
-| monitoring_config.py | Validated model/table identity, version and bounded policy. |
-| monitoring_registration.py | Activation/scoring enrollment and immutable scoring handoff. |
-| monitoring_tasks.py | Visible activation enrollment and per-commit scoring observation tasks. |
-| monitoring_output.py | Saved-batch drift report and safe shared-dashboard navigation in task output. |
-| monitoring_reference.py | Registered artifact and original training-reference replay. |
-| monitoring_sources.py | Saved predictions, source snapshots, receipts and delayed labels. |
-| monitoring_metrics.py | Core metric adapters and finite keyed reports. |
-| monitoring_store.py | Owned Delta objects, concurrent registration, inventory reads and report history. |
-| monitoring.py | Inventory-driven observations, failure isolation and MLflow reports. |
-| job_runtime.py / scoring_recovery.py | Invoke enrollment after successful scoring/recovery. |
-| model_set_project.py / monitoring_model_set.py | Enroll pinned components after activation and scoring. |
+| `observability/monitoring/monitoring_config.py` | Validated model/table identity, version and bounded policy. |
+| `observability/monitoring/monitoring_registration.py` | Activation/scoring enrollment and immutable scoring handoff. |
+| `jobs/monitoring/monitoring_tasks.py` | Visible activation enrollment and per-commit scoring observation tasks. |
+| `observability/monitoring/monitoring_output.py` | Saved-batch drift report and safe shared-dashboard navigation in task output. |
+| `observability/monitoring/monitoring_reference.py` | Registered artifact and original training-reference replay. |
+| `observability/monitoring/monitoring_sources.py` | Saved predictions, source snapshots, receipts and delayed labels. |
+| `observability/monitoring/local/monitoring_metrics.py` | Core metric adapters and finite keyed reports for local callers. |
+| `observability/monitoring/spark/` | Distributed monitoring measurements, references and source handling. |
+| `observability/monitoring/monitoring_store.py` | Owned Delta objects, concurrent registration, inventory reads and report history. |
+| `observability/monitoring/local/monitoring.py` | Local inventory observations, failure isolation and MLflow reports. |
+| `jobs/shared/job_runtime.py`, `scoring/incremental/scoring_recovery.py` | Invoke enrollment after successful scoring/recovery. |
+| `model_sets/model_set_project.py`, `model_sets/monitoring_model_set.py` | Enroll pinned components after activation and scoring. |
 
 The existing template's `src/monitoring/monitoring.lvdash.json` defines SQL,
-filters and four pages. `src/tools/configure_monitoring_dashboard.py` connects one
+filters and five pages. `src/tools/configure_monitoring_dashboard.py` connects one
 shared dashboard and its native refresh task to the existing project. The normal
 project variables select monitoring storage, and `resources/monitoring.job.yml`
 contains its separate Spark measurement/report/retraining job. No separate

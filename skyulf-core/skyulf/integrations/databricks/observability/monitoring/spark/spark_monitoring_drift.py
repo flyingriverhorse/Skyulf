@@ -9,14 +9,20 @@ from scipy.stats import entropy, kstwo
 
 from skyulf.profiling._drift_evidence import (
     DriftEvidence,
-    _categorical_test,
+    categorical_drift_test,
     correct_evidence,
     numeric_evidence,
 )
 from skyulf.profiling.drift import ColumnDrift, DriftMetric
 
-from ..local.monitoring_metrics import _column_drift_evidence, _metric
-from .spark_monitoring_metrics import _column, _exists, _finite, _functions, _numeric
+from ..local.monitoring_metrics import column_drift_evidence, monitoring_metric
+from .spark_monitoring_metrics import (
+    finite_spark_value,
+    has_spark_rows,
+    is_numeric_column,
+    spark_column,
+    spark_functions,
+)
 
 MAX_CATEGORY_SUMMARIES = 1024
 MAX_EXACT_KS_CELLS = 1_000_000
@@ -61,13 +67,13 @@ def _ks_evidence(statistic: float, n: int, m: int) -> DriftEvidence:
 
 def _numeric_frame(frame: Any, column: str) -> Any:
     """Keep native numeric coordinates so large integer order remains exact."""
-    value = _column(column)
-    return frame.where(_finite(value)).select(value.alias("value"))
+    value = spark_column(column)
+    return frame.where(finite_spark_value(value)).select(value.alias("value"))
 
 
 def _cdf_statistics(reference: Any, current: Any, n: int, m: int) -> tuple[float, float]:
     """Integrate exact empirical CDF gaps on executors and return two scalar summaries."""
-    f = _functions()
+    f = spark_functions()
     window = importlib.import_module("pyspark.sql.window").Window
     points = reference.select("value", f.lit(1).alias("r"), f.lit(0).alias("c")).unionByName(
         current.select("value", f.lit(0).alias("r"), f.lit(1).alias("c"))
@@ -84,7 +90,7 @@ def _cdf_statistics(reference: Any, current: Any, n: int, m: int) -> tuple[float
     )
     points = points.withColumn("gap", gap).withColumn("next", f.lead("value").over(ordered))
     delta = f.col("next") - f.col("value")
-    if _numeric(points, "value") and points.schema["value"].dataType.typeName() in {
+    if is_numeric_column(points, "value") and points.schema["value"].dataType.typeName() in {
         "long",
         "integer",
         "short",
@@ -99,8 +105,8 @@ def _cdf_statistics(reference: Any, current: Any, n: int, m: int) -> tuple[float
 
 def _histogram(frame: Any, edges: list[float], size: int) -> np.ndarray:
     """Reduce clipped reference-quantile bins to at most ten counts."""
-    f = _functions()
-    value = _column("value")
+    f = spark_functions()
+    value = spark_column("value")
     bucket = f.lit(0)
     for edge in edges[1:-1]:
         bucket = bucket + (value >= f.lit(edge)).cast("int")
@@ -113,7 +119,7 @@ def _histogram(frame: Any, edges: list[float], size: int) -> np.ndarray:
 
 def _histogram_metrics(reference: Any, current: Any, n: int, m: int) -> tuple[float, float]:
     """Use exact continuous quantiles, matching NumPy percentile interpolation."""
-    f = _functions()
+    f = spark_functions()
     percentiles = f.percentile("value", [index / 10 for index in range(11)])
     edges = sorted(set(reference.agg(percentiles.alias("edges")).first()["edges"]))
     if len(edges) < 2:
@@ -145,10 +151,10 @@ def _numeric_result(
     reference: Any, current: Any, column: str, thresholds: dict
 ) -> ColumnDrift | None:
     """Calculate numeric effect statistics and a separately identified inference gate."""
-    f = _functions()
-    if _exists(reference.where(f.abs(_column(column).cast("double")) == float("inf"))) or _exists(
-        current.where(f.abs(_column(column).cast("double")) == float("inf"))
-    ):
+    f = spark_functions()
+    if has_spark_rows(
+        reference.where(f.abs(spark_column(column).cast("double")) == float("inf"))
+    ) or has_spark_rows(current.where(f.abs(spark_column(column).cast("double")) == float("inf"))):
         return None
     ref, cur = _numeric_frame(reference, column), _numeric_frame(current, column)
     n, m = ref.count(), cur.count()
@@ -187,8 +193,8 @@ def _numeric_result(
 def _category_counts(frame: Any, column: str) -> dict[str, int] | None:
     """Bound category summaries explicitly without ever collecting input observations."""
     rows = (
-        frame.where(_column(column).isNotNull())
-        .select(_column(column).cast("string").alias("value"))
+        frame.where(spark_column(column).isNotNull())
+        .select(spark_column(column).cast("string").alias("value"))
         .groupBy("value")
         .count()
         .limit(MAX_CATEGORY_SUMMARIES + 1)
@@ -218,7 +224,7 @@ def _categorical_result(
         np.where(actual == 0, 0.5 / m, actual),
     )
     psi = float(np.sum((actual - expected) * np.log(actual / expected)))
-    test, probability, minimum = _categorical_test(table)
+    test, probability, minimum = categorical_drift_test(table)
     evidence = DriftEvidence(test=test, p_value=probability, reference_count=n, current_count=m)
     evidence._minimum_p_value = minimum
     metric = _metric_result("psi_categorical", psi, thresholds["psi"])
@@ -229,8 +235,8 @@ def _categorical_result(
 
 def _both_populated(reference: Any, current: Any, column: str) -> bool:
     """Retain the local no-data precedence even when inferred nullable types differ."""
-    return _exists(reference.where(_column(column).isNotNull())) and _exists(
-        current.where(_column(column).isNotNull())
+    return has_spark_rows(reference.where(spark_column(column).isNotNull())) and has_spark_rows(
+        current.where(spark_column(column).isNotNull())
     )
 
 
@@ -244,8 +250,8 @@ def _column_result(
     if not _both_populated(reference, current, column):
         return None
     if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.StringType):
-        converted = _column(column).try_cast("double")
-        if not _exists(current.where(_column(column).isNotNull() & converted.isNull())):
+        converted = spark_column(column).try_cast("double")
+        if not has_spark_rows(current.where(spark_column(column).isNotNull() & converted.isNull())):
             current = current.withColumn(column, converted)
             cur_type = current.schema[column].dataType
     if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.NumericType):
@@ -269,11 +275,13 @@ def _compatible_categories(
         for frame in (reference, current)
     )
     if boolean:
-        value = _functions().lower(_column(column).cast("string"))
+        value = spark_functions().lower(spark_column(column).cast("string"))
         reference, current = reference.withColumn(column, value), current.withColumn(column, value)
         if any(
-            _exists(
-                frame.where(_column(column).isNotNull() & ~_column(column).isin("true", "false"))
+            has_spark_rows(
+                frame.where(
+                    spark_column(column).isNotNull() & ~spark_column(column).isin("true", "false")
+                )
             )
             for frame in (reference, current)
         ):
@@ -306,7 +314,7 @@ def _result_rows(results: dict[str, ColumnDrift | None]) -> tuple[list[dict], in
     metrics, notes = [], []
     drifted = 0
     for column, result in results.items():
-        metrics.extend(_column_drift_evidence(column, result))
+        metrics.extend(column_drift_evidence(column, result))
         unavailable = result is None or (
             result.evidence is not None
             and result.evidence.status in {"insufficient_data", "unavailable"}
@@ -337,7 +345,9 @@ def drift_evidence(
         if column not in missing
     }
     _correct_results(results)
-    metrics = [_metric("drift", column, "schema_missing", 1.0, 0.0, True) for column in missing]
+    metrics = [
+        monitoring_metric("drift", column, "schema_missing", 1.0, 0.0, True) for column in missing
+    ]
     notes = [f"Feature {column} is missing from a monitoring input." for column in missing]
     measured, drifted, feature_notes, unmeasured = _result_rows(results)
     return metrics + measured, len(missing) + drifted, notes + feature_notes, unmeasured

@@ -8,13 +8,13 @@ from typing import Any
 from ....data.delta_io.delta import table_identity
 from ..monitoring_config import MonitorConfig
 from ..monitoring_sources import (
-    _model_predictions,
-    _prediction_columns,
-    _source_version,
-    _window_receipts,
+    model_predictions,
     observation_window,
+    prediction_columns,
+    prediction_source_version,
     read_snapshot,
     snapshot_at,
+    window_receipts,
 )
 
 
@@ -62,7 +62,9 @@ def _matching_features(
         batch_keys = selected.where(functions.col("run_id") == run_id).select(*keys)
         if not batch_keys.limit(1).count():
             continue
-        source_version = _source_version(item["receipt"], config, version, source_id, target_id)
+        source_version = prediction_source_version(
+            item["receipt"], config, version, source_id, target_id
+        )
         source = read_snapshot(spark, config.source_table, source_version)
         joined = source.join(batch_keys, list(keys), "inner").select(
             *dict.fromkeys((*keys, *features))
@@ -105,8 +107,8 @@ def read_spark_observation(
     prediction_version = snapshot_at(
         spark, config.prediction_table, end - timedelta(microseconds=1)
     )
-    receipts = _window_receipts(spark, config, start, end)
-    frame = _model_predictions(
+    receipts = window_receipts(spark, config, start, end)
+    frame = model_predictions(
         read_snapshot(spark, config.prediction_table, prediction_version),
         config,
         version,
@@ -114,7 +116,7 @@ def read_spark_observation(
         probabilities,
     )
     selected = frame.where(functions.col("run_id").isin(list(receipts))).select(
-        *_prediction_columns(frame, keys, probabilities)
+        *prediction_columns(frame, keys, probabilities)
     )
     require_unique_keys(selected, keys, "predictions")
     current, used = _matching_features(

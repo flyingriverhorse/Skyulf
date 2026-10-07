@@ -35,7 +35,7 @@ def _number(value: Any) -> str:
     return f"{numerator}/{denominator}"
 
 
-def _scalar(value: Any) -> tuple[str, Any]:
+def scalar_identity(value: Any) -> tuple[str, Any]:
     """Encode supported scalar feature values without unstable object representations."""
     if pd.isna(value):
         return "null", None
@@ -55,16 +55,16 @@ def _scalar(value: Any) -> tuple[str, Any]:
     raise ValueError(f"Unsupported training freshness value type: {type(value).__name__}.")
 
 
-def _row_counts(frame: pd.DataFrame, columns: list[str]) -> Counter[str]:
+def row_identity_counts(frame: pd.DataFrame, columns: list[str]) -> Counter[str]:
     """Hash feature-target multisets, preserving duplicates but ignoring order and dtype widening."""
     counts: Counter[str] = Counter()
     for row in frame.loc[:, columns].itertuples(index=False, name=None):
-        payload = json.dumps([_scalar(value) for value in row], separators=(",", ":"))
+        payload = json.dumps([scalar_identity(value) for value in row], separators=(",", ":"))
         counts[hashlib.sha256(payload.encode()).hexdigest()] += 1
     return counts
 
 
-def _compatible_specs(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> None:
+def validate_compatible_specs(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> None:
     """Prevent automatic comparisons across unrelated training source contracts."""
     fields = (
         "table",
@@ -105,9 +105,9 @@ def _baseline_counts(
 ) -> Counter[str]:
     """Count prior eligible values under both original and current source weights."""
     columns = [*spec.input_columns, spec.target_column]
-    weights = _filter_weight_columns(spec, current)
+    weights = filter_weight_columns(spec, current)
     if spec.split_strategy == "temporal" and not weights:
-        return _row_counts(train, columns)
+        return row_identity_counts(train, columns)
     bounded = _bounded(spec, monitor)
     source, old_train, old_holdout, _ = read_training_partitions(
         spark, bounded, temporal_cv=False, engine=engine
@@ -116,13 +116,13 @@ def _baseline_counts(
     if not weights:
         return baseline
     source = _replace_source_weights(source, current_frame, spec.record_key_columns, weights)
-    population = eligible_training_snapshot(source, _comparison_spec(bounded), engine=engine)
+    population = eligible_training_snapshot(source, comparison_spec(bounded), engine=engine)
     if spec.split_strategy == "temporal":
         population = population.loc[population[spec.event_column] < spec.holdout_start]
-    return baseline | _row_counts(population, columns)
+    return baseline | row_identity_counts(population, columns)
 
 
-def _comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
+def comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
     """Keep historical label alternatives without requiring a viable model-fit population."""
     steps = deepcopy(list(spec.pre_split_steps))
     for step in steps:
@@ -146,7 +146,7 @@ def _comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
     )
 
 
-def _filter_weight_columns(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> set[str]:
+def filter_weight_columns(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> set[str]:
     """Find declared source weights read by the original eligibility recipe."""
     weights = {
         column.casefold()
@@ -168,7 +168,7 @@ def _population_counts(
 ) -> Counter[str]:
     """Treat random holdout as seen, but retain the original temporal training boundary."""
     population = train if spec.split_strategy == "temporal" else pd.concat([train, holdout])
-    return _row_counts(population, [*spec.input_columns, spec.target_column])
+    return row_identity_counts(population, [*spec.input_columns, spec.target_column])
 
 
 def _replace_source_weights(
@@ -213,7 +213,7 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
     if engine != artifact.manifest.fitted_engine:
         raise ValueError("On-drift training engine differs from the active model.")
     current = resolve_training_spec(spark, workflow, now)
-    _compatible_specs(saved, current)
+    validate_compatible_specs(saved, current)
     # Reference replay may install older custom builders; restore this job's source.
     current = phase_training_spec(
         training_spec_payload(current, engine),
@@ -235,7 +235,7 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
             workflow.get("pipeline", {}).get("project_python_source"),
         )
     columns = [*current.input_columns, current.target_column]
-    counts = _row_counts(train, columns)
+    counts = row_identity_counts(train, columns)
     changed = sum((counts - baseline).values())
     payload = json.dumps(
         {"columns": columns, "rows": sorted(counts.items())}, separators=(",", ":")

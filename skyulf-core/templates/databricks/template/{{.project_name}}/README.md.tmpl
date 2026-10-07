@@ -1,6 +1,10 @@
 # {{.project_name}}
 
-Skyulf 0.9.1 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
+Start with [First run and project changes](START_HERE.md) for the selected layout,
+file ownership, execution order and troubleshooting. This page is the detailed
+reference for lifecycle and model configuration.
+
+Skyulf 0.9.2 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
 compute. Training and preprocessing fit locally in pandas or Polars. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses the selected local engine.{{end}}
 
 ## Inference mode and capacity

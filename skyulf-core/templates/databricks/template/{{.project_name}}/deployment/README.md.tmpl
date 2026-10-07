@@ -36,7 +36,7 @@ publication. Bundle validation alone does not certify a fitted artifact.{{else}}
 ## Files and environments
 
 `databricks.yml` includes `deployment/variables.yml`, `deployment/targets.yml`
-and the two job files under `resources/`. Keep the `train` and `score` job keys:
+and the three job files under `resources/`. Keep the `train`, `score` and `monitoring` job keys:
 changing them can recreate deployed jobs and lose their history.
 
 | Target | Intended use | Output/model names | Workspace files |
@@ -62,9 +62,10 @@ uses the workspace user ID, not just an email prefix, so two users named `alice`
 cannot share output/model names accidentally. Use each developer's own profile;
 one shared service account represents one identity, not several developers.
 
-Personal job names are `dev_<user>_train` and `dev_<user>_score`, without a project
-or environment label. Shared test/syst/prod jobs keep `<project>_train` and
-`<project>_score`, without a user prefix. Environment-specific roots and output
+Personal job names are `dev_<user>_train`, `dev_<user>_score` and
+`dev_<user>_monitoring`, without a project or environment label. Shared
+test/syst/prod jobs keep `<project>_train`, `<project>_score` and
+`<project>_monitoring`, without a user prefix. Environment-specific roots and output
 suffixes keep targets distinct when users choose to share one workspace.
 
 Personal names isolate deployments; they do not replace Unity Catalog grants.
@@ -113,8 +114,10 @@ databricks bundle deploy -t prod_development --profile YOUR_PROD_DEV_PROFILE
 databricks bundle run -t prod_development --profile YOUR_PROD_DEV_PROFILE train
 ```
 
-Scheduled train and score triggers start PAUSED for every personal target,
-when enabled. Manual runs still work. The target explicitly overrides schedule
+Scheduled train and score triggers, when enabled, and the monitoring trigger
+start PAUSED for every personal target. Personal monitoring enrollment and
+automatic retraining are disabled. Manual train/score runs still work.
+The target explicitly overrides schedule
 variables, because a pause preset alone cannot override an explicit job schedule.
 Only enable a personal schedule intentionally in that target's variables.
 Shared targets retain the initializer's schedule choices.
@@ -127,7 +130,7 @@ databricks bundle validate --strict -t prod
 databricks bundle deploy -t prod
 ```
 
-Deploy updates definitions; running train/score is a separate pipeline decision.
+Deploy updates definitions; running any of the jobs is a separate pipeline decision.
 Bundle variables are deployment-time settings. Use job parameters for individual
 run inputs, not new deployment-variable values on a previously deployed job.
 
@@ -137,11 +140,15 @@ The credentials executing `bundle deploy` are the deployment identity. Job
 `run_as` controls execution. Current initializer choice:
 `{{.deployment_identity}}`.
 
-| Choice | Shared train/score configuration |
+| Choice | Shared train/score/monitoring configuration |
 | --- | --- |
 | `deployer` | Emit no `run_as` override; preserve standard job ownership or externally managed identity |
-| `shared_service_principal` | Both jobs use `shared_service_principal` |
-| `separate_service_principals` | Train uses `train_service_principal`; score uses `score_service_principal` |
+| `shared_service_principal` | All three jobs use `shared_service_principal` |
+| `separate_service_principals` | Train uses `train_service_principal`; score and monitoring use `score_service_principal` |
+
+Monitoring reuses the scoring identity in separate mode. Arrange its monitoring
+source reads and evidence-store writes explicitly; this does not require model
+ownership. There is no additional monitoring principal to configure.
 
 For explicit service principals, configure application IDs, not account display
 names. A deployment service account may also be the shared run identity. Separate
@@ -161,7 +168,7 @@ inherit execution settings they cannot support.
 
 Every target includes `permissions: []`, ready for environment-specific access
 entries. An empty list declares no additional grants. Entries added here apply
-to both jobs in that target; personal targets have their own list and do not
+to all three jobs in that target; personal targets have their own list and do not
 inherit a shared target's permissions. For example:
 
 ```yaml
@@ -170,7 +177,7 @@ permissions:
     group_name: YOUR_ENVIRONMENT_VIEWERS
 ```
 
-Use the optional per-job lists below when train and score need different access.
+Use the optional per-job lists below when the jobs need different access.
 Avoid duplicating the same principal at target and job scope.
 
 Current `manage_job_permissions` choice: `{{.manage_job_permissions}}`.
@@ -179,8 +186,8 @@ deployment/platform setup can manage them. Changing an existing deployment from
 managed to external ACLs requires an intentional state/permission handoff: removing
 a previously managed permissions resource can reset existing nonadmin access.
 Review the deployment plan before changing this choice. When true, configure the
-`train_permissions` and `score_permissions` lists in `variables.yml` or per-target
-variable overrides.
+`train_permissions`, `score_permissions` and `monitoring_permissions` lists in
+`variables.yml` or per-target variable overrides.
 The default lists are empty; they do not create operator access.
 
 For example, a train ACL can contain:
@@ -202,10 +209,22 @@ maintainers. `CAN_MANAGE_RUN` applies to the whole train job, including its
 supported train/approve/reject/rollback parameters; it is not an approve-only role.
 Job access does not grant data or model access to the caller.
 
-If automatic score handoff is enabled and identities differ, the train run
-identity also needs permission to invoke the score job. Include that service
-principal in `score_permissions` with `CAN_MANAGE_RUN`, or arrange the equivalent
-access externally. The child score job must retain its own scoring `run_as`.
+Job-to-job calls run under the caller's execution identity. Arrange
+`CAN_MANAGE_RUN` on each called job where the workflow requires it, through the
+corresponding permissions list or existing external governance:
+
+| Calling Run as identity | Called job / ACL list | When required |
+| --- | --- | --- |
+| Train | Score / `score_permissions` | Automatic score handoff |
+| Score, or another authorized producer | Monitoring / `monitoring_permissions` | Submitting independent monitoring requests |
+| Monitoring (the score principal in separate mode) | Train / `train_permissions` | Opting into `on_drift=retrain` |
+
+Each child retains its configured `run_as`; invocation does not transfer the
+caller's data/model privileges. No cross-job grants are added automatically.
+Granting monitoring access to run train permits the whole train lifecycle,
+including approve/reject/rollback parameters. Keep `on_drift=disabled` unless
+that authority is acceptable; the setting alone is not a permission boundary.
+See [Databricks job privileges](https://docs.databricks.com/aws/en/jobs/privileges).
 
 ## Data, model and experiment access
 
@@ -217,7 +236,8 @@ grant privileges on existing resources.
 | --- | --- |
 | Train/lifecycle | Read training inputs; create/register model versions in the model schema; own the models whose aliases it changes; write the project's MLflow experiment |
 | Score | Read scoring inputs; execute/read the pinned registered models and their artifacts; create/write prediction tables, generations and views in the designated output schema |
-| Both | Use the required catalogs/schemas, read deployed code/wheel assets, and use the selected serverless compute or approved cluster policy |
+| Monitoring | Read configured source, prediction and label tables; read/write the central monitoring store and references; write monitoring reports to the configured experiment; use serverless compute |
+| All three | Use the required catalogs/schemas and read deployed code/wheel assets; train/score also need their selected serverless compute or approved cluster policy |
 
 Grant experiment access explicitly through your workspace governance, or manage
 an experiment resource at exactly `${workspace.root_path}/experiment` in a
@@ -225,7 +245,7 @@ separate approved Bundle resource file. An experiment's workspace permissions
 and a UC model's privileges are different controls. Keep model/schema creation
 and grants optional and explicit; do not take over existing objects on deploy.
 
-For enforced writer separation, score must not own the registered models or
+For enforced writer separation, the score/monitoring identity must not own the registered models or
 inherit model ownership through a group. Broader inherited permissions can defeat
 the intended separation even with different service principal IDs. A single
 account can run the project, but it cannot prove that scoring is forbidden from
@@ -349,12 +369,21 @@ The wheel filename includes its content digest as a build tag. Changed bytes
 therefore get a distinct deployment/cache identity without changing the release
 version required by existing models. The receipt matches the uploaded bytes.
 
-`requirements.txt` is shared by both jobs and includes exact project pins from
+`requirements.txt` is shared by all three jobs and includes exact project pins from
 `src/features/requirements.txt`. `train-requirements.txt` adds optional report
 packages. Initial model choices populate optional dependencies; update this file
 when changing Python model declarations later. Transitive dependencies are not
 fully locked by these direct pins.
 
-Override `job_tags`, `serverless_environment_version`, `serverless_budget_policy_id`,
-or policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`
-through target variables. A blank budget policy uses the workspace defaults.
+Override `job_tags` through target variables. For train and score, configure
+`serverless_environment_version` and `serverless_budget_policy_id`, or
+policy-cluster `spark_version`, `node_type_id`, `min_workers` and `max_workers`.
+
+Monitoring always uses an independent serverless environment, including when
+train/score use policy clusters. Configure `monitoring_environment_version`
+(default `4`) and `monitoring_budget_policy_id` (default blank) separately.
+Train/score runtime and budget overrides do not affect monitoring. A blank budget
+policy uses workspace defaults. Set the monitor's approved policy even when the
+model jobs use a classic cluster policy. Validate runtime/package compatibility,
+serverless availability and policy access in the intended workspace before use;
+local Bundle validation only verifies the generated settings.

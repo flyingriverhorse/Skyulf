@@ -3,6 +3,7 @@ resources:
     monitoring:
       name: ${bundle.name}_monitoring
       tags: ${var.job_tags}
+      budget_policy_id: ${var.monitoring_budget_policy_id}
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -143,7 +144,7 @@ resources:
       environments:
         - environment_key: monitoring
           spec:
-            client: "4"
+            client: ${var.monitoring_environment_version}
             dependencies:
               - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/requirements.txt

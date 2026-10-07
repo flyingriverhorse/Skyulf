@@ -115,19 +115,25 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
         model_set_output_mode="separate_views",
         combined_view_name="combined_results",
     )
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    contents["variables"]["monitoring_pause_status"]["default"] = "UNPAUSED"
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     first = _resolve(project, target, offline_workspace)
     offline_workspace.update(id="200002", userName="alice@other.invalid")
     second = _resolve(project, target, offline_workspace)
     for bundle in (first, second):
         jobs = bundle["resources"]["jobs"]
-        assert set(jobs) == {"train", "score"}
+        assert set(jobs) == {"train", "score", "monitoring"}
         for key, job in jobs.items():
             assert job["name"] == f"dev_alice_{key}"
             assert job["schedule"]["pause_status"] == "PAUSED"
             assert not job.get("run_as", {}).get("service_principal_name")
             assert not job.get("permissions")
             assert job["max_concurrent_runs"] == 1
-        assert jobs["score"]["tasks"][0]["notebook_task"]["base_parameters"]["resource_suffix"]
+        score_tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
+        assert score_tasks["score"]["notebook_task"]["base_parameters"]["resource_suffix"]
+        assert bundle["variables"]["monitoring_enabled"]["value"] == "false"
     assert first["workspace"]["root_path"] != second["workspace"]["root_path"]
     assert (
         first["variables"]["resource_suffix"]["value"]
@@ -207,14 +213,14 @@ def test_resolved_shared_targets_preserve_identity_and_acl_choices(
         key = f"{name}_service_principal"
         if key in variables:
             variables[key]["default"] = f"{name}-application-id"
-    for job in ("train", "score"):
+    for job in ("train", "score", "monitoring"):
         variables[f"{job}_permissions"]["default"] = [
             {"level": "CAN_MANAGE_RUN", "group_name": f"{job}-operators"},
             {"level": "CAN_MANAGE", "user_name": "alice@example.invalid"},
         ]
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, target, offline_workspace)
-    for job in ("train", "score"):
+    for job in ("train", "score", "monitoring"):
         resource = bundle["resources"]["jobs"][job]
         assert resource["name"] == f"{project.name}_{job}"
         assert {"level": "CAN_MANAGE_RUN", "group_name": f"{job}-operators"} in resource[
@@ -222,7 +228,11 @@ def test_resolved_shared_targets_preserve_identity_and_acl_choices(
         ]
         if identity != "deployer":
             role = "shared" if identity == "shared_service_principal" else job
+            if role == "monitoring":
+                role = "score"
             assert resource["run_as"]["service_principal_name"] == f"{role}-application-id"
+        else:
+            assert not resource.get("run_as", {}).get("service_principal_name")
     assert bundle["variables"]["resource_suffix"]["value"] == ""
 
 
@@ -235,9 +245,46 @@ def test_serverless_runtime_and_budget_overrides_reach_both_jobs(tmp_path, offli
     contents["variables"]["serverless_budget_policy_id"]["default"] = "approved-budget-policy"
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, "test", offline_workspace)
-    for job in bundle["resources"]["jobs"].values():
+    for role in ("train", "score"):
+        job = bundle["resources"]["jobs"][role]
         assert job["budget_policy_id"] == "approved-budget-policy"
         assert job["environments"][0]["spec"]["client"] == "3"
+    monitoring = bundle["resources"]["jobs"]["monitoring"]
+    assert not monitoring.get("budget_policy_id")
+    assert monitoring["environments"][0]["spec"]["client"] == "4"
+
+
+@pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
+def test_monitoring_runtime_and_budget_are_independent_of_training_compute(
+    tmp_path, offline_workspace, compute
+):
+    """Monitoring needs its own serverless policy even when model jobs use classic compute."""
+    project = _generate_project(tmp_path, compute_mode=compute, cluster_policy_name="local-policy")
+    path = project / "deployment/variables.yml"
+    contents = yaml.safe_load(path.read_text())
+    variables = contents["variables"]
+    assert variables["monitoring_environment_version"]["default"] == "4"
+    assert variables["monitoring_budget_policy_id"]["default"] == ""
+    variables["monitoring_environment_version"]["default"] = "3"
+    variables["monitoring_budget_policy_id"]["default"] = "monitoring-budget-policy"
+    path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
+    bundle = _resolve(project, "test", offline_workspace)
+    monitoring = bundle["resources"]["jobs"]["monitoring"]
+    assert monitoring["budget_policy_id"] == "monitoring-budget-policy"
+    assert monitoring["environments"][0]["spec"]["client"] == "3"
+    assert monitoring["environments"][0]["environment_key"] == "monitoring"
+    assert not monitoring.get("job_clusters")
+    for task in monitoring["tasks"]:
+        assert task["environment_key"] == "monitoring"
+        assert not task.get("job_cluster_key")
+        assert not task.get("existing_cluster_id")
+    for role in ("train", "score"):
+        job = bundle["resources"]["jobs"][role]
+        assert not job.get("budget_policy_id")
+        if compute == "serverless":
+            assert job["environments"][0]["spec"]["client"] == "4"
+        else:
+            assert job["job_clusters"][0]["new_cluster"]["policy_id"] == "local-policy-id"
 
 
 def test_external_identity_and_acl_management_remain_optional(tmp_path, offline_workspace):
@@ -246,7 +293,11 @@ def test_external_identity_and_acl_management_remain_optional(tmp_path, offline_
     result = _resolve(project, "prod", offline_workspace)
     assert "train_service_principal" not in result["variables"]
     assert "train_permissions" not in result["variables"]
-    assert not result["resources"]["jobs"]["score"].get("permissions")
+    assert "monitoring_permissions" not in result["variables"]
+    assert "monitoring_service_principal" not in result["variables"]
+    for job in result["resources"]["jobs"].values():
+        assert not job.get("permissions")
+        assert not job.get("run_as", {}).get("service_principal_name")
 
 
 def test_personal_policy_compute_resolves_without_changing_job_identity(
@@ -266,13 +317,18 @@ def test_personal_policy_compute_resolves_without_changing_job_identity(
     contents["variables"]["job_tags"]["default"] = {"cost_center": "ml-test"}
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     result = _resolve(project, "test_development", offline_workspace)
-    for job in result["resources"]["jobs"].values():
+    for role in ("train", "score"):
+        job = result["resources"]["jobs"][role]
         assert job["job_clusters"][0]["new_cluster"]["policy_id"] == "local-policy-id"
         assert job["job_clusters"][0]["new_cluster"]["autoscale"] == {
             "min_workers": 1,
             "max_workers": 3,
         }
         assert job["tags"]["cost_center"] == "ml-test"
+    monitoring = result["resources"]["jobs"]["monitoring"]
+    assert not monitoring.get("job_clusters")
+    assert monitoring["environments"][0]["spec"]["client"] == "4"
+    assert monitoring["tags"]["cost_center"] == "ml-test"
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
@@ -315,7 +371,8 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
     variables["score_min_retry_interval_millis"]["default"] = 60000
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, "test", offline_workspace)
-    for role, job in bundle["resources"]["jobs"].items():
+    for role in ("train", "score"):
+        job = bundle["resources"]["jobs"][role]
         assert job["timeout_seconds"] == 7200
         assert job["health"]["rules"][0]["value"] == 3600
         assert job["email_notifications"]["on_failure"] == ["operator@example.invalid"]
@@ -328,8 +385,8 @@ def test_operational_settings_resolve_without_retrying_lifecycle(
                 assert task["timeout_seconds"] == 1800
                 if compute == "serverless":
                     assert task["disable_auto_optimization"] is True
-    assert bundle["resources"]["jobs"]["score"]["tasks"][0]["min_retry_interval_millis"] == 60000
     score_tasks = {task["task_key"]: task for task in bundle["resources"]["jobs"]["score"]["tasks"]}
+    assert score_tasks["score"]["min_retry_interval_millis"] == 60000
     assert ("recover_predictions" in score_tasks) is (recovery == "true")
     if recovery == "true":
         assert score_tasks["scoring_report"]["run_if"] == "NONE_FAILED"

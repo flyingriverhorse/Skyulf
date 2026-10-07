@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.data.training.retraining_data import _row_counts
+from skyulf.integrations.databricks.data.training.retraining_data import row_identity_counts
 from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _assessment,
     _counts,
@@ -50,7 +50,7 @@ def test_split_digest_matches_local(spark, partitions, stratify):
     counts = _counts(_training_partition(frame, spec), ["x", "y"])
     result = _assessment(counts, _counts(frame, ["x", "y"]), ["x", "y"])
     payload = json.dumps(
-        {"columns": ["x", "y"], "rows": sorted(_row_counts(local, ["x", "y"]).items())},
+        {"columns": ["x", "y"], "rows": sorted(row_identity_counts(local, ["x", "y"]).items())},
         separators=(",", ":"),
     )
     assert result == {
@@ -158,7 +158,10 @@ def test_nullable_large_integer_matches_materialized_source(spark):
         ["x", "y"],
     )
     payload = json.dumps(
-        {"columns": ["x", "y"], "rows": sorted(_row_counts(local_train, ["x", "y"]).items())},
+        {
+            "columns": ["x", "y"],
+            "rows": sorted(row_identity_counts(local_train, ["x", "y"]).items()),
+        },
         separators=(",", ":"),
     )
     assert result["changed_rows"] == 0

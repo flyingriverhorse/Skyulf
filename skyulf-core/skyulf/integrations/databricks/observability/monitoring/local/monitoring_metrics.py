@@ -18,8 +18,8 @@ from skyulf.modeling._evaluation.metrics import (
 from skyulf.profiling.drift import DriftCalculator
 
 _DRIFT_THRESHOLDS = {"psi", "ks_statistic", "wasserstein", "kl_divergence"}
-_REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance")
-_CLASSIFICATION_METRICS = (
+REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance")
+CLASSIFICATION_METRICS = (
     "accuracy",
     "balanced_accuracy",
     "precision_weighted",
@@ -39,7 +39,7 @@ def _frame(value: pd.DataFrame | pl.DataFrame, name: str) -> pl.DataFrame:
     raise TypeError(f"{name} must be a pandas or Polars DataFrame.")
 
 
-def _metric(
+def monitoring_metric(
     category: str,
     column: str,
     name: str,
@@ -60,7 +60,7 @@ def _metric(
     }
 
 
-def _validate_inputs(
+def validate_monitoring_inputs(
     as_of: datetime,
     task: str,
     classes: tuple,
@@ -174,7 +174,8 @@ def _feature_quality(
     """Flag significant missingness increases and infinity, keeping raw fractions."""
     if column not in frame.columns or not len(frame):
         return [
-            _metric("quality", column, name) for name in ("missing_fraction", "nonfinite_fraction")
+            monitoring_metric("quality", column, name)
+            for name in ("missing_fraction", "nonfinite_fraction")
         ]
     values = frame[column].to_list()
     numeric = frame[column].dtype.is_numeric()
@@ -182,7 +183,7 @@ def _feature_quality(
     nonfinite = sum(numeric and _not_finite_number(value) for value in values)
     baseline = _reference_missing_fraction(reference, column)
     return [
-        _metric(
+        monitoring_metric(
             "quality",
             column,
             "missing_fraction",
@@ -190,7 +191,7 @@ def _feature_quality(
             baseline,
             issue=_missingness_increased(missing, len(values), reference, column),
         ),
-        _metric(
+        monitoring_metric(
             "quality",
             column,
             "nonfinite_fraction",
@@ -279,7 +280,7 @@ def _schema_evidence(
     metrics: list[dict[str, Any]] = []
     notes = []
     for column in missing:
-        metrics.append(_metric("drift", column, "schema_missing", 1.0, 0.0, True))
+        metrics.append(monitoring_metric("drift", column, "schema_missing", 1.0, 0.0, True))
         notes.append(f"Feature {column} is missing from a monitoring input.")
         metrics.extend(_feature_quality(current, column))
     return metrics, notes
@@ -311,7 +312,7 @@ def _common_evidence(
     for column in common:
         metrics.extend(_feature_quality(current, column, reference))
         result = core_report.column_drifts.get(column) if core_report is not None else None
-        evidence = _column_drift_evidence(column, result)
+        evidence = column_drift_evidence(column, result)
         metrics.extend(evidence)
         if result is None:
             notes.append(f"Feature {column} could not be measured for drift.")
@@ -327,12 +328,12 @@ def _common_evidence(
     return metrics, drifted, notes, unmeasured
 
 
-def _column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
+def column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
     """Retain Core's per-statistic verdict or an explicit unavailable row."""
     if result is None:
-        return [_metric("drift", column, "unavailable")]
+        return [monitoring_metric("drift", column, "unavailable")]
     metrics = [
-        _metric(
+        monitoring_metric(
             "drift",
             column,
             item.metric,
@@ -348,7 +349,9 @@ def _column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
             evidence.adjusted_p_value if evidence.status in {"supported", "not_detected"} else None
         )
         metrics.append(
-            _metric("drift", column, "statistical_evidence", value, evidence.significance_level)
+            monitoring_metric(
+                "drift", column, "statistical_evidence", value, evidence.significance_level
+            )
             | {"evidence": evidence.model_dump()}
         )
     return metrics
@@ -414,15 +417,21 @@ def _performance_evidence(
     probability_columns: tuple[str, ...],
 ) -> tuple[list[dict[str, Any]], int, list[str], bool]:
     """Report an explicit unavailable row when there are too few finite pairs."""
-    names = _REGRESSION_METRICS if task == "regression" else _CLASSIFICATION_METRICS
+    names = REGRESSION_METRICS if task == "regression" else CLASSIFICATION_METRICS
     notes: list[str] = []
     pairs = _labeled_pairs(task, classes, target, scored, labels)
     if len(pairs) < 2:
         notes.append("Performance unavailable: fewer than two finite labeled pairs.")
-        return [_metric("performance", target, name) for name in names], len(pairs), notes, False
+        return (
+            [monitoring_metric("performance", target, name) for name in names],
+            len(pairs),
+            notes,
+            False,
+        )
     values = _performance_values(task, pairs, classes, probability_columns)
     evidence = [
-        _metric("performance", target, name, float(value)) for name, value in values.items()
+        monitoring_metric("performance", target, name, float(value))
+        for name, value in values.items()
     ]
     unavailable = any(item["status"] == "unavailable" for item in evidence)
     if unavailable:
@@ -496,12 +505,12 @@ def _feature_report(
         return _drift_evidence(reference, current, columns, thresholds)
     metrics = []
     for column in columns:
-        metrics.append(_metric("drift", column, "unavailable"))
+        metrics.append(monitoring_metric("drift", column, "unavailable"))
         metrics.extend(_feature_quality(current, column))
     return metrics, 0, ["Reference or current feature data is empty."], True
 
 
-def _report_status(
+def monitoring_report_status(
     reference_rows: int,
     current_rows: int,
     drifted: int,
@@ -550,7 +559,7 @@ def build_monitoring_report(
     missing inputs and infinity remain quality issues. The raw nonfinite fraction
     still counts NaN, whose quality verdict comes from the missingness check.
     """
-    _validate_inputs(as_of, task, classes, thresholds)
+    validate_monitoring_inputs(as_of, task, classes, thresholds)
     reference = _frame(reference, "reference")
     current = _frame(current, "current")
     predictions = _frame(predictions, "predictions")
@@ -583,7 +592,7 @@ def build_monitoring_report(
     if labels is None:
         notes.append("No labels were provided; performance is unavailable.")
     quality_issue = _output_or_quality_issue(metrics, scored, notes)
-    status = _report_status(
+    status = monitoring_report_status(
         len(reference), len(current), drifted, unmeasured, quality_issue, bad_performance
     )
     return {
@@ -611,7 +620,7 @@ def build_performance_report(
     classes: tuple = (),
 ) -> dict:
     """Measure saved outcomes with the same class, eligibility and Core metric rules."""
-    _validate_inputs(as_of, task, classes, None)
+    validate_monitoring_inputs(as_of, task, classes, None)
     predictions = _frame(predictions, "predictions")
     labels = None if labels is None else _frame(labels, "labels")
     prediction_rows = _keyed_rows(predictions, record_key_columns, "predictions")

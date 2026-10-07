@@ -507,7 +507,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
         )
     selection = None
     if spec.training_sample_rows is not None:
-        source, selection = _sample_training_source(source, spec)
+        source, selection = sample_training_source(source, spec)
     ordering = ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
@@ -516,7 +516,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     return frame
 
 
-def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, dict[str, Any]]:
+def sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, dict[str, Any]]:
     """Select eligible keys by a seeded hash on Spark before transferring any training rows."""
     F = import_module("pyspark.sql.functions")
 
@@ -528,7 +528,7 @@ def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, 
     }
     _validate_sample_keys(source, keys, floating, F)
     source_rows = source.count()
-    source = _eligible_training_source(source, spec, floating)
+    source = eligible_training_source(source, spec, floating)
     eligible_rows = (
         source.count()
         if spec.filter_unavailable_results or spec.drop_missing_labels
@@ -555,7 +555,7 @@ def _sample_training_source(source: Any, spec: LocalTrainingSpec) -> tuple[Any, 
     }
 
 
-def _eligible_training_source(source: Any, spec: LocalTrainingSpec, floating: set[str]) -> Any:
+def eligible_training_source(source: Any, spec: LocalTrainingSpec, floating: set[str]) -> Any:
     """Apply label time and missing-target policies before validating the sampling pool."""
     if spec.filter_unavailable_results:
         result = column_name(cast(str, spec.result_available_at_column))
@@ -746,7 +746,7 @@ def split_labeled_snapshot(
     selected, filter_counts = _apply_pre_split_steps(selected, spec, engine)
     survivor_digest = _key_digest(selected, spec.record_key_columns)
     _validate_training_survivors(selected, spec, survivor_digest)
-    train, heldout = _partition_training_rows(selected, spec)
+    train, heldout = partition_training_rows(selected, spec)
     # Hash the ordered identity tuples only; never include keys in model features.
     digest = _key_digest(heldout, spec.record_key_columns)
     if spec.holdout_key_sha256 is not None and digest != spec.holdout_key_sha256:
@@ -1732,7 +1732,7 @@ def _partition_group_rows(
     return selected.iloc[train], selected.iloc[heldout]
 
 
-def _partition_training_rows(
+def partition_training_rows(
     selected: pd.DataFrame, spec: LocalTrainingSpec
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Build reproducible random or temporal partitions with viable labeled row counts."""

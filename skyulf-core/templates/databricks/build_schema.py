@@ -51,8 +51,19 @@ def render_schema(source: Path) -> str:
     if not properties:
         raise ValueError("No prompt properties found in schema topic files.")
     properties = _weight_questions(properties)
+    _validate_prompt_orders(properties)
     metadata["properties"] = dict(sorted(properties.items(), key=lambda item: item[1]["order"]))
     return _format_schema(metadata)
+
+
+def _validate_prompt_orders(properties: dict[str, Any]) -> None:
+    """Reject ambiguous CLI sequencing after all derived questions are inserted."""
+    owners: dict[int, str] = {}
+    for name, field in properties.items():
+        order = field["order"]
+        if order in owners:
+            raise ValueError(f"Duplicate prompt order {order}: {owners[order]}, {name}")
+        owners[order] = name
 
 
 def _weight_prefix(name: str) -> str:
@@ -162,7 +173,10 @@ def _weight_questions(properties: dict[str, Any]) -> dict[str, Any]:
     result = {}
     for name, original in properties.items():
         field = deepcopy(original)
-        field["order"] *= 10
+        scaled_order = field["order"] * 10
+        if not float(scaled_order).is_integer():
+            raise ValueError(f"{name}: prompt order must have at most one decimal place.")
+        field["order"] = int(scaled_order)
         if "skip_prompt_if" in field:
             field["skip_prompt_if"] = _weight_condition(field["skip_prompt_if"], choices)
         result[name] = field

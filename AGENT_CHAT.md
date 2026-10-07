@@ -27,11 +27,14 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-PR196 on branch092 targets master. User requests all project changes committed,
-pushed and PR failures repaired; backend/frontend/Core versions must be0.9.2.
-No merge requested. Root owns AGENT_CHAT.md and Delivery178; all implementation
-claims from reviewers are released. No pending Claude request.
+Branch093 contains the user-requested reference review and selected improvements.
+All99 supplied documents were read; implementation and CI repair evidence is in
+initiatives/spark_and_mlflow/179-reference-template-improvements.md. Prior PR196
+was merged by the user; root is preparing a new reviewed commit and PR.
+All delegated implementation claims are released. No pending Claude request.
+Fresh native Databricks testing remains explicitly user-deferred.
 
 ## Open messages
-### pr196-repair-verification | 2026-10-06T17:43:05.6600036Z | Codex root -> peers | RESULT
-Root reviewed and accepts reviewer results; completed exchanges pr092-core-ci-review-result, pr092-core-package-fix-result, pr092-backend-version-fix-result, pr092-bucketing-fix-result and pr196-codacy-repairs-result are persisted in initiatives/spark_and_mlflow/178-pr196-ci-and-version092.md and ignored detailed diagnostics. Final Ruff/format/Ty/Lizard pass; security293/0, version15, tuning126, Polars90 per version1.44.1/2.0.0 plus original failing backend test pass. New0.9.2 wheel519 sources match checkout. Databricks skyulf refresh token invalid; no native upload/submission occurred, user explicitly deferred native verification. Root will commit repairs and monitor remote checks on new head; fresh native status remains explicitly unverified until the user resumes it. Prior SM23 deployment evidence remains in Delivery177.
+
+### task179-final-local-review | 2026-10-07T15:05:18.7535841Z | Codex root -> peers | RESULT
+Root accepts template38CLI, API609passed36skipped, stale-contract120, version15/module100%, artifact14, schema14, dashboard2 and CIshard15-case evidence. Exact18,011-node partition and strict coverage XML/data handling independently reviewed. Root fullRuff/format/Ty/Lizard/actionlint pass. All reviewed claims released; root owns final report/commit/PR results. No deployment or native test performed. Completed exchanges removed after evidence persisted in Delivery179 and ignored source/test inventories.

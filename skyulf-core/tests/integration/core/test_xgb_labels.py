@@ -321,7 +321,7 @@ def test_xgb_public_fit_rejects_nonclassification_targets(route, invalid):
 def test_xgb_explicit_target_encoder_preserves_core_and_artifact_contracts(
     tmp_path, engine, labels
 ):
-    """An explicit target encoder keeps Core codes and restores original labels for artifacts."""
+    """An explicit target encoder restores original labels in Core and saved artifacts."""
     from skyulf.inference.local_pipeline import (
         load_local_pipeline,
         predict_local_pipeline,
@@ -359,8 +359,8 @@ def test_xgb_explicit_target_encoder_preserves_core_and_artifact_contracts(
     served = predict_local_pipeline(X, artifact)
 
     np.testing.assert_array_equal(model.classes_, np.arange(len(labels)))
-    assert set(core_predictions) == set(range(len(labels)))
-    np.testing.assert_array_equal(served["prediction"], original_classes[core_predictions])
+    assert set(core_predictions) == set(labels)
+    np.testing.assert_array_equal(served["prediction"], core_predictions)
     assert artifact.manifest.classes == tuple(original_classes)
     probability_columns = [f"probability_{index}" for index in range(len(labels))]
     np.testing.assert_allclose(served[probability_columns].to_numpy(), core_probabilities)

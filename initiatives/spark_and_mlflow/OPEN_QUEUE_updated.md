@@ -2,6 +2,13 @@
 
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
+> Reference follow-up (2026-10-07): all 99 supplied documentation files reviewed;
+> selected changes cover a layout-specific first-run guide, monitoring Run-as/ACL
+> parity and independent runtime/budget settings, current-release packaging, and
+> accurate online-monitoring documentation. PR196's remaining CI failures are
+> tracked with the same batch in [Delivery179](179-reference-template-improvements.md).
+> Fresh native testing remains user-deferred. SM-37/43b cloud identity acceptance
+> and SM-40's broader generated-project CI remain open.
 > Current sequence (2026-10-05): SM-23 batch scope closed with SM-23i Overview
 > performance separation. SM-57 is delivered for the admitted pandas-worker scope,
 > with all three serverless lifecycles, no-op parity and native refresh verified

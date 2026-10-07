@@ -103,7 +103,7 @@ def test_mlflow_roundtrip_keeps_temporal_seed_and_continuation(tmp_path, monkeyp
     mlflow = pytest.importorskip("mlflow")
     import tempfile
 
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.local_model import log_local_model, prepare_pyfunc_input
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
@@ -127,10 +127,11 @@ def test_mlflow_roundtrip_keeps_temporal_seed_and_continuation(tmp_path, monkeyp
         loaded = mlflow.pyfunc.load_model(model_uri)
         rows = pd.DataFrame({"t": [20, 21], "v": [20.0, 21.0]})
         expected = predict_local_pipeline(rows, artifact)
+        request = prepare_pyfunc_input(rows, loaded)
         with TemporalHistorySession(artifact.manifest.pipeline_sha256) as first:
-            a = loaded.predict(rows.iloc[:1])
+            a = loaded.predict(request.iloc[:1])
         with TemporalHistorySession(artifact.manifest.pipeline_sha256, first.state):
-            b = loaded.predict(rows.iloc[1:])
+            b = loaded.predict(request.iloc[1:])
         np.testing.assert_allclose(pd.concat([a, b])["prediction"], expected["prediction"])
     finally:
         mlflow.set_tracking_uri(original_uri)

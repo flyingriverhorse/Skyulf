@@ -294,7 +294,7 @@ def enroll_monitor(
     """Upsert one producer's enrollment without creating or replacing central objects."""
     row = inventory_row(config, datetime.now(UTC))
     if activation_started_ms is not None:
-        _validate_activation_order(activation_started_ms)
+        validate_activation_order(activation_started_ms)
         row["config_json"] = _json(
             config.payload() | {"_activation_started_ms": activation_started_ms}
         )
@@ -340,7 +340,7 @@ def _inventory_config(row: Any) -> MonitorConfig:
     """Reject inconsistent controls so the runner and dashboard cannot disagree."""
     payload = json.loads(row["config_json"])
     if "_activation_started_ms" in payload:
-        _validate_activation_order(payload.pop("_activation_started_ms"))
+        validate_activation_order(payload.pop("_activation_started_ms"))
     config = MonitorConfig.from_dict(payload)
     expected = inventory_row(config, datetime.now(UTC))
     checked = set(expected) - {"updated_at", "config_json"}
@@ -349,7 +349,7 @@ def _inventory_config(row: Any) -> MonitorConfig:
     return config
 
 
-def _validate_activation_order(value: Any) -> None:
+def validate_activation_order(value: Any) -> None:
     """Accept only the original lifecycle run's positive MLflow start timestamp."""
     if type(value) is not int or value <= 0:
         raise ValueError("Activation order must be a positive lifecycle start timestamp.")

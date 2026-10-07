@@ -14,7 +14,7 @@ from ...training.shared.local_training_evidence import validate_training_evidenc
 from .monitoring_config import MonitorConfig
 
 
-def _document(client: Any, run_id: str, path: str) -> dict:
+def reference_document(client: Any, run_id: str, path: str) -> dict:
     """Read exact saved JSON artifacts through a disposable local directory."""
     with TemporaryDirectory(prefix="skyulf-monitor-reference-") as directory:
         downloaded = client.download_artifacts(run_id, path, directory)
@@ -78,8 +78,8 @@ def load_monitoring_artifact(
     model = client.get_model_version(resolved.name, resolved.version)
     if not model.run_id:
         raise ValueError("Monitoring requires a saved training run.")
-    saved = _document(client, model.run_id, "candidate_training_spec.json")
-    filters = _document(client, model.run_id, "training_filter_evidence.json")
+    saved = reference_document(client, model.run_id, "candidate_training_spec.json")
+    filters = reference_document(client, model.run_id, "training_filter_evidence.json")
     if saved.get("engine") != artifact.manifest.fitted_engine:
         raise ValueError("Monitoring reference engine differs from the saved artifact.")
     spec = phase_training_spec(saved, artifact.pipeline.config.get("project_python_source"))

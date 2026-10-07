@@ -1,0 +1,134 @@
+# First run and project changes
+
+This project uses **{{.training_layout}}**, **{{.engine}}** training and
+**{{.inference_mode}}** inference. Run the commands below from this directory,
+beside `databricks.yml`. Replace `YOUR_PROFILE` with your authenticated CLI profile.
+
+## Where to make a change
+
+| Change | Edit | Check afterwards |
+| --- | --- | --- |
+| Input tables, record keys and shared input limits | `config/workflow.json` | Preview the resolved table names and selected columns. Source tables must already exist. |
+{{if eq .training_layout "single_model"}}| Model, tuning, CV and quality policy | `src/modeling/single_model.py` | Preview the training configuration; keep final holdout rows outside tuning. |
+{{else if eq .training_layout "model_competition"}}| Candidates, their search spaces and recipes | `src/modeling/model_competition.py` | Preview every candidate. Shared target, split and CV stay in `config/workflow.json`. |
+{{else}}| Each component's target, features, model, tuning and quality policy | `src/modeling/multi_model.py` | Preview every branch; exclude every known target from model inputs. |
+| Whole-set release policy and output tables/views | `src/modeling/model_set.py` | Review the complete set before activation; component aliases are not its release mechanism. |
+{{end}}| Fixed eligibility rules before splitting | `src/features/pre_split.py` | Preserve the record-key contract and document excluded rows. |
+| Learned preprocessing | `src/features/preprocessing.py` | Fit statistics inside each training fold; scoring uses the saved fitted recipe. |
+| Business output rules | `src/features/scoring.py` | Check typed output columns and required components before retraining. |
+| Workspace, schemas, Run-as identities and job permissions | `deployment/targets.yml`, `deployment/variables.yml` | Review the selected target and downstream job permissions. |
+| Core wheel/source and required release | `deployment/artifact.json` | Build the wheel and inspect `dist/skyulf/build.json`. |
+| Runtime dependencies | `deployment/requirements.txt`, `src/features/requirements.txt` | Install and verify matching versions before deployment. |
+| Monitoring tables, labels and retraining policies | Target variables in `deployment/targets.yml` | Start with performance `mode: report`; inspect saved evidence before enabling retraining. |
+| Job task graph | `resources/*.job.yml` | Validate the Bundle after regenerating the training graph when declarations change. |
+
+The thin notebooks in `src/jobs/` call Skyulf's library. Ordinary model and recipe
+changes belong in the files above. Regenerating a project is not an in-place
+upgrade: preserve your edited declarations and apply template changes deliberately.
+
+## 1. Check the project locally
+
+Install the matching Skyulf Core wheel and the project's declared dependencies in
+your local Python environment. Configure `deployment/artifact.json` with the source
+checkout or wheel you intend to deploy; keep that source outside `dist/skyulf/`.
+
+```powershell
+python src/tools/smoke.py
+python src/tools/preview.py --action train
+uv run --no-project python src/tools/build_wheel.py
+```
+
+`smoke.py` validates configuration and source syntax without running editable
+Python hooks. It does not prove data access, model fit, or deployment permissions.
+`preview.py` executes your trusted recipe builders, but does not read training
+tables or train. Keep I/O out of imports and builders. Both tools accept explicit
+catalog/schema/suffix bindings; they do not resolve `deployment/targets.yml` for
+you. Use the values of the target you will deploy.
+
+Review `dist/skyulf/build.json`: release, filename and SHA-256 identify the wheel
+bytes that will be uploaded. The builder rejects a mismatched release.
+
+## 2. Validate and deploy the selected target
+
+Fill the selected target's workspace, catalog/schema and identity values before
+running these commands. `REPLACE_*` values are deployment inputs to complete.
+Catalog/schema privileges and job-to-job execution rights are separate; see
+[deployment setup](deployment/README.md).
+
+```powershell
+databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
+databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
+```
+
+Deploy creates `train`, `score` and `monitoring` jobs. It does not train a model or
+create the input data. Monitoring uses its own serverless environment, including
+when training/scoring use a policy cluster. Personal targets start isolated with
+paused schedules; review shared-target schedules before deploying.
+
+## 3. Train, inspect the decision, then score
+
+```powershell
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE train
+```
+
+{{if eq .training_layout "model_competition"}}Each candidate trains on the shared training folds. `select_best_model` ranks
+training-side CV results; only its winner receives the reserved holdout and
+champion checks. Open `training_report` for the result and exact operator action.
+A failed winner does not automatically promote the runner-up.
+{{else if eq .training_layout "multi_target"}}Open each `train_<name>` result, then the `training_report` task (its notebook is
+`models_report.py`) and the set's `model_decision` task.
+The complete set has one pinned release; approve it as a set after all required
+component checks pass. `multi_model.py` controls fitting; `model_set.py` controls
+activation and publication.
+{{else}}Open `train_and_tune` for search/fitting evidence and `training_report` for the
+final decision. A registered candidate is not necessarily the active champion.
+{{end}}
+
+A manual policy leaves a passing candidate pending approval. Use the exact
+approve/reject/rollback parameters shown by the report; these refer to saved
+evidence. Confirm the selected concrete model or set version before scoring.
+When `score_handoff=after_alias_change` has already started a child score run,
+inspect that run before starting another one.
+
+```powershell
+databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE score
+```
+
+Open `scoring_report` for the committed result and source/selection provenance.
+Enable Delta Change Data Feed on the scoring source before new rows arrive.
+The initial scoring run processes existing source rows. Later behavior follows
+the configured source-change and model-change policies.
+
+## 4. Inspect monitoring
+
+A successful score commit can hand off to the separate `monitoring` job when
+monitoring is enabled. Its schedule can also check delayed labels. Open
+`monitoring_report` for drift, observed performance and performance-loss evidence;
+open `evaluate_retraining` for the saved policy decision and request, if eligible.
+Drift or performance loss can request retraining, subject to the configured
+freshness, row/label coverage, cooldown and request guards. Retraining still uses
+the normal training, quality and promotion rules.
+
+The shared native dashboard reads saved monitoring tables. Its refresh task
+updates the dashboard cache; it does not calculate new observations. See the
+[monitoring guide](src/monitoring/README.md) for table setup, labels, policies,
+refresh and online-serving diagnostics.
+
+## Find the failing stage
+
+| Symptom | First evidence to inspect | Next action |
+| --- | --- | --- |
+| Local smoke or preview fails | Printed field/recipe error | Fix the named setting or builder; preview does not test table permissions. |
+| Wheel build rejects the version | `deployment/artifact.json` and wheel metadata | Point at the intended release; keep source and generated output separate. |
+| Bundle validation fails | Target overrides and unresolved placeholders | Check the working directory, profile, target, YAML and resource references. |
+| Training stops before fitting | First failed task and original traceback | Check the source snapshot, keys, labels, input bounds and schema. |
+| Search runs longer than expected | Candidate/branch tuning settings and progress | Count trials, folds, nested searches and final refits; tune the budget explicitly. |
+| Candidate is registered but scoring cannot use it | Final promotion decision and score selection | Complete the required approval or correct the pinned selection. |
+| A parent succeeds but a downstream job cannot start | Calling task and target job ACL | Grant the configured Run-as principal the documented downstream execution right. |
+| Dashboard is empty or stale | Enrollment, latest saved observation, monitor run, then refresh run | Confirm the monitoring identity and table namespace before changing chart filters. |
+| Performance is unavailable | Label join, availability time and coverage reason | Supply matching outcomes and wait for the eligible window; missing labels are not healthy performance. |
+
+Record the failing job/run/task, target, model/set version and first traceback.
+The final report points to durable evidence; a report task's success alone does
+not prove that fitting, promotion or scoring succeeded. For detailed contracts,
+continue with the [project reference](README.md).

@@ -156,7 +156,7 @@ def test_spark_sampling_excludes_missing_targets_before_validation(delta_spark, 
         else {}
     )
     spec = _spec(drop_missing_labels=True, training_sample_rows=8, **settings)
-    sampled, evidence = retraining._sample_training_source(frame, spec)
+    sampled, evidence = retraining.sample_training_source(frame, spec)
     local = sampled.toPandas()
     local.attrs["training_selection"] = evidence
     if filter_times:

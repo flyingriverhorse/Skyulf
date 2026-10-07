@@ -280,15 +280,21 @@ def test_personal_targets_keep_outputs_and_identity_separate(tmp_path, identity)
         )
         assert personal["variables"]["retraining_pause_status"] == "PAUSED"
         assert personal["variables"]["scoring_pause_status"] == "PAUSED"
-        assert personal["resources"]["jobs"] == {job: {"name": job} for job in ("train", "score")}
+        assert personal["variables"]["monitoring_pause_status"] == "PAUSED"
+        assert personal["variables"]["monitoring_enabled"] == "false"
+        assert personal["resources"]["jobs"] == {
+            job: {"name": job} for job in ("train", "score", "monitoring")
+        }
         assert "run_as" not in personal
-        for job in ("train", "score"):
+        for job in ("train", "score", "monitoring"):
             resource = shared["resources"]["jobs"][job]
             assert resource["permissions"] == f"${{var.{job}_permissions}}"
             if identity == "deployer":
                 assert "run_as" not in resource
             else:
                 role = "shared" if identity == "shared_service_principal" else job
+                if role == "monitoring":
+                    role = "score"
                 assert resource["run_as"] == {
                     "service_principal_name": f"${{var.{role}_service_principal}}"
                 }

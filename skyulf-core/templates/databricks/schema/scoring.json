@@ -1,6 +1,6 @@
 {
   "score_source_table_name": {
-    "order": 7,
+    "order": 7.1,
     "type": "string",
     "default": "",
     "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
