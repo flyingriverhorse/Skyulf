@@ -29,8 +29,10 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-      - name: Install optional Spark test dependencies
-        run: uv pip install --system -r requirements-spark.txt
+      - name: Install Spark and MLflow test dependencies
+        run: uv pip install --system -r requirements-spark.txt -r requirements-mlflow.txt
+      - name: Require the Spark pyfunc integration dependencies
+        run: python -c "import mlflow, pyspark"
       - name: Exercise Spark JVM and Python workers
         run: >-
           python -m pytest skyulf-core/tests/spark -q -o addopts=

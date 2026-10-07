@@ -161,3 +161,14 @@ The root CI formatting scope and Lizard CCN 10 also passed. Independent review
 accepted workflow dependencies/concurrency, six artifact identities, input guards
 and the unchanged coverage scope and floor without repeating the test batch.
 Actual aggregate production coverage is still pending the six-lane CI run.
+
+That run then passed 53 Delta tests and 419 Spark tests, but skipped the pyfunc
+test module: the Spark-only requirements do not install optional MLflow. The
+Spark workflow now installs the existing MLflow requirements alongside its Spark
+requirements and explicitly imports both before running tests. The two existing
+regression/classification pyfunc parity cases must therefore execute in the
+dedicated lane. Base and Delta environments retain their dependency boundaries;
+no production package requirement or version constraint changes.
+Combined Python 3.12 dependency resolution passed with `uv pip compile`;
+actionlint and independent dependency/workflow review passed. Execution of those
+two parity cases remains pending the corrected CI environment.
