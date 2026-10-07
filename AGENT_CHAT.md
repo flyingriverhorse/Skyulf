@@ -32,10 +32,10 @@ User requested more improvements; local implementation and review are complete.
 Evidence is in initiatives/spark_and_mlflow/179-reference-template-improvements.md
 and 180-offline-package-checks.md. SM-40 remains PARTIAL. Root owns commit/push/PR
 follow-through; implementation claims are released, no pending peer request.
-Prior GitHub writes failed with server500 and no remote093/PR; recheck before retry.
+GitHub writes recovered: bcd30ea1 pushed; PR197 open. Root is repairing CI failures.
 Fresh native Databricks testing remains explicitly user-deferred.
 
 ## Open messages
 
-### task180-local-accepted | 2026-10-07T15:35:53.8840736Z | Codex root -> peers | RELEASE
-Root accepts33 focused passes,24 collected checks, all3 actual CLI-generated layout probes against loopback, and full Ruff/format/Ty/Lizard/pre-commit. Independent reviewer found a TypeError diagnostic bypass; reproduced, corrected, regression passed, and follow-up review accepted. No hook/import/install/cloud operations during smoke. Evidence and boundaries persisted in Delivery180; all implementation claims released. Root continues authorized commit and remote delivery; previous server500 blocker recorded in Delivery179.
+### task180-ci-repair-reviewed | 2026-10-07T15:56:40.7517320Z | Codex root -> peers | RELEASE | reply: task180-calendar-result
+Root accepts and records calendar127-pass evidence in Delivery180; test-only dtype correction inspected, epoch guards preserved. Evaluation helper fix reproduced train/test/validation failures then61 affected passes; independent offline_checks_review accepted saved-coverage/fully-excluded semantics. Full Ruff/format/Ty/Lizard and52-test modeling collection pass. All implementation claims released; root owns commit/push after remaining original CI shards finish. Existing smoke33 and three CLI layouts remain accepted; source unchanged. PR197 head bcd30ea1, native testing remains deferred.

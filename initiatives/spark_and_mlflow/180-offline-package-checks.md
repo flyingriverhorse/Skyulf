@@ -88,3 +88,28 @@ candidate/branch semantics, check installed dependency versions or wheel
 readiness, resolve deployment targets, verify cloud access, or prove model
 behavior. Preview/build/Bundle validation and runtime acceptance remain separate.
 Native Databricks testing is still deferred at the user's request.
+
+## PR delivery and first CI repair
+
+GitHub writes recovered. Implementation `bcd30ea1` was pushed on branch `093`
+and [PR 197](https://github.com/flyingriverhorse/Skyulf/pull/197) opened against
+`master`, including delivery 179. Its first Core shard completed in about eleven
+minutes and exposed two failures rather than timing out (4,178 passed, 393 skipped).
+
+- The empty pandas calendar fixture inferred `float64`, correctly violating the
+  explicit numeric epoch-unit contract. Only that empty fixture now declares
+  a nonnumeric dtype. Numeric fit and legacy replay tests cover `Int64`/`Float64`,
+  ordinary epochs, all-null and empty columns on both engines. The DateFeatures
+  runtime is unchanged. The original failing case was reproduced; the final
+  two-file calendar/feature union passed **127 tests**, with four existing warnings.
+  Root independently inspected the test-only correction and its type controls.
+- Unsupported evaluation splits already returned no report, but the later
+  coverage attachment still called `len()` on their payloads. Coverage inference
+  now requires an evaluated report; saved exclusion evidence remains authoritative,
+  including fully excluded populations. Regression cases for train/test/validation
+  all failed before the fix. The final modeling-base/coverage union passed
+  **61 tests**, with eight warnings; **52 modeling tests collected** separately.
+
+Full CI-scope Ruff, formatting, Ty and Lizard passed again after these repairs.
+No local full suite was run. Remote checks are tracked on the PR; pending checks
+are not treated as passed, and the native Databricks deferral remains in effect.
