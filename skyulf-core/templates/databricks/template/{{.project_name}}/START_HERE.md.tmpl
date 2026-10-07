@@ -39,7 +39,13 @@ uv run --no-project python src/tools/build_wheel.py
 ```
 
 `smoke.py` validates configuration and source syntax without running editable
-Python hooks. It does not prove data access, model fit, or deployment permissions.
+Python hooks. When present, `src/features/` and `src/composition/` also go through
+training's package snapshot checks: package boundaries, declared asset files,
+exact dependency pins and saved-source size limits. Dependencies are not imported
+or installed. A failure exits with code 1 and prints JSON identifying the file or
+package and reason; syntax errors also include the file, line and column.
+Successful output lists the checked packages in `project_packages`.
+It does not prove data access, model fit, or deployment permissions.
 `preview.py` executes your trusted recipe builders, but does not read training
 tables or train. Keep I/O out of imports and builders. Both tools accept explicit
 catalog/schema/suffix bindings; they do not resolve `deployment/targets.yml` for

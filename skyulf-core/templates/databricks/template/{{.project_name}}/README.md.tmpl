@@ -1538,11 +1538,19 @@ training requests. All project layouts use the same store and shared dashboard.
 ## Offline checks
 
 Run `python src/tools/smoke.py` without credentials. This reads workflow settings
-and parses Python syntax; it does not execute project hooks, train, access cloud
-data, or write resources. It validates the shared configuration, not resolved
-candidate/branch recipes. Use the existing preview tool for trusted recipe
-inspection and separate runtime tests for training/scoring behavior. A training
-row sample does not prevent writes and is not a smoke mode.
+and parses Python syntax. Present `src/features/` and `src/composition/` packages
+are checked using training's snapshot rules, including `__init__.py` boundaries,
+declared assets, exact dependency pins and source/asset size limits. It does not
+execute project hooks, install dependencies, train, access cloud data, or write
+resources. Success JSON lists `project_packages`; failure JSON identifies the
+file/package and reason and exits with code 1. Syntax errors include `file`,
+`line` and `column` fields.
+
+It validates the shared configuration and package inputs, not resolved
+candidate/branch recipes, installed dependency versions or wheel readiness.
+Use the existing preview tool for trusted recipe inspection and separate runtime
+tests for training/scoring behavior. A training row sample does not prevent
+writes and is not a smoke mode.
 
 Activation enrollment is ordered by the original serialized lifecycle run start.
 A delayed score cannot replace an activated different version, and repairing an
