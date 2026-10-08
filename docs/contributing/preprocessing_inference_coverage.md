@@ -239,3 +239,17 @@ This was a native notebook test of the Python fit/apply and diagnostic paths;
 it did not execute a Spark UDF or deploy a REST endpoint. No Unity Catalog tables,
 registered models or endpoints were created. It adds runtime evidence for the
 existing implementation and leaves all 50 backlog rows open.
+
+Task194 then exercised the actual inference routes on the same runtime source:
+[run 537211044950378](https://dbc-45604623-c18b.cloud.databricks.com/jobs/927702146751887/runs/537211044950378)
+finished **SUCCESS**. One freshly fitted and registered random-forest pipeline
+used six preprocessing steps: two SimpleImputers, GroupImputer,
+FeatureInteraction, StandardScaler and OneHotEncoder. All six probe steps passed.
+Eight scoring rows included numeric/category nulls, unseen categories and keys
+above 2^53. Actual Spark UDF execution used two partitions, prediction batch sizes
+1 and 3, and explicit `env_manager=local`; REST and the typed UC `ai_query`
+function used the same registered model version. Every route matched all three
+local output columns (`prediction`, `probability_0`, `probability_1`) with maximum
+absolute error **0.0**. The temporary endpoint was deleted after testing; the
+existing example endpoint kept its original identity and model version. This is
+a small correctness check, not load/latency testing or wider node admission.
