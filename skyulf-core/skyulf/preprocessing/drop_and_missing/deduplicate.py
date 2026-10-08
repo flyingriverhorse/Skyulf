@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import DeduplicateArtifact
@@ -74,6 +75,13 @@ class DeduplicateApplier(BaseApplier):
     duplicate group and is spelled ``False`` for pandas but ``"none"`` for
     polars.
     """
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Require complete duplicate groups before choosing which rows survive."""
+        if engine not in ("pandas", "polars"):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "filter", "global")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

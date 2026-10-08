@@ -195,6 +195,22 @@ Edits apply to newly trained model versions. Upstream Spark feature jobs are
 separate: a model trained on a merged table still needs those input features;
 it does not automatically execute the upstream joins from a raw table.
 
+## Check saved preprocessing across request sizes
+
+See [Preprocessing context and saved-model checks](PREPROCESSING_CONTEXT.md)
+for the complete explanation, a runnable fit/save/load/probe example, custom
+function/class declarations, and how to interpret each report status.
+
+`artifact` is the loaded fitted pipeline; `sample` is a small frame matching its
+input schema; `report` is diagnostic evidence about its preprocessing. The probe
+compares existing apply behavior across request sizes without learning again.
+A fitted group-mean lookup can be `row` context because the mean was already
+saved during training. Request-time grouping or rolling calculations need their
+actual groups/history and are reported separately.
+
+The probe is explicitly invoked. It does not run automatically in training,
+scoring or serving, and it does not grant Spark/REST eligibility.
+
 ## Why does the standalone serving demo have a different YAML shape?
 
 The repository's `examples/databricks_raw_serving/config.yml` is a small Core API

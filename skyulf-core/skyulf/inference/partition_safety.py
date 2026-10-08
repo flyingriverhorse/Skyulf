@@ -30,6 +30,7 @@ from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScal
 from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
 from . import _partition_trees as batch_trees
+from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
 from .local_pipeline import LocalPipelineArtifact
 from .local_scoring import prediction_output_schema
 
@@ -121,20 +122,10 @@ def _check_instance_methods(component: Any) -> None:
 
 def _check_schemas(artifact: LocalPipelineArtifact) -> None:
     """Bind column order and dtype metadata to the fitted inference schemas."""
-    schemas = artifact.pipeline._inference_schemas
-    manifest = artifact.manifest
-    if schemas is None:
-        raise _reject("pipeline", "Missing fitted inference schemas.")
-    actual = tuple(
-        (schema.columns, tuple(schema.dtypes.get(name, "unknown") for name in schema.columns))
-        for schema in schemas
-    )
-    expected = (
-        (manifest.input_columns, manifest.input_dtypes),
-        (manifest.feature_columns, manifest.feature_dtypes),
-    )
-    if actual != expected:
-        raise _reject("pipeline", "Manifest and fitted input/output schemas disagree.")
+    try:
+        check_fitted_schemas(artifact)
+    except ValueError as exc:
+        raise _reject("pipeline", str(exc)) from exc
 
 
 def _check_model(artifact: LocalPipelineArtifact) -> Any:
@@ -238,13 +229,7 @@ def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
         )
     if NodeRegistry.get_calculator(node) is not _CALCULATORS[node]:
         raise ValueError("Unreviewed calculator registration.")
-    applier = _APPLIERS[node]
-    state = applier.validate_fitted_state(record["artifact"])
-    resolve = applier.resolve_fitted_config
-    params = resolve(record.get("params", {}), state)
-    recipe = resolve(config.get("params", {}), state)
-    if _pack(params) != _pack(recipe):
-        raise ValueError("Recipe configuration disagrees with fitted parameters.")
+    state, params, _ = resolve_fitted_step(record, config)
     require_capability(
         node,
         "apply",

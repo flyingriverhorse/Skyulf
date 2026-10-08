@@ -1,0 +1,255 @@
+# Preprocessing context and saved-model checks
+
+Use this guide when a preprocessing step works on a full table but might behave
+differently when requests arrive one row at a time or in Spark worker batches.
+The existing step still owns its calculation. Training calls `fit`; inference
+calls `apply` with the information saved during training.
+
+## What does context mean?
+
+Context describes **the other input rows needed during inference**. It does not
+describe how much data training needed, choose an engine, or change the formula.
+
+| Context | Information required at inference | Example | Current probe behavior |
+| --- | --- | --- | --- |
+| `row` | This row and saved training state | Saved mean, scaler, category mapping | Compare full, repeated, chunked and reversed requests |
+| `group` | All relevant rows in the same group | Subtract this request's customer-group mean | Report `requires_context`; do not run independent chunks |
+| `window` | Neighboring or earlier rows, usually in a defined order | Lag or rolling mean | Report `requires_context`; do not invent history |
+| `global` | The complete intended input population | Choose duplicates across the whole request | Report `requires_context` if the step is active |
+| `unknown` | Not yet declared for this implementation/configuration | An undeclared custom callback | Try sample comparisons; retain `unknown` even when they pass |
+
+These declarations currently guide an explicit diagnostic. They do not create a
+Spark grouping/shuffle, sort the data, fetch older records or configure serving.
+Normal training and prediction do not automatically call this diagnostic.
+
+### Why is a fitted GroupImputer a row operation?
+
+Suppose training learned these income replacement values:
+
+| Segment | Saved mean income |
+| --- | ---: |
+| A | 200 |
+| B | 1200 |
+
+For a new row `{segment: A, income: null}`, `GroupImputer.apply` looks up the
+saved A value, 200. That remains 200 whether the request contains one row or a
+thousand rows. The training-time aggregation is already finished. Its inference
+context is therefore `row`, even though the step's name contains "Group".
+Unseen groups use the fitted fallback according to the node's saved policy.
+
+Compare that with a custom function computing
+`df.groupby("customer_id")["amount"].transform("mean")` on the incoming request.
+For one customer with amounts 10 and 30, the complete group gives 20 for both
+rows. Separating those rows into singleton requests gives 10 and 30. This is
+`group` context: the request must contain the intended complete groups. Saving
+the function in a model does not save future customer transactions.
+
+### Window and global examples
+
+A rolling mean over 10, 20, 30 with a two-row window is 10, 15, 25 when the first
+window accepts one row. Independently processing chunks `[10, 20]` and `[30]`
+loses the previous value for the last chunk. Declaring `window` makes this
+requirement visible. Carry-history mode additionally needs an explicit
+continuation session; restarting each request from training history is not
+equivalent to a continuous stream. The current probe does not run that session.
+
+Deduplication needs all rows in the intended deduplication population; duplicates
+in different partitions cannot be discovered independently. Its declared context
+is `global`. However, ordinary row-preserving prediction skips the built-in
+`Deduplicate` step. The probe follows that same rule and reports
+`action: skip_preserve_rows`, `status: skipped`; it does not remove predictions.
+
+## Where do I declare context?
+
+Built-in declarations belong to the existing Skyulf preprocessing implementation.
+You do not add a context setting to every built-in YAML entry. Some built-in
+configurations/engines are not reviewed yet and will report `unknown`.
+
+For a custom function, declare its actual behavior in the existing factory in
+`src/features/preprocessing.py`. For example, replace the shipped `log_feature`
+factory with this version; keep its existing `log1p_value` calculation:
+
+```python
+def log_feature(column):
+    """Add a per-row logarithm with no request-time population statistics."""
+    return column_step(
+        f"log_{column}",
+        log1p_value,
+        output=f"log_{column}",
+        params={"column": column},
+        inference_context="row",
+    )
+```
+
+Select it normally in `config/preprocessing.yml`:
+
+```yaml
+version: 1
+recipes:
+  default:
+    - custom: preprocessing.log_feature
+      params: {column: income}
+```
+
+The YAML selects the factory; the returned step contains the context. It is not
+a second YAML definition of the calculation. For `fitted_step`, use the same
+keyword when `apply(df, state)` only reads saved state. Do not label a callback
+`row` if it recalculates statistics from `df` during prediction.
+
+`filter_step` also accepts this diagnostic keyword. Its pre-split contract still
+requires fixed, row-local eligibility rules; `group`/`window`/`global` declarations
+do not make context-dependent pre-split filters valid. The preprocessing probe
+does not inspect the separate project scoring/pre-split eligibility policy.
+
+For an advanced custom class, add an optional static method to its existing
+Applier class, alongside its existing `apply`:
+
+```python
+from skyulf.core.capabilities import ExecutionCapability
+
+# Inside your existing Applier class:
+@staticmethod
+def inference_capability(state, *, engine):
+    """Describe only engines and modes supported by this saved implementation."""
+    if engine not in ("pandas", "polars"):
+        return None
+    return ExecutionCapability(engine, "apply", "local", "preserve", "row")
+```
+
+Use that example only if the class actually supports both engines and preserves
+rows. Otherwise narrow it. Omitting a declaration keeps context `unknown`.
+Editing the factory/class affects newly trained artifacts; an existing model
+continues using its captured source. A declaration is a claim to test, not a
+Spark/REST admission certificate.
+
+## What does `report = probe_fitted_preprocessing(artifact, sample)` do?
+
+It means: **take this already fitted pipeline, try its saved preprocessing on
+these example inputs in several ways, and return what happened**.
+
+| Name | What you provide or receive |
+| --- | --- |
+| `artifact` | A `LocalPipelineArtifact`: the loaded pipeline plus its manifest and saved fitted state. It is not a model-name string, endpoint or unfitted estimator. |
+| `sample` | A small pandas or Polars DataFrame matching the saved model input columns, order and dtypes. It normally excludes the target and unrelated record keys. |
+| `report` | A Python dictionary containing step names, context, hashes, checks, statuses and failure reasons. It is not predictions or a trained model. |
+
+The artifact is loaded with `load_local_pipeline(path)` from an existing local
+pipeline artifact directory, such as one created by `save_local_pipeline` or
+`fit_local_workflow`. The loader verifies saved payload/package checks. Do not
+pass `models:/...`, an endpoint name, or the result of a generic pyfunc loader
+directly to this API; those are different objects.
+
+If you already have the artifact, use a matching sample directly. If the model
+was trained on merged features, sample those features. The probe does not turn a
+raw source table into merged features or rerun upstream joins.
+
+### Complete runnable example
+
+This standalone example creates a tiny local artifact so the origin of every
+variable is clear. In a real project, replace the training section with loading
+your existing artifact; you do not retrain to run the probe.
+
+```python
+import json
+from pathlib import Path
+
+import pandas as pd
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
+from skyulf.pipeline import SkyulfPipeline
+
+training = pd.DataFrame({
+    "segment": ["A", "A", "B", "B", "A", "B"],
+    "income": [100.0, 300.0, 1000.0, 1400.0, 200.0, 1200.0],
+    "target": [1.0, 3.0, 10.0, 14.0, 2.0, 12.0],
+})
+pipeline = SkyulfPipeline({
+    "preprocessing": [
+        {"name": "fill_income", "transformer": "GroupImputer",
+         "params": {"columns": ["income"], "group_by": "segment", "strategy": "mean"}},
+        {"name": "encode_segment", "transformer": "OneHotEncoder",
+         "params": {"columns": ["segment"], "handle_unknown": "ignore", "max_categories": None}},
+    ],
+    "modeling": {"type": "linear_regression"},
+})
+pipeline.fit(
+    SplitDataset(train=training, test=training.iloc[:0]),
+    target_column="target",
+)
+
+# Training is finished. Save once; all following checks use this fitted state.
+artifact_path = Path("artifacts/context_demo")
+save_local_pipeline(pipeline, artifact_path)
+artifact = load_local_pipeline(artifact_path)
+
+# These are model inputs, including missing income and a previously unseen segment.
+sample = pd.DataFrame({
+    "segment": ["A", "B", "NEW"],
+    "income": [None, 1600.0, None],
+})
+report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
+
+print(report["status"])
+for step in report["steps"]:
+    print(step["name"], step.get("context"), step["status"])
+
+# Optional: persist diagnostic evidence locally. No prediction table is written.
+Path("preprocessing_report.json").write_text(
+    json.dumps(report, indent=2), encoding="utf-8"
+)
+```
+
+Expected summary:
+
+```text
+passed
+fill_income row passed
+encode_segment row passed
+```
+
+The sample contains three rows. `chunks:1` makes three separate one-row apply
+calls, and `chunks:2` makes one two-row call and one one-row call. Each result is
+compared with the corresponding rows from the full-sample result. The learned
+segment means and categories remain the ones from `training`.
+
+## How to read the report
+
+| Field or status | Meaning and next action |
+| --- | --- |
+| Top-level `status: passed` | All required sample checks and the final feature schema matched. Inspect context and empty-input support too. |
+| `checks` | `full`, `repeat`, `chunks:N`, `reverse` and `empty` name the attempted strategy. |
+| `failed` + `output_mismatch` | Inspect the named step for batch statistics, order, dtype changes or numerical rounding. |
+| `state_mutation` / `input_mutation` | The step changed its saved state or received input during apply. Keep learned state read-only and return transformed data separately. |
+| `apply_error` + `error_type` | The existing apply raised. Reproduce the named step locally with trusted data; sample-bearing exception messages are omitted from the report. |
+| `invalid_step_contract` | Saved identity/configuration/validation could not be inspected. Check the artifact and the optional validator; do not infer numerical parity. |
+| `requires_context` | Supply a separately designed group/history execution path; changing the label to `row` does not resolve the dependency. |
+| `skipped` | The normal prediction chain skips this fitted training step. No apply test ran for it. |
+| `not_run` | An earlier step failed or required context, so no result is claimed for this step. |
+| `empty` check: `not_supported` | Empty input raised. Other checks can pass; this does not promise support for empty requests. |
+| `state_validation: unavailable` | No applicable node-owned strict validator exists for this local state. Empirical checks may still pass. |
+| `admission: diagnostic_only` | The report grants no distributed or endpoint eligibility. |
+
+Validation of the initial artifact, sample schema and limits can raise an
+exception **before** a report exists. For example, wrong columns or more than
+`max_rows` are caller errors. Step execution failures normally appear in the
+report. The default limits are 256 rows and 8 MiB per frame; the probe rejects
+oversized samples instead of silently truncating them. These limits do not cap
+the project's full Spark scoring population.
+
+Choose a nonempty sample with realistic values, nulls, unseen categories and
+varied group keys. Only local pandas/Polars frames with immutable scalar cells
+are supported; nested mutable cells are rejected. Comparisons are exact. A
+floating-point difference near machine precision may need investigation but
+does not by itself demonstrate refitting. No tolerance setting is currently
+exposed. Passing finite samples cannot establish behavior for every future row.
+
+Run this after training/loading and when changing custom preprocessing or its
+dependencies. It is not an automatic Bundle task, production monitor, accuracy
+evaluation, drift check or performance-loss policy. It does not call the model's
+prediction method. It tests detached preprocessing state; module globals and
+external services accessed by trusted custom code are not isolated.
+
+See [PREPROCESSING.md](PREPROCESSING.md) for recipe placement and
+[SERVING.md](SERVING.md) for the separately enforced serving requirements.

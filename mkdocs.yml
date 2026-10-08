@@ -76,6 +76,7 @@ nav:
     - Leakage Proof (polars): examples/leakage_proof_polars.md
   - Contributing:
     - Writing Docs: contributing/writing_docs.md
+    - Preprocessing Inference Coverage: contributing/preprocessing_inference_coverage.md
   - User Guide:
     - Overview: user_guide/overview.md
     - Installation: user_guide/installation.md
