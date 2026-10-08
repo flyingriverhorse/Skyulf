@@ -9,10 +9,12 @@ from sklearn.preprocessing import StandardScaler
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import validate_state
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import StandardScalerArtifact
+from .._fitted_validation import portable_config
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -54,6 +56,16 @@ class StandardScalerApplier(BaseApplier):
     Spark validates portable state and applies native expressions without a
     data action. Its selected numeric columns become double when scaling is enabled.
     """
+
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return validate_state("StandardScaler", raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        return portable_config("StandardScaler", raw, state)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

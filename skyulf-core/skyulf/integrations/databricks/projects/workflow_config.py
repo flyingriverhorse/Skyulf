@@ -446,7 +446,8 @@ def _preview_training_source(checked: dict[str, Any], training_status: str) -> l
         f"Final holdout: {checked.get('split_strategy', 'random')} | "
         f"fraction={checked.get('test_size', 0.2)} | start={holdout_start}",
         f"Training: {training_status}",
-        "Pre-split cleanup (fixed normalization and training eligibility; edit build_pre_split_steps()):",
+        "Pre-split cleanup (fixed normalization and training eligibility; "
+        "edit config/pre_split.yml or the existing Python builder):",
     ]
 
 
@@ -594,7 +595,10 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         "Fixed feature cleanup is saved as a pipeline prefix and applied once to raw model inputs; "
         "training row exclusions are not repeated during scoring."
     )
-    lines.append("Fold-local preprocessing (after final split; edit build_preprocessing()):")
+    lines.append(
+        "Fold-local preprocessing (after final split; "
+        "edit config/preprocessing.yml or the existing Python builder):"
+    )
     lines.extend(
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )

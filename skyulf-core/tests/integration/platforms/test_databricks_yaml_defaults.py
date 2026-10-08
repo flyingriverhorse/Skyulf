@@ -28,6 +28,8 @@ def test_new_bundles_are_yaml_only_without_migration(tmp_path, layout, compute):
     project = _generate_project(tmp_path, training_layout=layout, compute_mode=compute)
     assert {path.name for path in (project / "config").iterdir()} == {
         "features.yml",
+        "pre_split.yml",
+        "preprocessing.yml",
         "training.yml",
         "inference.yml",
     }

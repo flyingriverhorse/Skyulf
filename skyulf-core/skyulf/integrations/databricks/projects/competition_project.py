@@ -18,11 +18,12 @@ from ..training.competition.competition_evaluation import (
 from ..training.tuning.local_cv import LocalCVSpec
 from ..training.tuning.local_search import base_model_config
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
-from ._project_files import modeling_hook, project_source, read_source, renamed_modeling_hook
+from ._project_files import modeling_hook, read_source, renamed_modeling_hook
 from .project import resolve_project_workflow, strict_json_value, validate_project_steps
 from .workflow_config import WORKFLOW_FIELDS, validate_workflow_pipeline
 from .yaml_config import project_training_config
 from .yaml_models import competition_candidates
+from .yaml_recipes import feature_project_source
 
 _CANDIDATE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 
@@ -141,7 +142,7 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
     candidates, source, weights = _load_candidates(Path(path), config["task"], limit)
     config = {**deepcopy(config), **weights}
     validate_weight_roles(config)
-    shared_source = _competition_source(project_source(Path(path), exclude_feature_groups=True))
+    shared_source = _competition_source(feature_project_source(Path(path)))
     result = deepcopy(config)
     resolved = {}
     common_steps = None

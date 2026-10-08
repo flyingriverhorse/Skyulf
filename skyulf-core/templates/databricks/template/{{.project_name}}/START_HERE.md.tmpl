@@ -6,11 +6,14 @@ beside `databricks.yml`. Replace `YOUR_PROFILE` with your authenticated CLI prof
 
 ## Where to make a change
 
-The project has three configuration files: `config/features.yml` for optional
+Configure the project through YAML: `config/features.yml` for optional
 upstream feature groups, `config/training.yml` for models and training, and
 `config/inference.yml` for scoring and model-set publication. Empty feature groups
 add no job. Follow [FEATURE_TABLES.md](FEATURE_TABLES.md) to enable them.
-Custom transformations and business functions remain ordinary Python.
+`config/pre_split.yml` and `config/preprocessing.yml` contain ordered recipes.
+Custom functions remain in `src/features/pre_split.py` and `preprocessing.py`.
+For a complete worked example connecting YAML, built-ins and custom functions,
+start with [Preprocessing and custom features](PREPROCESSING.md).
 
 | Change | Edit | Check afterwards |
 | --- | --- | --- |
@@ -18,8 +21,9 @@ Custom transformations and business functions remain ordinary Python.
 | Model, tuning, CV and quality policy | `config/training.yml` ? `models` | A model entry overrides shared defaults; nested mappings replace the whole value. |
 | Scoring source, selection and change policy | `config/inference.yml` | Review the saved version and output destination. |
 {{if eq .training_layout "multi_target"}}| Whole-set release policy and output tables/views | `config/inference.yml` ? `model_set` | Review the complete set before activation. |
-{{end}}| Fixed eligibility rules before splitting | `src/features/pre_split.py` | Preserve the record-key contract and document excluded rows. |
-| Learned preprocessing | `src/features/preprocessing.py` | Fit statistics inside each training fold; scoring uses the saved fitted recipe. |
+{{end}}| Fixed eligibility rules before splitting | `config/pre_split.yml` | Preserve the record-key contract and document excluded rows. |
+| Learned preprocessing | `config/preprocessing.yml` | Fit statistics inside each training fold; scoring uses the saved fitted recipe. |
+| Custom feature functions | `src/features/pre_split.py`, `src/features/preprocessing.py` | Select their factories in the matching YAML recipe. |
 | Shared Spark feature tables | `src/features/groups/`, `config/features.yml` | Compute shared features, refresh the feature graph, and run it before downstream training/scoring. |
 | Business output rules | `src/features/scoring.py` | Check typed output columns and required components before retraining. |
 | Workspace, schemas, Run-as identities and job permissions | `deployment/targets.yml`, `deployment/variables.yml` | Review the selected target and downstream job permissions. |
@@ -125,6 +129,10 @@ The shared native dashboard reads saved monitoring tables. Its refresh task
 updates the dashboard cache; it does not calculate new observations. See the
 [monitoring guide](src/monitoring/README.md) for table setup, labels, policies,
 refresh and online-serving diagnostics.
+
+For optional REST serving and SQL `ai_query` access to a concrete registered
+model version, follow [SERVING.md](SERVING.md). This is an explicit deployment
+step; normal training and batch scoring do not create endpoints or SQL functions.
 
 ## Find the failing stage
 

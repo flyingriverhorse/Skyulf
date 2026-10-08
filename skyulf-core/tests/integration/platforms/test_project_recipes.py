@@ -16,7 +16,7 @@ from skyulf.integrations.databricks.projects.project import load_project_workflo
 
 CUSTOM = (
     Path(__file__).resolve().parents[3]
-    / "templates/databricks/template/{{.project_name}}/src/features/custom"
+    / "templates/databricks/template/{{.project_name}}/src/features"
 )
 
 
@@ -24,11 +24,11 @@ def _project(tmp_path):
     """Build one package whose inactive default registers no custom classes."""
     root = tmp_path / "features"
     root.mkdir()
-    for filename in ("preprocessing_custom.py", "pre_split_custom.py"):
+    for filename in ("preprocessing.py", "pre_split.py"):
         shutil.copyfile(CUSTOM / filename, root / filename)
     root.joinpath("__init__.py").write_text(
-        "from .preprocessing_custom import frequency_encoding\n"
-        "from .pre_split_custom import minimum_completeness\n"
+        "from .preprocessing import frequency_encoding\n"
+        "from .pre_split import minimum_completeness\n"
         "def build_preprocessing(recipe='default'):\n"
         "    if recipe == 'default': return []\n"
         "    if recipe not in ('category', 'other'): raise ValueError('Unknown recipe')\n"

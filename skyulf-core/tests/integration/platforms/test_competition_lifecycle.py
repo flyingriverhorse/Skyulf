@@ -299,10 +299,10 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
     features.mkdir()
     template = (
         Path(__file__).resolve().parents[3]
-        / "templates/databricks/template/{{.project_name}}/src/features/custom/preprocessing_custom.py"
+        / "templates/databricks/template/{{.project_name}}/src/features/preprocessing.py"
     )
     shutil.copyfile(template, features / "custom.py")
-    shutil.copyfile(template.with_name("pre_split_custom.py"), features / "shared_filter.py")
+    shutil.copyfile(template.with_name("pre_split.py"), features / "shared_filter.py")
     pin = f"numpy=={importlib.metadata.version('numpy')}"
     features.joinpath("requirements.txt").write_text(pin, encoding="utf-8")
     features.joinpath("assets.json").write_text('["filter.json"]', encoding="utf-8")

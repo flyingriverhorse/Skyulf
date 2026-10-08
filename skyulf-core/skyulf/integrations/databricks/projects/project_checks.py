@@ -8,6 +8,7 @@ from ._project_files import project_source
 from .workflow_config import validate_project_settings
 from .yaml_config import project_config_path, read_training_config, read_workflow_config
 from .yaml_models import static_workflows
+from .yaml_recipes import feature_project_source
 
 
 def _check_config(root: Path, bindings: dict[str, str]) -> dict:
@@ -39,7 +40,10 @@ def _check_packages(root: Path) -> list[str]:
         try:
             if not path.is_dir() or not path.resolve().is_relative_to(root):
                 raise ValueError("Project package must be a directory inside the project.")
-            project_source(path, exclude_feature_groups=relative == "src/features")
+            if relative == "src/features":
+                feature_project_source(path)
+            else:
+                project_source(path)
         except (OSError, ValueError) as exc:
             raise ValueError(f"{relative}: {exc}") from exc
         checked.append(relative)

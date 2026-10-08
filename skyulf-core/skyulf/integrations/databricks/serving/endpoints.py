@@ -164,7 +164,13 @@ def build_pinned_endpoint(
             },
             "usage_tracking_config": {"enabled": True},
         }
-    return PinnedEndpointPlan(spec, config, tuple(name for name, _ in inputs), tuple(inputs))
+    return PinnedEndpointPlan(
+        spec,
+        config,
+        tuple(name for name, _ in inputs),
+        tuple(inputs),
+        tuple((column.name, column.dtype) for column in outputs),
+    )
 
 
 def prepare_pinned_endpoint(
@@ -226,6 +232,9 @@ def _require_config(endpoint: Any, plan: PinnedEndpointPlan) -> None:
     entities = _field(_field(endpoint, "config"), "served_entities") or []
     if _field(endpoint, "name") != plan.spec.endpoint_name or len(entities) != 1:
         raise ValueError("Serving endpoint config differs from the pinned plan.")
+    identity = (_field(entities[0], "entity_name"), _field(entities[0], "entity_version"))
+    if identity != (plan.spec.model_name, plan.spec.model_version):
+        raise ValueError("Serving endpoint config differs from the pinned model selector.")
     for key, wanted in expected["config"]["served_entities"][0].items():
         if _value(_field(entities[0], key)) != wanted:
             raise ValueError("Serving endpoint config differs from the pinned plan.")

@@ -81,12 +81,13 @@ def _validate_selector(spec: PinnedEndpointSpec) -> None:
 
 @dataclass(frozen=True, slots=True)
 class PinnedEndpointPlan:
-    """A validated SDK create body and the inspected input column names."""
+    """A validated SDK create body and the inspected model input/output schemas."""
 
     spec: PinnedEndpointSpec
     config: dict[str, Any]
     input_columns: tuple[str, ...]
     input_schema: tuple[tuple[str, str], ...]
+    output_schema: tuple[tuple[str, str], ...] = ()
 
 
 def _valid_uc(value: Any) -> bool:

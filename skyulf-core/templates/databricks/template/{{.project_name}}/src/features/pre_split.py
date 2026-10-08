@@ -1,72 +1,115 @@
-"""PRE-SPLIT: choose which rows may be used for training.
+"""YOUR OWN ROW FILTERS. Select them in config/pre_split.yml.
 
-Runs BEFORE the train/test split. Filters only remove rows: they never
-change values and never learn from data (that belongs in preprocessing.py).
+A filter decides, row by row, which rows may be used for training.
+Built-in filters and ordered lists live only in config/pre_split.yml:
 
-HOW TO USE
-  1. Put filters in the list of _default_recipe() below. They run top to bottom.
-     You can mix two kinds of filter in one list:
-       - Built-in step: a dict naming a Skyulf node, e.g.
-           {"name": "known_target", "transformer": "DropMissingRows",
-            "params": {"subset": ["target"], "how": "any"}}
-       - Your own filter: a function from custom/pre_split_custom.py, e.g.
-           value_range("age", minimum=0, maximum=120)
-         Uncomment its import line below first.
-  2. Check: python src/tools/preview.py --action train
+  - custom: pre_split.minimum_completeness
+    params: {columns: [field_a, field_b], min_present: 1}
 
-RECIPES
-  A recipe is a named list of filters. config/training.yml selects one with
-  pre_split_recipe; the default is "default". Competition shares that recipe.
-  Recipes starting with "example_" are ready-made lists to read or copy from.
-  "none" means no filters.
+Write one function that returns True for rows to KEEP, then wrap it:
 
-scoring.py can reuse these filters for scoring rows. A filter that reads the
-target column needs SKIP_TARGET_PRE_SPLIT_STEPS=True there.
+  filter_step(name, fn, columns=[...])
+      fn(df) -> True/False for every row
+      columns = the columns fn reads (Skyulf checks they exist)
+
+Rules:
+  - Look only at the row itself (no df.mean(), df.duplicated() etc.).
+    Something learned from data belongs in preprocessing, not here.
+  - Return exactly one True/False per row. Missing values give no answer,
+    so decide them yourself: (df["x"] > 0).fillna(False)
+  - Never change values; filters only remove rows.
+  - Write normal top-level `def` functions (no lambda).
+  - params={...} is passed to your function as its last argument.
+
+scoring.py can reuse these filters for scoring rows (SCORING_MODE="pre_split")
+or "combined" in features/scoring.py
 """
 
-from .custom import pre_split_custom
+from skyulf.preprocessing import filter_step
 
-# from .custom.pre_split_custom import minimum_completeness, value_range, allowed_values
-# from .custom.pre_split_custom import allowed_countries  # needs an asset, see its Example 4
-
-
-def build_pre_split_steps(recipe="default"):
-    """Return the filter list of one named recipe."""
-    recipes = {
-        "default": _default_recipe,
-        "none": lambda: [],
-        "example_complete_inputs": _example_complete_inputs,
-        "example_all": _example_all,
-    }
-    if recipe not in recipes:
-        raise ValueError(f"Unknown pre-split recipe: {recipe}. Choose from {list(recipes)}.")
-    return recipes[recipe]()
+# ---------------------------------------------------------------------------
+# Example 1 - keep rows with enough filled-in fields.
+#   minimum_completeness(["a", "b", "c"], min_present=2)
+#   a=1, b=null, c=3  -> kept (2 values)      a=null, b=null, c=3 -> removed
+#   null/NaN count as missing; empty text and infinity count as values.
+# ---------------------------------------------------------------------------
 
 
-def _default_recipe():
-    """Your main recipe. Empty until you uncomment or add filters."""
-    return [
-        # Built-in step (use your real target column name):
-        # {"name": "known_target", "transformer": "DropMissingRows",
-        #  "params": {"subset": ["target"], "how": "any"}},
-        # Your own filters (custom/pre_split_custom.py):
-        # minimum_completeness(columns=["field_a", "field_b", "field_c"], min_present=2),
-        # value_range("age", minimum=0, maximum=120),
-        # allowed_values("country", ["NL", "DE", "BE"]),
-        # allowed_countries(),  # reads assets/countries.json
-    ]
+def has_enough_values(df, params):
+    """True when at least min_present of the selected columns are not null."""
+    return df[params["columns"]].notna().sum(axis=1) >= params["min_present"]
 
 
-def _example_complete_inputs():
-    """Keep rows where at least one input has a value."""
-    return [
-        pre_split_custom.minimum_completeness(columns=["feature_value", "category"], min_present=1)
-    ]
+def minimum_completeness(columns, min_present=1):
+    """Keep rows where at least min_present of the given columns have a value."""
+    if not isinstance(columns, (list, tuple)) or not columns:
+        raise ValueError("Completeness columns must be a nonempty list of column names.")
+    if any(not isinstance(column, str) or not column for column in columns):
+        raise ValueError("Completeness columns must be nonempty column names.")
+    if len(set(columns)) != len(columns):
+        raise ValueError("Completeness columns must be unique.")
+    if type(min_present) is not int or not 1 <= min_present <= len(columns):
+        raise ValueError("min_present must be an integer between 1 and the number of columns.")
+    params = {"columns": list(columns), "min_present": min_present}
+    return filter_step(
+        "minimum_completeness", has_enough_values, columns=list(columns), params=params
+    )
 
 
-def _example_all():
-    """Two own filters, in the order they run."""
-    return [
-        pre_split_custom.minimum_completeness(columns=["feature_value", "category"], min_present=1),
-        pre_split_custom.value_range("feature_value", minimum=0, maximum=1_000_000),
-    ]
+# ---------------------------------------------------------------------------
+# Example 2 - keep values inside a known valid range (missing values are kept).
+#   value_range("age", 0, 120)   age = 35 kept, -1 removed, 130 removed, null kept
+# ---------------------------------------------------------------------------
+
+
+def in_range(df, params):
+    """True when the value is within [minimum, maximum] or missing."""
+    values = df[params["column"]]
+    return values.between(params["minimum"], params["maximum"]) | values.isna()
+
+
+def value_range(column, minimum, maximum):
+    """Remove rows whose column is outside [minimum, maximum]."""
+    params = {"column": column, "minimum": minimum, "maximum": maximum}
+    return filter_step(f"{column}_range", in_range, columns=[column], params=params)
+
+
+# ---------------------------------------------------------------------------
+# Example 3 - keep only listed categories (null is removed).
+#   allowed_values("country", ["NL", "DE"])   NL kept, FR removed, null removed
+# ---------------------------------------------------------------------------
+
+
+def is_allowed(df, params):
+    """True when the value is one of the allowed values."""
+    return df[params["column"]].isin(params["values"])
+
+
+def allowed_values(column, values):
+    """Keep rows whose column is one of the given values."""
+    params = {"column": column, "values": list(values)}
+    return filter_step(f"{column}_allowed", is_allowed, columns=[column], params=params)
+
+
+# ---------------------------------------------------------------------------
+# Example 4 - the allowed list read from a data file (asset). Inactive.
+#   1. Create src/features/assets/countries.json   ["NL", "DE", "BE"]
+#   2. In src/features/assets.json set   "files": ["assets/countries.json"]
+#   3. Uncomment the code below, then select custom: pre_split.allowed_countries in YAML.
+#   The file is saved with the model; editing it later needs a new training run.
+# ---------------------------------------------------------------------------
+
+# import json
+#
+# from skyulf.inference.project_package import read_project_asset
+#
+#
+# def is_known_country(df):
+#     """True when the country is listed in the saved countries file."""
+#     countries = json.loads(read_project_asset(__package__, "assets/countries.json"))
+#     return df["country"].isin(countries)
+#
+#
+# def allowed_countries():
+#     """Keep rows whose country is in assets/countries.json."""
+#     return filter_step("allowed_countries", is_known_country, columns=["country"])

@@ -7,7 +7,9 @@ import yaml
 from test_databricks_bundle_generation import CLI, OFFLINE_CLI, _generate_project
 from test_databricks_deployment import _resolve, offline_workspace  # noqa: F401 - pytest fixture
 
+from skyulf.integrations.databricks.features.config import parse_feature_config
 from skyulf.integrations.databricks.features.graph import refresh_feature_graph
+from skyulf.integrations.databricks.features.runtime import transform_source
 from skyulf.integrations.databricks.projects.project_checks import check_project
 
 pytestmark = pytest.mark.skipif(
@@ -29,10 +31,17 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
     )
     assert not (project / "src/jobs/feature_task.py").exists()
     assert (project / "config/training.yml").is_file()
-    for name in ("company", "activity"):
-        (project / f"src/features/groups/{name}.py").write_text(
-            "def compute(frame):\n    return frame\n", encoding="utf-8"
-        )
+    text = (project / "config/features.yml").read_text(encoding="utf-8")
+    assert parse_feature_config(yaml.safe_load(text)) is None
+    _, marker, example = text.partition("# version: 1\n")
+    assert marker, "The generated configuration must include an activatable example."
+    config = yaml.safe_load("version: 1\n" + "\n".join(line[2:] for line in example.splitlines()))
+    plan = parse_feature_config(config)
+    assert plan is not None
+    for group in plan.groups:
+        source, digest = transform_source(project, group)
+        compile(source, group.transform.split(":")[0], "exec")
+        assert len(digest) == 64
     smoke = check_project(
         project,
         {
@@ -44,22 +53,6 @@ def test_feature_job_resolves_for_each_layout_and_identity(tmp_path, layout, off
         },
     )
     assert smoke["status"] == "passed"
-    config = {
-        "version": 1,
-        "base_table": "workspace.test.observations",
-        "output_table": "workspace.test.merged",
-        "keys": ["id"],
-        "timestamp": "at",
-        "groups": {
-            name: {
-                "source_table": f"workspace.test.raw_{name}",
-                "output_table": f"workspace.test.features_{name}",
-                "transform": f"src/features/groups/{name}.py:compute",
-                "columns": [f"value_{name}"],
-            }
-            for name in ("company", "activity")
-        },
-    }
     (project / "config/features.yml").write_text(yaml.safe_dump(config))
     assert refresh_feature_graph(project) == ["activity", "company"]
     shared = _resolve(project, "test", offline_workspace)

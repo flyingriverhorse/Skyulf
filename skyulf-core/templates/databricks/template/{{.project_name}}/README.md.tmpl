@@ -45,7 +45,7 @@ stops scoring without changing the selected manager.
 
 ## Configure the project
 
-New projects use these three YAML files directly. No migration command or Python
+New projects use these YAML files directly. No migration command or Python
 model declaration file is needed.
 
 | File | Owns |
@@ -53,10 +53,12 @@ model declaration file is needed.
 | `config/features.yml` | Optional upstream feature groups and merged observations; empty `groups` disables the feature job |
 | `config/training.yml` | Sources, inputs, target, split/CV, models, tuning, weights and training quality policy |
 | `config/inference.yml` | Scoring source/output, model selection, change policy and whole-set publication |
-| `src/features/pre_split.py` | Fixed eligibility and cleanup functions before splitting |
-| `src/features/preprocessing.py` | Preprocessing fitted inside each training fold |
+| `config/pre_split.yml` | Ordered fixed eligibility filters before splitting |
+| `config/preprocessing.yml` | Ordered built-in and custom steps fitted inside each training fold |
+| `src/features/pre_split.py` | Custom row-filter functions selected by pre-split YAML |
+| `src/features/preprocessing.py` | Custom transformation functions selected by preprocessing YAML |
 | `src/features/scoring.py` | Per-model and combined business output functions |
-| `src/features/custom/` | Your own Python functions, imported by the recipe builders |
+| `src/features/custom/` | Optional scoring callbacks and advanced class examples |
 | `src/features/groups/` | Optional Spark functions producing shared Delta feature tables; configured in `config/features.yml` |
 | `deployment/targets.yml`, `deployment/variables.yml` | Workspace, UC bindings, identities, schedules and compute |
 
@@ -137,31 +139,36 @@ live in `model.params`. Stacking's internal CV differs from evaluation CV.
 and `pre_split_recipe` live in `defaults` or a model entry. Competition shares
 one weight column and pre-split policy. The optional top-level `pipeline` may
 contain empty `preprocessing`/`modeling` structure for tooling; actual model
-settings belong to named models, and preprocessing belongs to Python builders.
+settings belong to named models, and feature steps belong to their phase YAML files.
 
 ### Custom Python and saved replay
 
-Edit the returned step lists in `src/features/pre_split.py` and
-`src/features/preprocessing.py`. Uncomment the import and step for custom examples,
-then adapt the column names. `column_step` creates columns, `fitted_step` learns
+See [Preprocessing and custom features](PREPROCESSING.md) for the six-step
+customer example, the exact YAML/Python placement and optional prediction writes.
+
+Edit the ordered lists in `config/pre_split.yml` and `config/preprocessing.yml`.
+Keep custom functions in `src/features/pre_split.py` and `preprocessing.py`; select
+them with a YAML `custom` path and `params`. Adapt the example column names. `column_step` creates columns, `fitted_step` learns
 state on training rows and `filter_step` applies fixed eligibility. Relative
 imports keep custom functions available after model reload. Do not perform I/O
-in imports or recipe builders.
+in imports or custom factories. Each phase has one owner: do not export a Python
+builder for a phase configured in YAML. Existing Python-only projects still work.
 
 Training freezes `src/features/`, excluding the root `groups/` directory, as a
 versioned 64 KiB package snapshot. Spark producers in `groups/` execute separately
-in the feature job; keep model helpers in `custom/` and do not import producers
-from model recipes. See [FEATURE_TABLES.md](FEATURE_TABLES.md) for the stage boundary.
+in the feature job. Keep custom model functions in their phase modules; do not
+import producers from model recipes. See [FEATURE_TABLES.md](FEATURE_TABLES.md) for the stage boundary.
 Declare
 bounded data files in `src/features/assets.json` as `files: [...]` (the file itself
 uses JSON), and read them with `read_project_asset` from
 `skyulf.inference.project_package`. Paths stay inside the package; symlinks are
-rejected. Code, assets and exact dependency pins share the snapshot budget.
+rejected. Code, captured recipe declarations, assets and exact dependency pins share the
+snapshot budget.
 Use `distribution==version` in `src/features/requirements.txt` and install those
 versions in training/scoring environments; loading verifies them without installing.
 
 YAML and Python edits apply to the next training load. Saved models retain resolved
-settings, fitted preprocessing and frozen source; scoring and lifecycle replay do
+settings, recipe declarations, fitted preprocessing and frozen source; scoring and lifecycle replay do
 not reread editable YAML or Python. Changing rules/assets/pins requires a new model.
 
 ```powershell
@@ -879,6 +886,10 @@ clock or filesystem state. Use the saved asset helper for lookup data.
 ## Shared model monitoring
 
 ### Pinned serving and online enrollment
+
+For REST deployment and typed SQL function/`ai_query` calls, follow
+[SERVING.md](SERVING.md). The optional helper uses one concrete registered model
+version and derives SQL input/output types from its inspected package.
 
 For optional online monitoring, create a pinned endpoint from a concrete
 registered model version with the Skyulf public serving API. For example,

@@ -11,7 +11,7 @@ from .....inference.project_code import (
     load_project_module,
     project_step_source,
 )
-from .....preprocessing.function_steps import FILTER_STEP
+from .....preprocessing.function_steps import FILTER_STEP, resolve_function
 from ...training.fitting.local_pre_split import FIXED_TYPES, projected_fixed_steps
 
 
@@ -116,6 +116,22 @@ def _register_saved_filters(steps: list[dict[str, Any]], module: Any) -> None:
     )
     if any(not _owned_by(project_step_source(step), owner.__name__) for step in custom):
         raise ValueError("Scoring filters must belong to the saved project package.")
+    _register_filter_functions(custom)
+
+
+def _register_filter_functions(steps: list[dict[str, Any]]) -> None:
+    """Import only saved filter functions before admission, without rebuilding recipes."""
+    for step in steps:
+        if step["transformer"] != FILTER_STEP:
+            continue
+        try:
+            function = resolve_function(step["params"]["function"])
+        except (KeyError, ImportError, AttributeError, TypeError) as exc:
+            raise ValueError(
+                "Saved pre-split function is absent from captured project source."
+            ) from exc
+        if not callable(function):
+            raise ValueError("Saved pre-split function must be callable.")
 
 
 def _register_filter_classes(classes: list[dict[str, Any]], module: Any) -> None:

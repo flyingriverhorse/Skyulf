@@ -15,6 +15,7 @@ from sklearn.tree import DecisionTreeRegressor
 from ..._validation import raise_invalid_choice
 from ...engines.sklearn_bridge import SklearnBridge
 from ...utils import detect_numeric_columns, resolve_columns
+from .._fitted_validation import _fields
 from .._helpers import decimal_columns_to_float
 
 logger = logging.getLogger(__name__)
@@ -165,3 +166,22 @@ def _build_iterative_estimator(name: str) -> Any:
     if key in {"kneighbors", "knn"}:
         return KNeighborsRegressor(n_neighbors=5)
     return BayesianRidge()
+
+
+def _imputation_config(node: str, params: dict, state: dict) -> dict:
+    """Bind group and modal fill strategies to their learned artifact."""
+    defaults: dict[str, Any] = {"strategy": "mean"}
+    if node == "SimpleImputer":
+        defaults["fill_value"] = None
+    resolved = {**defaults, **params}
+    fields = {"columns", "strategy", "group_by" if node == "GroupImputer" else "fill_value"}
+    _fields(resolved, fields)
+    if resolved["strategy"] == "mode" and node == "GroupImputer":
+        resolved["strategy"] = "most_frequent"
+    if resolved["strategy"] != state["strategy"]:
+        raise ValueError("Configured strategy disagrees with fitted strategy.")
+    if node == "GroupImputer" and resolved["group_by"] != state["group_by"]:
+        raise ValueError("Configured group key disagrees with fitted key.")
+    if node == "SimpleImputer" and resolved["fill_value"] is not None:
+        raise ValueError("Mode imputation does not use a configured constant.")
+    return resolved

@@ -20,8 +20,12 @@ flowchart LR
 
 ## Configure data domains
 
-Replace `config/features.yml` with a project-specific configuration. Use fully
-qualified tables in the intended catalog/schema; this file currently uses exact
+`config/features.yml` includes the complete commented example below, wired to
+the shipped `src/features/groups/company.py` and `activity.py` files. Replace
+the two active disabled lines with that uncommented example; do not append
+duplicate YAML keys. Adapt the configuration and both functions to your data.
+The [groups README](src/features/groups/README.md) explains each file and field.
+Use fully qualified tables in the intended catalog/schema; this file uses exact
 names, not deployment placeholders. Create the destination schema and grant the
 job's Run-as identity access before running. Each output table must have one
 owning producer, and must differ from every input and other output table.
@@ -38,14 +42,26 @@ groups:
     output_table: workspace.demo.company_features
     transform: src/features/groups/company.py:compute_features
     columns: [employee_count]
+    lookup: exact
+    allow_missing: false
   activity:
     source_table: workspace.demo.activity_source
     output_table: workspace.demo.activity_features
     transform: src/features/groups/activity.py:compute_features
-    columns: [monthly_amount]
+    columns: [monthly_amount, transaction_count]
     lookup: asof
     allow_missing: false
 ```
+
+Expected inputs are `company_observations(company_id, observed_at, churn)`,
+`company_source(company_id, observed_at, employee_count)` and
+`activity_source(company_id, observed_at, amount)`. `churn` is the example training
+label; use your own target, or omit labels for a prediction observation table.
+All three use the same key type and date type for `observed_at` in this example.
+Activity input can contain many transactions per key/time. Its time must identify
+the completed month's feature availability; it must not attach future totals to
+an earlier event date. The example does not create a monthly window or infer late
+arrival cutoffs. Add those rules explicitly for raw event data.
 
 The base table defines the observations and labels to preserve. Every base and
 feature record must be unique and non-null on `(company_id, observed_at)`.
@@ -71,12 +87,12 @@ All feature code lives under `src/features/`, with separate execution stages:
 ```text
 src/features/
   groups/             Spark functions that produce shared Delta feature tables
-    company.py        Your company-domain features (create when needed)
-    activity.py       Your activity-domain features (create when needed)
-  pre_split.py        Fixed training-row eligibility
-  preprocessing.py    Model recipes fitted on training rows only
+    company.py        Shipped editable company-snapshot example
+    activity.py       Shipped editable monthly-total/count example
+  pre_split.py        Custom fixed row-filter functions
+  preprocessing.py    Custom transformations fitted on training rows only
   scoring.py          Prediction eligibility and business outputs
-  custom/             Custom implementations used by those model recipes/rules
+  custom/             Scoring callbacks and advanced class examples
 ```
 
 `base_table` supplies the observation rows, keys, timestamp and optional labels;
@@ -86,7 +102,7 @@ function returns the complete group DataFrame, and the feature job writes the
 configured output table. You do not need one Python file per feature column.
 The group name and filename need not match: `transform` connects them explicitly.
 
-Create `src/features/groups/company.py`:
+The shipped `src/features/groups/company.py` selects existing features:
 
 ```python
 def compute_features(frame):
@@ -94,7 +110,7 @@ def compute_features(frame):
     return frame.select("company_id", "observed_at", "employee_count")
 ```
 
-Create `src/features/groups/activity.py`:
+The shipped `src/features/groups/activity.py` produces two features in one pass:
 
 ```python
 from pyspark.sql import functions as F
@@ -102,7 +118,8 @@ from pyspark.sql import functions as F
 def compute_features(frame):
     """Aggregate transactions at the declared observation grain."""
     return frame.groupBy("company_id", "observed_at").agg(
-        F.sum("amount").alias("monthly_amount")
+        F.sum("amount").alias("monthly_amount"),
+        F.count(F.lit(1)).alias("transaction_count"),
     )
 ```
 
@@ -117,19 +134,20 @@ Use these transformations for source joins, aggregations and fixed formulas.
 Fixed operations such as type conversions or a known unit conversion may run here.
 For historical features, use only information available at the observation time.
 Fit imputers, scalers, learned encoders and feature selectors through
-`src/features/preprocessing.py` inside training folds; do not learn their state
+`config/preprocessing.yml` inside training folds; do not learn their state
 from the entire merged table. For example, a missing-value mean learned from
 both training and holdout rows would leak holdout information into the model.
 
 A fixed formula used only by one model can instead be a preprocessing step.
 Choose one owner for each transformation: do not compute the same conversion
 again inside the model when the input table already contains it. Model recipes
-can combine built-in steps and functions from `custom/`.
+in `config/preprocessing.yml` combine built-in steps and custom factories from
+`src/features/preprocessing.py`; fixed filters live in `config/pre_split.yml`.
 
 Only the root `groups/` directory is excluded from saved model source. Its
 functions are executed and hashed by the feature job, not imported by the
-model's recipe package. Keep model helpers in `custom/`, do not import from
-`groups/` in preprocessing or scoring, and keep Spark job dependencies in
+model's recipe package. Keep custom model functions in their phase modules; do
+not import from `groups/` in preprocessing or scoring. Keep Spark dependencies in
 `deployment/requirements.txt`. Groups do not need `__init__.py`. Static smoke
 still checks their Python syntax. Existing saved model versions keep their
 original source snapshots.
@@ -158,9 +176,25 @@ An existing output must have matching columns/types and CDF enabled. All inputs
 must be Delta tables. Job evidence records source versions, transform hashes,
 output versions, row counts and whether a group was reused.
 
-Set `training_table` and `score_source_table` to the merged table in the project's
-configuration, then run the normal training/scoring jobs. Feature production is a
-separate upstream job; it does not automatically retrain or change model aliases.
+For this example, edit these fields in the existing `config/training.yml`
+(retain its model, registry, split and other settings):
+
+```yaml
+defaults:
+  training_table: workspace.demo.company_merged
+  record_key_columns: [company_id, observed_at]
+  input_columns: [employee_count, monthly_amount, transaction_count]
+  target_column: churn
+```
+
+For independent-target projects, change overriding input/target settings under
+`models.<name>` as needed. In `config/inference.yml`, set
+`score_source_table: workspace.demo.company_merged`. The target is not a model
+input; a separate unlabeled scoring base/merged table can be used when needed.
+Put any learned missing-value handling in `config/preprocessing.yml`.
+
+Run the normal training/scoring jobs after feature production. Feature production
+is a separate upstream job; it does not automatically retrain or change model aliases.
 Run this producer before the downstream jobs when fresh features are required.
 
 For an ordinary full build, keep the `selected_groups` job parameter as `*`.
@@ -180,8 +214,10 @@ serializes its own runs, but does not lock unrelated producers.
 New projects already use `config/training.yml` and `config/inference.yml`.
 There is no migration step and no generated Python model declaration file.
 `training.yml` owns training/model/tuning settings; `inference.yml` owns scoring
-settings and model-set publication. Python preprocessing and business functions
-remain editable in `src/features/`. Duplicate setting owners fail validation.
+settings and model-set publication. Ordered feature recipes live in
+`config/pre_split.yml` and `config/preprocessing.yml`; custom functions remain
+editable in `src/features/pre_split.py` and `preprocessing.py`. Duplicate setting
+owners fail validation.
 
 ```powershell
 python src/tools/smoke.py

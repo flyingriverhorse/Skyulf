@@ -573,8 +573,8 @@ import pandas as pd
 
 from skyulf.preprocessing import filter_step, fitted_step
 
-from .custom.pre_split_custom import minimum_completeness
-from .custom.preprocessing_custom import frequency_encoding
+from .pre_split import minimum_completeness
+from .preprocessing import frequency_encoding
 
 COLUMNS = ["category", "region"]
 
@@ -621,10 +621,10 @@ def _template_project(tmp_path, recipe):
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path / recipe / "features"
-    (root / "custom").mkdir(parents=True)
-    for name in ("__init__.py", "preprocessing_custom.py", "pre_split_custom.py"):
-        source = TEMPLATE_FEATURES / "custom" / name
-        (root / "custom" / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    root.mkdir(parents=True)
+    for name in ("preprocessing.py", "pre_split.py"):
+        source = TEMPLATE_FEATURES / name
+        (root / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     (root / "__init__.py").write_text(TEMPLATE_PARITY, encoding="utf-8")
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
     return load_project_workflow(config, root, preprocessing_recipe=recipe, pre_split_recipe=recipe)

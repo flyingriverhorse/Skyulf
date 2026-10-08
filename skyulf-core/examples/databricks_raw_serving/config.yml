@@ -1,0 +1,34 @@
+# Standalone demo config consumed by fit_local_workflow, not the main template loader.
+# Main Bundle: config/training.yml selects a recipe in config/preprocessing.yml.
+# See the main template's PREPROCESSING.md for this same pipeline in that layout.
+# Resource names come from Bundle variables. All demo model settings live here.
+training_rows: 512
+prediction_rows: 128
+write_batch_predictions: false
+raw_columns: [age, income, tenure, segment]
+target_column: churn
+holdout_fraction: 0.25
+random_state: 42
+pipeline:
+  preprocessing:
+    - name: segment_fill
+      transformer: SimpleImputer
+      params: {columns: [segment], strategy: most_frequent}
+    - name: income_by_segment
+      transformer: GroupImputer
+      params: {columns: [income], group_by: segment, strategy: mean}
+    - name: numeric_fill
+      transformer: SimpleImputer
+      params: {columns: [age, tenure], strategy: mean}
+    - name: customer_interaction
+      transformer: FeatureInteraction
+      params: {columns: [income, tenure], degree: 2}
+    - name: numeric_scale
+      transformer: StandardScaler
+      params: {columns: [age, income, tenure, income_x_tenure]}
+    - name: segment_encoding
+      transformer: OneHotEncoder
+      params: {columns: [segment], handle_unknown: ignore, max_categories: null}
+  modeling:
+    type: random_forest_classifier
+    params: {n_estimators: 60, max_depth: 6, n_jobs: 1, random_state: 42}

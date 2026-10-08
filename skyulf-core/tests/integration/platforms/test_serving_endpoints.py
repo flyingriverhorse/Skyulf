@@ -81,6 +81,7 @@ def resolved(spec, artifact):
 def test_config_pins_certified_model_and_inference_logging(spec, resolved, artifact, package):
     """Provisioning must log the exact model identity on a small isolated endpoint."""
     plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=package)
+    assert plan.output_schema == (("prediction", "float64"),)
     assert plan.config == {
         "name": "sm23b-test",
         "config": {
@@ -394,3 +395,72 @@ def test_float32_request_rejects_finite_json_overflow(spec, resolved, artifact, 
     with pytest.raises(ValueError, match="schema"):
         query_named_records(client, plan, [{"x": 10**1000}])
     client.serving_endpoints.get.assert_not_called()
+
+
+@pytest.mark.parametrize("field,value", [("entity_version", "8"), ("entity_name", "main.ml.other")])
+def test_sql_deployment_rejects_mutated_config_identity(
+    spec, resolved, artifact, package, field, value
+):
+    """A mutable request dictionary cannot redefine the model selected by the frozen spec."""
+    from skyulf.integrations.databricks.serving import (
+        build_serving_sql_function,
+        create_serving_sql_function,
+    )
+
+    plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=package)
+    function = build_serving_sql_function(plan, "main.api.score")
+    plan.config["config"]["served_entities"][0][field] = value
+    client = SimpleNamespace(api_client=Mock(return_value=None))
+    client.api_client.do.return_value = _ready_telemetry_response(plan)
+    spark = SimpleNamespace(sql=Mock())
+    with pytest.raises(ValueError, match="selector"):
+        create_serving_sql_function(spark, client, function)
+    spark.sql.assert_not_called()
+
+
+def test_model_set_sql_preserves_record_keys_and_component_outcomes(tmp_path, artifact, spec):
+    """A served model set must retain its keyed multi-output schema in the SQL contract."""
+    from skyulf.inference.bundle import ColumnSpec
+    from skyulf.inference.model_set import ComponentReference, save_model_set
+    from skyulf.integrations.databricks.serving import build_serving_sql_function
+    from skyulf.integrations.mlflow.models.model_set import _signature as set_signature
+
+    components = {
+        branch: (
+            ComponentReference(
+                name=f"main.ml.{branch}", version="1", digest=artifact.manifest.pipeline_sha256
+            ),
+            tmp_path / "model",
+        )
+        for branch in ("left", "right")
+    }
+    model_set = save_model_set(
+        tmp_path / "set",
+        components,
+        record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+    )
+    certificate = spark_model.partition_safety_certificate(model_set)
+    inputs, _ = spark_model._contract(model_set)
+    package = SimpleNamespace(
+        metadata={
+            spark_model.SAFETY_KEY: certificate,
+            spark_model.SOURCE_KEY: spark_model.runtime_source_digest(),
+            TRANSPORT_KEY: transport_spec(inputs),
+            "skyulf_artifact_kind": "model_set",
+            "skyulf_execution_scope": "whole_frame_local",
+            "model_set_digest": certificate["model_set_sha256"],
+        },
+        signature=set_signature(model_set, spark_certified=True),
+    )
+    resolved = ResolvedModel(
+        spec.model_name, spec.model_version, spec.model_uri, None, model_set.manifest.set_sha256
+    )
+    endpoint = build_pinned_endpoint(
+        spec, resolved=resolved, artifact=model_set, package_info=package
+    )
+    function = build_serving_sql_function(endpoint, "main.api.score_set")
+    assert function.response_type == (
+        "STRUCT<`id`: BIGINT, `left__prediction`: DOUBLE, `left__scoring_status`: STRING, "
+        "`left__exclusion_reason`: STRING, `right__prediction`: DOUBLE, "
+        "`right__scoring_status`: STRING, `right__exclusion_reason`: STRING>"
+    )

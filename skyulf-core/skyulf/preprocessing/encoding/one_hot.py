@@ -11,10 +11,12 @@ from sklearn.preprocessing import OneHotEncoder
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import _normalize
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import OneHotArtifact
+from .._fitted_validation import _columns, _fields, _scalar, fitted_columns
 from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -24,6 +26,14 @@ logger = logging.getLogger(__name__)
 
 _MISSING_TOKEN = "__mlops_missing__"  # nosec B105 - sentinel value, not a credential
 _ESCAPE_PREFIX = "__mlops_literal__:"
+_DEFAULT_OPTIONS = {
+    "drop_first": False,
+    "max_categories": 20,
+    "handle_unknown": "ignore",
+    "prefix_separator": "_",
+    "drop_original": True,
+    "include_missing": False,
+}
 
 
 def _uses_missing_encoding(params: dict[str, Any]) -> bool:
@@ -182,6 +192,16 @@ class OneHotEncoderApplier(BaseApplier):
     unversioned artifacts retain their original missing-value transformation.
     """
 
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return _onehot_state(raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        return _onehot_config(fitted_columns(raw, state), state)
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch to the engine-specific transform, forwarding ``(X, y)`` only when present."""
@@ -199,15 +219,14 @@ class OneHotEncoderApplier(BaseApplier):
 
 def _resolve_fit_options(config: dict[str, Any]) -> dict[str, Any]:
     """Pull the per-call options out of ``config`` once, with defaults."""
+    options = {**_DEFAULT_OPTIONS, **config}
     return {
-        "drop": "first" if config.get("drop_first", False) else None,
-        "max_categories": config.get("max_categories", 20),
-        "handle_unknown": (
-            "ignore" if config.get("handle_unknown", "ignore") == "ignore" else "error"
-        ),
-        "prefix_separator": config.get("prefix_separator", "_"),
-        "drop_original": config.get("drop_original", True),
-        "include_missing": config.get("include_missing", False),
+        "drop": "first" if options["drop_first"] else None,
+        "max_categories": options["max_categories"],
+        "handle_unknown": "ignore" if options["handle_unknown"] == "ignore" else "error",
+        "prefix_separator": options["prefix_separator"],
+        "drop_original": options["drop_original"],
+        "include_missing": options["include_missing"],
     }
 
 
@@ -348,3 +367,130 @@ class OneHotEncoderCalculator(BaseCalculator):
 
 
 __all__ = ["OneHotEncoderApplier", "OneHotEncoderCalculator"]
+
+
+def _check_encoder(encoder: Any, columns: list[str]) -> None:
+    """Admit the exact dense fitted sklearn encoder without arbitrary callables."""
+    if type(encoder) is not OneHotEncoder:
+        raise ValueError("Expected exact OneHotEncoder.")
+    expected = {
+        "categories",
+        "sparse_output",
+        "dtype",
+        "handle_unknown",
+        "drop",
+        "min_frequency",
+        "max_categories",
+        "feature_name_combiner",
+        "_infrequent_enabled",
+        "n_features_in_",
+        "categories_",
+        "_drop_idx_after_grouping",
+        "drop_idx_",
+        "_n_features_outs",
+    }
+    _fields(vars(encoder), expected)
+    _encoder_options(encoder)
+    if encoder.drop not in (None, "first") or encoder.n_features_in_ != len(columns):
+        raise ValueError("Encoder feature count or dropped-category policy disagrees.")
+    _encoder_categories(encoder, columns)
+
+
+def _encoder_options(encoder: Any) -> None:
+    """Restrict serving to deterministic dense encoding without infrequent categories."""
+    if encoder.dtype is not np.int8 or encoder.feature_name_combiner != "concat":
+        raise ValueError("Unsupported encoder dtype or feature-name callback.")
+    if encoder.categories != "auto" or encoder.sparse_output is not False:
+        raise ValueError("Encoder requires automatic categories and dense output.")
+    if encoder.max_categories is not None or encoder.min_frequency is not None:
+        raise ValueError("Infrequent-category grouping requires separate batch admission.")
+    if encoder._infrequent_enabled is not False or encoder.handle_unknown not in (
+        "ignore",
+        "error",
+    ):
+        raise ValueError("Unsupported encoder inference policy.")
+
+
+def _encoder_categories(encoder: Any, columns: list[str]) -> None:
+    """Validate category widths and dropped indices before calling known name generation."""
+    if type(encoder.categories_) is not list or len(encoder.categories_) != len(columns):
+        raise ValueError("Encoder categories must align with columns.")
+    widths = []
+    for categories in encoder.categories_:
+        if type(categories) is not np.ndarray or categories.ndim != 1 or not len(categories):
+            raise ValueError("Encoder categories must be nonempty vectors.")
+        values = _normalize(categories.tolist())
+        for value in values:
+            _scalar(value)
+        if len(set(values)) != len(values):
+            raise ValueError("Encoder categories must be unique.")
+        widths.append(len(values) - int(encoder.drop == "first"))
+    if encoder._n_features_outs != widths:
+        raise ValueError("Encoder output widths disagree with fitted categories.")
+    _encoder_drop_indices(encoder, len(columns))
+
+
+def _encoder_drop_indices(encoder: Any, count: int) -> None:
+    """Bind both sklearn dropped-index fields to the supported drop policy."""
+    for indices in (encoder.drop_idx_, encoder._drop_idx_after_grouping):
+        if encoder.drop is None:
+            if indices is not None:
+                raise ValueError("Unexpected dropped category indices.")
+        elif type(indices) is not np.ndarray or indices.tolist() != [0] * count:
+            raise ValueError("Dropped indices must select the first fitted category.")
+
+
+def _onehot_state(raw: dict) -> dict:
+    """Keep the estimator in the certificate while validating every execution option."""
+    _fields(
+        raw,
+        {
+            "type",
+            "columns",
+            "encoder_object",
+            "feature_names",
+            "prefix_separator",
+            "drop_original",
+            "include_missing",
+        },
+    )
+    scalar = _normalize({key: value for key, value in raw.items() if key != "encoder_object"})
+    columns = _columns(scalar["columns"])
+    _columns(scalar["feature_names"])
+    if scalar["type"] != "onehot" or scalar["include_missing"] is not False:
+        raise ValueError("Only observed-category one-hot artifacts are admitted.")
+    if type(scalar["drop_original"]) is not bool or type(scalar["prefix_separator"]) is not str:
+        raise ValueError("Invalid encoder output options.")
+    encoder = raw["encoder_object"]
+    _check_encoder(encoder, columns)
+    if encoder.get_feature_names_out(columns).tolist() != scalar["feature_names"]:
+        raise ValueError("Encoder feature names disagree with fitted categories.")
+    return {**scalar, "encoder_object": encoder}
+
+
+def _onehot_config(params: dict, state: dict) -> dict:
+    """Check recipe options against the encoder that will actually transform rows."""
+    resolved = {**_DEFAULT_OPTIONS, **params}
+    _fields(
+        resolved,
+        {
+            "columns",
+            "drop_first",
+            "max_categories",
+            "handle_unknown",
+            "prefix_separator",
+            "drop_original",
+            "include_missing",
+        },
+    )
+    encoder = state["encoder_object"]
+    expected = {
+        "drop_first": encoder.drop == "first",
+        "max_categories": encoder.max_categories,
+        "handle_unknown": encoder.handle_unknown,
+        **{key: state[key] for key in ("prefix_separator", "drop_original", "include_missing")},
+    }
+    for key, value in expected.items():
+        if type(resolved[key]) is not type(value) or resolved[key] != value:
+            raise ValueError(f"Configured encoder {key} disagrees with fitted state.")
+    return resolved

@@ -1,7 +1,55 @@
-# Optional Spark data domains, shared by any number of models.
-# Empty groups keep the existing ready-table workflow and create no feature job.
-# Spark functions belong in src/features/groups/; model recipes stay beside it.
-# See FEATURE_TABLES.md for a complete example, then run:
-#   python src/tools/refresh_feature_graph.py
+# Optional Spark feature tables, shared by any number of models.
+# This active configuration uses an existing training table: no extra feature job.
 version: 1
 groups: {}
+
+# To enable the example below:
+# 1. Replace the two active lines above with the uncommented example block.
+#    Do not append a second version/groups mapping to the same YAML document.
+# 2. Change workspace.demo to your real catalog/schema and check source columns.
+#    Tables use exact names here: {catalog} placeholders are NOT expanded.
+# 3. Edit the shipped company.py/activity.py functions in src/features/groups/.
+#    Each receives a Spark DataFrame and returns keys + time + declared features.
+# 4. Run python src/tools/refresh_feature_graph.py, validate/deploy the Bundle,
+#    then run the features job. See ../FEATURE_TABLES.md for exact commands.
+# 5. Point training.yml training_table and inference.yml score_source_table at
+#    the merged output; select employee_count/monthly_amount/transaction_count
+#    as model inputs. Feature production does not start training automatically.
+#
+# Inputs (existing Delta tables; all observed_at columns have the same date type):
+# company_observations: company_id, observed_at, churn (optional training label)
+# company_source:       company_id, observed_at, employee_count (one per key/time)
+# activity_source:      company_id, observed_at, amount (many transactions allowed)
+# activity observed_at is the completed month's feature-availability date;
+# raw event timestamps need an explicit cutoff/window before using this example.
+# Create the destination schema and grant access to the job's Run-as identity.
+# The job creates the three output Delta tables, then upserts by company/time.
+#
+# base_table keeps observation rows/labels; it has no Python transform.
+# keys + timestamp must uniquely identify each base and produced feature row.
+# columns lists features only: exclude keys, timestamp and labels.
+# transform is a file:function reference; group and file names need not match.
+# exact matches key AND time; asof chooses the latest feature at/before that time.
+# allow_missing=false rejects absent matches; null values in matched rows survive.
+#
+# Copyable example (inactive until you replace the active configuration above):
+# version: 1
+# base_table: workspace.demo.company_observations
+# output_table: workspace.demo.company_merged
+# keys: [company_id]
+# timestamp: observed_at
+# groups:
+#   company:
+#     source_table: workspace.demo.company_source
+#     output_table: workspace.demo.company_features
+#     transform: src/features/groups/company.py:compute_features
+#     columns: [employee_count]
+#     lookup: exact
+#     allow_missing: false
+#   activity:
+#     source_table: workspace.demo.activity_source
+#     output_table: workspace.demo.activity_features
+#     transform: src/features/groups/activity.py:compute_features
+#     columns: [monthly_amount, transaction_count]
+#     lookup: asof
+#     allow_missing: false

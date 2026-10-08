@@ -229,6 +229,8 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "reserved_weight_columns",
         "weights_python_source",
         "weights_python_sha256",
+        "feature_lookup_json",
+        "feature_binding_json",
     ):
         old.pop(key)
     for key in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -243,6 +245,8 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "reserved_weight_columns",
         "weights_python_source",
         "weights_python_sha256",
+        "feature_lookup_json",
+        "feature_binding_json",
     ):
         saved.pop(key)
     saved["event_time_parsing"] = spec.event_time_parsing
@@ -423,7 +427,8 @@ def test_offline_preview_names_filter_phase_and_project_recipe(workflow_config):
     preview = preview_workflow_config(config, action="train")
     assert "known -> DropMissingRows" in preview
     assert "training filters -> final split" in preview
-    assert "build_pre_split_steps()" in preview
+    assert "config/pre_split.yml" in preview
+    assert "config/preprocessing.yml" in preview
     assert "fold-local preprocessing/model" in preview
 
 

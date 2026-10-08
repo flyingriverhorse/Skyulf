@@ -3,6 +3,10 @@
 {{- end -}}
 # Shared training settings; model entries override whole values from defaults.
 # Custom transformations stay in src/features. Scoring uses the saved fitted model.
+# preprocessing_recipe selects a list in config/preprocessing.yml.
+# pre_split_recipe selects a list in config/pre_split.yml.
+# Keep custom functions in src/features/preprocessing.py and pre_split.py.
+# See PREPROCESSING.md; do not add pipeline.preprocessing here.
 version: 1
 defaults:
   config_version: 1

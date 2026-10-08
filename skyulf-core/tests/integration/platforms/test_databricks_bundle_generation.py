@@ -499,28 +499,18 @@ def test_generated_source_layout_connects_both_custom_recipes(tmp_path):
     config = _read_validated_config(project)
     baseline = load_project_workflow(config, features)
     assert baseline["pre_split_steps"] == baseline["pipeline"]["preprocessing"] == []
-    for filename, factory, shown, configured in (
+    for phase, factory, params in (
         (
-            "pre_split.py",
+            "pre_split",
             "minimum_completeness",
-            'minimum_completeness(columns=["field_a", "field_b", "field_c"], min_present=2)',
-            'minimum_completeness(columns=["quality_a", "quality_b"], min_present=1)',
+            {"columns": ["quality_a", "quality_b"], "min_present": 1},
         ),
-        (
-            "preprocessing.py",
-            "frequency_encoding",
-            'frequency_encoding(columns=["category"])',
-            'frequency_encoding(columns=["category"])',
-        ),
+        ("preprocessing", "frequency_encoding", {"columns": ["category"]}),
     ):
-        path = features / filename
-        text = path.read_text(encoding="utf-8")
-        module = filename.removesuffix(".py") + "_custom"
-        text = text.replace(
-            f"# from .custom.{module} import {factory}", f"from .custom.{module} import {factory}"
-        )
-        assert f"# {shown}," in text
-        path.write_text(text.replace(f"# {shown},", f"{configured},"), encoding="utf-8")
+        path = project / "config" / f"{phase}.yml"
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        document["recipes"]["default"] = [{"custom": f"{phase}.{factory}", "params": params}]
+        path.write_text(yaml.safe_dump(document), encoding="utf-8")
     # Default scoring reuses pre-split checks, so their inputs must be declared too.
     config["input_columns"] = ["category", "amount", "quality_a", "quality_b"]
     training_path = project / "config/training.yml"
@@ -881,12 +871,13 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
             "params": {"columns": ["feature_value"]},
         },
     ]
-    source_path = project / "src/features/preprocessing.py"
-    with source_path.open("a", encoding="utf-8") as stream:
-        stream.write("\n\ndef build_preprocessing():\n    return " + repr(steps) + "\n")
+    recipe_path = project / "config/preprocessing.yml"
+    document = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    document["recipes"]["default"] = steps
+    recipe_path.write_text(yaml.safe_dump(document), encoding="utf-8")
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    config = load_project_workflow(config, source_path.parent)
+    config = load_project_workflow(config, project / "src/features")
     assert config["cv_enabled"] is True and config["cv_folds"] == 3
     assert config["training_sample_rows"] == 500 and config["training_sample_seed"] == 19
     preview = subprocess.run(

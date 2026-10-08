@@ -144,7 +144,7 @@ def test_custom_recipe_registers_only_selected_candidate_and_replays(tmp_path):
     root = _project(tmp_path)
     template = (
         Path(__file__).resolve().parents[3]
-        / "templates/databricks/template/{{.project_name}}/src/features/custom/preprocessing_custom.py"
+        / "templates/databricks/template/{{.project_name}}/src/features/preprocessing.py"
     )
     shutil.copyfile(template, root / "custom.py")
     root.joinpath("__init__.py").write_text(
@@ -253,13 +253,13 @@ def _shared_filter_project(tmp_path, reuse_scoring=True):
     root = _project(tmp_path)
     template = (
         Path(__file__).resolve().parents[3]
-        / "templates/databricks/template/{{.project_name}}/src/features/custom"
+        / "templates/databricks/template/{{.project_name}}/src/features"
     )
-    for filename in ("preprocessing_custom.py", "pre_split_custom.py"):
+    for filename in ("preprocessing.py", "pre_split.py"):
         shutil.copyfile(template / filename, root / filename)
     root.joinpath("__init__.py").write_text(
-        "from .preprocessing_custom import frequency_encoding\n"
-        "from .pre_split_custom import minimum_completeness\n"
+        "from .preprocessing import frequency_encoding\n"
+        "from .pre_split import minimum_completeness\n"
         "def build_preprocessing(recipe='default'):\n"
         "    steps = [frequency_encoding(['category'])]\n"
         "    if recipe == 'scaled':\n"

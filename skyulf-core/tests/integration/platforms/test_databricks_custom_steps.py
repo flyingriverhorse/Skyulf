@@ -10,18 +10,38 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+import yaml
 
 from skyulf.inference.project_code import load_project_module
 
-CUSTOM = (
+FEATURES = (
     Path(__file__).resolve().parents[3]
-    / "templates/databricks/template/{{.project_name}}/src/features/custom"
+    / "templates/databricks/template/{{.project_name}}/src/features"
 )
 
 
 def _custom_module(filename):
     """Load exactly the source shipped to users with isolated custom registrations."""
-    return load_project_module((CUSTOM / filename).read_text(encoding="utf-8"))
+    return load_project_module((FEATURES / filename).read_text(encoding="utf-8"))
+
+
+def _copy_features(tmp_path):
+    """Keep the same feature/config placement as a generated Bundle project."""
+    root = tmp_path / "src/features"
+    shutil.copytree(FEATURES, root, ignore=shutil.ignore_patterns("__pycache__"))
+    config = tmp_path / "config"
+    config.mkdir()
+    for phase in ("preprocessing", "pre_split"):
+        shutil.copyfile(FEATURES.parents[1] / "config" / f"{phase}.yml", config / f"{phase}.yml")
+    return root
+
+
+def _write_recipe(root, phase, steps):
+    """Edit only the default YAML list, preserving the inactive named examples."""
+    path = root.parents[1] / "config" / f"{phase}.yml"
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["recipes"]["default"] = steps
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
 
 
 def _native(frame, engine):
@@ -40,7 +60,7 @@ def _fit_apply(step, train, score):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_completeness_preserves_rows_with_enough_observed_fields(engine):
     """The general filter counts only selected fields and preserves survivor values/order."""
-    module = _custom_module("pre_split_custom.py")
+    module = _custom_module("pre_split.py")
     rows = pd.DataFrame(
         {
             "a": [1.0, np.nan, 2.0, np.nan],
@@ -74,7 +94,7 @@ def test_completeness_preserves_rows_with_enough_observed_fields(engine):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_template_range_and_allowed_filters_keep_expected_rows(engine):
     """The beginner filter examples must keep exactly the documented rows."""
-    module = _custom_module("pre_split_custom.py")
+    module = _custom_module("pre_split.py")
     rows = pd.DataFrame({"age": [5.0, -1.0, None, 130.0], "country": ["NL", "FR", "DE", None]})
     _, kept = _fit_apply(
         module.value_range("age", 0, 120), _native(rows, engine), _native(rows, engine)
@@ -105,7 +125,7 @@ _FREQ_SCORE = pd.DataFrame(
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_frequency_encoding_reuses_training_mapping_and_handles_unseen(engine):
     """Score batch frequencies must never replace the saved training distribution."""
-    module = _custom_module("preprocessing_custom.py")
+    module = _custom_module("preprocessing.py")
     step = module.frequency_encoding(["category"])
     state, result = _fit_apply(step, _native(_FREQ_TRAIN, engine), _native(_FREQ_SCORE, engine))
     assert state["state"] == {"category": {"A": 0.5, "B": 0.25}}
@@ -125,8 +145,8 @@ def test_rare_categories_function_and_class_versions_match(engine, categorical):
     train, score = _RARE_TRAIN.copy(), _RARE_SCORE.copy()
     if categorical:  # category dtype must still accept the new "Other" value
         train["city"], score["city"] = train.city.astype("category"), score.city.astype("category")
-    function_step = _custom_module("preprocessing_custom.py").rare_categories("city", 0.2)
-    class_step = _custom_module("advanced_class_step.py").class_rare_categories("city", 0.2)
+    function_step = _custom_module("preprocessing.py").rare_categories("city", 0.2)
+    class_step = _custom_module("custom/advanced_class_step.py").class_rare_categories("city", 0.2)
     for step in (function_step, class_step):
         state, result = _fit_apply(step, _native(train, engine), _native(score, engine))
         learned = state.get("state", state)  # fitted_step nests what learn() returned
@@ -142,8 +162,8 @@ def test_rare_categories_function_and_class_versions_match(engine, categorical):
 def test_rare_categories_rejects_invalid_share():
     """A share outside (0, 1) is a typo (5 instead of 0.05) and must fail early."""
     for filename, factory in [
-        ("preprocessing_custom.py", "rare_categories"),
-        ("advanced_class_step.py", "class_rare_categories"),
+        ("preprocessing.py", "rare_categories"),
+        ("custom/advanced_class_step.py", "class_rare_categories"),
     ]:
         with pytest.raises(ValueError, match="min_share"):
             getattr(_custom_module(filename), factory)("city", min_share=5)
@@ -152,7 +172,7 @@ def test_rare_categories_rejects_invalid_share():
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_template_log_feature_example(engine):
     """log_feature adds a stateless column and keeps the original one."""
-    module = _custom_module("preprocessing_custom.py")
+    module = _custom_module("preprocessing.py")
     frame = _native(pd.DataFrame({"value": [0.0, 1.0, -3.0]}), engine)
     _, logged = _fit_apply(module.log_feature("value"), frame, frame)
     logged = logged.to_pandas() if engine == "polars" else logged
@@ -178,20 +198,15 @@ def _enable_asset_examples(root):
     manifest["files"] = ["assets/city_region.json", "assets/countries.json"]
     (root / "assets.json").write_text(json.dumps(manifest), encoding="utf-8")
     for name, factory in (("preprocessing", "city_region"), ("pre_split", "allowed_countries")):
-        _uncomment_asset_example(root / "custom" / f"{name}_custom.py")
-        path = root / f"{name}.py"
-        source = path.read_text(encoding="utf-8")
-        line = f"from .custom.{name}_custom import {factory}"
-        source = source.replace(f"# {line}", line).replace(f"# {factory}(),", f"{factory}(),")
-        path.write_text(source, encoding="utf-8")
+        _uncomment_asset_example(root / f"{name}.py")
+        _write_recipe(root, name, [{"custom": f"{name}.{factory}"}])
 
 
 def test_commented_asset_examples_work_when_enabled(tmp_path):
     """The inactive asset examples must run once a user follows their three steps."""
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    root = tmp_path / "features"
-    shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
+    root = _copy_features(tmp_path)
     _enable_asset_examples(root)
     _configure(root, pre_split=False, preprocessing=False)
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
@@ -211,29 +226,28 @@ def test_commented_asset_examples_work_when_enabled(tmp_path):
 def test_completeness_rejects_ambiguous_rules(columns, minimum):
     """Malformed selections must fail before a Spark read or row filter is started."""
     with pytest.raises(ValueError):
-        _custom_module("pre_split_custom.py").minimum_completeness(columns, minimum)
+        _custom_module("pre_split.py").minimum_completeness(columns, minimum)
 
 
 @pytest.mark.parametrize("columns", [[], ["a", "a"], [""]])
 def test_frequency_rejects_ambiguous_columns(columns):
     """A custom encoder must not silently infer or duplicate feature columns."""
     with pytest.raises(ValueError):
-        _custom_module("preprocessing_custom.py").frequency_encoding(columns)
+        _custom_module("preprocessing.py").frequency_encoding(columns)
 
 
 def _enabled_project(tmp_path):
     """Enable the two separate builders exactly as a generated-project user would."""
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    root = tmp_path / "features"
-    shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
+    root = _copy_features(tmp_path)
     _configure(root, pre_split=True, preprocessing=True)
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
     return root, load_project_workflow(config, root)
 
 
 def _configure(root, *, pre_split, preprocessing):
-    """Configure the actual shipped builders by activating their inline custom step entries."""
+    """Select the shipped custom factories through the generated YAML recipe files."""
     # These training-only quality fields are deliberately absent from prediction input.
     # Scoring-policy reuse and its required inputs have separate integration coverage.
     (root / "scoring.py").write_text(
@@ -245,42 +259,36 @@ def _configure(root, *, pre_split, preprocessing):
         "    return []\n",
         encoding="utf-8",
     )
-    recipes = [
-        (
-            "pre_split.py",
-            pre_split,
-            "minimum_completeness",
-            'minimum_completeness(columns=["field_a", "field_b", "field_c"], min_present=2)',
-            'minimum_completeness(columns=["quality_a", "quality_b"], min_present=1)',
-        ),
-        (
-            "preprocessing.py",
-            preprocessing,
-            "frequency_encoding",
-            'frequency_encoding(columns=["category"])',
-            'frequency_encoding(columns=["category"])',
-        ),
-    ]
-    for filename, selected, factory, shown, configured in recipes:
-        if selected:
-            path = root / filename
-            source = path.read_text(encoding="utf-8")
-            module = filename.removesuffix(".py") + "_custom"
-            source = source.replace(
-                f"# from .custom.{module} import {factory}",
-                f"from .custom.{module} import {factory}",
-            )
-            assert f"# {shown}," in source
-            path.write_text(source.replace(f"# {shown},", f"{configured},"), encoding="utf-8")
+    if pre_split:
+        _write_recipe(
+            root,
+            "pre_split",
+            [
+                {
+                    "custom": "pre_split.minimum_completeness",
+                    "params": {"columns": ["quality_a", "quality_b"], "min_present": 1},
+                }
+            ],
+        )
+    if preprocessing:
+        _write_recipe(
+            root,
+            "preprocessing",
+            [
+                {
+                    "custom": "preprocessing.frequency_encoding",
+                    "params": {"columns": ["category"]},
+                }
+            ],
+        )
 
 
 @pytest.mark.parametrize("pre_split, preprocessing", [(False, False), (True, False), (False, True)])
-def test_custom_builders_use_inline_steps(tmp_path, pre_split, preprocessing):
-    """The real parent recipes configure custom steps independently without a demo toggle."""
+def test_custom_builders_use_yaml_steps(tmp_path, pre_split, preprocessing):
+    """The real YAML recipes configure each custom phase independently."""
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    root = tmp_path / "features"
-    shutil.copytree(CUSTOM.parent, root, ignore=shutil.ignore_patterns("__pycache__"))
+    root = _copy_features(tmp_path)
     _configure(root, pre_split=pre_split, preprocessing=preprocessing)
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
     loaded = load_project_workflow(config, root)

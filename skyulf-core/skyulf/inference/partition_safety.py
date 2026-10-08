@@ -12,8 +12,7 @@ from typing import Any
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from ..core.capabilities import UnsupportedExecutionError, require_capability
-from ..core.portable_pipeline import _config
-from ..core.portable_state import _pack, validate_state
+from ..core.portable_state import _pack
 from ..modeling._evaluation.thresholds import _class_threshold_array
 from ..modeling._tuning.engine import TuningApplier
 from ..modeling._tuning.schemas import TuningResult
@@ -225,25 +224,6 @@ def _check_step_identity(record: dict, config: dict) -> None:
         raise ValueError("Carry history cannot execute on independent workers.")
 
 
-def _resolved_config(node: str, raw: dict, state: dict) -> dict:
-    """Normalize fitted defaults while rejecting changed explicit column selection."""
-    columns = raw.get("columns")
-    if (
-        isinstance(columns, list)
-        and not raw.get("_auto_columns")
-        and columns != state.get("columns", [])
-    ):
-        raise ValueError("Configured columns disagree with fitted columns.")
-    resolved = _config(node, raw, state)
-    if node == "SimpleImputer" and resolved["strategy"] == "constant":
-        fill = resolved["fill_value"]
-        if fill is not None and any(
-            value != fill for value in state.get("fill_values", {}).values()
-        ):
-            raise ValueError("Configured constant disagrees with fitted fill values.")
-    return resolved
-
-
 def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
     """Validate one known apply body without invoking its fit, apply or callbacks."""
     node, name = record["type"], record["name"]
@@ -258,17 +238,11 @@ def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
         )
     if NodeRegistry.get_calculator(node) is not _CALCULATORS[node]:
         raise ValueError("Unreviewed calculator registration.")
-    batch_only = node in batch_nodes.APPLIERS or (
-        node == "SimpleImputer" and record["artifact"].get("strategy") == "most_frequent"
-    )
-    state = (
-        batch_nodes.batch_state(node, record["artifact"])
-        if batch_only
-        else validate_state(node, record["artifact"])
-    )
-    resolve = batch_nodes.batch_config if batch_only else _resolved_config
-    params = resolve(node, record.get("params", {}), state)
-    recipe = resolve(node, config.get("params", {}), state)
+    applier = _APPLIERS[node]
+    state = applier.validate_fitted_state(record["artifact"])
+    resolve = applier.resolve_fitted_config
+    params = resolve(record.get("params", {}), state)
+    recipe = resolve(config.get("params", {}), state)
     if _pack(params) != _pack(recipe):
         raise ValueError("Recipe configuration disagrees with fitted parameters.")
     require_capability(

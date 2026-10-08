@@ -8,9 +8,11 @@ from sklearn.impute import SimpleImputer
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import validate_state
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import SimpleImputerArtifact
+from .._fitted_validation import _scalar, fitted_columns, portable_config
 from .._helpers import (
     auto_detect_numeric_columns,
     decimal_columns_to_float,
@@ -21,6 +23,7 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import (
     _compute_polars_fill_values,
+    _imputation_config,
     _polars_missing_counts,
     _resolve_simple_columns,
 )
@@ -55,6 +58,22 @@ class SimpleImputerApplier(BaseApplier):
     Spark supports only ``mean`` and ``constant`` artifacts and applies them
     with native expressions. All-missing means leave existing columns untouched.
     """
+
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return (
+            _mode_state(raw)
+            if raw.get("strategy") == "most_frequent"
+            else validate_state("SimpleImputer", raw)
+        )
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        if state.get("strategy") == "most_frequent":
+            return _imputation_config("SimpleImputer", fitted_columns(raw, state), state)
+        return portable_config("SimpleImputer", raw, state)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -321,3 +340,13 @@ class SimpleImputerCalculator(BaseCalculator):
             "missing_counts": missing_counts,
             "total_missing": total_missing,
         }
+
+
+def _mode_state(raw: dict) -> dict:
+    """Reuse scalar/count validation without expanding the portable strategy vocabulary."""
+    if raw.get("strategy") != "most_frequent":
+        raise ValueError("Expected a most-frequent imputer.")
+    state = validate_state("SimpleImputer", {**raw, "strategy": "mean"})
+    for value in state["fill_values"].values():
+        _scalar(value)
+    return {**state, "strategy": "most_frequent"}

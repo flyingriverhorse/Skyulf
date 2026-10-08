@@ -217,7 +217,10 @@ def _training_pipeline(document: dict[str, Any], entries: list[dict[str, Any]]) 
     if pipeline.get("modeling"):
         raise ValueError("Model settings defined in both pipeline and training.yml models.")
     if pipeline.get("preprocessing"):
-        raise ValueError("Configure preprocessing in Python; leave the YAML pipeline list empty.")
+        raise ValueError(
+            "Configure preprocessing in config/preprocessing.yml (or a Python recipe); "
+            "leave the training.yml pipeline list empty."
+        )
     return pipeline
 
 
