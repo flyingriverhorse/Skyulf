@@ -202,8 +202,8 @@ test union contains 603 distinct cases. It covers built-in saved-state reuse,
 custom function/class replay, no refit, differing batch statistics, row/order
 changes, pandas metadata aliasing, mutable numpy cells, validator mutation,
 engine-context rejection and preservation of strict worker checks. Independent
-review findings were reproduced, repaired and checked. This evidence does not
-close the 50 open rows or claim a native Databricks run for the new diagnostic.
+review findings were reproduced, repaired and checked. These local checks do not
+close the 50 open rows; native runtime evidence is recorded below separately.
 
 Task192 reran the explicit affected union: **603 passed**, with 42 existing
 warnings from temporal CV, feature names, deprecated aliases and small fixtures.
@@ -212,3 +212,30 @@ also executed successfully. The report's 50 rows were checked against the live
 registry: all 54 remaining names match exactly, including aliases.
 The commit also includes the Task191 implementation/tests; future coverage
 changes should update this tracked report with fresh evidence.
+
+### Native Databricks verification
+
+On 2026-10-08, Task193 tested runtime commit `a50ddd8b` on Databricks serverless
+STANDARD with the `skyulf` profile. Run
+[55789884205809](https://dbc-45604623-c18b.cloud.databricks.com/jobs/801276331272715/runs/55789884205809)
+finished **TERMINATED / SUCCESS**: **213 passed**, zero failures or skips, in
+21.03 seconds of pytest execution. Two expected warnings came from R² metrics
+on one-row test fixtures; environment startup time is separate.
+
+The five explicit files were `test_preprocessing_probe.py`,
+`test_preprocessing_inference_context.py`, `test_preprocessing_probe_project.py`,
+`test_preprocessing_fitted_validation.py` and `test_partition_safety.py`.
+They verify saved-state reuse with fit disabled, captured custom replay in fresh
+processes, context requirements, mutation/batch-dependence detection and the
+unchanged strict partition admission checks. The installed wheel's 552 Python
+files matched the tested repository source hashes.
+
+The complete main-template guide example also executed successfully: saved
+`GroupImputer` and `OneHotEncoder` reported `row / passed` for full, repeated,
+single-row, chunked, reversed and empty inputs. Runtime: Python 3.12.3, pandas
+2.2.3, Polars 1.44.2, NumPy 2.1.3 and scikit-learn 1.8.0.
+
+This was a native notebook test of the Python fit/apply and diagnostic paths;
+it did not execute a Spark UDF or deploy a REST endpoint. No Unity Catalog tables,
+registered models or endpoints were created. It adds runtime evidence for the
+existing implementation and leaves all 50 backlog rows open.
