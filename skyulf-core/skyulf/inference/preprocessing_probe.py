@@ -67,6 +67,10 @@ def _prepare(
     before = _state_digest(record)
     if active:
         state, params, validated = resolve_fitted_step(record, config, require_portable=False)
+        local_validation = vars(type(record["applier"])).get("validate_inference_state")
+        if local_validation is not None:
+            type(record["applier"]).validate_inference_state(state)
+            validated = True
     else:
         if config["name"] != record["name"] or config["transformer"] != record["type"]:
             raise ValueError("Configured step disagrees with fitted name/type.")

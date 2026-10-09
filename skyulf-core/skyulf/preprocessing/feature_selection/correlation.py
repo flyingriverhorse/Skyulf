@@ -7,11 +7,13 @@ from typing import Any, Literal, cast
 import numpy as np
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import CorrelationThresholdArtifact
+from .._fitted_validation import _columns, local_boolean, local_state_fields
 from .._helpers import to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -146,6 +148,28 @@ def _polars_correlation_columns_to_drop(
 
 class CorrelationThresholdApplier(BaseApplier):
     """Remove the columns a fitted correlation threshold marked redundant."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved drop decisions without evaluating fit-only metadata.
+
+        Fewer than two fitted candidates produce an empty no-op artifact.
+        Threshold and method are unused at apply, including callable methods.
+        """
+        fields = {"type", "columns_to_drop", "threshold", "method", "drop_columns"}
+        if not local_state_fields(raw, "correlation_threshold", fields, allow_empty=True):
+            return raw
+        _columns(raw["columns_to_drop"])
+        local_boolean(raw["drop_columns"], "drop_columns")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe existing local saved apply without admitting partition workers."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        CorrelationThresholdApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

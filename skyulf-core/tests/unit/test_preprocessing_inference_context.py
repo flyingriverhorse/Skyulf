@@ -1,5 +1,6 @@
 """Fitted inference metadata describes context without running transformations."""
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -51,7 +52,7 @@ def _frame(engine):
     return pl.from_pandas(frame) if engine == "polars" else frame
 
 
-@pytest.mark.parametrize("node", ["RobustScaler", "missing_context_node"])
+@pytest.mark.parametrize("node", ["PowerTransformer", "missing_context_node"])
 def test_undeclared_nodes_stay_unknown(node):
     """Unreviewed behavior must not become row-local merely because it is registered."""
     assert _capability(node, {}, {}, engine="pandas") is None
@@ -334,3 +335,69 @@ def test_unregistered_captured_applier_without_hook_stays_unknown():
         _capability(f"{module}.Calculator.Applier", {}, {}, engine="pandas", applier=applier())
         is None
     )
+
+
+@pytest.mark.parametrize("raw", [None, [], {"type": "other"}, {"type": "test", "extra": 1}])
+def test_local_state_fields_rejects_corrupt_artifacts(raw):
+    """Malformed local state cannot silently gain a context declaration."""
+    from skyulf.preprocessing._fitted_validation import local_state_fields
+
+    with pytest.raises(ValueError, match="state"):
+        local_state_fields(raw, "test", {"type"}, allow_empty=True)
+
+
+def test_local_state_fields_distinguishes_noop_from_missing_state():
+    """Only owners whose fit emits an empty no-op may accept that saved artifact."""
+    from skyulf.preprocessing._fitted_validation import local_state_fields
+
+    assert local_state_fields({"type": "test"}, "test", {"type"}) is True
+    assert local_state_fields({}, "test", {"type"}, allow_empty=True) is False
+    with pytest.raises(ValueError, match="state"):
+        local_state_fields({}, "test", {"type"})
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_missing_indicator_context_rejects_saved_output_collision(engine):
+    """A corrupted selection must not promise valid apply when its own flag overwrites input."""
+    frame = pd.DataFrame({"x": [1.0, None], "x_missing": [2.0, None]})
+    if engine == "polars":
+        frame = pl.from_pandas(frame)
+    config = {"columns": ["x_missing"]}
+    state = NodeRegistry.get_calculator("MissingIndicator")().fit(frame, config)
+    assert _capability("MissingIndicator", config, state, engine=engine) is not None
+    state["columns"] = ["x", "x_missing"]
+    with pytest.raises(ValueError, match="collid|existing"):
+        _capability("MissingIndicator", config, state, engine=engine)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "node", ["CustomBinning", "CorrelationThreshold", "UnivariateSelection", "VarianceThreshold"]
+)
+@pytest.mark.parametrize("enabled", [False, True])
+def test_local_context_accepts_real_fitted_numpy_flags(node, engine, enabled):
+    """NumPy booleans accepted by fitting must survive metadata inspection unchanged."""
+    frame = pd.DataFrame(
+        {"x": [0.0, 1.0, 2.0, 3.0], "copy": [0.0, 2.0, 4.0, 6.0], "constant": [1.0] * 4}
+    )
+    if engine == "polars":
+        frame = pl.from_pandas(frame)
+    flag = np.bool_(enabled)
+    field = "drop_original" if node == "CustomBinning" else "drop_columns"
+    config = {
+        "columns": ["x", "copy"],
+        field: flag,
+        "bins": [0.0, 2.0, 4.0],
+        "label_format": "range",
+        "allow_missing_target": True,
+    }
+    state = NodeRegistry.get_calculator(node)().fit(frame, config)
+    applier = NodeRegistry.get_applier(node)()
+    output = applier.apply(frame, state)
+    assert len(output) == len(frame)
+    capability = _capability(node, config, state, engine=engine)
+    assert capability is not None and capability.context == "row"
+    assert state[field] is flag
+    state[field] = np.int64(1)
+    with pytest.raises(ValueError, match="boolean"):
+        _capability(node, config, state, engine=engine)

@@ -15,6 +15,17 @@ from ...utils import detect_numeric_columns, resolve_columns
 from .._helpers import decimal_columns_to_float
 
 
+def validate_scaler_vector(value: Any, size: int, *, nonnegative: bool = False) -> None:
+    """Inspect saved numeric arrays, retaining NaN statistics from all-null columns."""
+    if type(value) is not list or len(value) != size:
+        raise ValueError("Fitted scaler arrays must match the fitted columns.")
+    for item in value:
+        if not isinstance(item, Real) or isinstance(item, bool):
+            raise ValueError("Fitted scaler arrays must contain real numbers.")
+        if item in (float("inf"), float("-inf")) or (nonnegative and item < 0):
+            raise ValueError("Fitted scaler arrays contain invalid statistics.")
+
+
 def validate_scaling_range(value: Any, name: str) -> tuple[Any, Any]:
     """Normalize two finite bounds and validate the scaler's interval contract."""
     try:

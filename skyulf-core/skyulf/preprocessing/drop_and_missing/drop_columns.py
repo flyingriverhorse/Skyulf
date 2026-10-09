@@ -4,10 +4,12 @@ from typing import Any, cast
 
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import PolarsEngine
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingColumnsArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -29,6 +31,21 @@ class DropMissingColumnsApplier(BaseApplier):
     The selection is already baked into ``params``; this half is a pure drop
     and leaves ``y`` alone, so both engine paths are identical by construction.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved drop set; threshold metadata no longer controls apply."""
+        local_state_fields(raw, "drop_missing_columns", {"type", "columns_to_drop", "threshold"})
+        _columns(raw["columns_to_drop"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local saved apply context without granting worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        DropMissingColumnsApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

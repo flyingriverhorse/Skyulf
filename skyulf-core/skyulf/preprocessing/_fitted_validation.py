@@ -3,8 +3,32 @@
 import math
 from typing import Any
 
+import numpy as np
+
 from ..core.portable_pipeline import _config
 from ..core.portable_state import _normalize
+
+
+def local_state_fields(raw: Any, kind: str, fields: set[str], *, allow_empty: bool = False) -> bool:
+    """Inspect a local artifact's shape without granting portable execution.
+
+    Owners decide whether an empty dictionary is a real fitted no-op. They
+    validate their own values after this shared field and discriminator check.
+    The original state is neither normalized nor mutated.
+    """
+    if type(raw) is not dict:
+        raise ValueError("Local fitted state must be a dictionary.")
+    if not raw and allow_empty:
+        return False
+    if set(raw) != fields or raw.get("type") != kind:
+        raise ValueError("Unexpected local fitted state fields or type.")
+    return True
+
+
+def local_boolean(value: Any, name: str) -> None:
+    """Accept saved Python/NumPy booleans without coercing integer flags."""
+    if not isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"Fitted {name} must be a boolean.")
 
 
 def _fields(value: Any, names: set[str]) -> None:

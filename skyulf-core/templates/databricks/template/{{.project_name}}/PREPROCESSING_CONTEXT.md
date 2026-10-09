@@ -228,7 +228,8 @@ segment means and categories remain the ones from `training`.
 | `skipped` | The normal prediction chain skips this fitted training step. No apply test ran for it. |
 | `not_run` | An earlier step failed or required context, so no result is claimed for this step. |
 | `empty` check: `not_supported` | Empty input raised. Other checks can pass; this does not promise support for empty requests. |
-| `state_validation: unavailable` | No applicable node-owned strict validator exists for this local state. Empirical checks may still pass. |
+| `state_validation: node_owned` | The preprocessing owner inspected its saved state. This can be a local diagnostic contract; it does not mean worker admission. |
+| `state_validation: unavailable` | No applicable node-owned validator exists for this local state. Empirical checks may still pass. |
 | `admission: diagnostic_only` | The report grants no distributed or endpoint eligibility. |
 
 Validation of the initial artifact, sample schema and limits can raise an
@@ -244,6 +245,20 @@ are supported; nested mutable cells are rejected. Comparisons are exact. A
 floating-point difference near machine precision may need investigation but
 does not by itself demonstrate refitting. No tolerance setting is currently
 exposed. Passing finite samples cannot establish behavior for every future row.
+
+A `row` declaration describes the data the operation needs. It does not promise
+that every engine/configuration passes exact chunk comparisons. For example,
+pandas can choose different output dtypes for numeric bin labels or replacement
+values when one chunk contains only missing values. The report must retain that
+failure even though neither operation needs other rows to calculate its values.
+
+Built-in owners can inspect local saved state through `validate_inference_state`.
+The probe calls that hook on a detached artifact before the existing `apply`;
+malformed state produces `invalid_step_contract`. Learned arrays, fixed bin
+edges and selected columns are checked, not learned again. This hook is separate
+from the stricter fitted-state/configuration contracts used for Spark workers.
+Your custom preprocessing still runs through its existing saved apply function;
+there is no second implementation of its transformation to maintain.
 
 Run this after training/loading and when changing custom preprocessing or its
 dependencies. It is not an automatic Bundle task, production monitor, accuracy

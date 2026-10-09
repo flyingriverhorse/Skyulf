@@ -5,10 +5,12 @@ from typing import Any, cast
 import numpy as np
 from sklearn.feature_selection import VarianceThreshold
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns
 from .._artifacts import VarianceThresholdArtifact
+from .._fitted_validation import _columns, local_boolean, local_state_fields
 from .._helpers import resolve_columns_then_to_numpy
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -17,6 +19,38 @@ from ._common import _drop_selected_pandas, _drop_selected_polars
 
 class VarianceThresholdApplier(BaseApplier):
     """Remove the columns a fitted variance threshold rejected."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved selection membership without recomputing variances.
+
+        Empty fitted artifacts and selections are valid. The fit-only threshold
+        and variances remain untouched, including undefined all-missing variance.
+        """
+        fields = {
+            "type",
+            "selected_columns",
+            "candidate_columns",
+            "threshold",
+            "drop_columns",
+            "variances",
+        }
+        if not local_state_fields(raw, "variance_threshold", fields, allow_empty=True):
+            return raw
+        selected = _columns(raw["selected_columns"])
+        candidates = _columns(raw["candidate_columns"])
+        if not set(selected).issubset(candidates):
+            raise ValueError("Fitted selected columns must belong to candidate columns.")
+        local_boolean(raw["drop_columns"], "drop_columns")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe existing local saved apply without admitting partition workers."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        VarianceThresholdApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

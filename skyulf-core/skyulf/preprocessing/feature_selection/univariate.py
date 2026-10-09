@@ -5,10 +5,12 @@ from typing import Any, cast
 
 from sklearn.utils.multiclass import check_classification_targets
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from .._artifacts import UnivariateSelectionArtifact
+from .._fitted_validation import _columns, local_boolean, local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -40,6 +42,37 @@ def _univariate_target(y: Any, problem_type: str) -> Any:
 
 class UnivariateSelectionApplier(BaseApplier):
     """Remove the columns a univariate statistical test rejected."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved selection membership while preserving both fitted schemas.
+
+        A no-target fit uses ``scores``/``pvalues`` reporting fields; a scored
+        fit uses ``feature_scores``/``p_values``. Reports and the fitted method
+        are unused by apply and remain untouched, including nonfinite scores.
+        """
+        reports = (
+            {"scores", "pvalues"}
+            if type(raw) is dict and "scores" in raw
+            else {"feature_scores", "p_values"}
+        )
+        fields = {"type", "selected_columns", "candidate_columns", "method", "drop_columns"}
+        if not local_state_fields(raw, "univariate_selection", fields | reports, allow_empty=True):
+            return raw
+        selected = _columns(raw["selected_columns"])
+        candidates = _columns(raw["candidate_columns"])
+        if not set(selected).issubset(candidates):
+            raise ValueError("Fitted selected columns must belong to candidate columns.")
+        local_boolean(raw["drop_columns"], "drop_columns")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe existing local saved apply without admitting partition workers."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        UnivariateSelectionApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

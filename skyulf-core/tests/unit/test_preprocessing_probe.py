@@ -286,3 +286,33 @@ def test_probe_reports_window_requirement_without_running_independent_chunks(tmp
     assert report["steps"][0]["context"] == "window"
     assert report["steps"][0]["checks"] == []
     assert report["steps"][1]["status"] == "not_run"
+
+
+@pytest.mark.parametrize("mode", ["valid", "invalid", "mutate"])
+def test_probe_inspects_local_state_without_worker_validation(tmp_path, monkeypatch, mode):
+    """Local state hooks must run even when a node has no portable worker contract."""
+    artifact = _artifact(tmp_path)
+    owner = NodeRegistry.get_applier("StandardScaler")
+    before = artifact_digest(artifact.pipeline.feature_engineer.fitted_steps)
+
+    def inspect(state):
+        """Expose validation and mutation evidence before saved apply executes."""
+        if mode == "invalid":
+            raise ValueError("Invalid local fitted state")
+        if mode == "mutate":
+            state["columns"].append("unexpected")
+        return state
+
+    monkeypatch.setattr(owner, "validate_fitted_state", None)
+    monkeypatch.setattr(owner, "resolve_fitted_config", None)
+    monkeypatch.setattr(owner, "validate_inference_state", staticmethod(inspect), raising=False)
+    report = probe_fitted_preprocessing(artifact, pd.DataFrame({"value": [0.0, 2.0]}))
+    step = report["steps"][1]
+    if mode == "valid":
+        assert step["state_validation"] == "node_owned"
+        assert step["status"] == "passed"
+    else:
+        assert step["status"] == "failed"
+        assert step["reason"] == "invalid_step_contract"
+        assert step["checks"] == []
+    assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == before

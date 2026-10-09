@@ -27,8 +27,24 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch 093. Saved preprocessing context/probe implementation: a50ddd8b. Task193 native Python verification documented in cf2a420a: 213 passed plus executable guide; earlier local union 603 passed. The tracked backlog at docs/contributing/preprocessing_inference_coverage.md still has 50 open implementations; fit/apply execution is reused, not duplicated.
+Branch 093. Task195 adds local saved-state inspection and row context to ten
+preprocessing families; reuses existing transforms and keeps worker admission
+unchanged. Live inventory: 23 declared implementations, 40 undeclared / 44 IDs.
+Three exact-parity follow-ups remain documented (pandas numeric bins/object
+replacement and Polars MaxAbs floating-point rounding).
 
-Task194 real three-route smoke is complete: run 537211044950378, task 308830078979108, API TERMINATED / SUCCESS. Current runtime wheel 4df838c6, 552 installed source files verified. One registered RF model with six preprocessing steps, 8 rows including nulls/unseen categories/large keys; actual Spark UDF batches 1/3 over two partitions, REST and typed UC ai_query all matched all prediction/probability outputs exactly (max error 0.0). All six context probes passed. Temporary endpoint deleted; original endpoint identity and model version preserved by fresh API readback. No runtime repair needed. Evidence: initiatives/spark_and_mlflow/194-three-route-smoke.md and task194_native/verified-result.json, plus the tracked coverage report. Strict MkDocs build passed; documentation-only follow-up, no push. Commit readback belongs in Task194. All task claims released.
+Final source: 1342 local tests passed; full Ruff/format/Ty/Lizard and strict docs
+passed. Native final wheel 3e8a5eac, 552 installed source files matched: run
+585541621081287/job903098952257050/task19609502034591 SUCCESS; 610 passed, no failures or skips
+plus runnable guide. No tables, registered models or endpoints created. Six
+review findings repaired and independently checked; reviewer clear. Details and
+exact evidence: initiatives/spark_and_mlflow/195-preprocessing-context-batch.md
+and docs/contributing/preprocessing_inference_coverage.md. Commit readback will
+be recorded in Task195; no push requested.
+
+User side request: ponytail marketplace added and freshly listed; no individual
+plugin installed. Original preprocessing task continuation explicitly reaffirmed.
 
 ## Open messages
+
+- ID: T195-root-release; UTC: 2026-10-09T12:47:05; sender: Codex root; recipient: all; type: RELEASE; reply: T195-selectors-review-clear,T195-scale-missing-release,T195-stateless-compat-release. All findings/results preserved in Task195, acknowledged and compacted. All implementation/review claims released; final staging/hooks/commit belong to root.

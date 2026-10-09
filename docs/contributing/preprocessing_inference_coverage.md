@@ -1,7 +1,7 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-08**, branch `093`, Task191 implementation and Task192
-documentation/verification. This is a tracked continuation checklist. Update it
+Status snapshot: **2026-10-09**, branch `093`, Task195 local context expansion.
+This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
 
@@ -35,11 +35,11 @@ and [inference flow](../user_guide/inference_flow.md).
 | --- | ---: | --- |
 | Registered transformer IDs | 67 | Includes aliases and training/inspection helpers |
 | Distinct applier implementations | 63 | Four additional names refer to existing classes |
-| Implementations with context declaration machinery | 13 | Ten built-in implementations plus three custom wrappers |
-| Remaining without declaration machinery | **50** | **54 registered IDs** after including aliases; listed below |
+| Implementations with context declaration machinery | 23 | Twenty built-in implementations plus three custom wrappers |
+| Remaining without declaration machinery | **40** | **44 registered IDs** after including aliases; listed below |
 | Reviewed worker-admitted preprocessing families | 7 | Only their supported pandas configurations; not every mode/engine |
 
-The count of 13 describes available machinery, not unconditional support for
+The count of 23 describes available machinery, not unconditional support for
 every configuration. Existing worker-subset validators can abstain for valid
 local states. Some Polars configurations also have no matching declaration.
 Custom wrappers return `unknown` unless their saved definition explicitly
@@ -63,7 +63,34 @@ declares context. New project-defined classes are not part of the fixed 63.
 | `FittedFunction` | Explicit saved declaration, otherwise `unknown` | Validate saved-state reuse and no mutation per implementation |
 | `RowFilterFunction` | Explicit saved declaration, otherwise `unknown` | Prediction skip and fixed pre-split eligibility are separate contracts |
 
-## Remaining 50 implementations
+### Ten additional local contracts (Task195)
+
+These owners declare `row` for inspected pandas/Polars state and validate their
+saved apply parameters through `validate_inference_state`. Existing apply code
+is reused. None of these additions grants Spark-worker or endpoint admission.
+The scope column is part of the result, not an unconditional parity promise.
+
+| ID | Implementation | Inspected scope and remaining boundary |
+| --- | --- | --- |
+| PC-02 | `CustomBinning` | Fixed edges, ordinal/bin-index/range labels, missing policies, empty no-ops. Pandas numeric labels can change dtype across chunks; `keep` can also fail empty dtype parity. |
+| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Pandas object downcasting can change dtype across chunks; arbitrary mapping objects/Series are outside inspection. |
+| PC-09 | `DropMissingColumns` | Reuse saved dropped columns even when request missingness differs. Training threshold is reporting metadata, not recomputed. |
+| PC-11 | `MissingIndicator` | Saved columns and nonempty string suffix, null/NaN flags, no-op and empty frames. Non-string suffix objects are outside inspection. |
+| PC-21 | `CorrelationThreshold` | Saved drop list and enabled/disabled flag; no request correlation calculation. |
+| PC-23 | `UnivariateSelection` | Saved candidate/selected columns, no-target artifact and empty selection. Scoring methods without p-values now retain an empty p-value report. |
+| PC-24 | `VarianceThreshold` | Frozen selection with constant/all-missing requests, empty selection and saved undefined variance metadata. |
+| PC-28 | `MaxAbsScaler` | Saved scale/max-abs vectors, zeros/constants/nulls and empty no-op. Polars nonbinary division can differ by one ULP between full and singleton evaluation. |
+| PC-29 | `RobustScaler` | Saved center/scale/quantiles and all flag combinations, null statistics and empty no-op. Exact numerical parity remains sample/runtime-specific. |
+| PC-30 | `GeoDistance` | Saved coordinate/output names, both distance methods and units. Existing invalid-coordinate behavior is reported without adding new geospatial validation. |
+
+Keep these exact-parity follow-ups open: **PC-02 pandas numeric-label dtypes**,
+**PC-08 pandas object replacement dtypes**, and **PC-28 Polars arithmetic**.
+For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
+Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
+retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
+are additional to the 40 implementations without declarations.
+
+## Remaining 40 implementations without declarations
 
 Every row below is **OPEN**. The “review focus” is a work item, not a certified
 context declaration. Start with P1, then P2; P3 covers training/inspection
@@ -73,16 +100,12 @@ imply permission to expand worker admission.
 | ID | Priority | Registered names sharing this implementation | Review focus before closing |
 | --- | --- | --- | --- |
 | PC-01 | P2 | `GeneralBinning` | Resolve each mode's fitted bins, labels, boundary/null behavior |
-| PC-02 | P1 | `CustomBinning` | Fixed bin edges, outside-range values, label dtypes |
 | PC-03 | P2 | `KBinsDiscretizer` | Saved estimator/bins; chunk-invariant encoding and no refit |
 | PC-04 | P1 | `Casting` | Invalid casts, nullable dtypes and schema consistency |
 | PC-05 | P1 | `AliasReplacement` | Fixed mapping, unknown/null inputs, output type |
 | PC-06 | P1 | `InvalidValueReplacement` | Rule/fallback behavior without request-derived state |
 | PC-07 | P1 | `TextCleaning` | Unicode, nulls and deterministic per-row text rules |
-| PC-08 | P1 | `ValueReplacement` | Fixed replacement mapping, nulls and dtype stability |
-| PC-09 | P1 | `DropMissingColumns` | Reuse training-selected columns; never reselect from the request |
 | PC-10 | P3 | `DropMissingRows` | Row-filter context plus existing prediction-skip evidence |
-| PC-11 | P1 | `MissingIndicator` | Stable indicator columns/types for null-only and empty batches |
 | PC-12 | P2 | `DummyEncoder` | Frozen output columns, unseen categories, no batch vocabulary |
 | PC-13 | P2 | `HashEncoder` | Stable hash/configuration, output width and null handling |
 | PC-14 | P2 | `LabelEncoder` | Saved mapping and unknown/null policies |
@@ -92,16 +115,10 @@ imply permission to expand worker admission.
 | PC-18 | P1 | `DateFeatures` | Time zones, invalid dates and fixed feature schema |
 | PC-19 | P2 | `FeatureGenerationNode`, `FeatureMath`, `FeatureGeneration` | Review each mode; distinguish saved group-aggregation lookup from live grouping |
 | PC-20 | P1 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved terms, names/order and exact chunk behavior |
-| PC-21 | P1 | `CorrelationThreshold` | Reuse fitted selection; no request-time correlation selection |
 | PC-22 | P2 | `ModelBasedSelection` | Frozen selection mask, loaded estimator and dependencies |
-| PC-23 | P1 | `UnivariateSelection` | Frozen selection mask and output ordering |
-| PC-24 | P1 | `VarianceThreshold` | Frozen selection despite constant/null-only request chunks |
 | PC-25 | P2 | `feature_selection` | Delegate context/validation to the selected nested implementation |
 | PC-26 | P2 | `IterativeImputer` | Saved estimators, randomness, repeated transforms and no refit |
 | PC-27 | P2 | `KNNImputer` | Saved training neighbors, batching behavior and bounded state/package |
-| PC-28 | P1 | `MaxAbsScaler` | Saved scale, zero/constant/null columns and dtype stability |
-| PC-29 | P1 | `RobustScaler` | Saved quantiles/center/scale and row-independent apply |
-| PC-30 | P1 | `GeoDistance` | Saved distance settings, invalid/null coordinates |
 | PC-31 | P2 | `H3Index` | Optional dependency pins, resolution and invalid coordinates |
 | PC-32 | P3 | `DatasetProfile` | Separate inspection side effects from effective prediction apply |
 | PC-33 | P3 | `DataSnapshot` | Separate snapshot behavior from effective prediction apply |
@@ -149,7 +166,7 @@ remotely executed. Their completion needs accurate skip evidence, not a forced
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work not included in the 50 count
+### Cross-cutting work not included in the 40 count
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -191,7 +208,7 @@ for names in remaining:
     print(", ".join(names))
 ```
 
-Expected snapshot: 67 names, 63 implementations, 50 remaining implementations.
+Expected snapshot: 67 names, 63 implementations, 40 remaining implementations.
 This counts declaration machinery, not whether a fitted configuration passes
 `get_inference_capability` or the worker certificate.
 
@@ -202,8 +219,8 @@ test union contains 603 distinct cases. It covers built-in saved-state reuse,
 custom function/class replay, no refit, differing batch statistics, row/order
 changes, pandas metadata aliasing, mutable numpy cells, validator mutation,
 engine-context rejection and preservation of strict worker checks. Independent
-review findings were reproduced, repaired and checked. These local checks do not
-close the 50 open rows; native runtime evidence is recorded below separately.
+review findings were reproduced, repaired and checked. At that stage these local
+checks left all 50 then-open rows unchanged; native evidence is recorded below.
 
 Task192 reran the explicit affected union: **603 passed**, with 42 existing
 warnings from temporal CV, feature names, deprecated aliases and small fixtures.
@@ -238,7 +255,7 @@ single-row, chunked, reversed and empty inputs. Runtime: Python 3.12.3, pandas
 This was a native notebook test of the Python fit/apply and diagnostic paths;
 it did not execute a Spark UDF or deploy a REST endpoint. No Unity Catalog tables,
 registered models or endpoints were created. It adds runtime evidence for the
-existing implementation and leaves all 50 backlog rows open.
+existing implementation and left all 50 then-open backlog rows unchanged.
 
 Task194 then exercised the actual inference routes on the same runtime source:
 [run 537211044950378](https://dbc-45604623-c18b.cloud.databricks.com/jobs/927702146751887/runs/537211044950378)
@@ -253,3 +270,29 @@ local output columns (`prediction`, `probability_0`, `probability_1`) with maxim
 absolute error **0.0**. The temporary endpoint was deleted after testing; the
 existing example endpoint kept its original identity and model version. This is
 a small correctness check, not load/latency testing or wider node admission.
+
+### Task195 validation: ten additional local context contracts
+
+On 2026-10-09 the deduplicated union of 25 explicit affected test files passed:
+**1,342 passed**, 68 expected warnings, no failures. Full repository Ruff,
+formatting (1,606 files), the complete CI Ty scope and Lizard CCN <= 10 passed.
+Six independent review findings were reproduced and repaired, including NumPy
+scalar/boolean state compatibility, tuple replacement rules, legacy bin labels
+and internally conflicting generated column names. Existing transform formulas
+were retained; the separate univariate missing-p-value reporting crash was fixed.
+
+The final wheel was verified on Databricks serverless PERFORMANCE_OPTIMIZED,
+using the previously selected `skyulf` profile:
+[run 585541621081287](https://dbc-45604623-c18b.cloud.databricks.com/jobs/903098952257050/runs/585541621081287)
+finished **TERMINATED / SUCCESS**. **610 tests passed**, zero failures or skips,
+plus the complete Bundle guide example. All 552 installed Python source files
+matched the final source manifest. Wheel SHA256:
+`3e8a5eac4c8dc17e24164a3228a0611aca28308ea114a4e40027d2d80adf65c5`.
+
+Fresh-process tests fit/save ten actual pipelines per engine, then disable every
+involved calculator before loading and probing their artifacts. They cover
+pandas and Polars, frozen selections/statistics, full/singleton/chunk/reverse/
+empty execution, mutation detection and unchanged partition rejection. Separate
+tests retain the known exact-parity failures listed above. These are native
+Python validation results; this batch did not admit the ten nodes to Spark UDF,
+REST or `ai_query`, and did not create tables, registered models or endpoints.

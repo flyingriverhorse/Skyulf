@@ -2,13 +2,16 @@
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns
 from .._artifacts import ValueReplacementArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -200,6 +203,57 @@ def _apply_value_replacement_pandas(
     return df_out
 
 
+def _validate_replacement_scalar(value: Any) -> None:
+    """Allow Python and NumPy scalar rules without converting null or non-finite values."""
+    numpy_scalar = isinstance(value, np.generic) and value.dtype.kind in "biufU"
+    if type(value) not in (str, int, float, bool, type(None)) and not numpy_scalar:
+        raise ValueError("ValueReplacement rules must contain scalar values.")
+
+
+def _validate_replacement_mapping(mapping: Any) -> None:
+    """Inspect flat or consistently column-nested maps without coercing their keys."""
+    if type(mapping) is not dict:
+        raise ValueError("ValueReplacement mapping must be a dictionary.")
+    nested = any(type(value) is dict for value in mapping.values())
+    for key, value in mapping.items():
+        if nested:
+            if type(key) is not str or type(value) is not dict:
+                raise ValueError("ValueReplacement nested mappings need column dictionaries.")
+            for old, new in value.items():
+                _validate_replacement_scalar(old)
+                _validate_replacement_scalar(new)
+        else:
+            _validate_replacement_scalar(key)
+            _validate_replacement_scalar(value)
+
+
+def _validate_replacement_values(value: Any) -> None:
+    """Inspect scalar, list or tuple rules while retaining saved ordering and types."""
+    if type(value) in (list, tuple):
+        for item in value:
+            _validate_replacement_scalar(item)
+    else:
+        _validate_replacement_scalar(value)
+
+
+def _validate_replacement_rules(raw: dict) -> None:
+    """Validate active scalar/list pairing and retain mapping precedence unchanged."""
+    mapping, to_replace, value = raw["mapping"], raw["to_replace"], raw["value"]
+    if mapping is not None:
+        _validate_replacement_mapping(mapping)
+    if type(to_replace) is dict:
+        _validate_replacement_mapping(to_replace)
+    else:
+        _validate_replacement_values(to_replace)
+    _validate_replacement_values(value)
+    if mapping or to_replace is None or type(to_replace) is dict:
+        return
+    if type(value) in (list, tuple) and (
+        type(to_replace) not in (list, tuple) or len(to_replace) != len(value)
+    ):
+        raise ValueError("ValueReplacement scalar/list rules have incompatible lengths.")
+
+
 class ValueReplacementApplier(BaseApplier):
     """Replace configured values in the resolved columns, leaving other cells alone.
 
@@ -210,6 +264,24 @@ class ValueReplacementApplier(BaseApplier):
     lookup. A list of keys can share one replacement or have a same-length
     list of replacements. A column selection resolving to nothing is a no-op.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect scalar, list, tuple and dictionary state without coercing saved rules."""
+        local_state_fields(
+            raw, "value_replacement", {"type", "columns", "mapping", "to_replace", "value"}
+        )
+        _columns(raw["columns"])
+        _validate_replacement_rules(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe row dependency without claiming chunk-invariant dtype inference."""
+        if engine not in ("pandas", "polars"):
+            return None
+        ValueReplacementApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

@@ -318,8 +318,9 @@ def _univariate_score_dicts(
     if hasattr(selector, "scores_"):
         safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
         scores = dict(zip(cols, safe_scores.tolist(), strict=True))
-    if hasattr(selector, "pvalues_"):
-        safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
+    learned_pvalues = getattr(selector, "pvalues_", None)
+    if learned_pvalues is not None:
+        safe_pvalues = np.nan_to_num(learned_pvalues, nan=1.0)
         pvalues = dict(zip(cols, safe_pvalues.tolist(), strict=True))
     return scores, pvalues
 

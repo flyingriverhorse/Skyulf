@@ -14,9 +14,11 @@ import polars as pl
 
 from ..._validation import raise_invalid_choice
 from ...core.artifacts import GeoDistanceArtifact
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...core.schema import SkyulfSchema
 from ...registry import NodeRegistry
+from .._fitted_validation import local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -144,6 +146,24 @@ def _validate_geo_distance_method_unit(method: str, unit: str) -> None:
 
 class GeoDistanceApplier(BaseApplier):
     """Append the configured pairwise distance as a new numeric column."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved coordinate names and distance choices without touching request data."""
+        columns = {"lat1_col", "lon1_col", "lat2_col", "lon2_col", "output_column"}
+        local_state_fields(raw, "geo_distance", {"type", "method", "unit", *columns})
+        if any(type(raw[key]) is not str or not raw[key] for key in columns):
+            raise ValueError("GeoDistance fitted column names must be nonempty strings.")
+        _validate_geo_distance_method_unit(raw["method"], raw["unit"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe existing coordinate math as local row-preserving inference."""
+        if engine not in ("pandas", "polars"):
+            return None
+        GeoDistanceApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
