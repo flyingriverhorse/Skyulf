@@ -54,7 +54,9 @@ def _coerce_mapping_keys(mapping: dict[str, Any], dtype_kind: str) -> dict[Any, 
     coerce = {}
     for key, value in mapping.items():
         coerced_key = _coerce_key(key, dtype_kind)
-        if coerced_key is not _SKIP_MAPPING_KEY:
+        if coerced_key is not _SKIP_MAPPING_KEY and _replacement_key_matches_dtype(
+            coerced_key, dtype_kind
+        ):
             coerce[coerced_key] = value
     return coerce
 
@@ -79,7 +81,7 @@ def _polars_mapping_exprs(X: Any, valid: list[str], mapping: dict[str, Any]) -> 
             continue
         col_map = mapping[col] if is_nested else mapping
         col_map = _coerce_mapping_keys(col_map, _polars_dtype_kind(schema[col]))
-        exprs.append(pl.col(col).replace_strict(col_map, default=pl.col(col)).alias(col))
+        exprs.append(_polars_replace_mapping(col, schema[col], col_map))
     return exprs
 
 
@@ -100,7 +102,17 @@ def _replacement_key_matches_dtype(key: Any, dtype_kind: str) -> bool:
     """Respect pandas's distinction between boolean and numeric typed columns."""
     if pd.api.types.is_bool(key):
         return dtype_kind not in ("i", "u", "f")
+    if dtype_kind in ("i", "u") and not pd.isna(key) and pd.api.types.is_number(key):
+        return _integer_key_matches(key)
     return dtype_kind != "b" or not pd.api.types.is_number(key)
+
+
+def _integer_key_matches(key: Any) -> bool:
+    """Reject fractional and nonfinite keys that cannot match an integer observation."""
+    try:
+        return int(key) == key
+    except (OverflowError, TypeError, ValueError):
+        return False
 
 
 def _coerce_replacement_pairs(
@@ -132,7 +144,7 @@ def _value_replacement_exprs_polars(
     exprs = []
     for col in valid:
         col_map = dict(_coerce_replacement_pairs(pairs, _polars_dtype_kind(X.schema[col])))
-        exprs.append(pl.col(col).replace_strict(col_map, default=pl.col(col)).alias(col))
+        exprs.append(_polars_replace_mapping(col, X.schema[col], col_map))
     return exprs
 
 
@@ -146,6 +158,96 @@ def _pandas_dtype_kind(dtype: Any) -> str:
     return kind if kind in ("i", "u", "f", "b") else ""
 
 
+def _integer_replacement_value(value: Any, dtype: Any) -> int | None:
+    """Normalize a scalar only when the native integer dtype can represent it exactly."""
+    if pd.isna(value):
+        return None
+    try:
+        integer = int(value)
+        if integer != value:
+            raise ValueError("Fractional integer replacement.")
+        if hasattr(dtype, "is_integer"):
+            pl.Series([integer], dtype=dtype, strict=True)
+        else:
+            nullable_dtype: Any = f"{'U' if dtype.kind == 'u' else ''}Int{dtype.itemsize * 8}"
+            pd.array([integer], dtype=nullable_dtype)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"ValueReplacement requires replacements representable in {dtype}. "
+            "Use an explicit Casting step before fractional or out-of-range numeric rules."
+        ) from exc
+    return integer
+
+
+def _integer_replacement_rules(
+    dtype: Any, pairs: list[tuple[Any, Any]]
+) -> tuple[list[tuple[Any, Any]], bool]:
+    """Keep numeric/null integer rules exact while leaving nonnumeric native replacements alone."""
+    integer_dtype = (
+        dtype.is_integer()
+        if hasattr(dtype, "is_integer")
+        else _pandas_dtype_kind(dtype) in ("i", "u")
+    )
+    if not integer_dtype:
+        return pairs, False
+    rules = []
+    integer_output = True
+    for key, value in _integer_replacement_keys(dtype, pairs):
+        if not pd.isna(value):
+            if pd.api.types.is_number(value) and not pd.api.types.is_bool(value):
+                value = _integer_replacement_value(value, dtype)
+            else:
+                integer_output = False
+        rules.append((key, value))
+    if integer_output:
+        rules = [(key, None if pd.isna(value) else value) for key, value in rules]
+    return rules, integer_output
+
+
+def _integer_replacement_keys(dtype: Any, pairs: list[tuple[Any, Any]]) -> list[tuple[Any, Any]]:
+    """Avoid floating key comparisons and ignore keys outside the source integer range."""
+    rules = []
+    for key, value in pairs:
+        if not pd.isna(key) and pd.api.types.is_number(key):
+            try:
+                key = _integer_replacement_value(key, dtype)
+            except ValueError:
+                continue
+        rules.append((key, value))
+    return rules
+
+
+def _polars_replace_mapping(col: str, dtype: Any, mapping: dict) -> Any:
+    """Pin integer return types so unsigned defaults cannot promote exact values to Float64."""
+    rules, integer_output = _integer_replacement_rules(dtype, list(mapping.items()))
+    if integer_output:
+        return (
+            pl.col(col)
+            .replace_strict(dict(rules), default=pl.col(col), return_dtype=dtype)
+            .alias(col)
+        )
+    return pl.col(col).replace_strict(dict(rules), default=pl.col(col)).alias(col)
+
+
+def _pandas_integer_rules(
+    series: pd.Series, pairs: list[tuple[Any, Any]]
+) -> tuple[pd.Series, list[tuple[Any, Any]]]:
+    """Use a nullable integer container whenever configured numeric rules can introduce nulls."""
+    rules, integer_output = _integer_replacement_rules(series.dtype, pairs)
+    if not integer_output:
+        return series, rules
+    if any(value is None for _, value in rules):
+        series = series.convert_dtypes()
+        rules = [(key, pd.NA if value is None else value) for key, value in rules]
+    return series, rules
+
+
+def _pandas_replace_mapping(series: pd.Series, mapping: dict) -> pd.Series:
+    """Retain native dictionary replacement after validating integer-only numeric rules."""
+    series, pairs = _pandas_integer_rules(series, list(mapping.items()))
+    return series.replace(dict(pairs))
+
+
 def _pandas_apply_mapping(
     df_out: pd.DataFrame, valid: list[str], mapping: dict[str, Any]
 ) -> pd.DataFrame:
@@ -156,11 +258,11 @@ def _pandas_apply_mapping(
             for col, map_dict in mapping.items():
                 if col in valid:
                     map_dict = _coerce_mapping_keys(map_dict, _pandas_dtype_kind(df_out[col].dtype))
-                    df_out[col] = df_out[col].replace(map_dict)
+                    df_out[col] = _pandas_replace_mapping(df_out[col], map_dict)
         else:
             for col in valid:
                 col_map = _coerce_mapping_keys(mapping, _pandas_dtype_kind(df_out[col].dtype))
-                df_out[col] = df_out[col].replace(col_map)
+                df_out[col] = _pandas_replace_mapping(df_out[col], col_map)
     return df_out
 
 
@@ -168,6 +270,7 @@ def _pandas_replace_pairs(
     series: pd.Series, pairs: list[tuple[Any, Any]], scalar: bool
 ) -> pd.Series:
     """Keep native scalar null handling and ordered list replacement semantics."""
+    series, pairs = _pandas_integer_rules(series, pairs)
     if scalar and pairs:
         key, value = pairs[0]
         return series.replace(key, value)
@@ -257,6 +360,12 @@ class ValueReplacementApplier(BaseApplier):
     Mapping and ``to_replace`` keys are coerced to the column's dtype before
     lookup. A list of keys can share one replacement or have a same-length
     list of replacements. A column selection resolving to nothing is a no-op.
+
+    Numeric rules on integer columns must fit the existing integer dtype;
+    fractional, infinite and out-of-range replacements require an explicit
+    Casting step. Missing replacements use native nullable integers. These
+    checks use configured rules before matching rows, including empty requests.
+    Nonnumeric replacements retain their native engine behavior.
     """
 
     @staticmethod

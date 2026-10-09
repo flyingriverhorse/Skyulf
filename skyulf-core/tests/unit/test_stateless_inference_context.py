@@ -300,15 +300,16 @@ def test_value_replacement_preserves_object_dtype_across_chunks(rules, monkeypat
     assert output["x"].to_list() == [1, "unmapped", None]
 
 
-def test_value_replacement_numeric_widening_remains_reported(monkeypatch):
-    """Prevent object parity fixes from concealing unresolved integer-to-float widening."""
+def test_value_replacement_fractional_integer_rules_require_explicit_casting(monkeypatch):
+    """Inference must report the explicit dtype contract instead of silently widening integers."""
     frame = pd.DataFrame({"x": [1, 2]})
     record = _record("ValueReplacement", "pandas", {"columns": ["x"], "mapping": {1: 0.5}}, frame)
-    detail, output = _probe(record, frame, "pandas", monkeypatch)
-    checks = {check["name"]: check for check in detail["checks"]}
+    detail, _ = _probe(record, frame, "pandas", monkeypatch)
     assert detail["status"] == "failed"
-    assert checks["chunks:1"]["reason"] == "output_mismatch"
-    assert output["x"].to_list() == [0.5, 2.0]
+    assert detail["checks"][0]["reason"] == "apply_error"
+    assert detail["checks"][0]["error_type"] == "ValueError"
+    with pytest.raises(ValueError, match="Casting"):
+        record["applier"].apply(frame, record["artifact"])
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

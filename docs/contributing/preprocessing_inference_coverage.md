@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task205 numeric-boundary repairs.
+Status snapshot: **2026-10-09**, branch `093`, Task206 integer-contract repairs.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -75,7 +75,7 @@ The scope column is part of the result, not an unconditional parity promise.
 | ID | Implementation | Inspected scope and remaining boundary |
 | --- | --- | --- |
 | PC-02 | `CustomBinning` | Fixed edges, ordinal/bin-index/range labels, missing policies, empty no-ops. Pandas numeric labels retain nullable `Int64`; missing-label mode retains object dtype, including singleton and empty requests. |
-| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Pandas object input stays object. Numeric widening can still change dtype across chunks; arbitrary mapping objects/Series are outside inspection. |
+| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Integer numeric rules preserve width and precision; incompatible numeric replacements require explicit Casting, including empty/unmatched requests. Integer null rules use nullable output. Float/object dtype boundaries remain; arbitrary mapping objects/Series are outside inspection. |
 | PC-09 | `DropMissingColumns` | Reuse saved dropped columns even when request missingness differs. Training threshold is reporting metadata, not recomputed. |
 | PC-11 | `MissingIndicator` | Saved columns and nonempty string suffix, null/NaN flags, no-op and empty frames. Non-string suffix objects are outside inspection. |
 | PC-21 | `CorrelationThreshold` | Saved drop list and enabled/disabled flag; no request correlation calculation. |
@@ -99,10 +99,12 @@ replaying those older encoders can silently select their unknown-category code.
 At the sklearn boundary, nullable numeric missing values become `np.nan` even
 beside object features; other column values and large integer precision remain.
 
-Keep **PC-08 numeric widening** open. For PC-08,
-replacing `1` with `0.5` in an integer column widens matched chunks to float while
-unmatched chunks stay integer. Use a consistent float input dtype for that rule;
-the diagnostic continues reporting the integer-input mismatch.
+Task206 rejects PC-08 fractional numeric rules on integer input before matching
+rows. Replacing `1` with `0.5` requires an explicit preceding `Casting` to float.
+Integral numeric rules stay within the input integer dtype's range; missing
+replacements preserve nullable integer output. This avoids rounding untouched
+large integers or wrapping unsigned values. Float/object and mixed nonnumeric
+replacement boundaries remain configuration-specific.
 For PC-28, the original fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains exact comparisons; no tolerance was added to hide it. Task205 repairs
@@ -128,7 +130,7 @@ null behavior or numerical differences.
 | PC-18 | `DateFeatures` | UTC-aware saved states, epochs, time zones, nulls, tuples and NumPy string settings. Legacy non-UTC state stays `unknown`. Existing generated-name overwrites and Polars duplicate-output errors remain visible. |
 | PC-20 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved degree/flags/columns/order and prefixes. Apply rebuilds sklearn's combinatorial expansion from configuration; it does not learn request statistics. Empty requests retain the native output schema; null-input and generated-name collision errors remain. |
 | PC-36 | `ManualBounds` | Saved fixed/open limits; `row` context with a filter effect. Ordinary prediction runs this step and rejects requests that would lose rows. It is not automatically skipped. |
-| PC-37 | `Winsorize` | Saved training quantiles, never request quantiles. Pandas integer input may produce float full output but integer in-bound chunks; exact probing retains the mismatch. |
+| PC-37 | `Winsorize` | Saved training quantiles, never request quantiles. Integer input requires representable integral bounds and retains its dtype; fractional/out-of-range bounds require explicit Casting. Integer 0/100-percentile endpoints remain exact; large-integer interpolation is rejected before float conversion. Float/Decimal behavior remains native. |
 | PC-45 | `SimpleTransformation` | Eight existing fixed-formula modes and saved settings, including native no-ops. Numeric domains and exceptional scalar types remain native-engine boundaries. |
 
 Local validators preserve supported NumPy settings instead of rewriting them.
@@ -735,13 +737,15 @@ and Lizard CCN <= 10 passed. Independent review found no blocker, including 168
 Casting baseline comparisons, 112 float replacement comparisons and 180 scaler
 bulk comparisons. The 63-owner review count and worker admission are unchanged.
 
-PC-08 replacement and PC-37 winsorization still require an explicit numeric-type
-decision. Their full integer batches can round an untouched `9007199254740993`
+At Task205 delivery, PC-08 replacement and PC-37 winsorization still required an
+explicit numeric-type decision. Their full integer batches could round an
+untouched `9007199254740993`
 to `9007199254740992.0` while an unmatched singleton stays exact. A preceding
 `Casting` to `float64` stabilizes ordinary fractional model features, but even
 `coerce_on_error=False` does not make large-integer-to-float conversion lossless.
-Do not use it for columns requiring exact large integers. Existing strict
-diagnostics retain these failures rather than relabeling the operations global.
+Do not use it for columns requiring exact large integers. Task206's integer
+contract below supersedes these two observations without relabeling the
+operations global.
 
 The same final wheel passed **596 tests**, zero failures or skips, plus the Bundle
 guide on Databricks serverless PERFORMANCE_OPTIMIZED:
@@ -753,3 +757,56 @@ Two earlier attempts stopped during collection for missing test fixtures/imports
 and Hypothesis; the repaired test package ran unchanged runtime sources. This
 verifies native Python execution, not Spark UDF/REST/`ai_query` routes. No tables,
 registered models or endpoints were created.
+
+### Task206 integer contract and migration
+
+`ValueReplacement` now keeps integral numeric rules within the source integer
+dtype's range. `None`, `NaN` and `pd.NA` use integer nulls. Fractional, infinite
+or out-of-range numeric replacements raise an error directing callers to an
+explicit `Casting` step. Validation uses the configured rules and dtype before
+row matching, so an empty or unmatched request cannot conceal an invalid rule.
+
+`Winsorize` keeps integer output for representable integral bounds. Fractional,
+non-finite and out-of-range bounds require explicit Casting, including bounds
+that happen not to affect the current rows. Training percentile endpoints at
+0 and 100 use exact minima/maxima. Interpolated quantiles on integer data outside
+`[-2**53, 2**53]` are rejected before conversion; no custom quantile algorithm
+or automatic Decimal/object promotion was added.
+Within that range, interpolation still uses pandas's floating-point quantiles.
+The integer check validates the computed bound, not the mathematically exact
+quantile; rounding can hide a fractional part near `2**53`. Only the 0/100
+endpoints carry the exact-integer quantile guarantee.
+
+For genuinely fractional features, cast explicitly to float before fitting
+and replaying these steps. This accepts floating-point precision: converting
+`9007199254740993` to float64 still loses its final unit. Keep exact identifiers
+and other precision-sensitive integers out of that conversion.
+
+Refit and re-save affected older pipelines. Integer output may disagree with
+a legacy saved float schema or with downstream string-key encoders trained on
+keys such as `"2.0"` instead of `"2"`. Strict diagnostics continue reporting
+those mismatches. Saved artifact field layouts and worker admission are unchanged.
+Float32 widening, mixed nonnumeric replacements and native float/Decimal
+boundaries remain configuration-specific; this is not universal family closure.
+`ValueReplacement`'s configuration-only schema preview still passes input
+labels through; use fitted runtime schemas for dtype checks, including nullable
+integer outputs. Polars still rejects a NaN replacement key on integer input;
+a NaN replacement value is supported as an integer null.
+
+The affected local union passed **1,139 tests** across eighteen explicit file/node
+selections. After the final static and Arrow UInt64 repairs, the two precision
+files passed **68** and **43** tests; the final Arrow check passed again. These
+are focused reruns, not additional disjoint suites. Full Ruff, formatting, CI
+Ty and Lizard CCN <= 10 passed. Independent review found no blocker and checked
+unchanged float/object behavior, exact keys, Arrow types and weighted replay.
+
+The final wheel passed **538 tests**, zero failures or skips, plus the Bundle
+guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 1017340571205314](https://dbc-45604623-c18b.cloud.databricks.com/jobs/499829535761776/runs/1017340571205314)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and sixteen
+test/guide/support assets matched the manifest. The local collected and remote
+passed test-node sets match exactly. Pytest took 17.92 seconds; the complete run
+took 70.298 seconds. Wheel SHA256:
+`ac19dede21d980479f3c75d30f87ef587344bcc8913ec2897177c2f5c53379c0`.
+This verifies native Python fit/apply/predict execution. No Spark UDF, REST or
+`ai_query` routes were added; no tables, registered models or endpoints were created.

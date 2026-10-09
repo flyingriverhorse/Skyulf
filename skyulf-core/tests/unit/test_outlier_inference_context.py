@@ -169,8 +169,8 @@ def test_manual_decimal_bounds_preserve_native_fit_apply(engine):
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_integer_winsorize_keeps_strict_dtype_probe(engine):
-    """A row declaration must not conceal pandas integer clipping's chunk dtype drift."""
+def test_integer_winsorize_reports_fractional_bounds_as_explicit_cast_error(engine):
+    """Integer requests must fail before fractional clipping can silently round values."""
     record = _record("Winsorize", engine)
     sample = pd.DataFrame({"x": [2, 10]})
     if engine == "polars":
@@ -186,8 +186,10 @@ def test_integer_winsorize_keeps_strict_dtype_probe(engine):
         project_sha=None,
     )
     assert detail["context"] == "row"
-    if engine == "polars":
-        assert detail["status"] == "passed", detail
-    else:
-        assert detail["status"] == "failed", detail
-        assert any(check.get("reason") == "output_mismatch" for check in detail["checks"]), detail
+    assert detail["status"] == "failed", detail
+    assert detail["checks"][0] == {
+        "name": "full",
+        "status": "failed",
+        "reason": "apply_error",
+        "error_type": "ValueError",
+    }
