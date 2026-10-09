@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +16,75 @@ import pytest
 
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
+from skyulf.preprocessing.inspection import DataSnapshotApplier, DataSnapshotCalculator
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        date(2024, 1, 1),
+        datetime(2024, 1, 1, tzinfo=UTC),
+        time(12, 30),
+        timedelta(days=1),
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-02-01", tz="UTC"),
+        pd.Timedelta("1 day 1 ns"),
+        pd.NaT,
+        pd.Period("2024-01", freq="M"),
+        pd.Period("2024-02", freq="M"),
+        np.timedelta64(1, "ns"),
+        np.timedelta64(1, "ps"),
+    ],
+)
+def test_temporal_scalars_cannot_hide_values_in_object_state(value):
+    """Temporal values need a real scalar codec, never an empty instance dictionary digest."""
+    with pytest.raises(TypeError):
+        artifact_digest(value)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        [pd.Timestamp("2024-01-01"), pd.Timestamp("2024-02-01")],
+        [pd.Period("2024-01", freq="M"), pd.Period("2024-02", freq="M")],
+    ],
+)
+def test_real_snapshot_temporal_artifacts_fail_closed_instead_of_colliding(values):
+    """Different saved temporal cells must not silently share the same semantic identity."""
+    first = pd.DataFrame({"when": [values[0]]})
+    second = pd.DataFrame({"when": [values[1]]})
+    first_state: Any = DataSnapshotCalculator().fit(first, {})
+    second_state: Any = DataSnapshotCalculator().fit(second, {})
+    assert first_state != second_state
+    assert DataSnapshotApplier().apply(first, first_state) is first
+    assert DataSnapshotApplier().apply(second, second_state) is second
+    for state in (first_state, second_state):
+        with pytest.raises(TypeError):
+            artifact_digest(state)
+
+
+@pytest.mark.parametrize(
+    "dtype,expected",
+    [
+        ("datetime64[ns]", "ae0e7af25366386ecbdf9440ba1abb18abd3c151db90a0dcd4f686301deea9b1"),
+        ("timedelta64[ns]", "5e84b50b7e8a519a709530917da0982c76af4d0d2897db700a63670fc06e54d4"),
+    ],
+)
+def test_temporal_arrays_retain_existing_canonical_bytes(dtype, expected):
+    """Rejecting scalar fallback must not change supported temporal-array digests."""
+    values = np.array([0, 1, -9223372036854775808], dtype=dtype)
+    assert artifact_digest(values).hex() == expected
+
+
+def test_pipeline_fingerprint_rejects_real_temporal_snapshot_state():
+    """A fitted pipeline must expose unsupported snapshot values through its public seal."""
+    pipeline = SkyulfPipeline(
+        {"preprocessing": [{"name": "snapshot", "transformer": "DataSnapshot", "params": {}}]}
+    )
+    frame = pd.DataFrame({"when": pd.to_datetime(["2024-01-01", "2024-02-01"]), "target": [0, 1]})
+    pipeline.fit(frame, "target")
+    with pytest.raises(TypeError, match="temporal scalar"):
+        pipeline.fingerprint()
 
 
 def test_tree_missing_value_routing_changes_digest():

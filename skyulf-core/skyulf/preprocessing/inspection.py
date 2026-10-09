@@ -9,10 +9,12 @@ from typing import Any, cast
 
 import pandas as pd
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ._artifacts import DatasetProfileArtifact, DataSnapshotArtifact
+from ._fitted_validation import local_state_fields
 from ._helpers import auto_detect_numeric_columns, decimal_columns_to_float
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, fit_method
@@ -75,6 +77,20 @@ def _profile_fit_pandas(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProf
 
 class DatasetProfileApplier(BaseApplier):
     """Passthrough applier; the profile is produced entirely at fit time."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Check ownership while leaving the unused training report untouched."""
+        local_state_fields(raw, "dataset_profile", {"type", "profile"})
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe the existing passthrough without collecting new statistics."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        DatasetProfileApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     def apply(
         self,
@@ -144,6 +160,20 @@ def _snapshot_fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> DataSnapsho
 
 class DataSnapshotApplier(BaseApplier):
     """Passthrough applier; the snapshot is produced entirely at fit time."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Check ownership without interpreting or recapturing training values."""
+        local_state_fields(raw, "data_snapshot", {"type", "snapshot"})
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe the existing passthrough without taking another snapshot."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        DataSnapshotApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     def apply(
         self,

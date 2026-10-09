@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task199 feature/text/detector contexts.
+Status snapshot: **2026-10-09**, branch `093`, Task200 training/inspection lifecycle.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -35,11 +35,13 @@ and [inference flow](../user_guide/inference_flow.md).
 | --- | ---: | --- |
 | Registered transformer IDs | 67 | Includes aliases and training/inspection helpers |
 | Distinct applier implementations | 63 | Four additional names refer to existing classes |
-| Implementations with context declaration machinery | 55 | Fifty-two built-in implementations plus three custom wrappers |
-| Remaining without declaration machinery | **8** | **9 registered IDs** after including aliases; listed below |
+| Implementations with context declaration machinery | 61 | Fifty-eight built-in implementations plus three custom wrappers |
+| Without declaration machinery | 2 | Reviewed training-only splitter (two IDs) and open sentence embedder |
+| Implementations with reviewed context/lifecycle behavior | **62** | Includes the unrecorded training splitter without inventing a frame declaration |
+| Remaining lifecycle/asset review | **1** | `sentence_embedder`; external model assets are not captured yet |
 | Reviewed worker-admitted preprocessing families | 7 | Only their supported pandas configurations; not every mode/engine |
 
-The count of 55 describes available machinery, not unconditional support for
+The count of 61 describes available machinery, not unconditional support for
 every configuration. Existing worker-subset validators can abstain for valid
 local states. Some Polars configurations also have no matching declaration.
 Custom wrappers return `unknown` unless their saved definition explicitly
@@ -104,7 +106,7 @@ the diagnostic continues reporting the integer-input mismatch.
 For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-are additional to the 8 implementations without declarations. The Polars
+are additional to the remaining sentence-embedding work. The Polars
 rounding case remains a strict diagnostic boundary; it does not justify a second
 arithmetic implementation or a weaker comparison.
 
@@ -227,28 +229,55 @@ The local pipeline's core runtime manifest does not automatically record H3's
 version. Native verification for this batch explicitly uses `h3==4.5.0`; this
 is not an automatic dependency-packaging feature.
 
-## Remaining 8 implementations without declarations
+## Training-only and inspection lifecycle (Task200)
 
-Every row below is **OPEN**. The “review focus” is a work item, not a certified
-context declaration. Start with P1, then P2; P3 covers training/inspection
-semantics, and P4 needs external model packaging work. This ordering does not
-imply permission to expand worker admission.
+These seven owners have been reviewed against actual training and prediction.
+Six gained local declarations; the train/test splitter deliberately has no new
+hook because its partitioned `SplitDataset` is not a feature-frame transform.
+The existing query returns `unknown` for it, and real prediction never calls it.
 
-| ID | Priority | Registered names sharing this implementation | Review focus before closing |
+| ID | Implementation | Native apply and actual prediction behavior |
+| --- | --- | --- |
+| PC-10 | `DropMissingRows` | Native `row` / filter. Evaluation can filter, while ordinary prediction skips it and retains every requested row. Configure an imputer or let the model reject missing input. |
+| PC-32 | `DatasetProfile` | Statistics are captured during fit. Apply is an active `row` / preserve passthrough; prediction does not generate another profile. |
+| PC-33 | `DataSnapshot` | Rows are captured during fit. Apply is an active `row` / preserve passthrough; prediction does not capture new rows. |
+| PC-39 | `Oversampling` | Supported ordinary samplers use `global` context and expand training data. Prediction skips them. Combined SMOTETomek and custom callbacks remain `unknown`. |
+| PC-40 | `Undersampling` | Supported ordinary samplers use `global` context and filter training data. Prediction skips them. Replacement sampling and custom callbacks remain `unknown`. |
+| PC-41 | `TrainTestSplitter`, `Split` | Creates training partitions, is not recorded in `fitted_steps`, and has no probe entry. Reviewed training behavior is not an inference declaration. |
+| PC-42 | `feature_target_split` | Native `row` / preserve separation returns `(X, y)`, not a feature frame. It is also unrecorded and absent from the prediction report. |
+
+A skipped fitted step reports `action: skip_preserve_rows`, `status: skipped`,
+empty `checks` and `state_validation: unavailable`. Its context can describe the
+native training operation; the probe did not execute that operation. This differs
+from an unrecorded split marker, which has no entry or per-step state hash.
+The original configuration remains part of the saved pipeline.
+
+Do not infer sampler effects from their names. A real SMOTETomek example reduced
+six rows to zero, and replacement undersampling duplicated an original row.
+The current capability vocabulary cannot honestly express those mixed effects.
+Also retain the native target-only Polars limitation: removing the sole target
+column leaves zero-width features with height zero beside nonempty labels.
+This structural training helper has no newly enabled prediction route.
+
+Temporal scalar snapshot values have a separate integrity boundary. The former
+generic object hash could ignore a pandas Timestamp's actual date, making two
+different snapshots share a digest. Unsupported `date`, `time`, `timedelta`,
+pandas `Period` and NumPy `timedelta64` scalars now raise `TypeError` instead.
+Pandas temporal subclasses are included. NumPy
+non-object temporal arrays retain their existing byte encoding. A temporal
+snapshot can still be a native passthrough, but fingerprint/probe certification
+requires representable state. Ordinary local binary-payload checks are separate;
+this change does not add a datetime codec or recompute training reports.
+
+## Remaining lifecycle review: sentence embeddings
+
+| ID | Priority | Implementation | Open work |
 | --- | --- | --- | --- |
-| PC-10 | P3 | `DropMissingRows` | Row-filter context plus existing prediction-skip evidence |
-| PC-32 | P3 | `DatasetProfile` | Separate inspection side effects from effective prediction apply |
-| PC-33 | P3 | `DataSnapshot` | Separate snapshot behavior from effective prediction apply |
-| PC-39 | P3 | `Oversampling` | Training-only skip; do not generate rows during prediction |
-| PC-40 | P3 | `Undersampling` | Training-only skip; do not remove prediction requests |
-| PC-41 | P3 | `TrainTestSplitter`, `Split` | Unrecorded training markers/alias; no inference splitting |
-| PC-42 | P3 | `feature_target_split` | Training marker and target separation; no prediction execution |
-| PC-48 | P4 | `sentence_embedder` | Pin/save actual model assets/revision; verify fresh-process/offline replay |
+| PC-48 | P4 | `sentence_embedder` | Pin and save actual model assets/revision; verify fresh-process offline replay without relying on a warm model cache. |
 
-Some entries above are intentionally skipped during prediction rather than
-remotely executed. Their completion needs accurate skip evidence, not a forced
-`row` label. Context-dependent operators may be correctly complete with
-`requires_context`; a separate executor would need its own specification/tests.
+Reviewed declarations still have the configuration and dtype boundaries recorded
+above. Context-dependent operators can correctly report `requires_context`; a
+separate execution mechanism needs its own specification and tests.
 
 ## Definition of done for each row
 
@@ -271,7 +300,7 @@ remotely executed. Their completion needs accurate skip evidence, not a forced
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work not included in the 8 count
+### Cross-cutting work beyond the remaining owner
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -308,12 +337,14 @@ for owner, names in groups.items():
 
 print("Registered names:", len(NodeRegistry.list_transformers()))
 print("Distinct implementations:", len(groups))
-print("Remaining implementations:", len(remaining))
+print("Without declaration machinery:", len(remaining))
 for names in remaining:
     print(", ".join(names))
 ```
 
-Expected snapshot: 67 names, 63 implementations, 8 remaining implementations.
+Expected snapshot: 67 names, 63 implementations, 2 without declaration machinery:
+`TrainTestSplitter`/`Split` (reviewed training-only marker) and `sentence_embedder`
+(open external-asset work). Reviewed lifecycle coverage is recorded separately.
 This counts declaration machinery, not whether a fitted configuration passes
 `get_inference_capability` or the worker certificate.
 
@@ -514,3 +545,39 @@ Wheel SHA256:
 This verifies native Python fit/apply/predict with real saved models. It does
 not add Spark UDF, REST or `ai_query` admission or route tests. No tables,
 registered models or endpoints were created.
+
+### Task200 validation: training helpers, inspection and state integrity
+
+On 2026-10-09, **1,438 tests passed** across 36 explicit affected files. The
+inspection test's invalid-input annotation was corrected after full CI Ty
+identified an intentionally supplied `None`; all 18 cases in that file passed
+again. Runtime behavior was unchanged. Ruff, formatting, full CI Ty and Lizard
+CCN <= 10 passed. Independent review rechecked the original sampler/temporal
+findings without repeating the complete affected suite.
+
+Fresh processes reload eight real random-forest pipelines per engine, with
+all calculator fit calls and training-only filter/sampler/split apply calls
+disabled before loading. Full and singleton predictions match; requested rows
+are retained, saved reports are unchanged, and training split markers have no
+probe entries. Known mixed sampler effects remain `unknown`. A small native
+NumPy-boolean threshold compatibility fix preserves the original row-filter
+declaration without changing the missing-row formula.
+
+Actual Timestamp/Period snapshot collisions and NumPy timedelta/integer
+collisions were reproduced before the shared fail-closed correction. Supported
+scalar/container/array digest fixtures and NumPy temporal-array hashes remain
+unchanged. This is an integrity fix, not a new temporal scalar serialization
+feature. Context/lifecycle review now covers **62 of 63 owners**; **61 have
+declaration machinery**, and the train/test splitter remains an unrecorded
+training-only operation. Sentence embedding asset packaging remains open.
+
+The final wheel passed **399 tests**, zero failures or skips, plus the complete
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 152339084173952](https://dbc-45604623-c18b.cloud.databricks.com/jobs/750853859501812/runs/152339084173952)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and all ten
+test/guide assets matched the manifest. Full duration including setup:81.150s.
+Wheel SHA256:
+`ea03ef1d8e68bc3907ed3b0235ba4eaa940deb7c38c28cfad755c59b97db2be6`.
+This is native Python saved-model fit/apply/predict verification, not additional
+Spark UDF, REST or `ai_query` route coverage. No tables, registered models or
+endpoints were created.

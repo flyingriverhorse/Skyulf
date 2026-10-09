@@ -27,27 +27,31 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch 093, Task199 adds eleven preprocessing context owners under Ponytail full.
-Base a4ff850e. Scope: PC19/22/25/31/34/35/38/46/47/49/50. Inventory is 55/63;
-eight owners (nine registered IDs) remain. Existing transform formulas are reused.
-A shared Polars text-only scoring defect was fixed. No new worker admission.
+Task200 on branch093, base signed commit a8f98f23, Ponytail full.
+Seven remaining training/filter/inspection owners reviewed. Six add native
+local metadata; TrainTestSplitter/Split stays unrecorded with no useless hook.
+Counts:61/63 declaration machinery;62/63 reviewed lifecycle; sentence_embedder
+asset packaging remains open. No new worker admission or fit/apply formulas.
 
-All three domain agents released their implementation/test claims. Root
-acknowledges their results and independent reviews; evidence is recorded in
-initiatives/spark_and_mlflow/199-preprocessing-context-features.md and the tracked
-docs/contributing/preprocessing_inference_coverage.md. No unresolved findings.
+Temporal scalar digest collisions found in real snapshots now fail explicitly.
+Supported scalar/container/array digests and NumPy temporal arrays unchanged.
+All domain implementation and independent review claims released; root has
+acknowledged results and preserved evidence in:
+- initiatives/spark_and_mlflow/200-preprocessing-context-training.md
+- docs/contributing/preprocessing_inference_coverage.md
 
-Local evidence: 2,154 distinct cases in 44 explicit files. Initial union had
-2,140 passes and 14 obsolete negative expectations. After test-only corrections,
-both affected complete files passed 177 tests. Independent fixture review clear.
-Full CI Ruff/format/Ty/Lizard CCN10 passed. No runtime edit after the union.
+Local union:1,438passed across36 explicit files. Test-only invalid-None type
+annotation fixed afterward; its entire18casefile passed, fullCI Ty then passed.
+Ruff/format/CCN10 also passed. No runtime edits after union. Source/test/guide
+hashes packaged for native verification. No unresolved review findings.
 
-Native run 994473515746072, job 830129841788466: TERMINATED / SUCCESS. 712 passed
-tests plus the executable Bundle guide. All 552 installed runtime hashes match.
-Wheel SHA256 bbb85097d7813c5870b8055a1bc5ee546736c22c8306df48f85a25081dc4b3cf.
-Zero failures/skips, zero UC tables/models/endpoints created. Strict MkDocs passed.
-Root completing staged review and signed commit with hooks. No push.
+Native job750853859501812/run152339084173952:TERMINATED/SUCCESS.399passed
+plus Bundle guide, zero failed/skipped. Full duration81.150s; pytest22.56s.
+552 runtime files in wheel SHA256:
+ea03ef1d8e68bc3907ed3b0235ba4eaa940deb7c38c28cfad755c59b97db2be6.
+All552runtime/10test-guide hashes stillmatch. StrictMkDocs passed7.25s.
+Root completing staged review and signed commit hooks. No push.
 
 ## Open messages
 
-- ID: T199-root-ready; UTC: 2026-10-09T14:42:19.2126879Z; sender: Codex root; recipient: all; type: RELEASE; reply: T199-root-finalization. All Task199 implementation/test/doc claims released. Native712 plus guide passed; all hashes current; local2154 verified and independent reviews clear. Ruff/format/fullCI Ty/CCN10 and strictMkDocs pass. Staged28file diff reviewed with no generated artifacts. Root final signed commit with hooks next, no push. Record final commit in ignored Task199 report; no open peer requests.
+- ID: T200-root-ready; UTC: 2026-10-09T15:00:02.0428312Z; sender: Codex root; recipient: all; type: RELEASE; reply: T200-root-finalization. All Task200 implementation/test/doc claims released. Local1438/native399 plusguide verified; hashes current; independent reviews clear. Ruff/format/fullCI Ty/CCN10/strictMkDocs pass. Final staged review and signed commit hooks next, no push. Commit will be recorded in ignored Task200 report. No open peer questions.

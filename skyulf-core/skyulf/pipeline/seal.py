@@ -11,10 +11,12 @@ import dataclasses
 import hashlib
 import inspect
 from collections.abc import Iterator
+from datetime import date, time, timedelta
 from types import ModuleType
 from typing import Any
 
 import numpy as np
+from pandas import Period
 from sklearn._loss import _loss  # ty: ignore[unresolved-import] - compiled sklearn module
 from sklearn.linear_model import (
     _sgd_fast,  # ty: ignore[unresolved-import] - compiled sklearn module
@@ -53,6 +55,7 @@ def artifact_digest(obj: Any) -> bytes:
     NumPy dtypes containing objects are unsupported because their raw bytes
     contain process-dependent pointers. Nesting beyond Python's recursion
     capacity also raises ``TypeError``, with an excessive-depth explanation.
+    Temporal scalars are unsupported; NumPy temporal arrays retain their encoding.
 
     The length-framed encoding replaces the original ambiguous encoding;
     previously stored artifact digests and fitted fingerprints must be
@@ -156,6 +159,10 @@ def _array_children(h: Any, obj: np.ndarray) -> Iterator[Any]:
 
 def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
     """Write framing and yield ordered children for recursion in the caller's frame."""
+    if isinstance(obj, (date, time, timedelta, Period, np.timedelta64)):
+        raise TypeError(
+            f"Cannot digest temporal scalar of type {type(obj)!r}: no canonical representation"
+        )
     if _feed_scalar(h, obj):
         return
     if isinstance(obj, np.ndarray):

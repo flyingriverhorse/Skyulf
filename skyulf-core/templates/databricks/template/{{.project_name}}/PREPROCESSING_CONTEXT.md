@@ -259,6 +259,10 @@ failure even though neither operation needs other rows to calculate its values.
 | `Casting` | Saved categorical vocabularies can be reused per row. Legacy pandas category inference and coercive fallback conversions can depend on the complete request; the diagnostic reports that context. |
 | `GeneralBinning`, `KBinsDiscretizer`, `Winsorize` | Apply reuses training bins/limits. Integer pandas clipping may still fail exact chunk dtype comparisons; use representative model-input dtypes. |
 | `ManualBounds` | This is a row-local filter, not an automatically skipped step. In-bound prediction succeeds; a request that would lose rows is rejected to preserve prediction alignment. |
+| `DropMissingRows` | Native apply filters rows, but ordinary prediction skips it. Use an imputer for missing scoring values; skipping does not guarantee the model accepts nulls. |
+| `Oversampling`, `Undersampling` | These balance training classes using global context and are skipped during prediction. Mixed effects, replacement sampling and arbitrary callbacks can remain `unknown`. |
+| `DatasetProfile`, `DataSnapshot` | Fit saves training reports; apply passes prediction data through unchanged. The report or snapshot is not recomputed per request. |
+| `TrainTestSplitter`, `Split`, `feature_target_split` | These are training structure helpers, absent from saved `fitted_steps` and from the probe report. No prediction-time splitting occurs. The train/test splitter deliberately has no feature-frame context declaration. |
 | `DateFeatures` | New UTC-aware fitted settings can be inspected per row. Legacy non-UTC settings can stay `unknown`; existing generated-name collisions are not renamed by the probe. |
 | `PolynomialFeatures` | Apply reconstructs combinatorial terms from saved configuration and feature shape. Its internal sklearn `fit` does not learn means or categories. Empty/null inputs retain their existing errors. |
 | `TextCleaning`, `InvalidValueReplacement` | Fixed operations reuse saved settings. Null-only chunks, regex support and dtype changes are engine-specific, so include those cases in your sample. |
@@ -283,6 +287,17 @@ These local declarations do not make additional steps eligible for Spark workers
 or serving endpoints. Local-state validation also does not certify every value
 for artifact serialization: for example, native Decimal settings may be accepted
 by an applier but remain unsupported by sealed-model hashing.
+
+The same boundary applies to temporal scalar values saved in snapshots: the
+semantic hash rejects unsupported dates, times, durations and periods rather
+than silently treating different values as equal. Native passthrough apply and
+binary-payload checks are separate from diagnostic state hashing. NumPy temporal
+arrays retain their supported array encoding; no new scalar codec is implied.
+
+A skipped fitted step has no apply checks and reports
+`state_validation: unavailable`. An unrecorded split marker has no report entry
+at all. Neither result is a successful test of running that training operation
+on individual prediction rows.
 
 Built-in owners can inspect local saved state through `validate_inference_state`.
 The probe calls that hook on a detached artifact before the existing `apply`;
