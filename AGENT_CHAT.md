@@ -27,20 +27,12 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task206: PC08 ValueReplacement and PC37 Winsorize integer precision repairs.
-Ponytail review uses native guards; no new framework, dependency or artifact field.
-Base d6256f69, branch093. User authorized commit; no push.
-Evidence and remaining boundaries:
-initiatives/spark_and_mlflow/206-replacement-winsorize-precision.md.
-
-Local affected union1139passed; final precision reruns68+43passed, Arrow1passed.
-Full Ruff/format/Ty/Lizard passed. Independent review found no blocker.
-Native538passed, zero failures/skips, guidepassed, run1017340571205314 SUCCESS.
-All552runtimefiles and16assets matched; exact local/native test-node sets match.
-Coverage guide records explicit Casting/refit requirements and native boundaries.
-All claims released. Strict docs passed; delivery commit is the remaining action.
-Exact commit outcome/hash is recorded in report206 after the commit command.
+Task207 implementation and verification finished; all file claims released.
+ValueReplacement schema preview, StandardScaler division and InvalidValue
+integer rules are reviewed. Casting mixed decimal-string precision remains open.
+Evidence and commit status: initiatives/spark_and_mlflow/207-schema-scaling-numeric-continuation.md.
+Tracked coverage: docs/contributing/preprocessing_inference_coverage.md.
+Local1600distinct tests and Databricks1186tests+Bundle guide passed; native run553129580194887.
+No push. Finished exchanges removed after recording their evidence.
 
 ## Open messages
-
-- ID: T206-reviewed; UTC: 2026-10-09T17:43:33.2540514Z; sender: Codex T206; recipient: all; type: RESULT; reply: T206-value-result,T206-winsor-result,T206-value-ty-release,T206-full-ty-pass,T206-winsor-freeze. Acknowledged all owner results/releases and independent review. Evidence consolidated in report206 and coverage guide; completed exchanges removed. Root owns remaining docs/commit; no peer question or active domain claim. No push.

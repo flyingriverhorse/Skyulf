@@ -448,33 +448,32 @@ def test_robust_accepts_numpy_boolean_flags_saved_by_real_fit(flag):
     assert state["with_centering"] is flag
 
 
-def test_polars_nonbinary_scale_replays_exactly_across_saved_requests(tmp_path, monkeypatch):
+@pytest.mark.parametrize("node,context", [("MaxAbsScaler", "row"), ("StandardScaler", "unknown")])
+def test_polars_nonbinary_scale_replays_exactly_across_saved_requests(
+    tmp_path, monkeypatch, node, context
+):
     """Saved native scaling must use identical arithmetic for batches and singleton requests."""
-    train = pl.DataFrame(
-        {"x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0], "target": [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]}
-    )
+    train = pl.DataFrame({"x": [-5.0, 5.0], "target": [-10.0, 10.0]})
     pipeline = SkyulfPipeline(
         {
-            "preprocessing": [
-                {"name": "scale", "transformer": "MaxAbsScaler", "params": {"columns": ["x"]}}
-            ],
+            "preprocessing": [{"name": "scale", "transformer": node, "params": {"columns": ["x"]}}],
             "modeling": {"type": "linear_regression"},
         }
     )
     pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="target")
     save_local_pipeline(pipeline, tmp_path / "scale")
     artifact = load_local_pipeline(tmp_path / "scale")
-    _poison_fit(monkeypatch, "MaxAbsScaler")
+    _poison_fit(monkeypatch, node)
     sample = pl.DataFrame({"x": [None, 2.0, -10.0, 200.0, 6.0]})
     state = artifact.pipeline.feature_engineer.fitted_steps[0]["artifact"]
     assert state["scale"] == [5.0]
-    applier = NodeRegistry.get_applier("MaxAbsScaler")()
+    applier = NodeRegistry.get_applier(node)()
     full = applier.apply(sample, state)
     singleton = pl.concat([applier.apply(sample.slice(i, 1), state) for i in range(len(sample))])
     assert_polars_frame_equal(full, singleton, check_exact=True)
     result = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(2,))
     step = result["steps"][0]
-    assert step["context"] == "row" and step["state_validation"] == "node_owned"
+    assert step["context"] == context and step["state_validation"] == "node_owned"
     check = next(item for item in step["checks"] if item["name"] == "chunks:1")
     assert check["status"] == "passed"
     assert step["status"] == "passed", step
@@ -550,3 +549,113 @@ def test_maxabs_decimal_keeps_native_expression_boundary():
     for request in (sample, sample.slice(1, 1), sample.head(0)):
         expected = request.with_columns((pl.col("x") / 5.0).alias("x"))
         assert_polars_frame_equal(applier.apply(request, state), expected, check_exact=True)
+
+
+@pytest.mark.parametrize("dtype", [pl.Float32, pl.Float64, pl.Int8, pl.Int64, pl.UInt16, pl.UInt64])
+@pytest.mark.parametrize("stat_dtype", [np.float32, np.float64, np.int16, np.int64])
+@pytest.mark.parametrize("with_mean", [False, True])
+def test_standard_polars_preserves_dtype_and_exact_request_partitions(dtype, stat_dtype, with_mean):
+    """Saved NumPy statistic types must survive consistent division on empty, lazy and split input."""
+    values: list[float | None] = [None, 2, 6, 100, 0]
+    if dtype.is_float():
+        values += [-0.0, float("nan"), float("inf"), -float("inf")]
+    sample = pl.DataFrame({"x": pl.Series(values, dtype=dtype), "keep": range(len(values))})
+    state = {
+        "columns": ["missing", "x"],
+        "mean": np.array([100, 0], dtype=stat_dtype),
+        "scale": np.array([100, 5], dtype=stat_dtype),
+        "with_mean": with_mean,
+        "with_std": True,
+    }
+    before, saved = sample.clone(), pickle.dumps(state)
+    applier = NodeRegistry.get_applier("StandardScaler")()
+    full = applier.apply(sample, state)
+    centered = pl.col("x") - state["mean"][1] if with_mean else pl.col("x")
+    legacy = sample.select((centered / state["scale"][1]).alias("x"))
+    assert full["x"].dtype == legacy["x"].dtype
+    expected = np.divide(
+        sample.select(centered).to_series().to_numpy(),
+        state["scale"][1:],
+        dtype=str(legacy["x"].dtype).lower(),
+    )
+    np.testing.assert_array_equal(full["x"].to_numpy(), expected)
+    assert full["x"].is_null().equals(sample["x"].is_null())
+    for size in (1, 2, 3):
+        parts = [applier.apply(sample.slice(i, size), state) for i in range(0, len(sample), size)]
+        assert_polars_frame_equal(pl.concat(parts), full, check_exact=True)
+    assert_polars_frame_equal(applier.apply(sample.head(0), state), full.head(0), check_exact=True)
+    lazy = applier.apply(sample.lazy(), state)
+    assert isinstance(lazy, pl.LazyFrame)
+    assert_polars_frame_equal(lazy.collect(), full, check_exact=True)
+    assert_polars_frame_equal(
+        applier.apply(sample.reverse(), state), full.reverse(), check_exact=True
+    )
+    if dtype.is_float():
+        assert np.signbit(full["x"][5]) and full["x"].is_nan()[6]
+    assert_polars_frame_equal(sample, before)
+    assert pickle.dumps(state) == saved
+
+
+@pytest.mark.parametrize("with_mean,with_std", list(product([False, True], repeat=2)))
+def test_standard_polars_zero_scale_and_disabled_flags_preserve_native_output(with_mean, with_std):
+    """Zero-scale guards and disabled options must retain existing Float32 promotion and values."""
+    sample = pl.DataFrame({"x": pl.Series([None, 2, 6, -0.0], dtype=pl.Float32)})
+    state = {
+        "columns": ["x"],
+        "mean": [2.0],
+        "scale": [0.0],
+        "with_mean": with_mean,
+        "with_std": with_std,
+    }
+    expression = pl.col("x")
+    if with_mean:
+        expression = expression - np.float64(2)
+    if with_std:
+        expression = expression / 1.0
+    expected = sample.with_columns(expression)
+    applier = NodeRegistry.get_applier("StandardScaler")()
+    assert_polars_frame_equal(applier.apply(sample, state), expected, check_exact=True)
+    assert_polars_frame_equal(
+        applier.apply(sample.head(0), state), expected.head(0), check_exact=True
+    )
+
+
+@pytest.mark.parametrize(
+    "dtype,values",
+    [
+        (pl.Decimal(scale=1), [Decimal("2"), Decimal("6"), None]),
+        (pl.Int128, [2, 6, None]),
+        (pl.Boolean, [True, False, None]),
+    ],
+)
+def test_standard_polars_retains_nonprimitive_expression_boundary(dtype, values):
+    """Types outside NumPy's primitive bridge must keep the existing Polars expression semantics."""
+    sample = pl.DataFrame({"x": pl.Series(values, dtype=dtype)})
+    state = {"columns": ["x"], "mean": None, "scale": [5.0], "with_mean": False}
+    applier = NodeRegistry.get_applier("StandardScaler")()
+    for request in (sample, sample.slice(1, 1), sample.head(0)):
+        expected = request.with_columns((pl.col("x") / np.float64(5)).alias("x"))
+        assert_polars_frame_equal(applier.apply(request, state), expected, check_exact=True)
+
+
+@pytest.mark.parametrize("value", [0.0, -0.0, 1e-320, 1.0, None])
+def test_standard_polars_tiny_scale_uses_exact_native_division(value):
+    """Reciprocal overflow must not turn finite quotients or signed zeros into infinities or NaNs."""
+    sample = pl.DataFrame({"x": [value, 1e-320]})
+    state = {"columns": ["x"], "mean": None, "scale": [1e-320], "with_mean": False}
+    before, saved = sample.clone(), pickle.dumps(state)
+    applier = NodeRegistry.get_applier("StandardScaler")()
+    with np.errstate(over="ignore", invalid="ignore"):
+        expected = np.divide(sample["x"].to_numpy(), 1e-320)
+        full = applier.apply(sample, state)
+        singleton = pl.concat(
+            [applier.apply(sample.slice(i, 1), state) for i in range(len(sample))]
+        )
+        empty = applier.apply(sample.head(0), state)
+    np.testing.assert_array_equal(full["x"].to_numpy(), expected)
+    np.testing.assert_array_equal(np.signbit(full["x"].to_numpy()), np.signbit(expected))
+    assert full["x"].is_null().equals(sample["x"].is_null())
+    assert_polars_frame_equal(full, singleton, check_exact=True)
+    assert_polars_frame_equal(empty, full.head(0), check_exact=True)
+    assert_polars_frame_equal(sample, before)
+    assert pickle.dumps(state) == saved

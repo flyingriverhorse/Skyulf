@@ -410,6 +410,24 @@ def test_invalid_integer_null_replacement_retains_empty_and_chunk_schema(monkeyp
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_invalid_fractional_rules_require_explicit_casting(engine, monkeypatch):
+    """Diagnostics must expose unsafe integer rules and accept an explicitly floating feature."""
+    frame = _native(pd.DataFrame({"number": [-1, 2]}), engine)
+    config = {"columns": ["number"], "rule": "negative", "replacement": -0.5}
+    record = _record("InvalidValueReplacement", engine, config, frame)
+    cast_record = _record("Casting", engine, {"column_types": {"number": "float64"}}, frame)
+    floating = cast_record["applier"].apply(frame, cast_record["artifact"])
+    floating_record = _record("InvalidValueReplacement", engine, config, floating)
+
+    detail, _ = _probe(record, frame, engine, monkeypatch)
+    assert detail["status"] == "failed", detail
+    assert detail["checks"][0]["reason"] == "apply_error"
+    detail, output = _probe(floating_record, floating, engine, monkeypatch)
+    assert detail["status"] == "passed", detail
+    assert output["number"].to_list() == [-0.5, 2.0]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_alias_numpy_rules_are_inspected_without_rewriting(engine, monkeypatch):
     """Local alias inspection must retain genuine NumPy scalar values saved by fit."""
     config = {

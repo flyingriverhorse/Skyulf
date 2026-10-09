@@ -11,7 +11,7 @@ from ...registry import NodeRegistry
 from ...utils import resolve_columns
 from .._artifacts import ValueReplacementArtifact
 from .._fitted_validation import _columns, local_scalar, local_state_fields
-from .._helpers import resolve_valid_columns
+from .._helpers import integer_replacement_value, resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -158,27 +158,6 @@ def _pandas_dtype_kind(dtype: Any) -> str:
     return kind if kind in ("i", "u", "f", "b") else ""
 
 
-def _integer_replacement_value(value: Any, dtype: Any) -> int | None:
-    """Normalize a scalar only when the native integer dtype can represent it exactly."""
-    if pd.isna(value):
-        return None
-    try:
-        integer = int(value)
-        if integer != value:
-            raise ValueError("Fractional integer replacement.")
-        if hasattr(dtype, "is_integer"):
-            pl.Series([integer], dtype=dtype, strict=True)
-        else:
-            nullable_dtype: Any = f"{'U' if dtype.kind == 'u' else ''}Int{dtype.itemsize * 8}"
-            pd.array([integer], dtype=nullable_dtype)
-    except (OverflowError, TypeError, ValueError) as exc:
-        raise ValueError(
-            f"ValueReplacement requires replacements representable in {dtype}. "
-            "Use an explicit Casting step before fractional or out-of-range numeric rules."
-        ) from exc
-    return integer
-
-
 def _integer_replacement_rules(
     dtype: Any, pairs: list[tuple[Any, Any]]
 ) -> tuple[list[tuple[Any, Any]], bool]:
@@ -195,7 +174,7 @@ def _integer_replacement_rules(
     for key, value in _integer_replacement_keys(dtype, pairs):
         if not pd.isna(value):
             if pd.api.types.is_number(value) and not pd.api.types.is_bool(value):
-                value = _integer_replacement_value(value, dtype)
+                value = integer_replacement_value(value, dtype, "ValueReplacement")
             else:
                 integer_output = False
         rules.append((key, value))
@@ -210,7 +189,7 @@ def _integer_replacement_keys(dtype: Any, pairs: list[tuple[Any, Any]]) -> list[
     for key, value in pairs:
         if not pd.isna(key) and pd.api.types.is_number(key):
             try:
-                key = _integer_replacement_value(key, dtype)
+                key = integer_replacement_value(key, dtype, "ValueReplacement")
             except ValueError:
                 continue
         rules.append((key, value))
@@ -351,6 +330,54 @@ def _validate_replacement_rules(raw: dict) -> None:
         raise ValueError("ValueReplacement scalar/list rules have incompatible lengths.")
 
 
+def _configured_mapping(config: dict[str, Any]) -> Any:
+    """Give nonempty UI pairs the same precedence in fitting and schema preview."""
+    replacements = config.get("replacements")
+    if replacements:
+        return {item["old"]: item["new"] for item in replacements}
+    return config.get("mapping")
+
+
+def _schema_replacement_rules(
+    config: dict[str, Any], column: str
+) -> dict[Any, Any] | list[tuple[Any, Any]]:
+    """Select active rules for one column without executing a replacement."""
+    mapping = _configured_mapping(config)
+    to_replace = config.get("to_replace")
+    if not mapping and to_replace is not None and _is_mapping_like(to_replace):
+        mapping = dict(to_replace.items())
+    if mapping:
+        if any(isinstance(value, dict) for value in mapping.values()):
+            mapping = mapping.get(column, {})
+        return mapping
+    if to_replace is None:
+        return []
+    return _replacement_pairs(to_replace, config.get("value"))
+
+
+def _replacement_output_dtype(
+    label: str, configured: dict[Any, Any] | list[tuple[Any, Any]]
+) -> str | None:
+    """Retain definite native integer/object types and leave data-dependent types unknown."""
+    if not configured:
+        return label
+    dtype = pd.api.types.pandas_dtype(label)
+    kind = _pandas_dtype_kind(dtype)
+    rules = (
+        list(_coerce_mapping_keys(configured, kind).items())
+        if isinstance(configured, dict)
+        else _coerce_replacement_pairs(configured, kind)
+    )
+    rules, integer_output = _integer_replacement_rules(dtype, rules)
+    if not rules or label == "object":
+        return label
+    if not integer_output:
+        return None
+    if any(value is None for _, value in rules):
+        return str(pd.Series([], dtype=dtype).convert_dtypes().dtype)
+    return label
+
+
 class ValueReplacementApplier(BaseApplier):
     """Replace configured values in the resolved columns, leaving other cells alone.
 
@@ -438,9 +465,29 @@ class ValueReplacementCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Pass the input schema through, since only cell values are rewritten."""
-        # Value mapping replaces values in place; column set is preserved.
-        return input_schema
+        """Preserve columns and report only output dtypes guaranteed by the active rules.
+
+        Integer null rules expose their native nullable type. Data-dependent or
+        unsupported replacements omit the affected dtype; consumers can still
+        validate column references and display the type as unknown.
+        """
+        dtypes = dict(input_schema.dtypes)
+        for column in config.get("columns") or []:
+            if column not in dtypes:
+                continue
+            try:
+                label = _replacement_output_dtype(
+                    dtypes[column], _schema_replacement_rules(config, column)
+                )
+            except (TypeError, ValueError, OverflowError):
+                label = None
+            if label is None:
+                dtypes.pop(column)
+            else:
+                dtypes[column] = label
+        if dtypes == input_schema.dtypes:
+            return input_schema
+        return SkyulfSchema.from_columns(input_schema.columns, dtypes)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> ValueReplacementArtifact:  # pylint: disable=arguments-differ
@@ -451,14 +498,10 @@ class ValueReplacementCalculator(BaseCalculator):
         to fall back on when no mapping survived.
         """
         cols = resolve_columns(X, config)
-        mapping = config.get("mapping")
-        replacements = config.get("replacements")
-        if replacements:
-            mapping = {item["old"]: item["new"] for item in replacements}
         return {
             "type": "value_replacement",
             "columns": cols,
-            "mapping": mapping,
+            "mapping": _configured_mapping(config),
             "to_replace": config.get("to_replace"),
             "value": config.get("value"),
         }

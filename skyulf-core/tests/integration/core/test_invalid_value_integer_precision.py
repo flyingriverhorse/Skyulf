@@ -1,4 +1,4 @@
-"""OC-297: infinity-only cleanup must preserve exact integer observations."""
+"""Invalid-value numeric rules and infinity cleanup must preserve exact integer observations."""
 
 from typing import Any
 
@@ -14,6 +14,156 @@ from skyulf.preprocessing.cleaning.invalid_value import (
     InvalidValueReplacementApplier,
     InvalidValueReplacementCalculator,
 )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "dtype,replacement", [("int64", 0.5), ("uint64", -1), ("int8", 128), ("int64", np.inf)]
+)
+def test_integer_rules_require_representable_numeric_replacements(engine, dtype, replacement):
+    """Configured numeric rules must reject unsafe casts even when the request is unmatched or empty."""
+    frame = pd.DataFrame({"value": pd.Series([0, 2], dtype=dtype)})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"columns": ["value"], "rule": "zero", "replacement": replacement}
+    )
+    for chunk in (frame, frame.tail(1), frame.head(0)):
+        with pytest.raises(ValueError, match="Casting"):
+            InvalidValueReplacementApplier().apply(chunk, state)
+    assert frame["value"].to_list() == [0, 2]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("dtype,large", [("int64", 2**53 + 1), ("uint64", 2**64 - 1)])
+def test_integral_float_replacements_preserve_exact_integer_outputs(engine, dtype, large):
+    """An integral replacement must not cause native expression promotion to round another row."""
+    frame = pd.DataFrame({"value": pd.Series([0, large], dtype=dtype)})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(frame, {"rule": "zero", "replacement": 1.0})
+    for chunk in (frame, frame.tail(1), frame.head(0)):
+        result = InvalidValueReplacementApplier().apply(chunk, state)
+        assert result["value"].dtype == chunk["value"].dtype
+        assert result["value"].to_list() == (
+            [1, large] if len(chunk) == 2 else chunk["value"].to_list()
+        )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "kind,limit,expected",
+    [
+        ("max_value", float(2**53), [2**53, 0, 0]),
+        ("min_value", float(2**53 + 2), [0, 0, 2**53 + 2]),
+    ],
+)
+def test_integer_range_uses_exact_integral_threshold_comparisons(engine, kind, limit, expected):
+    """Floating representations of integral bounds must not merge adjacent large integer rows."""
+    values = [2**53, 2**53 + 1, 2**53 + 2]
+    frame = pd.DataFrame({"value": values})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"rule": "custom_range", kind: limit, "replacement": 0}
+    )
+    result = InvalidValueReplacementApplier().apply(frame, state)
+    assert result["value"].to_list() == expected
+    assert frame["value"].to_list() == values
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("config", [{}, {"replace_inf": True}, {"rule": "custom_range"}])
+def test_integer_noop_rules_do_not_validate_unused_fractional_replacements(engine, config):
+    """An impossible infinity match or absent range must retain the original no-op contract."""
+    frame = pd.DataFrame({"value": pd.Series([0, 2**64 - 1], dtype="UInt64")})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(frame, {"replacement": 0.5, **config})
+    for chunk in (frame, frame.head(0)):
+        result = InvalidValueReplacementApplier().apply(chunk, state)
+        assert result.equals(chunk)
+        assert result["value"].dtype == chunk["value"].dtype
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("limit", [float(2**64), np.inf])
+def test_integer_comparison_bounds_need_not_fit_column_dtype(engine, limit):
+    """An upper bound beyond UInt64 is still a valid comparison that must preserve all rows."""
+    frame = pd.DataFrame({"value": pd.Series([0, 2**64 - 1], dtype="UInt64")})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"rule": "custom_range", "max_value": limit, "replacement": 0}
+    )
+    result = InvalidValueReplacementApplier().apply(frame, state)
+    assert result.equals(frame)
+    assert result["value"].dtype == frame["value"].dtype
+
+
+@pytest.mark.parametrize("dtype", ["Int64", "UInt64", "int64[pyarrow]", "uint64[pyarrow]"])
+def test_integral_numeric_rules_preserve_pandas_extension_types(dtype):
+    """Normalization must retain nullable and Arrow masks, widths and exact large observations."""
+    if "pyarrow" in dtype:
+        pytest.importorskip("pyarrow")
+    frame = pd.DataFrame({"value": pd.Series([0, 2**53 + 1, None], dtype=dtype)})
+    expected = frame.copy()
+    expected.loc[0, "value"] = 1
+    state = InvalidValueReplacementCalculator().fit(frame, {"rule": "zero", "replacement": 1.0})
+    for chunk in (frame, frame.tail(2), frame.head(0)):
+        result = InvalidValueReplacementApplier().apply(chunk, state)
+        pd.testing.assert_frame_equal(result, expected.loc[chunk.index])
+    assert int(frame["value"].to_list()[1]) == 2**53 + 1
+
+
+@pytest.mark.parametrize(
+    "dtype", ["int8[pyarrow]", "uint8[pyarrow]", "int64[pyarrow]", "uint64[pyarrow]"]
+)
+@pytest.mark.parametrize("kind", ["min_value", "max_value"])
+@pytest.mark.parametrize("limit", [float(2**63), float(2**64), float(-(2**64))])
+def test_arrow_integer_range_masks_keep_exact_out_of_range_comparisons(dtype, kind, limit):
+    """Arrow scalar boxing must not reject bounds or round integers at the signed/unsigned limits."""
+    pytest.importorskip("pyarrow")
+    bounds = np.iinfo(np.dtype(dtype.split("[")[0]))
+    values = [int(bounds.min), 0, int(bounds.max), None]
+    frame = pd.DataFrame({"value": pd.Series(values, dtype=dtype)})
+    expected = pd.DataFrame(
+        {
+            "value": pd.Series(
+                [
+                    7
+                    if value is not None
+                    and (value < int(limit) if kind == "min_value" else value > int(limit))
+                    else value
+                    for value in values
+                ],
+                dtype=dtype,
+            )
+        }
+    )
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"rule": "custom_range", kind: limit, "replacement": 7}
+    )
+    for chunk in (frame, frame.tail(2), frame.head(0)):
+        result = InvalidValueReplacementApplier().apply(chunk, state)
+        pd.testing.assert_frame_equal(result, expected.loc[chunk.index])
+    assert frame["value"].iloc[2] == int(bounds.max)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("replacement", [True, "missing"])
+def test_integer_rules_keep_nonnumeric_replacement_engine_semantics(engine, replacement):
+    """Boolean and string replacements keep each engine's established type behavior."""
+    frame = pd.DataFrame({"value": [0, 2**53 + 1]})
+    frame = pl.from_pandas(frame) if engine == "polars" else frame
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"rule": "zero", "replacement": replacement}
+    )
+    result = InvalidValueReplacementApplier().apply(frame, state)
+    if engine == "pandas":
+        assert result["value"].dtype == object
+        assert result["value"].to_list() == [replacement, 2**53 + 1]
+    elif replacement is True:
+        assert result["value"].dtype == pl.Int64
+        assert result["value"].to_list() == [1, 2**53 + 1]
+    else:
+        assert result["value"].dtype == pl.String
+        assert result["value"].to_list() == ["missing", str(2**53 + 1)]
 
 
 def _integer_frame(engine: str) -> Any:

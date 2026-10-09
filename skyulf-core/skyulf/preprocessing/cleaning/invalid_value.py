@@ -15,7 +15,7 @@ from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import InvalidValueReplacementArtifact
 from .._fitted_validation import _columns, local_boolean, local_scalar, local_state_fields
 from .._helpers import auto_detect_numeric_columns as _auto_detect_numeric_columns
-from .._helpers import resolve_valid_columns
+from .._helpers import integer_replacement_value, resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -27,12 +27,21 @@ def _invalid_rule_polars(
     final_replacement: Any,
     min_value: Any,
     max_value: Any,
+    replacement_dtype: Any = None,
 ) -> Any:
     """Apply a single invalid-value rule to a Polars expression."""
     if rule in ("negative", "negative_to_nan"):
-        return pl.when(expr < 0).then(pl.lit(final_replacement)).otherwise(expr)
+        return (
+            pl.when(expr < 0)
+            .then(pl.lit(final_replacement, dtype=replacement_dtype))
+            .otherwise(expr)
+        )
     if rule == "zero":
-        return pl.when(expr == 0).then(pl.lit(final_replacement)).otherwise(expr)
+        return (
+            pl.when(expr == 0)
+            .then(pl.lit(final_replacement, dtype=replacement_dtype))
+            .otherwise(expr)
+        )
     if rule == "custom_range":
         if min_value is not None and max_value is not None:
             cond = (expr < min_value) | (expr > max_value)
@@ -42,7 +51,9 @@ def _invalid_rule_polars(
             cond = expr > max_value
         else:
             return expr
-        return pl.when(cond).then(pl.lit(final_replacement)).otherwise(expr)
+        return (
+            pl.when(cond).then(pl.lit(final_replacement, dtype=replacement_dtype)).otherwise(expr)
+        )
     return expr
 
 
@@ -58,6 +69,9 @@ def _invalid_rule_pandas_mask(
     if rule == "zero":
         return series == 0
     if rule == "custom_range":
+        if isinstance(series.dtype, pd.ArrowDtype) and pd.api.types.is_integer_dtype(series.dtype):
+            # Arrow boxes Python bounds as signed int64, even for uint64 columns.
+            series = series.convert_dtypes(dtype_backend="numpy_nullable")
         if min_value is not None and max_value is not None:
             return (series < min_value) | (series > max_value)
         if min_value is not None:
@@ -93,6 +107,22 @@ def _is_null_replacement(value: Any) -> bool:
     )
 
 
+def _integer_comparison_bound(value: Any) -> Any:
+    """Compare integral floating bounds as integers without limiting their range."""
+    if isinstance(value, (float, np.floating)) and np.isfinite(value) and value == int(value):
+        return int(value)
+    return value
+
+
+def _integer_rule_replacement(value: Any, dtype: Any) -> Any:
+    """Validate numeric integer rules while retaining native boolean and string replacements."""
+    if _is_null_replacement(value):
+        return None
+    if pd.api.types.is_number(value) and not pd.api.types.is_bool(value):
+        return integer_replacement_value(value, dtype, "InvalidValueReplacement")
+    return value
+
+
 # The frontend's "mode" dropdown offers a few convenience presets that don't
 # have a matching entry in `_invalid_rule_pandas_mask`/`_invalid_rule_polars`
 # (which only understand "negative"/"negative_to_nan", "zero", and
@@ -121,17 +151,42 @@ def _normalize_rule(
     return _RULE_ALIASES.get(raw_rule, raw_rule), min_value, max_value  # ty: ignore[no-matching-overload]
 
 
+def _has_numeric_rule(rule: Any, min_value: Any, max_value: Any) -> bool:
+    """Identify configured rules that actually compare numeric values."""
+    return rule in ("negative", "negative_to_nan", "zero") or (
+        rule == "custom_range" and (min_value is not None or max_value is not None)
+    )
+
+
 def _has_numeric_operation(params: Mapping[str, Any]) -> bool:
     """Identify rules and infinity flags that actually compare numeric values."""
-    rule = params.get("rule")
     return bool(
         params.get("replace_inf")
         or params.get("replace_neg_inf")
-        or rule in ("negative", "negative_to_nan", "zero")
-        or (
-            rule == "custom_range"
-            and (params.get("min_value") is not None or params.get("max_value") is not None)
+        or _has_numeric_rule(params.get("rule"), params.get("min_value"), params.get("max_value"))
+    )
+
+
+def _invalid_column_polars(col: str, dtype: Any, params: dict[str, Any]) -> Any:
+    """Build a numeric column expression without widening exact integer rules."""
+    expr = pl.col(col)
+    replacement = _resolve_invalid_replacement(params)
+    rule, minimum, maximum = params.get("rule"), params.get("min_value"), params.get("max_value")
+    replacement_dtype = None
+    if not dtype.is_integer():
+        expr = _invalid_inf_replacement_polars(
+            expr,
+            params.get("replace_inf", False),
+            params.get("replace_neg_inf", False),
+            replacement,
         )
+    elif _has_numeric_rule(rule, minimum, maximum):
+        replacement = _integer_rule_replacement(replacement, dtype)
+        minimum, maximum = _integer_comparison_bound(minimum), _integer_comparison_bound(maximum)
+        if replacement is None or type(replacement) is int:
+            replacement_dtype = dtype
+    return _invalid_rule_polars(expr, rule, replacement, minimum, maximum, replacement_dtype).alias(
+        col
     )
 
 
@@ -169,6 +224,9 @@ class InvalidValueReplacementApplier(BaseApplier):
     contain infinities and must not be widened to a floating-point sentinel.
     Active integer rules replacing values with None, NaN or pd.NA use nullable integers,
     retaining their width and exact values in full, singleton and empty requests.
+    Numeric replacements must be exactly representable in the current integer dtype;
+    fractional or out-of-range replacements require an explicit Casting step first.
+    Integral floating range bounds are compared as integers to retain exact ordering.
     """
 
     @staticmethod
@@ -229,26 +287,7 @@ class InvalidValueReplacementApplier(BaseApplier):
         if not valid or not _has_numeric_operation(params):
             return X, _y
 
-        replace_inf = params.get("replace_inf", False)
-        replace_neg_inf = params.get("replace_neg_inf", False)
-        rule = params.get("rule")
-        final_replacement = _resolve_invalid_replacement(params)
-        min_value = params.get("min_value")
-        max_value = params.get("max_value")
-
-        exprs = []
-        for col in valid:
-            expr = pl.col(col)
-            integer = X[col].dtype.is_integer()
-            if not integer:
-                expr = _invalid_inf_replacement_polars(
-                    expr, replace_inf, replace_neg_inf, final_replacement
-                )
-            replacement = (
-                None if integer and _is_null_replacement(final_replacement) else final_replacement
-            )
-            expr = _invalid_rule_polars(expr, rule, replacement, min_value, max_value)
-            exprs.append(expr.alias(col))
+        exprs = [_invalid_column_polars(col, X[col].dtype, params) for col in valid]
         return X.with_columns(exprs), _y
 
     @staticmethod
@@ -268,16 +307,15 @@ class InvalidValueReplacementApplier(BaseApplier):
             to_replace.append(np.inf)
         if replace_neg_inf:
             to_replace.append(-np.inf)
-        # Skip entirely when no rule/inf-replacement is configured for this
-        # column -- a true no-op, matching the polars path. Previously this
-        # unconditionally ran pd.to_numeric(..., errors="coerce"), which
-        # silently NaN'd out non-numeric columns even when nothing was
-        # actually configured to change.
-        if not to_replace and rule is None:
-            return
         df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
         if to_replace:
             df_out[col] = df_out[col].replace(to_replace, final_replacement)
+        if pd.api.types.is_integer_dtype(df_out[col]) and _has_numeric_rule(
+            rule, min_value, max_value
+        ):
+            final_replacement = _integer_rule_replacement(final_replacement, df_out[col].dtype)
+            min_value = _integer_comparison_bound(min_value)
+            max_value = _integer_comparison_bound(max_value)
         mask = _invalid_rule_pandas_mask(df_out[col], rule, min_value, max_value)
         if mask is not None:
             if pd.api.types.is_integer_dtype(df_out[col]) and _is_null_replacement(

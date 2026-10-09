@@ -46,6 +46,27 @@ def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     return [c for c in dict.fromkeys(requested) if c in cols_set]
 
 
+def integer_replacement_value(value: Any, dtype: Any, operation: str) -> int | None:
+    """Normalize a scalar only when the native integer dtype can represent it exactly."""
+    if pd.isna(value):
+        return None
+    try:
+        integer = int(value)
+        if integer != value:
+            raise ValueError("Fractional integer replacement.")
+        if hasattr(dtype, "is_integer"):
+            pl.Series([integer], dtype=dtype, strict=True)
+        else:
+            nullable_dtype: Any = f"{'U' if dtype.kind == 'u' else ''}Int{dtype.itemsize * 8}"
+            pd.array([integer], dtype=nullable_dtype)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{operation} requires replacements representable in {dtype}. "
+            "Use an explicit Casting step before fractional or out-of-range numeric rules."
+        ) from exc
+    return integer
+
+
 def promote_configured_columns_to_float64(
     input_schema: SkyulfSchema, config: dict[str, Any]
 ) -> SkyulfSchema:

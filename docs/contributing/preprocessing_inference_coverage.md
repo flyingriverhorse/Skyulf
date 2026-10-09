@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task206 integer-contract repairs.
+Status snapshot: **2026-10-09**, branch `093`, Task207 schema/numeric continuation.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -53,7 +53,7 @@ declares context. New project-defined classes are not part of the fixed 63.
 | --- | --- | --- |
 | `SimpleImputer` | `row` for matched reviewed declarations | Review additional local modes/engines independently |
 | `GroupImputer` | `row` for saved group lookups in reviewed declarations | Verify fallback/null-group modes independently |
-| `StandardScaler` | `row` for matched reviewed declarations | Exact Polars chunk arithmetic may differ by rounding |
+| `StandardScaler` | `row` for matched reviewed declarations | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; Polars declaration coverage is unchanged. |
 | `MinMaxScaler` | `row` for matched reviewed declarations | Boundaries, clip modes and engines remain configuration-specific |
 | `OneHotEncoder` | `row` for matched reviewed declarations | A local default such as `max_categories=20` may report `unknown` |
 | `FeatureInteraction` | `row` for matched reviewed declarations | Other feature-generation classes have separate entries below |
@@ -75,7 +75,7 @@ The scope column is part of the result, not an unconditional parity promise.
 | ID | Implementation | Inspected scope and remaining boundary |
 | --- | --- | --- |
 | PC-02 | `CustomBinning` | Fixed edges, ordinal/bin-index/range labels, missing policies, empty no-ops. Pandas numeric labels retain nullable `Int64`; missing-label mode retains object dtype, including singleton and empty requests. |
-| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Integer numeric rules preserve width and precision; incompatible numeric replacements require explicit Casting, including empty/unmatched requests. Integer null rules use nullable output. Float/object dtype boundaries remain; arbitrary mapping objects/Series are outside inspection. |
+| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Integer numeric rules preserve width and precision; incompatible numeric replacements require explicit Casting, including empty/unmatched requests. Integer null rules use nullable output. Preview reports definite integer/object types and leaves uncertain types unknown. Float/mixed-type runtime boundaries remain; arbitrary mapping objects/Series are outside inspection. |
 | PC-09 | `DropMissingColumns` | Reuse saved dropped columns even when request missingness differs. Training threshold is reporting metadata, not recomputed. |
 | PC-11 | `MissingIndicator` | Saved columns and nonempty string suffix, null/NaN flags, no-op and empty frames. Non-string suffix objects are outside inspection. |
 | PC-21 | `CorrelationThreshold` | Saved drop list and enabled/disabled flag; no request correlation calculation. |
@@ -110,7 +110,8 @@ Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnost
 retains exact comparisons; no tolerance was added to hide it. Task205 repairs
 this ordinary eager-frame case through native Series division. The narrower
 Decimal, NumPy-statistic and lazy boundaries in the owner row remain open.
-StandardScaler's separate Polars rounding boundary also remains unchanged.
+Task207 corrects StandardScaler's primitive numeric division separately while
+preserving its native dtype promotion; see its remaining boundaries above.
 
 ### Eleven additional local contracts (Task197)
 
@@ -125,7 +126,7 @@ null behavior or numerical differences.
 | PC-03 | `KBinsDiscretizer` | Saved bin edges for uniform, quantile and k-means strategies; inference does not recompute bins. |
 | PC-04 | `Casting` | Frozen categories and supported scalar conversions. Explicit nullable integer choices now survive fit/schema/replay; integer/object inputs retain exact integers beside null, malformed or out-of-range values when native parsing remains integral. Legacy categories and coercive fallback casts can need whole-request context. Lowercase integer targets still choose their container from request nulls; mixed fractional parsing retains its native precision boundary. |
 | PC-05 | `AliasReplacement` | Saved standard/custom mappings, unseen inputs and nulls. Native engine limitations are retained. |
-| PC-06 | `InvalidValueReplacement` | Fixed rules and replacement values. Integer rules using None, NaN or pd.NA retain nullable integer width and exact values across full, singleton and empty requests. Infinity-only integer cleanup remains a no-op. Fractional or otherwise incompatible replacements retain native dtype/error boundaries. |
+| PC-06 | `InvalidValueReplacement` | Fixed rules and replacement values. Active numeric integer rules require exactly representable replacements; otherwise explicit Casting is required before matching rows. None, NaN or pd.NA retain nullable integer width. Integral float bounds compare as exact integers. Infinity-only integer cleanup remains a no-op. Fractional/nonfinite bounds and nonnumeric replacements retain native boundaries. |
 | PC-07 | `TextCleaning` | Saved operation order, nulls, regex and no-op settings. Slash-date normalization preserves object output for pandas object/StringDtype input, including empty and null-only chunks followed by trim. Categorical mapping is unchanged; Polars still rejects unsupported regex lookbehind. |
 | PC-18 | `DateFeatures` | UTC-aware saved states, epochs, time zones, nulls, tuples and NumPy string settings. Legacy non-UTC state stays `unknown`. Existing generated-name overwrites and Polars duplicate-output errors remain visible. |
 | PC-20 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved degree/flags/columns/order and prefixes. Apply rebuilds sklearn's combinatorial expansion from configuration; it does not learn request statistics. Empty requests retain the native output schema; null-input and generated-name collision errors remain. |
@@ -788,9 +789,9 @@ keys such as `"2.0"` instead of `"2"`. Strict diagnostics continue reporting
 those mismatches. Saved artifact field layouts and worker admission are unchanged.
 Float32 widening, mixed nonnumeric replacements and native float/Decimal
 boundaries remain configuration-specific; this is not universal family closure.
-`ValueReplacement`'s configuration-only schema preview still passes input
-labels through; use fitted runtime schemas for dtype checks, including nullable
-integer outputs. Polars still rejects a NaN replacement key on integer input;
+At Task206 delivery, `ValueReplacement`'s configuration-only schema preview
+still passed input labels through; Task207 corrects that preview below.
+Polars still rejects a NaN replacement key on integer input;
 a NaN replacement value is supported as an integer null.
 
 The affected local union passed **1,139 tests** across eighteen explicit file/node
@@ -810,3 +811,71 @@ took 70.298 seconds. Wheel SHA256:
 `ac19dede21d980479f3c75d30f87ef587344bcc8913ec2897177c2f5c53379c0`.
 This verifies native Python fit/apply/predict execution. No Spark UDF, REST or
 `ai_query` routes were added; no tables, registered models or endpoints were created.
+
+### Task207 preview, StandardScaler and invalid integer rules
+
+`ValueReplacement` preview now preserves column names and reports only definite
+output dtypes. Integer null rules advertise nullable integers, including Arrow
+inputs whose runtime null conversion uses pandas nullable types. Existing
+object output stays object. If Float32 widening, mixed replacements or an
+unsupported rule prevents a definite result, only that column's dtype is
+omitted; the Canvas already displays it as `unknown`. Unaffected columns keep
+their types. UI-list precedence, nested mappings and collisions between coerced
+dictionary keys follow the existing runtime rules. Preview never fits or applies
+the pipeline, and fitted runtime schemas remain the validation authority.
+
+StandardScaler's Polars path uses native NumPy division for supported primitive
+numeric inputs and Float32/Float64 output, including lazy frames. Native Polars
+schema inference supplies the existing promotion; centering, nulls, zero-scale
+handling and saved statistics remain unchanged. This corrects chunk-dependent
+division without a tolerance or rounding layer. Ordinary bulk results can differ
+by a final bit; extreme reciprocal-overflow cases can change more substantially.
+For example, dividing `1e-320` by `1e-320` now produces `1` consistently.
+Float16, Decimal, Int128 and other unsupported expression types retain their
+previous path. MaxAbsScaler/RobustScaler boundaries listed above remain open.
+This change does not add a Polars context declaration or new worker admission.
+
+`InvalidValueReplacement` shares the existing integer scalar guard with
+`ValueReplacement`. Active integer rules normalize integral numeric sentinels
+and reject fractional, infinite or out-of-range replacements before matching
+rows, including empty or unmatched requests. Integral floating comparison
+bounds become exact integer bounds: an upper bound of `float(2**53)` must reject
+the larger integer `2**53 + 1`. Integer infinity-only cleanup and configurations
+without an effective numeric rule remain no-ops. Boolean/string replacements
+and fractional/nonfinite bounds retain their native behavior. Refit and re-save
+older pipelines whose changed integer output or numeric results affect saved
+schemas, encoders or model features; artifact field layouts are unchanged.
+
+Casting's remaining mixed-fraction boundary was reproduced rather than declared
+closed. Coercive parsing of an object column containing `2**53 + 1` and `"1.5"`
+can round the integer before conversion. A retry that removes fractional values
+does not solve mixtures also containing decimal strings such as `"1.0"`.
+No partial parser or automatic widening was added. Even strict conversion can
+silently round a large integer beside a decimal-form string such as `"1.0"`;
+rejecting observed fractional values alone is insufficient. Preserve already
+integer or canonical integer-string inputs when exact identity is required.
+Explicit nullable targets stabilize the container, while lowercase integer
+targets retain their legacy request-dependent container choice.
+
+All **1,600 distinct local tests** in eighteen explicit file selections passed.
+The first combined command passed 1,564; twenty-nine tests could not use the
+default Windows temporary folder and seven were affected by the backend import
+enabling pandas copy-on-write globally. Those thirty-six tests passed in a
+separate Core process with an explicit writable temporary folder. Passing groups
+were not repeated, and no runtime changes were made for these harness issues.
+Full Ruff, formatting, CI Ty and Lizard CCN <= 10 passed. Independent review
+passed thirty-five additional targeted probes with no remaining blocker.
+
+The same final wheel passed **1,186 tests**, zero failures or skips, plus the
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 553129580194887](https://dbc-45604623-c18b.cloud.databricks.com/jobs/972514887883844/runs/553129580194887)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and twenty-two
+test/guide/support assets matched the manifest; local collected and remote passed
+test-node sets match exactly. Pytest took 30.47 seconds with 85 warnings; the full
+run took 65.703 seconds. Wheel SHA256:
+`9bd91a3850fb74f37d44b98be59d3571b5bbbed7f561117689af98ee472f43dc`.
+The first attempt passed 1,185 tests but could not set up one test because its
+shared fixture file was missing from the archive. Adding the existing conftest
+and verifying the isolated fixture plan repaired packaging without changing the
+wheel. This validates native Python execution, not Spark UDF, REST or `ai_query`;
+no tables, registered models or endpoints were created.

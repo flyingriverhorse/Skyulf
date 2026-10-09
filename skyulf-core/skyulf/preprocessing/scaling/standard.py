@@ -93,15 +93,28 @@ class StandardScalerApplier(BaseApplier):
 
         mean_arr = np.array(mean) if mean is not None else np.zeros(len(cols))
         scale_arr = np.array(scale) if scale is not None else np.ones(len(cols))
+        schema = X.collect_schema()
 
         def _standardized_expr(col_name: str) -> Any:
             idx = cols.index(col_name)
-            e = pl.col(col_name)
+            e: Any = pl.col(col_name)
             if with_mean:
                 e = e - mean_arr[idx]
             if with_std:
                 s = scale_arr[idx]
-                e = e / (s if s != 0 else 1.0)
+                divided = e / (s if s != 0 else 1.0)
+                dtype = schema[col_name]
+                if s != 0 and (
+                    dtype in (pl.Float32, pl.Float64) or (dtype.is_integer() and dtype != pl.Int128)
+                ):
+                    output_dtype = X.lazy().select(divided).collect_schema()[col_name]
+                    if output_dtype in (pl.Float32, pl.Float64):
+                        # Use Polars' native promotion with batch-independent NumPy division.
+                        divided = cast(
+                            pl.Expr,
+                            np.divide(e, scale_arr[idx : idx + 1], dtype=str(output_dtype).lower()),
+                        )
+                e = divided
             return e.alias(col_name)
 
         exprs = [_standardized_expr(col_name) for col_name in valid]
