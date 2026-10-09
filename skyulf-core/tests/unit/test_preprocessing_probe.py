@@ -119,14 +119,14 @@ def test_probe_rejects_nested_mutable_cells(tmp_path):
 
 
 def test_probe_can_observe_local_state_outside_worker_validator_subset(tmp_path):
-    """Legitimate local defaults must be probed even when remote validation abstains."""
+    """Legitimate local missing-token state can be probed when node validation abstains."""
     artifact = _artifact(
         tmp_path,
         steps=[
             {
                 "name": "encode",
                 "transformer": "OneHotEncoder",
-                "params": {"columns": ["value"]},
+                "params": {"columns": ["value"], "include_missing": True},
             }
         ],
     )

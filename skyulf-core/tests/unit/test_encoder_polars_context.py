@@ -69,7 +69,14 @@ def test_reviewed_encoding_context_replays_saved_rows(engine, node, options):
     original = deepcopy(frame)
     state_bytes = pickle.dumps(state)
     expected_capability = ExecutionCapability(
-        engine, "apply", "local" if engine == "polars" else "python_batch", "preserve", "row"
+        engine,
+        "apply",
+        "local" if engine == "polars" else "python_batch",
+        "preserve",
+        "row",
+        config_match=(("max_categories", None),)
+        if node == "OneHotEncoder" and engine == "pandas"
+        else (),
     )
     assert get_inference_capability(node, config, state, engine=engine) == expected_capability
     target = np.array([0, 1, 1, 0])
@@ -120,11 +127,9 @@ def test_encoding_context_keeps_saved_validation_and_applier_identity(node, chan
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-@pytest.mark.parametrize(
-    "options", [{"max_categories": 20}, {"include_missing": True}, {"columns": []}]
-)
+@pytest.mark.parametrize("options", [{"include_missing": True}, {"columns": []}])
 def test_onehot_local_declaration_keeps_unreviewed_settings_unknown(engine, options):
-    """Local metadata must retain the existing infrequent, missing-token and no-op subset limits."""
+    """Local metadata must retain the existing missing-token and no-op subset limits."""
     _, config, state = _fitted("OneHotEncoder", engine, options)
     assert get_inference_capability("OneHotEncoder", config, state, engine=engine) is None
 

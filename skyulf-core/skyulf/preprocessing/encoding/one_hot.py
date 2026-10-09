@@ -323,7 +323,15 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     "OneHotEncoder",
     OneHotEncoderApplier,
     execution_capabilities=(
-        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability(
+            "pandas",
+            "apply",
+            "python_batch",
+            "preserve",
+            "row",
+            config_match=(("max_categories", None),),
+        ),
+        ExecutionCapability("pandas", "apply", "local", "preserve", "row"),
         ExecutionCapability("polars", "apply", "local", "preserve", "row"),
     ),
 )
@@ -390,6 +398,8 @@ def _check_encoder(encoder: Any, columns: list[str]) -> None:
         "drop_idx_",
         "_n_features_outs",
     }
+    if vars(encoder).get("max_categories") is not None:
+        expected.update({"_infrequent_indices", "_default_to_infrequent_mappings"})
     _fields(vars(encoder), expected)
     _encoder_options(encoder)
     if encoder.drop not in (None, "first") or encoder.n_features_in_ != len(columns):
@@ -398,25 +408,32 @@ def _check_encoder(encoder: Any, columns: list[str]) -> None:
 
 
 def _encoder_options(encoder: Any) -> None:
-    """Restrict serving to deterministic dense encoding without infrequent categories."""
+    """Restrict inspected state to deterministic dense encoding with an optional category cap."""
     if encoder.dtype is not np.int8 or encoder.feature_name_combiner != "concat":
         raise ValueError("Unsupported encoder dtype or feature-name callback.")
     if encoder.categories != "auto" or encoder.sparse_output is not False:
         raise ValueError("Encoder requires automatic categories and dense output.")
-    if encoder.max_categories is not None or encoder.min_frequency is not None:
-        raise ValueError("Infrequent-category grouping requires separate batch admission.")
-    if encoder._infrequent_enabled is not False or encoder.handle_unknown not in (
-        "ignore",
-        "error",
-    ):
+    _encoder_grouping_options(encoder)
+    if encoder.handle_unknown not in ("ignore", "error"):
         raise ValueError("Unsupported encoder inference policy.")
+
+
+def _encoder_grouping_options(encoder: Any) -> None:
+    """Bind the grouping flag to the supported positive Python integer cap."""
+    cap = encoder.max_categories
+    if cap is not None and (type(cap) is not int or cap < 1):
+        raise ValueError("Encoder category cap must be a positive integer or None.")
+    if encoder.min_frequency is not None:
+        raise ValueError("Frequency thresholds require separate context review.")
+    if encoder._infrequent_enabled is not (cap is not None):
+        raise ValueError("Encoder grouping flag disagrees with the category cap.")
 
 
 def _encoder_categories(encoder: Any, columns: list[str]) -> None:
     """Validate category widths and dropped indices before calling known name generation."""
     if type(encoder.categories_) is not list or len(encoder.categories_) != len(columns):
         raise ValueError("Encoder categories must align with columns.")
-    widths = []
+    counts = []
     for categories in encoder.categories_:
         if type(categories) is not np.ndarray or categories.ndim != 1 or not len(categories):
             raise ValueError("Encoder categories must be nonempty vectors.")
@@ -425,19 +442,76 @@ def _encoder_categories(encoder: Any, columns: list[str]) -> None:
             _scalar(value)
         if len(set(values)) != len(values):
             raise ValueError("Encoder categories must be unique.")
-        widths.append(len(values) - int(encoder.drop == "first"))
+        counts.append(len(values))
+    widths, dropped = _encoder_grouping(encoder, counts)
     if encoder._n_features_outs != widths:
         raise ValueError("Encoder output widths disagree with fitted categories.")
-    _encoder_drop_indices(encoder, len(columns))
+    _encoder_drop_indices(encoder, dropped)
 
 
-def _encoder_drop_indices(encoder: Any, count: int) -> None:
+def _encoder_grouping(encoder: Any, counts: list[int]) -> tuple[list[int], list[int]]:
+    """Bind saved rare-category indices and mappings to each capped output width."""
+    cap = encoder.max_categories
+    drop = int(encoder.drop == "first")
+    if cap is None:
+        return [count - drop for count in counts], [0] * len(counts)
+    indices = encoder._infrequent_indices
+    mappings = encoder._default_to_infrequent_mappings
+    for values in (indices, mappings):
+        if type(values) is not list or len(values) != len(counts):
+            raise ValueError("Encoder grouping must align with columns.")
+    dropped = [
+        _encoder_mapping(indices[i], mappings[i], count, cap) for i, count in enumerate(counts)
+    ]
+    return [min(count, cap) - drop for count in counts], dropped
+
+
+def _encoder_index_vector(value: Any, length: int) -> None:
+    """Require a concrete integer vector before interpreting saved category positions."""
+    if type(value) is not np.ndarray or value.ndim != 1 or value.dtype.kind not in "iu":
+        raise ValueError("Encoder grouping positions must be integer vectors.")
+    if len(value) != length:
+        raise ValueError("Encoder grouping vector has the wrong length.")
+
+
+def _encoder_mapping(indices: Any, mapping: Any, count: int, cap: int) -> int:
+    """Check the canonical fitted mapping and return the first original output category."""
+    if count < cap:
+        if indices is not None or mapping is not None:
+            raise ValueError("Unexpected infrequent-category grouping below the cap.")
+        return 0
+    _encoder_index_vector(indices, count - cap + 1)
+    _encoder_index_vector(mapping, count)
+    if (
+        not np.array_equal(indices, np.unique(indices))
+        or np.any(indices >= count)
+        or np.any(indices < 0)
+    ):
+        raise ValueError("Infrequent-category indices must be sorted, unique and in range.")
+    frequent = np.ones(count, dtype=bool)
+    frequent[indices] = False
+    expected = np.full(count, cap - 1, dtype=np.int64)
+    expected[frequent] = np.arange(cap - 1)
+    if not np.array_equal(mapping, expected):
+        raise ValueError("Encoder grouping mapping disagrees with infrequent categories.")
+    return int(np.flatnonzero(expected == 0)[0])
+
+
+def _encoder_drop_indices(encoder: Any, dropped: list[int]) -> None:
     """Bind both sklearn dropped-index fields to the supported drop policy."""
-    for indices in (encoder.drop_idx_, encoder._drop_idx_after_grouping):
+    for indices, expected in (
+        (encoder.drop_idx_, dropped),
+        (encoder._drop_idx_after_grouping, [0] * len(dropped)),
+    ):
         if encoder.drop is None:
             if indices is not None:
                 raise ValueError("Unexpected dropped category indices.")
-        elif type(indices) is not np.ndarray or indices.tolist() != [0] * count:
+        elif (
+            type(indices) is not np.ndarray
+            or indices.ndim != 1
+            or any(type(value) is not int for value in _normalize(indices.tolist()))
+            or indices.tolist() != expected
+        ):
             raise ValueError("Dropped indices must select the first fitted category.")
 
 

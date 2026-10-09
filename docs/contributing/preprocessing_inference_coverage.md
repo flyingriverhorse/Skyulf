@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task211 local median declarations.
+Status snapshot: **2026-10-09**, branch `093`, Task212 local capped one-hot declarations.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -55,7 +55,7 @@ declares context. New project-defined classes are not part of the fixed 63.
 | `GroupImputer` | `row` for saved group lookups, including local pandas/Polars median apply | Mean, median and most-frequent strategies reuse saved lookups/fallbacks; median is local-only. The `mode` alias still normalizes to most-frequent. Task210 preserves integer modes and group keys through UInt64; Int128 retains its previous conversion boundary. |
 | `StandardScaler` | `row` for matched reviewed declarations, including local Polars apply | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; local metadata does not grant worker admission. |
 | `MinMaxScaler` | `row` for matched reviewed declarations, including local Polars apply | Existing finite affine coefficients and matching feature range are required. All-null/nonfinite fits retain existing validator abstention. |
-| `OneHotEncoder` | `row` for matched reviewed declarations, including local Polars apply | Existing dense subset with `max_categories=None`, no infrequent grouping and `include_missing=False`; the default `max_categories=20` and empty artifacts remain `unknown`. |
+| `OneHotEncoder` | `row` for matched reviewed declarations, including local pandas/Polars category caps | Dense observed-category encoding with `include_missing=False`. Positive Python integer caps, including default `20` and saved infrequent grouping, are local-only; the existing uncapped pandas worker subset remains admitted. Missing-token mode, NumPy integer caps, nonfinite categories and empty artifacts remain `unknown`. |
 | `FeatureInteraction` | `row` for matched reviewed declarations, including local Polars apply | Existing degree 2–4 combinations, repetition and bias flags; Task210 preserves zero-column bias row counts. Other feature-generation classes have separate entries. |
 | `ClipValues` | `row` for matched reviewed declarations, including local Polars apply | Saved finite fixed limits and matching configuration; native dtype and numerical behavior are unchanged. |
 | `LagFeatures` | `window`, with its saved row effect | No independent-chunk probe or new history execution |
@@ -1085,3 +1085,39 @@ run took 84.135 seconds. Wheel SHA256:
 This validates native Python saved-state replay and local context diagnostics,
 including retained worker/codec rejection. It does not validate Spark UDF, REST
 or `ai_query` execution. No tables, registered models or endpoints were created.
+
+### Task212 local capped one-hot declarations
+
+OneHotEncoder now reports local `row` context in pandas and Polars for positive
+Python integer `max_categories`, including the default `20`. Its owner validates
+saved rare-category indices, their mapping to output columns, output widths and
+both dropped-category index arrays before inspecting generated feature names.
+The learned mapping is reused; inference never counts categories in the request.
+Caps below, equal to and above training cardinality are covered, including cap
+`1`, `drop_first`, zero-feature results and mixed grouped/ungrouped columns.
+
+The existing pandas `python_batch` declaration now explicitly selects
+`max_categories=None`; capped encoders receive only local declarations. Missing
+encoding, nonfinite categories, NumPy integer caps and empty no-op artifacts
+remain outside this reviewed subset. Recipe binding, exact estimator/applier
+identity, native unknown-category errors and worker rejection are retained.
+The seven admitted worker families and 63 completed initial owner reviews do
+not change.
+
+Review also found that float/boolean dropped-category indices could be accepted
+or raise an uncaught sklearn indexing error during inspection. The shared
+validator now requires integer indices after existing scalar normalization,
+which preserves sklearn's valid Python/NumPy integer entries. This strengthens
+both capped and uncapped inspection. Fit/apply code and artifact layouts are
+unchanged; no model refit or migration is required.
+
+The final local union passed **512 tests** across twelve affected files, including
+four new fit/save/fresh-process load/probe/predict cases with calculator fit
+disabled. They verify saved rare-category outputs, full/singleton prediction
+parity, immutable fitted state and actual worker rejection. Existing uncapped
+company-pipeline worker tests still pass. Full Ruff/format, full CI Ty scope and
+Lizard CCN 10 checks passed; independent Ponytail review found no remaining blocker.
+
+The matching 512-test Databricks package is prepared with exact wheel/source
+hashes. Native validation is pending explicit upload/run approval; no Task212
+Spark UDF, REST or `ai_query` execution has been claimed.

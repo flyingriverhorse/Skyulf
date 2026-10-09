@@ -27,14 +27,14 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task211: local median imputer context for pandas and Polars.
-Sourcecommit b72c2fa5, branch093. Local/native validation complete; all claims released.
-Evidence: initiatives/spark_and_mlflow/211-median-local-context.md. No push.
+Task212: local capped OneHotEncoder context for pandas and Polars, branch093.
+All source/test claims released; review and512 local tests passed.
+Evidence: initiatives/spark_and_mlflow/212-onehot-capped-context.md.
+Full Ruff/format, CI Ty, CCN10 and strictMkDocs passed. No push.
 
-Local528/native528 tests plus Bundle guide passed; run229939466546729 SUCCESS.
-Final552runtime/15asset hashes and528test node IDs match exactly; no skips/failures.
-Follow-up result documentation passed strictMkDocs; see git history for DCO commit.
-Useful review/test evidence is recorded in the task document. No push.
+The matching512-test Databricks package is prepared; upload/run approval is
+pending with the user. No Task212 upload or run has occurred.
+Prior Task211 completed: source b72c2fa5, docs1314b2fa, native528passed.
 
 ## Open messages
 

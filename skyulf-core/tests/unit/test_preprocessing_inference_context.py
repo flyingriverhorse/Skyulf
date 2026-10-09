@@ -259,7 +259,7 @@ def test_subclass_does_not_inherit_context_hook(isolated_registry):
 
 def test_valid_local_state_outside_worker_subset_stays_unknown():
     """Strict worker validators must not mislabel ordinary local state as corrupt."""
-    config = {"columns": ["group"]}
+    config = {"columns": ["group"], "include_missing": True}
     state = NodeRegistry.get_calculator("OneHotEncoder")().fit(_frame("pandas"), config)
     assert _capability("OneHotEncoder", config, state, engine="pandas") is None
 
