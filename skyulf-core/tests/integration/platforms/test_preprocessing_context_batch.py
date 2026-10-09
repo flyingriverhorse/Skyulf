@@ -147,3 +147,68 @@ def test_ten_local_contexts_reload_without_fit_in_a_fresh_process(tmp_path, engi
     reports = json.loads(result.stdout)
     assert set(reports) == set(RECIPES)
     assert all(report["status"] == "passed" for report in reports.values())
+
+
+def test_nullable_bins_and_object_replacement_reload_without_fit(tmp_path):
+    """Stable pandas output types must survive real model training and fresh-process replay."""
+    training = pd.DataFrame(
+        {
+            "x": [0.0, 1.0, 2.0, 3.0],
+            "value": pd.Series([0.0, 1.0, 2.0, 3.0], dtype=object),
+            "y": [0, 0, 1, 1],
+        }
+    )
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "replace",
+                    "transformer": "ValueReplacement",
+                    "params": {"columns": ["value"], "mapping": {0.0: 0.5}},
+                },
+                {
+                    "name": "bin",
+                    "transformer": "CustomBinning",
+                    "params": {"columns": ["x"], "bins": [0.0, 2.0, 4.0], "drop_original": True},
+                },
+            ],
+            "modeling": {
+                "type": "random_forest_regressor",
+                "params": {"n_estimators": 4, "random_state": 42},
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=training, test=training[:0]), target_column="y")
+    save_local_pipeline(pipeline, tmp_path / "model")
+    code = """
+import json, sys
+import numpy as np
+import pandas as pd
+from skyulf.registry import NodeRegistry
+from skyulf.inference.local_pipeline import load_local_pipeline
+from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
+def forbidden(*args, **kwargs):
+    # Loaded artifacts must use saved transforms, never fit again.
+    raise AssertionError('Unexpected fit during saved replay')
+for node in ('CustomBinning', 'ValueReplacement'):
+    NodeRegistry.get_calculator(node).fit = forbidden
+artifact = load_local_pipeline(sys.argv[1])
+sample = pd.DataFrame({'x': [0.0, 3.0, None, 9.0],
+                       'value': pd.Series([0.0, 3.0, None, 9.0], dtype=object)})
+report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 3))
+assert report['status'] == 'passed', report
+predictions = artifact.pipeline.predict(sample)
+singletons = np.concatenate([artifact.pipeline.predict(sample.iloc[i:i+1]) for i in range(len(sample))])
+assert np.isfinite(predictions).all()
+np.testing.assert_array_equal(predictions, singletons)
+print(json.dumps(report))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path / "model")],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    assert result.returncode == 0, result.stderr
+    assert len(json.loads(result.stdout)["steps"]) == 2

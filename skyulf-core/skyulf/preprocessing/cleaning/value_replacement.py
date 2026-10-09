@@ -151,20 +151,17 @@ def _pandas_apply_mapping(
     df_out: pd.DataFrame, valid: list[str], mapping: dict[str, Any]
 ) -> pd.DataFrame:
     is_nested = any(isinstance(v, dict) for v in mapping.values())
-    # `replace`'s implicit downcasting is deprecated (pandas GH#54710). Opt into
-    # the future (no-silent-downcast) behavior for this call only, then apply
-    # the same downcast explicitly via `infer_objects` to preserve current
-    # dtype behavior without the warning.
+    # Preserve object columns instead of inferring types from request neighbors.
     with pd.option_context("future.no_silent_downcasting", True):
         if is_nested:
             for col, map_dict in mapping.items():
                 if col in valid:
                     map_dict = _coerce_mapping_keys(map_dict, _pandas_dtype_kind(df_out[col].dtype))
-                    df_out[col] = df_out[col].replace(map_dict).infer_objects()
+                    df_out[col] = df_out[col].replace(map_dict)
         else:
             for col in valid:
                 col_map = _coerce_mapping_keys(mapping, _pandas_dtype_kind(df_out[col].dtype))
-                df_out[col] = df_out[col].replace(col_map).infer_objects()
+                df_out[col] = df_out[col].replace(col_map)
     return df_out
 
 
@@ -174,10 +171,10 @@ def _pandas_replace_pairs(
     """Keep native scalar null handling and ordered list replacement semantics."""
     if scalar and pairs:
         key, value = pairs[0]
-        return series.replace(key, value).infer_objects()
+        return series.replace(key, value)
     keys = [key for key, _ in pairs]
     values = [replacement for _, replacement in pairs]
-    return series.replace(keys, values).infer_objects()
+    return series.replace(keys, values)
 
 
 def _apply_value_replacement_pandas(

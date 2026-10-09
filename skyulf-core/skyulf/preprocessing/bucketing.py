@@ -271,7 +271,7 @@ def _apply_missing_strategy(
             binned_series = binned_series.cat.add_categories([missing_label])
         return binned_series.fillna(missing_label)
     # Numeric (ordinal/bin_index): widen to object so the label fits.
-    return binned_series.astype(object).fillna(missing_label)
+    return binned_series.astype(object).where(binned_series.notna(), missing_label)
 
 
 def _bin_one_column_pandas(
@@ -295,6 +295,9 @@ def _bin_one_column_pandas(
     if is_decimal_series(series):
         series = pd.to_numeric(series)
     binned = pd.cut(series, bins=sorted_edges, labels=labels, include_lowest=include_lowest)
+    if labels is False:
+        # Keep integer codes even when a request is empty or contains missing bins.
+        binned = binned.astype("Int64")
 
     binned = _apply_missing_strategy(binned, missing_strategy, missing_label)
     if label_format == "range" and labels is None:

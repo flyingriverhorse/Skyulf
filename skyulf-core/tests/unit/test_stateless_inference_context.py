@@ -171,7 +171,7 @@ def test_invalid_owned_values_are_rejected(node, field, value):
 def test_custom_binning_modes_report_exact_batch_behavior(
     engine, label_format, missing_strategy, include_lowest, drop_original, monkeypatch
 ):
-    """Fixed edges retain boundary/null values while the probe exposes pandas dtype drift."""
+    """Fixed bins must keep values and dtypes across chunks, nulls and empty requests."""
     config = {
         **_config("CustomBinning"),
         "label_format": label_format,
@@ -187,16 +187,8 @@ def test_custom_binning_modes_report_exact_batch_behavior(
     if engine == "polars":
         frame = pl.from_pandas(frame)
     detail, output = _probe(record, frame, engine, monkeypatch)
-    mismatch = engine == "pandas" and label_format != "range"
-    assert detail["status"] == ("failed" if mismatch else "passed")
-    checks = {check["name"]: check for check in detail["checks"]}
-    assert checks["repeat"]["status"] == checks["reverse"]["status"] == "passed"
-    for check in ("chunks:1", "chunks:3"):
-        assert checks[check]["status"] == ("failed" if mismatch else "passed")
-        if mismatch:
-            assert checks[check]["reason"] == "output_mismatch"
-    empty_mismatch = mismatch and missing_strategy == "keep"
-    assert checks["empty"]["status"] == ("failed" if empty_mismatch else "passed")
+    assert detail["status"] == "passed", detail
+    assert all(check["status"] == "passed" for check in detail["checks"])
     assert list(output.columns) == (["x_bucket"] if drop_original else ["x", "x_bucket"])
     actual = output["x_bucket"].to_list()
     if label_format == "range":
@@ -288,19 +280,35 @@ def test_value_replacement_rejects_invalid_pair_cardinality(rules):
         get_inference_capability("ValueReplacement", {}, state, engine="pandas")
 
 
-def test_value_replacement_object_downcast_is_reported(monkeypatch):
-    """A row dependency promise must not conceal infer_objects chunk dtype changes."""
-    frame = pd.DataFrame({"x": ["one", "unmapped"]})
-    record = _record("ValueReplacement", "pandas", {"columns": ["x"], "mapping": {"one": 1}}, frame)
+@pytest.mark.parametrize(
+    "rules",
+    [
+        {"mapping": {"one": 1}},
+        {"mapping": {"x": {"one": 1}}},
+        {"to_replace": "one", "value": 1},
+        {"to_replace": ["one"], "value": [1]},
+    ],
+)
+def test_value_replacement_preserves_object_dtype_across_chunks(rules, monkeypatch):
+    """Replacing a string with a number must not infer types from request neighbors."""
+    frame = pd.DataFrame({"x": ["one", "unmapped", None]})
+    record = _record("ValueReplacement", "pandas", {"columns": ["x"], **rules}, frame)
     detail, output = _probe(record, frame, "pandas", monkeypatch)
-    assert detail["status"] == "failed"
+    assert detail["status"] == "passed", detail
+    assert all(check["status"] == "passed" for check in detail["checks"])
+    assert output["x"].dtype == object
+    assert output["x"].to_list() == [1, "unmapped", None]
+
+
+def test_value_replacement_numeric_widening_remains_reported(monkeypatch):
+    """Prevent object parity fixes from concealing unresolved integer-to-float widening."""
+    frame = pd.DataFrame({"x": [1, 2]})
+    record = _record("ValueReplacement", "pandas", {"columns": ["x"], "mapping": {1: 0.5}}, frame)
+    detail, output = _probe(record, frame, "pandas", monkeypatch)
     checks = {check["name"]: check for check in detail["checks"]}
-    assert checks["chunks:1"] == {
-        "name": "chunks:1",
-        "status": "failed",
-        "reason": "output_mismatch",
-    }
-    assert output["x"].to_list() == [1, "unmapped"]
+    assert detail["status"] == "failed"
+    assert checks["chunks:1"]["reason"] == "output_mismatch"
+    assert output["x"].to_list() == [0.5, 2.0]
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

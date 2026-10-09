@@ -183,7 +183,7 @@ def test_apply_ordinal_label_format_assigns_expected_bin_indices() -> None:
 
 
 def test_apply_ordinal_dtype_matches_between_pandas_and_polars() -> None:
-    """Ordinal bin outputs must keep one integer dtype when no values are missing."""
+    """Ordinal bins stay integer and nullable regardless of a batch's missing values."""
     df_pd = _series_0_to_9()
     params = GeneralBinningCalculator().fit(
         df_pd, {"columns": ["x"], "strategy": "equal_width", "n_bins": 5}
@@ -192,8 +192,9 @@ def test_apply_ordinal_dtype_matches_between_pandas_and_polars() -> None:
     result_pd = GeneralBinningApplier().apply(df_pd, params)
     result_pl = GeneralBinningApplier().apply(pl.from_pandas(df_pd), params).to_pandas()
 
-    assert result_pd["x_binned"].dtype == np.int64
-    assert result_pl["x_binned"].dtype == result_pd["x_binned"].dtype
+    assert result_pd["x_binned"].dtype == pd.Int64Dtype()
+    assert pd.api.types.is_integer_dtype(result_pl["x_binned"])
+    assert result_pd["x_binned"].tolist() == result_pl["x_binned"].tolist()
 
 
 @pytest.mark.parametrize("label_format", ["ordinal", "bin_index"])
@@ -351,7 +352,7 @@ class TestApplyOutOfRangeMissingStrategy:
         result = GeneralBinningApplier().apply(df, params)
         for actual, expected_value in zip(result["x_binned"].tolist(), expected, strict=True):
             if expected_value is None:
-                assert np.isnan(actual)
+                assert pd.isna(actual)
             else:
                 assert actual == expected_value
 
@@ -976,8 +977,8 @@ def test_apply_out_of_range_values_polars_matches_pandas_missing() -> None:
     binned_pl = result_pl["x_binned"]
 
     # Out-of-range rows are missing on BOTH engines.
-    assert np.isnan(binned_pd.iloc[0]) and binned_pl[0] is None
-    assert np.isnan(binned_pd.iloc[-1]) and binned_pl[-1] is None
+    assert pd.isna(binned_pd.iloc[0]) and binned_pl[0] is None
+    assert pd.isna(binned_pd.iloc[-1]) and binned_pl[-1] is None
     # In-range codes are identical engine to engine.
     for i in (1, 2, 3, 4):
         assert binned_pl[i] == binned_pd.iloc[i], f"row {i} diverged"

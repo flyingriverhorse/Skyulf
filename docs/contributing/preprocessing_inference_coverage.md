@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task195 local context expansion.
+Status snapshot: **2026-10-09**, branch `093`, Task196 dtype parity repairs.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -72,8 +72,8 @@ The scope column is part of the result, not an unconditional parity promise.
 
 | ID | Implementation | Inspected scope and remaining boundary |
 | --- | --- | --- |
-| PC-02 | `CustomBinning` | Fixed edges, ordinal/bin-index/range labels, missing policies, empty no-ops. Pandas numeric labels can change dtype across chunks; `keep` can also fail empty dtype parity. |
-| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Pandas object downcasting can change dtype across chunks; arbitrary mapping objects/Series are outside inspection. |
+| PC-02 | `CustomBinning` | Fixed edges, ordinal/bin-index/range labels, missing policies, empty no-ops. Pandas numeric labels retain nullable `Int64`; missing-label mode retains object dtype, including singleton and empty requests. |
+| PC-08 | `ValueReplacement` | Fixed scalar/list/tuple and dictionary rules, nulls, typed keys and mapping precedence. Pandas object input stays object. Numeric widening can still change dtype across chunks; arbitrary mapping objects/Series are outside inspection. |
 | PC-09 | `DropMissingColumns` | Reuse saved dropped columns even when request missingness differs. Training threshold is reporting metadata, not recomputed. |
 | PC-11 | `MissingIndicator` | Saved columns and nonempty string suffix, null/NaN flags, no-op and empty frames. Non-string suffix objects are outside inspection. |
 | PC-21 | `CorrelationThreshold` | Saved drop list and enabled/disabled flag; no request correlation calculation. |
@@ -83,12 +83,30 @@ The scope column is part of the result, not an unconditional parity promise.
 | PC-29 | `RobustScaler` | Saved center/scale/quantiles and all flag combinations, null statistics and empty no-op. Exact numerical parity remains sample/runtime-specific. |
 | PC-30 | `GeoDistance` | Saved coordinate/output names, both distance methods and units. Existing invalid-coordinate behavior is reported without adding new geospatial validation. |
 
-Keep these exact-parity follow-ups open: **PC-02 pandas numeric-label dtypes**,
-**PC-08 pandas object replacement dtypes**, and **PC-28 Polars arithmetic**.
+Task196 fixes PC-02 numeric-label dtypes in the shared binning applier and PC-08
+object downcasting. This deliberately changes pandas ordinal output from NumPy
+`int64`/`float64` to nullable `Int64`. An object column stays object even when all
+replacement values happen to be numeric. If a later step requires numeric input,
+configure an explicit `Casting` step instead of relying on batch-dependent
+inference. For example, object-backed numbers containing `None` need a numeric
+cast before binning. No new artifact fields or transform implementations are needed.
+Refit the whole pipeline when upgrading older binning models with downstream
+string-key encoders. In particular, legacy `LabelEncoder`/`OrdinalEncoder` keys
+such as `"0.0"`, `"1.0"`, `"nan"` do not match the new integer/null representation;
+replaying those older encoders can silently select their unknown-category code.
+At the sklearn boundary, nullable numeric missing values become `np.nan` even
+beside object features; other column values and large integer precision remain.
+
+Keep **PC-08 numeric widening** and **PC-28 Polars arithmetic** open. For PC-08,
+replacing `1` with `0.5` in an integer column widens matched chunks to float while
+unmatched chunks stay integer. Use a consistent float input dtype for that rule;
+the diagnostic continues reporting the integer-input mismatch.
 For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-are additional to the 40 implementations without declarations.
+are additional to the 40 implementations without declarations. The Polars
+rounding case remains a strict diagnostic boundary; it does not justify a second
+arithmetic implementation or a weaker comparison.
 
 ## Remaining 40 implementations without declarations
 
@@ -296,3 +314,22 @@ empty execution, mutation detection and unchanged partition rejection. Separate
 tests retain the known exact-parity failures listed above. These are native
 Python validation results; this batch did not admit the ten nodes to Spark UDF,
 REST or `ai_query`, and did not create tables, registered models or endpoints.
+
+### Task196 validation: stable pandas dtypes and model prediction
+
+On 2026-10-09, **885 local tests passed**: 768 tests across ten explicitly
+selected affected files, plus 117 temporal model/bridge consumer tests. Full
+Ruff/format, CI Ty scope and Lizard CCN <= 10 passed. Independent review found
+and reproduced the mixed object/nullable-bin sklearn regression; its repair
+passed 19 additional precision, sentinel, mutation and empty-input probes.
+
+The final installed wheel passed **430 tests**, zero failures or skips, plus
+the runnable Bundle guide on Databricks serverless:
+[run 535767378226162](https://dbc-45604623-c18b.cloud.databricks.com/jobs/615731771938126/runs/535767378226162)
+finished **TERMINATED / SUCCESS**. All 552 installed runtime files matched source.
+Wheel SHA256: `dfd48304f50755d5dc951384bbf85d858c6119478e067aad6f5fb6abe8de1eec`.
+The saved-model regression disables fit in a fresh process and checks real
+random-forest predictions for full and singleton requests, including missing
+and out-of-range bins. This is native Python fit/apply/predict evidence; no new
+Spark UDF, REST or `ai_query` admission or route test was added. The remaining
+40 undeclared implementations and two documented parity boundaries stay open.
