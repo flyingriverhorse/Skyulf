@@ -169,10 +169,10 @@ def test_selector_context_rejects_malformed_saved_decisions(node, mutation):
         "wrong_type": {**state, "type": "wrong"},
         "extra": {**state, "unknown_behavior": True},
         "missing": {key: value for key, value in state.items() if key != field},
-        "list_type": {**state, field: tuple(state[field])},
+        "list_type": {**state, field: set(state[field])},
         "duplicate": {**state, field: ["keep", "keep"]},
         "nonstring": {**state, field: [None]},
-        "drop_flag": {**state, "drop_columns": "false"},
+        "drop_flag": {**state, "drop_columns": [False, True]},
     }
     malformed: Any = changes[mutation]
     applier: Any = NodeRegistry.get_applier(node)

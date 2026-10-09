@@ -13,10 +13,11 @@ from ...engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWra
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import CorrelationThresholdArtifact
-from .._fitted_validation import _columns, local_boolean, local_state_fields
+from .._fitted_validation import _columns, local_state_fields
 from .._helpers import to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._common import _local_selection_drop_flag
 
 _NATIVE_POLARS_METHODS = frozenset(("pearson", "spearman"))
 NativePolarsCorrelationMethod = Literal["pearson", "spearman"]
@@ -160,7 +161,7 @@ class CorrelationThresholdApplier(BaseApplier):
         if not local_state_fields(raw, "correlation_threshold", fields, allow_empty=True):
             return raw
         _columns(raw["columns_to_drop"])
-        local_boolean(raw["drop_columns"], "drop_columns")
+        _local_selection_drop_flag(raw["drop_columns"])
         return raw
 
     @staticmethod

@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task198 encoder/imputer contexts.
+Status snapshot: **2026-10-09**, branch `093`, Task199 feature/text/detector contexts.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -35,11 +35,11 @@ and [inference flow](../user_guide/inference_flow.md).
 | --- | ---: | --- |
 | Registered transformer IDs | 67 | Includes aliases and training/inspection helpers |
 | Distinct applier implementations | 63 | Four additional names refer to existing classes |
-| Implementations with context declaration machinery | 44 | Forty-one built-in implementations plus three custom wrappers |
-| Remaining without declaration machinery | **19** | **22 registered IDs** after including aliases; listed below |
+| Implementations with context declaration machinery | 55 | Fifty-two built-in implementations plus three custom wrappers |
+| Remaining without declaration machinery | **8** | **9 registered IDs** after including aliases; listed below |
 | Reviewed worker-admitted preprocessing families | 7 | Only their supported pandas configurations; not every mode/engine |
 
-The count of 44 describes available machinery, not unconditional support for
+The count of 55 describes available machinery, not unconditional support for
 every configuration. Existing worker-subset validators can abstain for valid
 local states. Some Polars configurations also have no matching declaration.
 Custom wrappers return `unknown` unless their saved definition explicitly
@@ -104,7 +104,7 @@ the diagnostic continues reporting the integer-input mismatch.
 For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-are additional to the 19 implementations without declarations. The Polars
+are additional to the 8 implementations without declarations. The Polars
 rounding case remains a strict diagnostic boundary; it does not justify a second
 arithmetic implementation or a weaker comparison.
 
@@ -181,7 +181,53 @@ change pandas chunk dtypes or make Polars reject mixed replacement values at
 different checks, depending on unique-value order. The diagnostic keeps these
 failures visible; it does not normalize fitted settings or weaken comparisons.
 
-## Remaining 19 implementations without declarations
+### Eleven additional local contracts (Task199)
+
+These owners reuse their existing transformations and saved state. Context
+inspection is still separate from worker admission and strict sample parity.
+
+| ID | Implementation | Inspected scope and remaining boundary |
+| --- | --- | --- |
+| PC-19 | `FeatureGenerationNode`, `FeatureMath`, `FeatureGeneration` | Fixed formulas and training-fitted group lookups. Inference never aggregates the request. Pandas similarity can depend on datetime rendering across rows and reports `global`; unpinned legacy similarity and uncertain fill/epsilon modes stay `unknown`. |
+| PC-22 | `ModelBasedSelection` | Saved selected/candidate columns and drop flag. Estimator importance metadata is not recalculated during prediction. |
+| PC-25 | `feature_selection` | Delegates validation and context to the concrete fitted selector. Existing unknown-method no-ops remain unchanged. |
+| PC-31 | `H3Index` | Saved coordinates/resolution and native output labels. Optional H3 must be installed; pandas empty-output dtype mismatches remain visible. |
+| PC-34 | `EllipticEnvelope` | Saved sklearn detector models and learned covariance state. Active models filter rows; null/nonfinite handling remains native. |
+| PC-35 | `IQR` | Saved training bounds; no request quartiles. Active bounds filter rows. |
+| PC-38 | `ZScore` | Saved means/stds and threshold; no request statistics. Active maps filter rows. |
+| PC-46 | `count_vectorizer` | Saved vocabulary, estimator and output layout; no inference vocabulary fit. Native cache mutations and unusual input dtypes remain diagnostic boundaries. |
+| PC-47 | `hashing_vectorizer` | Saved hash/analyzer settings and dense output width. A pristine native estimator can lazily mutate its cache on first transform; the diagnostic reports that mutation. |
+| PC-49 | `tfidf_vectorizer` | Saved vocabulary/IDF and output width; no request IDF fitting. Optional callbacks remain undeclared. |
+| PC-50 | `tokenizer` | Saved analyzer settings, output names and token counts. Native empty token-count dtypes can differ from nonempty output. |
+
+Normal prediction executes the three detectors and rejects row loss. A benign
+sample passing the probe does not make filtering safe for arbitrary requests.
+Group-aggregate feature generation, by contrast, reads frozen training mappings;
+missing or unseen groups keep the existing fallback behavior.
+
+A real model test also exposed a Polars scoring defect: with only a text column
+and `drop_original=True`, dropping that last input left a zero-height frame.
+The shared attachment helper now returns the generated feature frame when no
+input columns remain. This repairs text-only scoring across its consumers while
+retaining the existing tokenization, vocabulary and numerical calculations.
+
+Local selector validation now accepts NumPy string column names produced by real
+fits, and local bound validation accepts native empty-string column labels.
+Neither repair widens portable worker validation. H3 inspection also retains
+native `None`/hashable output labels; engine and model-schema restrictions remain.
+Feature overwrite and selector drop flags retain native scalar truthiness,
+including `None`; metadata inspection does not rewrite them as booleans. Use
+explicit YAML `true`/`false` in project recipes to express the intended behavior.
+Detector validation also preserves native hashable column labels and supported
+Fraction/Decimal settings. Unused fit-report fields do not impose new runtime
+restrictions. This does not add sealing or transport support for those types.
+
+H3 is an optional dependency: provision and pin it in the scoring environment.
+The local pipeline's core runtime manifest does not automatically record H3's
+version. Native verification for this batch explicitly uses `h3==4.5.0`; this
+is not an automatic dependency-packaging feature.
+
+## Remaining 8 implementations without declarations
 
 Every row below is **OPEN**. The “review focus” is a work item, not a certified
 context declaration. Start with P1, then P2; P3 covers training/inspection
@@ -191,24 +237,13 @@ imply permission to expand worker admission.
 | ID | Priority | Registered names sharing this implementation | Review focus before closing |
 | --- | --- | --- | --- |
 | PC-10 | P3 | `DropMissingRows` | Row-filter context plus existing prediction-skip evidence |
-| PC-19 | P2 | `FeatureGenerationNode`, `FeatureMath`, `FeatureGeneration` | Review each mode; distinguish saved group-aggregation lookup from live grouping |
-| PC-22 | P2 | `ModelBasedSelection` | Frozen selection mask, loaded estimator and dependencies |
-| PC-25 | P2 | `feature_selection` | Delegate context/validation to the selected nested implementation |
-| PC-31 | P2 | `H3Index` | Optional dependency pins, resolution and invalid coordinates |
 | PC-32 | P3 | `DatasetProfile` | Separate inspection side effects from effective prediction apply |
 | PC-33 | P3 | `DataSnapshot` | Separate snapshot behavior from effective prediction apply |
-| PC-34 | P2 | `EllipticEnvelope` | Saved detector, filter effects and inference row preservation |
-| PC-35 | P2 | `IQR` | Saved thresholds; filter/change behavior and row alignment |
-| PC-38 | P2 | `ZScore` | Saved mean/std; filter behavior, nulls and row alignment |
 | PC-39 | P3 | `Oversampling` | Training-only skip; do not generate rows during prediction |
 | PC-40 | P3 | `Undersampling` | Training-only skip; do not remove prediction requests |
 | PC-41 | P3 | `TrainTestSplitter`, `Split` | Unrecorded training markers/alias; no inference splitting |
 | PC-42 | P3 | `feature_target_split` | Training marker and target separation; no prediction execution |
-| PC-46 | P2 | `count_vectorizer` | Frozen vocabulary/output schema; dense output width/memory bounds and package replay |
-| PC-47 | P2 | `hashing_vectorizer` | Stable output width/hash and supported frame representation |
 | PC-48 | P4 | `sentence_embedder` | Pin/save actual model assets/revision; verify fresh-process/offline replay |
-| PC-49 | P2 | `tfidf_vectorizer` | Saved vocabulary/IDF; no request-time vocabulary/IDF fitting |
-| PC-50 | P2 | `tokenizer` | Null/text handling, saved analyzer settings, fixed output names/count dtypes and pandas/Polars fallback parity |
 
 Some entries above are intentionally skipped during prediction rather than
 remotely executed. Their completion needs accurate skip evidence, not a forced
@@ -236,7 +271,7 @@ remotely executed. Their completion needs accurate skip evidence, not a forced
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work not included in the 19 count
+### Cross-cutting work not included in the 8 count
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -278,7 +313,7 @@ for names in remaining:
     print(", ".join(names))
 ```
 
-Expected snapshot: 67 names, 63 implementations, 19 remaining implementations.
+Expected snapshot: 67 names, 63 implementations, 8 remaining implementations.
 This counts declaration machinery, not whether a fitted configuration passes
 `get_inference_capability` or the worker certificate.
 
@@ -450,3 +485,32 @@ setup took 60.836 seconds. Wheel SHA256:
 This validates native Python fit/apply/predict. It does not add Spark UDF, REST
 or `ai_query` admission or route tests. No tables, registered models or endpoints
 were created.
+
+### Task199 validation: generated features, selectors, detectors and text
+
+On 2026-10-09, **2,154 distinct local cases** across 44 explicit affected files
+were verified. The initial union passed 2,140 cases; 14 previous negative tests
+expected rejection of native-valid scalar flags or ordered tuple names. Their
+fixtures now use genuinely malformed arrays/sets, retaining rejection assertions.
+Both complete affected files then passed all 177 cases. No runtime code changed
+after the union. Full Ruff, formatting, CI Ty and Lizard CCN <= 10 passed.
+
+Fresh processes reload eleven actual random-forest pipelines per engine with
+all calculator fit methods disabled. The checks compare real predictions,
+singleton requests and unchanged learned-state digests; they retain detector
+row-loss errors and the documented text/H3 empty-schema diagnostic failures.
+The Polars sole-text scoring repair is covered with actual training targets
+absent from prediction input. Independent review reproduced, repaired and
+rechecked native scalar/label compatibility and callback context declarations.
+The inventory now has **55 of 63 implementations** declared, with **8 remaining**.
+
+The final wheel passed **712 tests**, zero failures or skips, plus the complete
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 994473515746072](https://dbc-45604623-c18b.cloud.databricks.com/jobs/830129841788466/runs/994473515746072)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources matched the
+tested working-tree manifest. The full run including setup took 79.913 seconds.
+Wheel SHA256:
+`bbb85097d7813c5870b8055a1bc5ee546736c22c8306df48f85a25081dc4b3cf`.
+This verifies native Python fit/apply/predict with real saved models. It does
+not add Spark UDF, REST or `ai_query` admission or route tests. No tables,
+registered models or endpoints were created.

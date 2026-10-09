@@ -10,7 +10,7 @@ from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from .._artifacts import UnivariateSelectionArtifact
-from .._fitted_validation import _columns, local_boolean, local_state_fields
+from .._fitted_validation import local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -20,6 +20,8 @@ from ._common import (
     _drop_selected_polars,
     _extract_target,
     _fillna_zero_with_warning,
+    _local_selection_columns,
+    _local_selection_drop_flag,
     _maybe_chi2_rescale,
     _prepare_sklearn_y,
     _resolve_candidate_columns,
@@ -59,11 +61,11 @@ class UnivariateSelectionApplier(BaseApplier):
         fields = {"type", "selected_columns", "candidate_columns", "method", "drop_columns"}
         if not local_state_fields(raw, "univariate_selection", fields | reports, allow_empty=True):
             return raw
-        selected = _columns(raw["selected_columns"])
-        candidates = _columns(raw["candidate_columns"])
+        selected = _local_selection_columns(raw["selected_columns"])
+        candidates = _local_selection_columns(raw["candidate_columns"])
         if not set(selected).issubset(candidates):
             raise ValueError("Fitted selected columns must belong to candidate columns.")
-        local_boolean(raw["drop_columns"], "drop_columns")
+        _local_selection_drop_flag(raw["drop_columns"])
         return raw
 
     @staticmethod

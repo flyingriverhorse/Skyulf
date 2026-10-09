@@ -266,6 +266,11 @@ failure even though neither operation needs other rows to calculate its values.
 | `TargetEncoder`, `WOEEncoder` | Prediction reuses the saved full-data mapping. TargetEncoder's out-of-fold training values deliberately differ from its inference values; WOE requires a binary training target. |
 | `KNNImputer`, `IterativeImputer` | Neighbors and prediction estimators come from training. IterativeImputer with active rounds needs request context because a completely null request takes a different initial-fill path. Custom/stochastic modes can stay `unknown`. |
 | `PowerTransformer`, power rules in `GeneralTransformation` | Lambdas and scaler values are saved. Existing error handling returns a complete column/frame unchanged after one invalid value, so active power transforms report `global`. |
+| `FeatureGeneration`, `FeatureMath`, `FeatureGenerationNode` | Fitted group aggregates are saved lookups, so inference does not need other group rows. Pandas similarity rendering can depend on neighboring datetimes and reports `global`; legacy unpinned similarity stays `unknown`. |
+| `ModelBasedSelection`, `feature_selection` | Prediction uses saved selected columns. The facade delegates inspection to its fitted concrete selector; it does not select features again. |
+| `IQR`, `ZScore`, `EllipticEnvelope` | Saved limits or detector models filter rows. Normal model prediction rejects a request that would lose rows; these steps are not automatically skipped. |
+| `count_vectorizer`, `tfidf_vectorizer`, `hashing_vectorizer`, `tokenizer` | Reuse learned vocabulary/IDF or saved analyzer settings. Outputs are dense. Custom callbacks, native estimator cache mutations and empty-output dtypes need their own diagnostic evidence. |
+| `H3Index` | Saved coordinate names and resolution drive the existing H3 calculation. Install and pin the optional `h3` dependency in the scoring environment; the built-in artifact does not automatically capture that package pin. Pandas empty-output dtype differences remain visible. |
 
 `global` can therefore describe error handling as well as population statistics.
 For Box-Cox, the valid row in `[2, -1]` can remain untransformed when the negative

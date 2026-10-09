@@ -19,13 +19,17 @@ import pandas as pd
 from .._helpers import select_rows_by_position
 
 
+def validate_detector_warnings(value: Any) -> None:
+    """Inspect fit-time diagnostic text without changing skipped-column provenance."""
+    if type(value) is not list or any(not isinstance(item, str) for item in value):
+        raise ValueError("Fitted detector warnings must be a list of strings.")
+
+
 def validate_fitted_bounds(bounds: Any, *, partial: bool) -> None:
     """Inspect per-column saved numeric limits without changing their scalar types."""
     if type(bounds) is not dict:
         raise ValueError("Fitted bounds must be a dictionary.")
-    for column, bound in bounds.items():
-        if not isinstance(column, str) or not column:
-            raise ValueError("Fitted bound columns must be nonempty strings.")
+    for bound in bounds.values():
         _validate_bound(bound, partial=partial)
 
 

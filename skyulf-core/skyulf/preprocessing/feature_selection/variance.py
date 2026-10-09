@@ -10,11 +10,16 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns
 from .._artifacts import VarianceThresholdArtifact
-from .._fitted_validation import _columns, local_boolean, local_state_fields
+from .._fitted_validation import local_state_fields
 from .._helpers import resolve_columns_then_to_numpy
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _drop_selected_pandas, _drop_selected_polars
+from ._common import (
+    _drop_selected_pandas,
+    _drop_selected_polars,
+    _local_selection_columns,
+    _local_selection_drop_flag,
+)
 
 
 class VarianceThresholdApplier(BaseApplier):
@@ -37,11 +42,11 @@ class VarianceThresholdApplier(BaseApplier):
         }
         if not local_state_fields(raw, "variance_threshold", fields, allow_empty=True):
             return raw
-        selected = _columns(raw["selected_columns"])
-        candidates = _columns(raw["candidate_columns"])
+        selected = _local_selection_columns(raw["selected_columns"])
+        candidates = _local_selection_columns(raw["candidate_columns"])
         if not set(selected).issubset(candidates):
             raise ValueError("Fitted selected columns must belong to candidate columns.")
-        local_boolean(raw["drop_columns"], "drop_columns")
+        _local_selection_drop_flag(raw["drop_columns"])
         return raw
 
     @staticmethod

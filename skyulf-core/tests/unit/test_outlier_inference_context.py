@@ -67,7 +67,7 @@ def test_fitted_bounds_inspection_never_executes(node, effect, engine, monkeypat
 
 
 @pytest.mark.parametrize("node", ["ManualBounds", "Winsorize"])
-@pytest.mark.parametrize("change", ["type", "extra", "bounds", "column", "field", "value"])
+@pytest.mark.parametrize("change", ["type", "extra", "bounds", "entry", "field", "value"])
 def test_invalid_bound_state_has_no_declaration(node, change):
     """Corrupt bounds cannot silently acquire trusted context metadata."""
     state: Any = deepcopy(_record(node, "pandas")["artifact"])
@@ -77,8 +77,8 @@ def test_invalid_bound_state_has_no_declaration(node, change):
         state["unreviewed"] = True
     elif change == "bounds":
         state["bounds"] = []
-    elif change == "column":
-        state["bounds"] = {1: {"lower": 0, "upper": 1}}
+    elif change == "entry":
+        state["bounds"]["x"] = []
     elif change == "field":
         state["bounds"]["x"]["inclusive"] = False
     else:

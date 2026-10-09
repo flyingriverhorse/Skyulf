@@ -3,10 +3,12 @@
 import logging
 from typing import Any, cast
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from .._artifacts import ModelBasedSelectionArtifact
+from .._fitted_validation import local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -16,6 +18,8 @@ from ._common import (
     _drop_selected_polars,
     _extract_target,
     _fillna_zero_with_warning,
+    _local_selection_columns,
+    _local_selection_drop_flag,
     _model_feature_importances,
     _prepare_sklearn_y,
     _resolve_candidate_columns,
@@ -28,6 +32,33 @@ logger = logging.getLogger(__name__)
 
 class ModelBasedSelectionApplier(BaseApplier):
     """Remove the columns an estimator's importances rejected."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved membership while leaving unused fit reports unchanged."""
+        fields = {
+            "type",
+            "selected_columns",
+            "candidate_columns",
+            "method",
+            "drop_columns",
+            "feature_importances",
+        }
+        if local_state_fields(raw, "model_based_selection", fields, allow_empty=True):
+            selected = _local_selection_columns(raw["selected_columns"])
+            candidates = _local_selection_columns(raw["candidate_columns"])
+            if not set(selected).issubset(candidates):
+                raise ValueError("Fitted selected columns must belong to candidate columns.")
+            _local_selection_drop_flag(raw["drop_columns"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved column selection without rerunning the training estimator."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        ModelBasedSelectionApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

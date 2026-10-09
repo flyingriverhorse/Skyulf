@@ -9,14 +9,17 @@ row-wise: the pandas engine via ``.apply()``, the polars engine over the two
 coordinate columns as numpy arrays (the frame itself is never converted).
 """
 
+from collections.abc import Hashable
 from typing import Any, cast
 
 import pandas as pd
 import polars as pl
 
 from ...core.artifacts import H3IndexArtifact
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
+from .._fitted_validation import local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -114,6 +117,27 @@ def _validate_h3_resolution(resolution: Any) -> None:
 
 class H3IndexApplier(BaseApplier):
     """Append each row's H3 hexagonal cell index as a new string column."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved coordinate choices without importing H3 or computing cells."""
+        local_state_fields(
+            raw, "h3_index", {"type", "lat_col", "lon_col", "resolution", "output_column"}
+        )
+        if any(not isinstance(raw[key], str) or not raw[key] for key in ("lat_col", "lon_col")):
+            raise ValueError("H3Index fitted coordinate names must be nonempty strings.")
+        if not isinstance(raw["output_column"], Hashable):
+            raise ValueError("H3Index fitted output name must be hashable.")
+        _validate_h3_resolution(raw["resolution"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved cell indexing while retaining the optional runtime dependency."""
+        if engine not in ("pandas", "polars"):
+            return None
+        H3IndexApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

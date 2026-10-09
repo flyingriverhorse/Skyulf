@@ -52,7 +52,7 @@ def _frame(engine):
     return pl.from_pandas(frame) if engine == "polars" else frame
 
 
-@pytest.mark.parametrize("node", ["ModelBasedSelection", "missing_context_node"])
+@pytest.mark.parametrize("node", ["sentence_embedder", "missing_context_node"])
 def test_undeclared_nodes_stay_unknown(node):
     """Unreviewed behavior must not become row-local merely because it is registered."""
     assert _capability(node, {}, {}, engine="pandas") is None
@@ -398,6 +398,6 @@ def test_local_context_accepts_real_fitted_numpy_flags(node, engine, enabled):
     capability = _capability(node, config, state, engine=engine)
     assert capability is not None and capability.context == "row"
     assert state[field] is flag
-    state[field] = np.int64(1)
-    with pytest.raises(ValueError, match="boolean"):
+    state[field] = np.array([True, False])
+    with pytest.raises(ValueError, match="boolean|scalar"):
         _capability(node, config, state, engine=engine)

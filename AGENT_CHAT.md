@@ -27,34 +27,27 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch 093, Task198 completes ten more preprocessing context owners under
-Ponytail full: Dummy/Hash/Label/Ordinal/Target/WOE, KNN/Iterative, General/Power.
-Inventory: 44 of 63 implementations have declarations; 19 remain (22 IDs).
-Existing fit/apply formulas are unchanged. Active power fallback and Iterative
-all-null-request behavior require global context; callbacks remain unknown.
-No new Spark UDF, REST or ai_query admission.
+Branch 093, Task199 adds eleven preprocessing context owners under Ponytail full.
+Base a4ff850e. Scope: PC19/22/25/31/34/35/38/46/47/49/50. Inventory is 55/63;
+eight owners (nine registered IDs) remain. Existing transform formulas are reused.
+A shared Polars text-only scoring defect was fixed. No new worker admission.
 
-Numeric dtype semantic hashing supports fitted Iterative state without dropping
-scalar variant, width or byte order. Unsupported dtype structures are rejected.
-Windows native pickle aliases and Hash NumPy scalar limits remain documented.
+All three domain agents released their implementation/test claims. Root
+acknowledges their results and independent reviews; evidence is recorded in
+initiatives/spark_and_mlflow/199-preprocessing-context-features.md and the tracked
+docs/contributing/preprocessing_inference_coverage.md. No unresolved findings.
 
-Final evidence: 1,914 distinct local cases across 44 explicit files verified.
-Two test-only expectation repairs were checked with their complete 105-case
-and 147-case files. Independent reviews cleared all findings, including 30
-Polars probes of unique-value ordering. All reviewer claims are released.
-Ruff/format, full CI Ty, Lizard CCN 10 and strict MkDocs passed.
+Local evidence: 2,154 distinct cases in 44 explicit files. Initial union had
+2,140 passes and 14 obsolete negative expectations. After test-only corrections,
+both affected complete files passed 177 tests. Independent fixture review clear.
+Full CI Ruff/format/Ty/Lizard CCN10 passed. No runtime edit after the union.
 
-Native run 839395366420866, job 455354355469257: TERMINATED / SUCCESS.
-562 tests passed plus the runnable Bundle guide; zero failures or skips.
-All 552 installed runtime files and final test/guide hashes match the manifest.
-Wheel SHA256: 4dcc42ca575575c403be868d4378f3b463dcd804d7147212f7084a5bea72c740.
-No tables, registered models or endpoints created. First native run's test
-portability failure and repair are retained in the task report.
-
-Evidence and remaining boundaries:
-- docs/contributing/preprocessing_inference_coverage.md
-- initiatives/spark_and_mlflow/198-preprocessing-context-estimators.md
+Native run 994473515746072, job 830129841788466: TERMINATED / SUCCESS. 712 passed
+tests plus the executable Bundle guide. All 552 installed runtime hashes match.
+Wheel SHA256 bbb85097d7813c5870b8055a1bc5ee546736c22c8306df48f85a25081dc4b3cf.
+Zero failures/skips, zero UC tables/models/endpoints created. Strict MkDocs passed.
+Root completing staged review and signed commit with hooks. No push.
 
 ## Open messages
 
-- ID: T198-root-ready; UTC: 2026-10-09T14:10:18.3272037Z; sender: Codex root; recipient: all; type: RELEASE; reply: T198-native-hash-review-clear,T198-root-native-hash. Review acknowledged and preserved in Task198 report. All implementation/test claims released; no peer questions or blockers. Root completing staged review and signed commit with hooks; no push. Final commit recorded in ignored task report to avoid a tracked status-only follow-up.
+- ID: T199-root-ready; UTC: 2026-10-09T14:42:19.2126879Z; sender: Codex root; recipient: all; type: RELEASE; reply: T199-root-finalization. All Task199 implementation/test/doc claims released. Native712 plus guide passed; all hashes current; local2154 verified and independent reviews clear. Ruff/format/fullCI Ty/CCN10 and strictMkDocs pass. Staged28file diff reviewed with no generated artifacts. Root final signed commit with hooks next, no push. Record final commit in ignored Task199 report; no open peer requests.

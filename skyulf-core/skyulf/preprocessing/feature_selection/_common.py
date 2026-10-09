@@ -3,6 +3,7 @@
 import contextlib
 import logging
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any, cast
 
 import numpy as np
@@ -31,6 +32,7 @@ from sklearn.utils.multiclass import type_of_target
 from ...engines import PolarsEngine
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import UnivariateSelectionArtifact
+from .._fitted_validation import local_scalar
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +114,21 @@ def _resolve_estimator(key: str | None, problem_type: str) -> Any:
 # -----------------------------------------------------------------------------
 # Shared apply helpers (drop unselected columns)
 # -----------------------------------------------------------------------------
+
+
+def _local_selection_columns(value: Any) -> list[str] | tuple[str, ...]:
+    """Inspect native ordered names without imposing the portable string-scalar codec."""
+    if type(value) not in (list, tuple) or any(not isinstance(item, str) for item in value):
+        raise ValueError("Fitted columns must be an ordered string sequence.")
+    if len(set(value)) != len(value):
+        raise ValueError("Fitted columns must be unique.")
+    return value
+
+
+def _local_selection_drop_flag(value: Any) -> None:
+    """Retain scalar truthiness accepted by every local selector's saved drop flag."""
+    if not isinstance(value, Decimal):
+        local_scalar(value, "drop_columns")
 
 
 def _resolve_drop_list(params: dict[str, Any], existing_cols: list[str]) -> list[str]:
