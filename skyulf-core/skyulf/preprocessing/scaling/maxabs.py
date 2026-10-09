@@ -22,7 +22,12 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _select_subset_pandas, _select_subset_polars, validate_scaler_vector
+from ._common import (
+    _select_subset_pandas,
+    _select_subset_polars,
+    divide_polars_column,
+    validate_scaler_vector,
+)
 
 
 class MaxAbsScalerApplier(BaseApplier):
@@ -71,7 +76,7 @@ class MaxAbsScalerApplier(BaseApplier):
                 if isinstance(X, pl.LazyFrame) or isinstance(s, np.generic)
                 else X.get_column(col_name)
             )
-            exprs.append((column / (s if s != 0 else 1.0)).alias(col_name))
+            exprs.append(divide_polars_column(X, column, s).alias(col_name))
         return X.with_columns(exprs), _y
 
     @staticmethod

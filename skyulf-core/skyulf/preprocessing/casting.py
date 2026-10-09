@@ -295,7 +295,16 @@ def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: boo
     # Use a small FIXED absolute tolerance rather than np.isclose's default
     # rtol=1e-5, which scales with magnitude and would let large fractional
     # values (e.g. 100000.001) slip through as "close enough" to integral.
-    fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
+    if numeric.dtype == object:
+        fractional_mask = numeric.map(
+            lambda value: (
+                pd.api.types.is_float(value)
+                and np.isfinite(value)
+                and abs(value - round(value)) >= 1e-9
+            )
+        )
+    else:
+        fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
     if not fractional_mask.any():
         return numeric
     if not coerce_on_error:
@@ -364,15 +373,39 @@ def _resolve_casting_dtype(dtype: Any) -> Any:
     return TYPE_ALIASES.get(label.lower(), dtype)
 
 
-def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
+def _parse_integer_scalar(value: Any, coerce_on_error: bool) -> Any:
+    """Keep native parsing while using Python scalars for exact integer-bound comparisons."""
+    parsed = pd.to_numeric(value, errors="coerce" if coerce_on_error else "raise")
+    return parsed.item() if isinstance(parsed, np.generic) else parsed
+
+
+def _integer_numeric_values(series: pd.Series, coerce_on_error: bool) -> pd.Series:
+    """Reparse ambiguous object values without promoting neighboring exact integers to floats."""
     errors = "coerce" if coerce_on_error else "raise"
     numeric = pd.to_numeric(series, errors=errors)
-    # Nullable parsing protects exact integers; retain the native float path's
-    # missing masks and safe-cast behavior when parsing produces floating values.
     if series.dtype.kind in "iuO":
         nullable = pd.to_numeric(series, errors=errors, dtype_backend="numpy_nullable")
         if pd.api.types.is_integer_dtype(nullable.dtype):
             numeric = nullable
+        elif series.dtype.kind == "O" and nullable.dtype.kind in ("f", "O"):
+            # ponytail: scalar parsing is slower; keep this fallback limited to
+            # ambiguous object integer casts until a lossless native batch parser exists.
+            numeric = pd.Series(
+                [
+                    _parse_integer_scalar(value, coerce_on_error)
+                    if pd.api.types.is_scalar(value)
+                    else numeric.iloc[position]
+                    for position, value in enumerate(series)
+                ],
+                index=series.index,
+                name=series.name,
+                dtype=object,
+            )
+    return numeric
+
+
+def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
+    numeric = _integer_numeric_values(series, coerce_on_error)
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
     numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
     if numeric.isna().any():
@@ -564,9 +597,8 @@ class CastingCalculator(BaseCalculator):
     ) -> SkyulfSchema:
         """Rewrite the dtype labels of ``input_schema`` for every column the config targets.
 
-        Unlike :meth:`fit`, this cannot check column presence against a frame, so
-        requested dtypes are applied unconditionally — a config naming an absent
-        column predicts a schema that apply will not actually produce.
+        The shared ``target_type`` overrides per-column choices, matching fit.
+        Columns absent from the input schema are skipped, as they are at runtime.
         """
         # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
@@ -574,7 +606,7 @@ class CastingCalculator(BaseCalculator):
         columns = config.get("columns", []) or []
         if target_type and columns:
             for col in columns:
-                column_types.setdefault(col, target_type)
+                column_types[col] = target_type
         new_schema = input_schema
         for col, dtype in column_types.items():
             resolved = _resolve_casting_dtype(dtype)

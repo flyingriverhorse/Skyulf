@@ -155,7 +155,12 @@ def test_existing_declarations_resolve_fitted_defaults(node, config):
         "preserve",
         "python_batch",
     )
-    assert _capability(node, config, state, engine="polars") is None
+    polars_capability = _capability(node, config, state, engine="polars")
+    if node == "StandardScaler":
+        assert polars_capability is not None
+        assert (polars_capability.context, polars_capability.execution_kind) == ("row", "local")
+    else:
+        assert polars_capability is None
 
 
 def test_changed_saved_applier_is_unknown():

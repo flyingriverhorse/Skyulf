@@ -165,14 +165,15 @@ class StandardScalerApplier(BaseApplier):
     )
     + tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             codec_version=1,
             config_match=(("with_mean", with_mean), ("with_std", with_std)),
         )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for with_mean in (True, False)
         for with_std in (True, False)
     ),

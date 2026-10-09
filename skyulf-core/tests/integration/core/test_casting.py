@@ -534,6 +534,24 @@ def test_infer_output_schema_target_type_with_columns() -> None:
     assert result.dtypes["y"] == "float64"
 
 
+@pytest.mark.parametrize("target", ["float64", "Int64"])
+def test_casting_preview_uses_the_same_config_precedence_as_fit(target):
+    """The shared target_type must override a per-column type in both preview and execution."""
+    from skyulf.core.schema import SkyulfSchema
+
+    frame = pd.DataFrame({"x": [1, 2], "keep": [3, 4]})
+    config = {
+        "column_types": {"x": "string", "missing": "float"},
+        "columns": ["x"],
+        "target_type": target,
+    }
+    calculator = CastingCalculator()
+    state = calculator.fit(frame, config)
+    schema = calculator.infer_output_schema(SkyulfSchema.from_dataframe(frame), config)
+    assert schema == SkyulfSchema.from_dataframe(CastingApplier().apply(frame, state))
+    assert config["column_types"] == {"x": "string", "missing": "float"}
+
+
 def test_infer_output_schema_empty_config_returns_same_schema() -> None:
     """infer_output_schema with no type instructions must return the input schema."""
     from skyulf.core.schema import SkyulfSchema

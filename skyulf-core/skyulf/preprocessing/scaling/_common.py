@@ -11,8 +11,29 @@ from math import isfinite
 from numbers import Real
 from typing import Any
 
+import numpy as np
+import polars as pl
+
 from ...utils import detect_numeric_columns, resolve_columns
 from .._helpers import decimal_columns_to_float
+
+
+def divide_polars_column(X: Any, column: pl.Expr | pl.Series, scale: Any) -> Any:
+    """Keep native bulk division and promotion identical across eager and lazy batches."""
+    denominator = scale if scale != 0 else 1.0
+    divided = column / denominator
+    if isinstance(column, pl.Series):
+        return divided
+    dtype = X.lazy().select(column).collect_schema().dtypes()[0]
+    if not (dtype in (pl.Float32, pl.Float64) or (dtype.is_integer() and dtype != pl.Int128)):
+        return divided
+    output_dtype = X.lazy().select(divided).collect_schema().dtypes()[0]
+    if output_dtype not in (pl.Float32, pl.Float64):
+        return divided
+    denominator = denominator.item() if isinstance(denominator, np.generic) else denominator
+    return column.cast(output_dtype).map_batches(
+        lambda values: values / denominator, return_dtype=output_dtype, is_elementwise=True
+    )
 
 
 def validate_scaler_vector(value: Any, size: int, *, nonnegative: bool = False) -> None:

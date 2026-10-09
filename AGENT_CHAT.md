@@ -27,12 +27,13 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task207 implementation and verification finished; all file claims released.
-ValueReplacement schema preview, StandardScaler division and InvalidValue
-integer rules are reviewed. Casting mixed decimal-string precision remains open.
-Evidence and commit status: initiatives/spark_and_mlflow/207-schema-scaling-numeric-continuation.md.
-Tracked coverage: docs/contributing/preprocessing_inference_coverage.md.
-Local1600distinct tests and Databricks1186tests+Bundle guide passed; native run553129580194887.
-No push. Finished exchanges removed after recording their evidence.
+Task208: Casting integer precision/preview and scaler context continuation.
+Base5949e6aa, branch093. Implementation and validation complete; no push.
+Evidence: initiatives/spark_and_mlflow/208-casting-scaler-context-continuation.md.
+All63 initial owner reviews already finished; configuration boundaries remain.
+Local1110/native916 passed; full static, independent review and strict docs passed.
+All file claims released; evidence and acknowledgements are in the task document.
 
 ## Open messages
+
+None.

@@ -448,7 +448,7 @@ def test_robust_accepts_numpy_boolean_flags_saved_by_real_fit(flag):
     assert state["with_centering"] is flag
 
 
-@pytest.mark.parametrize("node,context", [("MaxAbsScaler", "row"), ("StandardScaler", "unknown")])
+@pytest.mark.parametrize("node,context", [("MaxAbsScaler", "row"), ("StandardScaler", "row")])
 def test_polars_nonbinary_scale_replays_exactly_across_saved_requests(
     tmp_path, monkeypatch, node, context
 ):
@@ -528,6 +528,8 @@ def test_maxabs_numpy_statistics_keep_native_promotion(scale):
     assert applier.validate_inference_state(state) is state
     expected = sample.with_columns((pl.col("x") / scale).alias("x"))
     assert_polars_frame_equal(applier.apply(sample, state), expected, check_exact=True)
+    singleton = pl.concat([applier.apply(sample.slice(i, 1), state) for i in range(len(sample))])
+    assert_polars_frame_equal(singleton, expected, check_exact=True)
 
 
 @pytest.mark.parametrize("node", ["MaxAbsScaler", "RobustScaler"])
@@ -659,3 +661,110 @@ def test_standard_polars_tiny_scale_uses_exact_native_division(value):
     assert_polars_frame_equal(empty, full.head(0), check_exact=True)
     assert_polars_frame_equal(sample, before)
     assert pickle.dumps(state) == saved
+
+
+@pytest.mark.parametrize("with_mean,with_std", list(product([False, True], repeat=2)))
+def test_standard_polars_context_is_local_without_worker_admission(
+    with_mean, with_std, monkeypatch
+):
+    """Reviewed Polars context must reuse saved validation without granting native or worker execution."""
+    flags = {"with_mean": with_mean, "with_std": with_std}
+    state = NodeRegistry.get_calculator("StandardScaler")().fit(
+        pl.DataFrame({"x": [-5.0, 5.0]}), {"columns": ["x"], **flags}
+    )
+    saved = pickle.dumps(state)
+    _poison_fit(monkeypatch, "StandardScaler")
+    for engine, kind in [("polars", "local"), ("pandas", "python_batch"), ("spark", "native")]:
+        capability = get_inference_capability("StandardScaler", flags, state, engine=engine)
+        assert capability is not None
+        assert (capability.context, capability.row_effect, capability.execution_kind) == (
+            "row",
+            "preserve",
+            kind,
+        )
+    for kind in ("python_batch", "native"):
+        with pytest.raises(UnsupportedExecutionError):
+            require_capability(
+                "StandardScaler", "apply", "polars", config=flags, execution_kind=kind
+            )
+    malformed = {**state, "type": "invalid_scaler"}
+    assert get_inference_capability("StandardScaler", flags, malformed, engine="polars") is None
+    applier = NodeRegistry.get_applier("StandardScaler")()
+    applier.apply = lambda *args, **kwargs: None
+    assert (
+        get_inference_capability("StandardScaler", flags, state, engine="polars", applier=applier)
+        is None
+    )
+    assert pickle.dumps(state) == saved
+
+
+@pytest.mark.parametrize(
+    "node,center", [("MaxAbsScaler", False), ("RobustScaler", False), ("RobustScaler", True)]
+)
+@pytest.mark.parametrize("dtype", [pl.Float32, pl.Float64, pl.Int8])
+@pytest.mark.parametrize("stat_dtype", [float, np.float32, np.float64, np.int16])
+def test_scaler_lazy_columns_bind_native_dtype_and_statistics(node, center, dtype, stat_dtype):
+    """Each lazy column must keep its own saved scale and native bulk values across request sizes."""
+    values: list[float | None] = [None, 2, 6, 0]
+    if dtype.is_float():
+        values += [-0.0, float("nan"), float("inf")]
+    sample = pl.DataFrame({"x": pl.Series(values, dtype=dtype), "z": [6.0] * len(values)})
+    scales = [stat_dtype(100), stat_dtype(5), stat_dtype(3)]
+    centers = [100.0, 2.0, 0.0]
+    state = {"columns": ["missing", "x", "z"], "scale": scales}
+    if node == "MaxAbsScaler":
+        state.update(type="maxabs_scaler", max_abs=scales)
+    else:
+        state.update(
+            type="robust_scaler",
+            center=centers if center else None,
+            with_centering=center,
+            with_scaling=True,
+            quantile_range=(25.0, 75.0),
+        )
+    expressions = []
+    for i, name in enumerate(["x", "z"], start=1):
+        column = pl.col(name).cast(pl.Float64) if node == "RobustScaler" else pl.col(name)
+        if center:
+            column = column - centers[i]
+        expressions.append((column / scales[i]).alias(name))
+    expected = sample.with_columns(expressions)
+    before, saved = sample.clone(), pickle.dumps(state)
+    applier = NodeRegistry.get_applier(node)()
+    for request in (sample, sample.lazy()):
+        actual = applier.apply(request, state)
+        if isinstance(request, pl.LazyFrame):
+            assert isinstance(actual, pl.LazyFrame)
+            actual = actual.collect()
+        assert_polars_frame_equal(actual, expected, check_exact=True)
+    for size in (1, 2):
+        parts = [
+            applier.apply(sample.slice(i, size).lazy(), state).collect()
+            for i in range(0, len(sample), size)
+        ]
+        assert_polars_frame_equal(pl.concat(parts), expected, check_exact=True)
+    assert_polars_frame_equal(
+        applier.apply(sample.head(0).lazy(), state).collect(), expected.head(0)
+    )
+    assert_polars_frame_equal(sample, before)
+    assert pickle.dumps(state) == saved
+
+
+@pytest.mark.parametrize("node", ["MaxAbsScaler", "RobustScaler"])
+@pytest.mark.parametrize("scale", [0.0, 1e-320])
+def test_scaler_lazy_zero_and_tiny_scales_keep_legacy_bulk_semantics(node, scale):
+    """Partition repair must preserve legacy reciprocal overflow, zero guards and signed zeros."""
+    sample = pl.DataFrame({"x": [None, 0.0, -0.0, 1e-320, 1.0, 6.0]})
+    state = {"columns": ["x"], "scale": [np.float64(scale)], "with_centering": False}
+    denominator = np.float64(scale) if scale != 0 else 1.0
+    expected = sample.with_columns((pl.col("x") / denominator).alias("x"))
+    applier = NodeRegistry.get_applier(node)()
+    full = applier.apply(sample.lazy(), state).collect()
+    singleton = pl.concat(
+        [applier.apply(sample.slice(i, 1).lazy(), state).collect() for i in range(len(sample))]
+    )
+    assert_polars_frame_equal(full, expected, check_exact=True)
+    assert_polars_frame_equal(singleton, expected, check_exact=True)
+    np.testing.assert_array_equal(
+        np.signbit(full["x"].to_numpy()), np.signbit(expected["x"].to_numpy())
+    )

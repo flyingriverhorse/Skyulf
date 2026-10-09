@@ -25,6 +25,7 @@ from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import (
     _select_subset_pandas,
     _select_subset_polars,
+    divide_polars_column,
     validate_scaler_vector,
     validate_scaling_range,
 )
@@ -100,7 +101,7 @@ class RobustScalerApplier(BaseApplier):
                 e = e - center[i]
             if with_scaling and scale is not None:
                 s = scale[i]
-                e = e / (s if s != 0 else 1.0)
+                e = divide_polars_column(X, e, s)
             exprs.append(e.alias(col_name))
         return X.with_columns(exprs), _y
 
