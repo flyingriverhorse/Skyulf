@@ -4,7 +4,6 @@ The artifact is for whole-frame local batches. A pyfunc model here does not
 certify row-local HTTP serving or Spark partition safety.
 """
 
-import inspect
 import tempfile
 from copy import deepcopy
 from functools import partial
@@ -17,7 +16,7 @@ import pandas as pd
 import skyulf.integrations.mlflow.shared._model_metadata as model_metadata
 from skyulf.integrations.mlflow.shared._client import make_tracking_client
 from skyulf.integrations.mlflow.shared._model_metadata import (
-    mlflow_dtype,
+    column_schema,
     scrub_local_artifact_uri,
 )
 
@@ -37,7 +36,7 @@ from ..shared._nullable_transport import (
 from ..shared._nullable_transport import (  # noqa: F401 - public compatibility re-export
     prepare_pyfunc_input as prepare_pyfunc_input,
 )
-from ..spark._spark_environment import snapshot_worker_environment
+from ..spark._spark_environment import pyfunc_environment
 from ..spark._spark_output import (
     prepare_spark_output,
     require_spark_output,
@@ -149,23 +148,15 @@ def local_model_save_options(
         zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
     )
     certificate = optional_partition_certificate(artifact)
-    requirements = pip_requirements(artifact)
-    options: dict[str, Any] = {}
-    if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
-        options["uv_project_path"] = str(directory)
-    source_sha256 = None
-    if certificate:
-        code_paths, requirements, source_sha256 = snapshot_worker_environment(
-            directory, requirements
-        )
-        options["code_paths"] = code_paths
+    options, source_sha256 = pyfunc_environment(
+        directory, pip_requirements(artifact), spark_certified=bool(certificate)
+    )
     return {
         **options,
         "python_model": SkyulfLocalPythonModel(transport, certificate, source_sha256),
         "artifacts": {"local_pipeline": str(local_path)},
         "signature": _signature(artifact, spark_certified=certificate is not None),
         "input_example": _input_example(artifact),
-        "pip_requirements": requirements,
         "metadata": {
             "skyulf_artifact_kind": "local_pipeline",
             "skyulf_fitted_engine": artifact.manifest.fitted_engine,
@@ -187,27 +178,16 @@ def _signature(artifact: LocalPipelineArtifact, *, spark_certified: bool = False
     from mlflow.models import (  # noqa: PLC0415 - optional dependency boundary  # ty: ignore[unresolved-import]
         ModelSignature,
     )
-    from mlflow.types import (  # noqa: PLC0415 - optional dependency boundary  # ty: ignore[unresolved-import]
-        ColSpec,
-        Schema,
-    )
 
     manifest = artifact.manifest
     transport = transport_spec(zip(manifest.input_columns, manifest.input_dtypes, strict=True))
     encoded = transport["columns"] if transport else {}
-    inputs = Schema(
-        [
-            ColSpec(
-                mlflow_dtype("string" if name in encoded else normalized_dtype(dtype)), name=name
-            )
-            for name, dtype in zip(manifest.input_columns, manifest.input_dtypes, strict=True)
-        ]
+    inputs = column_schema(
+        (name, "string" if name in encoded else normalized_dtype(dtype))
+        for name, dtype in zip(manifest.input_columns, manifest.input_dtypes, strict=True)
     )
-    outputs = Schema(
-        [
-            ColSpec(mlflow_dtype(column.dtype), name=column.name)
-            for column in scoring_output_schema(artifact)
-        ]
+    outputs = column_schema(
+        (column.name, column.dtype) for column in scoring_output_schema(artifact)
     )
     options = {"params": spark_output_params()} if spark_certified else {}
     return ModelSignature(inputs=inputs, outputs=outputs, **options)

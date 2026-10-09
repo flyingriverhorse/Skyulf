@@ -27,25 +27,23 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task201 on branch093: fitted sentence encoder assets and all-preprocessor
-small-data verification completed. Ponytail full. Root finalizing the signed
-commit; no push. No active peer claims, unanswered questions or review findings.
+Task203: user-approved Ponytail PA-01 and PA-02 implemented on branch093,
+base b3507e7b. See initiatives/spark_and_mlflow/203-ponytail-simplification.md
+for the file map, patch digest, exact tests, independent review and baseline debt.
+Source/template reduction: 2458 net lines; 57 regression-test lines added.
+The generated 2353-property schema remains identical to HEAD.
 
-Evidence: docs/contributing/preprocessing_inference_coverage.md and
-initiatives/spark_and_mlflow/201-sentence-embedder-assets.md;
-per-name results: initiatives/spark_and_mlflow/201-all-preprocessing-native-results.md.
-Independent Codex review verified real encoder/tokenizer transport, dependency
-pins, native-valid settings, exact group/history values and lifecycle behavior.
-Completed exchanges and released claims were removed after recording findings.
-
-Local:691passed/1Windows-symlink skip across21 affected files; new all-owner
-matrix135passed, supplementary group/history/lifecycle22passed. Full Ruff,
-format, CI Ty and CCN10 passed; final strict docs build passed in9.02s.
-Native packaging:149/149passed, zero skips; job988493157672277/run968745626942362.
-Native all-owner:157/157passed, zero skips; job994960019987268/run113581190209016.
-67registered names/63owners, pandas67 andPolars67,32rows; no new Spark/REST
-admission. Both runs verified all552 runtime hashes for wheel063d876b...;
-no tables, registered models or endpoints created. Runtime unchanged since tests.
-
+Final unique affected cases: 345 passed, one existing boundary check failed.
+The initial union was 325 passed, 19 failed, two skipped; 18 CLI startup
+permission failures and two profile-gated catalog skips passed narrow reruns.
+T203-B01: eleven existing private imports across nine unchanged modules.
+Independent HEAD-archive and working-tree scans match exactly; no guard relaxed.
+Ruff, format, full CI Ty and Lizard CCN10 passed. No blocking refactor review
+findings. No cloud UDF/endpoint run, commit or push in this task.
+All Task203 file claims released; no pending peer questions. The baseline
+helper-ownership repair is documented separately from PA-01/PA-02.
 ## Open messages
-- ID: T201-root-release; UTC: 2026-10-09T15:39:16.7045976Z; sender: Codex root; recipient: all; type: RELEASE; reply: T201-root-final-report. All edit claims released after documentation and native evidence completed. Root owns staging/final commit only; no peer work pending. No push.
+
+- ID: T203-result; UTC: 2026-10-09T16:20:15.0829229Z; sender: Codex T203; recipient: all; type: RESULT; reply: T203-claim. PA-01/02 complete and reviewed; 345 unique tests passed, one independently confirmed pre-existing boundary failure T203-B01 remains. Exact evidence and 11 imports are in report203. Claims released; no peer action required; no commit/push.
+
+- ID: T204-start; UTC: 2026-10-09T16:30:42.4047278Z; sender: Codex T204; recipient: all; type: CLAIM; reply: T203-result. User requested commit of reviewed PA-01/02 then continuation from docs/contributing/preprocessing_inference_coverage.md. Own commit/gates for exact eight Task203 source/test files listed in report203 and AGENT_CHAT.md; no push. Coverage continuation is read-only while checking the remaining boundaries and user priority. Root owns tests; no conflicting peer claim found.

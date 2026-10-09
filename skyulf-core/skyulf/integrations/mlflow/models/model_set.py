@@ -1,6 +1,5 @@
 """Optional MLflow packaging for a complete pinned, locally executable model set."""
 
-import inspect
 import tempfile
 from collections.abc import Iterable
 from copy import deepcopy
@@ -14,7 +13,7 @@ import pandas as pd
 
 from skyulf.integrations.mlflow.shared._client import make_tracking_client
 from skyulf.integrations.mlflow.shared._model_metadata import (
-    mlflow_dtype,
+    column_schema,
     normalized_dtype,
     scrub_local_artifact_uri,
 )
@@ -42,7 +41,7 @@ from ..shared._nullable_transport import (
     transport_spec,
     validated_transport,
 )
-from ..spark._spark_environment import snapshot_worker_environment
+from ..spark._spark_environment import pyfunc_environment
 from ..spark._spark_output import (
     prepare_spark_output,
     require_spark_output,
@@ -151,22 +150,14 @@ def model_set_save_options(artifact: ModelSetArtifact, directory: Path) -> dict[
         (column.name, column.dtype) for column in artifact.manifest.input_schema
     )
     certificate = optional_partition_certificate(artifact)
-    requirements = _set_requirements(artifact)
-    options: dict[str, Any] = {}
-    if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
-        options["uv_project_path"] = str(directory)
-    source_sha256 = None
-    if certificate:
-        code_paths, requirements, source_sha256 = snapshot_worker_environment(
-            directory, requirements
-        )
-        options["code_paths"] = code_paths
+    options, source_sha256 = pyfunc_environment(
+        directory, _set_requirements(artifact), spark_certified=bool(certificate)
+    )
     return {
         **options,
         "python_model": SkyulfModelSetPythonModel(transport, certificate, source_sha256),
         "artifacts": {"model_set": str(artifact.directory)},
         "signature": _signature(artifact, spark_certified=certificate is not None),
-        "pip_requirements": requirements,
         "metadata": {
             "skyulf_artifact_kind": "model_set",
             "skyulf_execution_scope": "whole_frame_local",
@@ -180,31 +171,21 @@ def model_set_save_options(artifact: ModelSetArtifact, directory: Path) -> dict[
 def _signature(artifact: ModelSetArtifact, *, spark_certified: bool = False) -> Any:
     """Require an exact MLflow scalar representation for every input and output."""
     from mlflow.models import ModelSignature  # noqa: PLC0415  # ty: ignore[unresolved-import]
-    from mlflow.types import ColSpec, Schema  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     transport = transport_spec(
         (column.name, column.dtype) for column in artifact.manifest.input_schema
     )
     encoded = transport["columns"] if transport else {}
 
-    def schema(columns: Any, encode: bool = False) -> Any:
-        """Preserve names and order while rejecting lossy unsupported scalar types."""
-        return Schema(
-            [
-                ColSpec(
-                    mlflow_dtype(
-                        "string" if encode and c.name in encoded else normalized_dtype(c.dtype)
-                    ),
-                    name=c.name,
-                )
-                for c in columns
-            ]
-        )
-
     options = {"params": spark_output_params()} if spark_certified else {}
     return ModelSignature(
-        inputs=schema(artifact.manifest.input_schema, encode=True),
-        outputs=schema(model_set_output_schema(artifact)),
+        inputs=column_schema(
+            (c.name, "string" if c.name in encoded else normalized_dtype(c.dtype))
+            for c in artifact.manifest.input_schema
+        ),
+        outputs=column_schema(
+            (c.name, normalized_dtype(c.dtype)) for c in model_set_output_schema(artifact)
+        ),
         **options,
     )
 

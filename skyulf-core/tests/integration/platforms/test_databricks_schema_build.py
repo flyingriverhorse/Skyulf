@@ -53,6 +53,18 @@ def test_ensemble_group_rejects_names_without_slot(tmp_path):
         build(tmp_path)
 
 
+def test_ensemble_group_rejects_explicit_generated_position():
+    """A hand-written position must not silently override a generated model menu."""
+    expand = runpy.run_path(str(ROOT / "build_schema.py"))["_ensemble_questions"]
+    fields = json.loads((ROOT / "schema/competition_ensemble.json").read_text())
+    fields["competition_ensemble_SLOT_regression_base_2"] = {
+        **fields["competition_ensemble_SLOT_regression_base_1"],
+        "default": "lasso",
+    }
+    with pytest.raises(ValueError, match="Duplicate ensemble question.*regression_base_2"):
+        expand(fields)
+
+
 @pytest.mark.parametrize("duplicate", ["within_file", "across_files"])
 def test_duplicate_properties_fail_without_overwriting(duplicate, tmp_path):
     """Duplicate names must fail loudly instead of silently replacing user prompts."""
