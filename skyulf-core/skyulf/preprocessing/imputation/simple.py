@@ -64,15 +64,15 @@ class SimpleImputerApplier(BaseApplier):
     def validate_fitted_state(raw: dict) -> dict:
         """Inspect this node's supported saved state without fitting or applying data."""
         return (
-            _mode_state(raw)
-            if raw.get("strategy") == "most_frequent"
+            _local_statistic_state(raw)
+            if raw.get("strategy") in ("median", "most_frequent")
             else validate_state("SimpleImputer", raw)
         )
 
     @staticmethod
     def resolve_fitted_config(raw: dict, state: dict) -> dict:
         """Bind inference configuration to this node's inspected fitted artifact."""
-        if state.get("strategy") == "most_frequent":
+        if state.get("strategy") in ("median", "most_frequent"):
             return _imputation_config("SimpleImputer", fitted_columns(raw, state), state)
         return portable_config("SimpleImputer", raw, state)
 
@@ -181,6 +181,17 @@ class SimpleImputerApplier(BaseApplier):
             config_match=(("strategy", "most_frequent"),),
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
+    )
+    + tuple(
+        ExecutionCapability(
+            engine,
+            "apply",
+            "local",
+            "preserve",
+            "row",
+            config_match=(("strategy", "median"),),
+        )
+        for engine in ("pandas", "polars")
     ),
 )
 @node_meta(
@@ -345,11 +356,14 @@ class SimpleImputerCalculator(BaseCalculator):
         }
 
 
-def _mode_state(raw: dict) -> dict:
-    """Reuse scalar/count validation without expanding the portable strategy vocabulary."""
-    if raw.get("strategy") != "most_frequent":
-        raise ValueError("Expected a most-frequent imputer.")
+def _local_statistic_state(raw: dict) -> dict:
+    """Validate local medians and modes without expanding the portable strategy vocabulary."""
+    strategy = raw.get("strategy")
+    if strategy not in ("median", "most_frequent"):
+        raise ValueError("Expected a median or most-frequent imputer.")
     state = validate_state("SimpleImputer", {**raw, "strategy": "mean"})
     for value in state["fill_values"].values():
         _scalar(value)
-    return {**state, "strategy": "most_frequent"}
+        if strategy == "median" and type(value) not in (int, float, type(None)):
+            raise ValueError("Median fill values must be numeric or null.")
+    return {**state, "strategy": "median" if strategy == "median" else "most_frequent"}

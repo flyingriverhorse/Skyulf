@@ -162,9 +162,7 @@ def test_simple_restores_missing_fitted_column_with_existing_row_anchor(strategy
 @pytest.mark.parametrize(
     "node,strategy",
     [
-        ("SimpleImputer", "median"),
         ("SimpleImputer", "mode"),
-        ("GroupImputer", "median"),
     ],
 )
 def test_unreviewed_imputer_modes_remain_unknown(node, strategy):

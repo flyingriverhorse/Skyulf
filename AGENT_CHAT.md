@@ -27,15 +27,10 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task210: exact GroupImputer integers and Polars zero-width row preservation.
-Sourcecommit cde4a2d1, branch093. Local/native validation complete; all claims released.
-Evidence: initiatives/spark_and_mlflow/210-group-integer-empty-context.md. No push.
-
-Local575/native575 tests plus Bundle guide passed; run601530407504441 SUCCESS.
-Final552runtime/23asset hashes and575test node IDs match exactly; no skips/failures.
-Follow-up result documentation passed strictMkDocs; see git history for DCO commit.
-Useful review/test/migration evidence is recorded in the task document.
+Task211: local median imputer context for pandas and Polars.
+Base93396f37, branch093. Local implementation/tests complete; native approval pending.
+Evidence: initiatives/spark_and_mlflow/211-median-local-context.md. No push.
 
 ## Open messages
 
-None.
+- ID: T211-handoff; UTC: 2026-10-09T19:54:51.7061925Z; sender: Codex T211; recipient: all; type: RELEASE; reply: T211-root. All code/test/doc claims released for requested DCO commit. Reviewedfinal13-file union528passed5warnings46.60s; Ruff/format/fullCI Ty/Lizard/strictMkDocs passed. Existing fit/apply ASTs unchanged; median capabilities local only, real saved workers and portable median reject. Independentreview no blocker; canonical NumPystrategy finding fixed by2red/green tests. Final552runtime/15asset wheel806c4b16d71eee6510d5de15bc73245c9156ae4acf6624e9a9bfe05061d7a683,528nodes collected, archive fixture preflight passed. Task211 upload/run question pending, no remote mutation. Resume prepared task211_native after approval; readgit history for localcommit. No push.

@@ -272,6 +272,12 @@ def _polars_fill(
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for strategy in ("mean", "most_frequent")
+    )
+    + tuple(
+        ExecutionCapability(
+            engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
+        )
+        for engine in ("pandas", "polars")
     ),
 )
 @node_meta(
@@ -354,7 +360,7 @@ def _group_state(raw: dict) -> dict:
     state = _normalize(raw)
     _fields(state, {"type", "group_by", "strategy", "columns", "group_values", "fill_values"})
     columns = _columns(state["columns"])
-    if state["type"] != "group_imputer" or state["strategy"] not in ("mean", "most_frequent"):
+    if state["type"] != "group_imputer" or state["strategy"] not in _STRATEGIES:
         raise ValueError("Unsupported group imputer state.")
     if type(state["group_by"]) is not str or state["group_by"] in columns:
         raise ValueError("Invalid group key.")
@@ -363,7 +369,11 @@ def _group_state(raw: dict) -> dict:
     for column in columns:
         fallback = state["fill_values"][column]
         _scalar(fallback)
-        if state["strategy"] == "mean" and type(fallback) not in (int, float, type(None)):
+        if state["strategy"] in _NUMERIC_STRATEGIES and type(fallback) not in (
+            int,
+            float,
+            type(None),
+        ):
             raise ValueError("Global group means must be numeric.")
-        _group_pairs(state["group_values"][column], state["strategy"] == "mean")
+        _group_pairs(state["group_values"][column], state["strategy"] in _NUMERIC_STRATEGIES)
     return state

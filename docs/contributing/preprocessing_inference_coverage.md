@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task209 local Polars declarations.
+Status snapshot: **2026-10-09**, branch `093`, Task211 local median declarations.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -51,12 +51,12 @@ declares context. New project-defined classes are not part of the fixed 63.
 
 | Implementation | Present context behavior | Remaining boundary |
 | --- | --- | --- |
-| `SimpleImputer` | `row` for matched reviewed declarations, including local Polars apply | Mean, constant and most-frequent strategies reuse saved scalar validation. Median and the SimpleImputer `mode` alias remain `unknown`; zero-column restoration retains the boundary below. |
-| `GroupImputer` | `row` for saved group lookups, including local Polars apply | Mean and most-frequent strategies (including the `mode` alias) reuse saved lookups/fallbacks. Median remains `unknown`; large-integer mode precision remains open. |
+| `SimpleImputer` | `row` for matched reviewed declarations, including local pandas/Polars median apply | Median reuses saved numeric scalar validation through local-only declarations. The `mode` alias and unsupported empty/nonfinite states remain `unknown`. Task210 preserves Polars zero-column row counts. |
+| `GroupImputer` | `row` for saved group lookups, including local pandas/Polars median apply | Mean, median and most-frequent strategies reuse saved lookups/fallbacks; median is local-only. The `mode` alias still normalizes to most-frequent. Task210 preserves integer modes and group keys through UInt64; Int128 retains its previous conversion boundary. |
 | `StandardScaler` | `row` for matched reviewed declarations, including local Polars apply | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; local metadata does not grant worker admission. |
 | `MinMaxScaler` | `row` for matched reviewed declarations, including local Polars apply | Existing finite affine coefficients and matching feature range are required. All-null/nonfinite fits retain existing validator abstention. |
 | `OneHotEncoder` | `row` for matched reviewed declarations, including local Polars apply | Existing dense subset with `max_categories=None`, no infrequent grouping and `include_missing=False`; the default `max_categories=20` and empty artifacts remain `unknown`. |
-| `FeatureInteraction` | `row` for matched reviewed declarations, including local Polars apply | Existing degree 2–4 combinations, repetition and bias flags; zero-column bias retains the boundary below. Other feature-generation classes have separate entries. |
+| `FeatureInteraction` | `row` for matched reviewed declarations, including local Polars apply | Existing degree 2–4 combinations, repetition and bias flags; Task210 preserves zero-column bias row counts. Other feature-generation classes have separate entries. |
 | `ClipValues` | `row` for matched reviewed declarations, including local Polars apply | Saved finite fixed limits and matching configuration; native dtype and numerical behavior are unchanged. |
 | `LagFeatures` | `window`, with its saved row effect | No independent-chunk probe or new history execution |
 | `RollingAggregate` | `window` | No independent-chunk probe or new history execution |
@@ -1041,3 +1041,39 @@ run took 95.725 seconds. Wheel SHA256:
 This validates native Python fit/save/load/apply/predict and context diagnostics.
 Spark UDF, REST and `ai_query` admission remain unchanged; no tables, registered
 models or endpoints were created.
+
+### Task211 local median declarations
+
+SimpleImputer and GroupImputer now declare saved median application as `row`
+on pandas and Polars. The new entries use execution kind `local` and no codec;
+the existing pandas `python_batch` and Spark declarations are unchanged. The
+node-owned validators inspect saved medians and bind the recipe to the artifact.
+Inference still fills from training statistics, including saved group fallbacks.
+No fit/apply implementation, arithmetic, artifact field or generic resolver changed.
+
+Group median uses the existing numeric group/fallback checks. Simple median
+reuses the existing artifact shape/count checks and requires finite numeric or
+`None` fills. A pandas wholly-null fit that produces an empty artifact remains
+`unknown`; a valid Polars `None` median is inspectable and leaves existing missing
+values unchanged. Unsupported nonfinite/nonnumeric median values and a conflicting
+configured constant are
+rejected. The SimpleImputer `mode` recipe alias remains outside this reviewed
+subset. Existing modal validation still returns a canonical Python strategy
+string when given a NumPy string scalar.
+
+Local context does not authorize partition workers. Actual saved pandas median
+pipelines for both owners remain rejected by the worker capability gate; portable
+SimpleImputer encoding still accepts only its existing mean/constant vocabulary.
+No model refit or artifact migration is required for this metadata-only extension.
+
+All **528 local tests** in thirteen explicit affected files passed (5 warnings,
+46.60 seconds). The union includes 49 focused median cases and four median
+fit/save/fresh-process load/probe/predict cases across both engines, with fit
+disabled during replay and actual worker rejection checked. Full Ruff, formatting,
+CI Ty and Lizard CCN <= 10 passed. Independent Ponytail review retained all prior
+declaration entries and nineteen baseline validator outcomes; its normalization
+finding was reproduced and corrected before the final union.
+
+The matching wheel and 528-test package are prepared for Databricks validation;
+Task211 upload/run approval is pending. This does not claim Spark UDF or endpoint
+validation.
