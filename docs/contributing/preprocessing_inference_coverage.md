@@ -1074,6 +1074,14 @@ CI Ty and Lizard CCN <= 10 passed. Independent Ponytail review retained all prio
 declaration entries and nineteen baseline validator outcomes; its normalization
 finding was reproduced and corrected before the final union.
 
-The matching wheel and 528-test package are prepared for Databricks validation;
-Task211 upload/run approval is pending. This does not claim Spark UDF or endpoint
-validation.
+The same final wheel passed **528 tests**, zero failures or skips, plus the
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 229939466546729](https://dbc-45604623-c18b.cloud.databricks.com/jobs/783095403989408/runs/229939466546729)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and fifteen
+test/guide/support assets matched the manifest; local collected and remote passed
+test-node sets match exactly. Pytest took 32.87 seconds with 5 warnings; the full
+run took 84.135 seconds. Wheel SHA256:
+`806c4b16d71eee6510d5de15bc73245c9156ae4acf6624e9a9bfe05061d7a683`.
+This validates native Python saved-state replay and local context diagnostics,
+including retained worker/codec rejection. It does not validate Spark UDF, REST
+or `ai_query` execution. No tables, registered models or endpoints were created.
