@@ -324,6 +324,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     OneHotEncoderApplier,
     execution_capabilities=(
         ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
     ),
 )
 @node_meta(

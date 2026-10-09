@@ -237,13 +237,14 @@ def _polars_fill(
     GroupImputerApplier,
     execution_capabilities=tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             config_match=(("strategy", strategy),),
         )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for strategy in ("mean", "most_frequent")
     ),
 )

@@ -198,6 +198,7 @@ class FeatureInteractionApplier(BaseApplier):
     FeatureInteractionApplier,
     execution_capabilities=(
         ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
     ),
 )
 @node_meta(

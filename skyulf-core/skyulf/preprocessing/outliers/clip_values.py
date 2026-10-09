@@ -140,6 +140,7 @@ class ClipValuesApplier(BaseApplier):
     ClipValuesApplier,
     execution_capabilities=(
         ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
     ),
 )
 @node_meta(

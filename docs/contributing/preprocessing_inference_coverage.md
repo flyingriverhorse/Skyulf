@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task208 Casting/scaler continuation.
+Status snapshot: **2026-10-09**, branch `093`, Task209 local Polars declarations.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -51,13 +51,13 @@ declares context. New project-defined classes are not part of the fixed 63.
 
 | Implementation | Present context behavior | Remaining boundary |
 | --- | --- | --- |
-| `SimpleImputer` | `row` for matched reviewed declarations | Review additional local modes/engines independently |
-| `GroupImputer` | `row` for saved group lookups in reviewed declarations | Verify fallback/null-group modes independently |
+| `SimpleImputer` | `row` for matched reviewed declarations, including local Polars apply | Mean, constant and most-frequent strategies reuse saved scalar validation. Median and the SimpleImputer `mode` alias remain `unknown`; zero-column restoration retains the boundary below. |
+| `GroupImputer` | `row` for saved group lookups, including local Polars apply | Mean and most-frequent strategies (including the `mode` alias) reuse saved lookups/fallbacks. Median remains `unknown`; large-integer mode precision remains open. |
 | `StandardScaler` | `row` for matched reviewed declarations, including local Polars apply | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; local metadata does not grant worker admission. |
-| `MinMaxScaler` | `row` for matched reviewed declarations | Boundaries, clip modes and engines remain configuration-specific |
-| `OneHotEncoder` | `row` for matched reviewed declarations | A local default such as `max_categories=20` may report `unknown` |
-| `FeatureInteraction` | `row` for matched reviewed declarations | Other feature-generation classes have separate entries below |
-| `ClipValues` | `row` for matched reviewed declarations | Preserve configured limits and dtype behavior |
+| `MinMaxScaler` | `row` for matched reviewed declarations, including local Polars apply | Existing finite affine coefficients and matching feature range are required. All-null/nonfinite fits retain existing validator abstention. |
+| `OneHotEncoder` | `row` for matched reviewed declarations, including local Polars apply | Existing dense subset with `max_categories=None`, no infrequent grouping and `include_missing=False`; the default `max_categories=20` and empty artifacts remain `unknown`. |
+| `FeatureInteraction` | `row` for matched reviewed declarations, including local Polars apply | Existing degree 2–4 combinations, repetition and bias flags; zero-column bias retains the boundary below. Other feature-generation classes have separate entries. |
+| `ClipValues` | `row` for matched reviewed declarations, including local Polars apply | Saved finite fixed limits and matching configuration; native dtype and numerical behavior are unchanged. |
 | `LagFeatures` | `window`, with its saved row effect | No independent-chunk probe or new history execution |
 | `RollingAggregate` | `window` | No independent-chunk probe or new history execution |
 | `Deduplicate` | `global` / filter | Normal row-preserving prediction skips it |
@@ -942,4 +942,56 @@ run took 80.282 seconds. Wheel SHA256:
 `956695874a40fd4a4efe094fe2f21be1ac60264f77e269f4baccf7d37429821f`.
 This validates native Python fit/apply/predict and context diagnostics. Spark UDF,
 REST and `ai_query` admission remain unchanged; no tables, registered models or
+endpoints were created.
+
+### Task209 existing families' local Polars declarations
+
+SimpleImputer, GroupImputer, MinMaxScaler, ClipValues, OneHotEncoder and
+FeatureInteraction now expose the same reviewed saved-state subsets through
+Polars `local` / `row` metadata. Their pandas declarations already existed.
+Nine declaration entries cover the six owners' existing strategy selectors;
+codec versions, validation, configuration matching and applier identity checks
+are retained. No transformation, estimator, resolver or artifact format changed.
+Existing pandas/Spark declarations and worker admission are unchanged.
+
+This fills an engine-metadata gap, not every configuration gap. SimpleImputer
+median and its `mode` alias, GroupImputer median, OneHotEncoder's default
+`max_categories=20`, missing-token mode and empty artifacts still abstain.
+The GroupImputer `mode` alias already normalizes to the reviewed most-frequent
+strategy. Null/unseen groups reuse saved fallbacks without request aggregation.
+Local metadata never invokes fit or apply. A positive `row` declaration describes
+input dependencies; the exact diagnostic still detects dtype or shape failures.
+
+Two existing boundaries were reproduced and remain open:
+
+- GroupImputer mode can lose exact large integers beside nulls. Polars training
+  conversion can round `9007199254740993` to `9007199254740992.0`; pandas saved
+  lookup mapping can promote exact values to float when fallback groups appear.
+  UInt64 maximum-value mode inputs can also fail during apply. These are native
+  fit/lookup precision issues, not evidence that inference relearns group means.
+- A Polars frame with zero rows **and zero columns** can acquire one row when
+  SimpleImputer restores a missing column or FeatureInteraction adds a bias
+  literal. Ordinary zero-row frames retaining a column schema pass the reviewed
+  empty checks. The diagnostic still fails the zero-column cases; metadata does
+  not turn them into successful reports.
+
+All **584 local tests** across eighteen explicit affected files passed
+(29 warnings, 46.51 seconds). After tightening a test's pandas/Polars type
+narrowing and input-mutation assertion, its 26 cases passed again; this does not
+increase the distinct test count. The six-step model also passed fit/save and
+fresh-process load/probe/predict on both engines with calculators disabled.
+Full Ruff, formatting, CI Ty and Lizard CCN <= 10 passed. Independent review
+confirmed that numerical code and previous declaration sequences are unchanged;
+two additional probes kept the zero-column diagnostic failures visible.
+
+The same final wheel passed **584 tests**, zero failures or skips, plus the
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 407701115957407](https://dbc-45604623-c18b.cloud.databricks.com/jobs/461409568158715/runs/407701115957407)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and twenty-six
+test/guide/support assets matched the manifest; local collected and remote passed
+test-node sets match exactly. Pytest took 37.54 seconds with 29 warnings; the full
+run took 93.908 seconds. Wheel SHA256:
+`9236ae2b24cacbd55d9c0dbb153ca03e8c4973aca5369312297dea9d86e6e92d`.
+This validates native Python saved-state replay and context diagnostics. No Spark
+UDF, REST or `ai_query` routes were added, and no tables, registered models or
 endpoints were created.

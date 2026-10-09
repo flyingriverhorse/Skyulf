@@ -27,12 +27,12 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task208: Casting integer precision/preview and scaler context continuation.
-Base5949e6aa, branch093. Implementation and validation complete; no push.
-Evidence: initiatives/spark_and_mlflow/208-casting-scaler-context-continuation.md.
-All63 initial owner reviews already finished; configuration boundaries remain.
-Local1110/native916 passed; full static, independent review and strict docs passed.
-All file claims released; evidence and acknowledgements are in the task document.
+Task209: reviewed local Polars declarations for six existing pandas families.
+Base56936e5d, branch093. Implementation and local/native verification complete.
+Evidence: initiatives/spark_and_mlflow/209-local-polars-context-continuation.md.
+Local584/native584 tests and Bundle guide passed; run407701115957407 SUCCESS.
+Independent review and CI static scopes passed; configuration limits remain documented.
+All file claims released. Evidence/acknowledgements recorded in the task document. No push.
 
 ## Open messages
 
