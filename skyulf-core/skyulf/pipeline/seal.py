@@ -37,6 +37,7 @@ _TRANSIENT_ATTRIBUTES = frozenset({"last_transform_coverage_"})
 _BIT_GENERATOR_TYPES = frozenset(
     (np.random.PCG64, np.random.PCG64DXSM, np.random.MT19937, np.random.Philox, np.random.SFC64)
 )
+_NUMERIC_DTYPE_TYPES = frozenset(type(np.dtype(code)) for code in "?bhilqBHILQefdgFDG")
 
 
 def artifact_digest(obj: Any) -> bytes:
@@ -159,6 +160,8 @@ def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
         return
     if isinstance(obj, np.ndarray):
         yield from _array_children(h, obj)
+    elif isinstance(obj, np.dtype):
+        _feed_numeric_dtype(h, obj)
     elif isinstance(obj, np.random.RandomState):
         h.update(b"randomstate:")
         yield obj.get_state()
@@ -170,6 +173,20 @@ def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
         yield from obj
     else:
         yield from _object_children(h, obj)
+
+
+def _feed_numeric_dtype(h: Any, dtype: np.dtype) -> None:
+    """Encode plain numeric dtype metadata without discarding unsupported structure."""
+    if (
+        dtype.kind not in "biufc"
+        or dtype.fields is not None
+        or dtype.subdtype is not None
+        or dtype.metadata is not None
+        or type(dtype) not in _NUMERIC_DTYPE_TYPES
+    ):
+        raise TypeError(f"Cannot digest dtype {dtype}: no canonical representation")
+    _feed_bytes(h, b"numpy-dtype", dtype.str.encode())
+    _feed_bytes(h, b"scalar-variant", dtype.char.encode())
 
 
 def _generator_children(h: Any, obj: np.random.Generator) -> Iterator[Any]:

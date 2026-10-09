@@ -52,7 +52,7 @@ def _frame(engine):
     return pl.from_pandas(frame) if engine == "polars" else frame
 
 
-@pytest.mark.parametrize("node", ["PowerTransformer", "missing_context_node"])
+@pytest.mark.parametrize("node", ["ModelBasedSelection", "missing_context_node"])
 def test_undeclared_nodes_stay_unknown(node):
     """Unreviewed behavior must not become row-local merely because it is registered."""
     assert _capability(node, {}, {}, engine="pandas") is None

@@ -12,6 +12,25 @@ from typing import Any
 import numpy as np
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
+from .._fitted_validation import local_boolean
+from ..scaling._common import validate_scaler_vector
+
+
+def validate_power_parameters(state: dict, size: int) -> None:
+    """Inspect learned power/scaler vectors without constructing or fitting estimators."""
+    if state.get("method", "yeo-johnson") not in ("box-cox", "yeo-johnson"):
+        raise ValueError("Fitted power method is unsupported.")
+    local_boolean(state.get("standardize", True), "standardize")
+    validate_scaler_vector(state.get("lambdas"), size)
+    scaler = state.get("scaler_params", {})
+    if type(scaler) is not dict or set(scaler) - {"mean", "scale"}:
+        raise ValueError("Unexpected fitted power scaler fields.")
+    if state.get("standardize", True) and set(scaler) != {"mean", "scale"}:
+        raise ValueError("Standardized power state requires saved mean and scale.")
+    for name, values in scaler.items():
+        if values is not None:
+            validate_scaler_vector(values, size, nonnegative=name == "scale")
+
 
 def _narrow_scaler_values(
     values: Any,

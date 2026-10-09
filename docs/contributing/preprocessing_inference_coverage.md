@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task197 local context continuation.
+Status snapshot: **2026-10-09**, branch `093`, Task198 encoder/imputer contexts.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -35,11 +35,11 @@ and [inference flow](../user_guide/inference_flow.md).
 | --- | ---: | --- |
 | Registered transformer IDs | 67 | Includes aliases and training/inspection helpers |
 | Distinct applier implementations | 63 | Four additional names refer to existing classes |
-| Implementations with context declaration machinery | 34 | Thirty-one built-in implementations plus three custom wrappers |
-| Remaining without declaration machinery | **29** | **32 registered IDs** after including aliases; listed below |
+| Implementations with context declaration machinery | 44 | Forty-one built-in implementations plus three custom wrappers |
+| Remaining without declaration machinery | **19** | **22 registered IDs** after including aliases; listed below |
 | Reviewed worker-admitted preprocessing families | 7 | Only their supported pandas configurations; not every mode/engine |
 
-The count of 34 describes available machinery, not unconditional support for
+The count of 44 describes available machinery, not unconditional support for
 every configuration. Existing worker-subset validators can abstain for valid
 local states. Some Polars configurations also have no matching declaration.
 Custom wrappers return `unknown` unless their saved definition explicitly
@@ -104,7 +104,7 @@ the diagnostic continues reporting the integer-input mismatch.
 For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-are additional to the 29 implementations without declarations. The Polars
+are additional to the 19 implementations without declarations. The Polars
 rounding case remains a strict diagnostic boundary; it does not justify a second
 arithmetic implementation or a weaker comparison.
 
@@ -136,7 +136,52 @@ exponential clipping with Decimal can still fail for clipped or null values.
 Use ordinary numeric settings for sealed models and validate representative
 samples. No new mathematical implementation or relaxed comparison was added.
 
-## Remaining 29 implementations without declarations
+### Ten additional local contracts (Task198)
+
+This group includes operations whose existing execution genuinely depends on
+request boundaries. A declaration can correctly report `global` or `unknown`;
+neither means the estimator is being trained again.
+
+| ID | Implementation | Inspected scope and remaining boundary |
+| --- | --- | --- |
+| PC-12 | `DummyEncoder` | Saved vocabulary, output names and drop-first policy. Current category keys are row-local; legacy pandas datetime rendering can depend on neighboring values and reports `global`. |
+| PC-13 | `HashEncoder` | Existing stable hash and saved bucket count. Current key version is row-local; legacy pandas rendering reports `global`. Empty-result dtype mismatches remain exact probe failures. |
+| PC-14 | `LabelEncoder` | Saved feature/target mappings and unknown/missing codes. Current category keys are row-local; legacy pandas representations can change across batches. Target decoding is separate from feature-only inference. |
+| PC-15 | `OrdinalEncoder` | Saved category ordering, sentinels, feature and optional target encoders; no inference category fitting. Legacy pandas feature keys can require `global` context. |
+| PC-16 | `TargetEncoder` | Saved full-data category statistics and output class layout. Training cross-fitting deliberately differs from inference lookup; request labels are not used to relearn mappings. |
+| PC-17 | `WOEEncoder` | Saved binary-label mappings and defaults; use a genuine two-class training target to exercise this transform. Legacy pandas keys can require `global` context. |
+| PC-26 | `IterativeImputer` | Saved initial statistics and chained estimators. Active rounds report `global`: an entirely null request takes sklearn's initial-fill shortcut. Zero-round fits are row-local; posterior sampling or custom prediction estimators remain `unknown`. |
+| PC-27 | `KNNImputer` | Saved training neighbors, masks and supported distance/weight settings. Built-in modes are row-local; custom callbacks remain `unknown`. Numerical parity remains configuration/runtime-specific. |
+| PC-43 | `GeneralTransformation` | Simple formulas are row-local. Fitted power rules report `global` because one invalid value can cause a whole column to pass through unchanged. |
+| PC-44 | `PowerTransformer` | Saved lambdas/scaler settings are reused. Active fits report `global`: an invalid value causes whole-frame fallback. Genuine empty/no-op fits remain row-local. |
+
+For example, a valid value alongside a negative Box-Cox input can remain raw in
+the full request while the same value alone is transformed. Preserve request
+boundaries and correct invalid input; independent worker chunks do not preserve
+that fallback behavior. The diagnostic reports `requires_context` without running
+independent chunks. The existing fallback and transform math are unchanged.
+
+IterativeImputer's fitted sklearn objects also store NumPy dtype objects. Their
+plain numeric dtype metadata now has a distinct semantic hash encoding, preserving
+kind, scalar variant, width and byte order. Structured, metadata-bearing and
+nonnumeric dtype
+objects remain rejected. This fixes fingerprint/probe inspection; ordinary local
+save/load already used a binary payload checksum. Existing array/scalar encodings
+and strict worker admission are unchanged.
+
+Some native NumPy pickle aliases normalize on Windows: a `longdouble` dtype can
+reload as `float64` where their storage widths coincide. These remain distinct
+semantic identities; do not assume fingerprint equality for those normalized
+aliases. Ordinary float64 model reload is covered by the saved-model tests.
+
+Use an ordinary Python integer for HashEncoder's `n_features`. A NumPy integer
+retains existing runtime limits: NumPy 2 can raise `OverflowError` when a hash
+exceeds its signed range; NumPy 1 can promote buckets to float. The latter can
+change pandas chunk dtypes or make Polars reject mixed replacement values at
+different checks, depending on unique-value order. The diagnostic keeps these
+failures visible; it does not normalize fitted settings or weaken comparisons.
+
+## Remaining 19 implementations without declarations
 
 Every row below is **OPEN**. The “review focus” is a work item, not a certified
 context declaration. Start with P1, then P2; P3 covers training/inspection
@@ -146,17 +191,9 @@ imply permission to expand worker admission.
 | ID | Priority | Registered names sharing this implementation | Review focus before closing |
 | --- | --- | --- | --- |
 | PC-10 | P3 | `DropMissingRows` | Row-filter context plus existing prediction-skip evidence |
-| PC-12 | P2 | `DummyEncoder` | Frozen output columns, unseen categories, no batch vocabulary |
-| PC-13 | P2 | `HashEncoder` | Stable hash/configuration, output width and null handling |
-| PC-14 | P2 | `LabelEncoder` | Saved mapping and unknown/null policies |
-| PC-15 | P2 | `OrdinalEncoder` | Saved category order, sentinels and output dtype |
-| PC-16 | P2 | `TargetEncoder` | Fold-trained mappings; no target/request-time learning |
-| PC-17 | P2 | `WOEEncoder` | Saved mappings/smoothing, unseen values and class assumptions |
 | PC-19 | P2 | `FeatureGenerationNode`, `FeatureMath`, `FeatureGeneration` | Review each mode; distinguish saved group-aggregation lookup from live grouping |
 | PC-22 | P2 | `ModelBasedSelection` | Frozen selection mask, loaded estimator and dependencies |
 | PC-25 | P2 | `feature_selection` | Delegate context/validation to the selected nested implementation |
-| PC-26 | P2 | `IterativeImputer` | Saved estimators, randomness, repeated transforms and no refit |
-| PC-27 | P2 | `KNNImputer` | Saved training neighbors, batching behavior and bounded state/package |
 | PC-31 | P2 | `H3Index` | Optional dependency pins, resolution and invalid coordinates |
 | PC-32 | P3 | `DatasetProfile` | Separate inspection side effects from effective prediction apply |
 | PC-33 | P3 | `DataSnapshot` | Separate snapshot behavior from effective prediction apply |
@@ -167,8 +204,6 @@ imply permission to expand worker admission.
 | PC-40 | P3 | `Undersampling` | Training-only skip; do not remove prediction requests |
 | PC-41 | P3 | `TrainTestSplitter`, `Split` | Unrecorded training markers/alias; no inference splitting |
 | PC-42 | P3 | `feature_target_split` | Training marker and target separation; no prediction execution |
-| PC-43 | P2 | `GeneralTransformation` | Resolve each operation and saved parameters, including invalid domains |
-| PC-44 | P2 | `PowerTransformer` | Saved transform parameters, domains and loaded estimator |
 | PC-46 | P2 | `count_vectorizer` | Frozen vocabulary/output schema; dense output width/memory bounds and package replay |
 | PC-47 | P2 | `hashing_vectorizer` | Stable output width/hash and supported frame representation |
 | PC-48 | P4 | `sentence_embedder` | Pin/save actual model assets/revision; verify fresh-process/offline replay |
@@ -201,7 +236,7 @@ remotely executed. Their completion needs accurate skip evidence, not a forced
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work not included in the 29 count
+### Cross-cutting work not included in the 19 count
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -243,7 +278,7 @@ for names in remaining:
     print(", ".join(names))
 ```
 
-Expected snapshot: 67 names, 63 implementations, 29 remaining implementations.
+Expected snapshot: 67 names, 63 implementations, 19 remaining implementations.
 This counts declaration machinery, not whether a fitted configuration passes
 `get_inference_capability` or the worker certificate.
 
@@ -378,3 +413,40 @@ including setup, took 82.406 seconds. Wheel SHA256:
 This was native Python fit/apply/predict validation, not an additional Spark UDF,
 REST or `ai_query` route test. No tables, registered models or endpoints were
 created. The earlier Task194 route evidence remains scoped to its six steps.
+
+### Task198 validation: encoders, fitted imputers and power transforms
+
+On 2026-10-09, **1,914 distinct local cases** across 44 explicit affected files
+were verified. The initial union had 1,913 passes and one obsolete expectation
+that PowerTransformer lacked a declaration. That negative test now uses the
+still-undeclared ModelBasedSelection; its complete 105-case file then passed.
+No runtime change followed the union. Full Ruff, formatting, CI Ty and Lizard
+CCN <= 10 passed. One final test formatting change preserved its AST.
+
+Fresh processes reload ten actual random-forest pipelines per engine with
+calculators disabled, compare predictions against saved expectations and check
+unchanged learned-state digests. The tests retain `requires_context` for active
+power/iterative configurations, HashEncoder's empty-schema mismatch, and strict
+worker rejection. Ordinary row-local modes also compare singleton predictions.
+Independent review repaired and rechecked valid Decimal/boolean settings,
+missing iterative bounds, and Windows extended dtype compatibility. Existing
+array digest fixtures still match; no transform formula was replaced.
+
+The first native run exposed a NumPy-version assumption in one test: 561 passed
+and one expected a dtype mismatch where NumPy 2 correctly reported overflow.
+The test now pins that native exception and retains NumPy 1's dtype/mixed-value
+boundaries. Its entire 147-case file passed locally. Independent review used
+30 Polars probes to verify that unique-value order can change the failing check;
+these remain failed diagnostics. Runtime code and the 1,914 distinct-case count
+are unchanged.
+
+The final wheel then passed **562 tests**, zero failures or skips, plus the
+complete Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 839395366420866](https://dbc-45604623-c18b.cloud.databricks.com/jobs/455354355469257/runs/839395366420866)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources matched the
+tested working-tree manifest. Pytest took 25.34 seconds; the full run including
+setup took 60.836 seconds. Wheel SHA256:
+`4dcc42ca575575c403be868d4378f3b463dcd804d7147212f7084a5bea72c740`.
+This validates native Python fit/apply/predict. It does not add Spark UDF, REST
+or `ai_query` admission or route tests. No tables, registered models or endpoints
+were created.

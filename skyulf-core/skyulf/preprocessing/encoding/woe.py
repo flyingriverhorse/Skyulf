@@ -13,6 +13,7 @@ the caller's engine (pandas in/out, polars in/out).
 import logging
 import math
 from collections.abc import Mapping
+from numbers import Real
 from typing import Any, cast
 
 import numpy as np
@@ -20,12 +21,14 @@ import pandas as pd
 import polars as pl
 from sklearn.model_selection import KFold
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
+from .._fitted_validation import local_state_fields
 from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -98,6 +101,12 @@ def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
     return X_out, y
 
 
+def _validate_woe_values(values: Any) -> None:
+    """Inspect fitted numeric lookup values without converting NumPy scalars or nonfinite data."""
+    if any(isinstance(value, (bool, np.bool_)) or not isinstance(value, Real) for value in values):
+        raise ValueError("Fitted WOE values must be real numbers.")
+
+
 class WOEEncoderApplier(BaseApplier):
     """Replace each category with the Weight-of-Evidence value learned for it.
 
@@ -109,6 +118,46 @@ class WOEEncoderApplier(BaseApplier):
     literal strings; older artifacts preserve their original string keys.
     Encoded columns become float.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect learned mappings and their metadata without relearning target statistics."""
+        fields = {"type", "columns", "mappings", "information_value", "default"}
+        if isinstance(raw, dict) and "category_key_version" in raw:
+            fields.add("category_key_version")
+        if not local_state_fields(raw, "woe_encoder", fields, allow_empty=True):
+            return raw
+        columns = raw["columns"]
+        if not isinstance(columns, (list, tuple)) or any(not isinstance(c, str) for c in columns):
+            raise ValueError("Fitted WOE columns must be ordered strings.")
+        uses_category_keys(raw)
+        WOEEncoderApplier._validate_mappings(raw, columns)
+        _validate_woe_values([raw["default"], *raw["information_value"].values()])
+        return raw
+
+    @staticmethod
+    def _validate_mappings(raw: dict, columns: list[str]) -> None:
+        """Keep every map and information-value entry attached to its fitted source column."""
+        for field in ("mappings", "information_value"):
+            if type(raw[field]) is not dict or set(raw[field]) != set(columns):
+                raise ValueError("Fitted WOE maps and metadata must match selected columns.")
+        for mapping in raw["mappings"].values():
+            if type(mapping) is not dict or any(not isinstance(key, str) for key in mapping):
+                raise ValueError("Fitted WOE maps must use string category keys.")
+            _validate_woe_values(mapping.values())
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fixed WOE category lookups without granting partition execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        WOEEncoderApplier.validate_inference_state(state)
+        # Legacy pandas datetime string formatting can depend on neighboring rows.
+        legacy_pandas = (
+            engine == "pandas" and state.get("columns") and not uses_category_keys(state)
+        )
+        context = "global" if legacy_pandas else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

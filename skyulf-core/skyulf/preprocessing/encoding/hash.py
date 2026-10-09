@@ -2,16 +2,21 @@
 
 import hashlib
 import logging
+from decimal import Decimal
+from numbers import Real
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import HashEncoderArtifact
 from .._category_keys import category_key_expr, category_keys_pandas
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -124,6 +129,33 @@ class HashEncoderApplier(BaseApplier):
     missing and numeric scalars per value, keeping literal strings distinct.
     Older normalization versions retain their original bucket assignments.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved hashing choices without computing buckets or coercing scalars."""
+        fields = {"type", "columns", "n_features"}
+        if isinstance(raw, dict) and "numeric_normalization_version" in raw:
+            fields.add("numeric_normalization_version")
+        if not local_state_fields(raw, "hash_encoder", fields, allow_empty=True):
+            return raw
+        columns = raw["columns"]
+        if type(columns) not in (list, tuple) or any(not isinstance(col, str) for col in columns):
+            raise ValueError("Fitted hash columns must be a list or tuple of strings.")
+        count = raw["n_features"]
+        if not isinstance(count, (Real, Decimal, np.bool_)) or not count > 0:
+            raise ValueError("Fitted hash bucket count must be positive and numeric.")
+        _uses_numeric_normalization(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fixed hashing while preserving legacy pandas rendering dependencies."""
+        if engine not in ("pandas", "polars"):
+            return None
+        HashEncoderApplier.validate_inference_state(state)
+        legacy = state.get("columns") and state.get("numeric_normalization_version") != 2
+        context = "global" if engine == "pandas" and legacy else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

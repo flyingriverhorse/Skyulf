@@ -262,6 +262,17 @@ failure even though neither operation needs other rows to calculate its values.
 | `DateFeatures` | New UTC-aware fitted settings can be inspected per row. Legacy non-UTC settings can stay `unknown`; existing generated-name collisions are not renamed by the probe. |
 | `PolynomialFeatures` | Apply reconstructs combinatorial terms from saved configuration and feature shape. Its internal sklearn `fit` does not learn means or categories. Empty/null inputs retain their existing errors. |
 | `TextCleaning`, `InvalidValueReplacement` | Fixed operations reuse saved settings. Null-only chunks, regex support and dtype changes are engine-specific, so include those cases in your sample. |
+| `DummyEncoder`, `LabelEncoder`, `OrdinalEncoder`, `WOEEncoder`, `HashEncoder` | Current category keys reuse deterministic saved settings. Legacy pandas datetime rendering may depend on the batch; refit the whole pipeline to update that contract. HashEncoder empty output can still fail strict schema comparisons. |
+| `TargetEncoder`, `WOEEncoder` | Prediction reuses the saved full-data mapping. TargetEncoder's out-of-fold training values deliberately differ from its inference values; WOE requires a binary training target. |
+| `KNNImputer`, `IterativeImputer` | Neighbors and prediction estimators come from training. IterativeImputer with active rounds needs request context because a completely null request takes a different initial-fill path. Custom/stochastic modes can stay `unknown`. |
+| `PowerTransformer`, power rules in `GeneralTransformation` | Lambdas and scaler values are saved. Existing error handling returns a complete column/frame unchanged after one invalid value, so active power transforms report `global`. |
+
+`global` can therefore describe error handling as well as population statistics.
+For Box-Cox, the valid row in `[2, -1]` can remain untransformed when the negative
+neighbor makes the whole request fail, whereas `[2]` alone is transformed. The
+probe reports `requires_context`; it does not silently replace this behavior or
+claim singleton requests are equivalent. Correct invalid inputs and preserve
+request boundaries when using these modes.
 
 These local declarations do not make additional steps eligible for Spark workers
 or serving endpoints. Local-state validation also does not certify every value
