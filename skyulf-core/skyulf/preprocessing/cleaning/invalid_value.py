@@ -83,6 +83,16 @@ def _resolve_invalid_replacement(params: dict[str, Any]) -> Any:
     return value if value is not None else replacement
 
 
+def _is_null_replacement(value: Any) -> bool:
+    """Recognize numeric missing sentinels without coercing other replacement types."""
+    return (
+        value is None
+        or value is pd.NA
+        or isinstance(value, (float, np.floating))
+        and bool(np.isnan(value))
+    )
+
+
 # The frontend's "mode" dropdown offers a few convenience presets that don't
 # have a matching entry in `_invalid_rule_pandas_mask`/`_invalid_rule_polars`
 # (which only understand "negative"/"negative_to_nan", "zero", and
@@ -157,6 +167,8 @@ class InvalidValueReplacementApplier(BaseApplier):
     columns on both engines; text must be explicitly converted before this node.
     Infinity-only cleanup preserves integer values and dtypes: integers cannot
     contain infinities and must not be widened to a floating-point sentinel.
+    Active integer rules replacing values with None, NaN or pd.NA use nullable integers,
+    retaining their width and exact values in full, singleton and empty requests.
     """
 
     @staticmethod
@@ -227,11 +239,15 @@ class InvalidValueReplacementApplier(BaseApplier):
         exprs = []
         for col in valid:
             expr = pl.col(col)
-            if not X[col].dtype.is_integer():
+            integer = X[col].dtype.is_integer()
+            if not integer:
                 expr = _invalid_inf_replacement_polars(
                     expr, replace_inf, replace_neg_inf, final_replacement
                 )
-            expr = _invalid_rule_polars(expr, rule, final_replacement, min_value, max_value)
+            replacement = (
+                None if integer and _is_null_replacement(final_replacement) else final_replacement
+            )
+            expr = _invalid_rule_polars(expr, rule, replacement, min_value, max_value)
             exprs.append(expr.alias(col))
         return X.with_columns(exprs), _y
 
@@ -264,6 +280,10 @@ class InvalidValueReplacementApplier(BaseApplier):
             df_out[col] = df_out[col].replace(to_replace, final_replacement)
         mask = _invalid_rule_pandas_mask(df_out[col], rule, min_value, max_value)
         if mask is not None:
+            if pd.api.types.is_integer_dtype(df_out[col]) and _is_null_replacement(
+                final_replacement
+            ):
+                df_out[col] = df_out[col].convert_dtypes()
             df_out.loc[mask, col] = final_replacement
 
     @staticmethod

@@ -94,7 +94,8 @@ class RobustScalerApplier(BaseApplier):
         exprs = []
         for col_name in valid:
             i = cols.index(col_name)
-            e = pl.col(col_name).cast(pl.Float64)
+            column = pl.col(col_name) if isinstance(X, pl.LazyFrame) else X.get_column(col_name)
+            e = column.cast(pl.Float64)
             if with_centering and center is not None:
                 e = e - center[i]
             if with_scaling and scale is not None:

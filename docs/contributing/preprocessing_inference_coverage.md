@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task204 empty-input repairs.
+Status snapshot: **2026-10-09**, branch `093`, Task205 numeric-boundary repairs.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -81,8 +81,8 @@ The scope column is part of the result, not an unconditional parity promise.
 | PC-21 | `CorrelationThreshold` | Saved drop list and enabled/disabled flag; no request correlation calculation. |
 | PC-23 | `UnivariateSelection` | Saved candidate/selected columns, no-target artifact and empty selection. Scoring methods without p-values now retain an empty p-value report. |
 | PC-24 | `VarianceThreshold` | Frozen selection with constant/all-missing requests, empty selection and saved undefined variance metadata. |
-| PC-28 | `MaxAbsScaler` | Saved scale/max-abs vectors, zeros/constants/nulls and empty no-op. Polars nonbinary division can differ by one ULP between full and singleton evaluation. |
-| PC-29 | `RobustScaler` | Saved center/scale/quantiles and all flag combinations, null statistics and empty no-op. Exact numerical parity remains sample/runtime-specific. |
+| PC-28 | `MaxAbsScaler` | Saved scale/max-abs vectors, zeros/constants/nulls and empty no-op. Eager Polars frames with ordinary fitted scales use native Series division for consistent chunks. Decimal inputs, NumPy-valued scale artifacts and LazyFrame execution retain native expression boundaries. |
+| PC-29 | `RobustScaler` | Saved center/scale/quantiles and all flag combinations, null statistics and empty no-op. Eager Polars replay uses native Series arithmetic with its existing Float64 cast. LazyFrame execution retains native expression behavior. |
 | PC-30 | `GeoDistance` | Saved coordinate/output names, both distance methods and units. Existing invalid-coordinate behavior is reported without adding new geospatial validation. |
 
 Task196 fixes PC-02 numeric-label dtypes in the shared binning applier and PC-08
@@ -99,16 +99,16 @@ replaying those older encoders can silently select their unknown-category code.
 At the sklearn boundary, nullable numeric missing values become `np.nan` even
 beside object features; other column values and large integer precision remain.
 
-Keep **PC-08 numeric widening** and **PC-28 Polars arithmetic** open. For PC-08,
+Keep **PC-08 numeric widening** open. For PC-08,
 replacing `1` with `0.5` in an integer column widens matched chunks to float while
 unmatched chunks stay integer. Use a consistent float input dtype for that rule;
 the diagnostic continues reporting the integer-input mismatch.
-For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
+For PC-28, the original fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
-retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-remain separate from sentence-embedding asset packaging. The Polars
-rounding case remains a strict diagnostic boundary; it does not justify a second
-arithmetic implementation or a weaker comparison.
+retains exact comparisons; no tolerance was added to hide it. Task205 repairs
+this ordinary eager-frame case through native Series division. The narrower
+Decimal, NumPy-statistic and lazy boundaries in the owner row remain open.
+StandardScaler's separate Polars rounding boundary also remains unchanged.
 
 ### Eleven additional local contracts (Task197)
 
@@ -121,9 +121,9 @@ null behavior or numerical differences.
 | --- | --- | --- |
 | PC-01 | `GeneralBinning` | Fixed learned bins and supported label settings; shares validation with the existing binning owners. Numeric custom labels retain the existing Polars apply error. |
 | PC-03 | `KBinsDiscretizer` | Saved bin edges for uniform, quantile and k-means strategies; inference does not recompute bins. |
-| PC-04 | `Casting` | Frozen categories and supported scalar conversions. Legacy pandas categories need the whole request; coercive fallback casts can also depend on invalid neighboring values. Integer output dtypes can differ across chunks. |
+| PC-04 | `Casting` | Frozen categories and supported scalar conversions. Explicit nullable integer choices now survive fit/schema/replay; integer/object inputs retain exact integers beside null, malformed or out-of-range values when native parsing remains integral. Legacy categories and coercive fallback casts can need whole-request context. Lowercase integer targets still choose their container from request nulls; mixed fractional parsing retains its native precision boundary. |
 | PC-05 | `AliasReplacement` | Saved standard/custom mappings, unseen inputs and nulls. Native engine limitations are retained. |
-| PC-06 | `InvalidValueReplacement` | Fixed rules and replacement values. Pandas integer-to-null replacement can change the empty output dtype. |
+| PC-06 | `InvalidValueReplacement` | Fixed rules and replacement values. Integer rules using None, NaN or pd.NA retain nullable integer width and exact values across full, singleton and empty requests. Infinity-only integer cleanup remains a no-op. Fractional or otherwise incompatible replacements retain native dtype/error boundaries. |
 | PC-07 | `TextCleaning` | Saved operation order, nulls, regex and no-op settings. Slash-date normalization preserves object output for pandas object/StringDtype input, including empty and null-only chunks followed by trim. Categorical mapping is unchanged; Polars still rejects unsupported regex lookbehind. |
 | PC-18 | `DateFeatures` | UTC-aware saved states, epochs, time zones, nulls, tuples and NumPy string settings. Legacy non-UTC state stays `unknown`. Existing generated-name overwrites and Polars duplicate-output errors remain visible. |
 | PC-20 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved degree/flags/columns/order and prefixes. Apply rebuilds sklearn's combinatorial expansion from configuration; it does not learn request statistics. Empty requests retain the native output schema; null-input and generated-name collision errors remain. |
@@ -704,3 +704,52 @@ PC-37 integer winsorization remain open numeric/context boundaries. Existing
 strict diagnostic checks retain their dtype/output failures; no blanket numeric
 cast or comparison tolerance was added. Historical Task197-199 empty-schema
 observations above are superseded only for the five repaired configurations.
+
+### Task205 validation: exact integers and native scaling
+
+Explicit nullable integer casting choices such as `Int64` and `UInt64` now
+survive configuration normalization. Integer/object inputs use native nullable
+parsing when it produces an integer result; legacy float parsing and fallback
+behavior remain. Lowercase `int64` retains its existing container choice. For a
+stable nullable pandas output, request `Int64` explicitly. Already rounded
+floating-point inputs and mixed fractional parsing cannot recover lost precision.
+
+Invalid-value rules replacing integers with `None`, `NaN` or `pd.NA` now use
+nullable integer output, including empty or entirely unmatched chunks. Polars
+represents those missing integer values as null. Integer width and values above
+`2**53` remain exact; float-column sentinel behavior and infinity-only integer
+no-ops are unchanged. Refit older pipelines where these integer-rule outputs
+feed string-key encoders: an old learned key such as `"2.0"` differs from the
+new integer key `"2"`. This is an intentional output-type correction.
+
+For ordinary fitted MaxAbsScaler and RobustScaler state, eager Polars execution
+uses native Series arithmetic to remove the observed batch/singleton division
+difference. No formula, tolerance or saved-state field was added. StandardScaler
+remains unchanged because the same substitution changes Float32 promotion;
+MaxAbs Decimal/NumPy-statistic and lazy execution boundaries remain explicit.
+
+The affected local union passed **1,210 tests** across eighteen explicit file/node
+selections. After a test type-narrowing fix, all thirty-six integer-null cases
+passed again; these are repeats within the union. Full Ruff, formatting, CI Ty
+and Lizard CCN <= 10 passed. Independent review found no blocker, including 168
+Casting baseline comparisons, 112 float replacement comparisons and 180 scaler
+bulk comparisons. The 63-owner review count and worker admission are unchanged.
+
+PC-08 replacement and PC-37 winsorization still require an explicit numeric-type
+decision. Their full integer batches can round an untouched `9007199254740993`
+to `9007199254740992.0` while an unmatched singleton stays exact. A preceding
+`Casting` to `float64` stabilizes ordinary fractional model features, but even
+`coerce_on_error=False` does not make large-integer-to-float conversion lossless.
+Do not use it for columns requiring exact large integers. Existing strict
+diagnostics retain these failures rather than relabeling the operations global.
+
+The same final wheel passed **596 tests**, zero failures or skips, plus the Bundle
+guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 130677126334878](https://dbc-45604623-c18b.cloud.databricks.com/jobs/280135714197592/runs/130677126334878)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources matched the
+manifest. Pytest took 22.09 seconds; full duration was 81.963 seconds. Wheel SHA256:
+`97c96a95300613b14292a178d47a94f87ac8b0d28c1f1f23b1694c1d811efd53`.
+Two earlier attempts stopped during collection for missing test fixtures/imports
+and Hypothesis; the repaired test package ran unchanged runtime sources. This
+verifies native Python execution, not Spark UDF/REST/`ai_query` routes. No tables,
+registered models or endpoints were created.

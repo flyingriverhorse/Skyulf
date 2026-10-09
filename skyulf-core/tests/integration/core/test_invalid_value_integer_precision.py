@@ -123,3 +123,34 @@ def test_integer_rule_still_runs_alongside_infinity_flags() -> None:
         result,
         pl.DataFrame({"value": [0, 9007199254740993, None]}, schema={"value": pl.Int64}),
     )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("dtype", ["int8", "uint8", "int64", "uint64", "Int64", "UInt64"])
+@pytest.mark.parametrize("replacement", [None, np.nan, pytest.param(pd.NA, id="pandas_missing")])
+def test_null_rules_preserve_exact_integer_schema_across_requests(engine, dtype, replacement):
+    """Replacing an integer by missing must not round untouched values or vary chunk types."""
+    limit = 127 if dtype.endswith("8") else 9007199254740993
+    original = pd.DataFrame({"value": pd.Series([0, limit], dtype=dtype), "target": [7, 9]})
+    frame = original if engine == "pandas" else pl.from_pandas(original)
+    state = InvalidValueReplacementCalculator().fit(
+        frame, {"columns": ["value"], "rule": "zero", "replacement": replacement}
+    )
+    applier = InvalidValueReplacementApplier()
+    full = applier.apply(frame, state)
+    nullable = dtype.replace("uint", "UInt").replace("int", "Int")
+    expected = original.copy()
+    expected["value"] = pd.Series([None, limit], dtype=nullable)
+    if isinstance(frame, pd.DataFrame):
+        pd.testing.assert_frame_equal(full, expected)
+        for chunk in (frame.iloc[:1], frame.iloc[1:], frame.head(0)):
+            pd.testing.assert_frame_equal(applier.apply(chunk, state), expected.loc[chunk.index])
+        pd.testing.assert_frame_equal(frame, original)
+    else:
+        assert_frame_equal(full, pl.from_pandas(expected))
+        for start, count in ((0, 1), (1, 1), (0, 0)):
+            assert_frame_equal(
+                applier.apply(frame.slice(start, count), state), full.slice(start, count)
+            )
+        assert_frame_equal(frame, pl.from_pandas(original))
+    assert int(full["value"].iloc[1] if engine == "pandas" else full["value"][1]) == limit

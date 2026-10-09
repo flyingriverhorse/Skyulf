@@ -448,8 +448,8 @@ def test_robust_accepts_numpy_boolean_flags_saved_by_real_fit(flag):
     assert state["with_centering"] is flag
 
 
-def test_polars_nonbinary_scale_reports_observed_exact_rounding_difference(tmp_path, monkeypatch):
-    """A row-local promise must not hide actual full-versus-singleton floating differences."""
+def test_polars_nonbinary_scale_replays_exactly_across_saved_requests(tmp_path, monkeypatch):
+    """Saved native scaling must use identical arithmetic for batches and singleton requests."""
     train = pl.DataFrame(
         {"x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0], "target": [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]}
     )
@@ -471,14 +471,82 @@ def test_polars_nonbinary_scale_reports_observed_exact_rounding_difference(tmp_p
     applier = NodeRegistry.get_applier("MaxAbsScaler")()
     full = applier.apply(sample, state)
     singleton = pl.concat([applier.apply(sample.slice(i, 1), state) for i in range(len(sample))])
-    delta = abs(full["x"][4] - singleton["x"][4])
-    assert delta <= np.spacing(1.2)
+    assert_polars_frame_equal(full, singleton, check_exact=True)
     result = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(2,))
     step = result["steps"][0]
     assert step["context"] == "row" and step["state_validation"] == "node_owned"
     check = next(item for item in step["checks"] if item["name"] == "chunks:1")
-    if full.equals(singleton):
-        assert check["status"] == "passed"
-    else:
-        assert check["status"] == "failed" and check["reason"] == "output_mismatch"
+    assert check["status"] == "passed"
+    assert step["status"] == "passed", step
     assert result["admission"] == "diagnostic_only"
+
+
+@pytest.mark.parametrize(
+    "node,options",
+    [
+        ("MaxAbsScaler", {}),
+        ("RobustScaler", {"with_centering": False}),
+    ],
+)
+@pytest.mark.parametrize("dtype", [pl.Float32, pl.Float64, pl.Int64, pl.UInt64])
+def test_polars_scalers_preserve_bulk_values_and_exact_partitions(
+    node, options, dtype, monkeypatch
+):
+    """Native Series arithmetic must fix partition rounding without changing bulk schemas or masks."""
+    train = pl.DataFrame({"x": [-5.0, 5.0]})
+    state = NodeRegistry.get_calculator(node)().fit(train, {"columns": ["x"], **options})
+    assert state["scale"] == [5.0]
+    values: list[float | None] = [None, 2, 200, 6, 0]
+    if dtype.is_float():
+        values += [-0.0, float("nan"), float("inf"), -float("inf")]
+    sample = pl.DataFrame({"x": pl.Series(values, dtype=dtype), "keep": range(len(values))})
+    before = sample.clone()
+    serialized = pickle.dumps(state)
+    _poison_fit(monkeypatch, node)
+    applier = NodeRegistry.get_applier(node)()
+    column = pl.col("x").cast(pl.Float64) if node == "RobustScaler" else pl.col("x")
+    expected = sample.with_columns((column / 5.0).alias("x"))
+    actual = applier.apply(sample, state)
+    assert_polars_frame_equal(actual, expected, check_exact=True)
+    for size in (1, 2, 3):
+        for start in range(0, len(sample), size):
+            chunk = applier.apply(sample.slice(start, size), state)
+            assert_polars_frame_equal(chunk, expected.slice(start, size), check_exact=True)
+    assert_polars_frame_equal(applier.apply(sample.head(0), state), expected.head(0))
+    assert_polars_frame_equal(applier.apply(sample.reverse(), state), expected.reverse())
+    if dtype.is_float():
+        assert np.signbit(actual["x"][5]) and np.signbit(expected["x"][5])
+    assert_polars_frame_equal(sample, before)
+    assert pickle.dumps(state) == serialized
+
+
+@pytest.mark.parametrize("scale", [np.float64(5), np.int64(5), np.float32(5)])
+def test_maxabs_numpy_statistics_keep_native_promotion(scale):
+    """NumPy scalar dtype metadata must survive instead of narrowing Float32 requests."""
+    sample = pl.DataFrame({"x": pl.Series([2, 6, 10], dtype=pl.Float32)})
+    state = {"type": "maxabs_scaler", "columns": ["x"], "scale": [scale], "max_abs": [scale]}
+    applier = NodeRegistry.get_applier("MaxAbsScaler")()
+    assert applier.validate_inference_state(state) is state
+    expected = sample.with_columns((pl.col("x") / scale).alias("x"))
+    assert_polars_frame_equal(applier.apply(sample, state), expected, check_exact=True)
+
+
+@pytest.mark.parametrize("node", ["MaxAbsScaler", "RobustScaler"])
+def test_polars_scalers_retain_lazy_inputs(node):
+    """Repairing eager partition replay must not collect or reject existing lazy inputs."""
+    sample = pl.DataFrame({"x": [2.0, 6.0, 10.0]})
+    state = NodeRegistry.get_calculator(node)().fit(sample, {"columns": ["x"]})
+    applier = NodeRegistry.get_applier(node)()
+    result = applier.apply(sample.lazy(), state)
+    assert isinstance(result, pl.LazyFrame)
+    assert_polars_frame_equal(result.collect(), applier.apply(sample, state), check_exact=True)
+
+
+def test_maxabs_decimal_keeps_native_expression_boundary():
+    """Decimal division must retain Polars' native result without a new cast policy."""
+    sample = pl.DataFrame({"x": [Decimal("2"), Decimal("6"), None]})
+    state = {"type": "maxabs_scaler", "columns": ["x"], "scale": [5.0], "max_abs": [5.0]}
+    applier = NodeRegistry.get_applier("MaxAbsScaler")()
+    for request in (sample, sample.slice(1, 1), sample.head(0)):
+        expected = request.with_columns((pl.col("x") / 5.0).alias("x"))
+        assert_polars_frame_equal(applier.apply(request, state), expected, check_exact=True)

@@ -27,20 +27,21 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task203 committed as 97e81e94 with signed-off hooks passing; no push.
-Task204 continues docs/contributing/preprocessing_inference_coverage.md.
-PC-07/13/20/31/50 empty/null repairs are implemented and independently reviewed.
-Exact file map, red/green results, commands and remaining numerical boundaries:
-initiatives/spark_and_mlflow/204-preprocessing-continuation.md.
+Task204 committed7c867dbc with DCO sign-off, hooks and strict docs passing; no push.
+Task205 continues the remaining numerical boundaries with Ponytail.
+Exact map, reproduction, reviews and test evidence:
+initiatives/spark_and_mlflow/205-numeric-boundaries.md.
 
-Local affected union: 1074 passed; final static cleanups: 18 affected reruns passed.
-Full Ruff, format, CI Ty and Lizard passed. Independent review: 131 differential
-probes, no blocker. All domain-agent claims released and their results acknowledged.
-PC-04/06/08/28/37 remain explicit boundaries; no comparison tolerance added.
-T203-B01 is the separately documented pre-existing private-import guard failure.
+Four runtime files repaired: Casting explicit nullable integers/exact integer
+parsing; InvalidValueReplacement exact nullable integer missing values; native
+MaxAbs/Robust eager-Series arithmetic. Full affected union1210passed; final
+36 type-narrowing reruns passed. Full Ruff/format/Ty/Lizard and strict docs passed.
+Independent review found no blocker; all domain claims released and acknowledged.
+
+PC08/37 mixed numeric choices, legacy Casting containers/fallbacks, StandardScaler
+rounding and MaxAbs special-statistic/Decimal/lazy paths remain documented.
+Refit old downstream string-key encoders after integer-null output type changes.
 
 ## Open messages
 
-- ID: T204-final; UTC: 2026-10-09T16:53:32.9074685Z; sender: Codex T204; recipient: all; type: RELEASE; reply: T204-repair-claim. Five bounded repairs verified: local 1074 passed, static cleanup reruns 18 passed, native 710 passed with zero failures/skips plus guide; run 318386173857228 TERMINATED/SUCCESS. Final 552 runtime sources and 11 test/guide assets still match the wheel manifest; exact native/local collected node IDs match. Coverage guide and reports203/204 updated; full static gates and independent review passed. All root claims released; no pending peer request. Task203 committed 97e81e94; Task204 remains uncommitted; no push. Five numeric/context boundaries and T203-B01 remain explicit in reports.
-
-- ID: T205-start; UTC: 2026-10-09T16:58:35.1836983Z; sender: Codex T205; recipient: all; type: CLAIM; reply: T204-final. User requests committing Task204 and continuing remaining guide boundaries. Own the exact fifteen modified tracked Task204 files listed by git status (five runtime, eight tests, coverage guide, AGENT_CHAT), report204 and new initiatives/spark_and_mlflow/205-numeric-boundaries.md. No peer claims conflict. Stage/review/hooks/commit first; no push. Remaining five boundaries read-only until reproduction and concrete minimal design.
+- ID: T205-final; UTC: 2026-10-09T17:18:34.7257627Z; sender: Codex T205; recipient: all; type: RELEASE; reply: T205-start. Bounded numeric repairs verified:1210local tests,36post-typing reruns;596native tests plus guide, zero failures/skips, run130677126334878 TERMINATED/SUCCESS. All552runtimefiles and13assets remain identical; exact local/native node sets match. All static gates, applicable pre-commit hooks, strict docs and independent review passed. Runtime/test diff reviewed against tested snapshot. Task204 commit7c867dbc; Task205 included in this delivery commit; exact commit hash recorded in report205 after commit. All claims released; no peer question pending, no push. Remaining contracts and migration note are explicit in coverage guide/report205.

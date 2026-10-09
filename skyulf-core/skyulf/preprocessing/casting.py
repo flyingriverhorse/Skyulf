@@ -314,7 +314,7 @@ def _mask_out_of_range_or_raise(
     polars apply path which correctly nulls/raises via ``strict`` casts.
     """
     try:
-        info = np.iinfo(str(target_dtype))
+        info = np.iinfo(str(target_dtype).lower())
     except TypeError:
         # Unrecognized/non-integer dtype string: skip range-checking rather
         # than fail the cast outright.
@@ -356,8 +356,23 @@ _NULLABLE_INT_DTYPES = {
 }
 
 
+def _resolve_casting_dtype(dtype: Any) -> Any:
+    """Preserve explicitly nullable integer choices while resolving ordinary aliases."""
+    label = str(dtype)
+    if label in _NULLABLE_INT_DTYPES.values():
+        return dtype
+    return TYPE_ALIASES.get(label.lower(), dtype)
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
-    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
+    errors = "coerce" if coerce_on_error else "raise"
+    numeric = pd.to_numeric(series, errors=errors)
+    # Nullable parsing protects exact integers; retain the native float path's
+    # missing masks and safe-cast behavior when parsing produces floating values.
+    if series.dtype.kind in "iuO":
+        nullable = pd.to_numeric(series, errors=errors, dtype_backend="numpy_nullable")
+        if pd.api.types.is_integer_dtype(nullable.dtype):
+            numeric = nullable
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
     numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
     if numeric.isna().any():
@@ -562,8 +577,8 @@ class CastingCalculator(BaseCalculator):
                 column_types.setdefault(col, target_type)
         new_schema = input_schema
         for col, dtype in column_types.items():
-            resolved = TYPE_ALIASES.get(str(dtype).lower(), str(dtype))
-            new_schema = new_schema.with_dtype(col, resolved)
+            resolved = _resolve_casting_dtype(dtype)
+            new_schema = new_schema.with_dtype(col, str(resolved))
         return new_schema
 
     @fit_method
@@ -584,10 +599,10 @@ class CastingCalculator(BaseCalculator):
         final_map: dict[str, Any] = {}
         for col, dtype in column_types.items():
             if col in X.columns:
-                final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
+                final_map[col] = _resolve_casting_dtype(dtype)
 
         if target_type and columns:
-            resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
+            resolved_type = _resolve_casting_dtype(target_type)
             for col in columns:
                 if col in X.columns:
                     final_map[col] = resolved_type

@@ -396,15 +396,15 @@ def test_text_custom_regex_retains_engine_limitations(engine, monkeypatch):
         assert output["text"].to_list()[:2] == ["aX", "xb"]
 
 
-def test_invalid_integer_widening_on_empty_requests_remains_visible(monkeypatch):
-    """Empty integer requests must still expose dtype differences from a replaced full batch."""
+def test_invalid_integer_null_replacement_retains_empty_and_chunk_schema(monkeypatch):
+    """Nullable integer replacement must preserve exact values and schema across request sizes."""
     frame = pd.DataFrame({"number": [-1, 2]})
     config = {"columns": ["number"], "rule": "negative", "replacement": np.nan}
     record = _record("InvalidValueReplacement", "pandas", config, frame)
     detail, output = _probe(record, frame, "pandas", monkeypatch)
-    checks = {check["name"]: check for check in detail["checks"]}
-    assert detail["status"] == "failed", detail
-    assert checks["empty"]["reason"] == "output_mismatch"
+    assert detail["status"] == "passed", detail
+    assert all(check["status"] == "passed" for check in detail["checks"]), detail
+    assert output["number"].dtype == pd.Int64Dtype()
     assert pd.isna(output["number"].iloc[0])
     assert output["number"].iloc[1] == 2
 

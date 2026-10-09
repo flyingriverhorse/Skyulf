@@ -65,7 +65,13 @@ class MaxAbsScalerApplier(BaseApplier):
         exprs = []
         for col_name in valid:
             s = scale[cols.index(col_name)]
-            exprs.append((pl.col(col_name) / (s if s != 0 else 1.0)).alias(col_name))
+            # NumPy literals carry dtype metadata that Series scalar arithmetic discards.
+            column = (
+                pl.col(col_name)
+                if isinstance(X, pl.LazyFrame) or isinstance(s, np.generic)
+                else X.get_column(col_name)
+            )
+            exprs.append((column / (s if s != 0 else 1.0)).alias(col_name))
         return X.with_columns(exprs), _y
 
     @staticmethod
