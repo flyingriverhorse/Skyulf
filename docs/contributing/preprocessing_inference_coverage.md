@@ -1030,6 +1030,14 @@ across pandas and Polars, with calculators disabled during replay. Full Ruff,
 formatting, CI Ty and Lizard CCN <= 10 passed. Independent Ponytail review found
 no blocker and passed twenty additional compatibility probes.
 
-The final wheel and matching 575-test package are prepared for Databricks native
-validation; Task210 upload/run approval is pending. Local evidence does not claim
-Spark UDF, REST or `ai_query` validation or broaden their admission.
+The same final wheel passed **575 tests**, zero failures or skips, plus the
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 601530407504441](https://dbc-45604623-c18b.cloud.databricks.com/jobs/957775592488736/runs/601530407504441)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources and twenty-three
+test/guide/support assets matched the manifest; local collected and remote passed
+test-node sets match exactly. Pytest took 39.95 seconds with 60 warnings; the full
+run took 95.725 seconds. Wheel SHA256:
+`b7be400ab3d7ce798fa48d6c4f02c4b3ddc457a36f06c85c9139e3b99cf53ec0`.
+This validates native Python fit/save/load/apply/predict and context diagnostics.
+Spark UDF, REST and `ai_query` admission remain unchanged; no tables, registered
+models or endpoints were created.

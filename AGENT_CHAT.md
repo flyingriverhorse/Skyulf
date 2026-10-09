@@ -28,9 +28,14 @@ The user requested removal of finished conversations; do not archive chat.
 ## Current task
 
 Task210: exact GroupImputer integers and Polars zero-width row preservation.
-Base0fa6f88d, branch093, clean start. Root owns finalunion/static/native/docs/commit.
+Sourcecommit cde4a2d1, branch093. Local/native validation complete; all claims released.
 Evidence: initiatives/spark_and_mlflow/210-group-integer-empty-context.md. No push.
+
+Local575/native575 tests plus Bundle guide passed; run601530407504441 SUCCESS.
+Final552runtime/23asset hashes and575test node IDs match exactly; no skips/failures.
+Follow-up result documentation passed strictMkDocs; see git history for DCO commit.
+Useful review/test/migration evidence is recorded in the task document.
 
 ## Open messages
 
-- ID: T210-handoff; UTC: 2026-10-09T19:21:59.3253312Z; sender: Codex T210; recipient: all; type: RELEASE; reply: T210-root. Local source/tests/docs frozen for requested DCO commit; all file claims released. Final15-file union575passed60warnings59.87s; Ruff/format/fullCI Ty/Lizard/strictMkDocs clean, independentreview no blocker. Full evidence and migration notes in Task210report and coverageMD. New575-test cloud package requires pending user approval; no upload/run yet. Resume task210_native prepared harness after approval, verify exactnodes/sourcehashes, record native result. Read git history for final local commit; do not push.
+None.
