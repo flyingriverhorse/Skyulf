@@ -87,11 +87,17 @@ def _fill_columns(X: Any, config: dict[str, Any], group_by: str, strategy: str) 
     return columns
 
 
-def _training_frame(X: Any, columns: list[str], group_by: str) -> pd.DataFrame:
-    """Convert only the filled columns and the group key to pandas."""
+def _training_frame(X: Any, columns: list[str], group_by: str, strategy: str) -> pd.DataFrame:
+    """Convert selected columns, retaining integer group identities and modal values."""
     selected = [*columns, group_by]
     if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
-        return X.select(selected).to_pandas()
+        frame = X.select(selected).to_pandas()
+        exact = selected if strategy == "most_frequent" else [group_by]
+        for column in exact:
+            dtype = X.schema[column]
+            if dtype.is_integer() and dtype != pl.Int128:
+                frame[column] = pd.Series(X[column].to_list(), dtype=str(dtype))
+        return frame
     return to_pandas(X)[selected]
 
 
@@ -115,6 +121,27 @@ def _extend_categories(series: pd.Series, fills: pd.Series) -> pd.Series:
         if new:
             return series.cat.add_categories(new)
     return series
+
+
+def _pandas_group_fill(
+    keys: pd.Series, series: pd.Series, pairs: list[list], fallback: Any
+) -> pd.Series:
+    """Keep exact keys and integer fills through lookup, including an empty group map."""
+    mapping = dict(map(tuple, pairs))
+    native_float = pd.api.types.is_float_dtype(series.dtype) or all(
+        value is None or isinstance(value, (float, np.floating))
+        for value in [*mapping.values(), fallback]
+    )
+    lookup = pd.Series(
+        list(mapping.values()),
+        index=pd.Index(list(mapping), dtype=object),
+        dtype=None if native_float else object,
+    )
+    fills = keys.map(lookup)
+    if not native_float:
+        # Mapping an empty Series infers float64 even with an object-valued lookup.
+        fills = fills.astype(object)
+    return fills.where(fills.notna(), fallback) if fallback is not None else fills
 
 
 class GroupImputerApplier(BaseApplier):
@@ -155,10 +182,9 @@ class GroupImputerApplier(BaseApplier):
             if column not in out.columns:
                 continue
             series = out[column]
-            group_fill = keys.map(dict(map(tuple, params["group_values"][column])))
-            fallback = params["fill_values"].get(column)
-            if fallback is not None:
-                group_fill = group_fill.fillna(fallback)
+            group_fill = _pandas_group_fill(
+                keys, series, params["group_values"][column], params["fill_values"].get(column)
+            )
             if numeric:
                 if not pd.api.types.is_float_dtype(series) or is_decimal_series(series):
                     series = pd.to_numeric(series).astype("float64")
@@ -288,7 +314,7 @@ class GroupImputerCalculator(BaseCalculator):
         X = _native(X)
         _require_group_column(X.columns, group_by)
         columns = _fill_columns(X, config, group_by, strategy)
-        frame = _training_frame(X, columns, group_by)
+        frame = _training_frame(X, columns, group_by, strategy)
         fill_values = {}
         for column in columns:
             values = frame[column]

@@ -121,7 +121,7 @@ def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
     exprs = _build_interaction_exprs(X, combos)
 
     if params.get("include_bias", False) and _BIAS_COLUMN not in X.columns:
-        exprs.append(pl.lit(1.0).alias(_BIAS_COLUMN))
+        exprs.append(pl.repeat(1.0, pl.len()).alias(_BIAS_COLUMN))
 
     if not exprs:
         return X, _y
@@ -174,7 +174,8 @@ class FeatureInteractionApplier(BaseApplier):
 
         A combination whose columns are absent from ``X`` is skipped rather than
         raising, so the node survives an upstream column drop; ``include_bias``
-        adds a constant 1.0 ``interaction_bias`` column. When no column is
+        adds a constant 1.0 ``interaction_bias`` column per existing row,
+        including zero rows when no input columns remain. When no column is
         generated the frame is returned unchanged. Generated product names must
         be unique and must not collide with existing columns. An existing bias
         column retains its established passthrough behavior.

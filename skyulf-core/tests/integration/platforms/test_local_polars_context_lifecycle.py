@@ -17,6 +17,7 @@ from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipe
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
+from skyulf.preprocessing.pipeline import _apply_prediction_step
 from skyulf.registry import NodeRegistry
 
 RECIPES = {
@@ -107,3 +108,81 @@ def test_existing_contexts_reload_and_predict_without_fit(tmp_path, engine):
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert report["status"] == "passed" and report["admission"] == "diagnostic_only"
+
+
+def _replay_integer_group(directory):
+    """Inspect exact saved preprocessing independently of the model's numeric conversion."""
+
+    def forbidden(*args, **kwargs):
+        """Reloaded group values must come from the saved training artifact."""
+        raise AssertionError("Unexpected fit")
+
+    calculator: Any = NodeRegistry.get_calculator("GroupImputer")
+    calculator.fit = forbidden
+    sample, value = pickle.loads((directory / "sample.pkl").read_bytes())
+    artifact = load_local_pipeline(directory / "model")
+    records = artifact.pipeline.feature_engineer.fitted_steps
+    before = artifact_digest(records)
+    state = records[0]["artifact"]
+    assert state["fill_values"]["x"] == value
+    assert type(state["fill_values"]["x"]) is int
+    result = _apply_prediction_step(sample, records[0])
+    assert result["x"].to_list() == [value, 1, value, value]
+    assert result["x"].dtype == sample["x"].dtype
+    report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
+    assert report["status"] == "passed", report
+    assert report["steps"][0]["context"] == "row"
+    predictions = artifact.pipeline.predict(sample)
+    singles = np.concatenate(
+        [artifact.pipeline.predict(sample[i : i + 1]) for i in range(len(sample))]
+    )
+    np.testing.assert_array_equal(predictions, singles)
+    assert np.isfinite(predictions).all()
+    assert artifact_digest(records) == before
+    return report
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("dtype,value", [("Int64", 2**53 + 1), ("UInt64", 2**64 - 1)])
+def test_integer_group_state_survives_fresh_process_reload(tmp_path, engine, dtype, value):
+    """Saving a real pipeline must retain exact integer modes in both native engines."""
+    training = pd.DataFrame(
+        {
+            "g": [1, 1, 1, 2],
+            "x": pd.Series([value, None, value, 1], dtype=dtype),
+            "target": [0.0, 1.0, 2.0, 3.0],
+        }
+    )
+    sample = pd.DataFrame(
+        {"g": [1, 2, 3, 1], "x": pd.Series([None, None, None, value], dtype=dtype)}
+    )
+    if engine == "polars":
+        training, sample = pl.from_pandas(training), pl.from_pandas(sample)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "group",
+                    "transformer": "GroupImputer",
+                    "params": {"columns": ["x"], "group_by": "g", "strategy": "mode"},
+                }
+            ],
+            "modeling": {
+                "type": "random_forest_regressor",
+                "params": {"n_estimators": 2, "max_depth": 2, "random_state": 42, "n_jobs": 1},
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=training, test=training[:0]), target_column="target")
+    save_local_pipeline(pipeline, tmp_path / "model")
+    (tmp_path / "sample.pkl").write_bytes(pickle.dumps((sample, value)))
+    code = "import json,runpy,sys; from pathlib import Path; module=runpy.run_path(sys.argv[1]); print(json.dumps(module['_replay_integer_group'](Path(sys.argv[2]))))"
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(Path(__file__).resolve()), str(tmp_path)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["status"] == "passed"

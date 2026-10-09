@@ -27,13 +27,10 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task209: reviewed local Polars declarations for six existing pandas families.
-Base56936e5d, branch093. Implementation and local/native verification complete.
-Evidence: initiatives/spark_and_mlflow/209-local-polars-context-continuation.md.
-Local584/native584 tests and Bundle guide passed; run407701115957407 SUCCESS.
-Independent review and CI static scopes passed; configuration limits remain documented.
-All file claims released. Evidence/acknowledgements recorded in the task document. No push.
+Task210: exact GroupImputer integers and Polars zero-width row preservation.
+Base0fa6f88d, branch093, clean start. Root owns finalunion/static/native/docs/commit.
+Evidence: initiatives/spark_and_mlflow/210-group-integer-empty-context.md. No push.
 
 ## Open messages
 
-None.
+- ID: T210-handoff; UTC: 2026-10-09T19:21:59.3253312Z; sender: Codex T210; recipient: all; type: RELEASE; reply: T210-root. Local source/tests/docs frozen for requested DCO commit; all file claims released. Final15-file union575passed60warnings59.87s; Ruff/format/fullCI Ty/Lizard/strictMkDocs clean, independentreview no blocker. Full evidence and migration notes in Task210report and coverageMD. New575-test cloud package requires pending user approval; no upload/run yet. Resume task210_native prepared harness after approval, verify exactnodes/sourcehashes, record native result. Read git history for final local commit; do not push.

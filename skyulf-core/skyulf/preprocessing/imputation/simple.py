@@ -54,7 +54,8 @@ class SimpleImputerApplier(BaseApplier):
 
     The calculator artifact records per-column values for ``mean``, ``median``,
     ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.
-    Missing columns seen during fitting are restored with their stored value.
+    Missing columns seen during fitting are restored with their stored value,
+    preserving the row count even when no input columns remain.
     Spark supports only ``mean`` and ``constant`` artifacts and applies them
     with native expressions. All-missing means leave existing columns untouched.
     """
@@ -115,7 +116,7 @@ class SimpleImputerApplier(BaseApplier):
 
         # Restore columns that were present at fit time but missing in input X.
         exprs.extend(
-            pl.lit(fill_values[col]).alias(col)
+            pl.repeat(pl.lit(fill_values[col]), pl.len()).alias(col)
             for col in cols
             if col not in X.columns and col in fill_values
         )

@@ -962,7 +962,7 @@ strategy. Null/unseen groups reuse saved fallbacks without request aggregation.
 Local metadata never invokes fit or apply. A positive `row` declaration describes
 input dependencies; the exact diagnostic still detects dtype or shape failures.
 
-Two existing boundaries were reproduced and remain open:
+Two existing boundaries were reproduced here and repaired in Task210 below:
 
 - GroupImputer mode can lose exact large integers beside nulls. Polars training
   conversion can round `9007199254740993` to `9007199254740992.0`; pandas saved
@@ -995,3 +995,41 @@ run took 93.908 seconds. Wheel SHA256:
 This validates native Python saved-state replay and context diagnostics. No Spark
 UDF, REST or `ai_query` routes were added, and no tables, registered models or
 endpoints were created.
+
+### Task210 exact group integers and zero-column row counts
+
+GroupImputer now retains native Polars integer group keys when fitting every
+strategy, and integer values when fitting most-frequent/mode. Only these selected
+columns use nullable pandas integer storage; existing mean/median value conversion
+is retained. Signed and unsigned widths through UInt64 are covered. Int128 keeps
+its previous conversion path and is not included in this guarantee.
+
+Pandas application keeps group lookup keys and integer replacements exact before
+missing or unseen groups introduce nulls. This also covers an empty learned group
+map with an integer global fallback, duplicate request indexes, Arrow-backed
+integer columns and mixed integer/fractional keys. Native floating outputs and
+pure-float replacement errors are retained; Polars replacement casts are unchanged.
+No scoring-batch statistics are learned, and context declarations are unchanged.
+
+SimpleImputer missing-column restoration and FeatureInteraction bias generation
+now use native Polars repeats sized to the input. Zero-column frames retain their
+zero or nonzero row counts, scalar dtypes and lazy execution. The diagnostic's
+zero-column reversal retains a clone: Polars has no index or column values to
+reorder in this case, and its ordinary reverse operation loses the row count.
+
+Artifact fields and codec versions are unchanged. Exact saved group artifacts
+remain readable. Previously rounded fitted keys or values cannot be recovered;
+refit and re-save the affected whole model pipeline, including downstream steps,
+even if its displayed schema is unchanged. Models trained through the previously
+lossy pandas group replay should also be refitted before using corrected features.
+
+All **575 local tests** in fifteen explicit affected files passed (60 warnings,
+59.87 seconds). The union includes 46 group precision/control cases, 61 zero-column
+cases and four real integer-mode fit/save/fresh-process load/probe/predict cases
+across pandas and Polars, with calculators disabled during replay. Full Ruff,
+formatting, CI Ty and Lizard CCN <= 10 passed. Independent Ponytail review found
+no blocker and passed twenty additional compatibility probes.
+
+The final wheel and matching 575-test package are prepared for Databricks native
+validation; Task210 upload/run approval is pending. Local evidence does not claim
+Spark UDF, REST or `ai_query` validation or broaden their admission.

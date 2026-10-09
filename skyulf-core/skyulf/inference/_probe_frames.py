@@ -130,7 +130,12 @@ def slice_frame(frame: Frame, start: int, size: int) -> Frame:
 
 def reverse_frame(frame: Frame) -> Frame:
     """Reverse positions without adding a diagnostic feature or target."""
-    return frame.iloc[::-1] if isinstance(frame, pd.DataFrame) else frame.reverse()
+    if isinstance(frame, pd.DataFrame):
+        return frame.iloc[::-1]
+    if frame.width == 0:
+        # With no values or index to reorder, only height matters; native reverse loses it.
+        return frame.clone()
+    return frame.reverse()
 
 
 def assert_same(expected: Frame, actual: Frame, reason: str = "output_mismatch") -> None:
