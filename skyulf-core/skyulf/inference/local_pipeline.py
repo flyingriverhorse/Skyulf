@@ -23,7 +23,11 @@ from ..pipeline import SkyulfPipeline
 from ..preprocessing._target_labels import original_labels
 from ._manifest import checksum, runtime_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
-from .project_dependencies import source_project_requirements, verify_project_requirements
+from .project_dependencies import (
+    parse_project_requirements,
+    source_project_requirements,
+    verify_project_requirements,
+)
 from .project_scoring import validate_scoring_config
 
 _MAX_MANIFEST_BYTES = 64 * 1024
@@ -325,9 +329,21 @@ def _project_contract(pipeline: SkyulfPipeline) -> tuple[str, ...]:
         if not source:
             raise ValueError("Project scoring requires saved project Python source.")
         validate_scoring_config(config, source)
-    requirements = source_project_requirements(source) if source else ()
+    pins = set(source_project_requirements(source) if source else ())
+    for record in pipeline.feature_engineer.fitted_steps:
+        if record["type"] == "sentence_embedder":
+            pins.update(_embedding_requirements(record["artifact"]))
+    requirements = parse_project_requirements("\n".join(sorted(pins)))
     verify_project_requirements(requirements)
     return requirements
+
+
+def _embedding_requirements(artifact: dict) -> tuple[str, ...]:
+    """Read exact optional pins without importing or restoring the fitted encoder."""
+    requirements = artifact.get("model_requirements", ())
+    if not isinstance(requirements, tuple) or any(not isinstance(pin, str) for pin in requirements):
+        raise ValueError("Saved embedding requirements must be a tuple of exact pins.")
+    return parse_project_requirements("\n".join(requirements))
 
 
 def validate_local_input(

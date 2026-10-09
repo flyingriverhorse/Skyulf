@@ -27,31 +27,25 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task200 on branch093, base signed commit a8f98f23, Ponytail full.
-Seven remaining training/filter/inspection owners reviewed. Six add native
-local metadata; TrainTestSplitter/Split stays unrecorded with no useless hook.
-Counts:61/63 declaration machinery;62/63 reviewed lifecycle; sentence_embedder
-asset packaging remains open. No new worker admission or fit/apply formulas.
+Task201 on branch093: fitted sentence encoder assets and all-preprocessor
+small-data verification completed. Ponytail full. Root finalizing the signed
+commit; no push. No active peer claims, unanswered questions or review findings.
 
-Temporal scalar digest collisions found in real snapshots now fail explicitly.
-Supported scalar/container/array digests and NumPy temporal arrays unchanged.
-All domain implementation and independent review claims released; root has
-acknowledged results and preserved evidence in:
-- initiatives/spark_and_mlflow/200-preprocessing-context-training.md
-- docs/contributing/preprocessing_inference_coverage.md
+Evidence: docs/contributing/preprocessing_inference_coverage.md and
+initiatives/spark_and_mlflow/201-sentence-embedder-assets.md;
+per-name results: initiatives/spark_and_mlflow/201-all-preprocessing-native-results.md.
+Independent Codex review verified real encoder/tokenizer transport, dependency
+pins, native-valid settings, exact group/history values and lifecycle behavior.
+Completed exchanges and released claims were removed after recording findings.
 
-Local union:1,438passed across36 explicit files. Test-only invalid-None type
-annotation fixed afterward; its entire18casefile passed, fullCI Ty then passed.
-Ruff/format/CCN10 also passed. No runtime edits after union. Source/test/guide
-hashes packaged for native verification. No unresolved review findings.
-
-Native job750853859501812/run152339084173952:TERMINATED/SUCCESS.399passed
-plus Bundle guide, zero failed/skipped. Full duration81.150s; pytest22.56s.
-552 runtime files in wheel SHA256:
-ea03ef1d8e68bc3907ed3b0235ba4eaa940deb7c38c28cfad755c59b97db2be6.
-All552runtime/10test-guide hashes stillmatch. StrictMkDocs passed7.25s.
-Root completing staged review and signed commit hooks. No push.
+Local:691passed/1Windows-symlink skip across21 affected files; new all-owner
+matrix135passed, supplementary group/history/lifecycle22passed. Full Ruff,
+format, CI Ty and CCN10 passed; final strict docs build passed in9.02s.
+Native packaging:149/149passed, zero skips; job988493157672277/run968745626942362.
+Native all-owner:157/157passed, zero skips; job994960019987268/run113581190209016.
+67registered names/63owners, pandas67 andPolars67,32rows; no new Spark/REST
+admission. Both runs verified all552 runtime hashes for wheel063d876b...;
+no tables, registered models or endpoints created. Runtime unchanged since tests.
 
 ## Open messages
-
-- ID: T200-root-ready; UTC: 2026-10-09T15:00:02.0428312Z; sender: Codex root; recipient: all; type: RELEASE; reply: T200-root-finalization. All Task200 implementation/test/doc claims released. Local1438/native399 plusguide verified; hashes current; independent reviews clear. Ruff/format/fullCI Ty/CCN10/strictMkDocs pass. Final staged review and signed commit hooks next, no push. Commit will be recorded in ignored Task200 report. No open peer questions.
+- ID: T201-root-release; UTC: 2026-10-09T15:39:16.7045976Z; sender: Codex root; recipient: all; type: RELEASE; reply: T201-root-final-report. All edit claims released after documentation and native evidence completed. Root owns staging/final commit only; no peer work pending. No push.

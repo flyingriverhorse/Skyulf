@@ -118,12 +118,13 @@ class _SentenceEncoder:
 
 @pytest.fixture
 def sentence_encoder(monkeypatch):
-    """Keep wrapper parity independent of optional NLP imports and downloaded weights."""
+    """Mock model loading and packaging so wrapper parity needs no optional NLP imports."""
     from skyulf.preprocessing.vectorization import sentence_embedder
 
     encoder = _SentenceEncoder()
     monkeypatch.setitem(sys.modules, "sentence_transformers", None)
     monkeypatch.setattr(sentence_embedder, "_load_model", lambda model_name: encoder)
+    monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
     return encoder
 
 

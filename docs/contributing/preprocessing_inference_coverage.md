@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task200 training/inspection lifecycle.
+Status snapshot: **2026-10-09**, branch `093`, Task201 sentence encoder assets.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -35,13 +35,13 @@ and [inference flow](../user_guide/inference_flow.md).
 | --- | ---: | --- |
 | Registered transformer IDs | 67 | Includes aliases and training/inspection helpers |
 | Distinct applier implementations | 63 | Four additional names refer to existing classes |
-| Implementations with context declaration machinery | 61 | Fifty-eight built-in implementations plus three custom wrappers |
-| Without declaration machinery | 2 | Reviewed training-only splitter (two IDs) and open sentence embedder |
-| Implementations with reviewed context/lifecycle behavior | **62** | Includes the unrecorded training splitter without inventing a frame declaration |
-| Remaining lifecycle/asset review | **1** | `sentence_embedder`; external model assets are not captured yet |
+| Implementations with context declaration machinery | 62 | Fifty-nine built-in implementations plus three custom wrappers |
+| Without declaration machinery | 1 | Reviewed training-only splitter (two IDs) |
+| Implementations with reviewed context/lifecycle behavior | **63** | Includes the unrecorded training splitter without inventing a frame declaration |
+| Remaining initial owner reviews | **0** | Configuration, numerical and execution boundaries below still apply |
 | Reviewed worker-admitted preprocessing families | 7 | Only their supported pandas configurations; not every mode/engine |
 
-The count of 61 describes available machinery, not unconditional support for
+The count of 62 describes available machinery, not unconditional support for
 every configuration. Existing worker-subset validators can abstain for valid
 local states. Some Polars configurations also have no matching declaration.
 Custom wrappers return `unknown` unless their saved definition explicitly
@@ -106,7 +106,7 @@ the diagnostic continues reporting the integer-input mismatch.
 For PC-28, a fitted scale of 5 yielded `6 / 5 = 1.2000000000000002` in the full
 Polars result and `1.2` in a singleton, a difference of `2.22e-16`. The diagnostic
 retains `output_mismatch`; no tolerance was added to hide it. These follow-ups
-are additional to the remaining sentence-embedding work. The Polars
+remain separate from sentence-embedding asset packaging. The Polars
 rounding case remains a strict diagnostic boundary; it does not justify a second
 arithmetic implementation or a weaker comparison.
 
@@ -269,11 +269,51 @@ snapshot can still be a native passthrough, but fingerprint/probe certification
 requires representable state. Ordinary local binary-payload checks are separate;
 this change does not add a datetime codec or recompute training reports.
 
-## Remaining lifecycle review: sentence embeddings
+## Sentence encoder assets (Task201)
 
-| ID | Priority | Implementation | Open work |
+| ID | Status | Implementation | Reviewed scope |
 | --- | --- | --- | --- |
-| PC-48 | P4 | `sentence_embedder` | Pin and save actual model assets/revision; verify fresh-process offline replay without relying on a warm model cache. |
+| PC-48 | Implemented | `sentence_embedder` | Native PyTorch encoder snapshot, SHA256 identity, exact dependency pins, CPU replay and local pandas/Polars context inspection. |
+
+New fits capture the actual loaded encoder using native `torch.save` into an
+in-memory buffer. The immutable bytes contain weights, tokenizer and configuration;
+`model_sha256` identifies that exact snapshot. `model_name` remains provenance,
+not an instruction to download a replacement at prediction time. No learned
+transform or tokenization formula is implemented a second time.
+
+The existing `pipeline.pkl` carries these bytes through `save_local_pipeline`,
+model sets and MLflow pyfunc packages. There is no extra asset directory to copy
+or absolute model path to repair. Optional encoder dependencies are recorded at
+fit, merged with project pins and included in MLflow requirements; incompatible
+versions fail before native encoder restoration. The source model directory and
+Hugging Face cache are unnecessary when replaying the saved encoder.
+
+Apply restores the snapshot on **CPU**, calls the same native `encode`, and
+caches by immutable model bytes. A changed original model or another model with
+the same display name cannot replace a fitted snapshot. Neither fit nor apply
+adds direct filesystem operations to the preprocessing owner. First-time fitting
+a Hub model still requires network/cache access; installing Python dependencies
+is separate from offline model replay.
+
+`inference_capability` declares local `row` context for packaged state and empty
+no-ops. Inspection checks schema, width, bounded bytes, checksum and package pins
+without executing the encoder. Name-only legacy artifacts remain readable and
+`unknown`; refit to obtain captured assets. Python/NumPy scalar flag semantics are
+preserved; arbitrary truthy objects and noncanonical scalar classes are outside
+the inspected subset. An empty apply keeps the fitted output width without
+loading a model; a probe still validates its saved state first.
+
+The native snapshot uses executable pickle, like the existing pipeline payload:
+load only trusted artifacts. Checksums prove byte integrity, not authenticity.
+The **256 MiB** local-pipeline and aggregate model-set budgets remain unchanged;
+larger encoders or several copied encoders can exceed them. CPU PyTorch is the
+reviewed path; ONNX, OpenVINO, custom model implementations and cross-version
+loading are not admitted. Context metadata and offline replay do not add Spark
+UDF, REST or `ai_query` eligibility. Exact chunk equality still depends on the
+actual encoder, input and runtime; no numerical tolerance was added to the probe.
+
+Native API references: [PyTorch save](https://docs.pytorch.org/docs/stable/generated/torch.save.html)
+and [PyTorch load](https://docs.pytorch.org/docs/stable/generated/torch.load.html).
 
 Reviewed declarations still have the configuration and dtype boundaries recorded
 above. Context-dependent operators can correctly report `requires_context`; a
@@ -300,7 +340,7 @@ separate execution mechanism needs its own specification and tests.
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work beyond the remaining owner
+### Cross-cutting work beyond initial owner reviews
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -342,13 +382,33 @@ for names in remaining:
     print(", ".join(names))
 ```
 
-Expected snapshot: 67 names, 63 implementations, 2 without declaration machinery:
-`TrainTestSplitter`/`Split` (reviewed training-only marker) and `sentence_embedder`
-(open external-asset work). Reviewed lifecycle coverage is recorded separately.
+Expected snapshot: 67 names, 63 implementations, 1 without declaration machinery:
+`TrainTestSplitter`/`Split` (reviewed training-only marker).
+Reviewed lifecycle coverage is recorded separately.
 This counts declaration machinery, not whether a fitted configuration passes
 `get_inference_capability` or the worker certificate.
 
 ## Validation record
+
+### Task201: sentence snapshots and offline package replay
+
+The affected local union passed **691 tests** across 21 explicit files; one
+existing symlink test skipped because Windows symlink privilege was unavailable.
+Ruff, full CI formatting/Ty scopes, Lizard CCN <= 10 and strict MkDocs passed.
+
+Databricks [run 968745626942362](https://dbc-45604623-c18b.cloud.databricks.com/jobs/988493157672277/runs/968745626942362)
+finished **TERMINATED / SUCCESS**: **149 passed, zero failures or skips** in
+47.22 seconds of pytest execution (264.278 seconds total run time). The native
+check verified all 552 installed runtime files and the exact test inventory.
+Wheel SHA256: `063d876b41b16f9c79175644f690ed1fe1978863489e8e4ac3456486b440bfb3`.
+Six warnings came from intentionally tiny one-row holdouts where R² is undefined.
+
+Actual weighted sentence encoders survived fresh offline processes, removed
+source paths and empty caches in local artifacts, model sets and MLflow pyfunc
+packages. Overwriting the original encoder after fit did not change predictions.
+Independent local BERT/fast-tokenizer probes also retained weights, tokenizer,
+CPU placement and exact outputs in both engines. These are real model tests;
+the separately maintained mocked shape tests are not counted as asset proof.
 
 Task191 added 82 context cases and 48 probe/reload cases; the coordinated affected
 test union contains 603 distinct cases. It covers built-in saved-state reuse,
@@ -581,3 +641,30 @@ Wheel SHA256:
 This is native Python saved-model fit/apply/predict verification, not additional
 Spark UDF, REST or `ai_query` route coverage. No tables, registered models or
 endpoints were created.
+
+
+### Task201 validation: every registered preprocessor on small data
+
+At the user's request, the final installed wheel also ran every registered
+preprocessor against actual **32-row** fixtures in pandas and Polars. The matrix
+covers **67 registered names / 63 implementations**, with 134 actual fit/save/apply
+cases and one registry coverage guard. A further 22 selected cases check saved
+group statistics, ordered temporal history and training-only filter/sampler
+lifecycle. No calculator refitting is allowed during saved-state replay.
+
+The complete **157 tests passed**, zero failures or skips, on Databricks
+serverless:
+[run 113581190209016](https://dbc-45604623-c18b.cloud.databricks.com/jobs/994960019987268/runs/113581190209016)
+finished **TERMINATED / SUCCESS**. All 552 installed runtime files and all nine
+test/verifier/package assets matched the manifest. Pytest took 10.99 seconds;
+the complete run took 226.734 seconds. This uses the same Task201 wheel SHA256
+`063d876b41b16f9c79175644f690ed1fe1978863489e8e4ac3456486b440bfb3`.
+
+The durable matrix is
+`skyulf-core/tests/integration/core/test_preprocessing_small_data_roundtrip.py`.
+Each name has one explicit meaningful recipe; aliases, training helpers and
+inspection steps are included in the denominator. This does not establish every
+configuration, arbitrary custom code or exact pandas-to-Polars numerical parity.
+The run uses native Python execution on Databricks and adds no Spark UDF, REST
+or `ai_query` route coverage. No tables, registered models or endpoints were
+created. The context and execution boundaries elsewhere in this guide remain.

@@ -63,10 +63,11 @@ class _FixedEmbeddingModel:
 
 @pytest.fixture
 def embedding_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep the embedding node's real fit/apply boundary while replacing external inference."""
+    """Keep text fit/apply real while mocking external inference and asset packaging."""
     monkeypatch.setitem(
         sentence_embedder._MODEL_CACHE, "leakage-audit-model", _FixedEmbeddingModel()
     )
+    monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
 
 
 @pytest.mark.parametrize("calculator,applier,options", _TEXT_NODES)

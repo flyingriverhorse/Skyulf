@@ -330,9 +330,9 @@ class TestTokenizer:
 
 # ── SentenceEmbedder (optional dependency) ────────────────────────────────────
 #
-# This shape test mocks the model loader (like tests/test_sentence_embedder.py)
+# This shape test mocks model loading and asset packaging (like test_sentence_embedder.py)
 # so it runs without network access or the optional 'nlp' extra installed. Any
-# test that needs a real sentence-transformers model download must be opt-in.
+# real model snapshot/reload proof belongs to the optional dependency tests.
 
 _SENTENCE_EMBEDDER_MODULE_PATH = "skyulf.preprocessing.vectorization.sentence_embedder._load_model"
 
@@ -351,12 +351,18 @@ def _make_mock_sentence_embedder_model(dim: int = 16) -> MagicMock:
 
 class TestSentenceEmbedder:
     @patch(_SENTENCE_EMBEDDER_MODULE_PATH, return_value=_make_mock_sentence_embedder_model())
-    def test_embeddings_shape(self, _mock: Any, df_pandas: pd.DataFrame) -> None:
+    def test_embeddings_shape(
+        self, _mock: Any, df_pandas: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Mock asset capture while preserving the real embedding-column shape assertions."""
         from skyulf.preprocessing.vectorization import (
             SentenceEmbedderApplier,
             SentenceEmbedderCalculator,
         )
 
+        monkeypatch.setattr(
+            "skyulf.preprocessing.vectorization.sentence_embedder._snapshot_model", lambda model: {}
+        )
         calc = SentenceEmbedderCalculator()
         art = calc.fit(df_pandas, {"columns": [CONFIG_COL]})
         assert art["embedding_dim"] > 0
