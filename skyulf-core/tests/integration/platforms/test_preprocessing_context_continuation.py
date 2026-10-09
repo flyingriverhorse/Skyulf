@@ -137,7 +137,7 @@ def _replay(directory):
         if node == "PolynomialFeaturesNode":
             assert (
                 next(check for check in step["checks"] if check["name"] == "empty")["status"]
-                == "not_supported"
+                == "passed"
             )
         predictions = artifact.pipeline.predict(sample)
         chunks = [

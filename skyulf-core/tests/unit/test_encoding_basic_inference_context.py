@@ -105,11 +105,7 @@ def test_basic_saved_encoders_keep_exact_native_observations(node, engine, value
     detail, output = _probe(record, frame, engine, monkeypatch)
     checks = {check["name"]: check for check in detail["checks"]}
     assert checks["full"]["status"] == "passed"
-    if node == "HashEncoder":
-        assert detail["status"] == "failed", detail
-        assert checks["empty"]["reason"] == "output_mismatch", detail
-    else:
-        assert detail["status"] == "passed", detail
+    assert detail["status"] == "passed", detail
     assert len(output) == len(frame)
 
 
@@ -137,8 +133,7 @@ def test_basic_encoder_defaults_and_real_noops(node, engine, config, monkeypatch
     record = _record(node, engine, config)
     frame = _frame(engine)
     detail, output = _probe(record, frame, engine, monkeypatch)
-    expected = "failed" if node == "HashEncoder" and not config else "passed"
-    assert detail["status"] == expected, detail
+    assert detail["status"] == "passed", detail
     if config or node == "LabelEncoder":
         assert output.equals(frame)
     else:
@@ -179,7 +174,7 @@ def test_legacy_keys_keep_native_context_and_values(node, engine, monkeypatch):
         assert not direct.head(1).equals(singleton)
     else:
         assert direct.head(1).equals(singleton)
-        assert detail["status"] == ("failed" if node == "HashEncoder" else "passed"), detail
+        assert detail["status"] == "passed", detail
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -293,6 +288,43 @@ def test_empty_training_frames_produce_inspectable_native_states(node, engine, m
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("count", [8, True, 2**63])
+def test_hash_empty_integer_buckets_keep_populated_schema(engine, count):
+    """Empty replay must retain integer buckets without changing inputs or saved choices."""
+    frame = _frame(engine)
+    if engine == "pandas":
+        frame.index = pd.Index([8, 2, 2, 5], name="row")
+    record = _record("HashEncoder", engine, {"columns": ["category"], "n_features": count})
+    state = record["artifact"]
+    before = artifact_digest(state)
+    populated = record["applier"].apply(frame, state)
+    empty = frame.head(0)
+    output = record["applier"].apply(empty, state)
+    if engine == "pandas":
+        pd.testing.assert_frame_equal(output, populated.head(0))
+        pd.testing.assert_frame_equal(empty, frame.head(0))
+    else:
+        assert output.schema == populated.schema
+        assert output.equals(populated.head(0))
+        assert empty.equals(frame.head(0))
+    assert state["n_features"] is count
+    assert artifact_digest(state) == before
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("count", [2**63 + 1, 2**64])
+def test_hash_large_bucket_counts_keep_native_dtype_boundary(engine, count, monkeypatch):
+    """Large counts can produce unsigned buckets and must not be forced into int64."""
+    frame = _frame(engine)
+    record = _record("HashEncoder", engine, {"columns": ["category"], "n_features": count})
+    detail, _ = _probe(record, frame, engine, monkeypatch)
+    checks = {check["name"]: check for check in detail["checks"]}
+    assert checks["full"]["status"] == "passed", detail
+    assert checks["empty"]["reason"] == "output_mismatch", detail
+    assert detail["status"] == "failed", detail
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_hash_numpy_bucket_scalar_keeps_native_engine_boundary(engine, monkeypatch):
     """NumPy modulo dtype differences must not be hidden by normalizing saved parameters."""
     config = {"columns": (np.str_("category"),), "n_features": np.int64(8)}
@@ -342,7 +374,7 @@ def test_hash_version_one_keeps_legacy_batch_context(engine, monkeypatch):
     record["artifact"]["numeric_normalization_version"] = 1
     context = "global" if engine == "pandas" else "row"
     detail, _ = _probe(record, frame, engine, monkeypatch, context=context)
-    assert detail["status"] == ("requires_context" if engine == "pandas" else "failed"), detail
+    assert detail["status"] == ("requires_context" if engine == "pandas" else "passed"), detail
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

@@ -27,23 +27,20 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task203: user-approved Ponytail PA-01 and PA-02 implemented on branch093,
-base b3507e7b. See initiatives/spark_and_mlflow/203-ponytail-simplification.md
-for the file map, patch digest, exact tests, independent review and baseline debt.
-Source/template reduction: 2458 net lines; 57 regression-test lines added.
-The generated 2353-property schema remains identical to HEAD.
+Task203 committed as 97e81e94 with signed-off hooks passing; no push.
+Task204 continues docs/contributing/preprocessing_inference_coverage.md.
+PC-07/13/20/31/50 empty/null repairs are implemented and independently reviewed.
+Exact file map, red/green results, commands and remaining numerical boundaries:
+initiatives/spark_and_mlflow/204-preprocessing-continuation.md.
 
-Final unique affected cases: 345 passed, one existing boundary check failed.
-The initial union was 325 passed, 19 failed, two skipped; 18 CLI startup
-permission failures and two profile-gated catalog skips passed narrow reruns.
-T203-B01: eleven existing private imports across nine unchanged modules.
-Independent HEAD-archive and working-tree scans match exactly; no guard relaxed.
-Ruff, format, full CI Ty and Lizard CCN10 passed. No blocking refactor review
-findings. No cloud UDF/endpoint run, commit or push in this task.
-All Task203 file claims released; no pending peer questions. The baseline
-helper-ownership repair is documented separately from PA-01/PA-02.
+Local affected union: 1074 passed; final static cleanups: 18 affected reruns passed.
+Full Ruff, format, CI Ty and Lizard passed. Independent review: 131 differential
+probes, no blocker. All domain-agent claims released and their results acknowledged.
+PC-04/06/08/28/37 remain explicit boundaries; no comparison tolerance added.
+T203-B01 is the separately documented pre-existing private-import guard failure.
+
 ## Open messages
 
-- ID: T203-result; UTC: 2026-10-09T16:20:15.0829229Z; sender: Codex T203; recipient: all; type: RESULT; reply: T203-claim. PA-01/02 complete and reviewed; 345 unique tests passed, one independently confirmed pre-existing boundary failure T203-B01 remains. Exact evidence and 11 imports are in report203. Claims released; no peer action required; no commit/push.
+- ID: T204-final; UTC: 2026-10-09T16:53:32.9074685Z; sender: Codex T204; recipient: all; type: RELEASE; reply: T204-repair-claim. Five bounded repairs verified: local 1074 passed, static cleanup reruns 18 passed, native 710 passed with zero failures/skips plus guide; run 318386173857228 TERMINATED/SUCCESS. Final 552 runtime sources and 11 test/guide assets still match the wheel manifest; exact native/local collected node IDs match. Coverage guide and reports203/204 updated; full static gates and independent review passed. All root claims released; no pending peer request. Task203 committed 97e81e94; Task204 remains uncommitted; no push. Five numeric/context boundaries and T203-B01 remain explicit in reports.
 
-- ID: T204-start; UTC: 2026-10-09T16:30:42.4047278Z; sender: Codex T204; recipient: all; type: CLAIM; reply: T203-result. User requested commit of reviewed PA-01/02 then continuation from docs/contributing/preprocessing_inference_coverage.md. Own commit/gates for exact eight Task203 source/test files listed in report203 and AGENT_CHAT.md; no push. Coverage continuation is read-only while checking the remaining boundaries and user priority. Root owns tests; no conflicting peer claim found.
+- ID: T205-start; UTC: 2026-10-09T16:58:35.1836983Z; sender: Codex T205; recipient: all; type: CLAIM; reply: T204-final. User requests committing Task204 and continuing remaining guide boundaries. Own the exact fifteen modified tracked Task204 files listed by git status (five runtime, eight tests, coverage guide, AGENT_CHAT), report204 and new initiatives/spark_and_mlflow/205-numeric-boundaries.md. No peer claims conflict. Stage/review/hooks/commit first; no push. Remaining five boundaries read-only until reproduction and concrete minimal design.

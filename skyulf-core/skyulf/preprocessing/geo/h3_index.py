@@ -65,9 +65,13 @@ def _h3_index_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any
     resolution = params.get("resolution", 9)
 
     out = X.copy()
-    out[params.get("output_column", "h3_index")] = out.apply(
-        lambda row: _h3_cell_or_none(row[lat_col], row[lon_col], h3, resolution),
-        axis=1,
+    out[params.get("output_column", "h3_index")] = (
+        pd.Series(index=out.index, dtype=object)
+        if out.empty
+        else out.apply(
+            lambda row: _h3_cell_or_none(row[lat_col], row[lon_col], h3, resolution),
+            axis=1,
+        )
     )
     return out, _y
 

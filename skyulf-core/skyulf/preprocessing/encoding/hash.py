@@ -44,6 +44,11 @@ def _uses_numeric_normalization(params: dict[str, Any]) -> bool:
     return True
 
 
+def _empty_integer_buckets(X: Any, n_features: Any) -> bool:
+    """Only bounded Python-integer buckets have a fixed int64 empty schema."""
+    return len(X) == 0 and isinstance(n_features, int) and 0 < n_features <= 2**63
+
+
 def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Polars apply path — same ``_stable_hash`` (blake2b) as the pandas path.
 
@@ -72,7 +77,10 @@ def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
         unique_vals = X.select(str_col.alias(col)).to_series().unique().to_list()
         bucket_by_value = {v: _stable_hash(v) % n_features for v in unique_vals}
         exprs.append(str_col.replace_strict(bucket_by_value, default=None).alias(col))
-    return X.with_columns(exprs), y
+    X_out = X.with_columns(exprs)
+    if _empty_integer_buckets(X, n_features):
+        X_out = X_out.cast(dict.fromkeys(valid_cols, pl.Int64))
+    return X_out, y
 
 
 def _stable_hash(value: str) -> int:
@@ -114,6 +122,8 @@ def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
         # NaN-from-unmapped-key risk.
         bucket_by_value = {v: _stable_hash(v) % n_features for v in s.unique()}
         X_out[col] = s.map(bucket_by_value)
+    if _empty_integer_buckets(X, n_features):
+        X_out = X_out.astype(dict.fromkeys(valid_cols, "int64"))
     return X_out, y
 
 

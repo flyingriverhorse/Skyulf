@@ -252,13 +252,47 @@ def test_text_modes_replay_ordered_operations(engine, operation, monkeypatch):
     record = _record("TextCleaning", engine, config, frame)
     direct = record["applier"].apply(frame, record["artifact"])
     detail, output = _probe(record, frame, engine, monkeypatch)
-    null_map_inference = engine == "pandas" and operation.get("mode") == "normalize_slash_dates"
-    assert detail["status"] == ("failed" if null_map_inference else "passed"), detail
-    if null_map_inference:
-        checks = {check["name"]: check for check in detail["checks"]}
-        assert checks["chunks:1"]["reason"] == "apply_error"
-        assert checks["chunks:1"]["error_type"] == "AttributeError"
+    assert detail["status"] == "passed", detail
     assert output.equals(direct)
+
+
+@pytest.mark.parametrize("missing", [None, np.nan, pd.NA])
+@pytest.mark.parametrize("dtype", ["object", "string[python]", "string[pyarrow]", "category"])
+def test_slash_date_chain_preserves_null_and_empty_text_chunks(missing, dtype):
+    """Null-only and empty requests must retain the populated date-cleaning schema."""
+    if dtype == "string[pyarrow]":
+        pytest.importorskip("pyarrow")
+    frame = pd.DataFrame(
+        {"text": pd.array([" 12/3/2024 ", missing, "unmatched"], dtype=dtype), "target": [1, 2, 3]},
+        index=[9, 4, 4],
+    )
+    before = frame.copy(deep=True)
+    config = {
+        "columns": ["text"],
+        "operations": [{"op": "regex", "mode": "normalize_slash_dates"}, {"op": "trim"}],
+    }
+    record = _record("TextCleaning", "pandas", config, frame)
+    output = record["applier"].apply(frame, record["artifact"])
+    for chunk in (frame.iloc[1:2], frame.head(0)):
+        observed = record["applier"].apply(chunk, record["artifact"])
+        expected = output.iloc[1:2] if len(chunk) else output.head(0)
+        pd.testing.assert_frame_equal(observed, expected)
+    assert output["text"].iloc[0] == "2024-12-03"
+    assert output["text"].iloc[2] == "unmatched"
+    pd.testing.assert_frame_equal(frame, before)
+    pd.testing.assert_series_equal(output["target"], frame["target"])
+
+
+def test_slash_date_mapping_retains_categorical_output():
+    """Stabilizing object and nullable strings must not coerce existing categorical output."""
+    frame = pd.DataFrame({"text": pd.Categorical(["12/3/2024", None, "unmatched"])})
+    config = {"columns": ["text"], "operations": [{"op": "regex", "mode": "normalize_slash_dates"}]}
+    record = _record("TextCleaning", "pandas", config, frame)
+    output = record["applier"].apply(frame, record["artifact"])
+    empty = record["applier"].apply(frame.head(0), record["artifact"])
+    expected = pd.DataFrame({"text": pd.Categorical(["2024-12-03", None, "unmatched"])})
+    pd.testing.assert_frame_equal(output, expected)
+    pd.testing.assert_frame_equal(empty, expected.head(0))
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

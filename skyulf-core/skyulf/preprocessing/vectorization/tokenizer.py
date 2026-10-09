@@ -74,7 +74,7 @@ def _tokenizer_apply_pandas(
         tokens = text.map(analyze)
         outputs[f"{col}__tokens"] = tokens.map(" ".join)  # ty: ignore[no-matching-overload]
         if add_token_count:
-            outputs[f"{col}__token_count"] = tokens.map(len)
+            outputs[f"{col}__token_count"] = tokens.map(len).astype("int64")
 
     return _drop_and_concat(X, outputs, valid_cols, drop_original), y
 
@@ -100,9 +100,13 @@ def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
         if series.dtype != pl.String:
             return None
         tokens = [analyze(text) for text in series.fill_null("").to_list()]
-        new_cols.append(pl.Series(f"{col}__tokens", [" ".join(toks) for toks in tokens]))
+        new_cols.append(
+            pl.Series(f"{col}__tokens", [" ".join(toks) for toks in tokens], dtype=pl.String)
+        )
         if add_token_count:
-            new_cols.append(pl.Series(f"{col}__token_count", [len(toks) for toks in tokens]))
+            new_cols.append(
+                pl.Series(f"{col}__token_count", [len(toks) for toks in tokens], dtype=pl.Int64)
+            )
 
     return _drop_and_concat_polars(X, pl.DataFrame(new_cols), valid_cols, drop_original)
 

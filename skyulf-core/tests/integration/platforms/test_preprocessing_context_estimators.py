@@ -99,13 +99,6 @@ def _replay(directory):
         assert step["state_validation"] == "node_owned", report
         if node in ("IterativeImputer", "PowerTransformer"):
             assert step["context"] == "global" and step["status"] == "requires_context", report
-        elif node == "HashEncoder":
-            assert step["context"] == "row" and step["status"] == "failed", report
-            failed = [check for check in step["checks"] if check["status"] == "failed"]
-            assert failed and all(
-                check["name"] == "empty" and check["reason"] == "output_mismatch"
-                for check in failed
-            ), report
         else:
             assert step["context"] == "row" and report["status"] == "passed", report
         if step["context"] == "row":

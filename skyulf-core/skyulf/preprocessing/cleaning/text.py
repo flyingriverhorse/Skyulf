@@ -136,7 +136,10 @@ def _regex_pandas(series: pd.Series, mode: str, pattern: str | None, repl: str) 
     if mode == "extract_digits":
         return series.str.extract(r"(\d+)", expand=False)
     if mode == "normalize_slash_dates":
-        return series.map(_normalize_slash_dates_text)
+        result = series.map(_normalize_slash_dates_text)
+        if series.dtype == object or isinstance(series.dtype, pd.StringDtype):
+            return result.astype(object)
+        return result
     if mode == "custom" and pattern:
         return series.str.replace(pattern, repl, regex=True)
     return series

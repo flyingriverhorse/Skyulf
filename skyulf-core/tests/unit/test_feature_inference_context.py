@@ -105,11 +105,26 @@ def test_polynomial_aliases_replay_saved_column_order_and_powers(alias, engine, 
     sample = _frame(
         {"a": [2.0, 0.0, -3.0, 8.0], "keep": [1, 2, 3, 4], "b": [-1.0, 4.0, 0.0, 2.0]}, engine
     )
-    result = _check_saved_apply(alias, state, sample, engine, monkeypatch, empty=False)
+    result = _check_saved_apply(alias, state, sample, engine, monkeypatch)
     assert list(result.columns) == ["a", "keep", "b", "poly_b_pow_2", "poly_b_a", "poly_a_pow_2"]
     assert result["poly_b_pow_2"].to_list() == [1.0, 16.0, 0.0, 4.0]
     assert result["poly_b_a"].to_list() == [-2.0, 0.0, 0.0, 16.0]
     assert result["poly_a_pow_2"].to_list() == [4.0, 0.0, 9.0, 64.0]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("dtype", ["int64", "float32", "float64"])
+@pytest.mark.parametrize("columns", [["a", "b"], ["a"]])
+def test_polynomial_empty_keeps_native_schema_for_present_features(engine, dtype, columns):
+    """Empty requests keep native output precision and the existing missing-column layout."""
+    frame = _frame({"a": np.array([1, 2], dtype=dtype), "b": np.array([3, 5], dtype=dtype)}, engine)
+    state = NodeRegistry.get_calculator("PolynomialFeatures")().fit(
+        frame, {"columns": ["b", "a"], "degree": (1, 3), "include_bias": True}
+    )
+    sample = frame[columns] if engine == "pandas" else frame.select(columns)
+    applier = NodeRegistry.get_applier("PolynomialFeatures")()
+    full = applier.apply(sample, state)
+    _assert_equal(applier.apply(_slice(sample, []), state), _slice(full, []))
 
 
 @pytest.mark.parametrize("node", ["DateFeatures", "PolynomialFeatures", "PolynomialFeaturesNode"])
@@ -209,16 +224,14 @@ def test_polynomial_numpy_configuration_keeps_interactions_bias_and_input_terms(
         "output_prefix": "terms",
     }
     state = NodeRegistry.get_calculator("PolynomialFeatures")().fit(sample, config)
-    result = _check_saved_apply(
-        "PolynomialFeatures", state, sample, engine, monkeypatch, empty=False
-    )
+    result = _check_saved_apply("PolynomialFeatures", state, sample, engine, monkeypatch)
     assert list(result.columns) == ["a", "b", "terms_1", "terms_b", "terms_a", "terms_b_a"]
     assert result["terms_1"].to_list() == [1.0] * 4
     assert result["terms_b_a"].to_list() == [-2.0, 0.0, 0.0, 16.0]
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_polynomial_empty_null_and_new_name_collision_keep_apply_errors(engine, monkeypatch):
+def test_polynomial_null_and_new_name_collision_keep_apply_errors(engine, monkeypatch):
     """Context inspection cannot relax sklearn input validation or generated-name protection."""
     state = NodeRegistry.get_calculator("PolynomialFeatures")().fit(
         _frame({"x": [1.0, 2.0]}, engine), {"columns": ["x"]}
@@ -227,7 +240,6 @@ def test_polynomial_empty_null_and_new_name_collision_keep_apply_errors(engine, 
     applier = NodeRegistry.get_applier("PolynomialFeatures")()
     assert get_inference_capability("PolynomialFeatures", {}, state, engine=engine) is not None
     bad_frames = [
-        _slice(_frame({"x": [1.0]}, engine), []),
         _frame({"x": [np.nan]}, engine),
         _frame({"x": [1.0], "poly_x_pow_2": [7.0]}, engine),
     ]
@@ -365,8 +377,6 @@ def test_polynomial_real_fit_keeps_numpy_string_configuration(engine, field, mon
     state = NodeRegistry.get_calculator("PolynomialFeatures")().fit(sample, config)
     applier = NodeRegistry.get_applier("PolynomialFeatures")()
     direct = applier.apply(sample, state)
-    result = _check_saved_apply(
-        "PolynomialFeatures", state, sample, engine, monkeypatch, empty=False
-    )
+    result = _check_saved_apply("PolynomialFeatures", state, sample, engine, monkeypatch)
     _assert_equal(result, direct)
     assert result["terms_x_pow_2"].to_list() == [1.0, 4.0, 0.0, 9.0]

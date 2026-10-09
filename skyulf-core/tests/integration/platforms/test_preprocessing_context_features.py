@@ -142,18 +142,13 @@ def _replay(directory):
         step = report["steps"][0]
         assert step["state_validation"] == "node_owned" and step["context"] == "row", report
         assert step["row_effect"] == ("filter" if node in DETECTORS else "preserve"), report
-        empty_mismatch = node == "tokenizer" or (
-            node == "H3Index" and isinstance(sample, pd.DataFrame)
-        )
         expected_checks = [
             {"name": name, "status": "passed"}
             for name in ("full", "repeat", "chunks:1", "chunks:2", "reverse", "empty")
         ]
-        if empty_mismatch:
-            expected_checks[-1] = {"name": "empty", "status": "failed", "reason": "output_mismatch"}
         assert step["checks"] == expected_checks, report
-        assert report["status"] == ("failed" if empty_mismatch else "passed"), report
-        assert report["feature_schema"] == ("not_run" if empty_mismatch else "passed"), report
+        assert report["status"] == "passed", report
+        assert report["feature_schema"] == "passed", report
         if node in DETECTORS:
             outlier = pd.DataFrame({"x": [100.0]})
             if isinstance(sample, pl.DataFrame):

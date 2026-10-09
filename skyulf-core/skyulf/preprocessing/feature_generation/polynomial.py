@@ -49,8 +49,10 @@ def _polynomial_compute(
         interaction_only=params.get("interaction_only", False),
         include_bias=params.get("include_bias", False),
     )
-    poly.fit(X_subset)
-    transformed = poly.transform(X_subset)
+    # sklearn needs one row to derive its layout; only the feature count is fitted.
+    values = X_subset if len(X_subset) else np.zeros((1, len(valid_cols)), dtype=X_subset.dtype)
+    poly.fit(values)
+    transformed = poly.transform(values)[: len(X_subset)]
     if hasattr(transformed, "to_numpy"):
         transformed = transformed.to_numpy()
     keep, new_names = _polynomial_names(poly, valid_cols, params)

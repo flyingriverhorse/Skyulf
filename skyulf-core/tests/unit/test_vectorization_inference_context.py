@@ -112,7 +112,7 @@ def _probe(record, frame, engine, monkeypatch):
 
 
 def _assert_native_checks(detail, node, *, cached_stop_words=False, nullable_polars=False):
-    """Preserve the existing tokenizer empty-schema boundary in exact diagnostics."""
+    """Keep exact diagnostics for native cache mutation and nullable boolean rendering."""
     failures = [check for check in detail["checks"] if check["status"] != "passed"]
     if cached_stop_words:
         assert detail["checks"] == [
@@ -123,12 +123,40 @@ def _assert_native_checks(detail, node, *, cached_stop_words=False, nullable_pol
             ("chunks:1", "output_mismatch"),
             ("chunks:3", "output_mismatch"),
         ], detail
-    elif node == "tokenizer":
-        assert all(
-            check["name"] == "empty" and check["reason"] == "output_mismatch" for check in failures
-        ), detail
     else:
         assert detail["status"] == "passed", detail
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("add_token_count", [False, True])
+@pytest.mark.parametrize("drop_original", [False, True])
+def test_tokenizer_empty_outputs_keep_populated_schema(engine, add_token_count, drop_original):
+    """Empty requests retain string/count types without changing nulls, targets or row identity."""
+    original = pd.DataFrame({"text": ["Red blue", None, ""], "target": [2, 4, 6]}, index=[8, 2, 2])
+    frame = pl.from_pandas(original) if engine == "polars" else original.copy(deep=True)
+    record = _record(
+        "tokenizer",
+        engine,
+        {"columns": ["text"], "add_token_count": add_token_count, "drop_original": drop_original},
+        frame,
+    )
+    output = record["applier"].apply(frame, record["artifact"])
+    empty = record["applier"].apply(frame.head(0), record["artifact"])
+    assert output["text__tokens"].to_list() == ["red blue", "", ""]
+    if add_token_count:
+        assert output["text__token_count"].to_list() == [2, 0, 0]
+    if isinstance(frame, pl.DataFrame):
+        assert empty.schema == output.schema
+        assert output.schema["text__tokens"] == pl.String
+        assert not add_token_count or output.schema["text__token_count"] == pl.Int64
+        assert frame.equals(pl.from_pandas(original))
+    else:
+        pd.testing.assert_frame_equal(empty, output.head(0))
+        assert output["text__tokens"].dtype == object
+        assert not add_token_count or output["text__token_count"].dtype == np.dtype("int64")
+        pd.testing.assert_frame_equal(frame, original)
+        pd.testing.assert_index_equal(output.index, original.index)
+    assert output["target"].to_list() == [2, 4, 6]
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

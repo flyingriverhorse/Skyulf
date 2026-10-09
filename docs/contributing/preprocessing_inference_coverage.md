@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task201 sentence encoder assets.
+Status snapshot: **2026-10-09**, branch `093`, Task204 empty-input repairs.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -124,9 +124,9 @@ null behavior or numerical differences.
 | PC-04 | `Casting` | Frozen categories and supported scalar conversions. Legacy pandas categories need the whole request; coercive fallback casts can also depend on invalid neighboring values. Integer output dtypes can differ across chunks. |
 | PC-05 | `AliasReplacement` | Saved standard/custom mappings, unseen inputs and nulls. Native engine limitations are retained. |
 | PC-06 | `InvalidValueReplacement` | Fixed rules and replacement values. Pandas integer-to-null replacement can change the empty output dtype. |
-| PC-07 | `TextCleaning` | Saved operation order, nulls, regex and no-op settings. Pandas slash-date normalization followed by trim fails on a null-only chunk; Polars rejects unsupported regex lookbehind. |
+| PC-07 | `TextCleaning` | Saved operation order, nulls, regex and no-op settings. Slash-date normalization preserves object output for pandas object/StringDtype input, including empty and null-only chunks followed by trim. Categorical mapping is unchanged; Polars still rejects unsupported regex lookbehind. |
 | PC-18 | `DateFeatures` | UTC-aware saved states, epochs, time zones, nulls, tuples and NumPy string settings. Legacy non-UTC state stays `unknown`. Existing generated-name overwrites and Polars duplicate-output errors remain visible. |
-| PC-20 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved degree/flags/columns/order and prefixes. Apply rebuilds sklearn's combinatorial expansion from configuration; it does not learn request statistics. Existing empty/null-input errors remain. |
+| PC-20 | `PolynomialFeaturesNode`, `PolynomialFeatures` | Saved degree/flags/columns/order and prefixes. Apply rebuilds sklearn's combinatorial expansion from configuration; it does not learn request statistics. Empty requests retain the native output schema; null-input and generated-name collision errors remain. |
 | PC-36 | `ManualBounds` | Saved fixed/open limits; `row` context with a filter effect. Ordinary prediction runs this step and rejects requests that would lose rows. It is not automatically skipped. |
 | PC-37 | `Winsorize` | Saved training quantiles, never request quantiles. Pandas integer input may produce float full output but integer in-bound chunks; exact probing retains the mismatch. |
 | PC-45 | `SimpleTransformation` | Eight existing fixed-formula modes and saved settings, including native no-ops. Numeric domains and exceptional scalar types remain native-engine boundaries. |
@@ -147,7 +147,7 @@ neither means the estimator is being trained again.
 | ID | Implementation | Inspected scope and remaining boundary |
 | --- | --- | --- |
 | PC-12 | `DummyEncoder` | Saved vocabulary, output names and drop-first policy. Current category keys are row-local; legacy pandas datetime rendering can depend on neighboring values and reports `global`. |
-| PC-13 | `HashEncoder` | Existing stable hash and saved bucket count. Current key version is row-local; legacy pandas rendering reports `global`. Empty-result dtype mismatches remain exact probe failures. |
+| PC-13 | `HashEncoder` | Existing stable hash and saved bucket count. Current key version is row-local; legacy pandas rendering reports `global`. Empty output is int64 for Python integer bucket counts from 1 through 2**63. Larger counts and non-Python-integer settings retain native dtype/overflow boundaries. |
 | PC-14 | `LabelEncoder` | Saved feature/target mappings and unknown/missing codes. Current category keys are row-local; legacy pandas representations can change across batches. Target decoding is separate from feature-only inference. |
 | PC-15 | `OrdinalEncoder` | Saved category ordering, sentinels, feature and optional target encoders; no inference category fitting. Legacy pandas feature keys can require `global` context. |
 | PC-16 | `TargetEncoder` | Saved full-data category statistics and output class layout. Training cross-fitting deliberately differs from inference lookup; request labels are not used to relearn mappings. |
@@ -193,14 +193,14 @@ inspection is still separate from worker admission and strict sample parity.
 | PC-19 | `FeatureGenerationNode`, `FeatureMath`, `FeatureGeneration` | Fixed formulas and training-fitted group lookups. Inference never aggregates the request. Pandas similarity can depend on datetime rendering across rows and reports `global`; unpinned legacy similarity and uncertain fill/epsilon modes stay `unknown`. |
 | PC-22 | `ModelBasedSelection` | Saved selected/candidate columns and drop flag. Estimator importance metadata is not recalculated during prediction. |
 | PC-25 | `feature_selection` | Delegates validation and context to the concrete fitted selector. Existing unknown-method no-ops remain unchanged. |
-| PC-31 | `H3Index` | Saved coordinates/resolution and native output labels. Optional H3 must be installed; pandas empty-output dtype mismatches remain visible. |
+| PC-31 | `H3Index` | Saved coordinates/resolution and native output labels. Pandas empty output retains object dtype and the input index. Optional H3 remains required, including for valid empty requests. |
 | PC-34 | `EllipticEnvelope` | Saved sklearn detector models and learned covariance state. Active models filter rows; null/nonfinite handling remains native. |
 | PC-35 | `IQR` | Saved training bounds; no request quartiles. Active bounds filter rows. |
 | PC-38 | `ZScore` | Saved means/stds and threshold; no request statistics. Active maps filter rows. |
 | PC-46 | `count_vectorizer` | Saved vocabulary, estimator and output layout; no inference vocabulary fit. Native cache mutations and unusual input dtypes remain diagnostic boundaries. |
 | PC-47 | `hashing_vectorizer` | Saved hash/analyzer settings and dense output width. A pristine native estimator can lazily mutate its cache on first transform; the diagnostic reports that mutation. |
 | PC-49 | `tfidf_vectorizer` | Saved vocabulary/IDF and output width; no request IDF fitting. Optional callbacks remain undeclared. |
-| PC-50 | `tokenizer` | Saved analyzer settings, output names and token counts. Native empty token-count dtypes can differ from nonempty output. |
+| PC-50 | `tokenizer` | Saved analyzer settings, output names and token counts. Empty outputs retain the populated string representation and int64 counts in pandas and Polars. |
 
 Normal prediction executes the three detectors and rejects row loss. A benign
 sample passing the probe does not make filtering safe for arbitrary requests.
@@ -668,3 +668,39 @@ configuration, arbitrary custom code or exact pandas-to-Polars numerical parity.
 The run uses native Python execution on Databricks and adds no Spark UDF, REST
 or `ai_query` route coverage. No tables, registered models or endpoints were
 created. The context and execution boundaries elsewhere in this guide remain.
+
+### Task204 validation: empty schemas and null-only text
+
+Task204 repairs five previously recorded boundaries: PC-07 `TextCleaning`,
+PC-13 `HashEncoder`, PC-20 `PolynomialFeatures`, PC-31 `H3Index` and PC-50
+`tokenizer`. Their scope is recorded in the owner rows above. Existing native
+operations supply the output types; no dependency or artifact field was added.
+For an empty polynomial request, one zero-valued row supplies sklearn's native
+layout and the output is then sliced to zero rows. This learns no request
+statistics and preserves the existing null-input and name-collision errors.
+
+The local affected union passed **1,074 tests** across nineteen explicit file/node
+selections. After two static cleanups, all eighteen affected Hash/Tokenizer cases
+passed again; these are repeats, not additional distinct cases. Full Ruff,
+formatting, CI Ty and Lizard CCN <= 10 passed. Independent review found no blocker
+and verified 131 differential probes for populated values, dtypes and errors.
+Fresh-process saved-model checks disable calculator fit and compare full and
+singleton predictions plus learned-state digests.
+
+The final wheel passed **710 tests**, zero failures or skips, plus the complete
+Bundle guide on Databricks serverless PERFORMANCE_OPTIMIZED:
+[run 318386173857228](https://dbc-45604623-c18b.cloud.databricks.com/jobs/381149866704502/runs/318386173857228)
+finished **TERMINATED / SUCCESS**. All 552 installed Python sources matched the
+tested working-tree manifest. Pytest took 39.17 seconds; the complete run took
+88.803 seconds. Wheel SHA256:
+`aa9d35e9bea9c76e7560f31491a34b7b04b3eec4ae61ea382e0cd7ebc0e71617`.
+This is native Python fit/apply/predict coverage. No Spark UDF, REST or `ai_query`
+admission or route coverage was added; no tables, registered models or endpoints
+were created.
+
+The initial review count remains **63 of 63 owners**. PC-04 casting fallbacks,
+PC-06 integer/null replacement, PC-08 numeric widening, PC-28 Polars rounding and
+PC-37 integer winsorization remain open numeric/context boundaries. Existing
+strict diagnostic checks retain their dtype/output failures; no blanket numeric
+cast or comparison tolerance was added. Historical Task197-199 empty-schema
+observations above are superseded only for the five repaired configurations.

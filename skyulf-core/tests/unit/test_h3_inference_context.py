@@ -62,7 +62,7 @@ def test_h3_metadata_inspection_needs_no_execution_or_import(engine, monkeypatch
 @pytest.mark.parametrize(
     "resolution, output_name", [(0, "cell"), (15, ""), (True, np.str_("cell"))]
 )
-def test_h3_saved_choices_match_cells_and_report_empty_boundary(
+def test_h3_saved_choices_match_cells_through_empty_requests(
     engine, resolution, output_name, monkeypatch
 ):
     """Saved resolution and names must be reused for null, invalid and singleton requests."""
@@ -97,10 +97,7 @@ def test_h3_saved_choices_match_cells_and_report_empty_boundary(
         checks[name]["status"] == "passed"
         for name in ("full", "repeat", "chunks:1", "chunks:3", "reverse")
     )
-    if engine == "pandas":
-        assert detail["status"] == "failed" and checks["empty"]["reason"] == "output_mismatch"
-    else:
-        assert detail["status"] == "passed"
+    assert detail["status"] == "passed", detail
     assert artifact_digest(record) == before
 
 
@@ -181,6 +178,14 @@ def test_h3_native_output_labels_survive_inspection(engine, name, expected):
     state = record["artifact"]
     before = artifact_digest(state)
     output = record["applier"].apply(_frame(engine), state)
+    empty = _frame(engine).head(0)
+    empty_output = record["applier"].apply(empty, state)
+    if engine == "pandas":
+        pd.testing.assert_frame_equal(empty_output, output.head(0))
+        pd.testing.assert_frame_equal(empty, _frame(engine).head(0))
+    else:
+        assert empty_output.schema == output.schema
+        assert empty_output.equals(output.head(0))
     assert expected in output.columns
     assert output[expected].to_list()[0] == h3.latlng_to_cell(40.6, -73.7, 9)
     owner: Any = type(record["applier"])
