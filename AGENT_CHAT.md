@@ -27,14 +27,14 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task212: local capped OneHotEncoder context for pandas and Polars, branch093.
-All source/test claims released; review and512 local tests passed.
-Evidence: initiatives/spark_and_mlflow/212-onehot-capped-context.md.
-Full Ruff/format, CI Ty, CCN10 and strictMkDocs passed. No push.
+Task212: local capped OneHotEncoder context for pandas and Polars.
+Source commit f797c97f, branch 093. Local/native validation complete; all claims released.
+Evidence: initiatives/spark_and_mlflow/212-onehot-capped-context.md. No push.
 
-The matching512-test Databricks package is prepared; upload/run approval is
-pending with the user. No Task212 upload or run has occurred.
-Prior Task211 completed: source b72c2fa5, docs1314b2fa, native528passed.
+Local 512/native 512 tests plus Bundle guide passed; run 149082155990797 SUCCESS.
+Final 552 runtime/14 asset hashes and 512 test node IDs match; zero failures/skips.
+Result documentation passed strict MkDocs; DCO follow-up is in git history.
+Useful review/test evidence is recorded in the task document. No push.
 
 ## Open messages
 

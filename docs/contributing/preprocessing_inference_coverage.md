@@ -1118,6 +1118,16 @@ parity, immutable fitted state and actual worker rejection. Existing uncapped
 company-pipeline worker tests still pass. Full Ruff/format, full CI Ty scope and
 Lizard CCN 10 checks passed; independent Ponytail review found no remaining blocker.
 
-The matching 512-test Databricks package is prepared with exact wheel/source
-hashes. Native validation is pending explicit upload/run approval; no Task212
-Spark UDF, REST or `ai_query` execution has been claimed.
+The same **512 tests passed on Databricks serverless**, with zero failures or
+skips, plus the Bundle guide example. The native run verified all 552 installed
+runtime files and fourteen packaged assets against their SHA256 hashes, and
+its 512 passed node IDs match local collection exactly. Source commit:
+`f797c97f`. [Databricks run 149082155990797](https://dbc-45604623-c18b.cloud.databricks.com/jobs/392024338758505/runs/149082155990797)
+finished `SUCCESS` with pandas 2.2.3, Polars 1.44.2, NumPy 2.1.3 and
+scikit-learn 1.8.0. Pytest took 50.63 seconds with thirteen expected warnings;
+the complete run took 112.623 seconds. Wheel SHA256:
+`044e87d30fa4fa56f309e1c43803191c523945585c085aa19549615944f54ce9`.
+
+This validates native Python saved-state replay and local context diagnostics,
+including retained worker rejection. It does not validate Spark UDF, REST or
+`ai_query` execution. No tables, registered models or endpoints were created.
