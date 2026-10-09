@@ -380,9 +380,14 @@ def test_empty_state_is_not_a_fitted_artifact_for_other_nodes(node):
 
 
 @pytest.mark.parametrize("node", ["GeneralBinning", "KBinsDiscretizer"])
-def test_other_binning_nodes_remain_undeclared(node):
-    """CustomBinning must not implicitly advertise the shared applier's other calculators."""
-    assert get_inference_capability(node, {}, {}, engine="pandas") is None
+def test_other_binning_nodes_declare_their_own_local_context(node):
+    """Each binning calculator must own its declaration without granting Spark execution."""
+    config = {"columns": ["x"], "n_bins": 2, "strategy": "uniform"}
+    state = NodeRegistry.get_calculator(node)().fit(_frame("pandas"), config)
+    assert get_inference_capability(node, config, state, engine="pandas") == ExecutionCapability(
+        "pandas", "apply", "local", "preserve", "row"
+    )
+    assert get_inference_capability(node, config, state, engine="spark") is None
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

@@ -248,9 +248,25 @@ exposed. Passing finite samples cannot establish behavior for every future row.
 
 A `row` declaration describes the data the operation needs. It does not promise
 that every engine/configuration passes exact chunk comparisons. For example,
-pandas can choose different output dtypes for numeric bin labels or replacement
-values when one chunk contains only missing values. The report must retain that
+pandas can choose different output dtypes for integer casts, clipped integer
+values or numeric replacements across chunks. The report must retain that
 failure even though neither operation needs other rows to calculate its values.
+
+### Practical built-in boundaries
+
+| Step | Meaning for saved inference |
+| --- | --- |
+| `Casting` | Saved categorical vocabularies can be reused per row. Legacy pandas category inference and coercive fallback conversions can depend on the complete request; the diagnostic reports that context. |
+| `GeneralBinning`, `KBinsDiscretizer`, `Winsorize` | Apply reuses training bins/limits. Integer pandas clipping may still fail exact chunk dtype comparisons; use representative model-input dtypes. |
+| `ManualBounds` | This is a row-local filter, not an automatically skipped step. In-bound prediction succeeds; a request that would lose rows is rejected to preserve prediction alignment. |
+| `DateFeatures` | New UTC-aware fitted settings can be inspected per row. Legacy non-UTC settings can stay `unknown`; existing generated-name collisions are not renamed by the probe. |
+| `PolynomialFeatures` | Apply reconstructs combinatorial terms from saved configuration and feature shape. Its internal sklearn `fit` does not learn means or categories. Empty/null inputs retain their existing errors. |
+| `TextCleaning`, `InvalidValueReplacement` | Fixed operations reuse saved settings. Null-only chunks, regex support and dtype changes are engine-specific, so include those cases in your sample. |
+
+These local declarations do not make additional steps eligible for Spark workers
+or serving endpoints. Local-state validation also does not certify every value
+for artifact serialization: for example, native Decimal settings may be accepted
+by an applier but remain unsupported by sealed-model hashing.
 
 Built-in owners can inspect local saved state through `validate_inference_state`.
 The probe calls that hook on a detached artifact before the existing `apply`;

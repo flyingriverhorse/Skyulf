@@ -1,21 +1,59 @@
 """Simple Transformation node (log, sqrt, square, etc.)."""
 
+from decimal import Decimal
+from numbers import Real
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from .._artifacts import SimpleTransformationArtifact
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
 from ._ops import _PANDAS_OPS, _POLARS_OPS, _apply_polars_op
 
 
+def _validate_simple_rule(item: Any) -> None:
+    """Inspect saved math choices while retaining intentional unknown-method no-ops."""
+    if type(item) is not dict or set(item) - {"column", "method", "clip_threshold"}:
+        raise ValueError("SimpleTransformation rules contain unexpected fields.")
+    for key in ("column", "method"):
+        if item.get(key) is not None and not isinstance(item[key], str):
+            raise ValueError("SimpleTransformation column and method must be strings.")
+    threshold = item.get("clip_threshold")
+    if threshold is not None and not isinstance(threshold, (Real, Decimal, np.bool_)):
+        raise ValueError("SimpleTransformation clipping threshold must be numeric or None.")
+
+
 class SimpleTransformationApplier(BaseApplier):
     """Apply the configured per-column math transformations (log, sqrt, ...)."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect ordered native rules without consuming iterators or normalizing state."""
+        local_state_fields(raw, "simple_transformation", {"type", "transformations"})
+        transformations = raw["transformations"]
+        if transformations is None:
+            return raw
+        if type(transformations) not in (list, tuple):
+            raise ValueError("SimpleTransformation rules must be a list or tuple.")
+        for item in transformations:
+            _validate_simple_rule(item)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe native pointwise math as local row-preserving inference."""
+        if engine not in ("pandas", "polars"):
+            return None
+        SimpleTransformationApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

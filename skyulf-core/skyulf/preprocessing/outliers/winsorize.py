@@ -1,14 +1,17 @@
 """Winsorize node (clip extreme values to percentile bounds)."""
 
+from numbers import Real
 from typing import Any
 
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import WinsorizeArtifact
+from .._fitted_validation import local_state_fields
 from .._helpers import (
     auto_detect_numeric_columns,
     promote_configured_columns_to_float64,
@@ -17,10 +20,40 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._common import validate_fitted_bounds
 
 
 class WinsorizeApplier(BaseApplier):
     """Clip values to the fitted percentile bounds; rows are never removed."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect learned bounds and metadata without recomputing request quantiles."""
+        if not local_state_fields(
+            raw,
+            "winsorize",
+            {"type", "bounds", "lower_percentile", "upper_percentile", "warnings"},
+            allow_empty=True,
+        ):
+            return raw
+        validate_fitted_bounds(raw["bounds"], partial=False)
+        for field in ("lower_percentile", "upper_percentile"):
+            value = raw[field]
+            if isinstance(value, bool) or not isinstance(value, Real) or not 0 <= value <= 100:
+                raise ValueError("Fitted percentiles must be numbers between zero and 100.")
+        if type(raw["warnings"]) is not list or any(
+            type(item) is not str for item in raw["warnings"]
+        ):
+            raise ValueError("Fitted warnings must be a list of strings.")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local row clipping with saved limits without admitting Spark workers."""
+        if engine not in ("pandas", "polars"):
+            return None
+        WinsorizeApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

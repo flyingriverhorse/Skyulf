@@ -27,22 +27,27 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Branch 093. Task196 fixes pandas bin/replacement dtype drift and the resulting
-mixed object/nullable-bin sklearn prediction boundary in three existing owners.
-Ponytail full active. No duplicate transforms, relaxed comparisons or new worker
-admission. Inventory stays 23 declarations /40 undeclared implementations (44IDs).
-PC-08 numeric widening and PC-28 Polars 1ULP rounding remain open and documented.
-Legacy string-key encoders require whole-pipeline refit after dtype changes.
+Branch093, Task197 continues approved preprocessing inference contexts under
+Ponytail full. Added11 owners: GeneralBinning,KBins,Casting,AliasReplacement,
+InvalidValueReplacement,TextCleaning,DateFeatures,PolynomialFeatures,
+ManualBounds,Winsorize,SimpleTransformation. Registry:34 declarations /29
+remaining implementations (32IDs). Existing fit/apply formulas retained; no
+worker/endpoint admission. ManualBounds rejects prediction row loss, not skip.
 
-Final local: 885 tests passed (768 affected union +117 bridge/model consumers).
-Ruff/format, full CI Ty and Lizard passed. Independent reviewer reproduced and
-verified the model-boundary fix, passed 19 additional probes, and cleared review.
-Final native wheel dfd48304,552 installed sources verified: run535767378226162
-/job615731771938126/task109869075020402 SUCCESS,430 passed,zero fail/skip plus
-guide. Native Python fit/apply/predict only; no new tables/models/endpoints.
-Evidence: initiatives/spark_and_mlflow/196-preprocessing-parity.md and tracked
-docs/contributing/preprocessing_inference_coverage.md. Final docs/hooks/commit
-owned by root; no push requested. Task195 history retained in its own report.
+Final local union:1736 passed across31 explicit affected files,23warnings.
+Ruff/format1611files, fullCI Ty and LizardCCN10 passed. Independent cross-review
+reproduced and fixed genuine NumPy/tuple/null/Decimal validation rejections and
+Casting fallback's false row context. All owner claims released; original
+reviewers cleared all scoped findings. Known native dtype/regex/Decimal seal
+limits documented; oldPC08numericwidening andPC28Polarsrounding stayopen.
+
+Evidence and all peer results preserved in
+initiatives/spark_and_mlflow/197-preprocessing-context-continuation.md and
+tracked docs/contributing/preprocessing_inference_coverage.md.
+Native run1086439835567840 SUCCESS:755 tests+guide, wheel f88b066d,
+552 installed sourcefiles matched. Strict MkDocs passed. No tables/models/endpoints.
+All implementation/review claims released. Verified Task197 ready for signed commit; no push requested.
 
 ## Open messages
-- ID: T196-root-release; UTC: 2026-10-09T13:08:58.7622344Z; sender: Codex root; recipient: all; type: RELEASE; reply: T196-review-clear,T196-review-findings,T196-bridge-claim,T196-contract-claim,T196-root-claim. Reviewer findings acknowledged and preserved in Task196; all claims released. Root owns final docs/hooks/commit only. No peer requests remain.
+
+- ID: T197-root-final; UTC: 2026-10-09T13:39:22.9095481Z; sender: Codex root; recipient: all; type: RESULT; reply: T197-domain-review-clear,T197-feature-independent-clear,T197-cleaning-independent-clear,T197-cleaning-review-fix-release. Acknowledge all reviewed repairs and released claims; results preserved in Task197 report before compacting exchanges. Final local and native verification complete; root handles commit hooks. No peer blockers or unanswered requests.

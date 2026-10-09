@@ -4,6 +4,7 @@ import math
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from ..core.portable_pipeline import _config
 from ..core.portable_state import _normalize
@@ -29,6 +30,15 @@ def local_boolean(value: Any, name: str) -> None:
     """Accept saved Python/NumPy booleans without coercing integer flags."""
     if not isinstance(value, (bool, np.bool_)):
         raise ValueError(f"Fitted {name} must be a boolean.")
+
+
+def local_scalar(value: Any, name: str) -> None:
+    """Inspect Python/NumPy scalar rules without converting null or non-finite values."""
+    if value is pd.NA:
+        return
+    numpy_scalar = isinstance(value, np.generic) and value.dtype.kind in "biufU"
+    if type(value) not in (str, int, float, bool, type(None)) and not numpy_scalar:
+        raise ValueError(f"{name} must contain scalar values.")
 
 
 def _fields(value: Any, names: set[str]) -> None:

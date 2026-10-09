@@ -507,15 +507,20 @@ def _passthrough_artifact_options(config: dict[str, Any]) -> dict[str, Any]:
 
 
 class GeneralBinningApplier(BaseBinningApplier):
-    """Applier registered for the ``GeneralBinning`` node id.
+    """Inspect fitted bin decisions while inheriting the existing shared apply."""
 
-    Empty subclass: every binning behaviour is inherited from
-    :class:`BaseBinningApplier`. It exists as its own type so this node id
-    registers against a distinct Applier class, and as the base for the
-    ``CustomBinning`` and ``KBinsDiscretizer`` appliers.
-    """
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved edges, optional labels and display choices without fitting."""
+        return _validate_binning_inference_state(raw, allow_custom_labels=True)
 
-    pass
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved bin application as local row-preserving inference."""
+        if engine not in ("pandas", "polars"):
+            return None
+        GeneralBinningApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
 
 def _fit_one_column_into_maps(
@@ -633,7 +638,9 @@ def _validate_custom_bin_options(raw: dict) -> None:
         local_boolean(raw[key], key)
     if any(type(raw[key]) is not str for key in ("output_suffix", "missing_label")):
         raise ValueError("CustomBinning output suffix and missing label must be strings.")
-    if type(raw["precision"]) is not int:
+    if isinstance(raw["precision"], (bool, np.bool_)) or not isinstance(
+        raw["precision"], (int, np.integer)
+    ):
         raise ValueError("CustomBinning precision must be an integer.")
     if raw["label_format"] not in ("ordinal", "bin_index", "range"):
         raise ValueError("CustomBinning label format is unsupported.")
@@ -661,33 +668,64 @@ def _validate_custom_range_labels(raw: dict) -> None:
         _validate_custom_label_list(labels, active[col])
 
 
+def _validate_fitted_label_values(labels: Any) -> None:
+    """Inspect native label sequences without coercing their values or array dtype."""
+    if type(labels) not in (list, tuple, np.ndarray):
+        raise ValueError("Binning custom labels must be a list, tuple or array.")
+    if isinstance(labels, np.ndarray) and labels.ndim != 1:
+        raise ValueError("Binning custom labels must be one-dimensional.")
+    if any(
+        not isinstance(label, (str, bool, np.bool_)) and not _is_custom_bin_edge(label)
+        for label in labels
+    ):
+        raise ValueError("Binning custom labels must contain scalar values.")
+
+
+def _validate_fitted_custom_labels(labels_map: Any) -> None:
+    """Inspect retained scalar labels without changing native cardinality fallback."""
+    if type(labels_map) is not dict:
+        raise ValueError("Binning custom labels must be a dictionary.")
+    for column, labels in labels_map.items():
+        if type(column) is not str:
+            raise ValueError("Binning custom labels need column names.")
+        _validate_fitted_label_values(labels)
+
+
+def _validate_binning_inference_state(raw: dict, *, allow_custom_labels: bool) -> dict:
+    """Inspect shared local state unchanged, retaining empty and legacy fitted shapes."""
+    fields = {
+        "type",
+        "bin_edges",
+        "output_suffix",
+        "drop_original",
+        "label_format",
+        "missing_strategy",
+        "missing_label",
+        "include_lowest",
+        "precision",
+    }
+    optional = {"range_labels", "custom_labels"} if allow_custom_labels else {"range_labels"}
+    if type(raw) is dict:
+        fields.update(optional.intersection(raw))
+    if not local_state_fields(raw, "general_binning", fields, allow_empty=True):
+        return raw
+    _validate_custom_bin_edges(raw["bin_edges"])
+    _validate_custom_bin_options(raw)
+    if "range_labels" in raw:
+        _validate_custom_range_labels(raw)
+    if "custom_labels" in raw:
+        _validate_fitted_custom_labels(raw["custom_labels"])
+    _validate_binning_artifact(list(raw["bin_edges"]), raw)
+    return raw
+
+
 class CustomBinningApplier(GeneralBinningApplier):
     """Describe fixed-edge inference while reusing the shared binning apply logic."""
 
     @staticmethod
     def validate_inference_state(raw: dict) -> dict:
         """Inspect actual local fitted state unchanged, including the explicit empty no-op."""
-        fields = {
-            "type",
-            "bin_edges",
-            "output_suffix",
-            "drop_original",
-            "label_format",
-            "missing_strategy",
-            "missing_label",
-            "include_lowest",
-            "precision",
-        }
-        if type(raw) is dict and "range_labels" in raw:
-            fields.add("range_labels")
-        if not local_state_fields(raw, "general_binning", fields, allow_empty=True):
-            return raw
-        _validate_custom_bin_edges(raw["bin_edges"])
-        _validate_custom_bin_options(raw)
-        if "range_labels" in raw:
-            _validate_custom_range_labels(raw)
-        _validate_binning_artifact(list(raw["bin_edges"]), raw)
-        return raw
+        return _validate_binning_inference_state(raw, allow_custom_labels=False)
 
     @staticmethod
     def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
@@ -747,13 +785,20 @@ class CustomBinningCalculator(BaseCalculator):
 
 
 class KBinsDiscretizerApplier(GeneralBinningApplier):
-    """Applier registered for the ``KBinsDiscretizer`` node id.
+    """Inspect sklearn-selected edges while reusing the shared cut implementation."""
 
-    Empty subclass — sklearn only picks the edges at fit time; applying them is
-    the same cut as for any other binning node.
-    """
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the same saved artifact produced by GeneralBinning's sklearn path."""
+        return GeneralBinningApplier.validate_inference_state(raw)
 
-    pass
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fixed learned bins without granting distributed execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        KBinsDiscretizerApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
 
 @NodeRegistry.register("KBinsDiscretizer", KBinsDiscretizerApplier)

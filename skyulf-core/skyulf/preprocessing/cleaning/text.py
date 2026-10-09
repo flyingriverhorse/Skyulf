@@ -7,10 +7,12 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TextCleaningArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._helpers import auto_detect_text_columns as _auto_detect_text_columns
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
@@ -152,6 +154,23 @@ _TEXT_OPS_PANDAS: dict[str, Callable[[pd.Series, dict[str, Any]], pd.Series]] = 
 }
 
 
+def _validate_inference_text_operation(operation: dict) -> None:
+    """Check a saved fixed text operation without executing its regex or replacement."""
+    if set(operation) - {"op", "mode", "replacement", "pattern", "repl"}:
+        raise ValueError("Unexpected fitted text operation fields.")
+    for name in ("mode", "replacement", "repl"):
+        if not isinstance(operation.get(name), (str, type(None))):
+            raise ValueError(f"Fitted text {name} must be a string or None.")
+    pattern = operation.get("pattern")
+    if pattern is not None and not isinstance(pattern, str):
+        raise ValueError("Fitted text pattern must be a string or None.")
+    if operation["op"] == "regex" and operation.get("mode", "custom") == "custom" and pattern:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise ValueError("Invalid fitted text regex.") from exc
+
+
 class TextCleaningApplier(BaseApplier):
     """Apply an ordered chain of text operations to the resolved columns.
 
@@ -162,6 +181,32 @@ class TextCleaningApplier(BaseApplier):
     the literal ``"nan"``. Unrecognized operation names raise ``ValueError``, and
     an empty column set or empty operation list is a no-op.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved operations without rewriting their order, defaults or no-ops."""
+        if not local_state_fields(
+            raw, "text_cleaning", {"type", "columns", "operations"}, allow_empty=True
+        ):
+            return raw
+        _columns(raw["columns"])
+        operations = raw["operations"]
+        if operations is None:
+            return raw
+        if type(operations) not in (list, tuple):
+            raise ValueError("Fitted text operations must be a list or tuple.")
+        _validate_text_operations(operations)
+        for operation in operations:
+            _validate_inference_text_operation(operation)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local row operations while retaining engine-specific regex behavior."""
+        if engine not in ("pandas", "polars"):
+            return None
+        TextCleaningApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

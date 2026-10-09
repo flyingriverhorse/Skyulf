@@ -1,16 +1,19 @@
 """Invalid-value replacement node."""
 
 from collections.abc import Mapping
+from numbers import Real
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import InvalidValueReplacementArtifact
+from .._fitted_validation import _columns, local_boolean, local_scalar, local_state_fields
 from .._helpers import auto_detect_numeric_columns as _auto_detect_numeric_columns
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
@@ -155,6 +158,49 @@ class InvalidValueReplacementApplier(BaseApplier):
     Infinity-only cleanup preserves integer values and dtypes: integers cannot
     contain infinities and must not be widened to a floating-point sentinel.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect fixed numeric rules while retaining NumPy sentinels and true no-ops."""
+        if not local_state_fields(
+            raw,
+            "invalid_value_replacement",
+            {
+                "type",
+                "columns",
+                "replace_inf",
+                "replace_neg_inf",
+                "rule",
+                "replacement",
+                "value",
+                "min_value",
+                "max_value",
+            },
+            allow_empty=True,
+        ):
+            return raw
+        _columns(raw["columns"])
+        local_boolean(raw["replace_inf"], "replace_inf")
+        local_boolean(raw["replace_neg_inf"], "replace_neg_inf")
+        if raw["rule"] not in (None, "negative", "negative_to_nan", "zero", "custom_range"):
+            raise ValueError("Unknown fitted invalid-value rule.")
+        for name in ("min_value", "max_value"):
+            value = raw[name]
+            if value is not None and (
+                isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+            ):
+                raise ValueError("Fitted invalid-value bounds must be real numbers or None.")
+        local_scalar(raw["replacement"], "Invalid-value replacements")
+        local_scalar(raw["value"], "Invalid-value replacements")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe row dependency while leaving actual schema parity to the probe."""
+        if engine not in ("pandas", "polars"):
+            return None
+        InvalidValueReplacementApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

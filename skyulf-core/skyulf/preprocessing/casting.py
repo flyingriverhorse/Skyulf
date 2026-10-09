@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._artifacts import CastingArtifact
 from ._category_keys import category_key, category_key_expr
+from ._fitted_validation import _columns, local_boolean, local_state_fields
 from ._helpers import select_then_to_pandas
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -427,6 +429,57 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
     return df_out, y
 
 
+def _validate_casting_types(type_map: Any) -> None:
+    """Check real pandas dtype specifications without changing their saved representation."""
+    if type(type_map) is not dict:
+        raise ValueError("Fitted casting types must be a dictionary.")
+    _columns(list(type_map))
+    for dtype in type_map.values():
+        if not isinstance(dtype, (str, np.dtype, pd.api.extensions.ExtensionDtype, type)):
+            raise ValueError("Invalid fitted casting dtype.")
+        try:
+            pd.api.types.pandas_dtype(dtype)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid fitted casting dtype.") from exc
+
+
+def _validate_casting_categories(raw: dict) -> None:
+    """Inspect learned vocabularies while preserving artifacts predating saved categories."""
+    if "categories" not in raw:
+        return
+    categories = raw["categories"]
+    expected = {col for col, dtype in raw["type_map"].items() if dtype == "category"}
+    if type(categories) is not dict or set(categories) != expected:
+        raise ValueError("Fitted categories must match categorical casting columns.")
+    for values in categories.values():
+        if type(values) is not list:
+            raise ValueError("Fitted casting categories must be lists.")
+        try:
+            pd.CategoricalDtype(categories=values)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid fitted casting categories.") from exc
+
+
+def _pandas_cast_context(state: dict) -> str:
+    """Account for request vocabularies and whole-column best-effort fallback failures."""
+    for col, dtype in state["type_map"].items():
+        if col in state.get("categories", {}):
+            continue
+        label = str(dtype).lower()
+        if label == "category":
+            return "global"
+        if not state["coerce_on_error"]:
+            continue
+        if label in ("string", "str", "object") or label.startswith(
+            ("float", "int", "uint", "bool", "datetime")
+        ):
+            continue
+        # Native astype can fail on a neighbor; best-effort then retains every
+        # original value in the column rather than the successful row casts.
+        return "global"
+    return "row"
+
+
 class CastingApplier(BaseApplier):
     """Cast each column named in ``type_map`` to its target dtype on the active engine.
 
@@ -444,6 +497,27 @@ class CastingApplier(BaseApplier):
     freeze the training vocabulary; unseen values become missing. Older
     artifacts without a vocabulary retain their original casting behavior.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect local dtype/vocabulary state without converting or relearning it."""
+        fields = {"type", "type_map", "coerce_on_error"}
+        if isinstance(raw, dict) and "categories" in raw:
+            fields.add("categories")
+        local_state_fields(raw, "casting", fields)
+        _validate_casting_types(raw["type_map"])
+        local_boolean(raw["coerce_on_error"], "coerce_on_error")
+        _validate_casting_categories(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local casts, including request-derived legacy pandas vocabularies."""
+        if engine not in ("pandas", "polars"):
+            return None
+        CastingApplier.validate_inference_state(state)
+        context = _pandas_cast_context(state) if engine == "pandas" else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

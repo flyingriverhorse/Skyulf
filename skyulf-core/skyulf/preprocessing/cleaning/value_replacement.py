@@ -2,7 +2,6 @@
 
 from typing import Any
 
-import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -11,7 +10,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns
 from .._artifacts import ValueReplacementArtifact
-from .._fitted_validation import _columns, local_state_fields
+from .._fitted_validation import _columns, local_scalar, local_state_fields
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -202,9 +201,7 @@ def _apply_value_replacement_pandas(
 
 def _validate_replacement_scalar(value: Any) -> None:
     """Allow Python and NumPy scalar rules without converting null or non-finite values."""
-    numpy_scalar = isinstance(value, np.generic) and value.dtype.kind in "biufU"
-    if type(value) not in (str, int, float, bool, type(None)) and not numpy_scalar:
-        raise ValueError("ValueReplacement rules must contain scalar values.")
+    local_scalar(value, "ValueReplacement rules")
 
 
 def _validate_replacement_mapping(mapping: Any) -> None:

@@ -5,10 +5,12 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from .._artifacts import DateFeaturesArtifact
+from .._fitted_validation import local_boolean, local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
@@ -79,6 +81,12 @@ def _validate_numeric_date_columns(df: Any, columns: list[str], unit: str | None
 
 def _feat_name(col: str, feature: str) -> str:
     return f"{col}_{feature}"
+
+
+def _validate_date_names(value: Any) -> None:
+    """Retain native string sequences, including duplicates preserved by date fit."""
+    if type(value) not in (list, tuple) or any(not isinstance(item, str) for item in value):
+        raise ValueError("Fitted date columns and features must be string sequences.")
 
 
 def _resolve_features(config: dict[str, Any]) -> list[str]:
@@ -211,6 +219,34 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 class DateFeaturesApplier(BaseApplier):
     """Append calendar-part columns extracted from the configured datetime columns."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved calendar settings without parsing data or changing legacy defaults."""
+        optional = {"drop_original", "timezone", "epoch_unit"}
+        fields = {"type", "columns", "features"}
+        if type(raw) is dict:
+            fields.update(optional.intersection(raw))
+        local_state_fields(raw, "date_features", fields)
+        _validate_date_names(raw["columns"])
+        _validate_date_names(raw["features"])
+        if any(feature not in DATE_FEATURE_ACCESSORS for feature in raw["features"]):
+            raise ValueError("Fitted date features contain unsupported calendar parts.")
+        local_boolean(raw.get("drop_original", False), "drop_original")
+        if raw.get("timezone") is not None and type(raw["timezone"]) is not str:
+            raise ValueError("Fitted date timezone must be a string or None.")
+        _epoch_unit(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved UTC parsing without promising legacy mixed-timezone behavior."""
+        if engine not in ("pandas", "polars"):
+            return None
+        DateFeaturesApplier.validate_inference_state(state)
+        if state.get("timezone") != "UTC":
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

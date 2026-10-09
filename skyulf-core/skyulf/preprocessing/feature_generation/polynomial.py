@@ -1,5 +1,6 @@
 """Polynomial-features node."""
 
+from numbers import Integral
 from typing import Any, cast
 
 import numpy as np
@@ -7,14 +8,36 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import PolynomialFeatures
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns
 from .._artifacts import PolynomialFeaturesArtifact
+from .._fitted_validation import local_boolean, local_state_fields
 from .._helpers import select_then_to_numpy
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _validate_generated_names
+
+
+def _validate_polynomial_degree(degree: Any, include_bias: bool) -> None:
+    """Check saved sklearn degree bounds without constructing or fitting an estimator."""
+    if isinstance(degree, Integral):
+        bounds = (0, degree)
+    elif type(degree) in (list, tuple, np.ndarray) and np.shape(degree) == (2,):
+        bounds = degree
+    else:
+        raise ValueError("Fitted polynomial degree must be an integer or a pair of bounds.")
+    if any(not isinstance(item, Integral) or isinstance(item, (bool, np.bool_)) for item in bounds):
+        raise ValueError("Fitted polynomial degree bounds must be integers.")
+    if not 0 <= bounds[0] <= bounds[1] or (bounds[1] == 0 and not include_bias):
+        raise ValueError("Fitted polynomial degree bounds cannot produce an expansion.")
+
+
+def _validate_polynomial_names(value: Any) -> None:
+    """Accept fitted string names without coercing NumPy string scalars."""
+    if type(value) is not list or any(not isinstance(name, str) for name in value):
+        raise ValueError("Fitted polynomial names must be a list of strings.")
 
 
 def _polynomial_compute(
@@ -87,6 +110,44 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
 
 class PolynomialFeaturesApplier(BaseApplier):
     """Append the polynomial expansion described by the artifact."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved expansion configuration without rebuilding or fitting its terms."""
+        if not local_state_fields(
+            raw,
+            "polynomial_features",
+            {
+                "type",
+                "columns",
+                "degree",
+                "interaction_only",
+                "include_bias",
+                "include_input_features",
+                "output_prefix",
+                "feature_names",
+            },
+            allow_empty=True,
+        ):
+            return raw
+        _validate_polynomial_names(raw["columns"])
+        if len(set(raw["columns"])) != len(raw["columns"]):
+            raise ValueError("Fitted polynomial columns must be unique.")
+        for flag in ("interaction_only", "include_bias", "include_input_features"):
+            local_boolean(raw[flag], flag)
+        _validate_polynomial_degree(raw["degree"], raw["include_bias"])
+        if not isinstance(raw["output_prefix"], str):
+            raise ValueError("Fitted polynomial prefix must be a string.")
+        _validate_polynomial_names(raw["feature_names"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local polynomial arithmetic without granting worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        PolynomialFeaturesApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
