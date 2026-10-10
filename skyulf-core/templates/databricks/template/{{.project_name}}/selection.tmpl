@@ -30,3 +30,15 @@
 {{- skip "src/jobs/recover_predictions.py" -}}
 {{- skip "src/jobs/scoring_report.py" -}}
 {{- end -}}
+{{- if ne .include_daily_rollout "true" -}}
+{{- skip "resources/daily_rollout.job.yml" -}}
+{{- skip "src/jobs/daily_rollout.py" -}}
+{{- end -}}
+{{- if ne .include_online_publication "true" -}}
+{{- skip "resources/online_publication.job.yml" -}}
+{{- skip "src/jobs/online_publication.py" -}}
+{{- end -}}
+{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") -}}
+{{- skip "config/serving.yml" -}}
+{{- skip "deployment/serving-requirements.txt" -}}
+{{- end -}}

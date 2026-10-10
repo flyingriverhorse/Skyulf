@@ -5,6 +5,7 @@ Approval never fits, registers or uploads a model and never changes a scoring pi
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
@@ -13,15 +14,18 @@ import polars as pl
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
 from ...mlflow.lifecycle.promotion import (
+    AliasAdmission,
     AliasChangeReceipt,
     AliasConflictError,
     ExclusiveAliasWriterAdmission,
     active_marker,
+    alias_resource_id,
     controlled_champion_version,
     event_tag,
     initialize_champion,
     promote_candidate,
     read_event,
+    validate_admission,
     verify_original_receipt,
     verify_staged_challenger,
 )
@@ -183,6 +187,32 @@ def approve_candidate(
     """
     if config.get("promotion_policy") != "manual_approval":
         raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
+    return approve_saved_candidate(
+        spark,
+        config,
+        candidate_version=candidate_version,
+        comparison_sha256=comparison_sha256,
+        expected_champion_version=expected_champion_version,
+        admission=ExclusiveAliasWriterAdmission(),
+    )
+
+
+def approve_saved_candidate(
+    spark: Any,
+    config: dict[str, Any],
+    *,
+    candidate_version: str | None,
+    comparison_sha256: str | None,
+    expected_champion_version: str | None,
+    admission: AliasAdmission,
+    fresh_approval_guard: Callable[[], None] | None = None,
+) -> AliasChangeReceipt:
+    """Approve pinned saved evidence under the caller's shared alias authority.
+
+    Callers own their explicit manual or automatic authorization policy. Fresh
+    approval reconstructs the original bounded holdout and preserves all snapshot
+    checks. A repeated active committed transition returns its original receipt.
+    """
     candidate_version, comparison_sha256 = _validate_candidate_request(
         candidate_version, comparison_sha256, expected_champion_version
     )
@@ -191,6 +221,7 @@ def approve_candidate(
     max_bytes = input_budget_bytes(config.get("max_input_mb"))
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
+    validate_admission(admission, registry_uri)
     name = config["model_name"]
     client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
     report, spec, engine, filter_evidence = load_candidate_evidence(
@@ -202,14 +233,15 @@ def approve_candidate(
     )
     if resolved_candidate.digest != report.candidate_digest:
         raise ValueError("Candidate model digest differs from saved comparison.")
-    current = controlled_champion_version(
-        name, tracking_uri=tracking_uri, registry_uri=registry_uri
-    )
-    if current == candidate_version:
-        return _completed_approval(client, report, comparison_sha256)
-    if current != expected_champion_version:
-        raise AliasConflictError("Champion changed since the requested comparison.")
-    verify_staged_challenger(client, report, comparison_sha256)
+    with admission.hold(alias_resource_id(name)):
+        current = controlled_champion_version(
+            name, tracking_uri=tracking_uri, registry_uri=registry_uri
+        )
+        if current == candidate_version:
+            return _completed_approval(client, report, comparison_sha256)
+        if current != expected_champion_version:
+            raise AliasConflictError("Champion changed since the requested comparison.")
+        verify_staged_challenger(client, report, comparison_sha256)
     bounded_spec = replace(
         spec,
         max_rows=min(spec.max_rows, config["max_rows"]),
@@ -227,12 +259,14 @@ def approve_candidate(
     native = pl.from_pandas(heldout) if engine == "polars" else heldout
     options = {
         "target_column": spec.target_column,
-        "admission": ExclusiveAliasWriterAdmission(),
+        "admission": admission,
         "max_rows": bounded_spec.max_rows,
         "max_bytes": bounded_spec.max_bytes,
         "tracking_uri": tracking_uri,
         "registry_uri": registry_uri,
     }
+    if fresh_approval_guard is not None:
+        fresh_approval_guard()
     if expected_champion_version is None:
         return initialize_champion(report, native, **options)
     return promote_candidate(

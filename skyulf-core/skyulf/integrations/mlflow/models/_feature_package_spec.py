@@ -6,7 +6,7 @@ from typing import Any
 
 from ...databricks.feature_store.config import FeatureTrainingSpec
 
-_SPARK_TYPES = {
+SPARK_MLFLOW_TYPES = {
     "smallint": "integer",
     "int": "integer",
     "bigint": "long",
@@ -77,7 +77,7 @@ def _native_columns(native: Any) -> tuple[dict[str, Any], list[str], dict[str, A
     excluded = []
     for column in native.column_infos:
         if column.include:
-            included[column.output_name] = _SPARK_TYPES.get(column.data_type)
+            included[column.output_name] = SPARK_MLFLOW_TYPES.get(column.data_type)
         else:
             excluded.append(column.output_name)
         info = column.info
@@ -109,7 +109,7 @@ def _check_columns(
         raise ValueError("Native feature lookup columns differ from lookup_spec.")
 
 
-def _yaml_entries(value: Any) -> list[tuple[str, dict[str, Any]]]:
+def feature_spec_entries(value: Any) -> list[tuple[str, dict[str, Any]]]:
     """Reject ambiguous or malformed name-keyed SDK records."""
     if not isinstance(value, list):
         raise ValueError("Feature spec must contain lists of named records.")
@@ -129,11 +129,11 @@ def _yaml_entries(value: Any) -> list[tuple[str, dict[str, Any]]]:
 def _yaml_columns(value: Any) -> tuple[dict[str, Any], list[str], dict[str, Any]]:
     """Extract only the supported ordinary source and table-lookup semantics."""
     included, excluded, features = {}, [], {}
-    for name, data in _yaml_entries(value):
+    for name, data in feature_spec_entries(value):
         if type(data.get("include", True)) is not bool:
             raise ValueError("Feature spec include must be boolean.")
         if data.get("include", True):
-            included[name] = _SPARK_TYPES.get(data.get("data_type"))
+            included[name] = SPARK_MLFLOW_TYPES.get(data.get("data_type"))
         else:
             excluded.append(name)
         source = data.get("source")
@@ -168,11 +168,15 @@ def validate_saved_feature_spec(
         raise ValueError("Only explicit table lookup feature specs are supported.")
     _check_columns(*_yaml_columns(saved.get("input_columns")), spec, inputs)
     _check_timestamps(
-        {name: info.get("data_type") for name, info in _yaml_entries(saved.get("input_columns"))},
+        {
+            name: info.get("data_type")
+            for name, info in feature_spec_entries(saved.get("input_columns"))
+        },
         spec,
     )
     tables = {
-        name: data.get("lookback_window") for name, data in _yaml_entries(saved.get("input_tables"))
+        name: data.get("lookback_window")
+        for name, data in feature_spec_entries(saved.get("input_tables"))
     }
     _check_tables(tables, spec)
     return hashlib.sha256(payload).hexdigest()

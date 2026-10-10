@@ -21,6 +21,7 @@ from ...databricks.feature_store.lifecycle_config import (
     parse_feature_binding,
     serialize_feature_spec,
 )
+from ...databricks.feature_store.online_policy import ONLINE_FEATURES_KEY, OnlineFeaturePolicy
 from ...databricks.feature_store.runtime import feature_engineering_client
 from ..shared._client import make_tracking_client
 from ..shared._model_metadata import mlflow_dtype, normalized_dtype, scrub_local_artifact_uri
@@ -129,6 +130,7 @@ def feature_package_models(local_path: str | Path) -> tuple[Any, Any, Path]:
     )
     if metadata.get(FEATURE_SPEC_DIGEST_KEY) != digest:
         raise ValueError("Feature model spec digest differs from saved lookup instructions.")
+    _validate_online_contract(raw, deserialize_feature_spec(binding["lookup_spec"]))
     return outer, raw, raw_path
 
 
@@ -280,12 +282,15 @@ def log_feature_pipeline_model(
     artifact_path: str,
     tracking_uri: str | None = None,
     client: Any = None,
+    online_policy: OnlineFeaturePolicy | None = None,
 ) -> str:
     """Log an existing fitted pandas/Polars pipeline with native point-in-time lookup lineage.
 
     The native TrainingSet must expose exactly the fitted inputs plus its label.
     Nullable integer/boolean transport is rejected until the SDK provides a
-    post-lookup encoder. Cloud acceptance remains a separate runtime check.
+    post-lookup encoder. An online_policy checks received feature completeness
+    and freshness before preprocessing without replacing training snapshots.
+    Native request overrides remain possible. Cloud acceptance is separate.
     """
     validate_model_destination(run_id, artifact_path, tracking_uri)
     path = Path(local_artifact_path).resolve()
@@ -294,8 +299,12 @@ def log_feature_pipeline_model(
         zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
     )
     binding = _validate_contract(training_set, lookup_spec, lookup_binding, columns)
+    if online_policy is not None:
+        online_policy.validate_lookup(lookup_spec, dict(columns))
     with tempfile.TemporaryDirectory(prefix="skyulf-feature-local-") as directory:
-        options = pipeline_model_save_options(artifact, path, Path(directory))
+        options = pipeline_model_save_options(
+            artifact, path, Path(directory), online_policy=online_policy
+        )
         return _log_feature_options(
             options,
             training_set=training_set,
@@ -317,16 +326,23 @@ def log_feature_model_set(
     artifact_path: str,
     tracking_uri: str | None = None,
     client: Any = None,
+    online_policy: OnlineFeaturePolicy | None = None,
 ) -> str:
-    """Log one complete fitted model set against its compatible union lookup contract."""
+    """Log a complete model set against its compatible union lookup contract.
+
+    Optional online_policy guards the union before any component preprocessing;
+    it does not change the original training snapshot or authenticate overrides.
+    """
     from .model_set import model_set_save_options  # noqa: PLC0415 - avoid registry import cycle
 
     validate_model_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
     columns = [(column.name, column.dtype) for column in artifact.manifest.input_schema]
     binding = _validate_contract(training_set, lookup_spec, lookup_binding, columns)
+    if online_policy is not None:
+        online_policy.validate_lookup(lookup_spec, dict(columns))
     with tempfile.TemporaryDirectory(prefix="skyulf-feature-set-") as directory:
-        options = model_set_save_options(artifact, Path(directory))
+        options = model_set_save_options(artifact, Path(directory), online_policy=online_policy)
         return _log_feature_options(
             options,
             training_set=training_set,
@@ -352,3 +368,16 @@ def copy_feature_package(
     tracking.get_run(run_id)
     tracking.log_artifacts(run_id, str(Path(local_path).resolve()), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
+
+
+def _validate_online_contract(raw: Any, spec: FeatureTrainingSpec) -> None:
+    """Bind opt-in policy metadata to the executable raw model configuration."""
+    value = (raw.metadata or {}).get(ONLINE_FEATURES_KEY)
+    config = raw.flavors.get("python_function", {}).get("config") or {}
+    if config.get(ONLINE_FEATURES_KEY) != value:
+        raise ValueError("Online policy metadata differs from saved model configuration.")
+    if value is not None:
+        policy = OnlineFeaturePolicy.from_dict(value)
+        policy.validate_lookup(
+            spec, {column.name: column.type.name for column in raw.signature.inputs}
+        )

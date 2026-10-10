@@ -146,6 +146,7 @@ def build_pinned_endpoint(
     }
     if spec.logging_mode == "telemetry":
         config["telemetry_config"] = {
+            # Native CREATE requires all sinks; inference-only GET retains just logs.
             "table_names": {
                 "logs_table": spec.telemetry_logs_table,
                 "traces_table": spec.telemetry_traces_table,
@@ -298,13 +299,13 @@ def require_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
 
 def _telemetry_request(client: Any, method: str, path: str, body: dict | None = None) -> Any:
     """Use the injected SDK transport without losing newer response fields."""
-    transport = _api_transport(client)
+    transport = api_transport(client)
     if body is None:
         return transport(method=method, path=path)
     return transport(method=method, path=path, body=body)
 
 
-def _api_transport(client: Any) -> Any:
+def api_transport(client: Any) -> Any:
     """Require the authenticated transport supplied by the caller's SDK client."""
     transport = getattr(getattr(client, "api_client", None), "do", None)
     if not callable(transport):
@@ -343,7 +344,7 @@ def query_named_records(
     """Send finite JSON named rows unchanged after exact schema and state checks."""
     from databricks.sdk.service import serving  # noqa: PLC0415
 
-    rows = _validated_rows(records, plan)
+    rows = validate_named_rows(records, plan)
     if client_request_id is not None and (
         not isinstance(client_request_id, str) or not client_request_id.strip()
     ):
@@ -356,7 +357,7 @@ def query_named_records(
     workspace_id = _field(getattr(client, "config", None), "workspace_id")
     if workspace_id:
         headers["X-Databricks-Workspace-Id"] = workspace_id
-    response = _api_transport(client)(
+    response = api_transport(client)(
         method="POST",
         path=f"/serving-endpoints/{plan.spec.endpoint_name}/invocations",
         body=body,
@@ -366,7 +367,7 @@ def query_named_records(
     return serving.QueryEndpointResponse.from_dict(response)
 
 
-def _validated_rows(
+def validate_named_rows(
     records: Sequence[Mapping[str, Any]], plan: PinnedEndpointPlan
 ) -> list[dict[str, Any]]:
     """Copy named rows after JSON and artifact-schema validation."""
@@ -375,12 +376,12 @@ def _validated_rows(
     ):
         raise ValueError("Serving dataframe_records columns differ from artifact inputs.")
     rows = [dict(row) for row in records]
-    _validate_json_rows(rows)
-    _validate_schema_rows(rows, plan.input_schema)
+    validate_json_rows(rows)
+    validate_schema_rows(rows, plan.input_schema)
     return rows
 
 
-def _validate_json_rows(rows: list[dict[str, Any]]) -> None:
+def validate_json_rows(rows: list[dict[str, Any]]) -> None:
     """Require finite JSON scalars before the SDK sees an inference request."""
     try:
         json.dumps(rows, allow_nan=False)
@@ -390,7 +391,7 @@ def _validate_json_rows(rows: list[dict[str, Any]]) -> None:
         raise ValueError("Serving dataframe_records require scalar values.")
 
 
-def _validate_schema_rows(
+def validate_schema_rows(
     rows: list[dict[str, Any]], input_schema: tuple[tuple[str, str], ...]
 ) -> None:
     """Check every named value against its saved artifact input type."""

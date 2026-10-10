@@ -28,6 +28,12 @@ from ....inference.pipeline_scoring import (
     score_pipeline,
     scoring_output_schema,
 )
+from ...databricks.feature_store.online_policy import (
+    ONLINE_FEATURES_KEY,
+    OnlineFeaturePolicy,
+    saved_online_policy,
+    validate_online_features,
+)
 from ..shared._nullable_transport import (
     TRANSPORT_KEY,
     decode_frame,
@@ -62,12 +68,14 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
         input_transport: dict[str, Any] | None = None,
         safety_certificate: dict[str, Any] | None = None,
         source_sha256: str | None = None,
+        online_policy: OnlineFeaturePolicy | None = None,
     ) -> None:
         """Start unloaded until MLflow provides the saved artifact path."""
         self._artifact: FittedPipelineArtifact | None = None
         self._input_transport = deepcopy(input_transport)
         self._safety_certificate = deepcopy(safety_certificate)
         self._source_sha256 = source_sha256
+        self._online_policy = None if online_policy is None else online_policy.to_dict()
 
     def __getstate__(self) -> dict[str, Any]:
         """Reload saved project classes through context in each fresh process."""
@@ -81,6 +89,17 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
             raise ValueError("MLflow model is missing the local pipeline artifact.") from exc
         self._artifact = load_pipeline(artifact_path)
         self.input_transport()
+        saved_online_policy(
+            getattr(self, "_online_policy", None),
+            dict(
+                zip(
+                    self._artifact.manifest.input_columns,
+                    self._artifact.manifest.input_dtypes,
+                    strict=True,
+                )
+            ),
+            getattr(context, "model_config", None),
+        )
         validate_worker_certificate(
             self._artifact,
             getattr(self, "_safety_certificate", None),
@@ -106,6 +125,17 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfPipelinePythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf local pyfunc requires a pandas DataFrame.")
+        policy = saved_online_policy(
+            getattr(self, "_online_policy", None),
+            dict(
+                zip(
+                    self._artifact.manifest.input_columns,
+                    self._artifact.manifest.input_dtypes,
+                    strict=True,
+                )
+            ),
+        )
+        validate_online_features(model_input, policy)
         spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
         model_input = decode_frame(model_input, self.input_transport())
         model_input = _restore_nullable_dtypes(model_input, self._artifact)
@@ -144,7 +174,11 @@ def log_pipeline_model(
 
 
 def pipeline_model_save_options(
-    artifact: FittedPipelineArtifact, local_path: Path, directory: Path
+    artifact: FittedPipelineArtifact,
+    local_path: Path,
+    directory: Path,
+    *,
+    online_policy: OnlineFeaturePolicy | None = None,
 ) -> dict[str, Any]:
     """Share the exact fitted pyfunc, schema and worker evidence across loggers."""
     transport = transport_spec(
@@ -156,11 +190,19 @@ def pipeline_model_save_options(
     )
     return {
         **options,
-        "python_model": SkyulfPipelinePythonModel(transport, certificate, source_sha256),
+        **(
+            {"model_config": {ONLINE_FEATURES_KEY: online_policy.to_dict()}}
+            if online_policy
+            else {}
+        ),
+        "python_model": SkyulfPipelinePythonModel(
+            transport, certificate, source_sha256, online_policy
+        ),
         "artifacts": {"local_pipeline": str(local_path)},
         "signature": _signature(artifact, spark_certified=certificate is not None),
         "input_example": _input_example(artifact),
         "metadata": {
+            **({ONLINE_FEATURES_KEY: online_policy.to_dict()} if online_policy else {}),
             "skyulf_artifact_kind": "local_pipeline",
             "skyulf_fitted_engine": artifact.manifest.fitted_engine,
             "skyulf_execution_scope": "whole_frame_local",

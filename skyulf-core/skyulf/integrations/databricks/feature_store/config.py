@@ -7,7 +7,9 @@ from typing import Literal
 from ..shared._contracts import column_name, table_name
 
 
-def _columns(value: tuple[str, ...], field: str, *, allow_empty: bool = False) -> None:
+def validate_feature_columns(
+    value: tuple[str, ...], field: str, *, allow_empty: bool = False
+) -> None:
     """Require immutable, distinct column names instead of wildcard selection."""
     if not isinstance(value, tuple) or (not value and not allow_empty):
         raise ValueError(f"{field} must be a tuple of explicit column names.")
@@ -45,11 +47,13 @@ class FeatureLookupSpec:
     def __post_init__(self) -> None:
         """Reject ambiguous output names and invalid temporal lookup settings."""
         validate_uc_name(self.table_name)
-        _columns(self.lookup_key, "lookup_key")
-        _columns(self.feature_names, "feature_names")
+        validate_feature_columns(self.lookup_key, "lookup_key")
+        validate_feature_columns(self.feature_names, "feature_names")
         if self.timestamp_lookup_key is not None:
             column_name(self.timestamp_lookup_key)
-        _columns((*self.lookup_key, *self.feature_names, *self.timestamp_columns), "lookup")
+        validate_feature_columns(
+            (*self.lookup_key, *self.feature_names, *self.timestamp_columns), "lookup"
+        )
         if self.timestamp_type not in ("timestamp", "date"):
             raise ValueError("timestamp_type must be timestamp or date.")
         self._validate_lookback()
@@ -88,8 +92,8 @@ class FeatureTrainingSpec:
             raise ValueError("lookups must be a nonempty tuple of FeatureLookupSpec.")
         if any(not isinstance(item, FeatureLookupSpec) for item in self.lookups):
             raise TypeError("lookups must contain FeatureLookupSpec values.")
-        _columns(self.exclude_columns, "exclude_columns", allow_empty=True)
-        _columns(self.feature_names, "feature_names")
+        validate_feature_columns(self.exclude_columns, "exclude_columns", allow_empty=True)
+        validate_feature_columns(self.feature_names, "feature_names")
         self._validate_label()
         self._validate_lookup_columns()
         self._validate_table_windows()

@@ -111,6 +111,34 @@ def test_config_pins_certified_model_and_inference_logging(spec, resolved, artif
     assert plan.input_columns == ("x",)
 
 
+def test_inference_only_rollout_matches_native_persisted_sinks(spec, resolved, artifact, package):
+    """Native inference telemetry persists only its enabled log sink, not unused sinks."""
+    from skyulf.integrations.databricks.serving import (
+        build_rollout_endpoint,
+        rollout_endpoint_ready,
+    )
+
+    champion = build_pinned_endpoint(
+        spec, resolved=resolved, artifact=artifact, package_info=package
+    )
+    challenger_spec = replace(spec, model_version="8")
+    challenger = build_pinned_endpoint(
+        challenger_spec,
+        resolved=replace(resolved, version="8", model_uri=challenger_spec.model_uri),
+        artifact=artifact,
+        package_info=package,
+    )
+    plan = build_rollout_endpoint(champion, challenger)
+    readback = deepcopy(plan.config)
+    readback["state"] = {"ready": "READY", "config_update": "NOT_UPDATING"}
+    readback["telemetry_config"] = {
+        "table_names": {"logs_table": spec.telemetry_logs_table},
+        "inference_table_config": {"name": spec.inference_table, "sampling_fraction": 1.0},
+        "enabled_telemetry_features": ["TELEMETRY_FEATURE_INFERENCE_TABLE"],
+    }
+    assert rollout_endpoint_ready(readback, plan, challenger_percentage=0)
+
+
 @pytest.mark.parametrize("model_version", ["latest", "@champion", "0", "-1", "1.0"])
 def test_alias_or_nonconcrete_version_rejected(model_version):
     """An endpoint cannot drift with an alias or accept an invalid version."""

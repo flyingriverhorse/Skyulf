@@ -88,6 +88,7 @@ class PinnedEndpointPlan:
     input_columns: tuple[str, ...]
     input_schema: tuple[tuple[str, str], ...]
     output_schema: tuple[tuple[str, str], ...] = ()
+    online_contract: str | None = None
 
 
 def is_uc_identifier(value: Any) -> bool:

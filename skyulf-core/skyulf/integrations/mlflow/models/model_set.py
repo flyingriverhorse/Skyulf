@@ -29,6 +29,12 @@ from ....inference.project_dependencies import (
     parse_project_requirements,
     source_project_requirements,
 )
+from ...databricks.feature_store.online_policy import (
+    ONLINE_FEATURES_KEY,
+    OnlineFeaturePolicy,
+    saved_online_policy,
+    validate_online_features,
+)
 from ..registration.registry import (
     ResolvedModel,
     downloaded_registered_payload,
@@ -68,12 +74,14 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
         input_transport: dict[str, Any] | None = None,
         safety_certificate: dict[str, Any] | None = None,
         source_sha256: str | None = None,
+        online_policy: OnlineFeaturePolicy | None = None,
     ) -> None:
         """Defer loading fitted assets until MLflow supplies package context."""
         self._artifact: ModelSetArtifact | None = None
         self._input_transport = deepcopy(input_transport)
         self._safety_certificate = deepcopy(safety_certificate)
         self._source_sha256 = source_sha256
+        self._online_policy = None if online_policy is None else online_policy.to_dict()
 
     def __getstate__(self) -> dict[str, Any]:
         """Exclude process-local artifact paths and cached fitted objects."""
@@ -87,6 +95,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise ValueError("MLflow model is missing its model set artifact.") from exc
         self._artifact = load_model_set(path)
         self.input_transport()
+        saved_online_policy(
+            getattr(self, "_online_policy", None),
+            {column.name: column.dtype for column in self._artifact.manifest.input_schema},
+            getattr(context, "model_config", None),
+        )
         validate_worker_certificate(
             self._artifact,
             getattr(self, "_safety_certificate", None),
@@ -111,6 +124,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf model set pyfunc requires a pandas DataFrame.")
+        policy = saved_online_policy(
+            getattr(self, "_online_policy", None),
+            {column.name: column.dtype for column in self._artifact.manifest.input_schema},
+        )
+        validate_online_features(model_input, policy)
         spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
         model_input = decode_frame(model_input, self.input_transport())
         model_input = restore_nullable_dtypes(
@@ -147,7 +165,9 @@ def log_model_set(
     return f"runs:/{run_id}/{artifact_path}"
 
 
-def model_set_save_options(artifact: ModelSetArtifact, directory: Path) -> dict[str, Any]:
+def model_set_save_options(
+    artifact: ModelSetArtifact, directory: Path, *, online_policy: OnlineFeaturePolicy | None = None
+) -> dict[str, Any]:
     """Build the identical set wrapper and immutable evidence for every logger."""
     transport = transport_spec(
         (column.name, column.dtype) for column in artifact.manifest.input_schema
@@ -158,10 +178,18 @@ def model_set_save_options(artifact: ModelSetArtifact, directory: Path) -> dict[
     )
     return {
         **options,
-        "python_model": SkyulfModelSetPythonModel(transport, certificate, source_sha256),
+        **(
+            {"model_config": {ONLINE_FEATURES_KEY: online_policy.to_dict()}}
+            if online_policy
+            else {}
+        ),
+        "python_model": SkyulfModelSetPythonModel(
+            transport, certificate, source_sha256, online_policy
+        ),
         "artifacts": {"model_set": str(artifact.directory)},
         "signature": _signature(artifact, spark_certified=certificate is not None),
         "metadata": {
+            **({ONLINE_FEATURES_KEY: online_policy.to_dict()} if online_policy else {}),
             "skyulf_artifact_kind": "model_set",
             "skyulf_execution_scope": "whole_frame_local",
             "model_set_digest": artifact.manifest.set_sha256,

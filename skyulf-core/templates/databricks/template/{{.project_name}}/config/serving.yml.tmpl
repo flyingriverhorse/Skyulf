@@ -1,0 +1,52 @@
+# Optional jobs remain paused until these pins are configured and verified.
+# The rollout must already be initialized; the daily job never creates endpoints.
+rollout:
+  enabled: false
+  # True only when this serialized job has exclusive endpoint and alias write access.
+  exclusive_writer: false
+  run_id: ""
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  comparison_sha256: ""
+  approval:
+    model_name: ""
+    metric: {{if eq .task "classification"}}heldout_accuracy{{else}}heldout_rmse{{end}}
+    min_improvement: 0.0
+    quality_threshold: null
+    quality_gates: null
+    max_rows: 10000
+    max_input_mb: 64
+    tracking_uri: databricks
+    registry_uri: databricks-uc
+  # Named rows matching the pinned request schema; native smoke calls both versions.
+  smoke_records: []
+  health:
+    minimum_requests: 100
+    maximum_error_rate: 0.01
+    maximum_latency_ms: 1000.0
+    minimum_labeled_rows: 30
+    minimum_label_coverage: 0.8
+  monitoring:
+    environment: syst
+    project: {{.project_name}}
+    model_name: ""
+    model_version: ""
+    serving_endpoint: ""
+    # Both names select the same pinned endpoint inference payload table.
+    source_table: ""
+    prediction_table: ""
+    # Labels retain databricks_request_id and request_row_index for request attribution.
+    label_table: ""
+    result_available_at_column: ""
+    execution_engine: spark
+    reference_namespace: ""
+
+online_publication:
+  enabled: false
+  # True only when source/publication writers share externally enforced exclusive access.
+  exclusive_writer: false
+  # Existing latest-value Delta feature table with CDF and NOT NULL primary keys.
+  source_table: ""
+  source_table_id: ""
+  online_table: ""
+  online_store: ""

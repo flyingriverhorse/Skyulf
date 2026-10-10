@@ -18,6 +18,13 @@ self-contained example. Reading UC tables additionally needs an authenticated
 Spark session; MLflow registration needs tracking/registry access. Set explicit
 row and byte limits before reading a source into Python memory.
 
+For REST serving, see [online feature lookup](databricks_online_features.md) to
+package native entity-key lookups with saved completeness and freshness checks.
+See [gradual serving rollout](databricks_serving_rollout.md) to increase a
+challenger's traffic by 10 percentage points per passing 24-hour stage and
+automatically promote it after its final 100% stage passes. The optional Bundle
+jobs start paused and disabled; neither workflow requires a batch prediction sink.
+
 ## Upgrading integration code
 
 Use the purpose-based module, class and function names shown in this guide.
