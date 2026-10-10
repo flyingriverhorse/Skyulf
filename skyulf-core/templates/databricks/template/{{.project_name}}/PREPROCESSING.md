@@ -215,7 +215,7 @@ scoring or serving, and it does not grant Spark/REST eligibility.
 
 The repository's `examples/databricks_raw_serving/config.yml` is a small Core API
 demo. Its Python code passes `pipeline.preprocessing` and `pipeline.modeling`
-directly to `fit_local_workflow`. The Bundle loader deliberately rejects those
+directly to `fit_workflow`. The Bundle loader deliberately rejects those
 nonempty inline definitions in `training.yml`: steps come from
 `config/preprocessing.yml`, and the model comes from `models.<name>.model`.
 Use the placement above for this generated project.

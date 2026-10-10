@@ -12,7 +12,7 @@ defaults:
   config_version: 1
   training_layout: {{.training_layout}}
   engine: {{.engine}}
-  preprocessing_probe: false # Optional saved-preprocessing check; see PREPROCESSING_CONTEXT.md.
+  preprocessing_probe: false # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
   training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
 {{if ne .training_version "null"}}  training_version: {{.training_version}}
 {{end}}  record_key_columns: [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .record_key_columns -1}}{{if $i}}, {{end}}{{printf "%q" $column}}{{end}}]

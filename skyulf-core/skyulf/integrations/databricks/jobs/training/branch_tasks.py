@@ -13,8 +13,7 @@ from ....mlflow.lifecycle.validation import ModelComparisonReport
 from ...lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
 from ...model_sets.model_set_project import package_training_model_set, project_endpoints
 from ...model_sets.model_set_release import pin_model_set_baseline
-from ...training.fitting.local_retraining import LocalCandidateResult
-from ...training.local_branches import (
+from ...training.branches import (
     BranchTrainingResult,
     branch_training_payload,
     log_progress,
@@ -22,7 +21,8 @@ from ...training.local_branches import (
     restore_training_branches,
     train_branch,
 )
-from ...training.shared.local_training_evidence import evidence_digest
+from ...training.fitting.candidate import CandidateResult
+from ...training.shared.training_evidence import evidence_digest
 from ..lifecycle.lifecycle_tasks import record_phase_failure, validate_active_phase
 
 
@@ -178,7 +178,7 @@ def _completed_branches(store: PhaseStore, branches: tuple) -> BranchTrainingRes
         ):
             raise ValueError("Branch result differs from its pinned training task.")
         payload["comparison"] = ModelComparisonReport(**payload["comparison"])
-        completed[name] = LocalCandidateResult(**payload)
+        completed[name] = CandidateResult(**payload)
     first = branches[0].spec
     return BranchTrainingResult(
         store.run_id, first.table, first.version, completed, store.request["plan_sha256"]
@@ -299,3 +299,7 @@ def run_branch_operator(
     except BaseException:
         record_phase_failure(store, "operator")
         raise
+
+
+# Preserve class imports exposed by earlier module paths.
+LocalCandidateResult = CandidateResult

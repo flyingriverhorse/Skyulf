@@ -46,18 +46,18 @@ from ..jobs.shared.job_runtime import (
     read_notebook_config,
     validate_job_parameters,
 )
-from ..lifecycle.local_workflow import bind_target_name, resolve_target_config
+from ..lifecycle.workflow import bind_target_name, resolve_target_config
 from ..projects._project_files import project_source, read_source
 from ..projects.workflow_config import validate_workflow_config
 from ..projects.yaml_config import read_inference_config
-from ..scoring.incremental.local_incremental import (
+from ..scoring.incremental.incremental_batch import (
     bounded_frame,
     latest_source_version,
     validate_source_change_policy,
 )
 from ..shared._contracts import input_budget_bytes
-from ..training.local_branches import BranchTrainingResult, TrainingBranch, branch_training_payload
-from ..training.tuning.local_search import base_model_config
+from ..training.branches import BranchTrainingResult, TrainingBranch, branch_training_payload
+from ..training.tuning.search import base_model_config
 from .model_set_output import publication_policy, publication_views
 
 
@@ -403,7 +403,7 @@ def _log_training_set_package(
         return log_model_set(
             path, run_id=run_id, artifact_path=artifact_path, tracking_uri=tracking_uri
         )
-    from ...mlflow.models.local_feature_model import log_feature_model_set  # noqa: PLC0415
+    from ...mlflow.models.feature_model import log_feature_model_set  # noqa: PLC0415
     from ..feature_store.snapshots import validate_snapshots  # noqa: PLC0415
 
     training_set = model_set_training_set(spark, source, artifact, binding)

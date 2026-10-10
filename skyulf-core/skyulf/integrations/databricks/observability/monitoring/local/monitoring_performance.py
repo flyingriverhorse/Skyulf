@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from functools import partial
 from typing import Any
 
-from ......inference.local_scoring import score_local_pipeline
+from ......inference.pipeline_scoring import score_pipeline as score_local_pipeline
 from ....shared._contracts import table_name
 from ..monitoring_config import MonitorConfig, json_digest, qualified_name
 from ..monitoring_sources import read_current_observation, read_labels

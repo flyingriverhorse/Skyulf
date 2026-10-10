@@ -20,7 +20,7 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 
 if TYPE_CHECKING:
     from ....inference.bundle import InferenceBundle
-    from ....inference.local_pipeline import LocalPipelineArtifact
+    from ....inference.fitted_pipeline import FittedPipelineArtifact
 
 __all__ = [
     "RegistryAccessError",
@@ -31,7 +31,9 @@ __all__ = [
     "ResolvedModel",
     "load_registered_bundle",
     "load_registered_local_pipeline",
+    "load_registered_pipeline",
     "load_run_local_pipeline",
+    "load_run_pipeline",
     "register_model",
     "resolve_model",
 ]
@@ -198,7 +200,7 @@ def downloaded_registered_payload(
             local = _download_registered_entry(
                 mlflow, client, resolved, tracking_uri, package_uri, root
             )
-            from ..models.local_feature_model import feature_package_models  # noqa: PLC0415
+            from ..models.feature_model import feature_package_models  # noqa: PLC0415
 
             outer, _, _ = feature_package_models(local)
             _payload_metadata(outer, key, resolved.digest)
@@ -287,13 +289,13 @@ def load_registered_bundle(
         return bundle
 
 
-def load_registered_local_pipeline(
+def load_registered_pipeline(
     resolved: ResolvedModel,
     *,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
-) -> "LocalPipelineArtifact":
-    """Load a trusted local pipeline from one concrete registered-model version.
+) -> "FittedPipelineArtifact":
+    """Load a trusted fitted pipeline from one concrete registered-model version.
 
     The package's declared artifact path and both digests are checked before the
     fitted pipeline is returned. A digest is an integrity check, not a signature.
@@ -315,12 +317,12 @@ def load_registered_local_pipeline(
         return load_local_package(local_path, model, resolved.digest)
 
 
-def load_run_local_pipeline(
+def load_run_pipeline(
     model_uri: str,
     *,
     digest: str,
     tracking_uri: str | None = None,
-) -> "LocalPipelineArtifact":
+) -> "FittedPipelineArtifact":
     """Load a trusted unregistered run package with the registered loader's checks."""
     _parse_runs_uri(model_uri)
     if not isinstance(digest, str) or not digest.strip():
@@ -334,13 +336,13 @@ def load_run_local_pipeline(
     return load_local_package(Path(local_path), model, digest)
 
 
-def load_local_package(local_path: Path, model: Any, digest: str) -> "LocalPipelineArtifact":
+def load_local_package(local_path: Path, model: Any, digest: str) -> "FittedPipelineArtifact":
     """Validate shared run and registry metadata, contained paths and fitted identity."""
     metadata = _payload_metadata(model, "local_pipeline", digest)
     local_path, model, feature_lookup_json = unwrap_feature_package(local_path, model)
     artifact_path = packaged_artifact_path(Path(local_path), model.flavors, "local_pipeline")
-    from ....inference.local_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
-        load_local_pipeline,
+    from ....inference.fitted_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
+        load_pipeline as load_local_pipeline,
     )
 
     artifact = load_local_pipeline(artifact_path)
@@ -357,7 +359,7 @@ def unwrap_feature_package(local_path: Path, model: Any) -> tuple[Path, Any, str
     if "skyulf_feature_store" not in (model.metadata or {}):
         return local_path, model, None
     from ...databricks.feature_store.lifecycle_config import binding_json  # noqa: PLC0415
-    from ..models.local_feature_model import (  # noqa: PLC0415
+    from ..models.feature_model import (  # noqa: PLC0415
         FEATURE_STORE_KEY,
         feature_package_models,
     )
@@ -590,3 +592,8 @@ def _resolve_version(client: Any, name: str, alias: str | None, version: str | i
             ) from exc
         raise translate_error(exc, name=name, version=str(version or alias)) from exc
     return model_version
+
+
+# Released names remain aliases for imports and stored pickle references.
+load_registered_local_pipeline = load_registered_pipeline
+load_run_local_pipeline = load_run_pipeline

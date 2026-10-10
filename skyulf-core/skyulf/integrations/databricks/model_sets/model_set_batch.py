@@ -37,7 +37,7 @@ from ..scoring.batch.spark_scoring import (
     read_distributed_rows,
     score_distributed_set,
 )
-from ..scoring.incremental.local_incremental import (
+from ..scoring.incremental.incremental_batch import (
     SourceChangeRequiresRebuild,
     bounded_frame,
     check_incremental_bootstrap,

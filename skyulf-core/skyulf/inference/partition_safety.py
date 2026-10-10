@@ -31,8 +31,8 @@ from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
 from . import _partition_trees as batch_trees
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
-from .local_pipeline import LocalPipelineArtifact
-from .local_scoring import prediction_output_schema
+from .fitted_pipeline import FittedPipelineArtifact
+from .pipeline_scoring import prediction_output_schema
 
 _APPLIERS = {
     "SimpleImputer": SimpleImputerApplier,
@@ -83,7 +83,7 @@ def _reject(node: str, reason: str) -> UnsupportedExecutionError:
     return UnsupportedExecutionError(node, "apply", "pandas", reason)
 
 
-def _check_pipeline(artifact: LocalPipelineArtifact) -> None:
+def _check_pipeline(artifact: FittedPipelineArtifact) -> None:
     """Require reviewed orchestration, saved schemas and a pandas fit before inspection."""
     pipeline, manifest = artifact.pipeline, artifact.manifest
     if manifest.format_version != 2:
@@ -120,7 +120,7 @@ def _check_instance_methods(component: Any) -> None:
         raise _reject("pipeline", "Overridden inference methods are unsupported.")
 
 
-def _check_schemas(artifact: LocalPipelineArtifact) -> None:
+def _check_schemas(artifact: FittedPipelineArtifact) -> None:
     """Bind column order and dtype metadata to the fitted inference schemas."""
     try:
         check_fitted_schemas(artifact)
@@ -128,7 +128,7 @@ def _check_schemas(artifact: LocalPipelineArtifact) -> None:
         raise _reject("pipeline", str(exc)) from exc
 
 
-def _check_model(artifact: LocalPipelineArtifact) -> Any:
+def _check_model(artifact: FittedPipelineArtifact) -> Any:
     """Admit only reviewed deterministic estimators and their exact prediction wrappers."""
     estimator = artifact.pipeline.model_estimator
     if type(estimator) is not StatefulEstimator:
@@ -266,7 +266,7 @@ def _steps(engineer: FeatureEngineer) -> tuple[PartitionStepEvidence, ...]:
     return tuple(result)
 
 
-def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> PartitionSafetyEvidence:
+def require_partition_safe_pipeline(artifact: FittedPipelineArtifact) -> PartitionSafetyEvidence:
     """Inspect a loaded trusted artifact and return immutable pandas-worker evidence.
 
     No Spark session, callback or model prediction is invoked. Loaders must first
@@ -274,7 +274,7 @@ def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> Partitio
     the driver certificate. Captured project source alone is not executable
     inference behavior and does not grant or remove node admission.
     """
-    if type(artifact) is not LocalPipelineArtifact:
+    if type(artifact) is not FittedPipelineArtifact:
         raise TypeError("Expected a loaded LocalPipelineArtifact.")
     try:
         return _pipeline_evidence(artifact)
@@ -284,7 +284,7 @@ def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> Partitio
         raise _reject("pipeline", f"Malformed fitted inference state: {exc}") from exc
 
 
-def _pipeline_evidence(artifact: LocalPipelineArtifact) -> PartitionSafetyEvidence:
+def _pipeline_evidence(artifact: FittedPipelineArtifact) -> PartitionSafetyEvidence:
     """Build evidence after admission while keeping malformed metadata fail-closed."""
     _check_pipeline(artifact)
     steps = _steps(artifact.pipeline.feature_engineer)

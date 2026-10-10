@@ -51,7 +51,7 @@ def _spark_dtype(dtype: str) -> str:
 
 def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tuple, str]:
     """Project component inputs and standard outputs without mixing sibling targets."""
-    from skyulf.inference.local_scoring import prediction_output_schema  # noqa: PLC0415
+    from skyulf.inference.pipeline_scoring import prediction_output_schema  # noqa: PLC0415
 
     manifest = artifact.manifest
     inputs = tuple(

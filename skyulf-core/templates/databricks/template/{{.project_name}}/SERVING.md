@@ -201,19 +201,21 @@ and [SQL function creation](https://docs.databricks.com/aws/en/sql/language-manu
 | Row returns errorMessage | Endpoint response/build logs; preserve the failed row for diagnosis. |
 | First invocation is slow | Cold start and endpoint capacity; retry only under your workload's policy. |
 
-## Acceptance status
+## Validate your endpoint
 
-Local tests cover SQL generation, admitted schemas, error-mode contracts and
-deployment guards. Native Databricks acceptance on 2026-10-08 passed matching
-local/REST/SQL predictions for synthetic single, competition-winner and model-set
-regression packages. Nulls, reordered columns, large integer inputs/keys,
-component/composition outputs, duplicate function refusal and strict/captured
-endpoint errors were verified. Temporary acceptance endpoints were then removed.
+Compare direct saved-model, REST and SQL predictions using the same representative
+inputs. Include nulls, reordered named columns, integer limits and keys, and all
+component/composition outputs used by your application. Check strict and captured
+error behavior without treating an error result as a valid prediction.
 
-Before production use, validate your own model and caller identity. Native SQL
-classification probability coverage, separate-principal permission denial,
-scale-to-zero cold starts and sustained load remain outside that acceptance.
-Online monitoring enrollment is documented in [README.md](README.md#pinned-serving-and-online-enrollment).
+Use the actual caller identity to verify access rules. For classification, inspect
+labels and every probability column; for production capacity, measure cold starts,
+scale-to-zero behavior and sustained load. Recipe admission does not establish
+these endpoint-specific properties. Keep the concrete model version and request
+schema fixed during the comparison.
+
+Online monitoring enrollment is documented in
+[README.md](README.md#pinned-serving-and-online-enrollment).
 
 ## Raw-input models and optional prediction tables
 

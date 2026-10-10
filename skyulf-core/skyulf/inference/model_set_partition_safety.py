@@ -3,7 +3,7 @@
 from dataclasses import asdict
 from typing import Any
 
-from .local_pipeline import load_local_pipeline
+from .fitted_pipeline import load_pipeline as load_local_pipeline
 from .model_set import ModelSetArtifact, verify_model_set_files
 from .model_set_scoring import model_set_schema, validate_model_set_composition
 

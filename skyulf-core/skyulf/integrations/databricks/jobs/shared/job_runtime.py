@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from ....mlflow.lifecycle.promotion import AliasChangeReceipt
-from ...lifecycle.local_approval import resolve_candidate_comparison_digest
-from ...lifecycle.local_workflow import BundleActionResult as BundleActionResult
-from ...lifecycle.local_workflow import (
+from ...lifecycle.approval import resolve_candidate_comparison_digest
+from ...lifecycle.workflow import BundleActionResult as BundleActionResult
+from ...lifecycle.workflow import (
     build_bundle_result,
     resolve_target_config,
     run_action,

@@ -12,8 +12,8 @@ from .....mlflow.shared._client import make_registry_client, require_mlflow
 from ....data.delta_io.delta import table_identity
 from ....jobs.shared.notebook_diagnostics import notebook_task
 from ....shared._contracts import table_name
-from ....training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
-from ....training.shared.local_training_evidence import validate_training_evidence
+from ....training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
+from ....training.shared.training_evidence import validate_training_evidence
 from ..local.monitoring_performance import measure_holdout_values, performance_contract
 from ..monitoring_config import MonitorConfig, json_digest, qualified_name
 from ..monitoring_reference import load_monitoring_artifact, reference_document

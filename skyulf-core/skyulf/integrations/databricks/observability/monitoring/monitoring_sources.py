@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from ...data.delta_io.delta import history, table_identity
-from ...scoring.incremental.local_incremental import bounded_frame
+from ...scoring.incremental.incremental_batch import bounded_frame
 from ...shared._contracts import column_name
 from .monitoring_config import MonitorConfig
 

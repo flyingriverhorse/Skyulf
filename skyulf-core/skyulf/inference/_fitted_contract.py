@@ -4,10 +4,10 @@ from typing import Any
 
 from ..core.portable_state import _pack
 from ..pipeline.seal import artifact_digest
-from .local_pipeline import LocalPipelineArtifact
+from .fitted_pipeline import FittedPipelineArtifact
 
 
-def check_fitted_schemas(artifact: LocalPipelineArtifact) -> None:
+def check_fitted_schemas(artifact: FittedPipelineArtifact) -> None:
     """Bind column order and dtype metadata to the saved inference schemas."""
     schemas = artifact.pipeline._inference_schemas
     manifest = artifact.manifest

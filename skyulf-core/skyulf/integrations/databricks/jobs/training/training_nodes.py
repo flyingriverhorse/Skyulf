@@ -6,14 +6,15 @@ from typing import Any
 
 from skyulf.integrations.mlflow.shared._client import require_mlflow
 
-from ....mlflow.registration.registry import load_run_local_pipeline, packaged_artifact_path
+from ....mlflow.registration.registry import load_run_pipeline as load_run_local_pipeline
+from ....mlflow.registration.registry import packaged_artifact_path
 from ...lifecycle._lifecycle_data import training_partitions
 from ...lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
 from ...observability.reports.explanation_report import copy_winner_explanations
+from ...training.competition.competition import choose_winner
 from ...training.competition.competition_training import fit_training_pipeline
-from ...training.competition.local_competition import choose_winner
-from ...training.fitting import local_retraining as training
-from ...training.shared.local_training_evidence import evidence_digest
+from ...training.fitting import candidate as training
+from ...training.shared.training_evidence import evidence_digest
 
 
 def _candidate_phase(store: PhaseStore, name: str) -> str:
@@ -129,7 +130,7 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
     with TemporaryDirectory(prefix="skyulf-winner-adoption-") as directory:
         package = Path(store.client.download_artifacts(winner["run_id"], "model", directory))
         if artifact.feature_lookup_json is not None:
-            from ....mlflow.models.local_feature_model import copy_feature_package  # noqa: PLC0415
+            from ....mlflow.models.feature_model import copy_feature_package  # noqa: PLC0415
 
             return copy_feature_package(
                 package,

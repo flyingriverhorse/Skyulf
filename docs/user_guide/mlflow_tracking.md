@@ -5,7 +5,7 @@ base installation does not import or require MLflow. Install the optional
 extra only for jobs that should create tracking runs:
 
 ```bash
-pip install skyulf-core[mlflow]
+uv pip install "skyulf-core[mlflow]"
 # or, from this repository:
 uv pip install -r requirements-mlflow.txt
 ```
@@ -55,5 +55,22 @@ own run as `FINISHED`; an exception in the training body terminates it as
 `FAILED`.
 
 This adapter creates tracking metadata. See [MLflow models](mlflow_models.md)
-to package a fitted inference bundle in the same run. Registry/Unity Catalog,
-Delta batch publication and Databricks deployment remain later stages.
+to package a fitted pipeline or portable inference bundle in the same run, and
+[MLflow registry](mlflow_registry.md) to register and resolve model versions.
+[Databricks publication](databricks_batch.md) has a separate data-write contract.
+
+## Training preprocessing diagnostics
+
+Candidate training can log a saved-state diagnostic by setting
+`TrainingSpec(..., preprocessing_probe=True)`, or `defaults.preprocessing_probe:
+true` in a generated Bundle's `config/training.yml`. It defaults to off. The
+training run's **Artifacts** tab contains `preprocessing_probe.json`; competition
+and multi-target layouts record it on the run that actually fitted each pipeline.
+The training report displays it under **Preprocessing diagnostics**.
+
+The check uses the saved/reloaded artifact and at most the first 256 holdout rows,
+with an 8 MiB input/output limit. It neither refits nor controls promotion.
+See [preprocessing diagnostics and context](preprocessing_context.md) for the
+runnable example and interpretation of `passed`, `failed`, `requires_context`,
+`not_run` and unsupported empty input. MLflow artifact-write failures retain the
+training workflow's failure policy.

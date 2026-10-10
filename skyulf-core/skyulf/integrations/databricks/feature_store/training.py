@@ -189,7 +189,9 @@ def log_training_feature_model(
     path: Any, *, spark: Any, spec: Any, run_id: str, tracking_uri: str
 ) -> str:
     """Package fitted bytes with the frozen native lookup used to read training rows."""
-    from ...mlflow.models.local_feature_model import log_local_feature_model  # noqa: PLC0415
+    from ...mlflow.models.feature_model import (  # noqa: PLC0415 - optional MLflow boundary
+        log_feature_pipeline_model as log_local_feature_model,
+    )
     from .snapshots import validate_snapshots  # noqa: PLC0415
 
     binding = parse_feature_binding(spec.feature_binding_json)

@@ -143,7 +143,7 @@ def run_models_report_notebook(dbutils: Any, *, display_html: Any = None) -> str
 def _set_score_requested(request: dict, output: dict) -> bool:
     """Use the common handoff policy only for a verified whole-set champion transition."""
     from ....mlflow.lifecycle.promotion import AliasChangeReceipt  # noqa: PLC0415
-    from ...lifecycle.local_workflow import build_bundle_result  # noqa: PLC0415
+    from ...lifecycle.workflow import build_bundle_result  # noqa: PLC0415
 
     action = request["action"]
     receipt = output.get("alias_change" if action == "train" else "receipt")

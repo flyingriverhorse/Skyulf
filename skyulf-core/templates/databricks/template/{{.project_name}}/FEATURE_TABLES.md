@@ -374,9 +374,9 @@ Current limits are explicit:
 - Configure the active MLflow tracking/registry URIs to match the project's
   explicit URIs before native scoring. The SDK downloads the concrete model URI
   in that context; aliases are resolved before execution.
-- Local SDK and Spark checks are separate from native workspace acceptance,
-  which is still pending. SM-21b online-store publication and serving lookup
-  remain disabled. Native-feature monitoring currently supports Spark batch only.
+- Validate native lookup behavior on your own workspace and compute. Online-store
+  publication and serving lookup remain disabled. Native-feature monitoring
+  currently supports Spark batch only.
 
 Platform references: [task dependencies and parallel execution](https://docs.databricks.com/aws/en/jobs/run-if),
 [repairing selected tasks](https://docs.databricks.com/aws/en/jobs/repair-job-failures),

@@ -6,11 +6,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ....mlflow.registration.registry import load_registered_local_pipeline, resolve_model
+from ....mlflow.registration.registry import (
+    load_registered_pipeline as load_registered_local_pipeline,
+)
+from ....mlflow.registration.registry import resolve_model
 from ....mlflow.shared._client import make_registry_client, require_mlflow
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
-from ...training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
-from ...training.shared.local_training_evidence import validate_training_evidence
+from ...training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
+from ...training.shared.training_evidence import validate_training_evidence
 from .monitoring_config import MonitorConfig
 
 

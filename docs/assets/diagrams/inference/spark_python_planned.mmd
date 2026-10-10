@@ -1,7 +1,7 @@
 flowchart TD
     accTitle: Python FE and model inference inside Spark workers
-    accDescr: SM-10 distributes raw batches and applies fitted Python FE and the model inside each worker.
-    status["SM-10: AVAILABLE<br/>python_pipeline supports raw regression"]:::available
+    accDescr: distributes raw batches and applies fitted Python FE and the model inside each worker.
+    status["AVAILABLE<br/>python_pipeline supports raw regression"]:::available
     raw["Distributed Spark input<br/>Raw features + record_key_columns"]:::plain
     subgraph wa["Python worker A"]
         fea["Batch-independent Python FE<br/>Apply saved transformation rules"]:::available

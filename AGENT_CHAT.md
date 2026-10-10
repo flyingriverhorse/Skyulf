@@ -27,16 +27,20 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task215, branch 093, source 00254254. Implementation and reviews complete;
-1,170 distinct local tests passed with static/schema/docs and source hooks.
-Databricks: 1,093 distinct tests passed across two runs with the same wheel.
-First run 580851312882650: 1,091 passed, two failed due to an omitted test extra.
-Approved retry 100608908263263/job504858919108396: SUCCESS, two passed, guide
-passed; added optuna-integration 4.5.0 to the environment, no source change.
-Combined evidence verified against 553 runtime files, 56 assets, five markers,
-collection hashes and the exact retry node IDs. Strict MkDocs passed.
-Evidence: initiatives/spark_and_mlflow/215-preprocessing-completion.md and
-tracked docs/contributing/preprocessing_inference_coverage.md. No push.
+Task216 implementation is now authorized by the user. Previous planning-only
+restriction is superseded; no push. Root coordinates implementation on branch 093.
+Task: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
+It explains preprocessing_probe, proposes purpose-based replacements for
+misleading local names, preserves meaningful locality and saved-model/import
+compatibility, and inventories public integration documentation for a rewrite.
+Internal task history and run evidence belong under initiatives, not public docs.
+All 13 test-file references in the task were checked against the checkout.
+Previous Task215 implementation/native validation is complete; evidence remains
+in initiatives/spark_and_mlflow/215-preprocessing-completion.md.
 
 ## Open messages
-None. Task215 claims are released; final evidence is recorded in the task document.
+Active claims below. Inference domain release and verified results recorded in Task216.
+
+- T216-START | UTC 2026-10-10T11:32:04.1212075Z | root -> all | CLAIM | reply none: Implement approved Task216 with Ponytail and plan execution. Root owns this log, initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md and ignored .cache/t216-* evidence. Inference/MLflow, Databricks names and docs will be delegated with separate exact file claims. Root owns final union/static checks and integration review; agents run focused RED/GREEN only. Existing branch 093 and shared checkout retained for continuation.
+
+- T216-LOCAL-DONE | UTC 2026-10-10T12:01:43.8872196Z | root -> all | RESULT | reply T216-START: All released typing/review evidence recorded in Task216. Final union 930 passed, 1 source-drift failure, 1 missing-pyspark skip; exact frozen-source replay passed, yielding 931 unique local passes and 1 skip. Full Ty/Ruff/format/CCN10/schema/MkDocs pass. All142 reviewed hashes current, staged diff checked. Native wheel576 source files exact;858 packaged node IDs collected in isolation. Root completing source commit then native verification. No push.

@@ -26,8 +26,9 @@ from ._model_set_manifest import (
     validate_components,
     validate_keys,
 )
-from .local_pipeline import load_local_pipeline, read_bounded_artifact
-from .local_scoring import scoring_output_schema
+from .fitted_pipeline import load_pipeline as load_local_pipeline
+from .fitted_pipeline import read_bounded_artifact
+from .pipeline_scoring import scoring_output_schema
 
 _MAX_PACKAGE_BYTES = 256 * 1024 * 1024
 _MAX_MANIFEST_BYTES = 64 * 1024

@@ -12,9 +12,9 @@ from ....inference.project_code import (
     project_source_digest,
 )
 from ....inference.project_scoring import validate_scoring_config
-from ..training.fitting.local_ensemble import ENSEMBLE_MODELS
+from ..training.fitting.ensemble import ENSEMBLE_MODELS
 from ..training.thresholds.decision_thresholds import threshold_policy
-from ..training.tuning.local_search import bounded_space
+from ..training.tuning.search import bounded_space
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
 from ._project_files import modeling_hook, read_source
 from ._project_recipes import bind_recipe_source, recipe_label, recipe_steps

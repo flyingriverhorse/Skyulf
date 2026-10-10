@@ -53,7 +53,7 @@ def render_training_node(client: Any, run_id: str, output: dict) -> str:
     ]
     artifacts = {item.path for item in client.list_artifacts(run_id)}
     for path, title in (
-        ("preprocessing_probe.json", "Preprocessing inference check"),
+        ("preprocessing_probe.json", "Preprocessing diagnostics"),
         ("tuning.json", "Training search"),
         ("cross_validation.json", "Cross-validation results"),
         ("competition_evaluation.json", "Candidate selection evaluation"),

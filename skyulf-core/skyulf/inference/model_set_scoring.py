@@ -12,8 +12,21 @@ import polars as pl
 
 from ._manifest import ColumnSpec
 from ._model_set_operations import apply_operation, validate_operation
-from .local_pipeline import load_local_pipeline, validate_local_input
-from .local_scoring import _preserve_history, local_history_session, score_local_pipeline
+from .fitted_pipeline import (
+    load_pipeline as load_local_pipeline,
+)
+from .fitted_pipeline import (
+    validate_pipeline_input as validate_local_input,
+)
+from .pipeline_scoring import (
+    _preserve_history,
+)
+from .pipeline_scoring import (
+    pipeline_history_session as local_history_session,
+)
+from .pipeline_scoring import (
+    score_pipeline as score_local_pipeline,
+)
 from .project_code import load_project_module
 from .project_scoring import _check_rows, _json_copy, _resolve, _typed_column, _validate_rule
 

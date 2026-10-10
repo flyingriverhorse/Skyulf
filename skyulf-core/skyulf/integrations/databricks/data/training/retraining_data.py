@@ -13,17 +13,17 @@ from typing import Any
 import pandas as pd
 
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
-from ...lifecycle.local_workflow import resolve_training_spec
+from ...lifecycle.workflow import resolve_training_spec
 from ...observability.monitoring.monitoring_config import MonitorConfig
 from ...observability.monitoring.monitoring_reference import load_monitoring_reference
-from ...training.fitting.local_pre_split import FIXED_TYPES
-from ...training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from ...training.fitting.candidate import (
+    TrainingSpec,
     eligible_training_snapshot,
     read_training_partitions,
     training_spec_payload,
     validate_pre_split_step,
 )
+from ...training.fitting.pre_split import FIXED_TYPES
 
 
 def _number(value: Any) -> str:
@@ -64,7 +64,7 @@ def row_identity_counts(frame: pd.DataFrame, columns: list[str]) -> Counter[str]
     return counts
 
 
-def validate_compatible_specs(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> None:
+def validate_compatible_specs(saved: TrainingSpec, current: TrainingSpec) -> None:
     """Prevent automatic comparisons across unrelated training source contracts."""
     fields = (
         "table",
@@ -85,7 +85,7 @@ def validate_compatible_specs(saved: LocalTrainingSpec, current: LocalTrainingSp
         )
 
 
-def _bounded(spec: LocalTrainingSpec, monitor: MonitorConfig) -> LocalTrainingSpec:
+def _bounded(spec: TrainingSpec, monitor: MonitorConfig) -> TrainingSpec:
     """Respect the stricter training or monitoring materialization limits on every read."""
     return replace(
         spec,
@@ -97,10 +97,10 @@ def _bounded(spec: LocalTrainingSpec, monitor: MonitorConfig) -> LocalTrainingSp
 def _baseline_counts(
     spark: Any,
     monitor: MonitorConfig,
-    spec: LocalTrainingSpec,
+    spec: TrainingSpec,
     train: pd.DataFrame,
     engine: str,
-    current: LocalTrainingSpec,
+    current: TrainingSpec,
     current_frame: pd.DataFrame,
 ) -> Counter[str]:
     """Count prior eligible values under both original and current source weights."""
@@ -122,7 +122,7 @@ def _baseline_counts(
     return baseline | row_identity_counts(population, columns)
 
 
-def comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
+def comparison_spec(spec: TrainingSpec) -> TrainingSpec:
     """Keep historical label alternatives without requiring a viable model-fit population."""
     steps = deepcopy(list(spec.pre_split_steps))
     for step in steps:
@@ -146,7 +146,7 @@ def comparison_spec(spec: LocalTrainingSpec) -> LocalTrainingSpec:
     )
 
 
-def filter_weight_columns(saved: LocalTrainingSpec, current: LocalTrainingSpec) -> set[str]:
+def filter_weight_columns(saved: TrainingSpec, current: TrainingSpec) -> set[str]:
     """Find declared source weights read by the original eligibility recipe."""
     weights = {
         column.casefold()
@@ -164,7 +164,7 @@ def filter_weight_columns(saved: LocalTrainingSpec, current: LocalTrainingSpec) 
 
 
 def _population_counts(
-    spec: LocalTrainingSpec, train: pd.DataFrame, holdout: pd.DataFrame
+    spec: TrainingSpec, train: pd.DataFrame, holdout: pd.DataFrame
 ) -> Counter[str]:
     """Treat random holdout as seen, but retain the original temporal training boundary."""
     population = train if spec.split_strategy == "temporal" else pd.concat([train, holdout])
@@ -249,3 +249,7 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
         "source_version": current.version,
         "baseline_model_version": evidence["model_version"],
     }
+
+
+# Preserve class imports exposed by earlier module paths.
+LocalTrainingSpec = TrainingSpec

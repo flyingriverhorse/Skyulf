@@ -18,7 +18,12 @@ from skyulf.integrations.mlflow.shared._model_metadata import (
     scrub_local_artifact_uri,
 )
 
-from ....inference.local_pipeline import load_local_pipeline, read_bounded_artifact
+from ....inference.fitted_pipeline import (
+    load_pipeline as load_local_pipeline,
+)
+from ....inference.fitted_pipeline import (
+    read_bounded_artifact,
+)
 from ....inference.model_set import ModelSetArtifact, load_model_set
 from ....inference.model_set_scoring import model_set_output_schema, predict_model_set
 from ....inference.project_code import MAX_PROJECT_SOURCE_BYTES
@@ -54,7 +59,7 @@ from ..spark.spark_model import (
     optional_partition_certificate,
     validate_worker_certificate,
 )
-from .local_model import pip_requirements, validate_local_destination
+from .pipeline_model import pip_requirements, validate_local_destination
 
 
 class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):

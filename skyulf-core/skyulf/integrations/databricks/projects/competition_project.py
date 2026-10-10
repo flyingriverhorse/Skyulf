@@ -15,8 +15,8 @@ from ..training.competition.competition_evaluation import (
     competition_metric,
     validate_competition_preprocessing,
 )
-from ..training.tuning.local_cv import LocalCVSpec
-from ..training.tuning.local_search import base_model_config
+from ..training.tuning.cv import CVSpec
+from ..training.tuning.search import base_model_config
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
 from ._project_files import modeling_hook, read_source, renamed_modeling_hook
 from .project import resolve_project_workflow, strict_json_value, validate_project_steps
@@ -28,7 +28,7 @@ from .yaml_recipes import feature_project_source
 _CANDIDATE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 
 
-def _competition_settings(config: dict[str, Any]) -> tuple[LocalCVSpec, str, int]:
+def _competition_settings(config: dict[str, Any]) -> tuple[CVSpec, str, int]:
     """Require shared CV and bounded candidate/trial limits without coercion."""
     if config.get("training_layout") != "model_competition":
         raise ValueError("Competition requires training_layout=model_competition.")
@@ -43,7 +43,7 @@ def _competition_settings(config: dict[str, Any]) -> tuple[LocalCVSpec, str, int
         if type(value) is not int or not minimum <= value <= maximum:
             raise ValueError(f"{field} must be an integer from {minimum} to {maximum}.")
     metric = competition_metric(config.get("metric", ""), config.get("task", ""))
-    return LocalCVSpec.from_workflow(config), metric, config.get("competition_max_candidates", 8)
+    return CVSpec.from_workflow(config), metric, config.get("competition_max_candidates", 8)
 
 
 def _candidate_mapping(value: Any, limit: int) -> dict[str, Any]:
@@ -83,7 +83,7 @@ def _bind_candidate_metric(pipeline: dict[str, Any], metric: str) -> None:
 
 
 def _validate_candidate_pipeline(
-    pipeline: dict[str, Any], config: dict[str, Any], cv: LocalCVSpec, metric: str
+    pipeline: dict[str, Any], config: dict[str, Any], cv: CVSpec, metric: str
 ) -> None:
     """Validate task, preprocessing and authoritative CV without mutating saved recipes."""
     if set(pipeline) & WORKFLOW_FIELDS:
@@ -188,3 +188,7 @@ def _competition_source(source: str) -> str:
         "if callable(getattr(_skyulf_common_module, 'build_pre_split_steps', None)):\n"
         "    build_pre_split_steps = _skyulf_common_module.build_pre_split_steps\n"
     )
+
+
+# Preserve class imports exposed by earlier module paths.
+LocalCVSpec = CVSpec

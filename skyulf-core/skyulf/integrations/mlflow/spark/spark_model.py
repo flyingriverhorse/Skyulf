@@ -6,10 +6,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from ....inference.local_pipeline import LocalPipelineArtifact
-from ....inference.local_scoring import scoring_output_schema
+from ....inference.fitted_pipeline import FittedPipelineArtifact
 from ....inference.model_set import ModelSetArtifact
 from ....inference.model_set_scoring import model_set_output_schema
+from ....inference.pipeline_scoring import scoring_output_schema
 from ...databricks.feature_store.scoring import (
     feature_binding,
     feature_source_columns,
@@ -35,7 +35,7 @@ SOURCE_KEY = "skyulf_runtime_source_sha256"
 
 
 def partition_safety_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> dict[str, Any]:
     """Inspect the loaded payload and detach JSON-compatible certificate evidence."""
     from ....inference.model_set_partition_safety import (  # noqa: PLC0415
@@ -43,7 +43,7 @@ def partition_safety_certificate(
     )
     from ....inference.partition_safety import require_partition_safe_pipeline  # noqa: PLC0415
 
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         evidence = asdict(require_partition_safe_pipeline(artifact))
     elif isinstance(artifact, ModelSetArtifact):
         evidence = require_partition_safe_model_set(artifact)
@@ -53,7 +53,7 @@ def partition_safety_certificate(
 
 
 def optional_partition_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> dict[str, Any] | None:
     """Add inspected evidence to new packages without narrowing existing local logging."""
     try:
@@ -68,7 +68,7 @@ def runtime_source_digest() -> str:
 
 
 def validate_worker_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     certificate: dict[str, Any] | None,
     source_sha256: str | None,
 ) -> None:
@@ -81,9 +81,9 @@ def validate_worker_certificate(
         raise ValueError("Spark worker runtime source differs from the packaged source.")
 
 
-def _contract(artifact: LocalPipelineArtifact | ModelSetArtifact) -> tuple[list, tuple]:
+def _contract(artifact: FittedPipelineArtifact | ModelSetArtifact) -> tuple[list, tuple]:
     """Return ordered artifact inputs and every declared prediction output."""
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         inputs = list(
             zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
         )
@@ -122,7 +122,7 @@ def _validate_columns(frame: Any, inputs: list, keys: tuple[str, ...], outputs: 
 
 
 def _validate_model_keys(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     keys: tuple[str, ...],
     inputs: list,
     outputs: tuple,
@@ -184,7 +184,7 @@ def _scoring_package(artifact: Any, path: str, package: Any) -> Any:
         raise ValueError("Pinned package feature lookup differs from the loaded artifact binding.")
     if binding is None:
         return package
-    from ..models.local_feature_model import feature_package_models  # noqa: PLC0415
+    from ..models.feature_model import feature_package_models  # noqa: PLC0415
 
     outer, raw, _ = feature_package_models(path)
     if outer.metadata.get("skyulf_feature_store") != binding:
@@ -291,7 +291,7 @@ def predict_spark_pyfunc(
     frame: Any,
     *,
     model_uri: str,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     record_key_columns: tuple[str, ...],
     env_manager: str,
     prediction_batch_rows: int = DEFAULT_PREDICTION_BATCH_ROWS,

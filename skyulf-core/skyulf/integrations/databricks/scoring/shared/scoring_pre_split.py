@@ -12,7 +12,7 @@ from .....inference.project_code import (
     project_step_source,
 )
 from .....preprocessing.function_steps import FILTER_STEP, resolve_function
-from ...training.fitting.local_pre_split import FIXED_TYPES, projected_fixed_steps
+from ...training.fitting.pre_split import FIXED_TYPES, projected_fixed_steps
 
 
 def resolve_pre_split_scoring(
@@ -48,7 +48,7 @@ def resolve_pre_split_scoring(
 
 def _step_columns(step: dict[str, Any], target: str) -> list[str]:
     """Use the existing admission rules so scoring cannot admit learned pre-split steps."""
-    from ...training.fitting.local_retraining import (  # noqa: PLC0415 - preserve lazy dependency boundary
+    from ...training.fitting.candidate import (  # noqa: PLC0415 - preserve lazy dependency boundary
         validate_pre_split_step,
     )
 
@@ -166,7 +166,7 @@ def _saved_filter_owner(module: Any, custom: list[dict[str, Any]]) -> Any:
 
 def pre_split_exclusion_reasons(frame: pd.DataFrame, config: dict[str, Any]) -> pd.Series:
     """Run the saved recipe on a copy and report the first step excluding each position."""
-    from ...training.fitting.local_retraining import (  # noqa: PLC0415 - avoid import cycle
+    from ...training.fitting.candidate import (  # noqa: PLC0415 - avoid import cycle
         apply_pre_split_step,
     )
 

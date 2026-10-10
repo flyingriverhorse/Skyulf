@@ -7,10 +7,11 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ....inference.local_pipeline import LocalPipelineArtifact, load_local_pipeline
-from ....inference.local_scoring import scoring_output_schema
+from ....inference.fitted_pipeline import FittedPipelineArtifact
+from ....inference.fitted_pipeline import load_pipeline as load_local_pipeline
 from ....inference.model_set import ModelSetArtifact, load_model_set
 from ....inference.model_set_scoring import model_set_output_schema
+from ....inference.pipeline_scoring import scoring_output_schema
 from ...mlflow.registration.registry import (
     ResolvedModel,
     download_registered_package,
@@ -28,10 +29,10 @@ from .contracts import PinnedEndpointPlan, PinnedEndpointSpec
 
 
 def _artifact_schema(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> tuple[list[tuple[str, str]], tuple[Any, ...]]:
     """Read exact saved input and output fields from a fitted artifact."""
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         return (
             list(zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)),
             tuple(scoring_output_schema(artifact)),
@@ -47,7 +48,7 @@ def _artifact_schema(
 def _validate_identity(
     spec: PinnedEndpointSpec,
     resolved: ResolvedModel,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     metadata: Mapping[str, Any],
     certificate: dict[str, Any],
 ) -> None:
@@ -58,7 +59,7 @@ def _validate_identity(
         resolved.model_uri,
     ) != (spec.model_name, spec.model_version, spec.model_uri):
         raise ValueError("resolved registry model differs from the endpoint selector.")
-    local = isinstance(artifact, LocalPipelineArtifact)
+    local = isinstance(artifact, FittedPipelineArtifact)
     digest_key = "pipeline_sha256" if local else "model_set_sha256"
     metadata_key = "local_pipeline_digest" if local else "model_set_digest"
     digest = certificate[digest_key]
@@ -113,7 +114,7 @@ def build_pinned_endpoint(
     spec: PinnedEndpointSpec,
     *,
     resolved: ResolvedModel,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     package_info: Any,
 ) -> PinnedEndpointPlan:
     """Build a credential-free config from one inspected concrete registry package.
@@ -450,3 +451,7 @@ def _valid_integer(value: Any, bits: int, *, encoded: bool) -> bool:
             return False
         number = value
     return -(2 ** (bits - 1)) <= number < 2 ** (bits - 1)
+
+
+# Preserve class imports exposed by earlier module paths.
+LocalPipelineArtifact = FittedPipelineArtifact

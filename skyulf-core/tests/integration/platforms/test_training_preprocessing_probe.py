@@ -133,7 +133,7 @@ def test_training_probe_logs_real_saved_apply_and_report(
                 "candidate_training_spec.json",
             )
             html = render_training_node(run.client, run.run_id, {})
-            assert "Preprocessing inference check" in html and "diagnostic_only" in html
+            assert "Preprocessing diagnostics" in html and "diagnostic_only" in html
         assert fitted.training_rows == 1120 and fitted.holdout_rows == 280
 
 

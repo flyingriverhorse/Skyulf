@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ..fitting.local_ensemble import ENSEMBLE_MODELS
-from ..tuning.local_search import base_model_config
-from ..tuning.local_search_results import parameter_preview
+from ..fitting.ensemble import ENSEMBLE_MODELS
+from ..tuning.search import base_model_config
+from ..tuning.search_results import parameter_preview
 
 if TYPE_CHECKING:
-    from .....inference.local_pipeline import LocalPipelineArtifact
-    from ..fitting.local_retraining import LocalTrainingSpec
+    from .....inference.fitted_pipeline import FittedPipelineArtifact
+    from ..fitting.candidate import TrainingSpec
 
 
 def _parameter_value(value: Any) -> Any:
@@ -51,7 +51,7 @@ def _ensemble_parameters(model: Any, selected: dict[str, Any]) -> dict[str, Any]
     return params
 
 
-def _split_parameters(spec: LocalTrainingSpec) -> dict[str, Any]:
+def _split_parameters(spec: TrainingSpec) -> dict[str, Any]:
     """Expose only active split controls; temporal membership uses explicit UTC boundaries."""
     params: dict[str, Any] = {"strategy": spec.split_strategy, "group_column": spec.group_column}
     if spec.split_strategy == "random":
@@ -75,8 +75,8 @@ def _preview(value: Any, section: str) -> str:
 
 def log_training_parameters(
     run: Any,
-    artifact: LocalPipelineArtifact,
-    spec: LocalTrainingSpec,
+    artifact: FittedPipelineArtifact,
+    spec: TrainingSpec,
     config: dict[str, Any],
 ) -> None:
     """Persist comparison-friendly parameters with complete JSON summaries beside them.

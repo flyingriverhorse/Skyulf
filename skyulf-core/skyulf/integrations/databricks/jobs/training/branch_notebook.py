@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .....inference.project_code import load_project_module
-from ...lifecycle.local_workflow import resolve_target_config
+from ...lifecycle.workflow import resolve_target_config
 from ...model_sets.model_set_project import (
     capture_set_rules,
     load_project_model_set,
@@ -175,9 +175,11 @@ def run_branch_training_notebook(
         settings, champion_versions = pin_model_set_baseline(
             settings, configs, project_endpoints(next(iter(configs.values())))
         )
-    from ...training.local_branches import (  # noqa: PLC0415 - load training services after preflight
+    from ...training.branches import (  # noqa: PLC0415 - load training services after preflight
         prepare_training_branches,
-        train_local_branches,
+    )
+    from ...training.branches import (  # noqa: PLC0415 - load after preflight
+        train_branches as train_local_branches,
     )
 
     branches = prepare_training_branches(spark, configs, champion_versions=champion_versions)

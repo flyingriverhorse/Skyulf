@@ -5,11 +5,15 @@ file ownership, execution order and troubleshooting. This page is the detailed
 reference for lifecycle and model configuration.
 
 Skyulf 0.9.2 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
-compute. Training and preprocessing fit locally in pandas or Polars. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses the selected local engine.{{end}}
+compute. Training and preprocessing fit in one bounded Python process on this compute. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses a bounded frame in the saved pandas/Polars engine.{{end}}
 
 ## Inference mode and capacity
 
-The setup choice is `inference_mode={{.inference_mode}}`. Estimate the rows and
+The setup choice is `inference_mode={{.inference_mode}}`. Here `local` means
+whole-frame scoring, including on Databricks compute. The separate SDK
+`runtime="local"` value selects integration behavior and does not detect machine
+location; UC Delta publication requires `runtime="databricks"`. `engine` chooses
+pandas or Polars. Estimate the rows and
 bytes in **each scoring run** and the memory available to the selected compute.
 There is no universal row threshold for Spark. Local inference uses the configured
 `max_rows` and `max_input_mb` bounds. Spark inference distributes scoring through
@@ -42,6 +46,19 @@ or incoming Arrow allocation. Databricks manages Arrow transport; serverless
 does not permit changing its Arrow batch configuration. An environment failure
 stops scoring without changing the selected manager.
 {{end}}
+
+## Preprocessing diagnostics
+
+Set `defaults.preprocessing_probe: true` in `config/training.yml` to inspect
+saved preprocessing after fitting. It defaults to `false`. Each fitting run uses
+the saved/reloaded artifact and at most the first 256 holdout rows, with an 8 MiB
+input/output limit, and logs `preprocessing_probe.json` to MLflow.
+
+Open the fitting run's **Artifacts** tab or **Preprocessing diagnostics** in the
+training report. A step requiring group/window/global context can report
+`requires_context`, with later steps `not_run`. This does not refit, measure model
+quality or change promotion policy. Read [PREPROCESSING_CONTEXT.md](PREPROCESSING_CONTEXT.md)
+for a runnable example, all statuses and explicit lag/rolling continuation.
 
 ## Configure the project
 

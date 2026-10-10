@@ -31,10 +31,12 @@ from ..registration.registry import (
 )
 from .validation import (
     ModelComparisonReport,
-    compare_registered_local_models,
     comparison_digest,
     quality_gate_results,
     quality_gates_pass,
+)
+from .validation import (
+    compare_registered_pipeline_models as compare_registered_local_models,
 )
 
 _ALIAS = "champion"

@@ -2,7 +2,7 @@
 
 This executes trusted model code on a bounded sample. Passing observations are
 not partition admission, a sandbox, or proof for unobserved inputs. Load models
-through load_local_pipeline first to verify their packages and payload checksums.
+through load_pipeline first to verify their packages and payload checksums.
 """
 
 from copy import deepcopy
@@ -28,7 +28,8 @@ from ._probe_frames import (
     slice_frame,
     validate_frame,
 )
-from .local_pipeline import LocalPipelineArtifact, validate_local_input
+from .fitted_pipeline import FittedPipelineArtifact
+from .fitted_pipeline import validate_pipeline_input as validate_local_input
 
 
 def _state_digest(record: dict) -> str:
@@ -222,7 +223,7 @@ def _probe_checks(
     return detail, transformed
 
 
-def _records(artifact: LocalPipelineArtifact) -> list[tuple[dict, dict, bool]]:
+def _records(artifact: FittedPipelineArtifact) -> list[tuple[dict, dict, bool]]:
     """Bind fitted ordering to recipes and reuse the engineer's actual prediction skips."""
     engineer = artifact.pipeline.feature_engineer
     if artifact_digest(artifact.pipeline.config.get("preprocessing", [])) != artifact_digest(
@@ -242,9 +243,9 @@ def _records(artifact: LocalPipelineArtifact) -> list[tuple[dict, dict, bool]]:
     ]
 
 
-def _validate_artifact(artifact: LocalPipelineArtifact) -> None:
+def _validate_artifact(artifact: FittedPipelineArtifact) -> None:
     """Require the standard loaded pipeline and local schema contract."""
-    if type(artifact) is not LocalPipelineArtifact:
+    if type(artifact) is not FittedPipelineArtifact:
         raise TypeError("Expected a loaded LocalPipelineArtifact.")
     if (
         type(artifact.pipeline) is not SkyulfPipeline
@@ -261,7 +262,7 @@ def _validate_artifact(artifact: LocalPipelineArtifact) -> None:
     check_fitted_schemas(artifact)
 
 
-def _finish(report: dict, artifact: LocalPipelineArtifact, frame: Frame) -> dict:
+def _finish(report: dict, artifact: FittedPipelineArtifact, frame: Frame) -> dict:
     """Compare the actual final feature schema with the saved model input schema."""
     if report["status"] != "passed":
         report["feature_schema"] = "not_run"
@@ -280,7 +281,7 @@ def _finish(report: dict, artifact: LocalPipelineArtifact, frame: Frame) -> dict
 
 
 def probe_fitted_preprocessing(
-    artifact: LocalPipelineArtifact,
+    artifact: FittedPipelineArtifact,
     sample: Frame,
     *,
     chunk_sizes: tuple[int, ...] = (1, 2, 7),
@@ -295,7 +296,7 @@ def probe_fitted_preprocessing(
     probe. Unknown custom steps may pass samples but remain unverified for remote
     admission. Empty-input exceptions are reported as not_supported.
 
-    Load the artifact with load_local_pipeline first; this diagnostic does not
+    Load the artifact with load_pipeline first; this diagnostic does not
     repeat disk/package verification. Trusted callbacks can access globals or
     external services: copies and budgets are not a code sandbox or time limit.
     Frames must contain immutable scalar cells. Budgets apply per input/output

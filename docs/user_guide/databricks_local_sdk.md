@@ -1,20 +1,49 @@
-# Local-engine SDK for Databricks jobs
+# Databricks Python SDK: training and bounded scoring
 
-The first local workflow runs pandas or Polars feature engineering and a fitted
-scikit-learn model **inside one Python process**. `runtime="databricks"` means
-that process may be a Databricks job task; it does not switch inference to Spark.
-The same code also runs with `runtime="local"`. No Bundle project or
-`databricks.yml` is needed to use this SDK.
+Use the SDK to train, save, evaluate and score fitted pandas/Polars pipelines
+from Python, including inside a Databricks driver or serverless job. A generated
+Bundle is optional. Training and whole-frame scoring run in one Python process;
+Spark can read the pinned Delta source and publish the resulting predictions.
 
-SM-25 provides configuration, artifact selection and preflight. It accepts a
-caller-owned, bounded pandas/Polars frame and returns predictions. SM-24a adds
-an explicit, versioned UC Delta source reader for selected-period local batches.
-SM-15L publishes an explicitly selected period to UC Delta. The separate
-incremental runner below discovers new source inserts automatically.
+Three independent choices determine the workflow:
+
+| Setting | What it selects |
+| --- | --- |
+| `runtime="local"` or `"databricks"` | Integration behavior. No machine or geographic location is detected; `local` can run on cloud compute. UC Delta publication requires `databricks`. |
+| `engine="pandas"` or `"polars"` | The DataFrame engine for training and whole-frame scoring. It must match the saved pipeline. |
+| Bundle `inference_mode="local"` or `"spark"` | Bounded whole-frame scoring or distributed worker scoring. Spark scoring has separate fitted-recipe admission checks. |
+
+Start with [fit and score a small batch](#fit-and-score-a-small-batch) for a
+self-contained example. Reading UC tables additionally needs an authenticated
+Spark session; MLflow registration needs tracking/registry access. Set explicit
+row and byte limits before reading a source into Python memory.
+
+## API names and existing artifacts
+
+Use purpose-based names in new code. Previous public names and their hierarchical
+module paths remain compatibility aliases to the same implementations/classes;
+existing saved artifacts do not need a naming migration.
+
+| Previous name | Current name |
+| --- | --- |
+| `LocalTrainingSpec`, `LocalCandidateResult`, `train_local_candidate` | `TrainingSpec`, `CandidateResult`, `train_candidate` |
+| `LocalWorkflowConfig`, `PreparedLocalWorkflow`, `prepare_local_workflow` | `WorkflowConfig`, `PreparedWorkflow`, `prepare_workflow` |
+| `LocalSourceSpec`, `fit_local_workflow`, `score_local_source` | `SourceSpec`, `fit_workflow`, `score_source` |
+| `LocalCVSpec`, `preflight_local` | `CVSpec`, `preflight` |
+| `LocalPipelineArtifact`, `LocalPipelineManifest` | `FittedPipelineArtifact`, `FittedPipelineManifest` |
+| `save_local_pipeline`, `load_local_pipeline`, `predict_local_pipeline` | `save_pipeline`, `load_pipeline`, `predict_pipeline` in `skyulf.inference.fitted_pipeline` |
+| `score_local_pipeline`, `score_local_pipeline_with_history`, `LocalPrediction` | `score_pipeline`, `score_pipeline_with_history`, `PipelinePrediction` in `skyulf.inference.pipeline_scoring` |
+| `log_local_model` | `log_pipeline_model` in `skyulf.integrations.mlflow.models.pipeline_model` |
+| `run_local_batch`, `run_incremental_local_batch` | `run_frame_batch`, `run_incremental_batch` |
+
+Persisted values such as `kind="local_pipeline"`, `mode="local_pipeline"` and
+`execution_scope="whole_frame_local"` remain unchanged. Keep existing serialized
+configuration values; Python naming does not change execution admission, payload
+checks or resource budgets. Portable bundles continue to use `predict_local`.
 
 ## Train a candidate when labels are ready
 
-`train_local_candidate` reads a **specific Delta table version**, filters a
+`train_candidate` reads a **specific Delta table version**, filters a
 bounded event window in Spark when temporal splitting is selected. Random
 splitting uses Core `DataSplitter` on stable record-key order and needs no dates.
 Optional availability filtering excludes unknown results and those after the
@@ -27,9 +56,9 @@ model version but never assigns `@challenger` or `@champion`.
 
 ```python
 from datetime import UTC, datetime
-from skyulf.integrations.databricks import LocalTrainingSpec, train_local_candidate
+from skyulf.integrations.databricks import TrainingSpec, train_candidate
 
-spec = LocalTrainingSpec(
+spec = TrainingSpec(
     table="catalog.schema.labeled_events", version=12,
     split_strategy="temporal", filter_unavailable_results=True,
     result_cutoff=datetime(2026, 3, 15, tzinfo=UTC),
@@ -40,12 +69,12 @@ spec = LocalTrainingSpec(
     record_key_columns=("event_id",), input_columns=("feature_a", "feature_b"),
     target_column="target", max_rows=10_000, max_bytes=32_000_000,
 )
-result = train_local_candidate(
+result = train_candidate(
     spark, spec, pipeline_config,
     model_name="catalog.schema.customer_model",
     tracking_uri="databricks", registry_uri="databricks-uc",
-    experiment_name="/Users/me/customer-model", run_name="candidate-2026-03",
-    artifact_path="/tmp/customer-model", metric="heldout_rmse",
+    experiment_name="/Shared/customer-model", run_name="candidate-2026-03",
+    artifact_path="artifacts/customer-model", metric="heldout_rmse",
     min_improvement=0.05, engine="polars",
     champion_version="7",  # Pin this concrete version before the job starts.
 )
@@ -91,7 +120,7 @@ for examples, boundaries, supported directives and distributed validation cost.
 For a table without dates, create the same specification with no time fields:
 
 ```python
-spec = LocalTrainingSpec(
+spec = TrainingSpec(
     table="catalog.schema.labeled_customers", version=12,
     record_key_columns=("customer_id",), input_columns=("income", "age"),
     target_column="target", max_rows=10_000, max_bytes=32_000_000,
@@ -99,7 +128,7 @@ spec = LocalTrainingSpec(
 )
 ```
 
-Pass this spec to the same `train_local_candidate` call above with either fit
+Pass this spec to the same `train_candidate` call above with either fit
 engine. All targets must be known. Enable `filter_unavailable_results` and set
 `result_available_at_column` plus `result_cutoff` if outcomes arrive later;
 random splitting still needs no observation timestamp. The returned candidate
@@ -109,14 +138,14 @@ for the four supported combinations.
 
 ## Fit and score a small batch
 
-Candidate training also accepts `cv=LocalCVSpec(enabled=True, folds=3)` from
-`skyulf.integrations.databricks.training.tuning.local_cv`. It reuses Core CV on training rows,
+Candidate training also accepts `cv=CVSpec(enabled=True, folds=3)` from
+`skyulf.integrations.databricks.training.tuning.cv`. It reuses Core CV on training rows,
 refits preprocessing per fold and logs a separate report to the candidate's
 MLflow run. Use `method="stratified_k_fold"` for classification; time-series CV
 requires an explicit event window and `shuffle=False`. The saved final pipeline
 and its protected holdout are independent of the fold fits.
 
-`LocalTrainingSpec(training_sample_rows=10_000, training_sample_seed=42, ...)`
+`TrainingSpec(training_sample_rows=10_000, training_sample_seed=42, ...)`
 opts into seeded Spark-side selection before local transfer. The limit includes
 training and final holdout rows and cannot exceed `max_rows`. Sample membership
 is pinned for approval replay. Leaving it null preserves overflow-fail behavior.
@@ -124,8 +153,8 @@ See [Bundle CV, sampling and selection](databricks_bundle.md#optional-basic-mode
 for full contracts and the Bundle's `train` calendar settings. The Bundle uses
 the same action for manual and scheduled runs: null source version resolves
 latest once, explicit version pins the snapshot, and rolling windows derive at
-invocation. The direct `train_local_candidate` API still takes a concrete
-`LocalTrainingSpec` with its source version and any active date boundaries.
+invocation. The direct `train_candidate` API still takes a concrete
+`TrainingSpec` with its source version and any active date boundaries.
 
 Install the same `skyulf-core`, pandas, Polars and scikit-learn versions in the
 training and scoring environments. The local artifact records those versions,
@@ -136,10 +165,10 @@ only load packages from your own controlled producer.
 import pandas as pd
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import save_local_pipeline
+from skyulf.inference.fitted_pipeline import save_pipeline
 from skyulf.integrations.databricks import (
-    InputSource, LocalWorkflowConfig, ModelSelection, OutputSink,
-    prepare_local_workflow,
+    InputSource, WorkflowConfig, ModelSelection, OutputSink,
+    prepare_workflow,
 )
 from skyulf.pipeline import SkyulfPipeline
 
@@ -155,16 +184,16 @@ pipeline.fit(
     SplitDataset(train=train.iloc[:5], test=train.iloc[5:]),
     target_column="target",
 )
-save_local_pipeline(pipeline, "/tmp/customer-model")
+save_pipeline(pipeline, "artifacts/customer-model")
 
-config = LocalWorkflowConfig(
-    runtime="databricks",  # or "local" on a workstation
+config = WorkflowConfig(
+    runtime="local",       # integration selection; does not detect machine location
     engine="pandas",       # must match the recorded fit engine
     source=InputSource(kind="caller_frame", max_rows=10_000, max_bytes=32_000_000),
-    model=ModelSelection(kind="local_pipeline", path="/tmp/customer-model"),
+    model=ModelSelection(kind="local_pipeline", path="artifacts/customer-model"),
     sink=OutputSink(kind="return_frame"),
 )
-prepared = prepare_local_workflow(config)
+prepared = prepare_workflow(config)
 query = pd.DataFrame({"x": [7.0, 8.0]})
 predictions = prepared.predict(query)
 assert prepared.preflight.feature_order == ("x",)
@@ -173,7 +202,7 @@ print(predictions)
 
 The example uses a path within one process. A Databricks job's temporary path
 is not a cross-job model store. For separate training and scoring jobs, log the
-artifact with `log_local_model`, register that run model explicitly, then select
+artifact with `log_pipeline_model`, register that run model explicitly, then select
 the registered version in scoring. An alias is read once and converted to a
 concrete `models:/name/version` reference; later alias changes cannot alter the
 already prepared predictor.
@@ -189,39 +218,39 @@ selection = ModelSelection(
     registry_uri=registry_uri,
 )
 config = config.model_copy(update={"model": selection})
-prepared = prepare_local_workflow(config)  # read-only registry resolution and load
+prepared = prepare_workflow(config)  # read-only registry resolution and load
 print(prepared.preflight.model_version, prepared.preflight.model_digest)
 ```
 
 Obtain `tracking_uri` and `registry_uri` from your job's non-secret settings;
 authenticate through the runtime's credential provider. Do not put tokens or
 passwords into config or store URIs. Registering or changing an alias is a
-separate, explicit operation. The local SDK never promotes a model.
+separate, explicit operation. Preparing or scoring a workflow never promotes a model; lifecycle actions are explicit.
 
 ## Preflight and custom pipelines
 
-`LocalWorkflowConfig` is frozen, serializable and has no implicit source
-snapshot, period or promotion decision. `preflight_local(config, artifact=...)`
+`WorkflowConfig` is frozen, serializable and has no implicit source
+snapshot, period or promotion decision. `preflight(config, artifact=...)`
 performs offline checks without a registry call, package load or job submission.
 It returns issues with a code, category and suggested fix. For a registry
 selection, offline preflight reports `model_unresolved`; call
-`prepare_local_workflow` when read-only registry access is allowed. That step
+`prepare_workflow` when read-only registry access is allowed. That step
 loads the pinned package and performs full preflight before returning a
 predictor. `local_issues`, `remote_issues` and `remote_checked` keep the two
 stages visible. It may deserialize trusted pickle, but creates no cloud resource.
 If representative rows are available before submitting a job, pass
-`probe_frame=sample` to `preflight_local` or `prepare_local_workflow`. The probe
+`probe_frame=sample` to `preflight` or `prepare_workflow`. The probe
 runs the actual fitted FE and model and reports a `prediction_probe_failed`
 issue for an incompatible sample. A passing sample is evidence for that sample,
 not a guarantee about every later batch.
 
 ```python
-from skyulf.inference.local_pipeline import load_local_pipeline
-from skyulf.integrations.databricks import preflight_local
+from skyulf.inference.fitted_pipeline import load_pipeline
+from skyulf.integrations.databricks import preflight
 
-artifact = load_local_pipeline("/tmp/customer-model")
-report = preflight_local(config.model_copy(update={
-    "model": ModelSelection(kind="local_pipeline", path="/tmp/customer-model")
+artifact = load_pipeline("artifacts/customer-model")
+report = preflight(config.model_copy(update={
+    "model": ModelSelection(kind="local_pipeline", path="artifacts/customer-model")
 }), artifact=artifact)
 for issue in report.issues:
     print(issue.category, issue.code, issue.fix)
@@ -235,10 +264,13 @@ Integration examples cover imputation, scaling, encoding, binning, linear and
 logistic regression, and a MinMaxScaler/random-forest combination on both local
 engines. Other library combinations remain governed by their own fitted
 inference behavior and should receive replay tests before production use.
-The package is not eligible for Spark-native, Spark-worker or row-local HTTP
-execution. The separate `portable_bundle` selection uses
-`InferenceBundle` metadata and its own `predict_local` path for supported
-portable FE; selecting the wrong package kind fails preflight.
+Saving a pipeline does not itself admit it to independent worker batches or
+single-row requests. Inspected pandas artifacts can use the separately certified
+[Spark pyfunc route](databricks_bundle.md#distributed-inference-settings) when
+their exact fitted recipe and model are supported. A portable `InferenceBundle`
+uses a different state format and its own `predict_local`/`predict_spark` paths;
+selecting the wrong package kind fails preflight. See
+[preprocessing context](preprocessing_context.md) for groups and history.
 
 For example, an advanced pipeline may fit explicit binning followed by encoding
 before it is packaged; its saved edges and category positions are then replayed
@@ -258,11 +290,11 @@ pipeline = SkyulfPipeline({
     ],
     "modeling": {"type": "linear_regression"},
 })
-# Fit with SplitDataset, then save_local_pipeline as in the first example.
+# Fit with SplitDataset, then save_pipeline as in the first example.
 ```
 
 `InputSource` defaults to 100,000 rows and 128 MiB. Set tighter limits for each
-job. `PreparedLocalWorkflow.predict` checks both before running FE and the model.
+job. `PreparedWorkflow.predict` checks both before running FE and the model.
 It preserves the caller's input column order and rejects schema mismatches; it
 does not silently collect a Spark DataFrame. On Databricks, supply either a
 bounded caller-owned frame or the explicit pinned UC source adapter below.
@@ -270,7 +302,7 @@ bounded caller-owned frame or the explicit pinned UC source adapter below.
 ## Evaluate the held-out split in the model run
 
 Keep labeled test rows outside the fit split. After fitting and loading the
-artifact, `evaluate_local_holdout` calls the saved pipeline's normal prediction
+artifact, `evaluate_holdout` calls the saved pipeline's normal prediction
 path on those raw test features. It returns `heldout_mae`, `heldout_rmse` and
 `heldout_r2` for regression; classification returns `heldout_accuracy` and
 `heldout_f1_weighted`, plus `heldout_f1` for binary models (the model's second
@@ -282,13 +314,13 @@ MLflow run ID that contains the model artifact:
 import mlflow
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks import evaluate_local_holdout, fit_local_workflow
-from skyulf.integrations.mlflow.models.local_model import log_local_model
+from skyulf.integrations.databricks import evaluate_holdout, fit_workflow
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 
 # `frame` is a bounded, labeled pandas or Polars frame with 1,000 rows.
 training, heldout = frame[:800], frame[800:]
-artifact_path = "/tmp/customer-model"
-artifact = fit_local_workflow(
+artifact_path = "artifacts/customer-model"
+artifact = fit_workflow(
     {"preprocessing": preprocessing, "modeling": {"type": model_type}},
     SplitDataset(train=training, test=heldout),
     target_column="target",
@@ -296,38 +328,53 @@ artifact = fit_local_workflow(
     max_rows=1000,
     max_bytes=4_000_000,
 )
-metrics = evaluate_local_holdout(artifact, heldout, target_column="target")
+metrics = evaluate_holdout(artifact, heldout, target_column="target")
 with mlflow.start_run(run_name="customer-model") as run:
     mlflow.log_param("heldout_rows", len(heldout))
     mlflow.log_metrics(metrics)
-    model_uri = log_local_model(
+    model_uri = log_pipeline_model(
         artifact_path, run_id=run.info.run_id,
         artifact_path="model", tracking_uri="databricks",
     )
 ```
 
 The held-out labels are used only for evaluation. Monthly scoring reads raw
-features without labels and applies the already fitted FE and model. The
-SM-24a live validation (`initiatives/spark_and_mlflow/10-sm24a-heldout-metrics-report.md`)
-uses five model configurations with 800 training and 200 held-out rows each.
+features without labels and applies the already fitted FE and model.
+
+## Preprocessing diagnostics
+
+Set `TrainingSpec(..., preprocessing_probe=True)` to inspect the saved and
+reloaded preprocessing on at most the first 256 holdout rows. The option defaults
+to `False`. The 8 MiB input/output budget keeps the sample bounded; the report
+is saved as `preprocessing_probe.json` on the candidate's MLflow training run.
+
+This checks saved state, schema, repeated application, chunk/order consistency
+and mutation where the step's context allows those comparisons. It does not
+refit or measure model quality and does not change promotion policy. A step
+requiring groups or history reports `requires_context`, with later steps
+`not_run`; that is a request for the right execution context, not proof of a
+broken pipeline. See [the runnable example and report guide](preprocessing_context.md)
+for all statuses and direct `probe_fitted_preprocessing(artifact, sample)` use.
+The preflight prediction sample described above is a separate check that also
+calls the model.
 
 ## Fit and score a pinned UC source
 
-`fit_local_workflow` requires an explicit `SplitDataset`; it bounds the total
+`fit_workflow` requires an explicit `SplitDataset`; it bounds the total
 rows and in-memory bytes before fitting and saves the same trusted artifact as
-`save_local_pipeline`. Tracking and registration remain opt-in calls through
-`track_run`, `log_local_model` and `register_model`. They do not move an alias.
+`save_pipeline`. Tracking and registration remain opt-in calls through
+`track_run`, `log_pipeline_model` and `register_model`. They do not move an alias.
 
 ```python
 from datetime import UTC, datetime
 
 from skyulf.integrations.databricks import (
-    InputSource, LocalSourceSpec, LocalWorkflowConfig, ModelSelection,
-    OutputSink, prepare_local_workflow, score_local_source,
+    InputSource, SourceSpec, WorkflowConfig, ModelSelection,
+    OutputSink, prepare_workflow, score_source,
 )
 
 table = "catalog.schema.new_entities"
-config = LocalWorkflowConfig(
+config = WorkflowConfig(
     runtime="databricks",
     engine="polars",  # must match the registered artifact's fit engine
     source=InputSource(kind="uc_table", table=table, version=12,
@@ -337,15 +384,15 @@ config = LocalWorkflowConfig(
                          tracking_uri="databricks", registry_uri="databricks-uc"),
     sink=OutputSink(kind="return_frame"),
 )
-prepared = prepare_local_workflow(config)  # resolves a concrete model version
-period = LocalSourceSpec(
+prepared = prepare_workflow(config)  # resolves a concrete model version
+period = SourceSpec(
     table=table, version=12, record_key_columns=("entity_id",),
     input_columns=("amount", "city"),  # exact saved raw input order
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
     period_end=datetime(2026, 2, 1, tzinfo=UTC),
     max_rows=10_000, max_bytes=32_000_000,
 )
-result = score_local_source(spark, period, prepared)
+result = score_source(spark, period, prepared)
 print(result.predictions, result.diagnostics)
 ```
 
@@ -361,9 +408,9 @@ records the source version, period, model digest and concrete model version.
 No prediction table is created here. Whole-frame FE retains local pandas or
 Polars behavior even though Spark performs the bounded UC read.
 
-## Publish one local-scored month to a UC Delta table
+## Publish one scored month to a UC Delta table
 
-`run_local_batch` keeps feature engineering and model prediction in the saved
+`run_frame_batch` keeps feature engineering and model prediction in the saved
 pandas or Polars engine. Spark reads the pinned UC source and converts only the
 bounded final prediction rows to a DataFrame with the target's explicit schema.
 The guarded Delta writer then replaces exactly the requested half-open period.
@@ -391,8 +438,8 @@ from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 
 from skyulf.integrations.databricks import (
-    BatchSpec, InputSource, LocalSourceSpec, LocalWorkflowConfig,
-    ModelSelection, OutputSink, prepare_local_workflow, run_local_batch,
+    BatchSpec, InputSource, SourceSpec, WorkflowConfig,
+    ModelSelection, OutputSink, prepare_workflow, run_frame_batch,
 )
 from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
@@ -400,7 +447,7 @@ source_table = "catalog.schema.scoring_source"
 target_table = "catalog.schema.predictions"
 control_table = "catalog.schema.prediction_admission"
 source_version = 12
-source = LocalSourceSpec(
+source = SourceSpec(
     table=source_table,
     version=source_version,
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -410,7 +457,7 @@ source = LocalSourceSpec(
     max_rows=10_000,
     max_bytes=32_000_000,
 )
-config = LocalWorkflowConfig(
+config = WorkflowConfig(
     runtime="databricks",
     engine="polars",
     source=InputSource(
@@ -423,7 +470,7 @@ config = LocalWorkflowConfig(
     ),
     sink=OutputSink(kind="uc_delta", table=target_table),
 )
-prepared = prepare_local_workflow(config)
+prepared = prepare_workflow(config)
 spec = BatchSpec(
     period_start=source.period_start,
     period_end=source.period_end,
@@ -439,7 +486,7 @@ spec = BatchSpec(
     expected_target_version=0,  # read and pin before submission
     mode="local_pipeline",
 )
-result = run_local_batch(
+result = run_frame_batch(
     spark, source, prepared, spec,
     admission=DeltaTableAdmission(spark, control_table),
 )
@@ -460,7 +507,7 @@ an owner while a writer may still be active.
 
 ## Score newly inserted rows automatically
 
-`run_incremental_local_batch` selects records by **Delta source commits**, not
+`run_incremental_batch` selects records by **Delta source commits**, not
 by calendar date. On the first run it scores the existing bounded snapshot. On
 later runs it reads only inserts after the source version recorded in the last
 prediction-table commit. It appends predictions without replacing an older
@@ -480,12 +527,12 @@ control-table permissions.
 
 ```python
 from skyulf.integrations.databricks import (
-    InputSource, LocalWorkflowConfig, ModelSelection, OutputSink,
-    prepare_local_workflow, run_incremental_local_batch,
+    InputSource, WorkflowConfig, ModelSelection, OutputSink,
+    prepare_workflow, run_incremental_batch,
 )
 from skyulf.integrations.databricks.data.delta_io.delta_admission import DeltaTableAdmission
 
-config = LocalWorkflowConfig(
+config = WorkflowConfig(
     runtime="databricks",
     engine="polars",
     source=InputSource(
@@ -498,8 +545,8 @@ config = LocalWorkflowConfig(
     ),
     sink=OutputSink(kind="uc_delta", table="catalog.schema.predictions"),
 )
-prepared = prepare_local_workflow(config)
-result = run_incremental_local_batch(
+prepared = prepare_workflow(config)
+result = run_incremental_batch(
     spark, prepared, record_key_columns=("event_id",),
     admission=DeltaTableAdmission(spark, "catalog.schema.prediction_admission"),
 )
@@ -565,40 +612,24 @@ A changed model or a prior receipt without history requires a fresh target;
 contexts are never silently mixed across models. This is bounded local batch
 execution, not Spark worker or streaming state.
 
-**Period scoring:** `run_local_batch(..., history_state=...)` accepts an explicit
+**Period scoring:** `run_frame_batch(..., history_state=...)` accepts an explicit
 earlier context. A successful result's manifest contains the next context.
 Period replacement does not automatically choose another period's history.
 Retry identity includes the supplied context, so conflicting retries fail.
 
-**Core and backend:** ordinary prediction uses the immutable artifact seed.
-For successive Core calls, wrap prediction in
-`TemporalHistorySession(immutable_model_id, previous_state)` from
-`skyulf.preprocessing.time_series.history`, then persist `session.state`
-alongside successful predictions. The backend `/deployment/predict` accepts
-`continue_history=true` for the first request and `history_state` thereafter;
-its response returns the next state. The caller owns durable storage and
-serialization of those requests. The backend does not keep a hidden mutable
-history in its model cache. Repeating a request with the same input state is
-deterministic. An HTTP error returns no next state.
+**Core continuation:** use `score_pipeline_with_history` to receive a
+`PipelinePrediction` with `frame` and detached `history`. Pass that history to
+the next call. The [complete history example](preprocessing_context.md#runnable-history-continuation)
+shows model reload, JSON transport and equivalence with one complete request.
+Persist predictions and history atomically, and serialize writers or compare
+and swap the prior state. Ordinary prediction reuses the immutable training
+seed; it does not remember earlier calls.
 
-## Historical real-data validation
-
-The retired `databricks_local_real_taxi_job.py` notebook was a one-time
-Databricks validation using the public `samples.nyctaxi.trips` dataset. It
-materialized a bounded copy in an isolated Unity Catalog schema and trained a
-Skyulf `SimpleImputer` -> `StandardScaler` -> `OneHotEncoder` ->
-`random_forest_regressor` pipeline, saved its full artifact, logged held-out
-MAE/RMSE/R2 in MLflow and registered a concrete UC model version. Separate
-`score_initial` and `score_append` jobs called the incremental runner on
-200 existing and 100 subsequently inserted trips. Both persisted keyed Delta
-predictions; the second job checked prior rows and a no-op replay. See the
-SM-15I real NYC taxi live report under `initiatives/spark_and_mlflow/` for
-run IDs and measured results.
-
-Trip duration and dropoff ZIP are known only after a trip, so this validated
-retrospective batch fare estimation. The notebook and its test resources were
-removed during cleanup on 2026-10-04. Use the reusable SDK and generated Bundle
-for new workflows; the historical run is not a current deployment.
+The backend `/deployment/predict` accepts `continue_history=true` for the first
+request and `history_state` thereafter; its response returns the next state.
+The caller owns durable storage and request serialization. An HTTP error returns
+no next state. Custom group/window callbacks still need complete caller-supplied
+context; built-in carry mode does not create history for arbitrary callbacks.
 
 ## Saved scoring policies and project assets
 
@@ -725,10 +756,10 @@ recursive requirement files, options, extras and environment markers are rejecte
 
 Choose `training_layout=multi_target` when generating a project to use the existing
 `train` job for several named training branches. Configure branches in
-`src/modeling/branches.py`. The default `single_model` layout retains the ordinary
-training and lifecycle graph. Multi-target setup asks shared source, key, limit,
-compute and training schedule questions; target/model/search/CV/split/quality
-settings belong in branches.py.
+the named `models` mapping in `config/training.yml`. The default `single_model`
+layout retains its ordinary training graph. Shared source, keys and budgets
+belong under `defaults`; each model can override its target, inputs, estimator,
+search/CV, split and quality settings.
 
 A branch has its own target, input columns, preprocessing package, estimator,
 tuning/CV settings, quality metric and registered model name. For example, a
@@ -760,9 +791,9 @@ new model versions. It is not an exactly-once registration retry.
 Individual branches require `promotion_policy=manual_approval` and
 `score_handoff=disabled`; activation is controlled by the complete set's separate
 `promotion_policy`. Newly generated projects enable
-`src/modeling/model_set.py`: its `build_model_set()` factory declares the set's
-registered model name, prediction table, publication settings and shared rule path. Returning
-`None` disables set packaging; older projects without this file remain train only.
+the `model_set` mapping in `config/inference.yml`. It declares the set's
+registered name, prediction table, publication settings and shared rule path.
+Older Python-configured projects remain readable through their original loader.
 The project still has two jobs. Training registers the complete set candidate;
 training nominates the complete set as `challenger`. Automatic set activation can
 move the set champion, while component aliases stay unchanged. A later candidate
@@ -806,8 +837,7 @@ existing saved artifacts keep their original source without migration.
 ### Choose output storage and consumer views
 
 Multi-target initialization asks `model_set_name`, `model_set_output_mode` and a custom physical
-table name. The generated `modeling/model_set.py` contains the editable
-`publication` settings. Modes are:
+table name. Edit `model_set.publication` in `config/inference.yml`. Modes are:
 
 | Mode | Stored values | Consumer access |
 | --- | --- | --- |
@@ -829,7 +859,7 @@ this mode, even though needed for the combined calculations.
 
 Only `separate_views` asks for `model_view_prefix` and `combined_view_name`.
 Blank names use project defaults. Explicit names gain the active target catalog,
-output schema and resource suffix. Fine-tune names and selection in the factory:
+output schema and resource suffix. Fine-tune names and selection under `model_set.publication`; this dictionary shows the resolved setting:
 
 ```python
 "publication": {
@@ -857,15 +887,16 @@ the source or columns. Removing configuration does not delete catalog objects.
 
 Bundle initialization asks `model_set_promotion_policy` for multi-target projects.
 The default is `manual_approval`; `automatic` validates and activates a passing
-complete set after training. Existing projects can select this in the dictionary
-returned by `src/modeling/model_set.py`:
+complete set after training. Set `model_set.promotion_policy` in
+`config/inference.yml`:
 
-```python
-"promotion_policy": "automatic",
+```yaml
+model_set:
+  promotion_policy: automatic
 ```
 
-In each branch's `workflow` dictionary in `src/modeling/branches.py`, define its
-own task-appropriate metric and limits. For example, a revenue regressor can use:
+In each named `models` entry in `config/training.yml`, define its task-appropriate
+metric and limits. This resolved mapping illustrates a revenue regressor's policy:
 
 ```python
 "metric": "heldout_rmse",
@@ -946,7 +977,7 @@ prediction. Updating a feature or deleting the already-scored `id=101` instead
 fails the next incremental batch: there is no update/delete reconciliation of
 previous predictions under the default `source_change_policy="reject"`.
 For model-set scoring, select `rebuild_on_change` in Bundle setup or the
-`modeling/model_set.py` factory to reuse the complete snapshot rebuild when
+`model_set` mapping in `config/inference.yml` to reuse the complete snapshot rebuild when
 updates/deletes are observed, even without a model-set change. The selected set
 rescores ALL current rows, recomputes model/combined rules and resets temporal
 history. Deleted records disappear. This can replace earlier predictions from
@@ -965,33 +996,21 @@ incremental scorer still rejects source updates/deletes.
 
 ### Select preprocessing and pre-split recipes independently
 
-Keep custom implementations in `src/features/custom/`. In `preprocessing.py`,
-`build_preprocessing(recipe="default")` selects an ordered Core/custom step list.
-`pre_split.py` independently exposes `build_pre_split_steps(recipe="default")`.
-Select the two names at branch level (beside its `workflow` overlay):
+Declare named lists under `recipes` in `config/preprocessing.yml` and
+`config/pre_split.yml`. Keep custom function factories in the corresponding
+`src/features/preprocessing.py` and `src/features/pre_split.py` modules.
+Select the recipe names independently for each model in `config/training.yml`:
 
-```python
-"preprocessing_recipe": "example_frequency",
-"pre_split_recipe": "example_complete_inputs",
+```yaml
+models:
+  revenue:
+    preprocessing_recipe: revenue_features
+    pre_split_recipe: complete_inputs
 ```
 
-Another branch can select `example_imputer` with `none`, while a third selects
-`example_imputer_frequency` with the same `example_complete_inputs`. No feature-package copy is needed.
-The shipped starters use `feature_value` and `category`; adapt their columns or
-add your own recipe function to the relevant builder's mapping. `example_frequency`
-uses only the custom encoder, `example_imputer` uses only the Core mean imputer, and
-`example_imputer_frequency` runs imputation before encoding. `example_complete_inputs` requires at least
-one of those inputs; `none` produces an empty list. Both default recipes remain
-empty until explicitly configured.
-
-Keep `workflow.pipeline.preprocessing` empty in branches.py: the selected Python
-builder supplies the steps. `features_path` still selects the whole package and
-defaults to `../features`. All branches may share it while selecting different
-recipes. Learned values remain separate per model/fold. Pre-split scoring reuse
-uses the selected filter list; target-dependent skip policy still applies.
-
-Selectors are optional. Omitting one calls that builder without arguments,
-preserving older project factories. An explicit name requires a builder accepting
-`recipe=...`; missing or misspelled names fail before data reads. The saved code
-binds selected names so fresh-process model loading and training-plan replay use
-the exact original recipe even after the editable files change.
+Different models can share one recipe declaration while learning separate fitted
+state in each training fold. Missing names and duplicate configuration owners
+fail before reading data. The saved model captures the selected declarations and
+custom source, so editing today's files cannot alter an existing candidate.
+Older projects with Python recipe builders remain readable through their
+original loader; do not define the same recipe in both Python and YAML.

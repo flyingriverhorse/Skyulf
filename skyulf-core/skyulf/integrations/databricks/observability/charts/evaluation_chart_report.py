@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ....mlflow.registration.registry import load_run_local_pipeline
+from ....mlflow.registration.registry import load_run_pipeline as load_run_local_pipeline
 from .evaluation_chart_data import load_chart_sample
 from .evaluation_charts import chart_figure, diagnostic_charts, model_charts
 

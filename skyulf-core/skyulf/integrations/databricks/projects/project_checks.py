@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 
-from ..lifecycle.local_workflow import resolve_target_config
+from ..lifecycle.workflow import resolve_target_config
 from ._project_files import project_source
 from .workflow_config import validate_project_settings
 from .yaml_config import project_config_path, read_training_config, read_workflow_config

@@ -1,4 +1,4 @@
-"""Read-only comparison of pinned registered local pipeline versions."""
+"""Read-only comparison of pinned registered fitted pipeline versions."""
 
 import hashlib
 import json
@@ -10,9 +10,14 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
-from ....inference.local_evaluation import evaluate_local_holdout
-from ....inference.local_pipeline import LocalPipelineArtifact
-from ..registration.registry import ResolvedModel, load_registered_local_pipeline
+from ....inference.fitted_pipeline import FittedPipelineArtifact
+from ....inference.pipeline_evaluation import evaluate_holdout as evaluate_local_holdout
+from ..registration.registry import (
+    ResolvedModel,
+)
+from ..registration.registry import (
+    load_registered_pipeline as load_registered_local_pipeline,
+)
 
 _REGRESSION = {
     "heldout_mae",
@@ -254,7 +259,7 @@ def _validate_request(
 
 def _checked_artifact(
     reference: ResolvedModel, *, tracking_uri: str | None, registry_uri: str | None
-) -> LocalPipelineArtifact:
+) -> FittedPipelineArtifact:
     """Load one concrete artifact and confirm its registry digest."""
     artifact = load_registered_local_pipeline(
         reference, tracking_uri=tracking_uri, registry_uri=registry_uri
@@ -265,7 +270,7 @@ def _checked_artifact(
 
 
 def _validate_artifact_pair(
-    candidate: LocalPipelineArtifact, champion: LocalPipelineArtifact | None
+    candidate: FittedPipelineArtifact, champion: FittedPipelineArtifact | None
 ) -> None:
     """Require comparable tasks, class labels and target normalization recipes."""
     if champion is None:
@@ -282,8 +287,8 @@ def _validate_artifact_pair(
 
 
 def _comparison_metrics(
-    candidate: LocalPipelineArtifact,
-    champion: LocalPipelineArtifact | None,
+    candidate: FittedPipelineArtifact,
+    champion: FittedPipelineArtifact | None,
     heldout: pd.DataFrame | pl.DataFrame,
     target_column: str,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
@@ -328,7 +333,7 @@ def _comparison_decision(
     return False, "insufficient_improvement"
 
 
-def compare_registered_local_models(
+def compare_registered_pipeline_models(
     candidate: ResolvedModel,
     champion: ResolvedModel | None,
     heldout: pd.DataFrame | pl.DataFrame,
@@ -437,3 +442,7 @@ def _validate_reference_digest(reference: ResolvedModel) -> None:
     """Require artifact identity after the concrete registry identity is validated."""
     if not isinstance(reference.digest, str) or not reference.digest:
         raise ValueError("Each model must have a concrete version and artifact digest.")
+
+
+# Released names remain aliases for imports and stored pickle references.
+compare_registered_local_models = compare_registered_pipeline_models
