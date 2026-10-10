@@ -36,10 +36,13 @@ Full Ty/Ruff/format/CCN10/schema/MkDocs and commit hooks passed.
 Task/evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
 Native package ready: 858 tests, 576 exact runtime files, wheel SHA256
 56ace36b953f44ee64e797e1075ae2fa5e2de010f43d2e186c431a00f9abe9e6.
-Automatic approval review rejected the new source-package upload because prior
-approvals covered different payloads. Specific user approval question pending.
-No Task216 upload/run occurred. Resume with .cache/t216-submit.py after approval,
-then poll and verify with .cache/t216-poll.py and .cache/t216-verify-native.py.
+User approved the exact payload. Run 196440641386730 finished:854 passed,
+4 layout-test failures,0 skips;576 runtime/55 assets/5 markers and IDs verified.
+Four tests derived package paths from extracted fixtures instead of the installed
+wheel. Two test-only root constants corrected;26 affected tests passed both in
+checkout and isolated wheel. Independent review and full Ty/Ruff/format passed.
+Production wheel unchanged. Root preparing only4 native checks plus both guide
+examples; prior854 passes retained. Evidence and retry assets:task216_native.
 
 ## Open messages
 No active file claims. Domain findings and reviews recorded in the task document.

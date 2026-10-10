@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 PACKAGE = "skyulf.integrations.mlflow"
-ROOT = Path(__file__).resolve().parents[3] / "skyulf/integrations/mlflow"
+ROOT = Path(importlib.import_module(PACKAGE).__file__).resolve().parent
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 PACKAGE = "skyulf.integrations.databricks"
-PACKAGE_ROOT = Path(__file__).resolve().parents[3] / "skyulf/integrations/databricks"
+PACKAGE_ROOT = Path(importlib.import_module(PACKAGE).__file__).resolve().parent
 GROUPS = {
     "shared",
     "jobs",
