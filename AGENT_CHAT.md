@@ -27,27 +27,22 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task216 code/docs committed on branch 093: b23d34f9. No push.
-Purpose-based integration APIs preserve old imports/artifacts and wire values.
-Public integration guides rewritten; internal evidence stays under initiatives.
-Local outcomes: 931 unique tests passed, one missing-pyspark skip. The union's
-one source-snapshot failure passed in isolation after typing edits froze.
-Full Ty/Ruff/format/CCN10/schema/MkDocs and commit hooks passed.
-Task/evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
-Native package ready: 858 tests, 576 exact runtime files, wheel SHA256
+Task216 complete on branch 093. Source/docs: b23d34f9; test repair: 0ec4c406.
+Purpose-based integration APIs preserve legacy imports/artifacts and wire values.
+Public guides are updated; internal evidence remains under initiatives.
+Local: 931 unique tests passed, one missing-pyspark skip. The source-snapshot
+failure passed in isolation once source edits froze. Static/docs/commit gates passed.
+Databricks: 858 unique tests passed across two runs (854 + 4), zero remaining
+failures/skips; real Spark reader and both preprocessing/history guides passed.
+Initial run 196440641386730; approved focused retry 106939883844620 SUCCESS.
+The same b23d34f9 wheel and 576 runtime files were verified in both runs:
 56ace36b953f44ee64e797e1075ae2fa5e2de010f43d2e186c431a00f9abe9e6.
-User approved the exact payload. Run 196440641386730 finished: 854 passed,
-4 layout-test failures, 0 skips; 576 runtime/55 assets/5 markers and IDs verified.
-Four tests derived package paths from extracted fixtures instead of the installed
-wheel. Two test-only root constants corrected; 26 affected tests passed both in
-checkout and isolated wheel. Independent review and full Ty/Ruff/format passed.
-Production wheel unchanged; test fix committed as 0ec4c406. Four native checks
-and both guide examples are ready; prior 854 passes retained. Automatic review
-rejected the corrected test archive/new notebook upload because the first
-approval covered another payload. Specific retry approval question pending.
-No retry upload/run. After approval use .cache/t216-submit-retry.py, then
-.cache/t216-poll-retry.py and .cache/t216-verify-combined.py. Evidence and retry
-assets: initiatives/spark_and_mlflow/task216_native.
+Only two layout-test path constants changed for the retry. All 12 review IDs closed.
+Evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md
+and initiatives/spark_and_mlflow/task216_native/verified.json.
+No push. No workspace table, registered model or endpoint created.
 
 ## Open messages
-No active file claims. Domain findings and reviews recorded in the task document.
+
+No active claims or pending requests. Completed review and execution details are
+recorded in the task document; root's retry claims are released.
