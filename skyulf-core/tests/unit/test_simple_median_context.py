@@ -160,8 +160,8 @@ def test_simple_median_keeps_fitted_config_binding(change):
     assert get_inference_capability("SimpleImputer", config, state, engine="polars") is None
 
 
-def test_simple_median_override_and_mode_alias_stay_unknown():
-    """Local median metadata must not widen callable identity or existing modal alias scope."""
+def test_simple_median_override_and_mismatched_mode_stay_unknown():
+    """Recognizing the modal alias must not bypass callable identity or median recipe binding."""
     config, state = _fit("polars")
     applier = NodeRegistry.get_applier("SimpleImputer")()
     applier.apply = lambda *args: None
@@ -170,9 +170,6 @@ def test_simple_median_override_and_mode_alias_stay_unknown():
         is None
     )
     config["strategy"] = "mode"
-    state = NodeRegistry.get_calculator("SimpleImputer")().fit(
-        _frame("polars", [1, 1, 2, None]), config
-    )
     assert get_inference_capability("SimpleImputer", config, state, engine="polars") is None
 
 

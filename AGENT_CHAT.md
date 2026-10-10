@@ -27,14 +27,13 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task213: local missing-value OneHotEncoder context for pandas and Polars.
-Source commit ff63f32d, branch 093. Local/native validation complete; all claims released.
-Evidence: initiatives/spark_and_mlflow/213-onehot-missing-context.md. No push.
-
-Local 612/native 612 tests plus Bundle guide passed; run 860018333655758 SUCCESS.
-Final 552 runtime/16 asset hashes and 612 test node IDs match; zero failures/skips.
-Result documentation passed strict MkDocs; DCO follow-up is in git history.
-Useful review/test evidence is recorded in the task document. No push.
+Task214: SimpleImputer mode alias context, branch 093, base 51fb4742.
+Local source frozen: 368 tests passed; full Ruff/format/Ty/CCN10 and strict MkDocs passed.
+Independent Ponytail review: 6 alias and 10 rejection probes passed; no blocker.
+All source/test claims released. Root retains docs/contributing/preprocessing_inference_coverage.md
+and initiatives/spark_and_mlflow/214-simple-mode-context.md for native evidence.
+Task214 package is prepared (368 tests, 552 runtime hashes, 12 assets); cloud validation pending.
+Completed Task213 and Task214 review/results recorded in their task documents. No push.
 
 ## Open messages
 

@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-10**, branch `093`, Task213 local missing-value one-hot declarations.
+Status snapshot: **2026-10-10**, branch `093`, Task214 SimpleImputer mode alias.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -51,7 +51,7 @@ declares context. New project-defined classes are not part of the fixed 63.
 
 | Implementation | Present context behavior | Remaining boundary |
 | --- | --- | --- |
-| `SimpleImputer` | `row` for matched reviewed declarations, including local pandas/Polars median apply | Median reuses saved numeric scalar validation through local-only declarations. The `mode` alias and unsupported empty/nonfinite states remain `unknown`. Task210 preserves Polars zero-column row counts. |
+| `SimpleImputer` | `row` for matched reviewed declarations, including local pandas/Polars median apply and the `mode` alias | Median remains local-only. Task214 resolves `mode` to the existing `most_frequent` declaration, including its strict pandas worker checks. Unsupported empty/nonfinite states remain `unknown`. Task210 preserves Polars zero-column row counts. |
 | `GroupImputer` | `row` for saved group lookups, including local pandas/Polars median apply | Mean, median and most-frequent strategies reuse saved lookups/fallbacks; median is local-only. The `mode` alias still normalizes to most-frequent. Task210 preserves integer modes and group keys through UInt64; Int128 retains its previous conversion boundary. |
 | `StandardScaler` | `row` for matched reviewed declarations, including local Polars apply | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; local metadata does not grant worker admission. |
 | `MinMaxScaler` | `row` for matched reviewed declarations, including local Polars apply | Existing finite affine coefficients and matching feature range are required. All-null/nonfinite fits retain existing validator abstention. |
@@ -344,6 +344,11 @@ separate execution mechanism needs its own specification and tests.
    this row with engine/configuration scope, test evidence and commit reference.
 
 ### Cross-cutting work beyond initial owner reviews
+
+There are **four open work areas**, not four unreviewed implementations or four
+known defects. Configuration/dtype coverage is the current continuation; the
+other areas require a separate workflow/executor design or project-specific code.
+Unsupported boundaries in the tables are not all mandatory feature additions.
 
 - [ ] Decide whether/how to expose the diagnostic as an optional training/release
   check. It is currently an explicit library call; no automatic job was added.
@@ -1175,3 +1180,30 @@ This validates native Python saved-state replay and local context diagnostics,
 including retained worker rejection. It does not validate Spark UDF, REST or
 `ai_query` execution. No tables, registered models or endpoints were created.
 Owner-review and worker-family counts remain unchanged.
+
+### Task214 SimpleImputer mode alias
+
+SimpleImputer now resolves a configured `mode` to `most_frequent` during fitted
+configuration inspection, matching its existing training behavior and the shared
+GroupImputer resolver. The change removes one node-specific condition; it adds no
+transform, artifact field or capability entry. Both pandas and Polars can report
+`row` for the same saved modal fills. A fitted artifact must still contain the
+canonical strategy; mismatched columns/strategies, configured constants,
+nonfinite state and overridden appliers retain their existing rejection.
+
+Pandas mode recipes use the existing strict modal worker admission checks.
+Polars-fitted models remain worker-ineligible; median stays local-only, and
+modal portable codecs and native Spark declarations remain unsupported. The
+seven worker families and 63 completed initial owner reviews are unchanged.
+
+The affected local union passed **368 tests** across ten files, with two existing
+single-row R-squared warnings. Four added saved-model cases reuse the median
+lifecycle scaffold for SimpleImputer/GroupImputer and pandas/Polars. They disable
+fit in a fresh process, verify stored fill values, exact full/singleton model
+predictions, immutable state and actual worker admission/rejection. Unit cases
+cover scalar types, empty/reversed input and configuration binding. Independent
+Ponytail review passed six alias-equivalence and ten rejection probes. Full
+Ruff/format, full CI Ty scope and Lizard CCN 10 passed.
+
+Databricks validation for Task214 is pending. Earlier Task213 native results
+apply to its own source and test package, not this new change.

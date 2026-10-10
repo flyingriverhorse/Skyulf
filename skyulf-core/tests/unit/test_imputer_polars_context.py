@@ -62,6 +62,7 @@ def _assert_replay(node, state, sample):
         ("SimpleImputer", "mean"),
         ("SimpleImputer", "constant"),
         ("SimpleImputer", "most_frequent"),
+        ("SimpleImputer", "mode"),
         ("GroupImputer", "mean"),
         ("GroupImputer", "most_frequent"),
         ("GroupImputer", "mode"),
@@ -81,6 +82,7 @@ def test_real_imputer_state_declares_local_polars_and_replays(node, strategy, en
     state = calculator().fit(train, config)
     _assert_frame(train, before)
     saved = pickle.dumps(state)
+    saved_config = pickle.dumps(config)
 
     def forbidden(*args, **kwargs):
         """Metadata inspection must never execute transformation or learn from inference data."""
@@ -102,6 +104,7 @@ def test_real_imputer_state_declares_local_polars_and_replays(node, strategy, en
             )
             assert capability.codec_version == expected_codec
         normalized = owner.resolve_fitted_config(config, owner.validate_fitted_state(state))
+        assert normalized["strategy"] == ("most_frequent" if strategy == "mode" else strategy)
         for kind in ("native", "python_batch"):
             with pytest.raises(UnsupportedExecutionError):
                 require_capability(node, "apply", "polars", config=normalized, execution_kind=kind)
@@ -121,10 +124,12 @@ def test_real_imputer_state_declares_local_polars_and_replays(node, strategy, en
         11,
     ]
     assert pickle.dumps(state) == saved
+    assert pickle.dumps(config) == saved_config
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("node", ["SimpleImputer", "GroupImputer"])
+@pytest.mark.parametrize("strategy", ["most_frequent", "mode"])
 @pytest.mark.parametrize(
     "dtype,values",
     [
@@ -132,10 +137,12 @@ def test_real_imputer_state_declares_local_polars_and_replays(node, strategy, en
         ("boolean", [True, True, None, False]),
     ],
 )
-def test_modal_imputer_scalar_types_replay_without_new_promotions(engine, node, dtype, values):
+def test_modal_imputer_scalar_types_replay_without_new_promotions(
+    engine, node, strategy, dtype, values
+):
     """Scalar mode declarations must retain string and nullable boolean values and empty schemas."""
     train = _frame(engine, values, dtype)
-    config = {"columns": ["x"], "strategy": "most_frequent"}
+    config = {"columns": ["x"], "strategy": strategy}
     if node == "GroupImputer":
         config["group_by"] = "g"
     state = NodeRegistry.get_calculator(node)().fit(train, config)
@@ -145,7 +152,7 @@ def test_modal_imputer_scalar_types_replay_without_new_promotions(engine, node, 
     assert full["x"].to_list() == [values[0]] * 4
 
 
-@pytest.mark.parametrize("strategy", ["mean", "constant", "most_frequent"])
+@pytest.mark.parametrize("strategy", ["mean", "constant", "most_frequent", "mode"])
 def test_simple_restores_missing_fitted_column_with_existing_row_anchor(strategy):
     """A fitted column is restored per existing row and remains empty when its anchor is empty."""
     config = {"columns": ["x"], "strategy": strategy}
@@ -159,19 +166,26 @@ def test_simple_restores_missing_fitted_column_with_existing_row_anchor(strategy
     assert full["x"].to_list() == [state["fill_values"]["x"]] * 2
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize(
-    "node,strategy",
+    "change",
     [
-        ("SimpleImputer", "mode"),
+        {"strategy": "median"},
+        {"columns": ["g"]},
+        {"fill_value": 7},
+        {"unknown_option": True},
     ],
 )
-def test_unreviewed_imputer_modes_remain_unknown(node, strategy):
-    """Local declarations must not widen the portable vocabulary or silently normalize new recipes."""
-    config = {"columns": ["x"], "strategy": strategy}
-    if node == "GroupImputer":
-        config["group_by"] = "g"
-    state = NodeRegistry.get_calculator(node)().fit(_frame("polars", [1, 3, None, 9]), config)
-    assert get_inference_capability(node, config, state, engine="polars") is None
+def test_simple_mode_alias_retains_fitted_recipe_binding(engine, change):
+    """Accepting a spelling alias must not hide a changed strategy, column or unsupported option."""
+    config = {"columns": ["x"], "strategy": "mode"}
+    state = NodeRegistry.get_calculator("SimpleImputer")().fit(
+        _frame(engine, [1, 3, None, 9]), config
+    )
+    assert (
+        get_inference_capability("SimpleImputer", {**config, **change}, state, engine=engine)
+        is None
+    )
 
 
 @pytest.mark.parametrize("node", ["SimpleImputer", "GroupImputer"])
@@ -199,6 +213,7 @@ def test_imputer_invalid_state_config_and_identity_remain_unknown(node):
         ("GroupImputer", "mean"),
         ("GroupImputer", "most_frequent"),
         ("SimpleImputer", "most_frequent"),
+        ("SimpleImputer", "mode"),
     ],
 )
 def test_missing_global_statistic_retains_existing_state_boundary(engine, node, strategy):

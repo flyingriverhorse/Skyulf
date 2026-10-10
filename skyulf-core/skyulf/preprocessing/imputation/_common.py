@@ -176,7 +176,7 @@ def _imputation_config(node: str, params: dict, state: dict) -> dict:
     resolved = {**defaults, **params}
     fields = {"columns", "strategy", "group_by" if node == "GroupImputer" else "fill_value"}
     _fields(resolved, fields)
-    if resolved["strategy"] == "mode" and node == "GroupImputer":
+    if resolved["strategy"] == "mode":
         resolved["strategy"] = "most_frequent"
     if resolved["strategy"] != state["strategy"]:
         raise ValueError("Configured strategy disagrees with fitted strategy.")

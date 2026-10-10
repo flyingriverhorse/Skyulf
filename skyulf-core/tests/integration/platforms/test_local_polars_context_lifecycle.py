@@ -190,12 +190,12 @@ def test_integer_group_state_survives_fresh_process_reload(tmp_path, engine, dty
     assert json.loads(result.stdout)["status"] == "passed"
 
 
-def _replay_median(directory):
-    """Replay a saved median pipeline and retain the separate worker rejection."""
-    node, sample = pickle.loads((directory / "sample.pkl").read_bytes())
+def _replay_imputation_statistic(directory):
+    """Replay saved statistics and check the strategy's existing worker admission."""
+    node, strategy, sample = pickle.loads((directory / "sample.pkl").read_bytes())
 
     def forbidden(*args, **kwargs):
-        """Loading and diagnostics must never recompute a median from request rows."""
+        """Loading and diagnostics must never recompute statistics from request rows."""
         raise AssertionError("Unexpected fit")
 
     calculator: Any = NodeRegistry.get_calculator(node)
@@ -204,7 +204,12 @@ def _replay_median(directory):
     records = artifact.pipeline.feature_engineer.fitted_steps
     before = artifact_digest(records)
     output = _apply_prediction_step(sample, records[0])
-    expected = [2.5, 9.0, 4.0, 9.0] if node == "GroupImputer" else [4.0] * 4
+    expected = {
+        ("SimpleImputer", "median"): [4.0] * 4,
+        ("SimpleImputer", "mode"): [1.0] * 4,
+        ("GroupImputer", "median"): [2.5, 9.0, 4.0, 9.0],
+        ("GroupImputer", "mode"): [1.0, 9.0, 1.0, 9.0],
+    }[node, strategy]
     assert output["x"].to_list() == expected
     report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
     assert report["status"] == "passed", report
@@ -215,8 +220,15 @@ def _replay_median(directory):
         [artifact.pipeline.predict(sample[i : i + 1]) for i in range(len(sample))]
     )
     np.testing.assert_array_equal(predictions, singles)
-    with pytest.raises(UnsupportedExecutionError):
-        require_partition_safe_pipeline(artifact)
+    if strategy == "mode" and isinstance(sample, pd.DataFrame):
+        certificate = require_partition_safe_pipeline(artifact)
+        assert certificate.fitted_engine == "pandas"
+        assert len(certificate.steps) == 1 and certificate.steps[0].node_type == node
+        config = dict(json.loads(certificate.steps[0].config_json)["items"])
+        assert config["strategy"] == {"kind": "string", "value": "most_frequent"}
+    else:
+        with pytest.raises(UnsupportedExecutionError):
+            require_partition_safe_pipeline(artifact)
     assert np.isfinite(predictions).all()
     assert artifact_digest(records) == before
     return report
@@ -224,8 +236,9 @@ def _replay_median(directory):
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("node", ["SimpleImputer", "GroupImputer"])
-def test_median_local_context_survives_saved_model_reload(tmp_path, engine, node):
-    """Median recipes may report row context locally while saved models remain worker-ineligible."""
+@pytest.mark.parametrize("strategy", ["median", "mode"])
+def test_imputation_statistic_context_survives_saved_model_reload(tmp_path, engine, node, strategy):
+    """Median and mode replay saved rows while only pandas modes retain worker admission."""
     training = pd.DataFrame(
         {"g": [1, 1, 2, 2] * 2, "x": [1.0, 4.0, 9.0, None] * 2, "target": range(8)}
     )
@@ -233,12 +246,12 @@ def test_median_local_context_survives_saved_model_reload(tmp_path, engine, node
     sample.index = [7, 2, 2, 0]
     if engine == "polars":
         training, sample = pl.from_pandas(training), pl.from_pandas(sample)
-    params = {"columns": ["x"], "strategy": "median"}
+    params = {"columns": ["x"], "strategy": strategy}
     if node == "GroupImputer":
         params["group_by"] = "g"
     pipeline = SkyulfPipeline(
         {
-            "preprocessing": [{"name": "median", "transformer": node, "params": params}],
+            "preprocessing": [{"name": strategy, "transformer": node, "params": params}],
             "modeling": {
                 "type": "random_forest_regressor",
                 "params": {"n_estimators": 2, "max_depth": 2, "random_state": 42, "n_jobs": 1},
@@ -247,8 +260,8 @@ def test_median_local_context_survives_saved_model_reload(tmp_path, engine, node
     )
     pipeline.fit(SplitDataset(train=training, test=training[:0]), target_column="target")
     save_local_pipeline(pipeline, tmp_path / "model")
-    (tmp_path / "sample.pkl").write_bytes(pickle.dumps((node, sample)))
-    code = "import json,runpy,sys; from pathlib import Path; module=runpy.run_path(sys.argv[1]); print(json.dumps(module['_replay_median'](Path(sys.argv[2]))))"
+    (tmp_path / "sample.pkl").write_bytes(pickle.dumps((node, strategy, sample)))
+    code = "import json,runpy,sys; from pathlib import Path; module=runpy.run_path(sys.argv[1]); print(json.dumps(module['_replay_imputation_statistic'](Path(sys.argv[2]))))"
     result = subprocess.run(
         [sys.executable, "-c", code, str(Path(__file__).resolve()), str(tmp_path)],
         cwd=tmp_path,
