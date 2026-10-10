@@ -3,12 +3,12 @@
 from typing import Any
 
 from ..data.delta_io.delta import history, table_identity
-from .config import FeatureTrainingSpec, _uc_name
+from .config import FeatureTrainingSpec, validate_uc_name
 
 
 def snapshot_table(spark: Any, name: str) -> dict[str, Any]:
     """Capture a stable table identity around its current Delta history version."""
-    _uc_name(name)
+    validate_uc_name(name)
     identity = table_identity(spark, name)
     latest = history(spark, name).orderBy("version", ascending=False).select("version").first()
     if latest is None:

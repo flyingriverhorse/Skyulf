@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes, output_scalar
+from skyulf.integrations.databricks.shared._frames import frame_bytes, output_scalar
 
 from ...mlflow.registration.registry import ResolvedModel
 from ..data.admission import BatchConflictError, PublishAdmission, validate_admission

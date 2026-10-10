@@ -31,12 +31,10 @@ from ..registration.registry import (
 )
 from .validation import (
     ModelComparisonReport,
+    compare_registered_pipeline_models,
     comparison_digest,
     quality_gate_results,
     quality_gates_pass,
-)
-from .validation import (
-    compare_registered_pipeline_models as compare_registered_local_models,
 )
 
 _ALIAS = "champion"
@@ -591,7 +589,7 @@ def _validated_report(
         if expected_champion_version is not None
         else None
     )
-    fresh = compare_registered_local_models(
+    fresh = compare_registered_pipeline_models(
         candidate,
         champion,
         heldout,
@@ -635,7 +633,7 @@ def initialize_champion(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    fresh = compare_registered_local_models(
+    fresh = compare_registered_pipeline_models(
         candidate,
         None,
         heldout,

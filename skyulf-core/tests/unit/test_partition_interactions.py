@@ -8,11 +8,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
@@ -46,8 +42,8 @@ def interaction_artifact(tmp_path, request):
         }
     )
     pipeline.fit(SplitDataset(train=frame.iloc[:6], test=frame.iloc[6:]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "artifact")
-    return load_local_pipeline(tmp_path / "artifact")
+    save_pipeline(pipeline, tmp_path / "artifact")
+    return load_pipeline(tmp_path / "artifact")
 
 
 @pytest.mark.parametrize(
@@ -63,9 +59,9 @@ def test_raw_interactions_preserve_partition_reorder_null_and_empty_parity(inter
         {"income": [None, 15.0, 2.0, -1.0], "tenure": [3.0, None, 4.0, 5.0]},
         index=[90, 3, 7, 1],
     )
-    whole = predict_local_pipeline(raw, artifact)
-    split = pd.concat([predict_local_pipeline(raw.iloc[[i]], artifact) for i in range(len(raw))])
-    reordered = predict_local_pipeline(raw.iloc[[2, 0, 3, 1]], artifact)
+    whole = predict_pipeline(raw, artifact)
+    split = pd.concat([predict_pipeline(raw.iloc[[i]], artifact) for i in range(len(raw))])
+    reordered = predict_pipeline(raw.iloc[[2, 0, 3, 1]], artifact)
     pd.testing.assert_frame_equal(whole, split)
     pd.testing.assert_frame_equal(whole.sort_index(), reordered.sort_index())
     engineer = artifact.pipeline.feature_engineer

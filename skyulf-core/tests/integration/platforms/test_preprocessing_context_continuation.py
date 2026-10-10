@@ -14,7 +14,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
@@ -109,7 +109,7 @@ def _save(directory, engine):
             }
         )
         pipeline.fit(SplitDataset(train=training[2:], test=training[:2]), target_column="target")
-        save_local_pipeline(pipeline, directory / node)
+        save_pipeline(pipeline, directory / node)
         samples[node] = sample
     (directory / "samples.pkl").write_bytes(pickle.dumps(samples))
 
@@ -127,7 +127,7 @@ def _replay(directory):
     samples = pickle.loads((directory / "samples.pkl").read_bytes())
     reports = {}
     for node, sample in samples.items():
-        artifact = load_local_pipeline(directory / node)
+        artifact = load_pipeline(directory / node)
         before = artifact_digest(artifact.pipeline.feature_engineer.fitted_steps)
         report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 3))
         assert report["status"] == "passed", (node, report)

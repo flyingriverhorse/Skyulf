@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from raw_serving_demo import scoring
 from raw_serving_demo.training import fit_customer_pipeline
 
-from skyulf.inference.local_scoring import score_local_pipeline
+from skyulf.inference.pipeline_scoring import score_pipeline
 from skyulf.integrations.mlflow.spark.spark_model import partition_safety_certificate
 
 
@@ -46,8 +46,8 @@ def test_complete_example_accepts_raw_nulls_and_unknown_categories(fitted):
     raw.loc[0, "segment"] = "NewSegment"
     raw.loc[1, ["income", "age", "tenure"]] = np.nan
     before = partition_safety_certificate(artifact)
-    expected = score_local_pipeline(raw, artifact)
-    separate = pd.concat([score_local_pipeline(raw.iloc[[i]], artifact) for i in range(3)])
+    expected = score_pipeline(raw, artifact)
+    separate = pd.concat([score_pipeline(raw.iloc[[i]], artifact) for i in range(3)])
     pd.testing.assert_frame_equal(expected, separate)
     np.testing.assert_allclose(expected[["probability_0", "probability_1"]].sum(axis=1), 1)
     assert "income_x_tenure" in artifact.manifest.feature_columns

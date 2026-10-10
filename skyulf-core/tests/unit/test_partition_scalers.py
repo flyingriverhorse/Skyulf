@@ -6,11 +6,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
@@ -40,8 +36,8 @@ def minmax_artifact(tmp_path, request):
         }
     )
     pipeline.fit(SplitDataset(train=data.iloc[:4], test=data.iloc[4:]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "minmax")
-    return load_local_pipeline(tmp_path / "minmax")
+    save_pipeline(pipeline, tmp_path / "minmax")
+    return load_pipeline(tmp_path / "minmax")
 
 
 @pytest.mark.parametrize(
@@ -59,11 +55,11 @@ def test_minmax_saved_state_has_partition_reorder_null_and_empty_parity(minmax_a
         },
         index=[9, 2, 7, 1],
     )
-    whole = predict_local_pipeline(query, minmax_artifact)
+    whole = predict_pipeline(query, minmax_artifact)
     split = pd.concat(
-        [predict_local_pipeline(query.iloc[part], minmax_artifact) for part in ([0], [1, 2], [3])]
+        [predict_pipeline(query.iloc[part], minmax_artifact) for part in ([0], [1, 2], [3])]
     )
-    shuffled = predict_local_pipeline(query.iloc[[3, 1, 0, 2]], minmax_artifact)
+    shuffled = predict_pipeline(query.iloc[[3, 1, 0, 2]], minmax_artifact)
     pd.testing.assert_frame_equal(whole, split)
     pd.testing.assert_frame_equal(whole.sort_index(), shuffled.sort_index())
     engineer = minmax_artifact.pipeline.feature_engineer

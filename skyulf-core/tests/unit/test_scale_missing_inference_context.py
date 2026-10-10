@@ -15,7 +15,7 @@ from polars.testing import assert_frame_equal as assert_polars_frame_equal
 
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing.inference_context import get_inference_capability
@@ -461,8 +461,8 @@ def test_polars_nonbinary_scale_replays_exactly_across_saved_requests(
         }
     )
     pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "scale")
-    artifact = load_local_pipeline(tmp_path / "scale")
+    save_pipeline(pipeline, tmp_path / "scale")
+    artifact = load_pipeline(tmp_path / "scale")
     _poison_fit(monkeypatch, node)
     sample = pl.DataFrame({"x": [None, 2.0, -10.0, 200.0, 6.0]})
     state = artifact.pipeline.feature_engineer.fitted_steps[0]["artifact"]

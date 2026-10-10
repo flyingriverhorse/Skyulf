@@ -7,9 +7,12 @@ import pytest
 mlflow = pytest.importorskip("mlflow")
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
-from skyulf.inference.local_scoring import score_local_pipeline  # noqa: E402
-from skyulf.integrations.mlflow.models.local_model import log_local_model  # noqa: E402
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    save_pipeline,  # noqa: E402
+)
+from skyulf.inference.pipeline_scoring import score_pipeline  # noqa: E402
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model  # noqa: E402
 from skyulf.integrations.mlflow.spark.spark_model import predict_spark_pyfunc  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
@@ -45,14 +48,14 @@ def test_actual_named_spark_udf_matches_local_and_reuses_workers(
     )
     pipeline.fit(SplitDataset(train=training, test=training.head(0)), target_column="target")
     local = tmp_path / "local"
-    save_local_pipeline(pipeline, local)
-    artifact = load_local_pipeline(local)
+    save_pipeline(pipeline, local)
+    artifact = load_pipeline(local)
     previous = mlflow.get_tracking_uri()
     try:
         mlflow.set_tracking_uri(f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}")
         mlflow.set_experiment("spark-pyfunc")
         with mlflow.start_run() as run:
-            uri = log_local_model(local, run_id=run.info.run_id, artifact_path="model")
+            uri = log_pipeline_model(local, run_id=run.info.run_id, artifact_path="model")
         registered = mlflow.register_model(uri, "spark_model")
         query = pd.DataFrame(
             {
@@ -70,7 +73,7 @@ def test_actual_named_spark_udf_matches_local_and_reuses_workers(
             record_key_columns=("id",),
             env_manager="local",
         )
-        expected = score_local_pipeline(query[["x", "z"]], artifact)
+        expected = score_pipeline(query[["x", "z"]], artifact)
         for _ in range(2):
             # Only this bounded fixture is collected; production adapter retains a Spark frame.
             rows = actual.orderBy("id").collect()

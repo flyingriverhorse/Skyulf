@@ -207,8 +207,3 @@ def post_selection_cv(
         "selected_model": selected,
         "cv_config": {**report["cv_config"], "method": method},
     }
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec
-LocalPipelineArtifact = FittedPipelineArtifact

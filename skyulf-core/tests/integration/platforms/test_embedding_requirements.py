@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from skyulf.inference import local_pipeline, project_dependencies
+from skyulf.inference import fitted_pipeline, project_dependencies
 
 
 def _pipeline(*artifacts: dict, source_pins: tuple[str, ...] = ()) -> Any:
@@ -46,7 +46,7 @@ def test_saved_model_pins_merge_with_source_without_mutation(installed):
         source_pins=("numpy==2.1.3", "torch==2.9.0"),
     )
     before = deepcopy(vars(pipeline))
-    assert local_pipeline._project_contract(pipeline) == (
+    assert fitted_pipeline._project_contract(pipeline) == (
         "numpy==2.1.3",
         "sentence-transformers==6.0.0",
         "torch==2.9.0",
@@ -62,21 +62,21 @@ def test_conflicting_saved_model_pins_are_rejected(installed, from_source):
     if not from_source:
         artifacts.append({"model_requirements": ("torch==2.8.0",)})
     with pytest.raises(ValueError, match="dependency"):
-        local_pipeline._project_contract(_pipeline(*artifacts, source_pins=source_pins))
+        fitted_pipeline._project_contract(_pipeline(*artifacts, source_pins=source_pins))
 
 
 @pytest.mark.parametrize("pin", ["torch==2.8.0", "missing-encoder-package==1.0"])
 def test_saved_model_pins_verify_the_installed_runtime(installed, pin):
     """A package with unavailable encoder code must fail before native model restoration."""
     with pytest.raises(ValueError, match="dependency"):
-        local_pipeline._project_contract(_pipeline({"model_requirements": (pin,)}))
+        fitted_pipeline._project_contract(_pipeline({"model_requirements": (pin,)}))
 
 
 @pytest.mark.parametrize("pins", [None, "torch==2.9.0", ["torch==2.9.0"], (1,), ("torch>=2.9.0",)])
 def test_saved_model_pins_require_a_tuple_of_exact_strings(installed, pins):
     """Malformed saved dependency metadata must not silently disappear from the package."""
     with pytest.raises(ValueError, match="requirement"):
-        local_pipeline._project_contract(_pipeline({"model_requirements": pins}))
+        fitted_pipeline._project_contract(_pipeline({"model_requirements": pins}))
 
 
 @pytest.mark.parametrize("source_pins", [(), ("numpy==2.1.3",)])
@@ -86,4 +86,4 @@ def test_legacy_and_unrelated_states_keep_existing_contract(installed, source_pi
     pipeline.feature_engineer.fitted_steps.append(
         {"type": "count_vectorizer", "artifact": {"model_requirements": ("missing==1.0",)}}
     )
-    assert local_pipeline._project_contract(pipeline) == source_pins
+    assert fitted_pipeline._project_contract(pipeline) == source_pins

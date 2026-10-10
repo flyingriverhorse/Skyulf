@@ -12,7 +12,7 @@ import numpy as np
 import polars as pl
 
 from .....data.dataset import SplitDataset
-from .....inference.pipeline_evaluation import evaluate_holdout as evaluate_local_holdout
+from .....inference.pipeline_evaluation import evaluate_holdout
 from .....modeling._sample_weights import validate_sample_weight
 from .....modeling._tuning.cv_policy import (
     effective_cv_type,
@@ -21,8 +21,8 @@ from .....modeling._tuning.cv_policy import (
     take_rows,
 )
 from .....modeling._tuning.splitters import nested_inner_folds
-from ...scoring.batch.frame_batch import fit_workflow as fit_local_workflow
-from ...shared._local_frames import frame_bytes
+from ...scoring.batch.frame_batch import fit_workflow
+from ...shared._frames import frame_bytes
 from ..tuning.search import prepare_search_pipeline
 
 if TYPE_CHECKING:
@@ -64,7 +64,7 @@ def _evaluate_fold(
 ) -> tuple[dict, dict]:
     """Reload the exact persisted decision model before scoring untouched outer rows."""
     training = take_rows(frame, train)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         deepcopy(config),
         SplitDataset(
             train=training,
@@ -76,7 +76,7 @@ def _evaluate_fold(
         max_rows=len(frame),
         max_bytes=frame_bytes(frame) + 1,
     )
-    metrics = evaluate_local_holdout(artifact, take_rows(frame, test), target_column=target)
+    metrics = evaluate_holdout(artifact, take_rows(frame, test), target_column=target)
     return {
         name.removeprefix("heldout_"): value for name, value in metrics.items()
     }, artifact.pipeline._decision_threshold_evidence or {}

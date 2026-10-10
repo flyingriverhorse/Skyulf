@@ -27,10 +27,10 @@ def _project(tmp_path, config=None):
 def test_yaml_single_model_freezes_model_and_custom_source(tmp_path):
     """Changing YAML after fitting must never change an already saved predictor."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
     from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     path, features = _project(tmp_path)
     yaml_path = path.with_name("training.yml")
@@ -41,7 +41,7 @@ def test_yaml_single_model_freezes_model_and_custom_source(tmp_path):
     )
     config = load_project_workflow(read_workflow_config(path), features)
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -50,10 +50,10 @@ def test_yaml_single_model_freezes_model_and_custom_source(tmp_path):
         max_bytes=10000,
     )
     yaml_path.write_text("invalid: edited", encoding="utf-8")
-    loaded = load_local_pipeline(tmp_path / "artifact")
+    loaded = load_pipeline(tmp_path / "artifact")
     assert config["pipeline"]["modeling"] == {"type": "linear_regression", "params": {}}
     assert artifact.manifest.project_source_sha256
-    assert predict_local_pipeline(pd.DataFrame({"x": [5.0]}), loaded)[
+    assert predict_pipeline(pd.DataFrame({"x": [5.0]}), loaded)[
         "prediction"
     ].tolist() == pytest.approx([11.0])
 
@@ -273,7 +273,7 @@ def test_yaml_single_model_rejects_ignored_feature_path(tmp_path):
 
 def test_direct_yaml_keeps_target_bindings_when_loading_model(tmp_path):
     """Loading declarative models must not replace resolved UC names with raw placeholders."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
 

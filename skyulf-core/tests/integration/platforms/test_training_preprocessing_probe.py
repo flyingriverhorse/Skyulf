@@ -12,21 +12,21 @@ pytest.importorskip("mlflow")
 from mlflow import MlflowClient
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
+from skyulf.integrations.databricks.lifecycle.workflow import training_spec
 from skyulf.integrations.databricks.observability.reports.training_node_output import (
     render_training_node,
     training_report_document,
 )
 from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-from skyulf.integrations.databricks.training.fitting import local_retraining as retraining
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.training.fitting import candidate as retraining
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 from skyulf.pipeline.seal import artifact_digest
 
 
 def _spec():
     """Use a pinned minimal random split with a pre-change dataset identity."""
-    return retraining.LocalTrainingSpec(
+    return retraining.TrainingSpec(
         table="workspace.test.labels",
         version=4,
         record_key_columns=("id",),
@@ -51,9 +51,9 @@ def test_training_probe_preserves_legacy_identity_and_payload():
     disabled = _spec()
     enabled = replace(disabled, preprocessing_probe=True)
     payload = retraining.training_spec_payload(enabled, "pandas")
-    assert retraining.LocalTrainingSpec.from_payload(payload) == enabled
+    assert retraining.TrainingSpec.from_payload(payload) == enabled
     payload.pop("preprocessing_probe")
-    assert retraining.LocalTrainingSpec.from_payload(payload) == disabled
+    assert retraining.TrainingSpec.from_payload(payload) == disabled
     assert disabled.preprocessing_probe is False
     assert (
         enabled.dataset_id
@@ -112,7 +112,7 @@ def test_training_probe_logs_real_saved_apply_and_report(
             pipeline_config=config,
             artifact_path=tmp_path / "model",
             engine=engine,
-            cv=LocalCVSpec(),
+            cv=CVSpec(),
             risk_category=None,
         )
         assert config == original
@@ -142,12 +142,12 @@ def test_training_probe_redacts_failure_and_preserves_artifact(
     tmp_path, monkeypatch, local_tracking, engine
 ):
     """Diagnostic exceptions cannot leak sample values or fail a successful model fit."""
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
     from skyulf.integrations.databricks.training.shared import preprocessing_checks
 
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [2.0, 4.0, 6.0, 8.0]})
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         {"preprocessing": [], "modeling": {"type": "linear_regression"}},
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -181,14 +181,14 @@ def test_training_probe_records_window_context_without_partitioning(
     tmp_path, local_tracking, engine
 ):
     """A successfully fitted window model must remain a context requirement in reports."""
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
     from skyulf.integrations.databricks.training.shared.preprocessing_checks import (
         log_preprocessing_probe,
     )
 
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [2.0, 4.0, 6.0, 8.0]})
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         {
             "preprocessing": [
                 {

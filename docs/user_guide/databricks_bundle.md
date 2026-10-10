@@ -1038,7 +1038,7 @@ Parsing rules are saved with the candidate's training specification and dataset
 identity. Approval replays those saved rules. The job's cron timezone only
 controls when it runs; it does not define the source timestamps' timezone.
 For Python APIs, use `TrainingDateSpec` in the
-[local training guide](databricks_local_sdk.md#train-a-candidate-when-labels-are-ready).
+[Python SDK training guide](databricks_sdk.md#train-a-candidate-when-labels-are-ready).
 The supported format vocabulary is a subset of Python's
 [strptime directives](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes);
 source timezone rules use [IANA zoneinfo](https://docs.python.org/3/library/zoneinfo.html).
@@ -1461,17 +1461,19 @@ The library's `skyulf.integrations.databricks` modules are grouped under `jobs`,
 subpackages: `jobs/{training,monitoring,lifecycle,shared}`,
 `training/{fitting,competition,tuning,thresholds,weights,shared}` and
 `scoring/{batch,incremental,shared}`. Monitoring lives in
-`observability/monitoring`, with `local`, `spark` and `performance` subpackages;
+`observability/monitoring`, with `spark`, `performance` and `serving` subpackages;
 charts and reports have their own folders. For example, notebook adapters import
 `skyulf.integrations.databricks.jobs.shared.job_runtime`.
-Use these paths for new code. `_compat` preserves old module imports
-and serialized class references; it contains aliases, not a second runtime.
+Use these paths directly. The old `local_*` integration modules and renamed
+APIs have been removed; update existing imports and model packages as described
+in [upgrading integration code](databricks_sdk.md#upgrading-integration-code).
 The generated project's `src/jobs` directory remains unchanged.
 
 The related MLflow library follows the same organization:
 `skyulf.integrations.mlflow.{models,spark,lifecycle,registration,runs,shared}`.
-Its `_compat` aliases preserve existing model class and notebook import paths.
-Package import still leaves MLflow optional; pyfunc adapters load it when selected.
+Use `models.pipeline_model` and `models.feature_model` for fitted-pipeline
+adapters. Package import leaves MLflow optional; pyfunc adapters load it when
+selected.
 Worker source snapshots and certificates continue to cover the entire Skyulf
 package after the files move.
 

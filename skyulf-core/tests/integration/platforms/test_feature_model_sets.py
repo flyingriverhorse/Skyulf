@@ -89,14 +89,14 @@ def test_set_logger_uses_native_union_instead_of_discarding_binding(tmp_path, mo
     pytest.importorskip("mlflow")
     from skyulf.integrations.databricks.feature_store import snapshots
     from skyulf.integrations.databricks.model_sets import model_set_project as project
-    from skyulf.integrations.mlflow.models import local_feature_model
+    from skyulf.integrations.mlflow.models import feature_model
 
     source, artifact, training_set = object(), object(), object()
     binding = _binding()
     lookup = Mock(return_value=training_set)
     log = Mock(return_value="runs:/run/set")
     monkeypatch.setattr(project, "model_set_training_set", lookup, raising=False)
-    monkeypatch.setattr(local_feature_model, "log_feature_model_set", log)
+    monkeypatch.setattr(feature_model, "log_feature_model_set", log)
     monkeypatch.setattr(snapshots, "validate_snapshots", Mock())
     result = project._log_training_set_package(
         None, source, artifact, tmp_path, binding, "run", "set", "tracking"
@@ -112,11 +112,11 @@ def test_set_logger_rechecks_feature_version_before_registration(tmp_path, monke
     pytest.importorskip("mlflow")
     from skyulf.integrations.databricks.feature_store import snapshots
     from skyulf.integrations.databricks.model_sets import model_set_project as project
-    from skyulf.integrations.mlflow.models import local_feature_model
+    from skyulf.integrations.mlflow.models import feature_model
 
     log = Mock(return_value="runs:/run/set")
     monkeypatch.setattr(project, "model_set_training_set", Mock())
-    monkeypatch.setattr(local_feature_model, "log_feature_model_set", log)
+    monkeypatch.setattr(feature_model, "log_feature_model_set", log)
     monkeypatch.setattr(
         snapshots, "validate_snapshots", Mock(side_effect=ValueError("feature drift"))
     )

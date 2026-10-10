@@ -298,7 +298,3 @@ def _validate_cv_model(spec: CVSpec, config: dict[str, Any], event_column: str |
         raise ValueError("Stratified CV requires a classification model.")
     if spec.temporal and not event_column:
         raise ValueError("Time-series CV requires window selection with an explicit event_column.")
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-LocalCVSpec = CVSpec

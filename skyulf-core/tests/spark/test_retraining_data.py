@@ -17,8 +17,8 @@ from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _pandas_source_types,
     _training_partition,
 )
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     split_labeled_snapshot,
 )
 
@@ -26,7 +26,7 @@ from skyulf.integrations.databricks.training.fitting.local_retraining import (
 def _spec(**changes):
     """Give parity cases the same explicit split and safety policy as local training."""
     return replace(
-        LocalTrainingSpec(
+        TrainingSpec(
             table="a.b.c",
             version=1,
             record_key_columns=("id",),

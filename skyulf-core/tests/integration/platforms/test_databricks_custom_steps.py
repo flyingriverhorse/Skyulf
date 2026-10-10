@@ -303,10 +303,10 @@ def test_custom_steps_train_and_reload_without_editable_code(
 ):
     """The completeness filter, learned frequencies and saved package must compose end to end."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.inference.fitted_pipeline import predict_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         split_labeled_snapshot,
     )
 
@@ -324,7 +324,7 @@ def test_custom_steps_train_and_reload_without_editable_code(
             "target": np.arange(1, 17, dtype=float) * 20 + 1,
         }
     )
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.records",
         version=0,
         record_key_columns=("order_id",),
@@ -338,7 +338,7 @@ def test_custom_steps_train_and_reload_without_editable_code(
     assert set(train.amount) | set(heldout.amount) == set(range(10, 121, 10))
     assert heldout.attrs["pre_split_filter_counts"][0]["excluded_rows"] == 4
     data = SplitDataset(train=_native(train, engine), test=_native(heldout, engine))
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         data,
         target_column="target",
@@ -349,7 +349,7 @@ def test_custom_steps_train_and_reload_without_editable_code(
     state = artifact.pipeline.feature_engineer.fitted_steps[0]["artifact"]
     assert state["state"]["category"] == train.category.value_counts(normalize=True).to_dict()
     score = pd.DataFrame({"category": ["A", "NEW"], "amount": [55.0, 105.0]})
-    expected = predict_local_pipeline(score, artifact)["prediction"].tolist()
+    expected = predict_pipeline(score, artifact)["prediction"].tolist()
     np.testing.assert_allclose(expected, [111.0, 211.0], atol=1e-8)
     saved_path = str(tmp_path / "artifact")
     if transport == "mlflow":
@@ -358,11 +358,11 @@ def test_custom_steps_train_and_reload_without_editable_code(
         path.write_text("raise RuntimeError('edited project')\n", encoding="utf-8")
     code = (
         "import json, sys, pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline\n"
         "rows = pd.DataFrame({'category':['A','NEW'], 'amount':[55.,105.]})\n"
         "if sys.argv[2] == 'mlflow':\n"
         "    import mlflow\n    result = mlflow.pyfunc.load_model(sys.argv[1]).predict(rows)\n"
-        "else:\n    result = predict_local_pipeline(rows, load_local_pipeline(sys.argv[1]))\n"
+        "else:\n    result = predict_pipeline(rows, load_pipeline(sys.argv[1]))\n"
         "print(json.dumps(result['prediction'].tolist()))\n"
     )
     loaded = subprocess.run(
@@ -380,7 +380,7 @@ def _log_model(tmp_path):
     """Publish to a temporary local MLflow store through the real Core integration."""
     import mlflow
 
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
@@ -389,7 +389,7 @@ def _log_model(tmp_path):
         run_name="custom_steps",
     ) as run:
         assert run.run_id is not None
-        model_uri = log_local_model(
+        model_uri = log_pipeline_model(
             tmp_path / "artifact", run_id=run.run_id, artifact_path="model", tracking_uri=uri
         )
     return mlflow.artifacts.download_artifacts(artifact_uri=model_uri, tracking_uri=uri)
@@ -400,10 +400,7 @@ def test_frequencies_are_relearned_inside_each_cv_fold(tmp_path, monkeypatch, en
     """Each validation partition must use only its own training category frequencies."""
     from sklearn.model_selection import KFold
 
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
 
@@ -431,7 +428,7 @@ def test_frequencies_are_relearned_inside_each_cv_fold(tmp_path, monkeypatch, en
     report = evaluate_training_cv(
         _native(rows, engine),
         config["pipeline"],
-        LocalCVSpec(enabled=True, folds=3, shuffle=False),
+        CVSpec(enabled=True, folds=3, shuffle=False),
         target_column="target",
     )
     assert report is not None

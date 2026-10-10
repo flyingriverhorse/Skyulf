@@ -14,19 +14,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import pandas as pd
 import polars as pl
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes
+from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
 from .....inference.fitted_pipeline import (
     FittedPipelineArtifact,
+    load_pipeline,
+    save_pipeline,
 )
-from .....inference.fitted_pipeline import (
-    load_pipeline as load_local_pipeline,
-)
-from .....inference.fitted_pipeline import (
-    save_pipeline as save_local_pipeline,
-)
-from .....inference.pipeline_evaluation import (  # noqa: F401 - public compatibility re-export
+from .....inference.pipeline_evaluation import (
     evaluate_holdout as evaluate_holdout,
 )
 from .....inference.pipeline_scoring import scoring_counts
@@ -96,7 +92,7 @@ def fit_workflow(
         raise ValueError("max_bytes must be positive.")
     _validate_training_frames(data, max_rows, max_bytes)
     pipeline = fit_threshold_pipeline(config, data, target_column)
-    save_local_pipeline(
+    save_pipeline(
         pipeline,
         artifact_path,
         use_tuned_thresholds=(
@@ -104,13 +100,13 @@ def fit_workflow(
             or bool(config.get("modeling", {}).get("tune_threshold", False))
         ),
     )
-    return load_local_pipeline(artifact_path)
+    return load_pipeline(artifact_path)
 
 
 def read_source(spark: Any, spec: SourceSpec) -> pd.DataFrame:
     """Filter and project a fixed Delta snapshot before bounded driver transfer."""
     if not isinstance(spec, SourceSpec):
-        raise TypeError("spec must be a LocalSourceSpec.")
+        raise TypeError("spec must be a SourceSpec.")
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
     start = spec.period_start.astimezone(UTC).isoformat()
     end = spec.period_end.astimezone(UTC).isoformat()
@@ -144,7 +140,7 @@ def read_source(spark: Any, spec: SourceSpec) -> pd.DataFrame:
 def score_source(spark: Any, spec: SourceSpec, prepared: PreparedWorkflow) -> ScoreResult:
     """Score one pinned period without refitting FE or writing a Delta table."""
     _validate_scoring_source(spec, prepared)
-    frame = read_local_source(spark, spec)
+    frame = read_source(spark, spec)
     predictions = (
         pd.DataFrame(columns=pd.Index(prepared.preflight.output_columns))
         if frame.empty
@@ -206,7 +202,7 @@ def _validate_training_frames(data: SplitDataset, max_rows: int, max_bytes: int)
 def _validate_scoring_source(spec: SourceSpec, prepared: PreparedWorkflow) -> None:
     """Bind scoring to the prepared source, budgets and raw input column order."""
     if not isinstance(prepared, PreparedWorkflow):
-        raise TypeError("prepared must be a PreparedLocalWorkflow.")
+        raise TypeError("prepared must be a PreparedWorkflow.")
     source = prepared.config.source
     if source.kind != "uc_table" or source.table != spec.table or source.version != spec.version:
         raise ValueError("Prepared source must match the pinned Delta table and version.")
@@ -230,17 +226,3 @@ def _validate_source_columns(spec: SourceSpec) -> None:
     names = [*spec.record_key_columns, *spec.input_columns, spec.period_column]
     if len({name.lower() for name in names}) != len(names):
         raise ValueError("Row keys, input columns and period column must be distinct.")
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-evaluate_local_holdout = evaluate_holdout
-LocalSourceSpec = SourceSpec
-LocalScoreResult = ScoreResult
-fit_local_workflow = fit_workflow
-read_local_source = read_source
-score_local_source = score_source
-
-
-# Preserve class imports exposed by earlier module paths.
-PreparedLocalWorkflow = PreparedWorkflow
-LocalPipelineArtifact = FittedPipelineArtifact

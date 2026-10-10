@@ -28,7 +28,7 @@ def _previous(model, history=None):
 
 def _changed_source(monkeypatch, batch, previous, snapshot, error=None):
     """Simulate the remote CDF boundary while keeping actual scoring and receipts."""
-    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    from skyulf.integrations.databricks.scoring.incremental.incremental_batch import (
         SourceChangeRequiresRebuild,
     )
 

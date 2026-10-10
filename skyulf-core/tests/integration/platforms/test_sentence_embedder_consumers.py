@@ -15,7 +15,7 @@ torch = pytest.importorskip("torch")
 from tests.integration.platforms.test_sentence_embedder_artifact import _pipeline
 
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.model_set import ComponentReference, save_model_set
 from skyulf.preprocessing.vectorization import sentence_embedder as embedder
 
@@ -93,8 +93,8 @@ def test_model_set_replays_exact_sentence_snapshot_offline(tmp_path):
     original_model.save_pretrained(str(source), create_model_card=False)
     assert np.count_nonzero(original_model.encode(sample["text"].tolist())) == 0
     component = tmp_path / "component"
-    save_local_pipeline(pipeline, component)
-    artifact = load_local_pipeline(component)
+    save_pipeline(pipeline, component)
+    artifact = load_pipeline(component)
     package = save_model_set(
         tmp_path / "package",
         {
@@ -112,7 +112,7 @@ def test_model_set_replays_exact_sentence_snapshot_offline(tmp_path):
     copied = package.directory / "components" / "text"
     assert (copied / "pipeline.pkl").read_bytes() == (component / "pipeline.pkl").read_bytes()
     assert (
-        load_local_pipeline(copied).manifest.project_requirements
+        load_pipeline(copied).manifest.project_requirements
         == artifact.manifest.project_requirements
     )
     query = sample.assign(record_id=[17, 3, 21, 8, 13, 1])
@@ -125,18 +125,18 @@ def test_model_set_replays_exact_sentence_snapshot_offline(tmp_path):
 def test_local_pyfunc_replays_sentence_snapshot_and_dependency_pins(tmp_path):
     """MLflow must copy native encoder bytes and install their exact optional runtime."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.models.local_model import local_model_save_options
+    from skyulf.integrations.mlflow.models.pipeline_model import pipeline_model_save_options
 
     pipeline, source, sample = _pipeline(tmp_path)
     expected = pipeline.predict(sample)
     component = tmp_path / "component"
-    save_local_pipeline(pipeline, component)
-    artifact = load_local_pipeline(component)
+    save_pipeline(pipeline, component)
+    artifact = load_pipeline(component)
     package = tmp_path / "package"
     environment = tmp_path / "environment"
     environment.mkdir()
     mlflow.pyfunc.save_model(
-        path=str(package), **local_model_save_options(artifact, component, environment)
+        path=str(package), **pipeline_model_save_options(artifact, component, environment)
     )
     pins = set((package / "requirements.txt").read_text(encoding="utf-8").splitlines())
     assert set(artifact.manifest.project_requirements) <= pins

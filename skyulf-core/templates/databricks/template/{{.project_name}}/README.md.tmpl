@@ -11,9 +11,10 @@ compute. Training and preprocessing fit in one bounded Python process on this co
 
 The setup choice is `inference_mode={{.inference_mode}}`. Here `local` means
 whole-frame scoring, including on Databricks compute. The separate SDK
-`runtime="local"` value selects integration behavior and does not detect machine
-location; UC Delta publication requires `runtime="databricks"`. `engine` chooses
-pandas or Polars. Estimate the rows and
+`runtime="standalone"` value selects general Python integration on any compute;
+UC Delta publication requires `runtime="databricks"`. `engine` chooses pandas or
+Polars independently. The old SDK `runtime="local"` value is rejected; update
+existing workflow configurations. Estimate the rows and
 bytes in **each scoring run** and the memory available to the selected compute.
 There is no universal row threshold for Spark. Local inference uses the configured
 `max_rows` and `max_input_mb` bounds. Spark inference distributes scoring through

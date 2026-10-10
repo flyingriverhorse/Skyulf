@@ -29,7 +29,7 @@ from ...mlflow.lifecycle.rejection import reject_candidate
 from ...mlflow.lifecycle.validation import ModelComparisonReport, validate_quality_policy
 from ...mlflow.registration.registry import resolve_model
 from ..shared._contracts import input_budget_bytes
-from ..training.fitting import candidate as local_retraining
+from ..training.fitting import candidate
 from ..training.shared.training_evidence import (
     load_candidate_evidence,
     validate_training_evidence,
@@ -197,10 +197,10 @@ def approve_candidate(
         client, name, candidate_version, comparison_sha256, registry_uri=registry_uri
     )
     _validate_approval_policy(config, report, expected_champion_version)
-    candidate = resolve_model(
+    resolved_candidate = resolve_model(
         name, version=candidate_version, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
-    if candidate.digest != report.candidate_digest:
+    if resolved_candidate.digest != report.candidate_digest:
         raise ValueError("Candidate model digest differs from saved comparison.")
     current = controlled_champion_version(
         name, tracking_uri=tracking_uri, registry_uri=registry_uri
@@ -215,8 +215,8 @@ def approve_candidate(
         max_rows=min(spec.max_rows, config["max_rows"]),
         max_bytes=min(spec.max_bytes, max_bytes),
     )
-    frame = local_retraining.read_training_snapshot(spark, bounded_spec)
-    _, heldout, _ = local_retraining.split_labeled_snapshot(frame, bounded_spec, engine=engine)
+    frame = candidate.read_training_snapshot(spark, bounded_spec)
+    _, heldout, _ = candidate.split_labeled_snapshot(frame, bounded_spec, engine=engine)
     if filter_evidence is not None:
         validate_training_evidence(
             filter_evidence,
@@ -278,8 +278,3 @@ def _validate_approval_policy(
         or report.quality_threshold is None
     ):
         raise ValueError("Approval policy must match the saved, absolute-quality-gated comparison.")
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-reject_local_candidate = reject_workflow_candidate
-approve_local_candidate = approve_candidate

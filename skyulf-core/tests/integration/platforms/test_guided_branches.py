@@ -134,7 +134,7 @@ def _load_configs(project):
 def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, count):
     """Initialized multi-target projects must contain every requested independent branch."""
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate(tmp_path, branch_count=count)
     factory = _factory(project)
@@ -145,7 +145,7 @@ def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, 
     configs = _load_configs(project)
     for name, config in configs.items():
         checked = validate_workflow_config(config, action="train")
-        LocalCVSpec.from_workflow(checked).validate_pipeline(
+        CVSpec.from_workflow(checked).validate_pipeline(
             checked["pipeline"], target_column=checked["target_column"]
         )
         assert checked["model_name"] == f"workspace.models.sm33_generated_{name}_dev"
@@ -155,7 +155,7 @@ def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, 
 @pytest.mark.parametrize("strategy", ["grid", "random", "halving_grid", "halving_random", "optuna"])
 def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_path, strategy):
     """Changing one branch's tuning must preserve its sibling's model, space and recipe."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate(
         tmp_path,
@@ -187,7 +187,7 @@ def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_pa
     )
     configs = _load_configs(project)
     for config in configs.values():
-        LocalCVSpec.from_workflow(config).validate_pipeline(
+        CVSpec.from_workflow(config).validate_pipeline(
             config["pipeline"], target_column=config["target_column"]
         )
     revenue, churn = configs["revenue"], configs["churn"]
@@ -213,7 +213,7 @@ def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_pa
 def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
     """Ordinary siblings must not inherit a nested branch's group or temporal metadata."""
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     settings = {"branch_1_cv_group_column": "customer"} if policy == "group_k_fold" else {}
     if policy == "time_series_split":
@@ -229,15 +229,15 @@ def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
     configs = _load_configs(project)
     for config in configs.values():
         checked = validate_workflow_config(config, action="train")
-        LocalCVSpec.from_workflow(checked).validate_pipeline(
+        CVSpec.from_workflow(checked).validate_pipeline(
             checked["pipeline"],
             target_column=checked["target_column"],
             event_column=checked.get("event_column"),
         )
     left, right = configs["branch_1"], configs["branch_2"]
     assert left["cv_inner_folds"] == 2 and left["cv_nested_type"] == policy
-    assert LocalCVSpec.from_workflow(right).inner_folds is None
-    assert LocalCVSpec.from_workflow(right).nested_type == "auto"
+    assert CVSpec.from_workflow(right).inner_folds is None
+    assert CVSpec.from_workflow(right).nested_type == "auto"
     assert right.get("cv_group_column") is None and right.get("event_column") is None
     if policy == "time_series_split":
         assert left["split_strategy"] == "temporal" and left["cv_shuffle"] is False

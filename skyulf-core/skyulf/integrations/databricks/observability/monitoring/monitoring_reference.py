@@ -7,9 +7,9 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from ....mlflow.registration.registry import (
-    load_registered_pipeline as load_registered_local_pipeline,
+    load_registered_pipeline,
+    resolve_model,
 )
-from ....mlflow.registration.registry import resolve_model
 from ....mlflow.shared._client import make_registry_client, require_mlflow
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
 from ...training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
@@ -52,7 +52,7 @@ def load_monitoring_reference(
         train = train.drop(columns=[spec.weight_column])
     policy = config.performance_policy
     if policy and policy.get("mode") != "off" and policy["baseline"]["kind"] == "training_holdout":
-        from .local.monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
+        from .monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
 
         evidence["performance_baseline"] = measure_holdout_baseline(
             artifact, spec, holdout, config, evidence["model_version"], evidence["training_run_id"]
@@ -71,7 +71,7 @@ def load_monitoring_artifact(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    artifact = load_registered_local_pipeline(
+    artifact = load_registered_pipeline(
         resolved,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,

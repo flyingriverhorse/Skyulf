@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
@@ -110,14 +110,14 @@ def test_saved_integer_cast_replays_mixed_requests_without_refitting(target, tmp
         SplitDataset(train=training.iloc[2:], test=training.iloc[:2]), target_column="target"
     )
     directory = tmp_path / "model"
-    save_local_pipeline(pipeline, directory)
+    save_pipeline(pipeline, directory)
 
     def forbidden(*args, **kwargs):
         """Loading and scoring saved casting state must never refit it."""
         raise AssertionError("Unexpected fit")
 
     monkeypatch.setattr(CastingCalculator, "fit", forbidden)
-    artifact = load_local_pipeline(directory)
+    artifact = load_pipeline(directory)
     request = pd.DataFrame({"x": [str(2**53 + 1), "1.0", "1.5", None]})
     report = probe_fitted_preprocessing(artifact, request, chunk_sizes=(1, 2))
     assert report["status"] == "passed", report

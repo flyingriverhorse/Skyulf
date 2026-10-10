@@ -299,7 +299,3 @@ def run_branch_operator(
     except BaseException:
         record_phase_failure(store, "operator")
         raise
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCandidateResult = CandidateResult

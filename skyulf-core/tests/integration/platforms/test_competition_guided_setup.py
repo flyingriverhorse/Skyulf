@@ -130,8 +130,8 @@ def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy)
     from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.integrations.databricks.projects.project import load_project_workflow
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
@@ -180,7 +180,7 @@ def test_cli_builds_selected_recipes_and_common_search(tmp_path, task, strategy)
         if strategy in {"random", "optuna", "halving_random"}:
             effective = prepare_search_pipeline(
                 pipeline,
-                LocalCVSpec.from_workflow(config),
+                CVSpec.from_workflow(config),
                 target_column="target",
                 event_column=None,
             )
@@ -203,16 +203,16 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
     from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.project import load_project_workflow
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.competition.competition import choose_winner
     from skyulf.integrations.databricks.training.competition.competition_evaluation import (
         evaluate_competition_candidate,
     )
-    from skyulf.integrations.databricks.training.competition.local_competition import choose_winner
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
@@ -252,7 +252,7 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
         },
     )
     validate_workflow_config(resolved, action="train")
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     x = np.linspace(-2, 2, 60)
     frame = pd.DataFrame(
         {"feature_value": x, "target": (x > 0).astype(int) if classification else 2 * x + 1}
@@ -264,7 +264,7 @@ def test_generated_candidates_fit_and_select_without_python_edits(tmp_path, task
         effective = prepare_search_pipeline(
             item["pipeline"], cv, target_column="target", event_column=None
         )
-        artifact = fit_local_workflow(
+        artifact = fit_workflow(
             effective,
             SplitDataset(train=frame, test=frame.head(0)),
             target_column="target",
@@ -294,8 +294,8 @@ def test_cli_keeps_each_ensemble_composition_and_controls(tmp_path, task):
     from test_databricks_bundle_generation import CLI, OFFLINE_CLI, PROFILE, _generate_project
 
     from skyulf.integrations.databricks.projects.project import load_project_workflow
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE for real CLI generation.")
@@ -347,7 +347,7 @@ def test_cli_keeps_each_ensemble_composition_and_controls(tmp_path, task):
     for index, entry in enumerate(candidates.values()):
         effective = prepare_search_pipeline(
             entry["pipeline"],
-            LocalCVSpec(enabled=True, folds=2),
+            CVSpec(enabled=True, folds=2),
             target_column="target",
             event_column=None,
         )

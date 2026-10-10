@@ -5,7 +5,7 @@ from typing import Any
 
 from ...mlflow.shared._model_metadata import normalized_dtype
 from ...mlflow.shared._nullable_transport import transport_spec
-from .contracts import PinnedEndpointPlan, _valid_uc
+from .contracts import PinnedEndpointPlan, is_uc_identifier
 from .endpoints import require_pinned_endpoint_ready
 
 _SQL_TYPES = {
@@ -20,7 +20,7 @@ _SQL_TYPES = {
 
 def _identifier(value: str, label: str) -> str:
     """Quote a supported identifier without accepting SQL expressions or fragments."""
-    if not _valid_uc(value):
+    if not is_uc_identifier(value):
         raise ValueError(f"{label} must be a simple SQL identifier (letters, digits, underscore).")
     return f"`{value}`"
 

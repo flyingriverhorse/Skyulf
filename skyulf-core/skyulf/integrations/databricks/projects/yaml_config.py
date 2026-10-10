@@ -234,9 +234,9 @@ def read_inference_config(directory: str | Path) -> dict[str, Any] | None:
     )
     _version(document, path.name)
     if "model_set" in document:
-        from ..model_sets.model_set_project import _validate_set_settings  # noqa: PLC0415
+        from ..model_sets.model_set_project import validate_model_set_settings  # noqa: PLC0415
 
-        _validate_set_settings(document["model_set"])
+        validate_model_set_settings(document["model_set"])
     return document
 
 

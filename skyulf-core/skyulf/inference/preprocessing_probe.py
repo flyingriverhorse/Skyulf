@@ -28,8 +28,7 @@ from ._probe_frames import (
     slice_frame,
     validate_frame,
 )
-from .fitted_pipeline import FittedPipelineArtifact
-from .fitted_pipeline import validate_pipeline_input as validate_local_input
+from .fitted_pipeline import FittedPipelineArtifact, validate_pipeline_input
 
 
 def _state_digest(record: dict) -> str:
@@ -246,7 +245,7 @@ def _records(artifact: FittedPipelineArtifact) -> list[tuple[dict, dict, bool]]:
 def _validate_artifact(artifact: FittedPipelineArtifact) -> None:
     """Require the standard loaded pipeline and local schema contract."""
     if type(artifact) is not FittedPipelineArtifact:
-        raise TypeError("Expected a loaded LocalPipelineArtifact.")
+        raise TypeError("Expected a loaded FittedPipelineArtifact.")
     if (
         type(artifact.pipeline) is not SkyulfPipeline
         or type(artifact.pipeline.feature_engineer) is not FeatureEngineer
@@ -308,7 +307,7 @@ def probe_fitted_preprocessing(
     validate_frame(sample, max_rows, max_bytes)
     if not len(sample):
         raise ValueError("Probe needs a nonempty sample; empty behavior is checked separately.")
-    current = validate_local_input(copy_frame(sample), artifact)
+    current = validate_pipeline_input(copy_frame(sample), artifact)
     engineer = artifact.pipeline.feature_engineer
     use_spark(current, engineer.execution_options, engineer.frame_spec)
     validate_frame(current, max_rows, max_bytes)

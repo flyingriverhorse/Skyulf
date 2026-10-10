@@ -328,14 +328,14 @@ def test_completed_training_packages_original_registered_components(
 ):
     """Real completed training must become a frozen set with no component alias changes."""
     mlflow = pytest.importorskip("mlflow")
-    from test_local_branches import _configs, _data
+    from test_training_branches import _configs, _data
 
     from skyulf.inference.model_set_scoring import predict_model_set
     from skyulf.integrations.databricks.model_sets.model_set_project import (
         package_training_model_set,
     )
-    from skyulf.integrations.databricks.training import local_branches
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training import branches as local_branches
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
     from skyulf.integrations.mlflow.models.model_set import load_registered_model_set
 
     store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
@@ -345,12 +345,12 @@ def test_completed_training_packages_original_registered_components(
     configs.pop("ensemble")
     configs["amount"]["cv_enabled"] = False
     monkeypatch.setattr(
-        local_retraining,
+        candidate,
         "read_training_snapshot",
         lambda spark, spec: _data().loc[:, list(spec.source_columns)].copy(),
     )
     branches = local_branches.prepare_training_branches(None, configs)
-    outcome = local_branches.train_local_branches(
+    outcome = local_branches.train_branches(
         None,
         branches,
         tracking_uri=store,

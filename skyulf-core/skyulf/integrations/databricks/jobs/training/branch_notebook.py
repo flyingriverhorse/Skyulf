@@ -177,15 +177,13 @@ def run_branch_training_notebook(
         )
     from ...training.branches import (  # noqa: PLC0415 - load training services after preflight
         prepare_training_branches,
-    )
-    from ...training.branches import (  # noqa: PLC0415 - load after preflight
-        train_branches as train_local_branches,
+        train_branches,
     )
 
     branches = prepare_training_branches(spark, configs, champion_versions=champion_versions)
     base = next(iter(configs.values()))
     with tempfile.TemporaryDirectory(prefix="skyulf-branches-") as directory:
-        outcome = train_local_branches(
+        outcome = train_branches(
             spark,
             branches,
             **project_endpoints(base),

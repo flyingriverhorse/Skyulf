@@ -19,11 +19,7 @@ tokenizer_modules = pytest.importorskip(
 torch = pytest.importorskip("torch")
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -73,7 +69,7 @@ def test_embedding_artifact_replays_in_fresh_offline_process(tmp_path):
     """The fitted model must carry its encoder after source removal and cache isolation."""
     pipeline, source, sample = _pipeline(tmp_path)
     expected = pipeline.predict(sample).tolist()
-    save_local_pipeline(pipeline, tmp_path / "artifact")
+    save_pipeline(pipeline, tmp_path / "artifact")
     source.rename(tmp_path / "source-unavailable")
     script = """
 import json, socket, sys
@@ -82,9 +78,9 @@ def blocked(*args, **kwargs):
 socket.socket.connect = blocked
 socket.create_connection = blocked
 import pandas as pd
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-artifact = load_local_pipeline(sys.argv[1])
-result = predict_local_pipeline(pd.DataFrame(json.loads(sys.argv[2])), artifact)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+artifact = load_pipeline(sys.argv[1])
+result = predict_pipeline(pd.DataFrame(json.loads(sys.argv[2])), artifact)
 print('RESULT=' + json.dumps(result.to_dict(orient='list')))
 """
     env = {
@@ -119,12 +115,12 @@ print('RESULT=' + json.dumps(result.to_dict(orient='list')))
 def test_embedding_dependency_pins_travel_with_local_manifest(tmp_path):
     """MLflow must install the optional runtime required by the saved embedding bytes."""
     pipeline, _, sample = _pipeline(tmp_path)
-    save_local_pipeline(pipeline, tmp_path / "artifact")
-    restored = load_local_pipeline(tmp_path / "artifact")
+    save_pipeline(pipeline, tmp_path / "artifact")
+    restored = load_pipeline(tmp_path / "artifact")
     pins = {pin.split("==")[0] for pin in restored.manifest.project_requirements}
     assert {"sentence-transformers", "transformers", "torch", "tokenizers"} <= pins
     np.testing.assert_allclose(
-        predict_local_pipeline(sample, restored)["prediction"], pipeline.predict(sample)
+        predict_pipeline(sample, restored)["prediction"], pipeline.predict(sample)
     )
 
 
@@ -138,7 +134,7 @@ def test_saved_encoder_probe_reuses_exact_weights_after_cache_loss(tmp_path, mon
     expected = pipeline.predict(sample)
     with torch.no_grad():
         embedder._MODEL_CACHE[str(source)][0].emb_layer.weight.zero_()
-    save_local_pipeline(pipeline, tmp_path / "artifact")
+    save_pipeline(pipeline, tmp_path / "artifact")
     source.rename(tmp_path / "source-unavailable")
     monkeypatch.setattr(embedder, "_MODEL_CACHE", {})
 
@@ -147,8 +143,8 @@ def test_saved_encoder_probe_reuses_exact_weights_after_cache_loss(tmp_path, mon
         raise AssertionError("Saved apply tried to load the original model")
 
     monkeypatch.setattr(sentence_transformers.SentenceTransformer, "__init__", forbidden)
-    artifact = load_local_pipeline(tmp_path / "artifact")
+    artifact = load_pipeline(tmp_path / "artifact")
     report = probe_fitted_preprocessing(artifact, sample)
     assert report["status"] == "passed", report
     assert report["steps"][0]["context"] == "row"
-    np.testing.assert_array_equal(predict_local_pipeline(sample, artifact)["prediction"], expected)
+    np.testing.assert_array_equal(predict_pipeline(sample, artifact)["prediction"], expected)

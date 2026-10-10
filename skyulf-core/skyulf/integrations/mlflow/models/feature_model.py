@@ -13,7 +13,7 @@ from uuid import uuid4
 import mlflow  # ty: ignore[unresolved-import]
 import numpy as np
 
-from ....inference.fitted_pipeline import load_pipeline as load_local_pipeline
+from ....inference.fitted_pipeline import load_pipeline
 from ....inference.model_set import load_model_set
 from ...databricks.feature_store.config import FeatureTrainingSpec
 from ...databricks.feature_store.lifecycle_config import (
@@ -21,16 +21,14 @@ from ...databricks.feature_store.lifecycle_config import (
     parse_feature_binding,
     serialize_feature_spec,
 )
-from ...databricks.feature_store.runtime import _client
+from ...databricks.feature_store.runtime import feature_engineering_client
 from ..shared._client import make_tracking_client
 from ..shared._model_metadata import mlflow_dtype, normalized_dtype, scrub_local_artifact_uri
 from ..shared._nullable_transport import TRANSPORT_KEY, transport_spec
 from ._feature_package_spec import validate_native_training_set, validate_saved_feature_spec
 from .pipeline_model import (
-    pipeline_model_save_options as local_model_save_options,
-)
-from .pipeline_model import (
-    validate_local_destination,
+    pipeline_model_save_options,
+    validate_model_destination,
 )
 
 FEATURE_STORE_KEY = "skyulf_feature_store"
@@ -251,7 +249,7 @@ def _log_feature_options(
     )
     with _active_logging_run(run_id, tracking_uri) as tracking:
         sdk_path = f"skyulf_feature_source_{uuid4().hex}"
-        logged = _client(client).log_model(
+        logged = feature_engineering_client(client).log_model(
             model=options["python_model"],
             flavor=mlflow.pyfunc,
             training_set=training_set,
@@ -289,15 +287,15 @@ def log_feature_pipeline_model(
     Nullable integer/boolean transport is rejected until the SDK provides a
     post-lookup encoder. Cloud acceptance remains a separate runtime check.
     """
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     path = Path(local_artifact_path).resolve()
-    artifact = load_local_pipeline(path)
+    artifact = load_pipeline(path)
     columns = list(
         zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
     )
     binding = _validate_contract(training_set, lookup_spec, lookup_binding, columns)
     with tempfile.TemporaryDirectory(prefix="skyulf-feature-local-") as directory:
-        options = local_model_save_options(artifact, path, Path(directory))
+        options = pipeline_model_save_options(artifact, path, Path(directory))
         return _log_feature_options(
             options,
             training_set=training_set,
@@ -323,7 +321,7 @@ def log_feature_model_set(
     """Log one complete fitted model set against its compatible union lookup contract."""
     from .model_set import model_set_save_options  # noqa: PLC0415 - avoid registry import cycle
 
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
     columns = [(column.name, column.dtype) for column in artifact.manifest.input_schema]
     binding = _validate_contract(training_set, lookup_spec, lookup_binding, columns)
@@ -348,13 +346,9 @@ def copy_feature_package(
     tracking_uri: str | None = None,
 ) -> str:
     """Adopt a verified complete native package without rebuilding its training lineage."""
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     feature_package_models(local_path)
     tracking = make_tracking_client(tracking_uri)
     tracking.get_run(run_id)
     tracking.log_artifacts(run_id, str(Path(local_path).resolve()), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
-
-
-# Released names remain aliases for imports and stored pickle references.
-log_local_feature_model = log_feature_pipeline_model

@@ -25,12 +25,10 @@ from .fitting.candidate import (
     CandidateResult,
     TrainingSpec,
     candidate_config,
+    train_candidate,
     training_spec_payload,
     validate_cv_holdout_policy,
     validate_pre_split_step,
-)
-from .fitting.candidate import (
-    train_candidate as train_local_candidate,
 )
 from .tuning.cv import CVSpec
 from .weights.weight_config import validate_weight_roles
@@ -418,7 +416,7 @@ def train_branch(
     evaluation_charts: dict[str, Any] | None = None,
 ) -> CandidateResult:
     """Delegate fitting, registration and comparison to the existing candidate service."""
-    return train_local_candidate(
+    return train_candidate(
         spark,
         branch.spec,
         branch.pipeline,
@@ -504,13 +502,3 @@ def train_branches(
         run.client.log_dict(run.run_id, asdict(result), "branch_training_result.json")
         log_progress(run, completed, status="complete")
     return result
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-train_local_branches = train_branches
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalTrainingSpec = TrainingSpec
-LocalCandidateResult = CandidateResult
-LocalCVSpec = CVSpec

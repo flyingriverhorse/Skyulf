@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from typing import Any
 
 from .....inference.fitted_pipeline import FittedPipelineArtifact
-from .....inference.pipeline_scoring import pipeline_history_session as local_history_session
+from .....inference.pipeline_scoring import pipeline_history_session
 from .....preprocessing.time_series.history import TemporalHistorySession
 
 
@@ -20,7 +20,7 @@ def prediction_history(
     artifact = prepared.artifact
     if not isinstance(artifact, FittedPipelineArtifact):
         return nullcontext(None)
-    return local_history_session(artifact, state, bootstrap=bootstrap)
+    return pipeline_history_session(artifact, state, bootstrap=bootstrap)
 
 
 def incremental_history(prepared: Any, previous: dict | None) -> Any:
@@ -56,7 +56,3 @@ def bind_period_history(manifest: dict[str, Any], session: Any, previous: Any) -
         allow_nan=False,
     ).encode()
     return manifest | fields | {"request_digest": hashlib.sha256(fingerprint).hexdigest()}
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalPipelineArtifact = FittedPipelineArtifact

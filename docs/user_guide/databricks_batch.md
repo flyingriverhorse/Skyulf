@@ -7,7 +7,7 @@ feature engineering or the model. Scheduling remains the caller's responsibility
 
 Choose the execution path based on the artifact and input size. `run_batch`
 keeps inference distributed through the portable Spark bundle. For bounded
-pandas/Polars scoring, use [`run_frame_batch`](databricks_local_sdk.md#publish-one-scored-month-to-a-uc-delta-table):
+pandas/Polars scoring, use [`run_frame_batch`](databricks_sdk.md#publish-one-scored-month-to-a-uc-delta-table):
 Spark reads the pinned source, Python scores the selected frame, and the guarded
 writer publishes it to UC Delta. `runtime="databricks"` is required for this
 UC sink; it does not change the pipeline's pandas/Polars engine.

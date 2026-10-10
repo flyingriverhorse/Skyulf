@@ -11,12 +11,10 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 from ....inference.model_set import ModelSetArtifact
 from ...mlflow.lifecycle.validation import (
     ModelComparisonReport,
+    compare_registered_pipeline_models,
     comparison_payload,
     quality_gate_results,
     quality_gates_pass,
-)
-from ...mlflow.lifecycle.validation import (
-    compare_registered_pipeline_models as compare_registered_local_models,
 )
 from ...mlflow.registration.registry import resolve_model
 from ..jobs.shared.notebook_diagnostics import notebook_task
@@ -112,7 +110,7 @@ def _evaluate_component(
     heldout = _heldout(
         spark, spec, engine, evidence, {"max_rows": max_rows, "max_bytes": max_bytes}
     )
-    fresh = compare_registered_local_models(
+    fresh = compare_registered_pipeline_models(
         candidate,
         previous,
         heldout,

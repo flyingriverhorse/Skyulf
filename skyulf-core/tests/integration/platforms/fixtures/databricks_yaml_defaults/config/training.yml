@@ -3,6 +3,7 @@ defaults:
   config_version: 1
   training_layout: single_model
   engine: pandas
+  preprocessing_probe: false
   training_table: "{catalog}.{input_schema}.sm33_generated_source"
   record_key_columns: [entity_id]
   model_name: "{catalog}.{metadata_schema}.sm33_generated_model{resource_suffix}"

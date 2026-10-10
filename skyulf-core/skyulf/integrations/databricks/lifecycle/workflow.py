@@ -32,7 +32,7 @@ from ..data.admission import SingleWriterAdmission
 from ..data.training.training_dates import training_date_spec
 from ..observability.reports.explanations import validate_explanation_config
 from ..scoring.incremental.incremental_batch import (
-    run_incremental_batch as run_incremental_local_batch,
+    run_incremental_batch,
 )
 from ..scoring.shared.prediction_output import (
     IDENTIFIER_PATTERN,
@@ -47,9 +47,7 @@ from ..scoring.workflow import (
     ModelSelection,
     OutputSink,
     WorkflowConfig,
-)
-from ..scoring.workflow import (
-    prepare_workflow as prepare_local_workflow,
+    prepare_workflow,
 )
 from ..shared._contracts import input_budget_bytes
 from ..training.fitting.candidate import (
@@ -57,18 +55,15 @@ from ..training.fitting.candidate import (
     TrainingSpec,
     read_training_snapshot,
     split_labeled_snapshot,
+    train_candidate,
     validate_cv_holdout_policy,
-)
-from ..training.fitting.candidate import (
-    train_candidate as train_local_candidate,
 )
 from ..training.shared.training_evidence import (
     load_candidate_evidence,
     validate_training_evidence,
 )
 from ..training.tuning.cv import CVSpec
-from .approval import approve_candidate as approve_local_candidate
-from .approval import reject_workflow_candidate as reject_local_candidate
+from .approval import approve_candidate, reject_workflow_candidate
 
 _TABLE_FIELDS = (
     "training_table",
@@ -623,7 +618,7 @@ def _run_training_action(
         registry_uri=registry_uri,
     )
     try:
-        candidate = train_local_candidate(
+        candidate = train_candidate(
             spark,
             spec,
             config["pipeline"],
@@ -686,14 +681,14 @@ def _run_scoring_action(
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
         managed_prediction_view_exists(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
-    prepared = prepare_local_workflow(_scoring_config(score_config))
+    prepared = prepare_workflow(_scoring_config(score_config))
     from ..scoring.batch.spark_scoring import validate_prepared_spark  # noqa: PLC0415
 
     if config.get("inference_mode", "local") == "spark":
         validate_prepared_spark(prepared)
     if recovery_request is None:
         provision_prediction_table(spark, score_config, prepared)
-    result = run_incremental_local_batch(
+    result = run_incremental_batch(
         spark,
         prepared,
         record_key_columns=tuple(config["record_key_columns"]),
@@ -761,7 +756,7 @@ def run_action(
             config, promotion_receipt, expected_champion_version, tracking_uri, registry_uri
         )
     if action == "reject":
-        return reject_local_candidate(
+        return reject_workflow_candidate(
             config,
             candidate_version=candidate_version,
             comparison_sha256=comparison_sha256,
@@ -771,7 +766,7 @@ def run_action(
     if action == "approve":
         if policy != "manual_approval" or "promotion_policy" not in config:
             raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
-        return approve_local_candidate(
+        return approve_candidate(
             spark,
             config,
             candidate_version=candidate_version,
@@ -799,10 +794,3 @@ def run_action(
             recovery_request=recovery_request,
         )
     raise ValueError(f"Unknown workflow action: {action}.")
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalTrainingSpec = TrainingSpec
-LocalCandidateResult = CandidateResult
-LocalWorkflowConfig = WorkflowConfig
-LocalCVSpec = CVSpec

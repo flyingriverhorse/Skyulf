@@ -1,0 +1,711 @@
+"""Label-aware local candidate training from pinned Databricks snapshots."""
+
+import json
+import subprocess
+import sys
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+import polars as pl
+import pytest
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
+from skyulf.integrations.databricks.training.fitting import candidate as retraining
+from skyulf.integrations.mlflow.lifecycle.validation import comparison_payload
+
+
+def _spec(**changes):
+    """Keep training, holdout and label cutoffs explicit in tests."""
+    values: dict[str, Any] = {
+        "table": "workspace.test.labels",
+        "version": 4,
+        "start": datetime(2026, 1, 1, tzinfo=UTC),
+        "holdout_start": datetime(2026, 2, 1, tzinfo=UTC),
+        "cutoff": datetime(2026, 3, 1, tzinfo=UTC),
+        "split_strategy": "temporal",
+        "filter_unavailable_results": True,
+        "result_cutoff": datetime(2026, 3, 1, tzinfo=UTC),
+        "event_column": "event_time",
+        "result_available_at_column": "label_at",
+        "record_key_columns": ("id",),
+        "input_columns": ("x",),
+        "target_column": "target",
+        "max_rows": 10,
+        "max_bytes": 10000,
+    }
+    values.update(changes)
+    return retraining.TrainingSpec(**values)
+
+
+def _frame():
+    """Include an unavailable label and rows straddling the temporal holdout."""
+    return pd.DataFrame(
+        {
+            "id": [3, 1, 4, 2, 5],
+            "event_time": pd.to_datetime(
+                ["2026-02-10", "2026-01-10", "2026-02-11", "2026-01-11", "2026-02-12"], utc=True
+            ),
+            "label_at": pd.to_datetime(
+                ["2026-02-15", "2026-01-15", "2026-03-02", "2026-01-16", "2026-02-16"], utc=True
+            ),
+            "x": [3.0, 1.0, 4.0, 2.0, 5.0],
+            "target": [6.0, 2.0, 8.0, 4.0, 10.0],
+        }
+    )
+
+
+def test_split_excludes_late_labels_and_preserves_temporal_boundary():
+    """A label unavailable at cutoff must never enter fit or evaluation."""
+    train, holdout, skipped = retraining.split_labeled_snapshot(_frame(), _spec())
+    assert train["x"].tolist() == [1.0, 2.0]
+    assert holdout["x"].tolist() == [3.0, 5.0]
+    assert skipped == 1
+    assert "event_time" not in train.columns
+
+
+def test_split_is_reproducible_under_source_row_reordering():
+    """Snapshot row order cannot change the train or holdout membership."""
+    first = retraining.split_labeled_snapshot(_frame(), _spec())
+    second = retraining.split_labeled_snapshot(_frame().sample(frac=1, random_state=4), _spec())
+    pd.testing.assert_frame_equal(first[0], second[0])
+    pd.testing.assert_frame_equal(first[1], second[1])
+    assert first[2] == second[2]
+
+
+def test_split_rejects_event_after_label_and_unpinned_source():
+    """Invalid temporal provenance must fail before training begins."""
+    frame = _frame()
+    frame.loc[0, "label_at"] = pd.Timestamp("2026-02-01", tz="UTC")
+    with pytest.raises(ValueError, match="event time"):
+        retraining.split_labeled_snapshot(frame, _spec())
+    with pytest.raises(ValueError, match="version"):
+        _spec(version=None)
+
+
+def test_reader_pins_projects_and_limits_before_collecting(monkeypatch):
+    """Training must not materialize a whole unversioned Delta table."""
+    source = MagicMock()
+    source.read.format.return_value = source.read
+    source.read.option.return_value = source.read
+    source.read.table.return_value = source
+    source.where.return_value = source
+    source.select.return_value = source
+    source.orderBy.return_value = source
+    source.limit.return_value = source
+    row = _frame().iloc[0].to_dict()
+    row["event_time"] = int(row["event_time"].value // 1000)
+    row["label_at"] = int(row["label_at"].value // 1000)
+    source.toLocalIterator.return_value = iter([row])
+    monkeypatch.setattr(retraining, "normalize_training_dates", lambda frame, **kwargs: frame)
+    frame = retraining.read_training_snapshot(source, _spec())
+    source.read.option.assert_called_once_with("versionAsOf", 4)
+    source.where.assert_called_once()
+    source.select.assert_called_once_with("id", "event_time", "label_at", "x", "target")
+    source.limit.assert_called_once_with(11)
+    assert len(frame) == 1
+    assert frame.iloc[0]["event_time"] == _frame().iloc[0]["event_time"]
+
+
+def test_split_rejects_naive_times_without_an_explicit_timezone():
+    """Naive pandas input must obey the same source-zone policy as distributed reads."""
+    frame = _frame()
+    frame["event_time"] = frame["event_time"].dt.tz_localize(None)
+    with pytest.raises(ValueError, match="timezone"):
+        retraining.split_labeled_snapshot(frame, _spec())
+
+
+def test_training_boundary_order_uses_instants_across_dst_folds():
+    """Repeated-hour wall-clock order must not invert the actual pinned window."""
+    zone = ZoneInfo("Europe/Vilnius")
+    with pytest.raises(ValueError, match="start < holdout_start"):
+        _spec(
+            start=datetime(2026, 10, 25, 3, 15, tzinfo=zone, fold=1),
+            holdout_start=datetime(2026, 10, 25, 3, 45, tzinfo=zone, fold=0),
+            cutoff=datetime(2026, 10, 25, 4, tzinfo=zone),
+        )
+
+
+def test_split_parses_independent_event_and_result_rules_and_null_labels():
+    """Mixed source calendars preserve split membership and unknown label availability."""
+    frame = _frame()
+    frame["event_time"] = (
+        frame["event_time"].dt.tz_convert("Asia/Tokyo").dt.strftime("%d/%m/%Y %H:%M")
+    )
+    frame["label_at"] = frame["label_at"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+    frame.loc[2, "label_at"] = None
+    spec = _spec(
+        event_time_parsing=TrainingDateSpec(format="%d/%m/%Y %H:%M", timezone="Asia/Tokyo"),
+        result_time_parsing=TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z"),
+    )
+    train, holdout, skipped = retraining.split_labeled_snapshot(frame, spec)
+    assert train["x"].tolist() == [1.0, 2.0]
+    assert holdout["x"].tolist() == [3.0, 5.0]
+    assert skipped == 1
+    assert spec.dataset_id != _spec().dataset_id
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_temporal_split_fits_real_skyulf_pipeline_without_holdout_leakage(tmp_path, engine):
+    """Both local engines must fit on past labels and score unseen later rows."""
+    train, holdout, _ = retraining.split_labeled_snapshot(_frame(), _spec())
+    native_train = pl.from_pandas(train) if engine == "polars" else train
+    native_holdout = pl.from_pandas(holdout) if engine == "polars" else holdout
+    artifact = retraining.fit_workflow(
+        {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+        SplitDataset(train=native_train, test=native_train.head(0)),
+        target_column="target",
+        artifact_path=tmp_path / engine,
+        max_rows=10,
+        max_bytes=10000,
+    )
+    metrics = retraining.evaluate_holdout(artifact, native_holdout, target_column="target")
+    assert metrics["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
+
+
+def test_failed_candidate_never_mutates_champion(monkeypatch, tmp_path):
+    """A failed publication leaves promotion to an explicit later operation."""
+    from sklearn.linear_model import LinearRegression
+
+    spec = _spec()
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda spark, request: _frame())
+    monkeypatch.setattr(
+        retraining,
+        "fit_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest=SimpleNamespace(pipeline_sha256="a" * 64, project_source_sha256=None),
+            pipeline=SimpleNamespace(
+                config=args[0],
+                model_estimator=SimpleNamespace(_unwrap_tuned_model=lambda: LinearRegression()),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        retraining, "evaluate_holdout", lambda *args, **kwargs: {"heldout_rmse": 0.1}
+    )
+    monkeypatch.setattr(retraining, "log_pipeline_model", lambda *args, **kwargs: "runs:/run/model")
+    monkeypatch.setattr(
+        retraining,
+        "register_model",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("publish failed")),
+    )
+    monkeypatch.setattr(
+        retraining,
+        "resolve_model",
+        lambda *args, **kwargs: pytest.fail("alias must not be read before publish"),
+    )
+
+    @contextmanager
+    def fake_run(*args, **kwargs):
+        """Let publication fail after recording without contacting MLflow."""
+        yield SimpleNamespace(
+            run_id="run",
+            client=SimpleNamespace(log_dict=lambda *args, **kwargs: None),
+            log_config=lambda *args, **kwargs: None,
+            log_params=lambda *args, **kwargs: None,
+            set_tags=lambda *args, **kwargs: None,
+            log_metrics=lambda *args, **kwargs: None,
+        )
+
+    monkeypatch.setattr(retraining, "track_run", fake_run)
+    with pytest.raises(RuntimeError, match="publish failed"):
+        retraining.train_candidate(
+            None,
+            spec,
+            {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+            model_name="workspace.test.model",
+            tracking_uri="file:unused",
+            registry_uri="file:unused",
+            experiment_name="test",
+            run_name="candidate",
+            artifact_path=tmp_path / "artifact",
+            metric="heldout_rmse",
+            min_improvement=0,
+        )
+
+
+def test_invalid_comparison_request_fails_before_mlflow_publication(monkeypatch, tmp_path):
+    """An unusable metric must not create an orphan candidate version."""
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    monkeypatch.setattr(
+        retraining,
+        "read_training_snapshot",
+        lambda *args: pytest.fail("invalid metric must fail before reading training data"),
+    )
+    monkeypatch.setattr(
+        retraining,
+        "fit_workflow",
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest=SimpleNamespace(pipeline_sha256="a" * 64, project_source_sha256=None)
+        ),
+    )
+    monkeypatch.setattr(
+        retraining, "evaluate_holdout", lambda *args, **kwargs: {"heldout_rmse": 0.1}
+    )
+    monkeypatch.setattr(
+        retraining,
+        "register_model",
+        lambda *args, **kwargs: pytest.fail("invalid comparison must not register"),
+    )
+    with pytest.raises(ValueError, match="supported heldout metric"):
+        retraining.train_candidate(
+            None,
+            _spec(),
+            {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+            model_name="workspace.test.model",
+            tracking_uri=store,
+            registry_uri=store,
+            experiment_name="test",
+            run_name="candidate",
+            artifact_path=tmp_path / "artifact",
+            metric="heldout_not_a_metric",
+            min_improvement=0,
+        )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_path, engine):
+    """A real local MLflow run must retain model, metrics and comparison evidence."""
+    import mlflow
+
+    x = list(range(12))
+    frame = pd.DataFrame(
+        {
+            "id": x,
+            "event_time": pd.to_datetime(["2026-01-10"] * 8 + ["2026-02-10"] * 4, utc=True),
+            "label_at": pd.to_datetime(["2026-01-11"] * 8 + ["2026-02-11"] * 4, utc=True),
+            "x": pd.Series(x, dtype="float64"),
+            "target": pd.Series([2 * value for value in x], dtype="float64"),
+        }
+    )
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda spark, request: frame)
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
+    client.create_experiment("candidate_test", artifact_location=(tmp_path / "mlruns").as_uri())
+    result = retraining.train_candidate(
+        None,
+        _spec(max_rows=12, max_bytes=20000),
+        {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+        model_name=f"candidate_{engine}",
+        tracking_uri=store,
+        registry_uri=store,
+        experiment_name="candidate_test",
+        run_name=engine,
+        artifact_path=tmp_path / "artifact",
+        metric="heldout_rmse",
+        min_improvement=0,
+        engine=engine,
+    )
+    run = client.get_run(result.run_id)
+    artifacts = {artifact.path for artifact in client.list_artifacts(result.run_id)}
+    assert result.model_version == "1"
+    assert result.training_rows == 8 and result.holdout_rows == 4
+    assert result.comparison.reason == "no_champion"
+    assert run.data.metrics["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
+    assert "candidate_comparison.json" in artifacts
+    assert "candidate_training_spec.json" in artifacts
+    assert "model" in artifacts
+    assert run.data.tags["task"] == "training"
+    assert "dataset_id" not in run.data.tags and "phase" not in run.data.tags
+    assert run.data.tags["train_data_destination"] == _spec().table
+    assert run.data.tags["train_data_version"] == str(_spec().version)
+    assert run.data.tags["test_data_version"] == str(_spec().version)
+    assert "training_data.json" in artifacts
+    model_tags = client.get_model_version(f"candidate_{engine}", "1").tags
+    assert model_tags["engine"] == engine
+    assert model_tags["model_type"] == "linear_regression"
+    assert model_tags["train_data_destination"] == _spec().table
+    registrations = []
+    original_compare = retraining.compare_registered_pipeline_models
+
+    def compare_after_registration(candidate, *args, **kwargs):
+        """Comparison must follow the orchestrator's explicit registration hook."""
+        assert registrations == [candidate]
+        return original_compare(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(
+        retraining, "compare_registered_pipeline_models", compare_after_registration
+    )
+    next_result = retraining.train_candidate(
+        None,
+        _spec(max_rows=12, max_bytes=20000),
+        {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+        model_name=f"candidate_{engine}",
+        tracking_uri=store,
+        registry_uri=store,
+        experiment_name="candidate_test",
+        run_name=f"{engine}-challenger",
+        artifact_path=tmp_path / "artifact2",
+        metric="heldout_rmse",
+        min_improvement=0,
+        engine=engine,
+        champion_version=result.model_version,
+        on_registered=registrations.append,
+    )
+    assert next_result.model_version == "2"
+    assert next_result.comparison.champion_version == "1"
+    assert next_result.comparison.eligible is False
+    with pytest.raises(Exception, match="alias|Alias"):
+        client.get_model_version_by_alias(result.model_name, "champion")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_saved_filter_evidence_replays_after_project_file_changes(monkeypatch, tmp_path, engine):
+    """Approval must recover the original filtered cohort from saved artifacts."""
+    import hashlib
+    import json
+
+    import mlflow
+
+    from skyulf.integrations.databricks.lifecycle import approval
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+
+    source = tmp_path / "preprocessing.py"
+    source.write_text(
+        "def build_preprocessing():\n"
+        "    return [{'name': 'scale', 'transformer': 'StandardScaler', "
+        "'params': {'columns': ['x']}}]\n"
+        "def build_pre_split_steps():\n"
+        "    return [{'name': 'eligible', 'transformer': 'ManualBounds', "
+        "'params': {'bounds': {'x': {'lower': 1}}}}]\n",
+        encoding="utf-8",
+    )
+    project = load_project_workflow(
+        {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
+        source,
+    )
+    frame = pd.DataFrame(
+        {
+            "id": range(20),
+            "event_time": pd.to_datetime(["2026-01-10"] * 15 + ["2026-02-10"] * 5, utc=True),
+            "label_at": pd.to_datetime(["2026-01-11"] * 15 + ["2026-02-11"] * 5, utc=True),
+            "x": pd.Series(range(20), dtype="float64"),
+            "target": pd.Series([2 * value for value in range(20)], dtype="float64"),
+        }
+    )
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda spark, request: frame)
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
+    client.create_experiment("filter_evidence", artifact_location=(tmp_path / "mlruns").as_uri())
+    result = retraining.train_candidate(
+        None,
+        _spec(max_rows=20, max_bytes=30000, pre_split_steps=tuple(project["pre_split_steps"])),
+        project["pipeline"],
+        model_name=f"filter_evidence_{engine}",
+        tracking_uri=store,
+        registry_uri=store,
+        experiment_name="filter_evidence",
+        run_name=engine,
+        artifact_path=tmp_path / "artifact",
+        metric="heldout_rmse",
+        min_improvement=0,
+        quality_gates={"heldout_r2": 0.5},
+        engine=engine,
+        cv=CVSpec(enabled=True, folds=2),
+    )
+    source.write_text("def build_preprocessing():\n    return []\n", encoding="utf-8")
+    digest = hashlib.sha256(
+        json.dumps(comparison_payload(result.comparison), sort_keys=True, allow_nan=False).encode()
+    ).hexdigest()
+    report, saved, saved_engine, evidence = approval.load_candidate_evidence(
+        client, result.model_name, result.model_version, digest
+    )
+    _, holdout, _ = retraining.split_labeled_snapshot(frame, saved, engine=saved_engine)
+    assert evidence is not None
+    approval.validate_training_evidence(
+        evidence, saved, project_source_sha256=evidence["project_source_sha256"], heldout=holdout
+    )
+    artifacts = {item.path for item in client.list_artifacts(result.run_id)}
+    assert report.quality_gates == {"heldout_r2": 0.5}
+    assert report.dataset_id == saved.dataset_id
+    assert "training_filter_evidence.json" in artifacts
+    assert "cross_validation.json" in artifacts
+    assert "cv_rmse_mean" in client.get_run(result.run_id).data.metrics
+    assert holdout["x"].tolist() == [15.0, 16.0, 17.0, 18.0, 19.0]
+    assert saved.pre_split_steps == tuple(project["pre_split_steps"])
+
+    snapshot_path = client.download_artifacts(result.run_id, "training_snapshot.json")
+    snapshot = json.loads(Path(snapshot_path).read_text(encoding="utf-8"))
+    assert snapshot["version"] == 4
+    assert snapshot["engine"] == engine
+    assert snapshot["holdout_key_sha256"] is None
+    assert snapshot["training_evidence_sha256"] is None
+    config_path = client.download_artifacts(result.run_id, "pipeline_config.json")
+    saved_config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    assert saved_config["project_python_source"] == project["pipeline"]["project_python_source"]
+
+    downloaded = mlflow.artifacts.download_artifacts(
+        artifact_uri=f"runs:/{result.run_id}/model", tracking_uri=store
+    )
+    code = (
+        "import json, sys, mlflow, pandas as pd\n"
+        "model = mlflow.pyfunc.load_model(sys.argv[1])\n"
+        "print(json.dumps(model.predict(pd.DataFrame({'x': [0., 20.]}))"
+        "['prediction'].tolist()))\n"
+    )
+    fresh = subprocess.run(
+        [sys.executable, "-c", code, downloaded],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert fresh.returncode == 0, fresh.stderr
+    assert json.loads(fresh.stdout) == pytest.approx([0.0, 40.0], abs=1e-8)
+
+    original_download = client.download_artifacts
+
+    def changed_engine(run_id, path, directory):
+        """Model an altered spec artifact while leaving the real model intact."""
+        downloaded = original_download(run_id, path, directory)
+        if path != "candidate_training_spec.json":
+            return downloaded
+        changed = json.loads(Path(downloaded).read_text(encoding="utf-8"))
+        changed["engine"] = "polars" if engine == "pandas" else "pandas"
+        Path(downloaded).write_text(json.dumps(changed), encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", changed_engine)
+    with pytest.raises(ValueError, match="engine"):
+        approval.load_candidate_evidence(client, result.model_name, result.model_version, digest)
+
+    def changed_counts(run_id, path, directory):
+        """Model an altered filter receipt without changing the pinned comparison."""
+        downloaded = original_download(run_id, path, directory)
+        if path != "training_filter_evidence.json":
+            return downloaded
+        changed = json.loads(Path(downloaded).read_text(encoding="utf-8"))
+        changed["filter_counts"][0]["excluded_rows"] += 1
+        Path(downloaded).write_text(json.dumps(changed), encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", changed_counts)
+    with pytest.raises(ValueError, match="evidence digest"):
+        approval.load_candidate_evidence(client, result.model_name, result.model_version, digest)
+
+    def null_receipt(run_id, path, directory):
+        """A declared receipt decoded as JSON null must stop approval replay."""
+        downloaded = original_download(run_id, path, directory)
+        if path == "training_filter_evidence.json":
+            Path(downloaded).write_text("null", encoding="utf-8")
+        return downloaded
+
+    monkeypatch.setattr(client, "download_artifacts", null_receipt)
+    with pytest.raises(ValueError, match="training filter evidence.*object"):
+        approval.load_candidate_evidence(client, result.model_name, result.model_version, digest)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "read_training_snapshot",
+        "split_labeled_snapshot",
+        "evaluate_training_cv",
+        "fit_workflow",
+        "evaluate_holdout",
+    ],
+)
+def test_failed_training_retains_pin_before_risky_work(monkeypatch, tmp_path, engine, operation):
+    """Runtime failures retain replay inputs without publishing a candidate or alias."""
+    import mlflow
+
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+
+    source = tmp_path / "preprocessing.py"
+    original_source = "def build_preprocessing():\n    return []\n"
+    source.write_text(original_source, encoding="utf-8", newline="\n")
+    config = load_project_workflow(
+        {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
+        source,
+    )["pipeline"]
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
+    experiment = client.create_experiment(
+        "failed_pin", artifact_location=(tmp_path / "runs").as_uri()
+    )
+    failure = RuntimeError(f"original {operation} failure")
+    observed = []
+
+    def read_pin():
+        """Inspect persisted inputs through a real client before the operation fails."""
+        runs = client.search_runs([experiment])
+        if not runs:
+            return None
+        run_id = runs[0].info.run_id
+        path = client.download_artifacts(run_id, "training_snapshot.json")
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        saved_path = client.download_artifacts(run_id, "training_pipeline_config.json")
+        saved_config = json.loads(Path(saved_path).read_text(encoding="utf-8"))
+        assert saved_config["project_python_source"] == original_source
+        return payload
+
+    def fail(*args, **kwargs):
+        """Capture evidence at the failure boundary while preserving exception identity."""
+        observed.append(read_pin())
+        source.write_text("def build_preprocessing():\n    return ['changed']\n", encoding="utf-8")
+        raise failure
+
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda *args: _frame())
+    monkeypatch.setattr(retraining, operation, fail)
+    publish = MagicMock(side_effect=AssertionError("failure must not publish"))
+    callback = MagicMock(side_effect=AssertionError("failure must not nominate an alias"))
+    monkeypatch.setattr(retraining, "log_pipeline_model", publish)
+    monkeypatch.setattr(retraining, "register_model", publish)
+    with pytest.raises(RuntimeError) as caught:
+        retraining.train_candidate(
+            None,
+            _spec(),
+            config,
+            model_name=f"failed_{engine}",
+            tracking_uri=store,
+            registry_uri=store,
+            experiment_name="failed_pin",
+            run_name=operation,
+            artifact_path=tmp_path / "artifact",
+            metric="heldout_rmse",
+            min_improvement=0,
+            engine=engine,
+            on_registered=callback,
+        )
+    assert caught.value is failure
+    assert observed != [None], "Training must save its concrete pin before risky work"
+    snapshot = observed[0]
+    assert snapshot["table"] == "workspace.test.labels"
+    assert snapshot["version"] == 4
+    assert snapshot["input_columns"] == ["x"]
+    assert snapshot["record_key_columns"] == ["id"]
+    assert snapshot["target_column"] == "target"
+    assert snapshot["engine"] == engine
+    assert snapshot["start"] == "2026-01-01T00:00:00+00:00"
+    assert snapshot["holdout_start"] == "2026-02-01T00:00:00+00:00"
+    assert snapshot["cutoff"] == snapshot["result_cutoff"] == "2026-03-01T00:00:00+00:00"
+    runs = client.search_runs([experiment])
+    assert len(runs) == 1 and runs[0].info.status == "FAILED"
+    artifacts = {item.path for item in client.list_artifacts(runs[0].info.run_id)}
+    assert artifacts == {
+        "training_snapshot.json",
+        "pipeline_config.json",
+        "training_pipeline_config.json",
+    }
+    assert not client.search_registered_models()
+    publish.assert_not_called()
+    callback.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"engine": "spark"},
+        {"cv": {}},
+        {"min_improvement": -1},
+        {"quality_threshold": float("nan")},
+        {"champion_version": "latest"},
+        {"risk_category": 1},
+        {"spec": None},
+    ],
+)
+def test_invalid_training_arguments_do_not_start_tracking(monkeypatch, tmp_path, changes):
+    """Invalid requests must fail before a training run or source read exists."""
+    tracking = MagicMock(side_effect=AssertionError("invalid input must not start tracking"))
+    monkeypatch.setattr(retraining, "track_run", tracking)
+    monkeypatch.setattr(retraining, "read_training_snapshot", tracking)
+    arguments: dict[str, Any] = {
+        "spark": None,
+        "spec": _spec(),
+        "config": {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+        "model_name": "candidate",
+        "tracking_uri": "unused",
+        "registry_uri": "unused",
+        "experiment_name": "unused",
+        "run_name": "invalid",
+        "artifact_path": tmp_path / "artifact",
+        "metric": "heldout_rmse",
+        "min_improvement": 0,
+    }
+    arguments.update(changes)
+    with pytest.raises((TypeError, ValueError)):
+        retraining.train_candidate(**arguments)
+    tracking.assert_not_called()
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_snapshot_replay_uses_original_config_without_duplicate_fixed_steps(
+    monkeypatch, tmp_path, engine
+):
+    """Saved input config must replay a fixed replacement exactly once per pipeline."""
+    import mlflow
+
+    config = {"preprocessing": [], "modeling": {"type": "linear_regression"}}
+    spec = _spec(
+        pre_split_steps=(
+            {
+                "name": "replace",
+                "transformer": "ValueReplacement",
+                "params": {
+                    "columns": ["x"],
+                    "replacements": [
+                        {"old": 1, "new": 2},
+                        {"old": 2, "new": 3},
+                    ],
+                },
+            },
+        )
+    )
+    monkeypatch.setattr(retraining, "read_training_snapshot", lambda *args: _frame())
+    store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
+    client.create_experiment("manual_replay", artifact_location=(tmp_path / "runs").as_uri())
+    settings: dict[str, Any] = {
+        "model_name": f"replay_{engine}",
+        "tracking_uri": store,
+        "registry_uri": store,
+        "experiment_name": "manual_replay",
+        "run_name": "original",
+        "artifact_path": tmp_path / "original",
+        "metric": "heldout_rmse",
+        "min_improvement": 0,
+        "engine": engine,
+    }
+    original = retraining.train_candidate(None, spec, config, **settings)
+    snapshot = json.loads(
+        Path(client.download_artifacts(original.run_id, "training_snapshot.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    saved_config = json.loads(
+        Path(client.download_artifacts(original.run_id, "training_pipeline_config.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    saved_engine = snapshot.pop("engine")
+    for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
+        snapshot[field] = (
+            None if snapshot[field] is None else datetime.fromisoformat(snapshot[field])
+        )
+    for field in ("event_time_parsing", "result_time_parsing"):
+        snapshot[field] = TrainingDateSpec(**snapshot[field])
+    for field in ("record_key_columns", "input_columns", "pre_split_steps"):
+        snapshot[field] = tuple(snapshot[field])
+    replay_spec = retraining.TrainingSpec(**snapshot)
+    settings.update(
+        engine=saved_engine, run_name="manual_replay", artifact_path=tmp_path / "replay"
+    )
+    replay = retraining.train_candidate(None, replay_spec, saved_config, **settings)
+    effective = json.loads(
+        Path(client.download_artifacts(replay.run_id, "pipeline_config.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert len(effective["preprocessing"]) == 1
+    assert replay.dataset_id == original.dataset_id
+    assert (
+        client.get_run(replay.run_id).data.metrics == client.get_run(original.run_id).data.metrics
+    )

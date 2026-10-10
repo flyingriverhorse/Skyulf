@@ -14,8 +14,8 @@ from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _require_supported_recipe,
     _row_hash,
 )
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     partition_training_rows,
 )
 
@@ -23,7 +23,7 @@ from skyulf.integrations.databricks.training.fitting.local_retraining import (
 def _spec(**changes):
     """Keep split fixtures independent of cloud configuration and model storage."""
     return replace(
-        LocalTrainingSpec(
+        TrainingSpec(
             table="a.b.c",
             version=1,
             record_key_columns=("id",),

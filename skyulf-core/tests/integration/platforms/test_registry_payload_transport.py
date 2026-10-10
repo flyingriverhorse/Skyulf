@@ -16,11 +16,7 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference._manifest import ColumnSpec
 from skyulf.inference._model_set_manifest import ComponentReference
 from skyulf.inference.bundle import build_bundle, predict_local, save_bundle
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.model_set import save_model_set
 from skyulf.inference.model_set_scoring import predict_model_set
 from skyulf.integrations.mlflow.models import model_set
@@ -45,8 +41,8 @@ def package(request, tmp_path, monkeypatch):
         digest = bundle.semantic_digest
     else:
         local_path = payload if kind == "local_pipeline" else tmp_path / "component"
-        save_local_pipeline(pipeline, local_path)
-        local = load_local_pipeline(local_path)
+        save_pipeline(pipeline, local_path)
+        local = load_pipeline(local_path)
         digest = local.manifest.pipeline_sha256
         if kind == "model_set":
             artifact = save_model_set(
@@ -102,7 +98,7 @@ def package(request, tmp_path, monkeypatch):
     monkeypatch.setattr(mlflow.artifacts, "download_artifacts", download)
     loaders = {
         "bundle": registry.load_registered_bundle,
-        "local_pipeline": registry.load_registered_local_pipeline,
+        "local_pipeline": registry.load_registered_pipeline,
         "model_set": model_set.load_registered_model_set,
     }
     resolved = registry.ResolvedModel(
@@ -126,7 +122,7 @@ def test_direct_loader_downloads_only_declared_payload(package):
     if kind == "bundle":
         output = predict_local(query[["x"]], artifact)["prediction"]
     elif kind == "local_pipeline":
-        output = predict_local_pipeline(query[["x"]], artifact)["prediction"]
+        output = predict_pipeline(query[["x"]], artifact)["prediction"]
     else:
         assert artifact.directory.is_dir()
         assert not (artifact.directory.parents[1] / "code").exists()

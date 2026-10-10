@@ -14,8 +14,8 @@ from ....jobs.shared.notebook_diagnostics import notebook_task
 from ....shared._contracts import table_name
 from ....training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
 from ....training.shared.training_evidence import validate_training_evidence
-from ..local.monitoring_performance import measure_holdout_values, performance_contract
 from ..monitoring_config import MonitorConfig, json_digest, qualified_name
+from ..monitoring_performance import measure_holdout_values, performance_contract
 from ..monitoring_reference import load_monitoring_artifact, reference_document
 from ..monitoring_source_evidence import validate_source_evidence
 from ..monitoring_sources import read_snapshot

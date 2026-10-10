@@ -82,7 +82,9 @@ def test_notebook_displays_each_training_run_once(tmp_path):
 def test_training_persists_report_and_json(monkeypatch):
     """The HTML and JSON must describe the same bounded explanation, linked to its run."""
     pytest.importorskip("matplotlib")
-    from skyulf.integrations.databricks.observability.reports import local_explanations
+    from skyulf.integrations.databricks.observability.reports import (
+        explanations as local_explanations,
+    )
 
     monkeypatch.setattr(local_explanations, "explain_training_artifact", lambda *args: _evidence())
     run = Mock(run_id="run123")
@@ -117,10 +119,10 @@ def test_real_models_and_ensembles_explain_fitted_features(tmp_path, engine, mod
     import polars as pl
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.observability.reports.local_explanations import (
+    from skyulf.integrations.databricks.observability.reports.explanations import (
         explain_training_artifact,
     )
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     classification = model_type.endswith("classifier") or model_type == "logistic_regression"
     x = np.arange(30, dtype=float)
@@ -145,7 +147,7 @@ def test_real_models_and_ensembles_explain_fitted_features(tmp_path, engine, mod
         "explainability": {"method": "shap", "max_samples": 3, "max_display_samples": 3},
     }
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",

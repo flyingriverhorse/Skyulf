@@ -16,12 +16,8 @@ from ..preprocessing.time_series.history import (
 from ._manifest import ColumnSpec, label_dtype
 from .fitted_pipeline import (
     FittedPipelineArtifact,
-)
-from .fitted_pipeline import (
-    predict_pipeline as predict_local_pipeline,
-)
-from .fitted_pipeline import (
-    validate_pipeline_input as validate_local_input,
+    predict_pipeline,
+    validate_pipeline_input,
 )
 from .project_scoring import _typed_column, run_project_scoring, scoring_output_columns
 
@@ -37,7 +33,7 @@ class PipelinePrediction:
 def _validate_history_request(artifact: Any, state: Any, bootstrap: Any) -> None:
     """Reject ambiguous resets and malformed public continuation arguments."""
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("Expected a LocalPipelineArtifact.")
+        raise TypeError("Expected a FittedPipelineArtifact.")
     if type(bootstrap) is not bool or (bootstrap and state is not None):
         raise ValueError("Temporal bootstrap must be boolean and cannot accompany saved history.")
     if state is not None and not isinstance(state, dict):
@@ -110,15 +106,15 @@ def score_pipeline(
     """Return exactly one outcome per requested row using the saved rule versions."""
     config = artifact.pipeline.config.get("project_scoring")
     if config is None:
-        return predict_local_pipeline(frame, artifact)
-    validate_local_input(frame, artifact)
+        return predict_pipeline(frame, artifact)
+    validate_pipeline_input(frame, artifact)
     predicted = False
 
     def predict(eligible: Any) -> pd.DataFrame:
         """Delegate eligible rows to the existing engine and fitted-state contract."""
         nonlocal predicted
         predicted = True
-        return predict_local_pipeline(eligible, artifact)
+        return predict_pipeline(eligible, artifact)
 
     result = run_project_scoring(
         frame,
@@ -160,11 +156,11 @@ def score_pipeline_with_history(
     """
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
-    with local_history_session(artifact, history_state, bootstrap=bootstrap_history) as session:
+    with pipeline_history_session(artifact, history_state, bootstrap=bootstrap_history) as session:
         if len(frame):
-            result = score_local_pipeline(frame, artifact)
+            result = score_pipeline(frame, artifact)
         else:
-            validate_local_input(frame, artifact)
+            validate_pipeline_input(frame, artifact)
             _preserve_history(artifact)
             index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(0)
             result = pd.DataFrame(
@@ -186,10 +182,3 @@ def scoring_counts(frame: pd.DataFrame) -> dict[str, int]:
     if predicted + excluded != len(frame):
         raise ValueError("Scoring status must describe every requested row.")
     return {"predicted_count": predicted, "excluded_count": excluded}
-
-
-# Released names remain aliases for imports and stored pickle references.
-LocalPrediction = PipelinePrediction
-score_local_pipeline = score_pipeline
-score_local_pipeline_with_history = score_pipeline_with_history
-local_history_session = pipeline_history_session

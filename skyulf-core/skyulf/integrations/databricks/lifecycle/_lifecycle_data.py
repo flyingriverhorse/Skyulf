@@ -85,7 +85,3 @@ def training_partitions(
         load_frame(store, "holdout", prepared["holdout"]),
         prepared["unavailable_labels"],
     )
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

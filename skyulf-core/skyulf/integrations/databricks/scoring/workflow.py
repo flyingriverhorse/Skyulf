@@ -2,9 +2,9 @@
 
 The SDK does not submit jobs or read Unity Catalog tables. The separate
 frame_batch adapter uses the declared table snapshot and period. The ``runtime``
-setting selects integration policy; it does not detect the machine or restrict
-``local`` to a workstation. Both ``local`` and ``databricks`` can score a caller
-frame in the current Python process. UC Delta publication requires
+setting selects integration policy. ``standalone`` runs without Databricks
+services on any host; ``databricks`` enables workspace integration. Both can
+score a caller frame in the current Python process. UC Delta publication requires
 ``runtime="databricks"``; distributed inference is selected separately with
 ``inference_mode="spark"`` and retains its source, registry and engine checks.
 """
@@ -24,12 +24,9 @@ from ....inference._manifest import ColumnSpec
 from ....inference.bundle import InferenceBundle, load_bundle, predict_local
 from ....inference.fitted_pipeline import (
     FittedPipelineArtifact,
+    load_pipeline,
 )
-from ....inference.fitted_pipeline import (
-    load_pipeline as load_local_pipeline,
-)
-from ....inference.pipeline_scoring import score_pipeline as score_local_pipeline
-from ....inference.pipeline_scoring import scoring_output_schema
+from ....inference.pipeline_scoring import score_pipeline, scoring_output_schema
 from ...mlflow.registration.registry import (
     RegistryAccessError,
     RegistryDependencyError,
@@ -116,10 +113,10 @@ class OutputSink(BaseModel):
 
 
 class WorkflowConfig(BaseModel):
-    """Immutable, serializable decisions for one local-engine scoring job."""
+    """Immutable, serializable decisions for one pandas/Polars scoring job."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
-    runtime: Literal["local", "databricks", "spark"]
+    runtime: Literal["standalone", "databricks", "spark"]
     engine: Literal["pandas", "polars"]
     source: InputSource
     model: ModelSelection
@@ -200,7 +197,7 @@ class PreflightResult:
 
 
 class PreflightError(ValueError):
-    """The selected local workflow cannot safely start."""
+    """The selected workflow cannot safely start."""
 
     def __init__(self, result: PreflightResult) -> None:
         """Retain structured issues for CLI or job diagnostics."""
@@ -216,8 +213,8 @@ def _config_issues(config: WorkflowConfig) -> list[PreflightIssue]:
             PreflightIssue(
                 "runtime_unsupported",
                 "runtime",
-                "Spark is not a local engine runtime.",
-                "Choose local or databricks; use the separate Spark batch runner for Spark inference.",
+                "Spark execution uses a separate batch runner.",
+                "Choose standalone or databricks; use the separate Spark batch runner for Spark inference.",
             )
         )
     _collect_source_issues(config, issues)
@@ -267,7 +264,7 @@ def preflight(
     Registry selection remains unresolved until explicit preparation.
     """
     if not isinstance(config, WorkflowConfig):
-        raise TypeError("config must be a LocalWorkflowConfig.")
+        raise TypeError("config must be a WorkflowConfig.")
     issues = _config_issues(config)
     remote_checked = resolved is not None
     _collect_reference_issues(config, resolved, issues)
@@ -321,7 +318,7 @@ def preflight(
 
 @dataclass(frozen=True, slots=True)
 class PreparedWorkflow:
-    """A verified local predictor bound to one loaded artifact and config."""
+    """A verified pandas/Polars predictor bound to one loaded artifact and config."""
 
     config: WorkflowConfig
     artifact: FittedPipelineArtifact | InferenceBundle
@@ -333,14 +330,14 @@ class PreparedWorkflow:
             raise ValueError("Use the distributed incremental runner for Spark inference.")
         _check_frame_budget(frame, self.config.source)
         if isinstance(self.artifact, FittedPipelineArtifact):
-            return score_local_pipeline(frame, self.artifact)
+            return score_pipeline(frame, self.artifact)
         return predict_local(frame, self.artifact)
 
 
 def _check_frame_budget(frame: pd.DataFrame | pl.DataFrame, source: InputSource) -> None:
     """Bound driver rows and in-memory frame bytes before any prediction."""
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
-        raise TypeError("Local workflow requires a pandas or Polars DataFrame.")
+        raise TypeError("Workflow requires a pandas or Polars DataFrame.")
     if len(frame) > source.max_rows:
         raise ValueError("Input exceeds max_rows.")
     size = (
@@ -361,7 +358,7 @@ def prepare_workflow(
     call this only for artifacts from a trusted producer. No job is submitted.
     """
     if not isinstance(config, WorkflowConfig):
-        raise TypeError("config must be a LocalWorkflowConfig.")
+        raise TypeError("config must be a WorkflowConfig.")
     issues = _config_issues(config)
     if issues:
         raise PreflightError(PreflightResult(tuple(issues), False))
@@ -372,7 +369,7 @@ def prepare_workflow(
     else:
         from ...mlflow.registration.registry import (  # noqa: PLC0415 - optional MLflow client boundary
             load_registered_bundle,
-            load_registered_local_pipeline,
+            load_registered_pipeline,
             resolve_model,
         )
 
@@ -387,7 +384,7 @@ def prepare_workflow(
                 registry_uri=selection.registry_uri,
             )
             loader = (
-                load_registered_local_pipeline
+                load_registered_pipeline
                 if selection.kind == "local_pipeline"
                 else load_registered_bundle
             )
@@ -401,7 +398,7 @@ def prepare_workflow(
                 (issue,), True, resolved.version if resolved is not None else None
             )
             raise PreflightError(result) from exc
-    result = preflight_local(config, artifact=artifact, resolved=resolved, probe_frame=probe_frame)
+    result = preflight(config, artifact=artifact, resolved=resolved, probe_frame=probe_frame)
     if not result.ready:
         raise PreflightError(result)
     return PreparedWorkflow(config, artifact, result)
@@ -474,7 +471,7 @@ def _collect_reference_issues(
                 "model_unresolved",
                 "model",
                 "Registry identity and artifact metadata have not been checked.",
-                "Call prepare_local_workflow to resolve the alias once and load its pinned version.",
+                "Call prepare_workflow to resolve the alias once and load its pinned version.",
             )
         )
     if resolved is not None and (
@@ -586,7 +583,7 @@ def _probe_prediction(
         try:
             _check_frame_budget(probe_frame, config.source)
             if isinstance(artifact, FittedPipelineArtifact):
-                score_local_pipeline(probe_frame, artifact)
+                score_pipeline(probe_frame, artifact)
             else:
                 predict_local(probe_frame, artifact)
         except (TypeError, ValueError, RuntimeError) as exc:
@@ -606,9 +603,7 @@ def _load_selected_path(
     """Load the selected trusted local artifact and translate invalid package errors."""
     path = Path(selected_path)
     try:
-        artifact = (
-            load_local_pipeline(path) if selection.kind == "local_pipeline" else load_bundle(path)
-        )
+        artifact = load_pipeline(path) if selection.kind == "local_pipeline" else load_bundle(path)
     except (OSError, ValueError) as exc:
         issue = PreflightIssue(
             "artifact_invalid",
@@ -638,14 +633,3 @@ def _collect_uc_source_issues(config: WorkflowConfig, issues: list[PreflightIssu
                 "Set a version for snapshot reads or omit it for incremental reads.",
             )
         )
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-LocalWorkflowConfig = WorkflowConfig
-preflight_local = preflight
-PreparedLocalWorkflow = PreparedWorkflow
-prepare_local_workflow = prepare_workflow
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalPipelineArtifact = FittedPipelineArtifact

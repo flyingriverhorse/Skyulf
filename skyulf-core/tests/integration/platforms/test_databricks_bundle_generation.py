@@ -631,7 +631,7 @@ def _load_project_config(project, config):
 
 def _read_validated_config(project, *, action="score"):
     """Check generated settings against the same preflight used by the notebook."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = read_workflow_config(project / "config/training.yml")
@@ -826,8 +826,8 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     import polars as pl
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     model = "random_forest_classifier" if task == "classification" else "random_forest_regressor"
     project = _generate_project(
@@ -899,7 +899,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     )
     data = pl.from_pandas(frame) if engine == "polars" else frame
     artifact = tmp_path / "pipeline.pkl"
-    fit_local_workflow(
+    fit_workflow(
         config["pipeline"],
         SplitDataset(train=data, test=data[:0]),
         target_column="target",
@@ -910,7 +910,7 @@ def test_cli_guided_pipeline_cv_and_offline_preview(tmp_path, engine, task):
     incoming = pd.DataFrame({"feature_value": [None, 5.0, 8.0]})
     if engine == "polars":
         incoming = pl.from_pandas(incoming)
-    predictions = predict_local_pipeline(incoming, load_local_pipeline(artifact))
+    predictions = predict_pipeline(incoming, load_pipeline(artifact))
     assert len(predictions) == 3
     assert np.isfinite(np.asarray(predictions)).all()
 
@@ -1171,7 +1171,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
 @pytest.mark.parametrize("availability", [False, True])
 def test_cli_generates_date_free_training_contract(tmp_path, engine, task, availability):
     """The real initializer must support date-free training and independent delayed results."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     project = _generate_project(
@@ -1199,9 +1199,9 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
     assert config["split_strategy"] == "random"
     assert config["training_window_mode"] == "full_snapshot"
     assert "window_timezone" not in config
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
-    assert config["cv_enabled"] is False and LocalCVSpec.from_workflow(config).folds == 5
+    assert config["cv_enabled"] is False and CVSpec.from_workflow(config).folds == 5
     assert config.get("training_sample_rows") is None
     assert config["engine"] == engine
     assert config["test_size"] == 0.2 and config["random_state"] == 42
@@ -1219,7 +1219,7 @@ def test_cli_generates_date_free_training_contract(tmp_path, engine, task, avail
 
 def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
     """Initialization must not silently discard a supplied date mapping in random mode."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
@@ -1254,7 +1254,7 @@ def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
 )
 def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
     """Published examples must render and validate as usable manual training policies."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     root = Path(__file__).resolve().parents[3] / "templates/databricks/examples"
@@ -1293,11 +1293,11 @@ def test_generated_nested_search_preserves_separate_inner_folds(tmp_path):
         tmp_path, cv_enabled="true", cv_type="nested_cv", cv_folds="4", cv_inner_folds="2"
     )
     config = read_workflow_config(project / "config/training.yml")
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     config = _load_project_config(project, config)
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     recipe = prepare_search_pipeline(
         config["pipeline"], cv, target_column=config["target_column"], event_column=None
     )
@@ -1327,8 +1327,8 @@ def test_temporal_cv_initializes_a_usable_default_holdout(tmp_path, method):
 @pytest.mark.parametrize("policy", ["time_series_split", "stratified_group_k_fold"])
 def test_generated_nested_policies_preserve_controls_and_three_jobs(tmp_path, policy):
     """Real template expansion must carry split metadata and threshold opt-in into Core."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     settings = {"cv_enabled": "true", "cv_type": "nested_cv", "cv_nested_type": policy}
     temporal = policy == "time_series_split"
@@ -1350,7 +1350,7 @@ def test_generated_nested_policies_preserve_controls_and_three_jobs(tmp_path, po
     project = _generate_project(tmp_path, **settings)
     config = _read_validated_config(project)
     config = _load_project_config(project, config)
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     recipe = prepare_search_pipeline(
         config["pipeline"],
         cv,

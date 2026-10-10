@@ -155,7 +155,7 @@ def explain_training_artifact(
 ) -> dict[str, Any] | None:
     """Explain bounded training rows with fitted inference preprocessing only."""
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("Expected a LocalPipelineArtifact.")
+        raise TypeError("Expected a FittedPipelineArtifact.")
     limits = _settings(cast(dict[str, Any], artifact.pipeline.config))
     if limits is None:
         return None
@@ -202,7 +202,3 @@ def log_training_explanations(
         evidence["report_status"] = evidence["status"]
     run.client.log_dict(run.run_id, evidence, "explanations.json")
     run.client.log_text(run.run_id, report, "explanations.html")
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalPipelineArtifact = FittedPipelineArtifact

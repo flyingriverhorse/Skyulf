@@ -154,7 +154,7 @@ def test_empty_recovered_generation_remains_readable_without_new_view_activation
 
 def test_recovery_notebook_pins_version_and_publishes_only_completed_result(monkeypatch):
     """An alias change between tasks cannot redirect the saved recovery request."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.lifecycle.workflow import BundleActionResult
     from skyulf.integrations.databricks.scoring.incremental import scoring_recovery as module
 
     dbutils, values = task_utils()
@@ -175,10 +175,10 @@ def test_recovery_notebook_pins_version_and_publishes_only_completed_result(monk
 
 def test_full_rebuild_empty_recovery_replay_and_normal_noop_reach_report(monkeypatch):
     """Workflow activation must not turn a valid empty committed snapshot into a failed job."""
-    from tests.integration.platforms.test_databricks_local_workflow import _config
+    from tests.integration.platforms.test_databricks_lifecycle_workflow import _config
 
-    from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
-    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    from skyulf.integrations.databricks.lifecycle import workflow as workflow
+    from skyulf.integrations.databricks.scoring.incremental.incremental_batch import (
         IncrementalBatchResult,
     )
 
@@ -193,7 +193,7 @@ def test_full_rebuild_empty_recovery_replay_and_normal_noop_reach_report(monkeyp
         "value": "full_rebuild",
         "createtab_stmt": f"CREATE VIEW {config['prediction_table']} AS SELECT * FROM {config['prediction_table']}_v2",
     }
-    monkeypatch.setattr(workflow, "prepare_local_workflow", Mock())
+    monkeypatch.setattr(workflow, "prepare_workflow", Mock())
     provision = Mock()
     monkeypatch.setattr(workflow, "provision_prediction_table", provision)
     batch = Mock(
@@ -203,7 +203,7 @@ def test_full_rebuild_empty_recovery_replay_and_normal_noop_reach_report(monkeyp
             IncrementalBatchResult(9, 9, 0, 0, 4, {}, True, config["model_name"], "2"),
         ]
     )
-    monkeypatch.setattr(workflow, "run_incremental_local_batch", batch)
+    monkeypatch.setattr(workflow, "run_incremental_batch", batch)
     outcomes = [
         workflow.run_action(spark, config, "score", recovery_request=request)
         for request in (recovery_request(), recovery_request(), None)

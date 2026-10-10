@@ -12,7 +12,10 @@ pytest.importorskip("mlflow")
 pytest.importorskip("databricks.sdk")
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    save_pipeline,  # noqa: E402
+)
 from skyulf.integrations.databricks.serving import (  # noqa: E402
     PinnedEndpointSpec,
     build_pinned_endpoint,
@@ -22,7 +25,7 @@ from skyulf.integrations.databricks.serving import (  # noqa: E402
     query_named_records,
     require_pinned_endpoint_ready,
 )
-from skyulf.integrations.mlflow.models.local_model import _signature  # noqa: E402
+from skyulf.integrations.mlflow.models.pipeline_model import _signature  # noqa: E402
 from skyulf.integrations.mlflow.registration.registry import ResolvedModel  # noqa: E402
 from skyulf.integrations.mlflow.shared._nullable_transport import (  # noqa: E402
     TRANSPORT_KEY,
@@ -38,8 +41,8 @@ def artifact(tmp_path):
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [2.0, 4.0, 6.0]})
     pipeline = SkyulfPipeline({"modeling": {"type": "linear_regression"}})
     pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "model")
-    return load_local_pipeline(tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
+    return load_pipeline(tmp_path / "model")
 
 
 @pytest.fixture
@@ -265,7 +268,7 @@ def test_preparation_uses_exact_registry_version(spec, resolved, artifact, packa
     monkeypatch.setattr(endpoints, "resolve_model", resolve)
     monkeypatch.setattr(endpoints, "download_registered_package", download)
     monkeypatch.setattr(endpoints, "packaged_artifact_path", lambda *args: "payload")
-    monkeypatch.setattr(endpoints, "load_local_pipeline", loader)
+    monkeypatch.setattr(endpoints, "load_pipeline", loader)
     monkeypatch.setattr(endpoints, "Path", lambda value: value)
     monkeypatch.setattr(endpoints, "build_pinned_endpoint", Mock(return_value="plan"))
     import mlflow

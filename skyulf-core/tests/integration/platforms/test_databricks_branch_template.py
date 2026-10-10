@@ -334,7 +334,7 @@ def test_branch_notebook_passes_resolved_configs_to_service(
     from skyulf.integrations.databricks.jobs.training.branch_notebook import (
         run_branch_training_notebook,
     )
-    from skyulf.integrations.databricks.training import local_branches
+    from skyulf.integrations.databricks.training import branches as local_branches
 
     values, entries = _project(tmp_path, workflow_config)
     if explanations:
@@ -364,7 +364,7 @@ def test_branch_notebook_passes_resolved_configs_to_service(
         return_value=Result("parent", "workspace.inputs.source", 4, {"<cost>": {"version": "7"}})
     )
     monkeypatch.setattr(local_branches, "prepare_training_branches", prepare)
-    monkeypatch.setattr(local_branches, "train_local_branches", train)
+    monkeypatch.setattr(local_branches, "train_branches", train)
     display = Mock()
     dbutils = SimpleNamespace(widgets=SimpleNamespace(getAll=lambda: values), notebook=Mock())
     output = run_branch_training_notebook(

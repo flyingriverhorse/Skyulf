@@ -22,14 +22,10 @@ from skyulf.integrations.mlflow.shared._model_metadata import (
 
 from ....inference.fitted_pipeline import (
     FittedPipelineArtifact,
-)
-from ....inference.fitted_pipeline import (
-    load_pipeline as load_local_pipeline,
+    load_pipeline,
 )
 from ....inference.pipeline_scoring import (
-    score_pipeline as score_local_pipeline,
-)
-from ....inference.pipeline_scoring import (
+    score_pipeline,
     scoring_output_schema,
 )
 from ..shared._nullable_transport import (
@@ -83,7 +79,7 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
             artifact_path = context.artifacts["local_pipeline"]
         except (AttributeError, KeyError) as exc:
             raise ValueError("MLflow model is missing the local pipeline artifact.") from exc
-        self._artifact = load_local_pipeline(artifact_path)
+        self._artifact = load_pipeline(artifact_path)
         self.input_transport()
         validate_worker_certificate(
             self._artifact,
@@ -94,7 +90,7 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
     def input_transport(self) -> dict[str, Any] | None:
         """Return a detached transport contract checked against the loaded artifact."""
         if self._artifact is None:
-            raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
+            raise RuntimeError("SkyulfPipelinePythonModel.load_context() was not called.")
         manifest = self._artifact.manifest
         return validated_transport(
             getattr(self, "_input_transport", None),
@@ -107,7 +103,7 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
         """Apply the saved fit engine to MLflow's named pandas input columns."""
         del context
         if self._artifact is None:
-            raise RuntimeError("SkyulfLocalPythonModel.load_context() was not called.")
+            raise RuntimeError("SkyulfPipelinePythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf local pyfunc requires a pandas DataFrame.")
         spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
@@ -115,7 +111,7 @@ class SkyulfPipelinePythonModel(mlflow.pyfunc.PythonModel):
         model_input = _restore_nullable_dtypes(model_input, self._artifact)
         result = score_prediction_batches(
             model_input,
-            partial(score_local_pipeline, artifact=self._artifact),
+            partial(score_pipeline, artifact=self._artifact),
             params,
             spark_output,
         )
@@ -130,9 +126,9 @@ def log_pipeline_model(
     tracking_uri: str | None = None,
 ) -> str:
     """Log a fitted pandas/Polars pipeline under one explicit MLflow run and artifact path."""
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     local_path = Path(local_artifact_path).resolve()
-    artifact = load_local_pipeline(local_path)
+    artifact = load_pipeline(local_path)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-local-mlflow-") as directory:
@@ -140,7 +136,7 @@ def log_pipeline_model(
         mlflow.pyfunc.save_model(
             path=str(model_path),
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
-            **local_model_save_options(artifact, local_path, Path(directory)),
+            **pipeline_model_save_options(artifact, local_path, Path(directory)),
         )
         scrub_local_artifact_uri(model_path, "local_pipeline")
         client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
@@ -240,7 +236,7 @@ def pip_requirements(artifact: FittedPipelineArtifact) -> list[str]:
     )
 
 
-def validate_local_destination(run_id: str, artifact_path: str, tracking_uri: str | None) -> None:
+def validate_model_destination(run_id: str, artifact_path: str, tracking_uri: str | None) -> None:
     """Validate the explicit run and upload destination before reading the artifact."""
     if type(run_id) is not str or not run_id.strip():
         raise ValueError("run_id must be a non-empty string.")
@@ -265,9 +261,3 @@ def _restore_nullable_dtypes(frame: pd.DataFrame, artifact: FittedPipelineArtifa
     return restore_nullable_dtypes(
         frame, zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
     )
-
-
-# Released names remain aliases for imports and stored pickle references.
-SkyulfLocalPythonModel = SkyulfPipelinePythonModel
-log_local_model = log_pipeline_model
-local_model_save_options = pipeline_model_save_options

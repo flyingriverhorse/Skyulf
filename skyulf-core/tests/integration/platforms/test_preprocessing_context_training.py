@@ -13,7 +13,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
@@ -70,7 +70,7 @@ def _save_models(directory, engine):
         assert not records if node in MARKERS else records[0]["type"] == node
         expected = pipeline.predict(sample)
         digest = artifact_digest(records)
-        save_local_pipeline(pipeline, directory / node)
+        save_pipeline(pipeline, directory / node)
         requests[node] = (sample, expected, digest)
     (directory / "requests.pkl").write_bytes(pickle.dumps(requests))
 
@@ -92,7 +92,7 @@ def _reload_models(directory):
     for node, (sample, expected, digest) in pickle.loads(
         (directory / "requests.pkl").read_bytes()
     ).items():
-        artifact = load_local_pipeline(directory / node)
+        artifact = load_pipeline(directory / node)
         actual = artifact.pipeline.predict(sample)
         np.testing.assert_array_equal(actual, expected)
         assert len(actual) == len(sample)

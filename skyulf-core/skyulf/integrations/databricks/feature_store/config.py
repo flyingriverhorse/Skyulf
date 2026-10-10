@@ -17,7 +17,7 @@ def _columns(value: tuple[str, ...], field: str, *, allow_empty: bool = False) -
         raise ValueError(f"{field} must contain distinct column names.")
 
 
-def _uc_name(value: str) -> None:
+def validate_uc_name(value: str) -> None:
     """Require a catalog-qualified name for this Unity Catalog-only adapter."""
     table_name(value)
     if len(value.split(".")) != 3:
@@ -44,7 +44,7 @@ class FeatureLookupSpec:
 
     def __post_init__(self) -> None:
         """Reject ambiguous output names and invalid temporal lookup settings."""
-        _uc_name(self.table_name)
+        validate_uc_name(self.table_name)
         _columns(self.lookup_key, "lookup_key")
         _columns(self.feature_names, "feature_names")
         if self.timestamp_lookup_key is not None:

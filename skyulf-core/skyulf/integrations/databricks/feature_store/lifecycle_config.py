@@ -6,7 +6,7 @@ from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
-from .config import FeatureLookupSpec, FeatureTrainingSpec, _uc_name
+from .config import FeatureLookupSpec, FeatureTrainingSpec, validate_uc_name
 
 
 def _mapping(value: Any, fields: set[str], label: str) -> dict[str, Any]:
@@ -27,7 +27,7 @@ def _table_name(value: Any) -> str:
     """Validate required table strings before passing them to the typed contract."""
     if not isinstance(value, str):
         raise ValueError("Feature table_name must be a string.")
-    _uc_name(value)
+    validate_uc_name(value)
     return value
 
 
@@ -215,5 +215,5 @@ def bind_lookup_tables(value: Any, bindings: dict[str, str]) -> dict[str, Any]:
             raise ValueError("feature_lookup table_name must be a string.")
         for key, replacement in bindings.items():
             lookup["table_name"] = lookup["table_name"].replace("{" + key + "}", replacement)
-        _uc_name(lookup["table_name"])
+        validate_uc_name(lookup["table_name"])
     return config

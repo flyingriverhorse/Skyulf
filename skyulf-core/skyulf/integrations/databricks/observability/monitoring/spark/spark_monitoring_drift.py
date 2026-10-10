@@ -15,7 +15,7 @@ from skyulf.profiling._drift_evidence import (
 )
 from skyulf.profiling.drift import ColumnDrift, DriftMetric
 
-from ..local.monitoring_metrics import column_drift_evidence, monitoring_metric
+from ..monitoring_metrics import column_drift_evidence, monitoring_metric
 from .spark_monitoring_metrics import (
     finite_spark_value,
     has_spark_rows,

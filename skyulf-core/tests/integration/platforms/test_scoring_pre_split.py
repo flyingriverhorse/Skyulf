@@ -249,7 +249,7 @@ def test_saved_reused_custom_filter_loads_in_fresh_process(tmp_path, engine, mod
     import sys
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     config = _project(tmp_path, engine=engine, mode=mode)
     root = tmp_path / "src/features"
@@ -266,7 +266,7 @@ def test_saved_reused_custom_filter_loads_in_fresh_process(tmp_path, engine, mod
     train = pd.DataFrame({"feature_value": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     native = pl.from_pandas(train) if engine == "polars" else train
     path = tmp_path / "artifact"
-    fit_local_workflow(
+    fit_workflow(
         pipeline,
         SplitDataset(train=native, test=native[:0]),
         target_column="target",
@@ -277,10 +277,10 @@ def test_saved_reused_custom_filter_loads_in_fresh_process(tmp_path, engine, mod
     shutil.rmtree(root)
     code = (
         "import json,sys,pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline\n"
-        "from skyulf.inference.local_scoring import score_local_pipeline\n"
-        "model=load_local_pipeline(sys.argv[1])\n"
-        "result=score_local_pipeline(pd.DataFrame({'feature_value':[None,5.0]}),model)\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline\n"
+        "from skyulf.inference.pipeline_scoring import score_pipeline\n"
+        "model=load_pipeline(sys.argv[1])\n"
+        "result=score_pipeline(pd.DataFrame({'feature_value':[None,5.0]}),model)\n"
         "assert result.scoring_status.tolist()==['excluded','predicted']\n"
         "assert result.exclusion_reason.iloc[0]=='pre_split:minimum_completeness'\n"
         "assert abs(result.prediction.iloc[1]-11.0)<1e-8\n"
@@ -302,13 +302,13 @@ def test_saved_reused_custom_filter_loads_in_fresh_process(tmp_path, engine, mod
 def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engine):
     """The real candidate recipe applies a non-idempotent replacement exactly once per prediction."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_scoring import score_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.inference.pipeline_scoring import score_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         candidate_config,
     )
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     steps = [
         {
@@ -322,7 +322,7 @@ def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engin
         _missing("feature_value"),
     ]
     config = _project(tmp_path, engine=engine, steps=steps)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="a.b.c",
         version=0,
         record_key_columns=("id",),
@@ -336,7 +336,7 @@ def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engin
         spec,
         config["pipeline"],
         engine=engine,
-        cv=LocalCVSpec(),
+        cv=CVSpec(),
         metric="heldout_rmse",
         min_improvement=0.0,
         champion_version=None,
@@ -345,7 +345,7 @@ def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engin
     )
     train = pd.DataFrame({"feature_value": [4.0, 5.0, 6.0, 7.0], "target": [8.0, 10.0, 12.0, 14.0]})
     native = pl.from_pandas(train) if engine == "polars" else train
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         pipeline,
         SplitDataset(train=native, test=native[:0]),
         target_column="target",
@@ -353,7 +353,7 @@ def test_reuse_fixed_changes_do_not_double_transform_saved_model(tmp_path, engin
         max_rows=10,
         max_bytes=10000,
     )
-    result = score_local_pipeline(pd.DataFrame({"feature_value": [1.0]}), artifact)
+    result = score_pipeline(pd.DataFrame({"feature_value": [1.0]}), artifact)
     assert result.prediction.iloc[0] == pytest.approx(4.0)
 
 

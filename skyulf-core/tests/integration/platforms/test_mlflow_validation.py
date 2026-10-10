@@ -10,17 +10,17 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import LocalPipelineArtifact
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.inference.fitted_pipeline import FittedPipelineArtifact
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 from skyulf.integrations.mlflow.lifecycle import validation
 from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
 
-def _fitted(tmp_path, offset: float) -> LocalPipelineArtifact:
+def _fitted(tmp_path, offset: float) -> FittedPipelineArtifact:
     """Fit one model whose known bias makes comparison direction observable."""
     x = np.arange(12, dtype="float64")
     frame = pd.DataFrame({"x": x, "target": 2.0 * x + offset})
-    return fit_local_workflow(
+    return fit_workflow(
         {"preprocessing": [], "modeling": {"type": "linear_regression"}},
         SplitDataset(train=frame, test=frame.head(0)),
         target_column="target",
@@ -30,7 +30,7 @@ def _fitted(tmp_path, offset: float) -> LocalPipelineArtifact:
     )
 
 
-def _reference(artifact: LocalPipelineArtifact, version: str) -> ResolvedModel:
+def _reference(artifact: FittedPipelineArtifact, version: str) -> ResolvedModel:
     """Bind the fitted artifact to one concrete registry identity."""
     return ResolvedModel(
         name="workspace.test.risk",
@@ -59,10 +59,10 @@ def test_comparison_uses_same_holdout_and_minimizes_error(tmp_path, monkeypatch)
         loaded.append(resolved.version)
         return references[resolved]
 
-    monkeypatch.setattr(validation, "load_registered_local_pipeline", load)
+    monkeypatch.setattr(validation, "load_registered_pipeline", load)
     heldout = _holdout()
     original = heldout.copy(deep=True)
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "2"),
         _reference(champion, "1"),
         heldout,
@@ -91,10 +91,8 @@ def test_comparison_uses_same_holdout_and_minimizes_error(tmp_path, monkeypatch)
 def test_first_candidate_is_reported_without_automatic_champion(tmp_path, monkeypatch) -> None:
     """The first registered version must still require a separate bootstrap choice."""
     candidate = _fitted(tmp_path, 0.0)
-    monkeypatch.setattr(
-        validation, "load_registered_local_pipeline", lambda *args, **kwargs: candidate
-    )
-    report = validation.compare_registered_local_models(
+    monkeypatch.setattr(validation, "load_registered_pipeline", lambda *args, **kwargs: candidate)
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "1"),
         None,
         _holdout(),
@@ -128,11 +126,11 @@ def test_incompatible_class_contract_rejects_before_scoring(tmp_path, monkeypatc
     )
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda resolved, **kwargs: candidate if resolved.version == "2" else champion,
     )
     with pytest.raises(ValueError, match="class"):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             _reference(candidate, "2"),
             _reference(champion, "1"),
             _holdout(),
@@ -162,7 +160,7 @@ def test_invalid_comparison_fails_before_model_load(
     candidate = _fitted(tmp_path, 0.0)
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda *args, **kwargs: pytest.fail("model should not load"),
     )
     options: dict[str, Any] = {
@@ -175,7 +173,7 @@ def test_invalid_comparison_fails_before_model_load(
     }
     options.update(changes)
     with pytest.raises(ValueError, match=message):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             _reference(candidate, "2"), None, _holdout(), **options
         )
 
@@ -192,7 +190,7 @@ def test_polars_classification_comparison_selects_core_metrics(
     train = pl.DataFrame({"x": x, "target": truth})
     reversed_train = pl.DataFrame({"x": x, "target": np.where(x > 0, "no", "yes")})
     config = {"preprocessing": [], "modeling": {"type": "logistic_regression"}}
-    candidate = fit_local_workflow(
+    candidate = fit_workflow(
         config,
         SplitDataset(train=train, test=train.head(0)),
         target_column="target",
@@ -200,7 +198,7 @@ def test_polars_classification_comparison_selects_core_metrics(
         max_rows=24,
         max_bytes=20_000,
     )
-    champion = fit_local_workflow(
+    champion = fit_workflow(
         config,
         SplitDataset(train=reversed_train, test=reversed_train.head(0)),
         target_column="target",
@@ -211,12 +209,12 @@ def test_polars_classification_comparison_selects_core_metrics(
     assert candidate.manifest.classes == champion.manifest.classes
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda resolved, **kwargs: candidate if resolved.version == "2" else champion,
     )
     heldout = pl.DataFrame({"x": [-3.0, -2.0, 2.0, 3.0], "target": ["no", "no", "yes", "yes"]})
 
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "2"),
         _reference(champion, "1"),
         heldout,
@@ -243,7 +241,7 @@ def test_polars_classification_comparison_selects_core_metrics(
 def test_real_local_registry_comparison_keeps_alias_pinned(tmp_path) -> None:
     """Fetching both registered versions must leave the champion alias unchanged."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.registration.registry import register_model, resolve_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
@@ -256,7 +254,7 @@ def test_real_local_registry_comparison_keeps_alias_pinned(tmp_path) -> None:
         _fitted(tmp_path, offset)
         with track_run(tracking, run_name=f"candidate-{offset}") as run:
             assert run.run_id is not None
-            model_uri = log_local_model(
+            model_uri = log_pipeline_model(
                 tmp_path / f"model-{offset}",
                 run_id=run.run_id,
                 artifact_path="model",
@@ -267,7 +265,7 @@ def test_real_local_registry_comparison_keeps_alias_pinned(tmp_path) -> None:
     champion = resolve_model(name, alias="champion", tracking_uri=uri, registry_uri=uri)
     candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
 
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         candidate,
         champion,
         _holdout(),
@@ -293,11 +291,11 @@ def test_candidate_must_clear_absolute_quality_gate(tmp_path, monkeypatch) -> No
     candidate = _fitted(tmp_path, 5.0)
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda resolved, **kwargs: candidate if resolved.version == "2" else champion,
     )
 
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "2"),
         _reference(champion, "1"),
         _holdout(),
@@ -322,10 +320,10 @@ def test_secondary_gates_explain_all_failures(tmp_path, monkeypatch, champion_pr
     champion = _fitted(tmp_path, 10.0)
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda ref, **kwargs: candidate if ref.version == "2" else champion,
     )
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "2"),
         _reference(champion, "1") if champion_present else None,
         _holdout(),
@@ -371,8 +369,8 @@ def test_quality_policy_rejects_invalid_guardrails(gates):
 def test_comparison_payload_preserves_historical_single_gate_digest(tmp_path, monkeypatch):
     """Adding optional guardrails must not invalidate saved single-gate approval receipts."""
     candidate = _fitted(tmp_path, 0.0)
-    monkeypatch.setattr(validation, "load_registered_local_pipeline", lambda *a, **k: candidate)
-    report = validation.compare_registered_local_models(
+    monkeypatch.setattr(validation, "load_registered_pipeline", lambda *a, **k: candidate)
+    report = validation.compare_registered_pipeline_models(
         _reference(candidate, "1"),
         None,
         _holdout(),
@@ -394,7 +392,7 @@ def test_comparison_payload_preserves_historical_single_gate_digest(tmp_path, mo
 def test_binary_probability_gate_uses_actual_holdout_availability(tmp_path, monkeypatch, missing):
     """AUC may gate a binary classifier only when both held-out classes are available."""
     frame = pd.DataFrame({"x": [-4.0, -3.0, -2.0, 2.0, 3.0, 4.0], "target": [0, 0, 0, 1, 1, 1]})
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         {"preprocessing": [], "modeling": {"type": "logistic_regression"}},
         SplitDataset(train=frame, test=frame.head(0)),
         target_column="target",
@@ -402,9 +400,9 @@ def test_binary_probability_gate_uses_actual_holdout_availability(tmp_path, monk
         max_rows=10,
         max_bytes=10_000,
     )
-    monkeypatch.setattr(validation, "load_registered_local_pipeline", lambda *a, **k: artifact)
+    monkeypatch.setattr(validation, "load_registered_pipeline", lambda *a, **k: artifact)
     heldout = pd.DataFrame({"x": [-1.0, 1.0], "target": [0, 0] if missing else [0, 1]})
-    report = validation.compare_registered_local_models(
+    report = validation.compare_registered_pipeline_models(
         _reference(artifact, "1"),
         None,
         heldout,
@@ -447,8 +445,8 @@ def test_classification_gate_domains(metric, threshold, valid):
 def test_passing_secondary_gates_do_not_qualify_a_tie(tmp_path, monkeypatch):
     """Additional guardrails cannot waive the strict selection-metric improvement rule."""
     artifact = _fitted(tmp_path, 1)
-    monkeypatch.setattr(validation, "load_registered_local_pipeline", lambda *a, **k: artifact)
-    report = validation.compare_registered_local_models(
+    monkeypatch.setattr(validation, "load_registered_pipeline", lambda *a, **k: artifact)
+    report = validation.compare_registered_pipeline_models(
         _reference(artifact, "2"),
         _reference(artifact, "1"),
         _holdout(),
@@ -472,11 +470,11 @@ def test_malformed_resolved_version_fails_before_registry_load(tmp_path, monkeyp
     reference = replace(_reference(candidate, "2"), version=2)
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda *args, **kwargs: pytest.fail("registry must not be called"),
     )
     with pytest.raises(ValueError, match="concrete version"):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             reference,
             None,
             _holdout(),
@@ -499,9 +497,9 @@ def test_registry_permission_failure_does_not_yield_a_report(tmp_path, monkeypat
         """Represent an access failure at the optional registry boundary."""
         raise RegistryAccessError("denied")
 
-    monkeypatch.setattr(validation, "load_registered_local_pipeline", denied)
+    monkeypatch.setattr(validation, "load_registered_pipeline", denied)
     with pytest.raises(RegistryAccessError, match="denied"):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             _reference(candidate, "2"),
             None,
             _holdout(),
@@ -519,11 +517,11 @@ def test_too_small_holdout_fails_before_registry_load(tmp_path, monkeypatch) -> 
     candidate = _fitted(tmp_path, 0.0)
     monkeypatch.setattr(
         validation,
-        "load_registered_local_pipeline",
+        "load_registered_pipeline",
         lambda *args, **kwargs: pytest.fail("registry must not be called"),
     )
     with pytest.raises(ValueError, match="at least two"):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             _reference(candidate, "2"),
             None,
             _holdout().head(1),

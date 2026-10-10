@@ -95,7 +95,7 @@ def test_shared_helpers_have_one_definition_name():
     paths = list((root / "integrations").rglob("*.py"))
     paths += [
         root / "inference/bundle.py",
-        root / "inference/local_pipeline.py",
+        root / "inference/fitted_pipeline.py",
         root / "modeling/_tuning/cv_policy.py",
     ]
     violations = [item for path in paths for item in _helper_aliases(path, root / "integrations")]
@@ -143,7 +143,7 @@ def test_boundary_scanners_distinguish_modules_from_helper_bindings(
     [
         "skyulf.integrations.mlflow.lifecycle.promotion",
         "skyulf.integrations.databricks.jobs.training.training_nodes",
-        "skyulf.integrations.databricks.lifecycle.local_workflow",
+        "skyulf.integrations.databricks.lifecycle.workflow",
     ],
 )
 def test_internal_helpers_preserve_optional_imports(first):

@@ -6,8 +6,7 @@ from typing import Any
 
 from skyulf.integrations.mlflow.shared._client import require_mlflow
 
-from ....mlflow.registration.registry import load_run_pipeline as load_run_local_pipeline
-from ....mlflow.registration.registry import packaged_artifact_path
+from ....mlflow.registration.registry import load_run_pipeline, packaged_artifact_path
 from ...lifecycle._lifecycle_data import training_partitions
 from ...lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
 from ...observability.reports.explanation_report import copy_winner_explanations
@@ -113,7 +112,7 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
     """Repackage the original fitted bytes under the parent run without fitting again."""
     config = store.request["config"]
     row = winner["evaluation"]
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         row["model_uri"],
         digest=row["model_digest"],
         tracking_uri=config["tracking_uri"],
@@ -140,7 +139,7 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
             )
         model = require_mlflow().models.Model.load(package)
         path = packaged_artifact_path(package, model.flavors, "local_pipeline")
-        return training.log_local_model(
+        return training.log_pipeline_model(
             path, run_id=store.run_id, tracking_uri=config["tracking_uri"]
         )
 
@@ -179,7 +178,7 @@ def join_competition_training(store: PhaseStore, reference: dict[str, str]) -> L
             copy_winner_explanations(store, selection)
         tags = {**winner["training"]["tags"], "competition_winner": selection["winner"]}
         store.run.set_tags({**tags, "competition_count": str(len(completed))})
-        artifact = load_run_local_pipeline(
+        artifact = load_run_pipeline(
             uri,
             digest=winner["training"]["model_digest"],
             tracking_uri=store.request["config"]["tracking_uri"],

@@ -13,7 +13,7 @@ from skyulf.integrations.databricks.feature_store.lifecycle_config import (
     binding_json,
     serialize_feature_spec,
 )
-from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
+from skyulf.integrations.databricks.lifecycle.workflow import training_spec
 
 
 @pytest.fixture
@@ -99,8 +99,8 @@ def test_feature_frame_fits_real_pipeline_and_keeps_saved_lineage(
     bound_spec, monkeypatch, tmp_path
 ):
     """Prepared native features must reach actual fitting without losing their snapshot receipt."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining as fitting
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.fitting import candidate as fitting
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     frame = pd.DataFrame(
         {
@@ -125,11 +125,11 @@ def test_feature_frame_fits_real_pipeline_and_keeps_saved_lineage(
         pipeline_config=config,
         artifact_path=tmp_path / "model",
         engine="pandas",
-        cv=LocalCVSpec(),
+        cv=CVSpec(),
         risk_category=None,
         prepared_data=(frame, train, holdout, unavailable),
     )
     assert fitted.spec.feature_binding_json == bound_spec.feature_binding_json
     assert fitted.training_rows == 4 and fitted.holdout_rows == 2
-    result = fitting.evaluate_local_holdout(fitted.artifact, fitted.holdout, target_column="target")
+    result = fitting.evaluate_holdout(fitted.artifact, fitted.holdout, target_column="target")
     assert result["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)

@@ -188,7 +188,3 @@ def _competition_source(source: str) -> str:
         "if callable(getattr(_skyulf_common_module, 'build_pre_split_steps', None)):\n"
         "    build_pre_split_steps = _skyulf_common_module.build_pre_split_steps\n"
     )
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

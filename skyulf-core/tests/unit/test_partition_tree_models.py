@@ -6,11 +6,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
@@ -59,8 +55,8 @@ def fitted_tree(tmp_path, node, *, tuned=False):
         assert isinstance(pipeline.model_estimator.model, tuple)
         pipeline.model_estimator.model[1].decision_thresholds = {"high": 0.8, "low": 0.2}
     destination = tmp_path / node
-    save_local_pipeline(pipeline, destination)
-    return load_local_pipeline(destination)
+    save_pipeline(pipeline, destination)
+    return load_pipeline(destination)
 
 
 @pytest.mark.parametrize("node", TREE_NODES)
@@ -70,11 +66,11 @@ def test_exact_tree_models_replay_saved_state_in_any_batch(tmp_path, node, tuned
     artifact = fitted_tree(tmp_path, node, tuned=tuned)
     before = require_partition_safe_pipeline(artifact)
     query = pd.DataFrame({"x": [np.nan, -2.0, 0.0, 9.0, np.nan]}, index=[90, 1, 15, 3, 4])
-    whole = predict_local_pipeline(query, artifact)
+    whole = predict_pipeline(query, artifact)
     split = pd.concat(
-        [predict_local_pipeline(query.iloc[part], artifact) for part in ([0], [1, 2], [3, 4])]
+        [predict_pipeline(query.iloc[part], artifact) for part in ([0], [1, 2], [3, 4])]
     )
-    reordered = predict_local_pipeline(query.iloc[[4, 2, 0, 3, 1]], artifact)
+    reordered = predict_pipeline(query.iloc[[4, 2, 0, 3, 1]], artifact)
     pd.testing.assert_frame_equal(whole, split)
     pd.testing.assert_frame_equal(whole.sort_index(), reordered.sort_index())
     empty_features = artifact.pipeline.feature_engineer.transform(

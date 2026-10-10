@@ -252,18 +252,18 @@ def test_saved_proof_lookup_refuses_missing_uncommitted_or_malformed_receipts(mo
     from types import SimpleNamespace
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.lifecycle import local_approval
+    from skyulf.integrations.databricks.lifecycle import approval
     from skyulf.integrations.mlflow.lifecycle.promotion import AliasConflictError
 
     client = Mock()
     raw = event if isinstance(event, str) else json.dumps(event)
     client.get_model_version.return_value = SimpleNamespace(tags={"promotion_event": raw})
-    monkeypatch.setattr(local_approval, "controlled_champion_version", lambda *a, **kw: "1")
-    monkeypatch.setattr(local_approval, "active_marker", lambda *a, **kw: "event")
-    monkeypatch.setattr(local_approval, "require_mlflow", lambda: object())
-    monkeypatch.setattr(local_approval, "make_registry_client", lambda *a: client)
+    monkeypatch.setattr(approval, "controlled_champion_version", lambda *a, **kw: "1")
+    monkeypatch.setattr(approval, "active_marker", lambda *a, **kw: "event")
+    monkeypatch.setattr(approval, "require_mlflow", lambda: object())
+    monkeypatch.setattr(approval, "make_registry_client", lambda *a: client)
     with pytest.raises(AliasConflictError):
-        local_approval.resolve_candidate_comparison_digest(_config(), "2", action="approve")
+        approval.resolve_candidate_comparison_digest(_config(), "2", action="approve")
 
 
 @pytest.mark.parametrize("action", ["approve", "reject"])

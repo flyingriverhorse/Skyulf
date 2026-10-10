@@ -200,7 +200,3 @@ def _validate_candidate_identities(saved: dict, candidates: dict, fitted: dict) 
             raise ValueError("Competition score belongs to another candidate recipe.")
         if row["candidate"] == saved["winner"] and row["model_digest"] != fitted["model_digest"]:
             raise ValueError("Competition winner artifact differs from the selected model.")
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

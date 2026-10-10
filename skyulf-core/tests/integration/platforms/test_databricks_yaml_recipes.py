@@ -8,12 +8,12 @@ import pytest
 yaml = pytest.importorskip("yaml")
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline
-from skyulf.inference.local_scoring import score_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline
+from skyulf.inference.pipeline_scoring import score_pipeline
 from skyulf.inference.project_code import load_project_module, project_source_digest
 from skyulf.inference.project_package import discard_project_package
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_yaml_builtin_and_custom_order_survives_saved_model_reload(recipe_projec
     assert resolved["pipeline"]["preprocessing"][0] == _fill()
     assert resolved["pipeline"]["preprocessing"][1]["name"] == "double"
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         resolved["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -78,7 +78,7 @@ def test_yaml_builtin_and_custom_order_survives_saved_model_reload(recipe_projec
         max_bytes=10000,
     )
     raw = pd.DataFrame({"x": [None, 5.0]})
-    expected = score_local_pipeline(raw, artifact)
+    expected = score_pipeline(raw, artifact)
     source = resolved["pipeline"]["project_python_source"]
     declarations.write_text("not: a recipe", encoding="utf-8")
     (recipe_project / "preprocessing.py").write_text(
@@ -87,8 +87,8 @@ def test_yaml_builtin_and_custom_order_survives_saved_model_reload(recipe_projec
     discard_project_package(load_project_module(source).__name__)
     replay = load_project_module(source)
     assert replay.build_preprocessing() == resolved["pipeline"]["preprocessing"]
-    loaded = load_local_pipeline(tmp_path / "model")
-    pd.testing.assert_frame_equal(expected, score_local_pipeline(raw, loaded))
+    loaded = load_pipeline(tmp_path / "model")
+    pd.testing.assert_frame_equal(expected, score_pipeline(raw, loaded))
     assert expected.prediction.tolist() == pytest.approx([6.0, 11.0])
 
 

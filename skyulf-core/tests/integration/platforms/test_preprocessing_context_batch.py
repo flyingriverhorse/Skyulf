@@ -13,7 +13,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
@@ -93,7 +93,7 @@ def _save_cases(directory, engine):
             {"preprocessing": steps, "modeling": {"type": "linear_regression"}}
         )
         pipeline.fit(SplitDataset(train=frame, test=frame[:0]), target_column="target")
-        save_local_pipeline(pipeline, directory / node)
+        save_pipeline(pipeline, directory / node)
         samples[node] = sample
     (directory / "samples.pkl").write_bytes(pickle.dumps(samples))
 
@@ -111,7 +111,7 @@ def _replay_saved(directory):
     samples = pickle.loads((directory / "samples.pkl").read_bytes())
     reports = {}
     for node, sample in samples.items():
-        artifact = load_local_pipeline(directory / node)
+        artifact = load_pipeline(directory / node)
         before = artifact_digest(artifact.pipeline.feature_engineer.fitted_steps)
         report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(2, 3))
         assert report["status"] == "passed", (node, report)
@@ -179,20 +179,20 @@ def test_nullable_bins_and_object_replacement_reload_without_fit(tmp_path):
         }
     )
     pipeline.fit(SplitDataset(train=training, test=training[:0]), target_column="y")
-    save_local_pipeline(pipeline, tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
     code = """
 import json, sys
 import numpy as np
 import pandas as pd
 from skyulf.registry import NodeRegistry
-from skyulf.inference.local_pipeline import load_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 def forbidden(*args, **kwargs):
     # Loaded artifacts must use saved transforms, never fit again.
     raise AssertionError('Unexpected fit during saved replay')
 for node in ('CustomBinning', 'ValueReplacement'):
     NodeRegistry.get_calculator(node).fit = forbidden
-artifact = load_local_pipeline(sys.argv[1])
+artifact = load_pipeline(sys.argv[1])
 sample = pd.DataFrame({'x': [0.0, 3.0, None, 9.0],
                        'value': pd.Series([0.0, 3.0, None, 9.0], dtype=object)})
 report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 3))

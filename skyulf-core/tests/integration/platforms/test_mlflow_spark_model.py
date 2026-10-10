@@ -9,12 +9,15 @@ import pytest
 
 mlflow = pytest.importorskip("mlflow")
 
-from tests.integration.platforms.test_local_feature_model import (  # noqa: E402
+from tests.integration.platforms.test_feature_pipeline_model import (  # noqa: E402
     package_inputs as package_inputs,
 )
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    save_pipeline,  # noqa: E402
+)
 from skyulf.integrations.mlflow.spark import spark_model  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
@@ -25,8 +28,8 @@ def artifact(tmp_path):
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [2.0, 4.0, 6.0, 8.0]})
     pipeline = SkyulfPipeline({"modeling": {"type": "linear_regression"}})
     pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "model")
-    return load_local_pipeline(tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
+    return load_pipeline(tmp_path / "model")
 
 
 @pytest.mark.parametrize(
@@ -50,16 +53,16 @@ def test_mutable_or_unregistered_uri_rejected_before_udf(artifact, monkeypatch, 
 
 def test_worker_revalidates_certificate_and_runtime_source(artifact, tmp_path):
     """A certificate is detached evidence, not permission to accept another payload."""
-    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel
+    from skyulf.integrations.mlflow.models.pipeline_model import SkyulfPipelinePythonModel
 
     certificate = spark_model.partition_safety_certificate(artifact)
-    model = SkyulfLocalPythonModel(None, certificate, spark_model.runtime_source_digest())
+    model = SkyulfPipelinePythonModel(None, certificate, spark_model.runtime_source_digest())
     model.load_context(SimpleNamespace(artifacts={"local_pipeline": str(tmp_path / "model")}))
     assert model.predict(None, pd.DataFrame({"x": [5.0]}))["prediction"].iloc[0] == pytest.approx(
         10
     )
     certificate["pipeline_sha256"] = "0" * 64
-    changed = SkyulfLocalPythonModel(None, certificate, spark_model.runtime_source_digest())
+    changed = SkyulfPipelinePythonModel(None, certificate, spark_model.runtime_source_digest())
     with pytest.raises(ValueError, match="certificate"):
         changed.load_context(SimpleNamespace(artifacts={"local_pipeline": str(tmp_path / "model")}))
     with pytest.raises(ValueError, match="runtime source"):
@@ -110,7 +113,7 @@ def test_concrete_package_download_uses_explicit_stores_without_global_mutation(
 
 def test_additive_certificate_cannot_override_original_package_identity(artifact):
     """The certificate supplements the original digest and cannot hide mismatched metadata."""
-    from skyulf.integrations.mlflow.models.local_model import _signature
+    from skyulf.integrations.mlflow.models.pipeline_model import _signature
 
     metadata = {
         spark_model.SAFETY_KEY: spark_model.partition_safety_certificate(artifact),
@@ -131,13 +134,13 @@ def test_additive_certificate_cannot_override_original_package_identity(artifact
 
 def test_local_logging_adds_certificate_without_changing_scope(artifact, tmp_path, monkeypatch):
     """New inspected packages retain legacy execution scope and bundle worker source."""
-    from skyulf.integrations.mlflow.models import local_model
+    from skyulf.integrations.mlflow.models import pipeline_model
 
     calls = []
-    monkeypatch.setattr(local_model, "make_tracking_client", lambda uri: Mock())
-    monkeypatch.setattr(local_model, "scrub_local_artifact_uri", lambda *args: None)
+    monkeypatch.setattr(pipeline_model, "make_tracking_client", lambda uri: Mock())
+    monkeypatch.setattr(pipeline_model, "scrub_local_artifact_uri", lambda *args: None)
     monkeypatch.setattr(mlflow.pyfunc, "save_model", lambda **kwargs: calls.append(kwargs))
-    local_model.log_local_model(tmp_path / "model", run_id="run", artifact_path="model")
+    pipeline_model.log_pipeline_model(tmp_path / "model", run_id="run", artifact_path="model")
     saved = calls[0]
     assert saved["metadata"]["skyulf_execution_scope"] == "whole_frame_local"
     assert saved["metadata"][spark_model.SAFETY_KEY] == spark_model.partition_safety_certificate(
@@ -477,12 +480,12 @@ def test_certified_set_spark_output_preserves_nulls_and_local_dtypes(
 
 def test_uncertified_pyfunc_cannot_enable_spark_output(artifact, tmp_path, monkeypatch):
     """The transport flag cannot authorize an uncertified legacy whole-frame artifact."""
-    from skyulf.integrations.mlflow.models import local_model
+    from skyulf.integrations.mlflow.models import pipeline_model
 
-    model = local_model.SkyulfLocalPythonModel()
+    model = pipeline_model.SkyulfPipelinePythonModel()
     model.load_context(SimpleNamespace(artifacts={"local_pipeline": str(tmp_path / "model")}))
     score = Mock()
-    monkeypatch.setattr(local_model, "score_local_pipeline", score)
+    monkeypatch.setattr(pipeline_model, "score_pipeline", score)
     with pytest.raises(ValueError, match="certif"):
         model.predict(None, pd.DataFrame({"x": [5.0]}), params={"skyulf_spark_output": True})
     score.assert_not_called()
@@ -491,7 +494,7 @@ def test_uncertified_pyfunc_cannot_enable_spark_output(artifact, tmp_path, monke
 @pytest.mark.parametrize("certified", [False, True])
 def test_spark_package_requires_exact_output_transport_param_schema(artifact, certified):
     """A worker package that cannot preserve string nulls must fail before UDF creation."""
-    from skyulf.integrations.mlflow.models.local_model import _signature
+    from skyulf.integrations.mlflow.models.pipeline_model import _signature
 
     certificate = spark_model.partition_safety_certificate(artifact)
     metadata = {
@@ -531,9 +534,9 @@ def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
     artifact, tmp_path, monkeypatch
 ):
     """Serverless model-call bounds cannot rely on an unavailable Spark Arrow setting."""
-    from skyulf.integrations.mlflow.models import local_model
+    from skyulf.integrations.mlflow.models import pipeline_model
 
-    model = local_model.SkyulfLocalPythonModel(
+    model = pipeline_model.SkyulfPipelinePythonModel(
         None,
         spark_model.partition_safety_certificate(artifact),
         spark_model.runtime_source_digest(),
@@ -542,7 +545,7 @@ def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
     query = pd.DataFrame(
         {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]}, index=[19, 4, 19, -1, 50, 4, 9]
     )
-    original = local_model.score_local_pipeline
+    original = pipeline_model.score_pipeline
     calls = []
 
     def observe(frame, artifact):
@@ -550,7 +553,7 @@ def test_spark_worker_bounds_model_calls_and_preserves_duplicate_indices(
         calls.append(len(frame))
         return original(frame, artifact)
 
-    monkeypatch.setattr(local_model, "score_local_pipeline", observe)
+    monkeypatch.setattr(pipeline_model, "score_pipeline", observe)
     expected = model.predict(None, query, params={"skyulf_spark_batch_rows": 3})
     assert calls == [7]
     calls.clear()
@@ -657,15 +660,15 @@ def test_real_feature_envelope_passes_raw_spark_contract_and_rejects_binding_dri
     from dataclasses import replace
 
     from skyulf.integrations.databricks.feature_store.lifecycle_config import binding_json
-    from skyulf.integrations.mlflow.models.local_feature_model import log_local_feature_model
+    from skyulf.integrations.mlflow.models.feature_model import log_feature_pipeline_model
 
     path, options, _ = package_inputs
-    uri = log_local_feature_model(path, **options)
+    uri = log_feature_pipeline_model(path, **options)
     local = mlflow.artifacts.download_artifacts(
         artifact_uri=uri, tracking_uri=options["tracking_uri"]
     )
     artifact = replace(
-        load_local_pipeline(path), feature_lookup_json=binding_json(options["lookup_binding"])
+        load_pipeline(path), feature_lookup_json=binding_json(options["lookup_binding"])
     )
     package = mlflow.models.Model.load(local)
     raw = spark_model._scoring_package(artifact, local, package)

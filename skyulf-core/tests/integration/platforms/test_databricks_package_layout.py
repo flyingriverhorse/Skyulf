@@ -1,6 +1,7 @@
-"""Runtime packages stay navigable without breaking deployed module references."""
+"""Runtime modules own their implementation and serialize current canonical names."""
 
 import importlib
+import importlib.util
 import os
 import pickle
 import subprocess
@@ -29,8 +30,6 @@ GROUPS = {
     [
         ("jobs.shared.job_runtime", "job_runtime"),
         ("jobs.training.training_nodes", "training_nodes"),
-        ("training.fitting.local_retraining", "local_retraining"),
-        ("training.tuning.local_cv", "local_cv"),
         ("observability.monitoring.spark.spark_monitoring_metrics", "spark_monitoring_metrics"),
         ("observability.monitoring.performance.performance_policy", "performance_policy"),
         ("shared._contracts", "_contracts"),
@@ -51,23 +50,17 @@ def test_runtime_root_contains_only_package_entrypoint():
     assert {path.name for path in PACKAGE_ROOT.iterdir() if path.is_dir()} >= GROUPS
 
 
-@pytest.mark.parametrize("legacy_first", [True, False])
 @pytest.mark.parametrize("promotion_first", [True, False])
-def test_legacy_import_order_preserves_class_identity(legacy_first, promotion_first):
-    """Old notebooks and new runtime code must share one class in either order."""
-    names = [f"{PACKAGE}.local_retraining", f"{PACKAGE}.training.fitting.local_retraining"]
-    if not legacy_first:
-        names.reverse()
+def test_canonical_import_order_preserves_pickled_class_identity(promotion_first):
+    """Canonical imports and serialized classes must work in fresh processes in either order."""
     script = "import skyulf.integrations.mlflow.lifecycle.promotion\n" if promotion_first else ""
     script += (
         "import importlib, pickle\n"
-        f"first = importlib.import_module({names[0]!r})\n"
-        f"second = importlib.import_module({names[1]!r})\n"
-        "assert first is second\n"
-        "assert first.LocalTrainingSpec is second.LocalTrainingSpec\n"
-        "legacy = pickle.loads(b'cskyulf.integrations.databricks.local_retraining"
-        "\\nLocalTrainingSpec\\n.')\n"
-        "assert legacy is first.LocalTrainingSpec\n"
+        f"module = importlib.import_module('{PACKAGE}.training.fitting.candidate')\n"
+        f"from {PACKAGE} import TrainingSpec\n"
+        "assert module.TrainingSpec is TrainingSpec\n"
+        "assert TrainingSpec.__module__ == module.__name__\n"
+        "assert pickle.loads(pickle.dumps(TrainingSpec)) is TrainingSpec\n"
     )
     environment = dict(os.environ)
     environment["PYTHONPATH"] = str(PACKAGE_ROOT.parents[2])
@@ -95,14 +88,39 @@ def test_all_legacy_modules_resolve_to_canonical_modules():
         assert legacy is canonical
 
 
-def test_legacy_monkeypatch_and_pickled_class_use_canonical_module(monkeypatch):
-    """Existing patch paths and pickles keep addressing the executing runtime."""
-    legacy = importlib.import_module(f"{PACKAGE}.local_retraining")
-    canonical = importlib.import_module(f"{PACKAGE}.training.fitting.local_retraining")
-    sentinel = object()
-    monkeypatch.setattr(legacy, "train_local_candidate", sentinel)
-    restored = pickle.loads(
-        b"cskyulf.integrations.databricks.local_retraining\nLocalTrainingSpec\n."
-    )
-    assert canonical.train_local_candidate is sentinel
-    assert restored is canonical.LocalTrainingSpec
+def test_retired_training_pickle_path_is_not_redirected():
+    """Old saved class paths fail clearly rather than silently reviving removed modules."""
+    with pytest.raises(ModuleNotFoundError) as error:
+        pickle.loads(b"cskyulf.integrations.databricks.local_retraining\nLocalTrainingSpec\n.")
+    assert error.value.name == f"{PACKAGE}.local_retraining"
+
+
+@pytest.mark.parametrize(
+    "canonical, retired",
+    [
+        ("shared._frames", "shared._local_frames"),
+        ("observability.monitoring.monitoring", "observability.monitoring.local.monitoring"),
+        (
+            "observability.monitoring.monitoring_metrics",
+            "observability.monitoring.local.monitoring_metrics",
+        ),
+        (
+            "observability.monitoring.monitoring_performance",
+            "observability.monitoring.local.monitoring_performance",
+        ),
+    ],
+)
+def test_shared_frame_and_monitoring_modules_have_direct_names(canonical, retired):
+    """Shared pandas/Polars and Spark helpers must not hide behind local-only paths."""
+    name = f"{PACKAGE}.{canonical}"
+    assert importlib.util.find_spec(name) is not None
+    module = importlib.import_module(name)
+    assert module.__name__ == name
+    basename = retired.rsplit(".", 1)[-1]
+    for suffix in (retired, basename, f"_compat.{basename}"):
+        old_name = f"{PACKAGE}.{suffix}"
+        with pytest.raises(ModuleNotFoundError) as error:
+            importlib.import_module(old_name)
+        assert error.value.name and (
+            old_name == error.value.name or old_name.startswith(error.value.name + ".")
+        )

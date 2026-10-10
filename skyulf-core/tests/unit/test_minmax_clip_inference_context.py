@@ -11,7 +11,7 @@ from polars.testing import assert_frame_equal
 
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.partition_safety import _inspect_step, require_partition_safe_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
@@ -223,14 +223,14 @@ def test_saved_minmax_identity_keeps_real_pipeline_worker_boundary(tmp_path, eng
         }
     )
     pipeline.fit(SplitDataset(train=frame, test=frame[:0]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
 
     def forbidden(*args, **kwargs):
         """Loading an intentionally disabled scaler must never fit it again."""
         raise AssertionError("Unexpected fit")
 
     monkeypatch.setattr(NodeRegistry.get_calculator("MinMaxScaler"), "fit", forbidden)
-    restored = load_local_pipeline(tmp_path / "model")
+    restored = load_pipeline(tmp_path / "model")
     sample = (
         frame.drop(columns=["target"]) if isinstance(frame, pd.DataFrame) else frame.drop("target")
     )

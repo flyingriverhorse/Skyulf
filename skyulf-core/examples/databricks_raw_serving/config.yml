@@ -1,4 +1,4 @@
-# Standalone demo config consumed by fit_local_workflow, not the main template loader.
+# Standalone demo config consumed by fit_workflow, not the main template loader.
 # Main Bundle: config/training.yml selects a recipe in config/preprocessing.yml.
 # See the main template's PREPROCESSING.md for this same pipeline in that layout.
 # Resource names come from Bundle variables. All demo model settings live here.

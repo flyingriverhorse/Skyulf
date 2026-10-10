@@ -76,9 +76,9 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
-    return local_workflow
+    return workflow
 
 
 @pytest.mark.parametrize("prefix", ["event", "result"])

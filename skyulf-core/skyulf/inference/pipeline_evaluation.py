@@ -13,8 +13,7 @@ from ..modeling._evaluation.metrics import (
     calculate_regression_metrics,
 )
 from ..preprocessing._target_labels import encoded_labels
-from .fitted_pipeline import FittedPipelineArtifact
-from .fitted_pipeline import predict_pipeline as predict_local_pipeline
+from .fitted_pipeline import FittedPipelineArtifact, predict_pipeline
 
 
 def evaluate_holdout(
@@ -43,7 +42,7 @@ def evaluate_holdout(
     )
     actual = heldout[target_column].to_numpy()
     with parallel_config(backend="sequential"):
-        predictions = predict_local_pipeline(features, artifact)
+        predictions = predict_pipeline(features, artifact)
     raw_metrics = _holdout_metrics(artifact, features, heldout, target_column, actual, predictions)
     if on_predictions is not None:
         on_predictions(actual, predictions)
@@ -55,7 +54,7 @@ def _validate_holdout(
 ) -> None:
     """Require labeled evaluation rows with a target outside the model inputs."""
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("artifact must be a LocalPipelineArtifact.")
+        raise TypeError("artifact must be a FittedPipelineArtifact.")
     if not isinstance(heldout, pd.DataFrame | pl.DataFrame):
         raise TypeError("heldout must be a pandas or Polars DataFrame.")
     if len(heldout) < 2:
@@ -109,7 +108,3 @@ def _holdout_metrics(
             **scoring_args,
         )
     return raw_metrics
-
-
-# Released names remain aliases for imports and stored pickle references.
-evaluate_local_holdout = evaluate_holdout

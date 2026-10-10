@@ -21,7 +21,7 @@ from .....inference.project_code import load_project_module, project_source_dige
 from ....mlflow.lifecycle.challenger import ChallengerLifecycle
 from ....mlflow.lifecycle.promotion import AliasChangeReceipt, ExclusiveAliasWriterAdmission
 from ....mlflow.lifecycle.validation import ModelComparisonReport
-from ....mlflow.registration.registry import load_run_pipeline as load_run_local_pipeline
+from ....mlflow.registration.registry import load_run_pipeline
 from ...lifecycle import _lifecycle_data as data_stages
 from ...lifecycle import workflow as workflow
 from ...lifecycle._lifecycle_state import (
@@ -242,7 +242,7 @@ def _train(spark: Any, store: PhaseStore) -> dict[str, Any]:
         )
         if selection is not None:
             fitted.tags["competition_winner"] = selection["winner"]
-        model_uri = training.log_local_model(
+        model_uri = training.log_pipeline_model(
             path,
             run_id=store.run_id,
             tracking_uri=config["tracking_uri"],
@@ -345,7 +345,7 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
     config, effective_config = selected_request(store)
     if fitted["model_uri"] != f"runs:/{store.run_id}/model":
         raise ValueError("Fitted model source differs from lifecycle invocation.")
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         fitted["model_uri"], digest=fitted["model_digest"], tracking_uri=config["tracking_uri"]
     )
     source = config["pipeline"].get("project_python_source")
@@ -903,7 +903,3 @@ def _run_model_decision(
         tracking_uri=tracking_uri,
         reference=reference,
     )
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

@@ -671,7 +671,3 @@ def _preview_scoring_rules(pipeline: dict[str, Any]) -> list[str]:
         "Every input key receives predicted/excluded status; exclusions carry reasons.",
         "Rules affect scoring only; training filters and holdout metrics remain independent.",
     ]
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

@@ -7,12 +7,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.lifecycle.local_workflow import (
+from skyulf.integrations.databricks.lifecycle.workflow import (
     resolve_target_config,
     resolve_training_spec,
     training_spec,
 )
-from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
 
 
 def _config(workflow_config):
@@ -92,4 +92,4 @@ def test_tampered_training_spec_lookup_is_rejected(workflow_config):
     spec = training_spec(_config(workflow_config))
     with pytest.raises(ValueError):
         replace(spec, feature_lookup_json='{"lookups": []}')
-    assert isinstance(spec, LocalTrainingSpec)
+    assert isinstance(spec, TrainingSpec)

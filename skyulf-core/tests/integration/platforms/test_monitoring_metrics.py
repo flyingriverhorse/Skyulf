@@ -8,7 +8,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
     build_monitoring_report,
 )
 
@@ -551,7 +551,7 @@ def test_same_missingness_process_rarely_flags_sampling_noise():
     """Independent samples from the same process must not systematically block retraining."""
     import numpy as np
 
-    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
         _feature_quality,
     )
 

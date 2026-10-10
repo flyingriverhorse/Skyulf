@@ -12,10 +12,10 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 from skyulf.preprocessing.function_steps import FittedFunctionCalculator
 
 SOURCE = '''
@@ -110,7 +110,7 @@ def _saved_project(tmp_path, mode="fitted", engine="pandas"):
         pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]}), engine
     )
     path = tmp_path / "artifact"
-    fit_local_workflow(
+    fit_workflow(
         config["pipeline"],
         SplitDataset(train=rows, test=rows[:0]),
         target_column="target",
@@ -118,7 +118,7 @@ def _saved_project(tmp_path, mode="fitted", engine="pandas"):
         max_rows=10,
         max_bytes=10000,
     )
-    return load_local_pipeline(path), root, path
+    return load_pipeline(path), root, path
 
 
 def _sample(engine="pandas"):
@@ -164,12 +164,12 @@ def test_probe_reloads_captured_project_in_a_fresh_process(tmp_path, engine, mod
     (root / "steps.py").write_text("raise RuntimeError('live source loaded')\n", encoding="utf-8")
     code = """
 import json, sys, pandas as pd, polars as pl
-from skyulf.inference.local_pipeline import load_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.preprocessing.function_steps import FittedFunctionCalculator
 def forbidden(*args, **kwargs):
     raise AssertionError("Diagnostic must not fit")
-artifact = load_local_pipeline(sys.argv[1])
+artifact = load_pipeline(sys.argv[1])
 FittedFunctionCalculator.fit = forbidden
 frame = pd.DataFrame({"x": [103.125, 101.25, 104.375, 102.5]})
 sample = pl.from_pandas(frame) if sys.argv[2] == "polars" else frame

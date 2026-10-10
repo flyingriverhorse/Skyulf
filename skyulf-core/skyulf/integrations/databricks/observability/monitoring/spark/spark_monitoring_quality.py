@@ -4,7 +4,7 @@ from typing import Any
 
 from scipy.stats import fisher_exact
 
-from ..local.monitoring_metrics import (
+from ..monitoring_metrics import (
     monitoring_metric,
     monitoring_report_status,
     validate_monitoring_inputs,

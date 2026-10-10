@@ -15,9 +15,9 @@ import pandas as pd
 from .....inference.project_code import load_project_module, project_source_digest
 from ....mlflow.lifecycle.validation import ModelComparisonReport, comparison_digest
 from ....mlflow.registration.registry import (
-    load_registered_pipeline as load_registered_local_pipeline,
+    load_registered_pipeline,
+    resolve_model,
 )
-from ....mlflow.registration.registry import resolve_model
 from ...shared.json_contracts import finite_json_digest
 
 if TYPE_CHECKING:
@@ -175,7 +175,7 @@ def _load_candidate_recipe(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri or tracking_uri,
     )
-    artifact = load_registered_local_pipeline(
+    artifact = load_registered_pipeline(
         reference, tracking_uri=tracking_uri, registry_uri=registry_uri or tracking_uri
     )
     if engine != artifact.manifest.fitted_engine:

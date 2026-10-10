@@ -12,7 +12,7 @@ from .lifecycle_config import (
     parse_feature_binding,
     serialize_feature_spec,
 )
-from .runtime import _client, _validate_input, create_feature_training_set
+from .runtime import create_feature_training_set, feature_engineering_client, validate_feature_input
 
 
 def lookup_controls(spec: Any) -> tuple[str, ...]:
@@ -114,10 +114,10 @@ def create_checked_training_set(
     expected = deserialize_feature_spec(binding["lookup_spec"])
     if lookup.lookups != expected.lookups:
         raise ValueError("Native training lookup differs from its pinned feature binding.")
-    _validate_input(source, lookup, training=True, allow_feature_overrides=False)
+    validate_feature_input(source, lookup, training=True, allow_feature_overrides=False)
     records = binding["lookup_evidence"]["feature_tables"]
     validate_snapshots(spark, records)
-    client = _client(client)
+    client = feature_engineering_client(client)
     validate_feature_tables(spark, source, lookup, client, records)
     result = create_feature_training_set(
         source, lookup, client=client, lookup_factory=lookup_factory
@@ -190,7 +190,7 @@ def log_training_feature_model(
 ) -> str:
     """Package fitted bytes with the frozen native lookup used to read training rows."""
     from ...mlflow.models.feature_model import (  # noqa: PLC0415 - optional MLflow boundary
-        log_feature_pipeline_model as log_local_feature_model,
+        log_feature_pipeline_model,
     )
     from .snapshots import validate_snapshots  # noqa: PLC0415
 
@@ -198,7 +198,7 @@ def log_training_feature_model(
     lookup = training_lookup(spec)
     native = logging_training_set(spark, spec)
     assert lookup is not None
-    uri = log_local_feature_model(
+    uri = log_feature_pipeline_model(
         path,
         training_set=native,
         lookup_spec=lookup,

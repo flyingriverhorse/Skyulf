@@ -6,7 +6,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from skyulf.inference.local_scoring import score_local_pipeline
+from skyulf.inference.pipeline_scoring import score_pipeline
 from skyulf.integrations.databricks.serving import (
     PinnedEndpointSpec,
     build_serving_sql_function,
@@ -17,7 +17,7 @@ from skyulf.integrations.databricks.serving import (
     require_pinned_endpoint_ready,
 )
 from skyulf.integrations.mlflow.registration.registry import (
-    load_registered_local_pipeline,
+    load_registered_pipeline,
     resolve_model,
 )
 
@@ -144,10 +144,8 @@ def verify(spark, client, plan, namespace, source_version, config):
         read_cohort(spark, namespace, source_version, "score"), config["prediction_rows"]
     )
     resolved = resolve_model(plan.spec.model_name, version=plan.spec.model_version, **STORES)
-    artifact = load_registered_local_pipeline(resolved, **STORES)
-    expected = score_local_pipeline(source[list(plan.input_columns)], artifact).reset_index(
-        drop=True
-    )
+    artifact = load_registered_pipeline(resolved, **STORES)
+    expected = score_pipeline(source[list(plan.input_columns)], artifact).reset_index(drop=True)
     errors = {}
     for method in ("rest", "sql"):
         table_name = "predictions_rest" if method == "rest" else "predictions_ai_query"

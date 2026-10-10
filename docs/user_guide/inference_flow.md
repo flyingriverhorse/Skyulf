@@ -4,7 +4,7 @@ Inference reuses the preprocessing and model learned during training. The
 execution choice determines where those saved transformations run and which
 artifacts can be used. It does not fit a new imputer, scaler or model.
 
-For a runnable starting point, use the [Python SDK example](databricks_local_sdk.md#fit-and-score-a-small-batch)
+For a runnable starting point, use the [Python SDK example](databricks_sdk.md#fit-and-score-a-small-batch)
 for a bounded frame, or the [Spark bundle example](inference_bundles.md#native-spark-fe-and-worker-model-inference)
 for distributed input. Install the model's recorded dependencies in each
 process that loads it.
@@ -52,9 +52,9 @@ appropriate tolerances; universal bit-for-bit equality is not promised.
 
 ## Whole-frame Python execution
 
-![Python prediction applies saved preprocessing to raw input](../assets/diagrams/inference/local.svg)
+![Python prediction applies saved preprocessing to raw input](../assets/diagrams/inference/whole_frame.svg)
 
-[Editable diagram source](../assets/diagrams/inference/local.mmd)
+[Editable diagram source](../assets/diagrams/inference/whole_frame.mmd)
 
 `score_pipeline(frame, artifact)` handles a pandas or Polars frame in one Python
 process. It validates the saved input contract and uses the recorded fit engine.
@@ -67,10 +67,11 @@ DataFrame. For `input_stage="raw"`, it applies saved preprocessing first. A
 preprocessing. Applying a scaler twice gives the wrong input; the API cannot
 infer from numeric values whether a column has already been scaled.
 
-`runtime="local"` in `WorkflowConfig` selects integration behavior; it does not
-detect the machine or restrict execution to a workstation. `runtime="databricks"`
-is required for UC Delta publication. The pandas/Polars `engine` and Bundle
-`inference_mode="local"`/`"spark"` are independent choices.
+`runtime="standalone"` in `WorkflowConfig` selects general Python integration
+on any compute. `runtime="databricks"` enables Databricks integration and is
+required for UC Delta publication. The pandas/Polars `engine` and Bundle
+`inference_mode="local"`/`"spark"` are independent choices. The old SDK
+`runtime="local"` value is rejected; update existing workflow configurations.
 
 ## Native Spark preprocessing and a Python model
 

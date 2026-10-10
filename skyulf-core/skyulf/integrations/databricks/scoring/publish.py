@@ -5,14 +5,13 @@ from importlib.metadata import version
 from typing import Any
 
 from skyulf.integrations.databricks.shared._batch_manifest import batch_manifest
-from skyulf.integrations.databricks.shared._local_frames import output_scalar
+from skyulf.integrations.databricks.shared._frames import output_scalar
 
 from ....inference.fitted_pipeline import FittedPipelineArtifact
 from ..data.admission import PublishAdmission, validate_admission
 from ..data.delta_io.delta import history, publish_replace_period, table_identity
 from ..shared._contracts import PREDICTION_METADATA_COLUMNS, BatchResult, BatchSpec
-from .batch.frame_batch import SourceSpec
-from .batch.frame_batch import score_source as score_local_source
+from .batch.frame_batch import SourceSpec, score_source
 from .incremental.history import bind_period_history, prediction_history
 from .workflow import PreparedWorkflow, WorkflowConfig
 
@@ -95,7 +94,7 @@ def run_frame_batch(
     if snapshot is None or snapshot.committed_us > int(spec.as_of_utc.timestamp() * 1_000_000):
         raise ValueError("Source snapshot was not available at as_of or its history expired.")
     with prediction_history(prepared, history_state) as temporal_session:
-        scored = score_local_source(spark, source, prepared)
+        scored = score_source(spark, source, prepared)
     count = len(scored.predictions)
     if count == 0 and not spec.allow_empty:
         raise ValueError("Empty period replacement requires allow_empty=True.")
@@ -239,14 +238,3 @@ def _complete_local_output(
     if output.count() != count:
         raise ValueError("Prediction keys do not match the pinned source rows.")
     return output
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-run_local_batch = run_frame_batch
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalWorkflowConfig = WorkflowConfig
-PreparedLocalWorkflow = PreparedWorkflow
-LocalSourceSpec = SourceSpec
-LocalPipelineArtifact = FittedPipelineArtifact

@@ -8,7 +8,7 @@ from typing import Any
 from ....config_validation import validate_preprocessing_steps
 from ....inference.project_code import project_source_digest
 from ....inference.recipe_config import custom_reference
-from ._project_files import _contained_file, project_source, read_source
+from ._project_files import contained_project_file, project_source, read_source
 from .yaml_config import read_yaml_mapping
 
 _FACTORIES = {"preprocessing": "build_preprocessing", "pre_split": "build_pre_split_steps"}
@@ -34,7 +34,7 @@ def _custom_source(root: Path, reference: Any) -> None:
     if (root / relative).is_dir():
         filename = relative + "/__init__.py"
     try:
-        _contained_file(root, filename)
+        contained_project_file(root, filename)
     except ValueError as exc:
         raise ValueError(f"custom module {module!r} must be inside the feature package.") from exc
 
@@ -99,7 +99,7 @@ def _python_owner(root: Path, phase: str) -> None:
     for filename in ("__init__.py", f"{phase}.py"):
         if not (root / filename).exists():
             continue
-        tree = ast.parse(read_source(_contained_file(root, filename)), filename=filename)
+        tree = ast.parse(read_source(contained_project_file(root, filename)), filename=filename)
         if any(_binds_name(statement, _FACTORIES[phase]) for statement in tree.body):
             raise ValueError(f"Recipes defined in both {phase}.yml and {filename}.")
 
@@ -114,7 +114,7 @@ def _declarations(root: Path) -> dict[str, dict[str, list[dict[str, Any]]]]:
             continue
         if not directory.resolve().is_relative_to(root.parent.parent.resolve()):
             raise ValueError("Recipe configuration must remain inside the project.")
-        document = read_yaml_mapping(_contained_file(directory, path.name))
+        document = read_yaml_mapping(contained_project_file(directory, path.name))
         declarations[phase] = _recipes(document, root, phase)
         _python_owner(root, phase)
     return declarations

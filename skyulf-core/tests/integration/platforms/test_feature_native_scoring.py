@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from tests.integration.platforms.test_local_cdf_recovery import recovery_case as recovery_case
+from tests.integration.platforms.test_frame_cdf_recovery import recovery_case as recovery_case
 
 
 def _binding():
@@ -115,7 +115,7 @@ def test_empty_feature_binding_never_reads_tables():
 
 def test_single_feature_change_rejected_before_noop(recovery_case, monkeypatch):
     """An unchanged base table cannot hide feature updates from the publication gate."""
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = recovery_case
     store.source_version = store.previous["source_end_version"]
@@ -126,7 +126,7 @@ def test_single_feature_change_rejected_before_noop(recovery_case, monkeypatch):
         raising=False,
     )
     with pytest.raises(ValueError, match="features changed"):
-        batch.run_incremental_local_batch(
+        batch.run_incremental_batch(
             store, store.prepared, record_key_columns=("id",), admission=store
         )
     assert store.writes == []
@@ -177,7 +177,7 @@ def test_native_call_passes_pinned_uri_named_schema_and_worker_params(monkeypatc
 
     client = Mock()
     sdk = SimpleNamespace(FeatureEngineeringClient=Mock(return_value=client))
-    monkeypatch.setattr(scoring, "_sdk", lambda: sdk, raising=False)
+    monkeypatch.setattr(scoring, "require_feature_engineering", lambda: sdk)
     monkeypatch.setattr(scoring, "_validate_feature_stores", lambda *args: None, raising=False)
     schema, frame = object(), object()
     result = scoring.native_feature_score(
@@ -309,14 +309,14 @@ def test_feature_table_identity_stays_stable_while_reading_version(monkeypatch):
 
 def test_feature_snapshot_rechecked_after_waiting_for_admission(recovery_case, monkeypatch):
     """A feature update while the target is locked must not escape a no-op decision."""
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = recovery_case
     store.source_version = store.previous["source_end_version"]
     guard = Mock(side_effect=[{}, ValueError("features changed during admission")])
     monkeypatch.setattr(batch, "validate_feature_snapshot", guard)
     with pytest.raises(ValueError, match="during admission"):
-        batch.run_incremental_local_batch(
+        batch.run_incremental_batch(
             store, store.prepared, record_key_columns=("id",), admission=store
         )
     assert store.writes == [] and guard.call_count == 2
@@ -324,9 +324,9 @@ def test_feature_snapshot_rechecked_after_waiting_for_admission(recovery_case, m
 
 def test_single_feature_receipt_checked_before_recovery_write(recovery_case, monkeypatch):
     """A changed feature snapshot must abort the actual guarded Delta writer."""
-    from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
+    from tests.integration.platforms.test_frame_cdf_recovery import recover, recovery_request
 
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = recovery_case
     request = recovery_request(store)

@@ -30,9 +30,7 @@ __all__ = [
     "RegistryOperationError",
     "ResolvedModel",
     "load_registered_bundle",
-    "load_registered_local_pipeline",
     "load_registered_pipeline",
-    "load_run_local_pipeline",
     "load_run_pipeline",
     "register_model",
     "resolve_model",
@@ -342,10 +340,10 @@ def load_local_package(local_path: Path, model: Any, digest: str) -> "FittedPipe
     local_path, model, feature_lookup_json = unwrap_feature_package(local_path, model)
     artifact_path = packaged_artifact_path(Path(local_path), model.flavors, "local_pipeline")
     from ....inference.fitted_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
-        load_pipeline as load_local_pipeline,
+        load_pipeline,
     )
 
-    artifact = load_local_pipeline(artifact_path)
+    artifact = load_pipeline(artifact_path)
     if (
         artifact.manifest.pipeline_sha256 != digest
         or artifact.manifest.fitted_engine != metadata.get("skyulf_fitted_engine")
@@ -592,8 +590,3 @@ def _resolve_version(client: Any, name: str, alias: str | None, version: str | i
             ) from exc
         raise translate_error(exc, name=name, version=str(version or alias)) from exc
     return model_version
-
-
-# Released names remain aliases for imports and stored pickle references.
-load_registered_local_pipeline = load_registered_pipeline
-load_run_local_pipeline = load_run_pipeline

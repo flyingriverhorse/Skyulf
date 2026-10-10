@@ -159,7 +159,7 @@ classification bundle and a Spark DataFrame. The fitted FE runs as native Spark 
 Only the prepared feature columns and row keys reach the Python workers;
 the estimator receives the features in the saved training order. Pandas/NumPy
 batches exist inside those workers, without collecting the dataset to the driver.
-Local training describes where the fit runs; it does not waive the matching
+Training fits the model in one Python process; it does not waive the matching
 runtime requirements above. Train/package and consume in compatible environments,
 even when switching from pandas or Polars inputs to Spark inputs.
 

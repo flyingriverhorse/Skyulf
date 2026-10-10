@@ -18,7 +18,7 @@ from skyulf.core.capabilities import (
 )
 from skyulf.core.portable_state import encode_state
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.partition_safety import _inspect_step, require_partition_safe_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
@@ -291,14 +291,14 @@ def test_saved_simple_empty_mode_keeps_real_pipeline_worker_boundary(tmp_path, e
         }
     )
     pipeline.fit(SplitDataset(train=frame, test=frame[:0]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
 
     def forbidden(*args, **kwargs):
         """Loading an intentionally disabled imputer must never learn new fill values."""
         raise AssertionError("Unexpected fit")
 
     monkeypatch.setattr(NodeRegistry.get_calculator("SimpleImputer"), "fit", forbidden)
-    restored = load_local_pipeline(tmp_path / "model")
+    restored = load_pipeline(tmp_path / "model")
     sample = frame.drop(columns=["target"]) if engine == "pandas" else frame.drop("target")
     report = probe_fitted_preprocessing(restored, sample, chunk_sizes=(1, 2))
     assert report["status"] == "passed" and report["steps"][0]["context"] == "row"

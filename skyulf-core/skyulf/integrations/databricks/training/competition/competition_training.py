@@ -112,7 +112,7 @@ def fit_training_pipeline(
             engine=config["engine"],
             risk_category=config.get("risk_category"),
         )
-        model_uri = training.log_local_model(
+        model_uri = training.log_pipeline_model(
             path,
             run_id=created.info.run_id,
             tracking_uri=config["tracking_uri"],
@@ -148,7 +148,3 @@ def fit_training_pipeline(
     except BaseException:
         child.client.set_terminated(child.run_id, status="FAILED")
         raise
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

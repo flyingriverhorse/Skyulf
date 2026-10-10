@@ -57,7 +57,7 @@ def test_preprocessing_owns_validation_without_refitting(node, config, monkeypat
 def test_empty_portable_preprocessing_remains_admitted(node, tmp_path):
     """Moving validation must preserve explicitly empty no-op preprocessing steps."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.partition_safety import require_partition_safe_pipeline
     from skyulf.pipeline import SkyulfPipeline
 
@@ -69,7 +69,7 @@ def test_empty_portable_preprocessing_remains_admitted(node, tmp_path):
         }
     )
     pipeline.fit(SplitDataset(train=frame.iloc[:3], test=frame.iloc[3:]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "empty")
-    evidence = require_partition_safe_pipeline(load_local_pipeline(tmp_path / "empty"))
+    save_pipeline(pipeline, tmp_path / "empty")
+    evidence = require_partition_safe_pipeline(load_pipeline(tmp_path / "empty"))
     assert evidence.steps[0].node_type == node
     assert evidence.steps[0].action == "apply"

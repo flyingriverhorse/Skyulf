@@ -4,9 +4,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_scoring import score_local_pipeline
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.mlflow.models.local_model import log_local_model
+from skyulf.inference.pipeline_scoring import score_pipeline
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 from skyulf.integrations.mlflow.registration.registry import register_model
 from skyulf.integrations.mlflow.spark.spark_model import partition_safety_certificate
 
@@ -25,7 +25,7 @@ def fit_customer_pipeline(frame, config, path):
         random_state=config["random_state"],
         stratify=frame[config["target_column"]],
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=train, test=holdout),
         target_column=config["target_column"],
@@ -48,7 +48,7 @@ def write_optional_batch_predictions(enabled, spark, artifact, namespace, source
     rows = read_cohort(spark, namespace, source_version, "score").limit(10001).toPandas()
     if len(rows) > 10000:
         raise ValueError("Optional demo batch publication supports at most 10000 rows")
-    predictions = score_local_pipeline(rows[list(artifact.manifest.input_columns)], artifact)
+    predictions = score_pipeline(rows[list(artifact.manifest.input_columns)], artifact)
     table = f"{namespace}.batch_predictions"
     write_predictions(spark, rows.customer_id.tolist(), predictions, table, source_version)
     return {"status": "written", "table": table, "rows": len(rows)}
@@ -74,7 +74,7 @@ def train(spark, namespace, source_version, config, experiment_path):
         with TemporaryDirectory(prefix="skyulf-raw-customer-") as directory:
             path = Path(directory) / "pipeline"
             artifact, holdout = fit_customer_pipeline(frame, config, path)
-            predictions = score_local_pipeline(holdout[config["raw_columns"]], artifact)
+            predictions = score_pipeline(holdout[config["raw_columns"]], artifact)
             labels = holdout[config["target_column"]]
             metrics = {
                 "holdout_accuracy": accuracy_score(labels, predictions.prediction),
@@ -95,7 +95,7 @@ def train(spark, namespace, source_version, config, experiment_path):
                 },
                 "feature_contract.json",
             )
-            uri = log_local_model(
+            uri = log_pipeline_model(
                 path, run_id=run_id, artifact_path="pipeline", tracking_uri="databricks"
             )
             version = register_model(uri, f"{namespace}.customer_churn", **STORES)

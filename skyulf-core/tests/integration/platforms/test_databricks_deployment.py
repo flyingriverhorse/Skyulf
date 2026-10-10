@@ -143,7 +143,7 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
         first["variables"]["resource_suffix"]["value"]
         != second["variables"]["resource_suffix"]["value"]
     )
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_target_config
 
     config = read_workflow_config(project / "config/training.yml")
     names = []

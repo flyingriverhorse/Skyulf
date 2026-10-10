@@ -12,7 +12,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.training.fitting import local_retraining as training
+from skyulf.integrations.databricks.training.fitting import candidate as training
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def _spec(*, steps=(), **changes):
         "pre_split_steps": steps,
     }
     values.update(changes)
-    return training.LocalTrainingSpec(**values)
+    return training.TrainingSpec(**values)
 
 
 def _frame():
@@ -88,10 +88,10 @@ def test_candidate_training_filters_before_split_and_model_fit(
         observed["holdout"] = frame
         raise RuntimeError("captured filtered holdout")
 
-    monkeypatch.setattr(training, "fit_local_workflow", capture_fit)
-    monkeypatch.setattr(training, "evaluate_local_holdout", capture_holdout)
+    monkeypatch.setattr(training, "fit_workflow", capture_fit)
+    monkeypatch.setattr(training, "evaluate_holdout", capture_holdout)
     with pytest.raises(RuntimeError, match="captured filtered holdout"):
-        training.train_local_candidate(
+        training.train_candidate(
             object(),
             spec,
             {"preprocessing": [], "modeling": {"type": "linear_regression"}},
@@ -125,7 +125,7 @@ def test_candidate_training_filters_before_split_and_model_fit(
 )
 def test_training_rejects_unsafe_recipe_before_source_read(monkeypatch, transformer, params):
     """A bad pre-split recipe must fail before a candidate reads or fits data."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
     config = {
         "training_table": "workspace.test.labels",
@@ -146,9 +146,9 @@ def test_training_rejects_unsafe_recipe_before_source_read(monkeypatch, transfor
         "pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}},
         "pre_split_steps": [{"name": "bad", "transformer": transformer, "params": params}],
     }
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", lambda *args: pytest.fail("read"))
+    monkeypatch.setattr(workflow, "read_training_snapshot", lambda *args: pytest.fail("read"))
     with pytest.raises(ValueError, match="pre.split|column|bounds"):
-        local_workflow.run_action(
+        workflow.run_action(
             object(), config, "train", experiment_name="test", artifact_path="unused"
         )
 
@@ -221,6 +221,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "pre_split_steps",
         "max_rows",
         "max_bytes",
+        "preprocessing_probe",
         "survivor_key_sha256",
         "training_evidence_sha256",
         "group_column",
@@ -251,7 +252,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         saved.pop(key)
     saved["event_time_parsing"] = spec.event_time_parsing
     saved["result_time_parsing"] = spec.result_time_parsing
-    restored = training.LocalTrainingSpec(**saved)
+    restored = training.TrainingSpec(**saved)
     assert spec.dataset_id == restored.dataset_id == f"{spec.table}@3/random/{expected}"
     assert training.replace(spec, group_column="entity").dataset_id != spec.dataset_id
     assert (
@@ -370,10 +371,7 @@ def test_project_loader_owns_optional_recipe_and_returns_fresh_steps(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_temporal_filtering_precedes_fold_local_cv(engine):
     """Time-series folds see only surviving training rows and retain event metadata."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
 
     frame = pd.DataFrame(
         {
@@ -409,7 +407,7 @@ def test_temporal_filtering_precedes_fold_local_cv(engine):
     result = evaluate_training_cv(
         native,
         {"preprocessing": [], "modeling": {"type": "linear_regression"}},
-        LocalCVSpec(enabled=True, folds=2, method="time_series_split", shuffle=False),
+        CVSpec(enabled=True, folds=2, method="time_series_split", shuffle=False),
         target_column="target",
         event_column="event",
     )
@@ -502,7 +500,7 @@ def test_fixed_cast_prepares_numeric_manual_bounds_on_working_frame(engine):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
     """Promotion rechecks the filtered holdout rather than the raw population."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
     steps = ({"name": "known", "transformer": "DropMissingRows", "params": {"subset": ["target"]}},)
     original = _spec(steps=steps)
@@ -510,10 +508,10 @@ def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
     saved["event_time_parsing"] = original.event_time_parsing
     saved["result_time_parsing"] = original.result_time_parsing
     saved["pre_split_steps"] = tuple(saved["pre_split_steps"])
-    restored = training.LocalTrainingSpec(**saved)
+    restored = training.TrainingSpec(**saved)
     expected = training.split_labeled_snapshot(_frame(), restored)[1]
     report: Any = SimpleNamespace(champion_version=None, candidate_version="2")
-    candidate = training.LocalCandidateResult(
+    candidate = training.CandidateResult(
         run_id="run",
         model_name="workspace.test.model",
         model_version="2",
@@ -527,10 +525,10 @@ def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
         comparison_sha256="b" * 64,
         holdout_key_sha256=expected.attrs["holdout_key_sha256"],
     )
-    monkeypatch.setattr(local_workflow, "require_mlflow", lambda: object())
-    monkeypatch.setattr(local_workflow, "make_registry_client", lambda *args: object())
+    monkeypatch.setattr(workflow, "require_mlflow", lambda: object())
+    monkeypatch.setattr(workflow, "make_registry_client", lambda *args: object())
     monkeypatch.setattr(
-        local_workflow,
+        workflow,
         "load_candidate_evidence",
         lambda *args, **kwargs: (
             report,
@@ -539,16 +537,16 @@ def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
             None,
         ),
     )
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", lambda spark, spec: _frame())
+    monkeypatch.setattr(workflow, "read_training_snapshot", lambda spark, spec: _frame())
     observed = {}
 
     def capture_stage(report, heldout, **kwargs):
         """Inspect the actual holdout passed into challenger staging."""
         observed["heldout"] = heldout
 
-    monkeypatch.setattr(local_workflow, "stage_challenger", capture_stage)
+    monkeypatch.setattr(workflow, "stage_challenger", capture_stage)
     assert (
-        local_workflow.automatic_promotion(
+        workflow.automatic_promotion(
             object(), {"engine": engine}, restored, candidate, promote=False
         )
         is None
@@ -559,7 +557,7 @@ def test_automatic_promotion_replays_saved_filter_spec(monkeypatch, engine):
 
 def test_automatic_replay_refuses_candidate_without_saved_receipt(monkeypatch):
     """Automatic staging cannot replay an unsaved in-memory filter specification."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
     spec = _spec()
     candidate = SimpleNamespace(
@@ -567,12 +565,10 @@ def test_automatic_replay_refuses_candidate_without_saved_receipt(monkeypatch):
         holdout_key_sha256="a" * 64,
     )
     monkeypatch.setattr(
-        local_workflow, "read_training_snapshot", lambda *args: pytest.fail("source read")
+        workflow, "read_training_snapshot", lambda *args: pytest.fail("source read")
     )
     with pytest.raises(ValueError, match="saved comparison|candidate result"):
-        local_workflow.automatic_promotion(
-            object(), {"engine": "pandas"}, spec, candidate, promote=False
-        )
+        workflow.automatic_promotion(object(), {"engine": "pandas"}, spec, candidate, promote=False)
 
 
 def test_polars_filter_chain_converts_only_at_split_boundary(monkeypatch):
@@ -828,7 +824,7 @@ def test_cv_receives_raw_values_with_fixed_prefix_before_learned_suffix(
     monkeypatch, tmp_path, engine, local_tracking_store
 ):
     """Each CV fold fits fixed replay before its own learned scaler on raw rows."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     frame = pd.DataFrame(
         {
@@ -874,9 +870,9 @@ def test_cv_receives_raw_values_with_fixed_prefix_before_learned_suffix(
         raise RuntimeError("scoring reached")
 
     monkeypatch.setattr(training, "evaluate_training_cv", capture_cv)
-    monkeypatch.setattr(training, "evaluate_local_holdout", stop_at_scoring)
+    monkeypatch.setattr(training, "evaluate_holdout", stop_at_scoring)
     with pytest.raises(RuntimeError, match="scoring reached"):
-        training.train_local_candidate(
+        training.train_candidate(
             object(),
             spec,
             config,
@@ -889,7 +885,7 @@ def test_cv_receives_raw_values_with_fixed_prefix_before_learned_suffix(
             metric="heldout_rmse",
             min_improvement=0.0,
             engine=engine,
-            cv=LocalCVSpec(enabled=True, folds=3, shuffle=False),
+            cv=CVSpec(enabled=True, folds=3, shuffle=False),
         )
     assert 1.0 in observed["raw"] or 2.0 in observed["raw"]
     assert observed["steps"] == ["ValueReplacement", "StandardScaler"]
@@ -975,7 +971,7 @@ def test_saved_pipeline_replays_fixed_features_once_from_raw_values(
     monkeypatch, tmp_path, engine, local_tracking_store
 ):
     """A fitted local artifact scores raw input through its one saved fixed prefix."""
-    from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
 
     frame = pd.DataFrame(
         {
@@ -1022,9 +1018,9 @@ def test_saved_pipeline_replays_fixed_features_once_from_raw_values(
         captured["heldout"] = heldout
         raise RuntimeError("scoring reached")
 
-    monkeypatch.setattr(training, "evaluate_local_holdout", stop_at_scoring)
+    monkeypatch.setattr(training, "evaluate_holdout", stop_at_scoring)
     with pytest.raises(RuntimeError, match="scoring reached"):
-        training.train_local_candidate(
+        training.train_candidate(
             object(),
             spec,
             config,
@@ -1038,7 +1034,7 @@ def test_saved_pipeline_replays_fixed_features_once_from_raw_values(
             min_improvement=0.0,
             engine=engine,
         )
-    artifact = load_local_pipeline(tmp_path / "artifact")
+    artifact = load_pipeline(tmp_path / "artifact")
     assert captured["artifact"].pipeline.config == artifact.pipeline.config
     assert config["preprocessing"] == []
     assert len(artifact.pipeline.config["preprocessing"]) == 1
@@ -1047,13 +1043,13 @@ def test_saved_pipeline_replays_fixed_features_once_from_raw_values(
         "columns"
     ] == ["target"]
     assert set(captured["heldout"].columns) == {"x", "target"}
-    predicted = predict_local_pipeline(pd.DataFrame({"x": [1.0, 2.0]}), artifact)
+    predicted = predict_pipeline(pd.DataFrame({"x": [1.0, 2.0]}), artifact)
     np.testing.assert_allclose(predicted["prediction"], [4.0, 6.0], atol=1e-8)
 
 
 def test_target_contract_ignores_step_names_and_feature_only_maps():
     """Only the target operation affects whether two model scores are comparable."""
-    from skyulf.integrations.databricks.training.fitting.local_pre_split import target_contract
+    from skyulf.integrations.databricks.training.fitting.pre_split import target_contract
 
     step = {
         "name": "one",
@@ -1086,7 +1082,7 @@ def test_target_contract_ignores_step_names_and_feature_only_maps():
 
 def test_nested_feature_only_replacement_has_identity_target_contract():
     """A mixed selection does not imply a target edit without a target mapping."""
-    from skyulf.integrations.databricks.training.fitting.local_pre_split import (
+    from skyulf.integrations.databricks.training.fitting.pre_split import (
         projected_fixed_steps,
         target_contract,
     )
@@ -1144,10 +1140,10 @@ def test_champion_target_contract_mismatch_stops_before_metrics(monkeypatch):
         validation, "_checked_artifact", lambda ref, **kwargs: artifacts[ref.version]
     )
     monkeypatch.setattr(
-        validation, "evaluate_local_holdout", lambda *args, **kwargs: pytest.fail("metric called")
+        validation, "evaluate_holdout", lambda *args, **kwargs: pytest.fail("metric called")
     )
     with pytest.raises(ValueError, match="target normalization contracts differ"):
-        validation.compare_registered_local_models(
+        validation.compare_registered_pipeline_models(
             candidate,
             champion,
             pd.DataFrame({"x": [1, 2], "target": [0, 1]}),

@@ -13,19 +13,13 @@ import polars as pl
 from ._manifest import ColumnSpec
 from ._model_set_operations import apply_operation, validate_operation
 from .fitted_pipeline import (
-    load_pipeline as load_local_pipeline,
-)
-from .fitted_pipeline import (
-    validate_pipeline_input as validate_local_input,
+    load_pipeline,
+    validate_pipeline_input,
 )
 from .pipeline_scoring import (
     _preserve_history,
-)
-from .pipeline_scoring import (
-    pipeline_history_session as local_history_session,
-)
-from .pipeline_scoring import (
-    score_pipeline as score_local_pipeline,
+    pipeline_history_session,
+    score_pipeline,
 )
 from .project_code import load_project_module
 from .project_scoring import _check_rows, _json_copy, _resolve, _typed_column, _validate_rule
@@ -318,10 +312,10 @@ def _score_component(
     max_bytes: int,
 ) -> tuple[pd.DataFrame, Any]:
     """Release one loaded component before advancing to the next model in the set."""
-    local = load_local_pipeline(artifact.directory / "components" / component.branch)
+    local = load_pipeline(artifact.directory / "components" / component.branch)
     selected = raw[[column.name for column in component.input_schema]].copy(deep=True)
     _bounded(selected, max_rows, max_bytes)
-    with local_history_session(local, state, bootstrap=bootstrap) as session:
+    with pipeline_history_session(local, state, bootstrap=bootstrap) as session:
         result = _predict_component(selected, local, component)
         _check_rows(result, selected, pd.DataFrame)
         result = _component_outcomes(result, component)
@@ -334,8 +328,8 @@ def _score_component(
 def _predict_component(selected: pd.DataFrame, local: Any, component: Any) -> pd.DataFrame:
     """Validate empty inputs and preserve history without invoking an estimator."""
     if not selected.empty:
-        return score_local_pipeline(selected, local)
-    validate_local_input(selected, local)
+        return score_pipeline(selected, local)
+    validate_pipeline_input(selected, local)
     _preserve_history(local)
     return pd.DataFrame(
         {

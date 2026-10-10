@@ -11,12 +11,10 @@ import pandas as pd
 import polars as pl
 
 from ....inference.fitted_pipeline import FittedPipelineArtifact
-from ....inference.pipeline_evaluation import evaluate_holdout as evaluate_local_holdout
+from ....inference.pipeline_evaluation import evaluate_holdout
 from ..registration.registry import (
     ResolvedModel,
-)
-from ..registration.registry import (
-    load_registered_pipeline as load_registered_local_pipeline,
+    load_registered_pipeline,
 )
 
 _REGRESSION = {
@@ -261,7 +259,7 @@ def _checked_artifact(
     reference: ResolvedModel, *, tracking_uri: str | None, registry_uri: str | None
 ) -> FittedPipelineArtifact:
     """Load one concrete artifact and confirm its registry digest."""
-    artifact = load_registered_local_pipeline(
+    artifact = load_registered_pipeline(
         reference, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
     if artifact.manifest.pipeline_sha256 != reference.digest:
@@ -293,10 +291,10 @@ def _comparison_metrics(
     target_column: str,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
     """Evaluate the same labeled rows with both saved pipelines, without fitting."""
-    candidate_metrics = evaluate_local_holdout(candidate, heldout, target_column=target_column)
+    candidate_metrics = evaluate_holdout(candidate, heldout, target_column=target_column)
     if champion is None:
         return candidate_metrics, None
-    return candidate_metrics, evaluate_local_holdout(champion, heldout, target_column=target_column)
+    return candidate_metrics, evaluate_holdout(champion, heldout, target_column=target_column)
 
 
 def _selected_metric(metrics: dict[str, float], metric: str) -> float:
@@ -442,7 +440,3 @@ def _validate_reference_digest(reference: ResolvedModel) -> None:
     """Require artifact identity after the concrete registry identity is validated."""
     if not isinstance(reference.digest, str) or not reference.digest:
         raise ValueError("Each model must have a concrete version and artifact digest.")
-
-
-# Released names remain aliases for imports and stored pickle references.
-compare_registered_local_models = compare_registered_pipeline_models

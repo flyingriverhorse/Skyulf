@@ -11,7 +11,7 @@ from typing import Any
 
 import pandas as pd
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes, output_scalar
+from skyulf.integrations.databricks.shared._frames import frame_bytes, output_scalar
 
 from .....inference.fitted_pipeline import FittedPipelineArtifact
 from .....inference.pipeline_scoring import scoring_counts
@@ -109,7 +109,7 @@ def _validate_prepared(
 ) -> tuple[str, ...]:
     """Require a ready UC model and an automatic source-selection contract."""
     if not isinstance(prepared, PreparedWorkflow):
-        raise TypeError("prepared must be a PreparedLocalWorkflow.")
+        raise TypeError("prepared must be a PreparedWorkflow.")
     config = prepared.config
     _validate_incremental_source(config)
     artifact = _validate_incremental_model(prepared, config)
@@ -760,13 +760,3 @@ def _incremental_table_ids(
     if source_id == target_id:
         raise ValueError("Source and prediction target must be different Delta tables.")
     return source_table, target_table, source_id, target_id
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-run_incremental_local_batch = run_incremental_batch
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalWorkflowConfig = WorkflowConfig
-PreparedLocalWorkflow = PreparedWorkflow
-LocalPipelineArtifact = FittedPipelineArtifact

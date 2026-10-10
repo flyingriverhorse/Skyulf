@@ -21,8 +21,8 @@ def test_grouped_replay_avoids_discarded_source_reads(staged, monkeypatch, engin
     """Reuse checked phase metadata while retaining fresh source replay before alias mutation."""
     import mlflow
 
-    from skyulf.integrations.databricks.lifecycle import local_workflow
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.lifecycle import workflow
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     adapter, client, config, _, frame = staged
     config.update(engine=engine, promotion_policy=policy)
@@ -51,8 +51,8 @@ def test_grouped_replay_avoids_discarded_source_reads(staged, monkeypatch, engin
         counts["task_evidence_checks"] += 1
         return validate(*args, **kwargs)
 
-    monkeypatch.setattr(local_retraining, "read_training_snapshot", read_source)
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", read_source)
+    monkeypatch.setattr(candidate, "read_training_snapshot", read_source)
+    monkeypatch.setattr(workflow, "read_training_snapshot", read_source)
     monkeypatch.setattr(mlflow.MlflowClient, "download_artifacts", read_artifact)
     monkeypatch.setattr(mlflow.artifacts, "download_artifacts", read_package)
     monkeypatch.setattr(adapter, "validate_training_evidence", check_evidence)
@@ -87,13 +87,13 @@ def test_grouped_replay_avoids_discarded_source_reads(staged, monkeypatch, engin
 
 def test_registration_rechecks_train_receipt_after_evaluation(staged, monkeypatch):
     """Phase-local reuse must not remove the final integrity check before registry mutation."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     trained = _call(staged, "train", prepared.reference)
     run_id = prepared.reference["run_id"]
-    evaluate = local_retraining.evaluate_candidate
+    evaluate = candidate.evaluate_candidate
 
     def alter_receipt(*args, **kwargs):
         """Model an edit while evaluation is running, before registration intent is written."""
@@ -106,7 +106,7 @@ def test_registration_rechecks_train_receipt_after_evaluation(staged, monkeypatc
         client.log_dict(run_id, receipt, path)
         return metrics
 
-    monkeypatch.setattr(local_retraining, "evaluate_candidate", alter_receipt)
+    monkeypatch.setattr(candidate, "evaluate_candidate", alter_receipt)
     with pytest.raises(ValueError, match="digest"):
         _call(staged, "evaluate_register", trained.reference)
     assert not client.search_registered_models()
@@ -167,18 +167,16 @@ def staged(tmp_path, monkeypatch):
     """Use real isolated MLflow stores and replace only unavailable Spark transport."""
     mlflow = pytest.importorskip("mlflow")
 
-    from skyulf.integrations.databricks.lifecycle import local_workflow
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.lifecycle import workflow
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     adapter = _module()
     store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
     client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
     client.create_experiment("staged", artifact_location=(tmp_path / "runs").as_uri())
     frame = pd.DataFrame({"id": range(20), "x": range(20), "target": range(0, 40, 2)})
-    monkeypatch.setattr(
-        local_retraining, "read_training_snapshot", lambda spark, spec: frame.copy()
-    )
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", lambda spark, spec: frame.copy())
+    monkeypatch.setattr(candidate, "read_training_snapshot", lambda spark, spec: frame.copy())
+    monkeypatch.setattr(workflow, "read_training_snapshot", lambda spark, spec: frame.copy())
     config = {
         "engine": "pandas",
         "training_table": "workspace.test.labels",
@@ -276,8 +274,8 @@ def test_search_result_survives_durable_registration_and_comparison(staged, engi
 
 def test_hard_voting_search_survives_registry_and_heldout_comparison(staged):
     """Prediction-only classifiers must complete the same durable candidate lifecycle."""
-    from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
+    from skyulf.inference.fitted_pipeline import predict_pipeline
+    from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
 
     _, client, config, _, frame = staged
     frame["target"] = frame["x"] % 2
@@ -307,13 +305,13 @@ def test_hard_voting_search_survives_registry_and_heldout_comparison(staged):
     trained = _call(staged, "train_register", prepared.reference)
     compared = _call(staged, "compare_decide", trained.reference)
     candidate = compared.output["candidate"]
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         f"runs:/{candidate['run_id']}/model",
         digest=candidate["model_digest"],
         tracking_uri=config["tracking_uri"],
     )
     assert artifact.manifest.classification_probabilities is False
-    assert list(predict_local_pipeline(frame[["x"]], artifact).columns) == ["prediction"]
+    assert list(predict_pipeline(frame[["x"]], artifact).columns) == ["prediction"]
     assert "heldout_accuracy" in candidate["comparison"]["candidate_metrics"]
     assert "heldout_roc_auc" not in candidate["comparison"]["candidate_metrics"]
     assert client.get_model_version(config["model_name"], "1").version == 1
@@ -322,7 +320,7 @@ def test_hard_voting_search_survives_registry_and_heldout_comparison(staged):
 @pytest.mark.parametrize("policy", ["automatic", "manual_approval"])
 def test_quality_gates_survive_durable_training_and_approval(staged, policy, monkeypatch):
     """An additional bound must reach saved evidence, version tags and approval policy checks."""
-    from skyulf.integrations.databricks.lifecycle.local_approval import approve_local_candidate
+    from skyulf.integrations.databricks.lifecycle.approval import approve_candidate
 
     _, client, config, _, _ = staged
     original = type(client).set_model_version_tag
@@ -353,10 +351,8 @@ def test_quality_gates_survive_durable_training_and_approval(staged, policy, mon
             "expected_champion_version": None,
         }
         with pytest.raises(ValueError, match="policy"):
-            approve_local_candidate(
-                None, {**config, "quality_gates": {"heldout_r2": 0.7}}, **options
-            )
-        receipt = approve_local_candidate(None, config, **options)
+            approve_candidate(None, {**config, "quality_gates": {"heldout_r2": 0.7}}, **options)
+        receipt = approve_candidate(None, config, **options)
         assert receipt.new_version == "1"
     assert str(client.get_model_version_by_alias(config["model_name"], "champion").version) == "1"
 
@@ -480,18 +476,18 @@ def test_train_prepares_latest_once_and_downstream_keeps_the_pin(staged, engine)
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_phases_roundtrip_and_only_finalize_completed_training(staged, engine, monkeypatch):
     """A fitted package survives temporary cleanup and registers only after evaluation."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     paths = []
-    original_fit = local_retraining.fit_local_workflow
+    original_fit = candidate.fit_workflow
 
     def capture_path(*args, **kwargs):
         """Observe disposable fit directories without changing the real fitting operation."""
         paths.append(Path(kwargs["artifact_path"]))
         return original_fit(*args, **kwargs)
 
-    monkeypatch.setattr(local_retraining, "fit_local_workflow", capture_path)
+    monkeypatch.setattr(candidate, "fit_workflow", capture_path)
     config["engine"] = engine
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     reference = prepared.reference
@@ -544,7 +540,7 @@ def test_out_of_order_foreign_and_repeated_stages_fail_closed(staged):
 
 def test_failed_evaluation_never_registers_and_finalizer_marks_failed(staged, monkeypatch):
     """Evaluation errors retain the original exception and cannot publish a successful result."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
@@ -555,7 +551,7 @@ def test_failed_evaluation_never_registers_and_finalizer_marks_failed(staged, mo
         """Simulate the actual evaluation boundary failing."""
         raise failure
 
-    monkeypatch.setattr(local_retraining, "evaluate_local_holdout", fail)
+    monkeypatch.setattr(candidate, "evaluate_holdout", fail)
     with pytest.raises(RuntimeError) as caught:
         _call(staged, "evaluate_register", trained.reference)
     assert caught.value is failure
@@ -579,12 +575,12 @@ def test_finalized_incomplete_run_cannot_resume_training(staged):
 
 def test_lost_registration_response_cannot_register_twice(staged, monkeypatch):
     """An accepted mutation with a lost response remains unknown rather than retryable."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     trained = _call(staged, "train", prepared.reference)
-    original = local_retraining.register_model
+    original = candidate.register_model
     failure = RuntimeError("registration response lost")
 
     def lost_response(*args, **kwargs):
@@ -592,7 +588,7 @@ def test_lost_registration_response_cannot_register_twice(staged, monkeypatch):
         original(*args, **kwargs)
         raise failure
 
-    monkeypatch.setattr(local_retraining, "register_model", lost_response)
+    monkeypatch.setattr(candidate, "register_model", lost_response)
     with pytest.raises(RuntimeError) as caught:
         _call(staged, "evaluate_register", trained.reference)
     assert caught.value is failure
@@ -609,7 +605,7 @@ def test_lost_registration_response_cannot_register_twice(staged, monkeypatch):
 @pytest.mark.parametrize("legacy", [False, True])
 def test_task_prepare_rejects_stale_champion_before_creating_run(staged, monkeypatch, legacy):
     """Durable tasks must retain stricter champion admission even for legacy automatic input."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
     _, client, config, _, _ = staged
     config["champion_version"] = "99"
@@ -617,7 +613,7 @@ def test_task_prepare_rejects_stale_champion_before_creating_run(staged, monkeyp
         config.pop("score_model_selection")
         config.pop("promotion_policy")
         config["model_selection_mode"] = "auto_champion"
-    monkeypatch.setattr(local_workflow, "controlled_champion_version", Mock(return_value="2"))
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="2"))
     with pytest.raises(ValueError, match="champion_version"):
         _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     experiment = client.get_experiment_by_name("staged")
@@ -626,16 +622,14 @@ def test_task_prepare_rejects_stale_champion_before_creating_run(staged, monkeyp
 
 def test_registration_receipt_survives_candidate_resolution_failure(staged, monkeypatch):
     """A committed version must retain its receipt even if the next registry read fails."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
-    from skyulf.integrations.databricks.training.shared.local_training_evidence import (
-        evidence_digest,
-    )
+    from skyulf.integrations.databricks.training.fitting import candidate
+    from skyulf.integrations.databricks.training.shared.training_evidence import evidence_digest
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     trained = _call(staged, "train", prepared.reference)
     failure = RuntimeError("candidate resolution failed")
-    monkeypatch.setattr(local_retraining, "resolve_model", Mock(side_effect=failure))
+    monkeypatch.setattr(candidate, "resolve_model", Mock(side_effect=failure))
     with pytest.raises(RuntimeError) as caught:
         _call(staged, "evaluate_register", trained.reference)
     assert caught.value is failure
@@ -653,7 +647,7 @@ def test_registration_receipt_survives_candidate_resolution_failure(staged, monk
 
 def test_registration_accepts_verified_normalized_artifact_source(staged, monkeypatch):
     """Registry source normalization must not invalidate the exact recorded publication."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
@@ -667,7 +661,7 @@ def test_registration_accepts_verified_normalized_artifact_source(staged, monkey
         client.create_registered_model(name)
         return client.create_model_version(name, source, run_id=run_id, tags=kwargs["tags"])
 
-    monkeypatch.setattr(local_retraining, "register_model", normalized_registration)
+    monkeypatch.setattr(candidate, "register_model", normalized_registration)
     registered = _call(staged, "evaluate_register", trained.reference)
     compared = _call(staged, "compare", registered.reference)
     assert compared.output["model_version"] == "1"
@@ -675,7 +669,7 @@ def test_registration_accepts_verified_normalized_artifact_source(staged, monkey
 
 def test_comparison_failure_restores_exact_challenger_without_nomination(staged, monkeypatch):
     """A fresh task process retains the registered contender and records comparison error."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
     from skyulf.integrations.mlflow.lifecycle.challenger import ChallengerLifecycle
 
     _, client, config, _, _ = staged
@@ -688,7 +682,7 @@ def test_comparison_failure_restores_exact_challenger_without_nomination(staged,
         """Fail after a concrete candidate has been durably nominated."""
         raise failure
 
-    monkeypatch.setattr(local_retraining, "compare_registered_local_models", fail)
+    monkeypatch.setattr(candidate, "compare_registered_pipeline_models", fail)
     monkeypatch.setattr(ChallengerLifecycle, "registered", lambda *args: pytest.fail("renominated"))
     with pytest.raises(RuntimeError) as caught:
         _call(staged, "compare", registered.reference)
@@ -703,7 +697,7 @@ def test_comparison_failure_restores_exact_challenger_without_nomination(staged,
 @pytest.mark.parametrize("change", ["request", "evidence", "spec", "membership", "model", "source"])
 def test_saved_provenance_or_membership_change_blocks_registration(staged, change, monkeypatch):
     """Altered artifacts or a replayed population cannot authorize candidate publication."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, frame = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
@@ -738,7 +732,7 @@ def test_saved_provenance_or_membership_change_blocks_registration(staged, chang
             """A missing pinned Delta version must not fall back to latest."""
             raise ValueError("Pinned source is unavailable")
 
-        monkeypatch.setattr(local_retraining, "read_training_snapshot", missing_source)
+        monkeypatch.setattr(candidate, "read_training_snapshot", missing_source)
     with pytest.raises(ValueError):
         _call(staged, "evaluate_register", trained.reference)
     assert not client.search_registered_models()
@@ -787,7 +781,7 @@ def test_manual_actions_reuse_saved_evidence_without_fit_or_registration(
     staged, action, grouped, monkeypatch
 ):
     """Operator tasks bypass training and finish their own descriptor runs from saved evidence."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate_training
 
     adapter, client, config, _, frame = staged
     config["promotion_policy"] = "manual_approval"
@@ -812,8 +806,8 @@ def test_manual_actions_reuse_saved_evidence_without_fit_or_registration(
         """Detect any attempt to fit or publish another version during an operator task."""
         pytest.fail("Manual action attempted training or registration")
 
-    monkeypatch.setattr(local_retraining, "fit_local_workflow", forbidden)
-    monkeypatch.setattr(local_retraining, "register_model", forbidden)
+    monkeypatch.setattr(candidate_training, "fit_workflow", forbidden)
+    monkeypatch.setattr(candidate_training, "register_model", forbidden)
     config["pipeline"] = {"project_python_source": "raise RuntimeError('editable project')"}
     context = adapter.LifecycleContext(job_id="10", job_run_id="21")
     operator_staged = (adapter, client, config, context, frame)
@@ -925,10 +919,10 @@ def test_finalizer_failure_leaves_incomplete_and_preserves_committed_promotion(
     assert str(client.get_model_version_by_alias(config["model_name"], "champion").version) == "1"
 
 
-@pytest.mark.parametrize("operation", ["evaluate_training_cv", "fit_local_workflow"])
+@pytest.mark.parametrize("operation", ["evaluate_training_cv", "fit_workflow"])
 def test_cv_and_fit_failure_never_reach_registration(staged, monkeypatch, operation):
     """The staged train boundary retains original failures before any publication is possible."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     config.update(cv_enabled=True, cv_folds=2)
@@ -939,7 +933,7 @@ def test_cv_and_fit_failure_never_reach_registration(staged, monkeypatch, operat
         """Raise from the selected real computation boundary before registration."""
         raise failure
 
-    monkeypatch.setattr(local_retraining, operation, fail)
+    monkeypatch.setattr(candidate, operation, fail)
     with pytest.raises(RuntimeError) as caught:
         _call(staged, "train", prepared.reference)
     assert caught.value is failure
@@ -990,10 +984,10 @@ def test_grouped_training_preserves_receipts_and_publishes_result(staged, engine
 @pytest.mark.parametrize(
     ("operation", "group", "failed_phase", "unattempted_phase"),
     [
-        ("fit_local_workflow", "train_register", "train", "evaluate_register"),
-        ("evaluate_local_holdout", "train_register", "evaluate_register", "compare"),
+        ("fit_workflow", "train_register", "train", "evaluate_register"),
+        ("evaluate_holdout", "train_register", "evaluate_register", "compare"),
         ("register_model", "train_register", "evaluate_register", "compare"),
-        ("compare_registered_local_models", "compare_decide", "compare", "decide"),
+        ("compare_registered_pipeline_models", "compare_decide", "compare", "decide"),
         ("automatic_promotion", "compare_decide", "decide", "result"),
     ],
 )
@@ -1001,8 +995,8 @@ def test_group_failure_stops_later_work_and_complete_cannot_publish(
     staged, monkeypatch, operation, group, failed_phase, unattempted_phase
 ):
     """Grouped failures preserve their exception and cannot yield a score handoff."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.lifecycle import workflow
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
@@ -1015,7 +1009,7 @@ def test_group_failure_stops_later_work_and_complete_cannot_publish(
         """Inject one computation or transport failure without replacing receipt handling."""
         raise failure
 
-    module = local_workflow if operation == "automatic_promotion" else local_retraining
+    module = workflow if operation == "automatic_promotion" else candidate
     monkeypatch.setattr(module, operation, fail)
     with pytest.raises(RuntimeError) as caught:
         _call(staged, group, reference)
@@ -1163,7 +1157,7 @@ def test_complete_never_publishes_missing_or_failed_operator_result(staged, atte
 @pytest.mark.parametrize("readable", [False, True])
 def test_complete_publishes_real_rollback_without_training(staged, monkeypatch, readable):
     """Operator completion returns the restored champion and never reruns training phases."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
     from skyulf.integrations.mlflow.lifecycle.promotion import AliasChangeReceipt
 
     adapter, client, config, _, frame = staged
@@ -1185,8 +1179,8 @@ def test_complete_publishes_real_rollback_without_training(staged, monkeypatch, 
         """Rollback must only reuse persisted promotion and registry evidence."""
         pytest.fail("Rollback attempted training or registration")
 
-    monkeypatch.setattr(local_retraining, "fit_local_workflow", forbidden)
-    monkeypatch.setattr(local_retraining, "register_model", forbidden)
+    monkeypatch.setattr(candidate, "fit_workflow", forbidden)
+    monkeypatch.setattr(candidate, "register_model", forbidden)
     current = (adapter, client, config, adapter.LifecycleContext("10", "22"), frame)
     pending = _call(
         current,
@@ -1311,12 +1305,12 @@ def test_task_states_only_accepted_by_complete_before_external_work(monkeypatch,
 @pytest.mark.parametrize("policy", ["automatic", "manual_approval"])
 def test_readable_graph_executes_data_stages_before_fitting(staged, monkeypatch, engine, policy):
     """Named data stages do real work and training consumes their checked saved partitions."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, frame = staged
     config.update(engine=engine, promotion_policy=policy)
     reads = Mock(side_effect=lambda spark, spec: frame.copy())
-    monkeypatch.setattr(local_retraining, "read_training_snapshot", reads)
+    monkeypatch.setattr(candidate, "read_training_snapshot", reads)
     prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
     reads.assert_not_called()
     loaded = _call(staged, "load_data", prepared.reference)
@@ -1345,7 +1339,7 @@ def test_readable_graph_executes_data_stages_before_fitting(staged, monkeypatch,
 
 def test_readable_graph_rejects_modified_partition_before_fit(staged, monkeypatch):
     """A changed saved dataset cannot enter training even when its receipt is intact."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
@@ -1357,7 +1351,7 @@ def test_readable_graph_rejects_modified_partition_before_fit(staged, monkeypatc
     saved.write_bytes(b"changed")
     client.log_artifact(prepared.reference["run_id"], str(saved), "lifecycle/data")
     fit = Mock(side_effect=AssertionError("must reject before fitting"))
-    monkeypatch.setattr(local_retraining, "fit_local_workflow", fit)
+    monkeypatch.setattr(candidate, "fit_workflow", fit)
     with pytest.raises(ValueError, match="digest"):
         _call(staged, "train", split.reference)
     fit.assert_not_called()
@@ -1370,7 +1364,7 @@ def test_readable_decision_routes_manual_actions_without_fitting(
     staged, monkeypatch, action, decision_state
 ):
     """Manual actions share the decision node and only successful task output permits scoring."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate_training
 
     adapter, client, config, _, frame = staged
     config["promotion_policy"] = "manual_approval"
@@ -1380,8 +1374,8 @@ def test_readable_decision_routes_manual_actions_without_fitting(
     _call(staged, "complete", prepared.reference, task_states=_TRAIN_TASK_STATES)
     candidate = compared.output["candidate"]
     forbidden = Mock(side_effect=AssertionError("manual action must not fit or register"))
-    monkeypatch.setattr(local_retraining, "fit_local_workflow", forbidden)
-    monkeypatch.setattr(local_retraining, "register_model", forbidden)
+    monkeypatch.setattr(candidate_training, "fit_workflow", forbidden)
+    monkeypatch.setattr(candidate_training, "register_model", forbidden)
     operator = (adapter, client, config, adapter.LifecycleContext("10", "21"), frame)
     options = {
         "candidate_version": candidate["model_version"],
@@ -1415,12 +1409,12 @@ def test_readable_decision_routes_manual_actions_without_fitting(
 
 def test_readable_failed_data_stage_cannot_publish_success(staged, monkeypatch):
     """An ALL_DONE report must close failed data work without a scoring handoff."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate
 
     _, client, config, _, _ = staged
     prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
     monkeypatch.setattr(
-        local_retraining,
+        candidate,
         "read_training_snapshot",
         Mock(side_effect=ValueError("source unavailable")),
     )

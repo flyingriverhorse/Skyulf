@@ -19,9 +19,7 @@ from skyulf.integrations.mlflow.shared._model_metadata import (
 )
 
 from ....inference.fitted_pipeline import (
-    load_pipeline as load_local_pipeline,
-)
-from ....inference.fitted_pipeline import (
+    load_pipeline,
     read_bounded_artifact,
 )
 from ....inference.model_set import ModelSetArtifact, load_model_set
@@ -59,7 +57,7 @@ from ..spark.spark_model import (
     optional_partition_certificate,
     validate_worker_certificate,
 )
-from .pipeline_model import pip_requirements, validate_local_destination
+from .pipeline_model import pip_requirements, validate_model_destination
 
 
 class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
@@ -133,7 +131,7 @@ def log_model_set(
     tracking_uri: str | None = None,
 ) -> str:
     """Log a complete model set without selecting aliases or retaining producer paths."""
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
@@ -199,9 +197,7 @@ def _set_requirements(artifact: ModelSetArtifact) -> list[str]:
     """Merge component and captured composition pins without producer URLs or conflicts."""
     requirements: dict[str, str] = {}
     for component in artifact.manifest.components:
-        pins = pip_requirements(
-            load_local_pipeline(artifact.directory / "components" / component.branch)
-        )
+        pins = pip_requirements(load_pipeline(artifact.directory / "components" / component.branch))
         _merge_requirements(requirements, pins)
     source = read_bounded_artifact(artifact.directory / "composition.py", MAX_PROJECT_SOURCE_BYTES)
     _merge_requirements(requirements, source_project_requirements(source.decode("utf-8")))

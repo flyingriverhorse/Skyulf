@@ -14,7 +14,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
@@ -71,7 +71,7 @@ def _save(directory, engine):
         assert pipeline.feature_engineer.fitted_steps[0]["artifact"], node
         predictions = pipeline.predict(sample)
         digest = artifact_digest(pipeline.feature_engineer.fitted_steps)
-        save_local_pipeline(pipeline, directory / node)
+        save_pipeline(pipeline, directory / node)
         evidence[node] = (sample, predictions, digest)
     (directory / "requests.pkl").write_bytes(pickle.dumps(evidence))
 
@@ -89,7 +89,7 @@ def _replay(directory):
     requests = pickle.loads((directory / "requests.pkl").read_bytes())
     statuses = {}
     for node, (sample, expected, digest) in requests.items():
-        artifact = load_local_pipeline(directory / node)
+        artifact = load_pipeline(directory / node)
         assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == digest
         actual = artifact.pipeline.predict(sample)
         np.testing.assert_array_equal(actual, expected)

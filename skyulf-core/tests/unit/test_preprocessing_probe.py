@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
@@ -39,8 +39,8 @@ def _artifact(tmp_path, engine="pandas", steps=None):
     pipeline = SkyulfPipeline(config)
     pipeline.fit(SplitDataset(train=frame, test=frame[:0]), target_column="target")
     path = tmp_path / "artifact"
-    save_local_pipeline(pipeline, path)
-    return load_local_pipeline(path)
+    save_pipeline(pipeline, path)
+    return load_pipeline(path)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

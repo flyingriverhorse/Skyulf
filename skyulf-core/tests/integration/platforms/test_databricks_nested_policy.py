@@ -9,19 +9,19 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
 from skyulf.integrations.databricks.jobs.shared.job_output import _nested_search_output
 from skyulf.integrations.databricks.lifecycle._lifecycle_data import load_frame, save_frame
 from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     _materialize_training_rows,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.training.tuning.local_search_results import tuning_evidence
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.search_results import tuning_evidence
 
 
 def _search():
@@ -40,7 +40,7 @@ def _search():
 
 def test_nested_time_settings_reach_core_search():
     """The wrapper must preserve chronology settings and threshold opt-in."""
-    cv = LocalCVSpec.from_workflow(
+    cv = CVSpec.from_workflow(
         {
             "cv_enabled": True,
             "cv_type": "nested_cv",
@@ -72,7 +72,7 @@ def test_group_holdout_retains_only_training_split_metadata(engine):
         }
     )
     frame.loc[3, "x"] = float("nan")
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.source",
         version=0,
         record_key_columns=("id",),
@@ -97,12 +97,12 @@ def test_group_holdout_retains_only_training_split_metadata(engine):
 def test_group_metadata_is_required_before_fitting():
     """A group policy without an identity column must fail before source access."""
     with pytest.raises(ValueError, match="cv_group_column"):
-        LocalCVSpec(enabled=True, method="nested_cv", nested_type="group_k_fold")
+        CVSpec(enabled=True, method="nested_cv", nested_type="group_k_fold")
 
 
 def test_source_materialization_preserves_group_identifiers():
     """Group identities are categorical values, even when source dates need conversion."""
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.source",
         version=0,
         record_key_columns=("id",),
@@ -183,7 +183,7 @@ def test_nested_policy_artifact_retains_features_only(tmp_path, engine, policy):
     )
     temporal = policy == "time_series_split"
     frame = frame.drop(columns=["entity" if temporal else "event"])
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=2,
         inner_folds=2,
@@ -206,7 +206,7 @@ def test_nested_policy_artifact_retains_features_only(tmp_path, engine, policy):
         pipeline, cv, target_column="target", event_column="event" if temporal else None
     )
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -218,9 +218,9 @@ def test_nested_policy_artifact_retains_features_only(tmp_path, engine, policy):
     evidence = tuning_evidence(artifact)
     assert evidence is not None and len(evidence["nested_cv"]["folds"]) == 2
     assert evidence["modeling"]["cv_nested_type"] == policy
-    loaded = load_local_pipeline(tmp_path / "artifact")
+    loaded = load_pipeline(tmp_path / "artifact")
     pd.testing.assert_frame_equal(
-        predict_local_pipeline(frame[["x"]], artifact), predict_local_pipeline(frame[["x"]], loaded)
+        predict_pipeline(frame[["x"]], artifact), predict_pipeline(frame[["x"]], loaded)
     )
 
 
@@ -230,10 +230,10 @@ def test_nested_binary_threshold_is_saved_and_enabled(tmp_path, engine):
     frame = pd.DataFrame(
         {"x": range(72), "target": ["yes" if n % 4 == 0 else "no" for n in range(72)]}
     )
-    cv = LocalCVSpec(enabled=True, folds=3, inner_folds=2, method="nested_cv")
+    cv = CVSpec(enabled=True, folds=3, inner_folds=2, method="nested_cv")
     config = prepare_search_pipeline(_search(), cv, target_column="target", event_column=None)
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -251,7 +251,7 @@ def test_nested_binary_threshold_is_saved_and_enabled(tmp_path, engine):
     readable = "".join(_nested_search_output(evidence))
     assert "Final decision thresholds" in readable and "Decision thresholds" in readable
     assert "f1" in readable
-    loaded = load_local_pipeline(tmp_path / "artifact")
+    loaded = load_pipeline(tmp_path / "artifact")
     pd.testing.assert_frame_equal(
-        predict_local_pipeline(frame[["x"]], artifact), predict_local_pipeline(frame[["x"]], loaded)
+        predict_pipeline(frame[["x"]], artifact), predict_pipeline(frame[["x"]], loaded)
     )

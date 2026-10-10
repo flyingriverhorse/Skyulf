@@ -1,4 +1,4 @@
-"""Purpose names retain the existing Databricks integration contracts."""
+"""Purpose names define the Databricks API without legacy local aliases."""
 
 import importlib
 import json
@@ -6,6 +6,7 @@ from hashlib import sha256
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 from pydantic import ValidationError
 
@@ -34,13 +35,13 @@ from skyulf.pipeline import SkyulfPipeline
         ("train_branches", "train_local_branches"),
     ],
 )
-def test_public_names_are_same_objects(new, old):
-    """Both supported spellings must share implementation and type identity."""
+def test_public_api_exposes_only_canonical_names(new, old):
+    """One public spelling avoids duplicate APIs and misleading location names."""
     import skyulf.integrations.databricks as db
 
     assert hasattr(db, new), f"Missing purpose-based public API: {new}"
-    assert getattr(db, new) is getattr(db, old)
-    assert new in db.__all__ and old in db.__all__
+    assert not hasattr(db, old)
+    assert new in db.__all__ and old not in db.__all__
 
 
 @pytest.mark.parametrize(
@@ -66,13 +67,15 @@ def test_public_names_are_same_objects(new, old):
         ("observability.reports.local_explanations", "observability.reports.explanations"),
     ],
 )
-def test_old_hierarchical_and_flat_imports_share_canonical_module(old, new):
-    """Compatibility paths must preserve globals used by saved code and caller hooks."""
+def test_canonical_modules_own_code_without_legacy_paths(old, new):
+    """The clean migration must remove old files, not replace them with import hooks."""
     prefix = "skyulf.integrations.databricks."
-    legacy = importlib.import_module(prefix + old)
     canonical = importlib.import_module(prefix + new)
-    flat = importlib.import_module(prefix + old.rsplit(".", 1)[-1])
-    assert legacy is canonical is flat
+    assert canonical.__name__ == prefix + new
+    for legacy in (old, old.rsplit(".", 1)[-1], "_compat." + old.rsplit(".", 1)[-1]):
+        with pytest.raises(ModuleNotFoundError) as error:
+            importlib.import_module(prefix + legacy)
+        assert error.value.name == prefix + legacy
 
 
 def _workflow(path, **changes):
@@ -85,7 +88,7 @@ def _workflow(path, **changes):
     )
 
     values = {
-        "runtime": "local",
+        "runtime": "standalone",
         "engine": "pandas",
         "source": InputSource(kind="caller_frame"),
         "model": ModelSelection(kind="local_pipeline", path=str(path)),
@@ -95,25 +98,33 @@ def _workflow(path, **changes):
     return WorkflowConfig.model_validate(values)
 
 
-def test_runtime_policy_does_not_detect_machine_location(tmp_path, monkeypatch):
-    """Driver environment markers cannot turn local runtime into a workstation restriction."""
-    from skyulf.inference.local_pipeline import save_local_pipeline
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_runtime_policy_does_not_detect_machine_location(tmp_path, monkeypatch, engine):
+    """Standalone execution works on cloud hosts without enabling Databricks publication."""
+    from skyulf.inference.fitted_pipeline import save_pipeline
     from skyulf.integrations.databricks import OutputSink, preflight, prepare_workflow
 
     monkeypatch.setenv("DATABRICKS_RUNTIME_VERSION", "test-driver")
     frame = pd.DataFrame({"x": np.arange(8, dtype=float), "target": np.arange(8) * 2.0})
     pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "linear_regression"}})
-    pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "pipeline")
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(SplitDataset(train=native, test=native.head(0)), target_column="target")
+    save_pipeline(pipeline, tmp_path / "pipeline")
     outputs = []
-    for runtime in ("local", "databricks"):
-        prepared = prepare_workflow(_workflow(tmp_path / "pipeline", runtime=runtime))
+    for runtime in ("standalone", "databricks"):
+        prepared = prepare_workflow(
+            _workflow(tmp_path / "pipeline", runtime=runtime, engine=engine)
+        )
         assert prepared.preflight.ready
-        outputs.append(prepared.predict(pd.DataFrame({"x": [2.0, 4.0]})))
+        inputs = pd.DataFrame({"x": [2.0, 4.0]})
+        output = prepared.predict(pl.from_pandas(inputs) if engine == "polars" else inputs)
+        outputs.append(output.to_pandas() if isinstance(output, pl.DataFrame) else output)
     pd.testing.assert_frame_equal(outputs[0], outputs[1])
     np.testing.assert_allclose(outputs[0]["prediction"], [4.0, 8.0])
     sink_config = _workflow(
-        tmp_path / "pipeline", sink=OutputSink(kind="uc_delta", table="c.s.predictions")
+        tmp_path / "pipeline",
+        engine=engine,
+        sink=OutputSink(kind="uc_delta", table="c.s.predictions"),
     )
     assert "sink_runtime_mismatch" in {issue.code for issue in preflight(sink_config).issues}
 
@@ -160,20 +171,23 @@ def test_training_spec_serialization_keeps_saved_keys():
     assert digest == "4bb82749d44838f7c6e438f195784e2ff1efa79b91423516ab71600f0ec3e147"
 
 
-def test_workflow_schema_only_changes_its_public_title():
-    """New Python names cannot silently alter persisted workflow validation contracts."""
+def test_runtime_schema_separates_integration_policy_from_frame_engine():
+    """Runtime names must describe integration policy while engine selects the frame type."""
     from skyulf.integrations.databricks import WorkflowConfig
 
     schema = WorkflowConfig.model_json_schema()
     assert schema["title"] == "WorkflowConfig"
-    schema["title"] = "LocalWorkflowConfig"
-    digest = sha256(json.dumps(schema, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    assert digest == "800e70c7240282be3c7ff4752c70bc62c9a44cfcd2f9a3d3de3269c0da492e66"
+    assert schema["properties"]["runtime"]["enum"] == ["standalone", "databricks", "spark"]
+    assert schema["properties"]["engine"]["enum"] == ["pandas", "polars"]
+    assert schema["properties"]["inference_mode"]["enum"] == ["local", "spark"]
+    assert schema["properties"]["spark_udf_env_manager"]["enum"] == ["local", "virtualenv"]
+    with pytest.raises(ValidationError, match="standalone"):
+        _workflow("model", runtime="local")
 
 
 def test_workflow_rejection_preserves_existing_registry_hook(monkeypatch):
-    """Legacy rejection callers must still intercept the low-level registry operation."""
-    from skyulf.integrations.databricks.lifecycle import local_approval as approval
+    """The high-level workflow must still use the injectable low-level registry operation."""
+    from skyulf.integrations.databricks.lifecycle import approval
 
     report = object()
     receipt = object()
@@ -191,7 +205,7 @@ def test_workflow_rejection_preserves_existing_registry_hook(monkeypatch):
     )
     monkeypatch.setattr(approval, "controlled_champion_version", lambda *args, **kwargs: None)
     monkeypatch.setattr(approval, "reject_candidate", reject)
-    result = approval.reject_local_candidate(
+    result = approval.reject_workflow_candidate(
         {"promotion_policy": "manual_approval", "model_name": "c.s.model"},
         candidate_version="1",
         comparison_sha256="a" * 64,
@@ -201,4 +215,3 @@ def test_workflow_rejection_preserves_existing_registry_hook(monkeypatch):
     assert result is receipt
     assert calls[0][0] is report
     assert calls[0][1]["reason"] == "Operator decision"
-    assert approval.reject_local_candidate is approval.reject_workflow_candidate

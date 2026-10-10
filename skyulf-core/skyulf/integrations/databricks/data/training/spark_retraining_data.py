@@ -458,7 +458,3 @@ def _assessment(counts: Any, baseline: Any, columns: list[str]) -> dict:
         "changed_rows": changed,
         "content_sha256": _content_digest(counts, columns),
     }
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalTrainingSpec = TrainingSpec

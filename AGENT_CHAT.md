@@ -27,22 +27,28 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task216 complete on branch 093. Source/docs: b23d34f9; test repair: 0ec4c406.
-Purpose-based integration APIs preserve legacy imports/artifacts and wire values.
-Public guides are updated; internal evidence remains under initiatives.
-Local: 931 unique tests passed, one missing-pyspark skip. The source-snapshot
-failure passed in isolation once source edits froze. Static/docs/commit gates passed.
-Databricks: 858 unique tests passed across two runs (854 + 4), zero remaining
-failures/skips; real Spark reader and both preprocessing/history guides passed.
-Initial run 196440641386730; approved focused retry 106939883844620 SUCCESS.
-The same b23d34f9 wheel and 576 runtime files were verified in both runs:
-56ace36b953f44ee64e797e1075ae2fa5e2de010f43d2e186c431a00f9abe9e6.
-Only two layout-test path constants changed for the retry. All 12 review IDs closed.
-Evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md
-and initiatives/spark_and_mlflow/task216_native/verified.json.
-No push. No workspace table, registered model or endpoint created.
+Task217 implementation and validation COMPLETE, branch093; baseline a698a737.
+User now authorizes a signed local commit; no push. All ownership claims released;
+no unanswered peer request. Completed exchanges removed after evidence capture.
 
-## Open messages
+Direct integration names and runtime=standalone are implemented. Net runtime
+reduction:47 files,2,067 lines. Seven shared helper names are direct; no wrappers.
+Independent reviews passed. Final Ruff, full CI Ty, formatter, CCN10, strict docs
+build and diff checks passed. Local combined result:4,297 unique passed,98
+explicit environment skips,0 unresolved failures. Final Databricks run
+746953963382530 passed1,131/1,131 and3/3 examples with no failures/skips;529 runtime
+and75 asset hashes match the reviewed uncommitted source. Old evidence preserved.
 
-No active claims or pending requests. Completed review and execution details are
-recorded in the task document; root's retry claims are released.
+Authoritative task/review/test record:
+initiatives/spark_and_mlflow/217-clean-integration-names.md
+Final native machine proof:
+initiatives/spark_and_mlflow/task217_native_final/verified.json
+Local exact-identity aggregate:.cache/t217-local-verified.json
+
+Acknowledged and closed:C217-NATIVE-FINAL-DONE,C217-TEMPLATE-FIXTURE-REVIEW,
+C217-HELPERS-DONE,C217-INFERENCE-FINAL-REVIEW. No push/deployment performed.
+C217-COMMIT-READY | 2026-10-10T16:35:08Z | Codex/root -> peers | RELEASE | reply:C217-COMMIT-CLAIM
+All 529 runtime and 75 asset hashes rechecked; final native raw output and exact
+test identities verified. Reviewed 325-path working-tree status is unchanged.
+Closure edits complete. Applicable configured hooks passed: whitespace, YAML,
+Ruff, formatter, Lizard CCN10 and full CI Ty. Commit result goes in the task record.

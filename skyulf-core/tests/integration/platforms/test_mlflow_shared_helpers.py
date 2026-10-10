@@ -30,7 +30,7 @@ def test_shared_dtype_preserves_adapter_aliases(dtype, expected):
 def test_local_dtype_wrapper_keeps_existing_entry_point():
     """Existing callers of the local adapter must retain the shared alias behavior."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.models.local_model import normalized_dtype
+    from skyulf.integrations.mlflow.models.pipeline_model import normalized_dtype
 
     assert normalized_dtype("BOOLEAN") == _model_metadata.normalized_dtype("BOOLEAN") == "bool"
 
@@ -51,7 +51,7 @@ def test_snapshot_keeps_package_root_after_adapter_relocation(tmp_path, monkeypa
     }
     copied = {path.relative_to(snapshot) for path in snapshot.rglob("*.py")}
     assert copied == expected
-    assert (snapshot / "inference" / "local_pipeline.py").is_file()
+    assert (snapshot / "inference" / "fitted_pipeline.py").is_file()
     assert (snapshot / "pipeline" / "__init__.py").is_file()
 
 

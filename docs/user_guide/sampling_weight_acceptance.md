@@ -60,7 +60,7 @@ serialization or estimator parallelism; use a justified tolerance and inspect
 large discrepancies rather than increasing it to hide a failure.
 
 For job execution, candidate registration and publication, see the
-[Databricks Python SDK](databricks_local_sdk.md) and
+[Databricks Python SDK](databricks_sdk.md) and
 [Bundle operator walkthrough](databricks_bundle_walkthrough.md). Validate CV,
 search, promotion, concurrent writers and serving separately when your production
 workflow uses them.

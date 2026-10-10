@@ -22,23 +22,21 @@ from typing import Any, Literal, cast
 import pandas as pd
 import polars as pl
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes
+from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
-from .....inference.pipeline_evaluation import evaluate_holdout as evaluate_local_holdout
+from .....inference.pipeline_evaluation import evaluate_holdout
 from .....inference.project_code import is_project_filter_step
 from .....leakage import step_learns_from_data
 from .....preprocessing.split import DataSplitter
 from .....registry import NodeRegistry
 from ....mlflow.lifecycle.validation import (
     ModelComparisonReport,
+    compare_registered_pipeline_models,
     comparison_digest,
     comparison_payload,
     quality_gate_results,
     validate_quality_policy,
-)
-from ....mlflow.lifecycle.validation import (
-    compare_registered_pipeline_models as compare_registered_local_models,
 )
 from ....mlflow.registration.registry import ResolvedModel, register_model, resolve_model
 from ....mlflow.runs.tracking import TrackingConfig, track_run
@@ -65,7 +63,7 @@ from ...observability.reports.explanations import (
     log_training_explanations,
     validate_explanation_config,
 )
-from ...scoring.batch.frame_batch import fit_workflow as fit_local_workflow
+from ...scoring.batch.frame_batch import fit_workflow
 from ...shared._contracts import column_name, table_name
 from ..shared.preprocessing_checks import log_preprocessing_probe
 from ..shared.training_evidence import build_training_evidence, evidence_digest
@@ -502,7 +500,7 @@ class CandidateResult:
 def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     """Project and cap a versioned Delta read before materializing driver rows."""
     if not isinstance(spec, TrainingSpec):
-        raise TypeError("spec must be LocalTrainingSpec.")
+        raise TypeError("spec must be TrainingSpec.")
     spec = pin_training_lookup(spark, spec)
     _pre_split_columns(
         spec.pre_split_steps,
@@ -818,7 +816,7 @@ def log_pipeline_model(
 ) -> str:
     """Import the optional MLflow pyfunc package only for a tracked run."""
     from ....mlflow.models.pipeline_model import (  # noqa: PLC0415 - optional MLflow boundary
-        log_pipeline_model as log_local_model,
+        log_pipeline_model as log_pyfunc_model,
     )
 
     if spec is not None and spec.feature_lookup_json is not None:
@@ -827,7 +825,7 @@ def log_pipeline_model(
         return log_training_feature_model(
             artifact_path, spark=spark, spec=spec, run_id=run_id, tracking_uri=tracking_uri
         )
-    return log_local_model(
+    return log_pyfunc_model(
         artifact_path, run_id=run_id, artifact_path="model", tracking_uri=tracking_uri
     )
 
@@ -873,11 +871,11 @@ def candidate_config(
 ) -> dict[str, Any]:
     """Validate one training request and derive its effective preprocessing recipe."""
     if not isinstance(spec, TrainingSpec):
-        raise TypeError("spec must be LocalTrainingSpec.")
+        raise TypeError("spec must be TrainingSpec.")
     if engine not in ("pandas", "polars"):
         raise ValueError("engine must be pandas or polars.")
     if not isinstance(cv, CVSpec):
-        raise TypeError("cv must be LocalCVSpec.")
+        raise TypeError("cv must be CVSpec.")
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
@@ -1031,7 +1029,7 @@ def fit_candidate(
         sample_weight=sample_weight,
     )
     native_train = _final_fit_frame(native_train, spec, temporal_cv, search or automatic)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         pipeline_config,
         SplitDataset(
             train=native_train, test=native_train.head(0), train_sample_weight=sample_weight
@@ -1219,7 +1217,7 @@ def evaluate_candidate(
     evaluation_charts: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """Require a finite initial holdout metric before any registration."""
-    metrics = evaluate_local_holdout(
+    metrics = evaluate_holdout(
         artifact,
         native_holdout,
         target_column=spec.target_column,
@@ -1250,7 +1248,7 @@ def compare_candidate(
     unavailable: int,
 ) -> CandidateResult:
     """Compare concrete model versions and save the SDK's unchanged result evidence."""
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         champion,
         native_holdout,
@@ -1395,7 +1393,7 @@ def train_candidate(
             risk_category=risk_category,
         )
         run.log_metrics(metrics)
-        model_uri = log_local_model(
+        model_uri = log_pipeline_model(
             artifact_path,
             run_id=run.run_id,
             tracking_uri=tracking_uri,
@@ -1633,7 +1631,7 @@ def _validate_filter_frame(
 def _validate_labeled_snapshot(frame: pd.DataFrame, spec: TrainingSpec, engine: str) -> None:
     """Validate the split request, source schema, budgets and unique identities."""
     if not isinstance(frame, pd.DataFrame) or not isinstance(spec, TrainingSpec):
-        raise TypeError("Expected a pandas frame and LocalTrainingSpec.")
+        raise TypeError("Expected a pandas frame and TrainingSpec.")
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
@@ -1907,14 +1905,3 @@ def _log_tuning_evidence(run: Any, artifact: Any, config: dict[str, Any]) -> Non
         run.client.log_dict(run.run_id, search_result, "tuning.json")
         run.log_params(tuning_run_params(search_result))
         run.log_metrics({"tuning_best_score": search_result["best_score"]})
-
-
-# Preserve public imports and pickle-qualified names from earlier releases.
-LocalTrainingSpec = TrainingSpec
-LocalCandidateResult = CandidateResult
-log_local_model = log_pipeline_model
-train_local_candidate = train_candidate
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec

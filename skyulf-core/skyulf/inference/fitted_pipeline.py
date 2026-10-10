@@ -276,7 +276,7 @@ def require_pipeline_scope(
 ) -> None:
     """Reject execution modes that the fitted artifact has not been proven to support."""
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("Expected a LocalPipelineArtifact.")
+        raise TypeError("Expected a FittedPipelineArtifact.")
     if scope != artifact.manifest.execution_scope:
         raise ValueError(f"Local pipeline artifact is not eligible for {scope}.")
 
@@ -286,10 +286,10 @@ def predict_pipeline(
 ) -> pd.DataFrame:
     """Apply the fitted preprocessing and model with the recorded fit engine."""
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("Expected a LocalPipelineArtifact.")
+        raise TypeError("Expected a FittedPipelineArtifact.")
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
-    native = validate_local_input(frame, artifact)
+    native = validate_pipeline_input(frame, artifact)
     prediction = np.asarray(
         artifact.pipeline.predict(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
@@ -362,13 +362,3 @@ def validate_pipeline_input(
         where="local pipeline input",
     )
     return native
-
-
-# Released names remain aliases for imports and stored pickle references.
-LocalPipelineArtifact = FittedPipelineArtifact
-LocalPipelineManifest = FittedPipelineManifest
-save_local_pipeline = save_pipeline
-load_local_pipeline = load_pipeline
-predict_local_pipeline = predict_pipeline
-validate_local_input = validate_pipeline_input
-require_local_pipeline_scope = require_pipeline_scope

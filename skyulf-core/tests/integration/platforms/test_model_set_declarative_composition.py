@@ -9,7 +9,7 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.model_set import ComponentReference, load_model_set, save_model_set
 from skyulf.inference.model_set_partition_safety import require_partition_safe_model_set
 from skyulf.inference.model_set_scoring import (
@@ -171,8 +171,8 @@ def saved_set(tmp_path, request):
         )
         pipeline.fit(SplitDataset(train=data, test=data.iloc[:0]), target_column="target")
         path = tmp_path / branch
-        save_local_pipeline(pipeline, path)
-        digest = load_local_pipeline(path).manifest.pipeline_sha256
+        save_pipeline(pipeline, path)
+        digest = load_pipeline(path).manifest.pipeline_sha256
         paths[branch] = (ComponentReference(name=branch, version="1", digest=digest), path)
     artifact = save_model_set(
         tmp_path / "set",

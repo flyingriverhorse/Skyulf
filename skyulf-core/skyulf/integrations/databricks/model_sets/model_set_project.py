@@ -72,7 +72,7 @@ def load_project_model_set(
     settings = declared if declared is not None else _python_set_settings(path)
     if settings is None:
         return None
-    _validate_set_settings(settings)
+    validate_model_set_settings(settings)
     bindings = {
         key: values[key]
         for key in (
@@ -110,7 +110,7 @@ def _python_set_settings(path: Path) -> dict[str, Any] | None:
     return factory()
 
 
-def _validate_set_settings(settings: Any) -> None:
+def validate_model_set_settings(settings: Any) -> None:
     """Separate editable destinations from rules captured only during training."""
     required = {"model_name", "prediction_table"}
     optional = {

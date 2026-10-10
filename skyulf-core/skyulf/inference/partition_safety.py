@@ -275,7 +275,7 @@ def require_partition_safe_pipeline(artifact: FittedPipelineArtifact) -> Partiti
     inference behavior and does not grant or remove node admission.
     """
     if type(artifact) is not FittedPipelineArtifact:
-        raise TypeError("Expected a loaded LocalPipelineArtifact.")
+        raise TypeError("Expected a loaded FittedPipelineArtifact.")
     try:
         return _pipeline_evidence(artifact)
     except UnsupportedExecutionError:

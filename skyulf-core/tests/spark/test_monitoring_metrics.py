@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
     build_performance_report,
 )
 

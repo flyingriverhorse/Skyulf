@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes
+from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....inference.fitted_pipeline import FittedPipelineArtifact
 from .....modeling._sample_weights import validate_sample_weight
@@ -100,7 +100,7 @@ def _validate_input(
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Competition training data must be a pandas or Polars DataFrame.")
     if not isinstance(artifact, FittedPipelineArtifact):
-        raise TypeError("Competition requires a fitted LocalPipelineArtifact.")
+        raise TypeError("Competition requires a fitted FittedPipelineArtifact.")
     if not cv.enabled:
         raise ValueError("Competition requires enabled CV.")
     if target_column not in frame.columns or target_column in artifact.manifest.input_columns:
@@ -428,8 +428,3 @@ def _threshold_fold_scores(folds: list[dict], metric: str) -> list[float]:
             )
         scores.append(_finite_score(fold[metric]))
     return scores
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalCVSpec = CVSpec
-LocalPipelineArtifact = FittedPipelineArtifact

@@ -41,23 +41,6 @@ from .training.fitting.candidate import (
     train_candidate,
 )
 
-# Keep previous public spellings as aliases to the same implementations.
-LocalScoreResult = ScoreResult
-LocalSourceSpec = SourceSpec
-LocalWorkflowConfig = WorkflowConfig
-PreparedLocalWorkflow = PreparedWorkflow
-LocalCandidateResult = CandidateResult
-LocalTrainingSpec = TrainingSpec
-evaluate_local_holdout = evaluate_holdout
-fit_local_workflow = fit_workflow
-read_local_source = read_source
-score_local_source = score_source
-run_incremental_local_batch = run_incremental_batch
-run_local_batch = run_frame_batch
-preflight_local = preflight
-prepare_local_workflow = prepare_workflow
-train_local_candidate = train_candidate
-
 if TYPE_CHECKING:
     from .training.branches import (
         BranchTrainingResult,
@@ -66,7 +49,6 @@ if TYPE_CHECKING:
         prepare_training_branches,
         restore_training_branches,
         train_branches,
-        train_local_branches,
     )
 
 _BRANCH_EXPORTS = {
@@ -75,7 +57,6 @@ _BRANCH_EXPORTS = {
     "branch_training_payload",
     "prepare_training_branches",
     "restore_training_branches",
-    "train_local_branches",
     "train_branches",
 }
 
@@ -92,12 +73,6 @@ def __getattr__(name: str) -> Any:
 
 
 __all__ = [
-    "LocalScoreResult",
-    "LocalSourceSpec",
-    "LocalWorkflowConfig",
-    "PreparedLocalWorkflow",
-    "LocalCandidateResult",
-    "LocalTrainingSpec",
     "evaluate_holdout",
     "fit_workflow",
     "read_source",
@@ -127,19 +102,9 @@ __all__ = [
     "TrainingDateSpec",
     "TrainingBranch",
     "branch_training_payload",
-    "evaluate_local_holdout",
-    "fit_local_workflow",
-    "preflight_local",
-    "prepare_local_workflow",
     "prepare_training_branches",
-    "read_local_source",
     "read_training_snapshot",
     "restore_training_branches",
     "run_batch",
-    "run_incremental_local_batch",
-    "run_local_batch",
-    "score_local_source",
     "split_labeled_snapshot",
-    "train_local_candidate",
-    "train_local_branches",
 ]

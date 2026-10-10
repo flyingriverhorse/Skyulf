@@ -98,7 +98,7 @@ def test_monitoring_reader_requires_distributed_batch_for_native_features():
 
 def test_performance_population_tracks_lookup_identity_but_allows_new_versions():
     """Production baselines cannot silently compare a replacement feature table's semantics."""
-    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_performance import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_performance import (
         population_contract,
     )
 

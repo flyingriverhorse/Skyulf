@@ -7,7 +7,7 @@ from functools import reduce
 from operator import and_, or_
 from typing import Any
 
-from ..local.monitoring_metrics import (
+from ..monitoring_metrics import (
     CLASSIFICATION_METRICS,
     REGRESSION_METRICS,
     validate_monitoring_inputs,

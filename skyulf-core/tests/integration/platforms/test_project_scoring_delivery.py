@@ -10,11 +10,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.integrations.databricks.projects.project import load_project_workflow
 from skyulf.pipeline import SkyulfPipeline
 
@@ -51,46 +47,46 @@ def fitted_scoring_artifact(tmp_path, engine="pandas"):
     pipeline = SkyulfPipeline(workflow["pipeline"])
     pipeline.fit(SplitDataset(train=data[:16], test=data[16:]), target_column="target")
     destination = tmp_path / "artifact"
-    save_local_pipeline(pipeline, destination)
+    save_pipeline(pipeline, destination)
     source.write_text("raise RuntimeError('edited project must not run')", encoding="utf-8")
-    return load_local_pipeline(destination)
+    return load_pipeline(destination)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_saved_scoring_preserves_membership_and_raw_evaluation(tmp_path, engine):
     """Scoring emits exclusions while heldout evaluation still measures the entire population."""
-    from skyulf.inference.local_scoring import score_local_pipeline, scoring_output_schema
+    from skyulf.inference.pipeline_scoring import score_pipeline, scoring_output_schema
 
     artifact = fitted_scoring_artifact(tmp_path, engine)
     frame = pd.DataFrame({"x": [-1.0, 2.0, 8.0]}, index=[8, 3, 8])
-    scored = score_local_pipeline(frame, artifact)
+    scored = score_pipeline(frame, artifact)
     assert scored.index.tolist() == [8, 3, 8]
     assert scored.scoring_status.tolist() == ["excluded", "predicted", "predicted"]
     assert scored.exclusion_reason.iloc[0] == "negative_input"
     assert pd.isna(scored.prediction.iloc[0])
     assert scored.band.iloc[1:].tolist() == ["low", "high"]
     np.testing.assert_allclose(scored.prediction.iloc[1:].astype(float), [4, 16])
-    assert len(predict_local_pipeline(frame, artifact)) == 3
+    assert len(predict_pipeline(frame, artifact)) == 3
     assert tuple(scored.columns) == tuple(c.name for c in scoring_output_schema(artifact))
 
 
 def test_all_excluded_does_not_invoke_model(tmp_path):
     """An excluded-only batch must remain publishable and never call the estimator."""
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
 
     artifact = fitted_scoring_artifact(tmp_path)
     with patch.object(artifact.pipeline, "predict", side_effect=AssertionError("model called")):
-        result = score_local_pipeline(pd.DataFrame({"x": [-2.0, -1.0]}), artifact)
+        result = score_pipeline(pd.DataFrame({"x": [-2.0, -1.0]}), artifact)
     assert result.scoring_status.tolist() == ["excluded", "excluded"]
     assert result.prediction.isna().all()
 
 
 def test_empty_scoring_keeps_schema(tmp_path):
     """An empty request has the saved output schema without evaluating callbacks."""
-    from skyulf.inference.local_scoring import score_local_pipeline, scoring_output_schema
+    from skyulf.inference.pipeline_scoring import score_pipeline, scoring_output_schema
 
     artifact = fitted_scoring_artifact(tmp_path)
-    result = score_local_pipeline(pd.DataFrame({"x": pd.Series([], dtype="float64")}), artifact)
+    result = score_pipeline(pd.DataFrame({"x": pd.Series([], dtype="float64")}), artifact)
     assert result.empty
     assert tuple(result.columns) == tuple(c.name for c in scoring_output_schema(artifact))
 
@@ -100,10 +96,13 @@ def test_mlflow_signature_and_pyfunc_apply_saved_rules(tmp_path):
     pytest.importorskip("mlflow")
     from types import SimpleNamespace
 
-    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel, _signature
+    from skyulf.integrations.mlflow.models.pipeline_model import (
+        SkyulfPipelinePythonModel,
+        _signature,
+    )
 
     artifact = fitted_scoring_artifact(tmp_path)
-    model = SkyulfLocalPythonModel()
+    model = SkyulfPipelinePythonModel()
     model.load_context(SimpleNamespace(artifacts={"local_pipeline": str(tmp_path / "artifact")}))
     result = model.predict(None, pd.DataFrame({"x": [-1.0, 8.0]}))
     assert result.scoring_status.tolist() == ["excluded", "predicted"]
@@ -124,12 +123,12 @@ def test_scoring_configuration_is_bound_to_artifact(tmp_path):
 def test_preflight_probe_exercises_saved_output_rule(tmp_path):
     """A model-only probe must not hide an invalid declared scoring output."""
     from skyulf.inference.project_code import load_project_module
-    from skyulf.integrations.databricks.scoring.local_sdk import (
+    from skyulf.integrations.databricks.scoring.workflow import (
         InputSource,
-        LocalWorkflowConfig,
         ModelSelection,
         OutputSink,
-        preflight_local,
+        WorkflowConfig,
+        preflight,
     )
 
     artifact = fitted_scoring_artifact(tmp_path)
@@ -143,14 +142,14 @@ def test_preflight_probe_exercises_saved_output_rule(tmp_path):
     invalid_output.__module__ = module.__name__
     module.__dict__["band"] = invalid_output
     try:
-        config = LocalWorkflowConfig(
-            runtime="local",
+        config = WorkflowConfig(
+            runtime="standalone",
             engine="pandas",
             source=InputSource(kind="caller_frame"),
             model=ModelSelection(kind="local_pipeline", path=str(tmp_path / "artifact")),
             sink=OutputSink(kind="return_frame"),
         )
-        result = preflight_local(config, artifact=artifact, probe_frame=pd.DataFrame({"x": [2.0]}))
+        result = preflight(config, artifact=artifact, probe_frame=pd.DataFrame({"x": [2.0]}))
         assert "prediction_probe_failed" in [issue.code for issue in result.issues]
     finally:
         module.__dict__["band"] = original
@@ -158,7 +157,7 @@ def test_preflight_probe_exercises_saved_output_rule(tmp_path):
 
 def test_all_excluded_keeps_temporal_session_state(tmp_path):
     """Skipping every estimate must not discard the incoming continuation tail."""
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
     from skyulf.preprocessing.time_series.history import TemporalHistorySession
     from skyulf.preprocessing.time_series.lag import LagFeaturesCalculator
 
@@ -174,26 +173,26 @@ def test_all_excluded_keeps_temporal_session_state(tmp_path):
         "steps": {params["history_id"]: [{"t": 2, "x": 4.0}]},
     }
     with TemporalHistorySession("model", previous) as history:
-        scored = score_local_pipeline(pd.DataFrame({"x": [-1.0]}), artifact)
+        scored = score_pipeline(pd.DataFrame({"x": [-1.0]}), artifact)
     assert history.state == previous
     assert scored.scoring_status.tolist() == ["excluded"]
 
 
 def test_all_excluded_still_validates_saved_input_schema(tmp_path):
     """Eligibility cannot silently admit a different raw input type contract."""
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
 
     artifact = fitted_scoring_artifact(tmp_path)
     artifact.pipeline.config["project_scoring"]["eligibility"][0]["params"]["minimum"] = "0"
     with pytest.raises(ValueError, match="dtype|type"):
-        score_local_pipeline(pd.DataFrame({"x": ["-1"]}), artifact)
+        score_pipeline(pd.DataFrame({"x": ["-1"]}), artifact)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("model", ["logistic_regression", "voting_classifier", "voting_regressor"])
 def test_scoring_policy_classification_and_ensembles(tmp_path, engine, model):
     """Probabilities and ensemble estimates retain exclusions without changing output meaning."""
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
     from skyulf.inference.project_code import load_project_module
 
     source = load_project_module(SOURCE)
@@ -218,9 +217,9 @@ def test_scoring_policy_classification_and_ensembles(tmp_path, engine, model):
     if engine == "polars":
         rows = pl.from_pandas(rows)
     pipeline.fit(SplitDataset(train=rows[:32], test=rows[32:]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "model")
-    artifact = load_local_pipeline(tmp_path / "model")
-    result = score_local_pipeline(pd.DataFrame({"x": [-1.0, 2.0, 8.0]}), artifact)
+    save_pipeline(pipeline, tmp_path / "model")
+    artifact = load_pipeline(tmp_path / "model")
+    result = score_pipeline(pd.DataFrame({"x": [-1.0, 2.0, 8.0]}), artifact)
     assert result.scoring_status.tolist() == ["excluded", "predicted", "predicted"]
     assert pd.isna(result.prediction.iloc[0])
     if classification:
@@ -229,7 +228,7 @@ def test_scoring_policy_classification_and_ensembles(tmp_path, engine, model):
             (result.probability_0 + result.probability_1).iloc[1:].astype(float), 1.0
         )
     else:
-        expected = predict_local_pipeline(pd.DataFrame({"x": [2.0, 8.0]}), artifact)
+        expected = predict_pipeline(pd.DataFrame({"x": [2.0, 8.0]}), artifact)
         np.testing.assert_allclose(result.prediction.iloc[1:].astype(float), expected.prediction)
     if model.startswith("voting_"):
         estimator = artifact.pipeline.model_estimator

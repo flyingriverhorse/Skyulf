@@ -32,7 +32,7 @@ the model's fitted imputation is applied. Native validation compares null-input
 predictions as well as ordinary rows; a successful table write alone is not
 treated as proof of prediction parity.
 
-This demo passes `config.yml`'s `pipeline` directly to `fit_local_workflow`.
+This demo passes `config.yml`'s `pipeline` directly to `fit_workflow`.
 It does **not** use the main Bundle configuration loader. Do not copy its
 `pipeline.preprocessing` or `pipeline.modeling` into a generated project's
 `config/training.yml`: that loader rejects inline preprocessing and model

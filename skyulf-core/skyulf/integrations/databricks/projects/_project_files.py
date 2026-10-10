@@ -29,7 +29,7 @@ def _module_path(path: Path, root: Path) -> str:
     return relative.as_posix()
 
 
-def _contained_file(root: Path, relative: str) -> Path:
+def contained_project_file(root: Path, relative: str) -> Path:
     """Require canonical relative paths without symlinks or platform-specific aliases."""
     parts = relative.split("/")
     if any(part in {"", ".", ".."} for part in parts) or any(
@@ -52,14 +52,16 @@ def _project_assets(root: Path) -> dict[str, str]:
     if not manifest.exists() and not manifest.is_symlink():
         return {}
     try:
-        entries = _asset_entries(json.loads(read_source(_contained_file(root, "assets.json"))))
+        entries = _asset_entries(
+            json.loads(read_source(contained_project_file(root, "assets.json")))
+        )
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError("Project assets.json must contain a JSON list of asset paths.") from exc
     entries = _validate_asset_entries(entries)
     assets = {}
     size = 0
     for relative in sorted(entries):
-        path = _contained_file(root, relative)
+        path = contained_project_file(root, relative)
         with path.open("rb") as stream:
             content = stream.read(MAX_PROJECT_SOURCE_BYTES + 1)
         size += len(content)
@@ -100,7 +102,7 @@ def _project_requirements(root: Path) -> tuple[str, ...]:
     manifest = root / "requirements.txt"
     if not manifest.exists() and not manifest.is_symlink():
         return ()
-    return parse_project_requirements(read_source(_contained_file(root, "requirements.txt")))
+    return parse_project_requirements(read_source(contained_project_file(root, "requirements.txt")))
 
 
 def _validate_package_files(files: dict[str, str]) -> None:

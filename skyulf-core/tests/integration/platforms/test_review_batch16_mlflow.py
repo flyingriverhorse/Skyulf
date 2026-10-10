@@ -11,7 +11,7 @@ mlflow = pytest.importorskip("mlflow")
 
 from test_mlflow_promotion import _promote, _stage, case  # noqa: F401 - pytest fixture registration
 
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.integrations.mlflow.registration import registry
 from skyulf.pipeline import SkyulfPipeline
 
@@ -24,8 +24,8 @@ def test_local_artifact_drops_training_weights_without_mutating_fit(tmp_path):
     pipeline.fit(frame, target_column="target", sample_weight=weights)
     before = pipeline.feature_engineer.train_sample_weight_.copy()
     expected = pipeline.predict(frame[["x"]])
-    save_local_pipeline(pipeline, tmp_path / "model")
-    restored = load_local_pipeline(tmp_path / "model")
+    save_pipeline(pipeline, tmp_path / "model")
+    restored = load_pipeline(tmp_path / "model")
     assert restored.pipeline.feature_engineer.train_sample_weight_ is None
     np.testing.assert_array_equal(pipeline.feature_engineer.train_sample_weight_, before)
     np.testing.assert_array_equal(restored.pipeline.predict(frame[["x"]]), expected)

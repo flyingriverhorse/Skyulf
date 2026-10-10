@@ -249,7 +249,3 @@ def assess_training_data(spark: Any, monitor: MonitorConfig, workflow: dict, now
         "source_version": current.version,
         "baseline_model_version": evidence["model_version"],
     }
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalTrainingSpec = TrainingSpec

@@ -13,15 +13,15 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
 ):
     """Regression, classification and ensemble gates must jointly control one champion."""
     mlflow = pytest.importorskip("mlflow")
-    from test_local_branches import _configs, _data
+    from test_training_branches import _configs, _data
 
     from skyulf.integrations.databricks.model_sets import model_set_project as project
     from skyulf.integrations.databricks.model_sets import model_set_release as release
     from skyulf.integrations.databricks.model_sets.model_set_quality import (
         evaluate_model_set_quality,
     )
-    from skyulf.integrations.databricks.training import local_branches
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training import branches as local_branches
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
     from skyulf.integrations.mlflow.lifecycle.model_set_challenger import reject_model_set
     from skyulf.integrations.mlflow.lifecycle.model_set_lifecycle import rollback_model_set
     from skyulf.integrations.mlflow.lifecycle.promotion import (
@@ -39,7 +39,7 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
     known = data.category.notna()
     data.loc[known, "category"] = (data.loc[known, "x"] >= 30).astype(float)
     monkeypatch.setattr(
-        local_retraining,
+        candidate,
         "read_training_snapshot",
         lambda spark, spec: data.loc[:, list(spec.source_columns)].copy(),
     )
@@ -80,7 +80,7 @@ def test_mixed_models_auto_release_replacement_failure_and_rollback(
         branches = local_branches.prepare_training_branches(
             None, recipes, champion_versions=versions
         )
-        outcome = local_branches.train_local_branches(
+        outcome = local_branches.train_branches(
             None,
             branches,
             **endpoints,

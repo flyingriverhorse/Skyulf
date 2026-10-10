@@ -49,14 +49,12 @@ def test_holdout_performance_baseline_uses_saved_model_and_verified_membership(
     import numpy as np
     from test_monitoring_performance import policy
 
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
     from skyulf.integrations.databricks.observability.monitoring import monitoring_reference
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        split_labeled_snapshot,
-    )
+    from skyulf.integrations.databricks.training.fitting.candidate import split_labeled_snapshot
 
     _, _, config, _, frame = staged
     config["engine"] = engine
@@ -81,7 +79,7 @@ def test_holdout_performance_baseline_uses_saved_model_and_verified_membership(
         None, monitor, tracking_uri=config["tracking_uri"], registry_uri=config["registry_uri"]
     )
     _, heldout, _ = split_labeled_snapshot(frame, spec, engine=engine)
-    guesses = score_local_pipeline(heldout.loc[:, list(artifact.manifest.input_columns)], artifact)
+    guesses = score_pipeline(heldout.loc[:, list(artifact.manifest.input_columns)], artifact)
     expected = np.abs(
         guesses["prediction"].to_numpy() - heldout[spec.target_column].to_numpy()
     ).mean()

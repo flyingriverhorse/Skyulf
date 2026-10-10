@@ -4,10 +4,10 @@ import importlib
 from collections.abc import Callable
 from typing import Any
 
-from .config import FeatureLookupSpec, FeatureTrainingSpec, _uc_name
+from .config import FeatureLookupSpec, FeatureTrainingSpec, validate_uc_name
 
 
-def _sdk() -> Any:
+def require_feature_engineering() -> Any:
     """Load the runtime-only dependency when an uninjected operation needs it."""
     try:
         return importlib.import_module("databricks.feature_engineering")
@@ -20,9 +20,9 @@ def _sdk() -> Any:
         ) from exc
 
 
-def _client(client: Any) -> Any:
+def feature_engineering_client(client: Any) -> Any:
     """Keep caller-injected clients and their selected workspace unchanged."""
-    return _sdk().FeatureEngineeringClient() if client is None else client
+    return require_feature_engineering().FeatureEngineeringClient() if client is None else client
 
 
 def _lookup(spec: FeatureLookupSpec, factory: Callable[..., Any]) -> Any:
@@ -39,7 +39,7 @@ def _lookup(spec: FeatureLookupSpec, factory: Callable[..., Any]) -> Any:
     return factory(**options)
 
 
-def _validate_input(
+def validate_feature_input(
     df: Any,
     spec: FeatureTrainingSpec,
     *,
@@ -113,10 +113,12 @@ def create_feature_training_set(
     because SDK feature lookup does not replay external frame transformations.
     This helper does not collect Spark data, fit models, or publish tables.
     """
-    _validate_input(df, spec, training=True, allow_feature_overrides=allow_feature_overrides)
-    factory = _sdk().FeatureLookup if lookup_factory is None else lookup_factory
+    validate_feature_input(df, spec, training=True, allow_feature_overrides=allow_feature_overrides)
+    factory = (
+        require_feature_engineering().FeatureLookup if lookup_factory is None else lookup_factory
+    )
     lookups = [_lookup(lookup, factory) for lookup in spec.lookups]
-    return _client(client).create_training_set(
+    return feature_engineering_client(client).create_training_set(
         df=df,
         feature_lookups=lookups,
         label=spec.label,
@@ -134,7 +136,7 @@ def _validate_log_destination(artifact_path: str, options: dict[str, Any]) -> No
     if ":" in artifact_path:
         raise ValueError("artifact_path must be a run-relative path.")
     if options.get("registered_model_name") is not None:
-        _uc_name(options["registered_model_name"])
+        validate_uc_name(options["registered_model_name"])
 
 
 def log_feature_model(
@@ -159,7 +161,7 @@ def log_feature_model(
         raise TypeError("training_set must be a native TrainingSet with load_df().")
     if not callable(getattr(flavor, "save_model", None)):
         raise TypeError("flavor must support MLflow save_model().")
-    return _client(client).log_model(
+    return feature_engineering_client(client).log_model(
         model=model,
         training_set=training_set,
         flavor=flavor,
@@ -190,7 +192,9 @@ def score_feature_model(
         raise ValueError("model_uri must reference a feature-packaged models:/ or runs:/ model.")
     if result_type is None or (isinstance(result_type, str) and not result_type.strip()):
         raise ValueError("result_type must explicitly describe the model output schema.")
-    _validate_input(df, spec, training=False, allow_feature_overrides=allow_feature_overrides)
-    return _client(client).score_batch(
+    validate_feature_input(
+        df, spec, training=False, allow_feature_overrides=allow_feature_overrides
+    )
+    return feature_engineering_client(client).score_batch(
         model_uri=model_uri, df=df, result_type=result_type, **score_options
     )

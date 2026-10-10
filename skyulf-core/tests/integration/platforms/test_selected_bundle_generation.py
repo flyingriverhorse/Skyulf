@@ -37,11 +37,8 @@ def test_only_yaml_model_settings_are_generated(tmp_path, layout):
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 def test_unused_optional_training_settings_are_absent(tmp_path, layout):
     """Date-free random training keeps defaults without irrelevant null placeholders."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import (
-        training_settings,
-        training_spec,
-    )
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.lifecycle.workflow import training_settings, training_spec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate_project(
         tmp_path,
@@ -81,7 +78,7 @@ def test_unused_optional_training_settings_are_absent(tmp_path, layout):
     assert training_spec(training_settings(config, now)) == training_spec(
         training_settings(legacy, now)
     )
-    assert LocalCVSpec.from_workflow(config) == LocalCVSpec.from_workflow(legacy)
+    assert CVSpec.from_workflow(config) == CVSpec.from_workflow(legacy)
 
 
 @pytest.mark.parametrize("strategy", ["random", "grid", "optuna"])

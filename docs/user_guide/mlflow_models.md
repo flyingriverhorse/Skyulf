@@ -1,6 +1,6 @@
 # MLflow model packaging
 
-## Library layout and compatibility
+## Library layout and upgrades
 
 MLflow implementation lives under `skyulf.integrations.mlflow`: `models` owns
 pyfunc adapters, `spark` owns distributed prediction and worker environments,
@@ -8,11 +8,13 @@ pyfunc adapters, `spark` owns distributed prediction and worker environments,
 owns registry resolution, and `runs` owns tracking. Shared client, signature and
 nullable transport helpers live in `shared`.
 
-Use these grouped paths in new code. Released flat import paths remain available
-through lazy `_compat` aliases, including classes referenced in saved models.
-The root still exports `TrackingConfig`, `TrackingRun` and `track_run` without
-loading the optional MLflow dependency. Worker wheels and source certificates
-continue to cover the entire `skyulf` package.
+Use these grouped paths directly. The former `local_model` and
+`local_feature_model` modules and their renamed APIs have been removed. Saved
+packages that reference removed paths may require rebuilding and logging with
+the current imports; see [upgrading integration code](databricks_sdk.md#upgrading-integration-code).
+The root exports `TrackingConfig`, `TrackingRun` and `track_run` without loading
+the optional MLflow dependency. Worker wheels and source certificates cover the
+entire `skyulf` package.
 
 ## Fitted pipelines (pandas or Polars)
 
@@ -247,7 +249,7 @@ propagate to the caller even when tracking was configured with `warn`.
 Producer project files and the temporary source bundle path are excluded.
 
 Use the [registry guide](mlflow_registry.md) to register a concrete run artifact
-and manage candidate/champion versions. The [Databricks Python SDK](databricks_local_sdk.md)
+and manage candidate/champion versions. The [Databricks Python SDK](databricks_sdk.md)
 adds pinned UC source reads and bounded Delta publication; the
 [Bundle guide](databricks_bundle.md) describes distributed scoring and deployment
 settings. Those integrations keep their own schema, context and admission checks;

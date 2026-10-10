@@ -14,12 +14,12 @@ import pytest
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared real-store fixture
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.training.shared.local_training_evidence import (
+from skyulf.integrations.databricks.training.shared.training_evidence import (
     build_training_evidence,
     evidence_digest,
     validate_training_evidence,
@@ -32,7 +32,7 @@ from skyulf.integrations.databricks.training.shared.training_parameters import (
 def _spec(weighted=True):
     """Use captured source that must never execute during saved-artifact replay."""
     source = "raise RuntimeError('mutable weight hook executed')\n"
-    return LocalTrainingSpec(
+    return TrainingSpec(
         table="workspace.test.source",
         version=4,
         record_key_columns=("id",),
@@ -102,7 +102,7 @@ def test_saved_weight_summary_and_configured_class_weight_are_logged(tmp_path, c
         "training_weights": summary,
     }
     weights = train.pop("training_weight").to_numpy()
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=train, test=train.head(0), train_sample_weight=weights),
         target_column="target",
@@ -159,18 +159,18 @@ def test_weighted_lifecycle_preserves_snapshot_and_cleans_monitoring(staged, mon
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
     _, client, config, _, frame = staged
     explained_columns = []
-    explain = local_retraining.log_training_explanations
+    explain = candidate.log_training_explanations
 
     def record_explanation_inputs(run, artifact, training_frame):
         """Observe the real explanation boundary before its optional SHAP execution."""
         explained_columns.append(list(training_frame.columns))
         return explain(run, artifact, training_frame)
 
-    monkeypatch.setattr(local_retraining, "log_training_explanations", record_explanation_inputs)
+    monkeypatch.setattr(candidate, "log_training_explanations", record_explanation_inputs)
     config["pipeline"]["explainability"] = {
         "method": "shap",
         "max_samples": 4,

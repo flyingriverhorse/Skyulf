@@ -391,7 +391,7 @@ prediction method. It tests detached preprocessing state; module globals and
 external services accessed by trusted custom code are not isolated.
 
 See [preprocessing placement](preprocessing_placement.md), the
-[Databricks Python SDK](databricks_local_sdk.md), and
+[Databricks Python SDK](databricks_sdk.md), and
 [Bundle distributed inference](databricks_bundle.md#distributed-inference-settings)
 for their separate execution requirements.
 

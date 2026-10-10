@@ -7,8 +7,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ....inference.fitted_pipeline import FittedPipelineArtifact
-from ....inference.fitted_pipeline import load_pipeline as load_local_pipeline
+from ....inference.fitted_pipeline import FittedPipelineArtifact, load_pipeline
 from ....inference.model_set import ModelSetArtifact, load_model_set
 from ....inference.model_set_scoring import model_set_output_schema
 from ....inference.pipeline_scoring import scoring_output_schema
@@ -206,7 +205,7 @@ def prepare_pinned_endpoint(
     kind = metadata.get("skyulf_artifact_kind")
     if kind == "local_pipeline":
         artifact_path = packaged_artifact_path(package_path, package_info.flavors, kind)
-        artifact = load_local_pipeline(artifact_path)
+        artifact = load_pipeline(artifact_path)
     elif kind == "model_set":
         artifact_path = packaged_artifact_path(package_path, package_info.flavors, kind)
         artifact = load_model_set(artifact_path)
@@ -451,7 +450,3 @@ def _valid_integer(value: Any, bits: int, *, encoded: bool) -> bool:
             return False
         number = value
     return -(2 ** (bits - 1)) <= number < 2 ** (bits - 1)
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalPipelineArtifact = FittedPipelineArtifact

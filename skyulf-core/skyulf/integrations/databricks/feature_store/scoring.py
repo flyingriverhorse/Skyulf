@@ -9,7 +9,7 @@ from typing import Any
 
 from ...mlflow.shared._nullable_transport import transport_spec
 from . import snapshots
-from .runtime import _sdk
+from .runtime import require_feature_engineering
 
 
 def feature_binding(artifact: Any) -> dict[str, Any] | None:
@@ -55,7 +55,7 @@ def validate_feature_source(frame: Any, artifact: Any) -> None:
     if binding is None:
         return
     from .lifecycle_config import deserialize_feature_spec  # noqa: PLC0415
-    from .runtime import _validate_input  # noqa: PLC0415
+    from .runtime import validate_feature_input  # noqa: PLC0415
 
     spec = deserialize_feature_spec(binding["lookup_spec"])
     names = {name.casefold() for name in (*frame.columns, *spec.feature_names)}
@@ -63,7 +63,7 @@ def validate_feature_source(frame: Any, artifact: Any) -> None:
         raise ValueError(
             "Native feature scoring requires batch input without reserved prediction columns."
         )
-    _validate_input(frame, spec, training=False, allow_feature_overrides=False)
+    validate_feature_input(frame, spec, training=False, allow_feature_overrides=False)
     missing = set(feature_source_columns(artifact)).difference(frame.columns)
     if missing:
         raise ValueError(f"Missing native feature scoring source inputs: {sorted(missing)}.")
@@ -145,7 +145,7 @@ def native_feature_score(
     )
 
     _validate_feature_stores(tracking_uri, registry_uri)
-    client = _sdk().FeatureEngineeringClient(model_registry_uri=registry_uri)
+    client = require_feature_engineering().FeatureEngineeringClient(model_registry_uri=registry_uri)
     return client.score_batch(
         model_uri=model_uri,
         df=frame,

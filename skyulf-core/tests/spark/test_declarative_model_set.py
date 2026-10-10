@@ -8,7 +8,10 @@ mlflow = pytest.importorskip("mlflow")
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
 from skyulf.inference._manifest import ColumnSpec  # noqa: E402
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    save_pipeline,  # noqa: E402
+)
 from skyulf.inference.model_set import (  # noqa: E402
     ComponentReference,
     load_model_set,
@@ -50,8 +53,8 @@ def _tree_set(tmp_path):
             )
             pipeline.fit(SplitDataset(train=data, test=data.iloc[:0]), target_column="target")
             path = tmp_path / branch
-            save_local_pipeline(pipeline, path)
-            digest = load_local_pipeline(path).manifest.pipeline_sha256
+            save_pipeline(pipeline, path)
+            digest = load_pipeline(path).manifest.pipeline_sha256
             records[branch] = (ComponentReference(name=branch, version="1", digest=digest), path)
     rules = [
         {

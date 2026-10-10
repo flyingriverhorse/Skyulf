@@ -649,9 +649,8 @@ evidence; successful HTTP requests alone do not establish prediction quality.
 
 ## File responsibilities
 
-Canonical library paths below are relative to `skyulf/integrations/databricks/`.
-The `_compat/` modules retain old import paths; make implementation changes in
-the corresponding domain files.
+Import monitoring helpers from the domain modules below. Paths are relative to
+`skyulf/integrations/databricks/`.
 
 | File | Responsibility |
 | --- | --- |
@@ -661,10 +660,11 @@ the corresponding domain files.
 | `observability/monitoring/monitoring_output.py` | Saved-batch drift report and safe shared-dashboard navigation in task output. |
 | `observability/monitoring/monitoring_reference.py` | Registered artifact and original training-reference replay. |
 | `observability/monitoring/monitoring_sources.py` | Saved predictions, source snapshots, receipts and delayed labels. |
-| `observability/monitoring/local/monitoring_metrics.py` | Core metric adapters and finite keyed reports for local callers. |
+| `observability/monitoring/monitoring_metrics.py` | Core metric adapters and finite keyed reports for bounded frames. |
+| `observability/monitoring/monitoring_performance.py` | Mature performance windows measured against a pinned model baseline. |
 | `observability/monitoring/spark/` | Distributed monitoring measurements, references and source handling. |
 | `observability/monitoring/monitoring_store.py` | Owned Delta objects, concurrent registration, inventory reads and report history. |
-| `observability/monitoring/local/monitoring.py` | Local inventory observations, failure isolation and MLflow reports. |
+| `observability/monitoring/monitoring.py` | Inventory observations, engine dispatch, failure isolation and MLflow reports. |
 | `jobs/shared/job_runtime.py`, `scoring/incremental/scoring_recovery.py` | Invoke enrollment after successful scoring/recovery. |
 | `model_sets/model_set_project.py`, `model_sets/monitoring_model_set.py` | Enroll pinned components after activation and scoring. |
 

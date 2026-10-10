@@ -53,7 +53,3 @@ def _holdout_probe(
         return probe_fitted_preprocessing(artifact, sample)
     except Exception as exc:  # noqa: BLE001 - optional diagnostic must redact callback failures
         return {**report, "status": "failed", "error_type": type(exc).__name__}
-
-
-# Preserve class imports exposed by earlier module paths.
-LocalPipelineArtifact = FittedPipelineArtifact

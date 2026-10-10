@@ -87,7 +87,7 @@ nav:
     - MLflow Models (Development): user_guide/mlflow_models.md
     - MLflow Registry (Development): user_guide/mlflow_registry.md
     - Databricks Batch (Development): user_guide/databricks_batch.md
-    - Databricks Python SDK: user_guide/databricks_local_sdk.md
+    - Databricks Python SDK: user_guide/databricks_sdk.md
     - Databricks Bundle: user_guide/databricks_bundle.md
     - Databricks Bundle Operator Walkthrough: user_guide/databricks_bundle_walkthrough.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
