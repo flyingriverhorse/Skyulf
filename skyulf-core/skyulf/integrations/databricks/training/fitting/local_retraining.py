@@ -66,6 +66,7 @@ from ...observability.reports.local_explanations import (
 from ...scoring.batch.local_batch import fit_local_workflow
 from ...shared._contracts import column_name, table_name
 from ..shared.local_training_evidence import build_training_evidence, evidence_digest
+from ..shared.preprocessing_checks import log_preprocessing_probe
 from ..shared.training_parameters import log_training_parameters
 from ..thresholds.decision_thresholds import threshold_policy
 from ..tuning.local_cv import CV_FIELDS, LocalCVSpec, evaluate_training_cv
@@ -130,6 +131,7 @@ class LocalTrainingSpec:
     training_evidence_sha256: str | None = None
     feature_lookup_json: str | None = None
     feature_binding_json: str | None = None
+    preprocessing_probe: bool = False
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> LocalTrainingSpec:
@@ -174,8 +176,8 @@ class LocalTrainingSpec:
         training_lookup(self)
 
     def _validate_label_policy(self) -> None:
-        """Require explicit boolean values for both independent label eligibility policies."""
-        for field in ("filter_unavailable_results", "drop_missing_labels"):
+        """Require explicit booleans for label eligibility and optional diagnostics."""
+        for field in ("filter_unavailable_results", "drop_missing_labels", "preprocessing_probe"):
             if type(getattr(self, field)) is not bool:
                 raise ValueError(f"{field} must be boolean.")
 
@@ -349,7 +351,7 @@ class LocalTrainingSpec:
             settings.pop("training_evidence_sha256")
         if not self.pre_split_steps:
             settings.pop("pre_split_steps")
-        for field in ("max_rows", "max_bytes"):
+        for field in ("max_rows", "max_bytes", "preprocessing_probe"):
             settings.pop(field)
         for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
             value = getattr(self, field)
@@ -1046,6 +1048,7 @@ def fit_candidate(
         )
     if pipeline_config.get("explainability"):
         log_training_explanations(run, artifact, native_train)
+    log_preprocessing_probe(run, artifact, native_holdout, enabled=spec.preprocessing_probe)
     evidence = build_training_evidence(
         spec, holdout, project_source_sha256=artifact.manifest.project_source_sha256
     )

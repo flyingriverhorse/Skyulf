@@ -56,6 +56,8 @@ class SimpleImputerApplier(BaseApplier):
     ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.
     Missing columns seen during fitting are restored with their stored value,
     preserving the row count even when no input columns remain.
+    Empty saved artifacts declare identity replay only when the recipe explicitly
+    selects no columns; automatic or missing selections remain unreviewed.
     Spark supports only ``mean`` and ``constant`` artifacts and applies them
     with native expressions. All-missing means leave existing columns untouched.
     """
@@ -72,6 +74,17 @@ class SimpleImputerApplier(BaseApplier):
     @staticmethod
     def resolve_fitted_config(raw: dict, state: dict) -> dict:
         """Bind inference configuration to this node's inspected fitted artifact."""
+        if not state:
+            if not user_picked_no_columns(raw) or raw.get("_auto_columns"):
+                raise ValueError("An empty imputer artifact requires explicit empty columns.")
+            strategy = raw.get("strategy")
+            if strategy in ("median", "most_frequent", "mode"):
+                canonical = "median" if strategy == "median" else "most_frequent"
+                return _imputation_config(
+                    "SimpleImputer",
+                    fitted_columns(raw, {"columns": []}),
+                    {"strategy": canonical},
+                )
         if state.get("strategy") in ("median", "most_frequent"):
             return _imputation_config("SimpleImputer", fitted_columns(raw, state), state)
         return portable_config("SimpleImputer", raw, state)

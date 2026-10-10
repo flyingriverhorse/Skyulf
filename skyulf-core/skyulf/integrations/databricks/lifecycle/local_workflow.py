@@ -244,6 +244,7 @@ def training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     from ..feature_store.lifecycle_config import workflow_lookup_json  # noqa: PLC0415
 
     return LocalTrainingSpec(
+        preprocessing_probe=config.get("preprocessing_probe", False),
         feature_lookup_json=workflow_lookup_json(config),
         table=config["training_table"],
         version=version,

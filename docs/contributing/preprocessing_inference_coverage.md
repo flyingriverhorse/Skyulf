@@ -343,21 +343,37 @@ separate execution mechanism needs its own specification and tests.
 7. Run focused affected tests and CI static scopes, review the change, then update
    this row with engine/configuration scope, test evidence and commit reference.
 
-### Cross-cutting work beyond initial owner reviews
+### Continuation work completed in Task215
 
-There are **four open work areas**, not four unreviewed implementations or four
-known defects. Configuration/dtype coverage is the current continuation; the
-other areas require a separate workflow/executor design or project-specific code.
-Unsupported boundaries in the tables are not all mandatory feature additions.
+The concrete continuation items now reuse existing execution and diagnostic
+paths. Configuration matrices and arbitrary project code remain ongoing coverage
+responsibilities, rather than a finite set of unreviewed owners.
 
-- [ ] Decide whether/how to expose the diagnostic as an optional training/release
-  check. It is currently an explicit library call; no automatic job was added.
-- [ ] Specify any future group/window executor, including complete-group keys,
-  ordering, late rows and history continuation. The probe does not build one.
-- [ ] Expand reviewed engine/configuration coverage within the already declared
-  families. A family count is not a matrix of every supported mode.
-- [ ] Review each project's custom declarations, packaging and sample coverage.
-  The three wrappers cannot certify arbitrary user code.
+- [x] Optional `preprocessing_probe` training setting, default off, checks the
+  saved/reloaded model on at most 256 holdout inputs with an 8 MiB frame budget.
+  Shared candidate fits log `preprocessing_probe.json` for the training report.
+  Results do not gate promotion or change dataset identity, fitting or scoring.
+- [x] `score_local_pipeline_with_history` returns local predictions and detached
+  JSON continuation through the existing temporal session. Model-set and
+  Databricks paths share the factory. Existing ordering, tie/late/replay and
+  model-binding checks apply; empty requests validate and preserve history.
+  Callers supply complete custom groups/windows and publish predictions/history
+  atomically using serialized writes or storage compare-and-swap.
+- [x] Explicit empty OneHotEncoder, SimpleImputer and MinMaxScaler selections,
+  NumPy integral OneHot caps, automatic empty selections and all-null/nonfinite
+  statistics reviewed. Only exact empty state with an explicit empty recipe and
+  valid options proves identity. Automatic selections remain uncertified and
+  can report `invalid_step_contract` when recipe binding is unavailable.
+- [x] Custom group completeness and continuation ownership documented and tested
+  with captured custom-group replay. Every actual project's callbacks and
+  packaging still require that project's own evidence.
+
+Seven worker families remain. Identity no-ops can pass only an existing pandas
+declaration whose ordinary selector allows the recipe. Median, capped/missing
+OneHot and Polars-fitted worker limits remain. Native unsigned OneHot caps that
+trigger sklearn infrequent grouping can still fail during fit; unsigned parity
+tests cover successful native fits. No every-dtype, custom-project, Spark UDF or
+serving-endpoint guarantee is implied.
 
 ## Reproduce the inventory
 
@@ -1218,3 +1234,26 @@ the complete run took 118.344 seconds. Wheel SHA256:
 This validates native Python saved-state replay, local context diagnostics and
 worker admission checks. It does not validate Spark UDF, REST or `ai_query`
 execution. No tables, registered models or endpoints were created.
+
+
+### Task215: explicit identity, training diagnostics and local continuation
+
+Local validation covers **1,170 distinct passing tests**, including real
+pandas/Polars fit/save/load, worker recipe rejection, temporal continuation and
+single/competition/branch training consumers. The initial 31-file run had
+1,006 passes, seven stale template-fixture failures and four CLI opt-in skips.
+The fixtures now use the same feature-group exclusion as production packaging;
+all 22 scoring-delivery tests passed after that correction. The four skipped
+CLI cases passed offline, as did three additional layout smoke renders and
+150 additional direct-consumer cases. Passing groups were not repeated.
+
+Ruff, full CI format/Ty scopes, backend/Core CCN <= 10, generated Bundle schema
+and strict MkDocs passed. Independent Ponytail reviews found and closed an
+empty/all-excluded history validation gap using existing row/schema/budget/order
+checks. The final behavior preserves nullable empty-output schemas, rejects
+malformed continuation and keeps prediction/history publication caller-owned.
+
+Task215 native Databricks validation is pending. Its prepared package will test
+the 33 non-CLI affected files against installed wheel bytes; the local CLI
+rendering checks remain separate. These are native model lifecycle checks,
+not Spark UDF, REST, `ai_query` or endpoint acceptance.

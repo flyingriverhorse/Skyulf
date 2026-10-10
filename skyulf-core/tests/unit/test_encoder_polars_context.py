@@ -127,10 +127,11 @@ def test_encoding_context_keeps_saved_validation_and_applier_identity(node, chan
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_onehot_local_declaration_keeps_unreviewed_settings_unknown(engine):
-    """Local metadata must retain the existing empty-artifact subset limit."""
+def test_onehot_explicit_empty_selection_declares_row_context(engine):
+    """An explicit no-op keeps its input rows without needing a fitted encoder."""
     _, config, state = _fitted("OneHotEncoder", engine, {"columns": []})
-    assert get_inference_capability("OneHotEncoder", config, state, engine=engine) is None
+    capability = get_inference_capability("OneHotEncoder", config, state, engine=engine)
+    assert capability is not None and capability.context == "row"
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

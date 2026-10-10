@@ -27,7 +27,11 @@ from ._common import _select_subset_pandas, _select_subset_polars, validate_scal
 
 
 class MinMaxScalerApplier(BaseApplier):
-    """Rescale the selected columns into the fitted ``feature_range``."""
+    """Rescale selected columns or replay an explicit empty selection unchanged.
+
+    Empty artifacts declare identity only with an explicit empty column recipe.
+    Automatic selections and non-finite learned coefficients remain unreviewed.
+    """
 
     @staticmethod
     def validate_fitted_state(raw: dict) -> dict:
@@ -37,7 +41,9 @@ class MinMaxScalerApplier(BaseApplier):
     @staticmethod
     def resolve_fitted_config(raw: dict, state: dict) -> dict:
         """Bind inference configuration to this node's inspected fitted artifact."""
-        return _minmax_config(fitted_columns(_minmax_values(raw), state), state)
+        if not state and (not user_picked_no_columns(raw) or raw.get("_auto_columns")):
+            raise ValueError("An empty scaler artifact requires explicit empty columns.")
+        return _minmax_config(fitted_columns(_minmax_values(raw), state or {"columns": []}), state)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -183,6 +189,8 @@ def _finite_vector(values: Any, size: int) -> None:
 def _minmax_state(raw: dict) -> dict:
     """Inspect the scalar artifact actually executed instead of admitting a native scaler."""
     state = _minmax_values(raw)
+    if not state:
+        return state
     _fields(state, {"type", "columns", "min", "scale", "data_min", "data_max", "feature_range"})
     columns = _columns(state["columns"])
     if state["type"] != "minmax_scaler" or not columns:
@@ -202,6 +210,6 @@ def _minmax_config(params: dict, state: dict) -> dict:
     resolved = {"feature_range": [0, 1], **params}
     _fields(resolved, {"columns", "feature_range"})
     _minmax_range(resolved["feature_range"])
-    if resolved["feature_range"] != state["feature_range"]:
+    if state and resolved["feature_range"] != state["feature_range"]:
         raise ValueError("Configured MinMax range disagrees with fitted state.")
     return resolved

@@ -160,11 +160,19 @@ def test_all_excluded_keeps_temporal_session_state(tmp_path):
     """Skipping every estimate must not discard the incoming continuation tail."""
     from skyulf.inference.local_scoring import score_local_pipeline
     from skyulf.preprocessing.time_series.history import TemporalHistorySession
+    from skyulf.preprocessing.time_series.lag import LagFeaturesCalculator
 
     artifact = fitted_scoring_artifact(tmp_path)
-    params = {"history_mode": "carry", "history_id": "test", "history_seed": [{"t": 1, "x": 2.0}]}
+    params = LagFeaturesCalculator().fit(
+        pd.DataFrame({"t": [1], "x": [2.0]}),
+        {"columns": ["x"], "sort_by": "t", "history_mode": "carry"},
+    )
     artifact.pipeline.feature_engineer.fitted_steps.append({"name": "unused", "artifact": params})
-    previous = {"version": 1, "model_id": "model", "steps": {"test": [{"t": 2, "x": 4.0}]}}
+    previous = {
+        "version": 1,
+        "model_id": "model",
+        "steps": {params["history_id"]: [{"t": 2, "x": 4.0}]},
+    }
     with TemporalHistorySession("model", previous) as history:
         scored = score_local_pipeline(pd.DataFrame({"x": [-1.0]}), artifact)
     assert history.state == previous
@@ -241,7 +249,7 @@ def test_template_scoring_rules_are_usable_from_saved_package():
         Path(__file__).resolve().parents[3]
         / "templates/databricks/template/{{.project_name}}/src/features"
     )
-    source = project_source(root)
+    source = project_source(root, exclude_feature_groups=True)
     module = load_project_module(source)
     assert module.build_scoring() == {"reuse_pre_split": True, "skip_target_steps": False}
     config = {
@@ -297,7 +305,7 @@ def test_template_scoring_sections_reject_invalid_inputs_and_add_bands(engine, t
         re.sub(r'(?m)^(        )# (?=[{}" ])', r"\1", scoring_path.read_text(encoding="utf-8")),
         encoding="utf-8",
     )
-    source = project_source(root)
+    source = project_source(root, exclude_feature_groups=True)
     module = load_project_module(source)
     scoring = importlib.import_module(f"{module.__name__}.scoring")
     config = {
@@ -359,7 +367,7 @@ def test_template_scoring_range_rejects_invalid_limits(limits):
         Path(__file__).resolve().parents[3]
         / "templates/databricks/template/{{.project_name}}/src/features"
     )
-    module = load_project_module(project_source(root))
+    module = load_project_module(project_source(root, exclude_feature_groups=True))
     custom = importlib.import_module(f"{module.__name__}.custom.scoring_custom")
     with pytest.raises(ValueError, match="finite ordered"):
         custom.require_value_range(pd.DataFrame({"x": [3.0]}), {"column": "x", **limits})

@@ -118,8 +118,8 @@ def test_probe_rejects_nested_mutable_cells(tmp_path):
         probe_fitted_preprocessing(artifact, pd.DataFrame({"value": [[1], [2]]}))
 
 
-def test_probe_can_observe_local_state_outside_worker_validator_subset(tmp_path):
-    """Legitimate empty local artifacts can be probed when node validation abstains."""
+def test_probe_validates_explicit_empty_encoder_identity(tmp_path):
+    """An explicit no-op must retain its validated recipe during saved replay."""
     artifact = _artifact(
         tmp_path,
         steps=[
@@ -132,8 +132,8 @@ def test_probe_can_observe_local_state_outside_worker_validator_subset(tmp_path)
     )
     report = probe_fitted_preprocessing(artifact, pd.DataFrame({"value": [0.0, 2.0, 0.0]}))
     assert report["status"] == "passed", report
-    assert report["steps"][0]["state_validation"] == "unavailable"
-    assert report["steps"][0]["context"] == "unknown"
+    assert report["steps"][0]["state_validation"] == "node_owned"
+    assert report["steps"][0]["context"] == "row"
 
 
 @pytest.mark.parametrize(

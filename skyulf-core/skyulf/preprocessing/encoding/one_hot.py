@@ -190,6 +190,8 @@ class OneHotEncoderApplier(BaseApplier):
     collide with retained input columns; conflicts raise ``ValueError``.
     New artifacts escape literal missing tokens and escape-prefixed strings;
     unversioned artifacts retain their original missing-value transformation.
+    An empty artifact declares identity replay only for an explicit empty
+    column selection with a validated recipe.
     """
 
     @staticmethod
@@ -200,7 +202,9 @@ class OneHotEncoderApplier(BaseApplier):
     @staticmethod
     def resolve_fitted_config(raw: dict, state: dict) -> dict:
         """Bind inference configuration to this node's inspected fitted artifact."""
-        return _onehot_config(fitted_columns(raw, state), state)
+        if not state and (not user_picked_no_columns(raw) or raw.get("_auto_columns")):
+            raise ValueError("An empty encoder artifact requires explicit empty columns.")
+        return _onehot_config(fitted_columns(raw, state or {"columns": []}), state)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -419,14 +423,20 @@ def _encoder_options(encoder: Any) -> None:
 
 
 def _encoder_grouping_options(encoder: Any) -> None:
-    """Bind the grouping flag to the supported positive Python integer cap."""
-    cap = encoder.max_categories
-    if cap is not None and (type(cap) is not int or cap < 1):
-        raise ValueError("Encoder category cap must be a positive integer or None.")
+    """Bind the grouping flag to a positive native integer cap."""
+    cap = _category_cap(encoder.max_categories)
     if encoder.min_frequency is not None:
         raise ValueError("Frequency thresholds require separate context review.")
-    if encoder._infrequent_enabled is not (cap is not None):
+    if _normalize(encoder._infrequent_enabled) is not (cap is not None):
         raise ValueError("Encoder grouping flag disagrees with the category cap.")
+
+
+def _category_cap(value: Any) -> int | None:
+    """Normalize Python/NumPy integer caps without modifying the saved estimator."""
+    cap = _normalize(value)
+    if cap is not None and (type(cap) is not int or cap < 1):
+        raise ValueError("Encoder category cap must be a positive integer or None.")
+    return cap
 
 
 def _encoder_categories(encoder: Any, columns: list[str]) -> None:
@@ -451,7 +461,7 @@ def _encoder_categories(encoder: Any, columns: list[str]) -> None:
 
 def _encoder_grouping(encoder: Any, counts: list[int]) -> tuple[list[int], list[int]]:
     """Bind saved rare-category indices and mappings to each capped output width."""
-    cap = encoder.max_categories
+    cap = _normalize(encoder.max_categories)
     drop = int(encoder.drop == "first")
     if cap is None:
         return [count - drop for count in counts], [0] * len(counts)
@@ -517,6 +527,9 @@ def _encoder_drop_indices(encoder: Any, dropped: list[int]) -> None:
 
 def _onehot_state(raw: dict) -> dict:
     """Keep the estimator in the certificate while validating every execution option."""
+    if not raw:
+        _fields(raw, set())
+        return {}
     fields = {
         "type",
         "columns",
@@ -558,22 +571,20 @@ def _onehot_output_options(scalar: dict, versioned: bool) -> None:
 def _onehot_config(params: dict, state: dict) -> dict:
     """Check recipe options against the encoder that will actually transform rows."""
     resolved = {**_DEFAULT_OPTIONS, **params}
-    _fields(
-        resolved,
-        {
-            "columns",
-            "drop_first",
-            "max_categories",
-            "handle_unknown",
-            "prefix_separator",
-            "drop_original",
-            "include_missing",
-        },
-    )
+    _fields(resolved, {"columns", *_DEFAULT_OPTIONS})
+    if not state:
+        _onehot_output_options(resolved, False)
+        _category_cap(resolved["max_categories"])
+        if type(resolved["drop_first"]) is not bool or resolved["handle_unknown"] not in (
+            "ignore",
+            "error",
+        ):
+            raise ValueError("Invalid encoder no-op options.")
+        return resolved
     encoder = state["encoder_object"]
     expected = {
         "drop_first": encoder.drop == "first",
-        "max_categories": encoder.max_categories,
+        "max_categories": _normalize(encoder.max_categories),
         "handle_unknown": encoder.handle_unknown,
         **{key: state[key] for key in ("prefix_separator", "drop_original", "include_missing")},
     }

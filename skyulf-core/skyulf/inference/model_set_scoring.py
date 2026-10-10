@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -11,11 +10,10 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import polars as pl
 
-from ..preprocessing.time_series.history import TemporalHistorySession
 from ._manifest import ColumnSpec
 from ._model_set_operations import apply_operation, validate_operation
 from .local_pipeline import load_local_pipeline, validate_local_input
-from .local_scoring import _preserve_history, score_local_pipeline
+from .local_scoring import _preserve_history, local_history_session, score_local_pipeline
 from .project_code import load_project_module
 from .project_scoring import _check_rows, _json_copy, _resolve, _typed_column, _validate_rule
 
@@ -273,26 +271,6 @@ def _raw_input(
     return raw[[column.name for column in artifact.manifest.input_schema]]
 
 
-def _history_context(local: Any, state: Any, bootstrap: bool) -> Any:
-    """Create component-local carry sessions without importing platform adapters."""
-    identities = [
-        step["artifact"]["history_id"]
-        for step in local.pipeline.feature_engineer.fitted_steps
-        if step["artifact"].get("history_mode") == "carry"
-    ]
-    if not identities:
-        if state is not None:
-            raise ValueError("Saved temporal history requires carry steps.")
-        return nullcontext(None)
-    if bootstrap:
-        state = {
-            "version": 1,
-            "model_id": local.manifest.pipeline_sha256,
-            "steps": dict.fromkeys(identities, []),
-        }
-    return TemporalHistorySession(local.manifest.pipeline_sha256, state)
-
-
 def _component_outcomes(result: pd.DataFrame, component: Any) -> pd.DataFrame:
     """Validate complete declared predictions and explicit per-component exclusions."""
     if list(result.columns) != [col.name for col in component.output_schema]:
@@ -330,7 +308,7 @@ def _score_component(
     local = load_local_pipeline(artifact.directory / "components" / component.branch)
     selected = raw[[column.name for column in component.input_schema]].copy(deep=True)
     _bounded(selected, max_rows, max_bytes)
-    with _history_context(local, state, bootstrap) as session:
+    with local_history_session(local, state, bootstrap=bootstrap) as session:
         result = _predict_component(selected, local, component)
         _check_rows(result, selected, pd.DataFrame)
         result = _component_outcomes(result, component)

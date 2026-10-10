@@ -27,14 +27,14 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task214: SimpleImputer mode alias context, branch 093, source fdf306fc.
-Local/native validation complete: 368 tests passed in each; all claims released.
-Databricks run 799415499227444 (job 407639260284510) TERMINATED/SUCCESS.
-All 552 runtime and 12 asset hashes plus 368 test node IDs match; Bundle guide passed.
-Local Ruff/format/Ty/CCN10 and independent Ponytail review passed.
-Evidence: initiatives/spark_and_mlflow/214-simple-mode-context.md.
-Result documentation passed strict MkDocs; see git history for DCO follow-up. No push.
+Task215 preprocessing completion on branch093; base48de280d. User approved all
+four bounded improvements and delegated design choices. No push.
+Implementation and independent reviews complete. Final scoped local evidence:
+1170 distinct tests passed after stale fixture repair and offline CLI reruns.
+Ruff/full format/Ty/CCN10/schema and strict MkDocs passed.
+Evidence: initiatives/spark_and_mlflow/215-preprocessing-completion.md and
+tracked docs/contributing/preprocessing_inference_coverage.md.
 
 ## Open messages
 
-None.
+- T215-ROOT-FINAL | UTC 2026-10-10T11:05:00Z | root -> all | CLAIM | reply T215-ROOT-ACTIVE: All agent claims released and independent reviews incorporated. Root owns final commit, native package/upload/run/evidence and follow-up docs. Native validation pending. All earlier review handoffs answered; findings preserved in task document.

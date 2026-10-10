@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from typing import Any
 
 from .....inference.local_pipeline import LocalPipelineArtifact
+from .....inference.local_scoring import local_history_session
 from .....preprocessing.time_series.history import TemporalHistorySession
 
 
@@ -19,24 +20,7 @@ def prediction_history(
     artifact = prepared.artifact
     if not isinstance(artifact, LocalPipelineArtifact):
         return nullcontext(None)
-    steps = artifact.pipeline.feature_engineer.fitted_steps
-    identities = [
-        step["artifact"]["history_id"]
-        for step in steps
-        if step["artifact"].get("history_mode") == "carry"
-    ]
-    if not identities:
-        if state is not None:
-            raise ValueError("Saved temporal history requires a model with carry steps.")
-        return nullcontext(None)
-    model_id = artifact.manifest.pipeline_sha256
-    if bootstrap:
-        state = {
-            "version": 1,
-            "model_id": model_id,
-            "steps": {identity: [] for identity in identities},
-        }
-    return TemporalHistorySession(model_id, state)
+    return local_history_session(artifact, state, bootstrap=bootstrap)
 
 
 def incremental_history(prepared: Any, previous: dict | None) -> Any:

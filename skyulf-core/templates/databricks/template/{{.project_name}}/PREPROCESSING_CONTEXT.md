@@ -20,7 +20,7 @@ describe how much data training needed, choose an engine, or change the formula.
 
 These declarations currently guide an explicit diagnostic. They do not create a
 Spark grouping/shuffle, sort the data, fetch older records or configure serving.
-Normal training and prediction do not automatically call this diagnostic.
+Training can opt into the diagnostic below. Prediction does not run it.
 
 ### Why is a fitted GroupImputer a row operation?
 
@@ -52,6 +52,44 @@ loses the previous value for the last chunk. Declaring `window` makes this
 requirement visible. Carry-history mode additionally needs an explicit
 continuation session; restarting each request from training history is not
 equivalent to a continuous stream. The current probe does not run that session.
+
+### Local predictions with continued history
+
+Use the existing carry-history modes of `LagFeatures` and `RollingAggregate`
+through `score_local_pipeline_with_history`. Supply the actual request frame in
+the saved engine/schema. Each step retains its own transformed tail; subsequent
+requests receive the returned JSON-compatible state:
+
+```python
+from skyulf.inference.local_scoring import score_local_pipeline_with_history
+
+first = score_local_pipeline_with_history(first_batch, artifact)
+second = score_local_pipeline_with_history(
+    next_batch, artifact, history_state=first.history
+)
+predictions = second.frame
+next_history = second.history
+```
+
+The first call starts from the saved training seed. For a complete initial
+history replay, use `bootstrap_history=True` on that first call to exclude the
+seed; do not combine it with `history_state`. Calls neither fetch older rows nor
+change the artifact. Saved state belongs to its model digest and engine. Existing
+ordering, tie-breaker, per-group limits and late/repeated-row checks still apply.
+Empty requests preserve validated history and return nullable prediction columns.
+Models without carry steps return `history=None` and reject supplied history.
+
+Persist predictions and returned history atomically. Serialize calls sharing a
+history stream or use compare-and-swap in your storage so two writers cannot
+overwrite each other's progress. Reusing an old detached state can replay an old
+request; this API cannot detect storage races. Databricks incremental scoring
+already owns its durable history/receipt path and uses the same session factory.
+
+For custom `group`, `window` or `global` callbacks, pass the complete intended
+request, including required context rows, through local scoring. The wrapper
+preserves that request as one frame; it cannot infer group completeness, build
+custom history, or admit independent Spark partitions. Built-in carry history
+does not provide state for arbitrary custom callbacks.
 
 Deduplication needs all rows in the intended deduplication population; duplicates
 in different partitions cannot be discovered independently. Its declared context
@@ -216,6 +254,24 @@ segment means and categories remain the ones from `training`.
 
 ## How to read the report
 
+### Optional training report
+
+In generated `config/training.yml`, set `defaults.preprocessing_probe: true`
+(default `false`). Single-model, competition and multi-target training use the
+same saved-model check. Each fit samples the first 256 holdout input rows and
+uses the probe's 8 MiB frame limit; it does not log the sample values or refit.
+The run records `preprocessing_probe.json`, displayed under **Preprocessing
+inference check** in the training report. The SDK equivalent is
+`LocalTrainingSpec(..., preprocessing_probe=True)`.
+
+`failed`, `requires_context` and empty-holdout `not_run` remain diagnostic
+outcomes. They do not block promotion or change the data identity, split, model,
+thresholds or aliases. An MLflow write error follows the existing training
+failure path. Custom callbacks remain trusted code with possible external side
+effects; the row/byte limits are not a sandbox or execution timeout.
+
+### Status fields
+
 | Field or status | Meaning and next action |
 | --- | --- |
 | Top-level `status: passed` | All required sample checks and the final feature schema matched. Inspect context and empty-input support too. |
@@ -308,7 +364,8 @@ Your custom preprocessing still runs through its existing saved apply function;
 there is no second implementation of its transformation to maintain.
 
 Run this after training/loading and when changing custom preprocessing or its
-dependencies. It is not an automatic Bundle task, production monitor, accuracy
+dependencies, or enable the optional training report above. It is not a separate
+Bundle task, production monitor, accuracy
 evaluation, drift check or performance-loss policy. It does not call the model's
 prediction method. It tests detached preprocessing state; module globals and
 external services accessed by trusted custom code are not isolated.

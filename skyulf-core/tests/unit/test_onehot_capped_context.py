@@ -118,16 +118,41 @@ def test_onehot_dropping_every_output_preserves_rows(engine, cap):
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_onehot_numpy_caps_and_nonfinite_categories_remain_unknown(engine):
-    """This extension must retain explicit scalar and learned-category review boundaries."""
-    _, config, state = _fitted(engine, {"max_categories": np.int64(3)})
-    assert get_inference_capability("OneHotEncoder", config, state, engine=engine) is None
+def test_onehot_nonfinite_categories_remain_unknown(engine):
+    """A supported category cap must not admit unreviewed nonfinite learned categories."""
     frame = pd.DataFrame({"category": [1.0, 2.0, np.nan]})
     if engine == "polars":
         frame = pl.from_pandas(frame, nan_to_null=False)
     config = {"columns": ["category"], "max_categories": 3}
     state = NodeRegistry.get_calculator("OneHotEncoder")().fit(frame, config)
     assert get_inference_capability("OneHotEncoder", config, state, engine=engine) is None
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("cap", [np.int32(3), np.int64(3), np.uint64(20)])
+def test_onehot_numpy_integral_caps_match_native_integer(engine, cap):
+    """Native NumPy caps must match Python integers without changing saved scalar identities."""
+    frame, config, state = _fitted(engine, {"max_categories": cap, "drop_first": True})
+    original = deepcopy(frame)
+    saved = pickle.dumps((config, state))
+    applier = NodeRegistry.get_applier("OneHotEncoder")()
+    for configured in (cap, int(cap)):
+        assert get_inference_capability(
+            "OneHotEncoder", {**config, "max_categories": configured}, state, engine=engine
+        ) == ExecutionCapability(engine, "apply", "local", "preserve", "row")
+    _, _, python_state = _fitted(engine, {"max_categories": int(cap), "drop_first": True})
+    full = applier.apply(frame, state)
+    _equal(full, applier.apply(frame, python_state))
+    for positions in ([0], [1], [12], [12, 1, 0, 1], [], list(range(12, -1, -1))):
+        _equal(applier.apply(_take(frame, positions), state), _take(full, positions))
+    assert (
+        get_inference_capability(
+            "OneHotEncoder", {**config, "max_categories": int(cap) + 1}, state, engine=engine
+        )
+        is None
+    )
+    _equal(frame, original)
+    assert pickle.dumps((config, state)) == saved
 
 
 @pytest.mark.parametrize(
@@ -145,6 +170,7 @@ def test_onehot_numpy_caps_and_nonfinite_categories_remain_unknown(engine):
         ("_default_to_infrequent_mappings", [np.array([2, 0, 2, 2, 2, 1, 2]), np.array([0, 1])]),
         ("_default_to_infrequent_mappings", []),
         ("_infrequent_enabled", False),
+        ("_infrequent_enabled", 1),
         ("_n_features_outs", [7, 2]),
         ("drop_idx_", np.array([0, 0], dtype=object)),
         ("_drop_idx_after_grouping", np.array([1, 0], dtype=object)),

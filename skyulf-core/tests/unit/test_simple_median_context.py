@@ -17,6 +17,11 @@ from skyulf.core.capabilities import (
     require_capability,
 )
 from skyulf.core.portable_state import encode_state
+from skyulf.data.dataset import SplitDataset
+from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.partition_safety import _inspect_step, require_partition_safe_pipeline
+from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
+from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing.imputation.simple import SimpleImputerApplier
 from skyulf.preprocessing.inference_context import get_inference_capability
 from skyulf.registry import NodeRegistry
@@ -203,3 +208,107 @@ def test_simple_local_statistics_keep_normalized_python_strategy(strategy):
     assert normalized["strategy"] == strategy
     assert type(normalized["strategy"]) is str
     assert pickle.dumps(state) == saved
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("strategy", ["mean", "median", "mode", "constant"])
+def test_simple_explicit_empty_selection_is_a_valid_saved_identity(engine, strategy):
+    """Explicitly disabling imputation must preserve rows while keeping median workers excluded."""
+    frame = _frame(engine, [1, None, 3, None])
+    config = {"columns": [], "strategy": strategy}
+    state = NodeRegistry.get_calculator("SimpleImputer")().fit(frame, config)
+    assert state == {}
+    state = pickle.loads(pickle.dumps(state))
+    original = deepcopy(frame)
+    before = pickle.dumps((config, state))
+    capability = get_inference_capability("SimpleImputer", config, state, engine=engine)
+    assert capability is not None and capability.context == "row"
+    assert capability.execution_kind == (
+        "python_batch" if engine == "pandas" and strategy != "median" else "local"
+    )
+    applier = SimpleImputerApplier()
+    for positions in ([0, 1, 2, 3], [1], [3, 0, 1], []):
+        sample = _take(frame, positions)
+        _equal(applier.apply(sample, state), sample)
+    record = {
+        "name": "empty",
+        "type": "SimpleImputer",
+        "artifact": state,
+        "params": config,
+        "applier": applier,
+    }
+    recipe = {"name": "empty", "transformer": "SimpleImputer", "params": config}
+    if strategy == "median":
+        with pytest.raises(UnsupportedExecutionError):
+            _inspect_step(record, recipe)
+    else:
+        assert _inspect_step(record, recipe).action == "apply"
+    _equal(frame, original)
+    assert pickle.dumps((config, state)) == before
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"columns": ["x"]},
+        {"columns": [], "_auto_columns": True},
+        {"columns": [], "strategy": "unknown"},
+        {"columns": [], "strategy": "mode", "fill_value": 4},
+        {"columns": [], "strategy": "median", "fill_value": 4},
+        {"columns": [], "strategy": "mode", "unexpected": True},
+    ],
+)
+def test_simple_empty_identity_requires_an_explicit_supported_recipe(config):
+    """A missing artifact cannot conceal learned selection or unsupported recipe options."""
+    assert get_inference_capability("SimpleImputer", config, {}, engine="pandas") is None
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_saved_simple_empty_mode_keeps_real_pipeline_worker_boundary(tmp_path, engine, monkeypatch):
+    """A saved explicit identity can be inspected without admitting a Polars-fitted worker model."""
+    frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [2.0, 4.0, 6.0, 8.0]})
+    if engine == "polars":
+        frame = pl.from_pandas(frame)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "empty",
+                    "transformer": "SimpleImputer",
+                    "params": {"columns": [], "strategy": "mode"},
+                }
+            ],
+            "modeling": {
+                "type": "random_forest_regressor",
+                "params": {
+                    "n_estimators": 2,
+                    "max_depth": 2,
+                    "random_state": 42,
+                    "n_jobs": 1,
+                },
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=frame, test=frame[:0]), target_column="target")
+    save_local_pipeline(pipeline, tmp_path / "model")
+
+    def forbidden(*args, **kwargs):
+        """Loading an intentionally disabled imputer must never learn new fill values."""
+        raise AssertionError("Unexpected fit")
+
+    monkeypatch.setattr(NodeRegistry.get_calculator("SimpleImputer"), "fit", forbidden)
+    restored = load_local_pipeline(tmp_path / "model")
+    sample = frame.drop(columns=["target"]) if engine == "pandas" else frame.drop("target")
+    report = probe_fitted_preprocessing(restored, sample, chunk_sizes=(1, 2))
+    assert report["status"] == "passed" and report["steps"][0]["context"] == "row"
+    assert report["steps"][0]["state_validation"] == "node_owned"
+    np.testing.assert_array_equal(restored.pipeline.predict(sample), pipeline.predict(sample))
+    if engine == "pandas":
+        assert require_partition_safe_pipeline(restored).steps[0].node_type == "SimpleImputer"
+        restored.pipeline.config["preprocessing"][0]["params"]["columns"] = ["x"]
+        with pytest.raises(UnsupportedExecutionError):
+            require_partition_safe_pipeline(restored)
+    else:
+        with pytest.raises(UnsupportedExecutionError):
+            require_partition_safe_pipeline(restored)
