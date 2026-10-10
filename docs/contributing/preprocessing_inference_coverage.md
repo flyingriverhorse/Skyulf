@@ -1132,7 +1132,6 @@ This validates native Python saved-state replay and local context diagnostics,
 including retained worker rejection. It does not validate Spark UDF, REST or
 `ai_query` execution. No tables, registered models or endpoints were created.
 
-
 ### Task213 local missing-value one-hot declarations
 
 OneHotEncoder now reports local `row` context in pandas and Polars for
@@ -1162,7 +1161,17 @@ changed file passing; it does not increase the distinct total. Full Ruff/format,
 full CI Ty scope and Lizard CCN 10 passed; independent Ponytail review found no
 remaining blocker.
 
-The matching 612-test Databricks package is prepared with exact source hashes.
-Native validation is pending upload/run approval. This task adds no Spark UDF,
-REST or `ai_query` route verification. Owner-review and worker-family counts
-remain unchanged.
+The same **612 tests passed on Databricks serverless**, with zero failures or
+skips, plus the Bundle guide example. All 552 installed runtime files and sixteen
+packaged assets match their prepared SHA256 hashes; all 612 passed test node IDs
+match local collection exactly. Source commit: `ff63f32d`.
+[Databricks run 860018333655758](https://dbc-45604623-c18b.cloud.databricks.com/jobs/738429510801716/runs/860018333655758)
+finished `SUCCESS` with pandas 2.2.3, Polars 1.44.2, NumPy 2.1.3 and
+scikit-learn 1.8.0. Pytest took 56.27 seconds with thirteen expected warnings;
+the complete run took 119.243 seconds. Wheel SHA256:
+`4416c89710367a1bc6ffe66c509422232adc4f1b2716c54b13730108b6b5435e`.
+
+This validates native Python saved-state replay and local context diagnostics,
+including retained worker rejection. It does not validate Spark UDF, REST or
+`ai_query` execution. No tables, registered models or endpoints were created.
+Owner-review and worker-family counts remain unchanged.
