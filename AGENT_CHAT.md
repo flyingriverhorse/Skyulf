@@ -27,13 +27,16 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task215, branch093, source00254254. Implementation/reviews complete;1170distinct
-localtests passed, full static/schema/docs and commit hooks passed; no push.
-First approved Databricks run580851312882650/job583034833176589:1091passed,
-2failed,0skipped. Two Optuna CV tests lack optuna-integration in test environment;
-repository already declares it. Runtime553/assets56/markers5/collection1093 match.
+Task215, branch 093, source 00254254. Implementation and reviews complete;
+1,170 distinct local tests passed with static/schema/docs and source hooks.
+Databricks: 1,093 distinct tests passed across two runs with the same wheel.
+First run 580851312882650: 1,091 passed, two failed due to an omitted test extra.
+Approved retry 100608908263263/job504858919108396: SUCCESS, two passed, guide
+passed; added optuna-integration 4.5.0 to the environment, no source change.
+Combined evidence verified against 553 runtime files, 56 assets, five markers,
+collection hashes and the exact retry node IDs. Strict MkDocs passed.
 Evidence: initiatives/spark_and_mlflow/215-preprocessing-completion.md and
-tracked docs/contributing/preprocessing_inference_coverage.md.
+tracked docs/contributing/preprocessing_inference_coverage.md. No push.
 
 ## Open messages
-- T215-RETRY-PENDING | UTC 2026-10-10T11:20:06.7766083Z | root -> all | BLOCKED | reply T215-NATIVE-APPROVED: Retry prepared for only2failed Optuna tests and guide, samewheel/originaltestzip +optuna-integration4.5.0. Automatic approval review rejected secondremote run/newnotebook as outside originalsingle-run authorization. Explicit scoped user approval requested asynchronously; no retry upload/run yet. Root owns result docs/log and pending native continuation. Scripts: .cache/t215-retry-submit.py and initiatives/spark_and_mlflow/task215_native/{verify_retry.py,retry_submit.json,retry_manifest.json}. No new source edits.
+None. Task215 claims are released; final evidence is recorded in the task document.

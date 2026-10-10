@@ -1259,8 +1259,9 @@ cases because the validation environment omitted `optuna-integration`, which is
 already declared in the repository's dependency/CI requirements. The correction
 adds `optuna-integration==4.5.0` to the test environment and selects only those
 two failed cases plus the guide example; it does not change the model wheel.
-That follow-up run is prepared and awaits explicit user approval after automatic
-approval review rejected a second upload/run under the first single-run approval.
+After explicit user approval, the focused retry passed both cases and the Bundle
+guide example. Across the two runs, **all 1,093 distinct tests passed**; the 1,091
+already passing cases were not repeated.
 
 Source commit: `00254254`. All 553 installed runtime files, 56 repository assets,
 five generated test-package markers and the 1,093-node collection hash matched.
@@ -1271,6 +1272,18 @@ complete failure list; the full collected-node hash and outcome counts were
 preserved. Wheel SHA256:
 `461b74c8910f42c77007d6f98ccf88d92e60282ae80fcf5286c387418b0f2a61`.
 
+[Retry Databricks run 100608908263263](https://dbc-45604623-c18b.cloud.databricks.com/jobs/504858919108396/runs/100608908263263)
+finished `SUCCESS` in 63.116 seconds: **two passed, zero failed or skipped**.
+Pytest took 0.51 seconds with two Ridge feature-name warnings. Both passed node
+IDs exactly match the first run's failure list. The unchanged wheel, all runtime
+files and packaged assets were verified again; the selected-node SHA256 was
+`c70ecaffa2d89604015a888039ae31d9b9c21935c0185471da9ea9a2a9f80386`.
+The retry used Optuna and Optuna Integration 4.5.0 with pandas 2.2.3,
+Polars 1.44.2, NumPy 2.1.3 and scikit-learn 1.8.0. The guide's GroupImputer and
+OneHotEncoder reported `row` and passed full, repeated, chunked, reversed and
+empty-input checks, including feature-schema validation.
+
 The local CLI rendering checks remain separate. These are native model lifecycle
 checks, not Spark UDF, REST, `ai_query` or endpoint acceptance. MLflow model
 fixtures use temporary local SQLite stores, not the workspace registry.
+No workspace tables, registered models or endpoints were created.
