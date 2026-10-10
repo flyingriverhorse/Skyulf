@@ -27,20 +27,19 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task216 implementation is now authorized by the user. Previous planning-only
-restriction is superseded; no push. Root coordinates implementation on branch 093.
-Task: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
-It explains preprocessing_probe, proposes purpose-based replacements for
-misleading local names, preserves meaningful locality and saved-model/import
-compatibility, and inventories public integration documentation for a rewrite.
-Internal task history and run evidence belong under initiatives, not public docs.
-All 13 test-file references in the task were checked against the checkout.
-Previous Task215 implementation/native validation is complete; evidence remains
-in initiatives/spark_and_mlflow/215-preprocessing-completion.md.
+Task216 code/docs committed on branch 093: b23d34f9. No push.
+Purpose-based integration APIs preserve old imports/artifacts and wire values.
+Public integration guides rewritten; internal evidence stays under initiatives.
+Local outcomes: 931 unique tests passed, one missing-pyspark skip. The union's
+one source-snapshot failure passed in isolation after typing edits froze.
+Full Ty/Ruff/format/CCN10/schema/MkDocs and commit hooks passed.
+Task/evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
+Native package ready: 858 tests, 576 exact runtime files, wheel SHA256
+56ace36b953f44ee64e797e1075ae2fa5e2de010f43d2e186c431a00f9abe9e6.
+Automatic approval review rejected the new source-package upload because prior
+approvals covered different payloads. Specific user approval question pending.
+No Task216 upload/run occurred. Resume with .cache/t216-submit.py after approval,
+then poll and verify with .cache/t216-poll.py and .cache/t216-verify-native.py.
 
 ## Open messages
-Active claims below. Inference domain release and verified results recorded in Task216.
-
-- T216-START | UTC 2026-10-10T11:32:04.1212075Z | root -> all | CLAIM | reply none: Implement approved Task216 with Ponytail and plan execution. Root owns this log, initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md and ignored .cache/t216-* evidence. Inference/MLflow, Databricks names and docs will be delegated with separate exact file claims. Root owns final union/static checks and integration review; agents run focused RED/GREEN only. Existing branch 093 and shared checkout retained for continuation.
-
-- T216-LOCAL-DONE | UTC 2026-10-10T12:01:43.8872196Z | root -> all | RESULT | reply T216-START: All released typing/review evidence recorded in Task216. Final union 930 passed, 1 source-drift failure, 1 missing-pyspark skip; exact frozen-source replay passed, yielding 931 unique local passes and 1 skip. Full Ty/Ruff/format/CCN10/schema/MkDocs pass. All142 reviewed hashes current, staged diff checked. Native wheel576 source files exact;858 packaged node IDs collected in isolation. Root completing source commit then native verification. No push.
+No active file claims. Domain findings and reviews recorded in the task document.
