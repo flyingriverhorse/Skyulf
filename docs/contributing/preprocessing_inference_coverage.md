@@ -1,6 +1,6 @@
 # Preprocessing inference context: coverage and remaining work
 
-Status snapshot: **2026-10-09**, branch `093`, Task212 local capped one-hot declarations.
+Status snapshot: **2026-10-10**, branch `093`, Task213 local missing-value one-hot declarations.
 This is a tracked continuation checklist. Update it
 when a family gains a reviewed declaration or new validation evidence; do not
 treat a passing sample report as closing an entire family.
@@ -55,7 +55,7 @@ declares context. New project-defined classes are not part of the fixed 63.
 | `GroupImputer` | `row` for saved group lookups, including local pandas/Polars median apply | Mean, median and most-frequent strategies reuse saved lookups/fallbacks; median is local-only. The `mode` alias still normalizes to most-frequent. Task210 preserves integer modes and group keys through UInt64; Int128 retains its previous conversion boundary. |
 | `StandardScaler` | `row` for matched reviewed declarations, including local Polars apply | Primitive numeric Polars division uses batch-independent native NumPy arithmetic with existing promotion. Float16/Decimal/Int128 and other unsupported types retain native expression boundaries; local metadata does not grant worker admission. |
 | `MinMaxScaler` | `row` for matched reviewed declarations, including local Polars apply | Existing finite affine coefficients and matching feature range are required. All-null/nonfinite fits retain existing validator abstention. |
-| `OneHotEncoder` | `row` for matched reviewed declarations, including local pandas/Polars category caps | Dense observed-category encoding with `include_missing=False`. Positive Python integer caps, including default `20` and saved infrequent grouping, are local-only; the existing uncapped pandas worker subset remains admitted. Missing-token mode, NumPy integer caps, nonfinite categories and empty artifacts remain `unknown`. |
+| `OneHotEncoder` | `row` for matched reviewed declarations, including local pandas/Polars category caps and missing-value encoding | Positive Python integer caps and `include_missing=True` are local-only. Missing encoding preserves version 1 escaping or unversioned legacy replay. The existing uncapped pandas worker subset requires `include_missing=False`. NumPy integer caps, nonfinite learned categories and empty artifacts remain `unknown`. |
 | `FeatureInteraction` | `row` for matched reviewed declarations, including local Polars apply | Existing degree 2–4 combinations, repetition and bias flags; Task210 preserves zero-column bias row counts. Other feature-generation classes have separate entries. |
 | `ClipValues` | `row` for matched reviewed declarations, including local Polars apply | Saved finite fixed limits and matching configuration; native dtype and numerical behavior are unchanged. |
 | `LagFeatures` | `window`, with its saved row effect | No independent-chunk probe or new history execution |
@@ -1131,3 +1131,38 @@ the complete run took 112.623 seconds. Wheel SHA256:
 This validates native Python saved-state replay and local context diagnostics,
 including retained worker rejection. It does not validate Spark UDF, REST or
 `ai_query` execution. No tables, registered models or endpoints were created.
+
+
+### Task213 local missing-value one-hot declarations
+
+OneHotEncoder now reports local `row` context in pandas and Polars for
+`include_missing=True`, with both uncapped and capped fitted encoders. The owner
+reuses the existing missing-policy version guard before scalar normalization;
+boolean, float and NumPy integer versions remain invalid just as they are during
+apply. Versioned artifacts require the missing flag, and configured options still
+bind to saved state. The existing worker declaration explicitly selects both
+`max_categories=None` and `include_missing=False`; missing-enabled encoders do
+not gain worker admission.
+
+Version 1 retains distinct indicators for nulls, literal missing tokens and
+escape-prefixed strings. Unversioned artifacts preserve their original replay,
+including the legacy missing/literal collision. Native dtype restrictions also
+remain: for example, a legacy Polars Enum without the missing sentinel can keep
+nulls and raise under the saved unknown-category error policy. This declaration
+does not change those rules or migrate artifacts. Fit/apply functions and saved
+field layouts are unchanged; no refit is required for the metadata extension.
+
+The affected local union passed **612 tests** across fourteen files, including
+four new fit/save/fresh-process load/probe/predict cases with fit disabled.
+They verify missing/literal identity, full/singleton prediction parity, immutable
+state and actual worker rejection. Tests also cover native textual dtypes,
+all-null fits, empty requests, capped grouping, malformed policies and legacy
+replay. A test-fixture type clarification was followed by all 43 tests in that
+changed file passing; it does not increase the distinct total. Full Ruff/format,
+full CI Ty scope and Lizard CCN 10 passed; independent Ponytail review found no
+remaining blocker.
+
+The matching 612-test Databricks package is prepared with exact source hashes.
+Native validation is pending upload/run approval. This task adds no Spark UDF,
+REST or `ai_query` route verification. Owner-review and worker-family counts
+remain unchanged.

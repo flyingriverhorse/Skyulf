@@ -329,7 +329,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
             "python_batch",
             "preserve",
             "row",
-            config_match=(("max_categories", None),),
+            config_match=(("max_categories", None), ("include_missing", False)),
         ),
         ExecutionCapability("pandas", "apply", "local", "preserve", "row"),
         ExecutionCapability("polars", "apply", "local", "preserve", "row"),
@@ -517,30 +517,42 @@ def _encoder_drop_indices(encoder: Any, dropped: list[int]) -> None:
 
 def _onehot_state(raw: dict) -> dict:
     """Keep the estimator in the certificate while validating every execution option."""
-    _fields(
-        raw,
-        {
-            "type",
-            "columns",
-            "encoder_object",
-            "feature_names",
-            "prefix_separator",
-            "drop_original",
-            "include_missing",
-        },
-    )
+    fields = {
+        "type",
+        "columns",
+        "encoder_object",
+        "feature_names",
+        "prefix_separator",
+        "drop_original",
+        "include_missing",
+    }
+    if "missing_encoding_version" in raw:
+        fields.add("missing_encoding_version")
+    _fields(raw, fields)
+    versioned = _uses_missing_encoding(raw)
     scalar = _normalize({key: value for key, value in raw.items() if key != "encoder_object"})
     columns = _columns(scalar["columns"])
     _columns(scalar["feature_names"])
-    if scalar["type"] != "onehot" or scalar["include_missing"] is not False:
-        raise ValueError("Only observed-category one-hot artifacts are admitted.")
-    if type(scalar["drop_original"]) is not bool or type(scalar["prefix_separator"]) is not str:
-        raise ValueError("Invalid encoder output options.")
+    if scalar["type"] != "onehot":
+        raise ValueError("Expected one-hot artifact.")
+    _onehot_output_options(scalar, versioned)
     encoder = raw["encoder_object"]
     _check_encoder(encoder, columns)
     if encoder.get_feature_names_out(columns).tolist() != scalar["feature_names"]:
         raise ValueError("Encoder feature names disagree with fitted categories.")
     return {**scalar, "encoder_object": encoder}
+
+
+def _onehot_output_options(scalar: dict, versioned: bool) -> None:
+    """Validate saved output flags without upgrading an unversioned missing policy."""
+    if versioned and scalar["include_missing"] is not True:
+        raise ValueError("Versioned missing encoding requires include_missing=True.")
+    if (
+        type(scalar["drop_original"]) is not bool
+        or type(scalar["include_missing"]) is not bool
+        or type(scalar["prefix_separator"]) is not str
+    ):
+        raise ValueError("Invalid encoder output options.")
 
 
 def _onehot_config(params: dict, state: dict) -> dict:

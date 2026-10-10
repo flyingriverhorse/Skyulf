@@ -333,3 +333,85 @@ def test_capped_onehot_local_context_survives_saved_model_reload(tmp_path, engin
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
     assert report["status"] == "passed" and report["admission"] == "diagnostic_only"
+
+
+def _replay_missing_onehot(directory):
+    """Replay saved missing-value identity while retaining the local-only execution boundary."""
+
+    def forbidden(*args, **kwargs):
+        """Saved missing categories must not be relearned from inference partitions."""
+        raise AssertionError("Unexpected fit")
+
+    calculator: Any = NodeRegistry.get_calculator("OneHotEncoder")
+    calculator.fit = forbidden
+    sample = pickle.loads((directory / "sample.pkl").read_bytes())
+    artifact = load_local_pipeline(directory / "model")
+    records = artifact.pipeline.feature_engineer.fitted_steps
+    before = artifact_digest(records)
+    state = records[0]["artifact"]
+    assert state["missing_encoding_version"] == 1
+    encoder = state["encoder_object"]
+    if encoder.max_categories is not None:
+        assert len(encoder.infrequent_categories_[0]) > 0
+    output = _apply_prediction_step(sample, records[0])
+    token = "__mlops_missing__"
+    prefix = "__mlops_literal__:"
+    columns = [f"group_{token}", f"group_{prefix}{token}", f"group_{prefix}{prefix}{token}"]
+    np.testing.assert_array_equal(
+        output[columns].to_numpy(), [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, 0]]
+    )
+    report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
+    assert report["status"] == "passed", report
+    assert report["steps"][0]["context"] == "row"
+    assert report["steps"][0]["state_validation"] == "node_owned"
+    predictions = artifact.pipeline.predict(sample)
+    singles = np.concatenate(
+        [artifact.pipeline.predict(sample[i : i + 1]) for i in range(len(sample))]
+    )
+    np.testing.assert_array_equal(predictions, singles)
+    with pytest.raises(UnsupportedExecutionError):
+        require_partition_safe_pipeline(artifact)
+    assert np.isfinite(predictions).all()
+    assert artifact_digest(records) == before
+    return report
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("options", [{"max_categories": None}, {}])
+def test_missing_onehot_local_context_survives_saved_model_reload(tmp_path, engine, options):
+    """Real nulls and escaped literals remain distinct after saved capped and uncapped replay."""
+    special = [None, "__mlops_missing__", "__mlops_literal__:__mlops_missing__"]
+    groups = special * 3 + [f"c{i:02}" for i in range(22)]
+    training = pd.DataFrame({"group": groups, "target": range(len(groups))})
+    sample = pd.DataFrame({"group": [*special, "unseen"]}, index=[7, 2, 2, 0])
+    if engine == "polars":
+        training, sample = pl.from_pandas(training), pl.from_pandas(sample)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "missing",
+                    "transformer": "OneHotEncoder",
+                    "params": {"columns": ["group"], "include_missing": True, **options},
+                }
+            ],
+            "modeling": {
+                "type": "random_forest_regressor",
+                "params": {"n_estimators": 2, "max_depth": 2, "random_state": 42, "n_jobs": 1},
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=training, test=training[:0]), target_column="target")
+    save_local_pipeline(pipeline, tmp_path / "model")
+    (tmp_path / "sample.pkl").write_bytes(pickle.dumps(sample))
+    code = "import json,runpy,sys; from pathlib import Path; module=runpy.run_path(sys.argv[1]); print(json.dumps(module['_replay_missing_onehot'](Path(sys.argv[2]))))"
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(Path(__file__).resolve()), str(tmp_path)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["status"] == "passed" and report["admission"] == "diagnostic_only"

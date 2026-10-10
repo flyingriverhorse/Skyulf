@@ -74,7 +74,7 @@ def test_reviewed_encoding_context_replays_saved_rows(engine, node, options):
         "local" if engine == "polars" else "python_batch",
         "preserve",
         "row",
-        config_match=(("max_categories", None),)
+        config_match=(("max_categories", None), ("include_missing", False))
         if node == "OneHotEncoder" and engine == "pandas"
         else (),
     )
@@ -127,10 +127,9 @@ def test_encoding_context_keeps_saved_validation_and_applier_identity(node, chan
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-@pytest.mark.parametrize("options", [{"include_missing": True}, {"columns": []}])
-def test_onehot_local_declaration_keeps_unreviewed_settings_unknown(engine, options):
-    """Local metadata must retain the existing missing-token and no-op subset limits."""
-    _, config, state = _fitted("OneHotEncoder", engine, options)
+def test_onehot_local_declaration_keeps_unreviewed_settings_unknown(engine):
+    """Local metadata must retain the existing empty-artifact subset limit."""
+    _, config, state = _fitted("OneHotEncoder", engine, {"columns": []})
     assert get_inference_capability("OneHotEncoder", config, state, engine=engine) is None
 
 
