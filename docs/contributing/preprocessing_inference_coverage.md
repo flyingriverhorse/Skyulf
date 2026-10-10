@@ -1205,5 +1205,16 @@ cover scalar types, empty/reversed input and configuration binding. Independent
 Ponytail review passed six alias-equivalence and ten rejection probes. Full
 Ruff/format, full CI Ty scope and Lizard CCN 10 passed.
 
-Databricks validation for Task214 is pending. Earlier Task213 native results
-apply to its own source and test package, not this new change.
+The same **368 tests passed on Databricks serverless**, with zero failures or
+skips, plus the Bundle guide example. All 552 installed runtime files and twelve
+packaged assets match their prepared SHA256 hashes; the 368 passed test node IDs
+match local collection exactly. Source commit: `fdf306fc`.
+[Databricks run 799415499227444](https://dbc-45604623-c18b.cloud.databricks.com/jobs/407639260284510/runs/799415499227444)
+finished `SUCCESS` with pandas 2.2.3, Polars 1.44.2, NumPy 2.1.3 and
+scikit-learn 1.8.0. Pytest took 57.95 seconds with two expected warnings;
+the complete run took 118.344 seconds. Wheel SHA256:
+`89e98599f0332c46329dd315b4afb55c8f02a8648e31d0a838af560a1136d5c6`.
+
+This validates native Python saved-state replay, local context diagnostics and
+worker admission checks. It does not validate Spark UDF, REST or `ai_query`
+execution. No tables, registered models or endpoints were created.
