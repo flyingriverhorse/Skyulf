@@ -1253,7 +1253,24 @@ empty/all-excluded history validation gap using existing row/schema/budget/order
 checks. The final behavior preserves nullable empty-output schemas, rejects
 malformed continuation and keeps prediction/history publication caller-owned.
 
-Task215 native Databricks validation is pending. Its prepared package will test
-the 33 non-CLI affected files against installed wheel bytes; the local CLI
-rendering checks remain separate. These are native model lifecycle checks,
-not Spark UDF, REST, `ai_query` or endpoint acceptance.
+The first Task215 native run executed the 33 non-CLI affected files:
+**1,091 passed, two failed, zero skipped**. Both failures are Optuna temporal-CV
+cases because the validation environment omitted `optuna-integration`, which is
+already declared in the repository's dependency/CI requirements. The correction
+adds `optuna-integration==4.5.0` to the test environment and selects only those
+two failed cases plus the guide example; it does not change the model wheel.
+That follow-up run is prepared and awaits explicit user approval after automatic
+approval review rejected a second upload/run under the first single-run approval.
+
+Source commit: `00254254`. All 553 installed runtime files, 56 repository assets,
+five generated test-package markers and the 1,093-node collection hash matched.
+[First Databricks run 580851312882650](https://dbc-45604623-c18b.cloud.databricks.com/jobs/583034833176589/runs/580851312882650)
+finished `INTERNAL_ERROR / FAILED` after 428.3 seconds because the notebook
+requires every selected test to pass. Its error text was truncated after the
+complete failure list; the full collected-node hash and outcome counts were
+preserved. Wheel SHA256:
+`461b74c8910f42c77007d6f98ccf88d92e60282ae80fcf5286c387418b0f2a61`.
+
+The local CLI rendering checks remain separate. These are native model lifecycle
+checks, not Spark UDF, REST, `ai_query` or endpoint acceptance. MLflow model
+fixtures use temporary local SQLite stores, not the workspace registry.

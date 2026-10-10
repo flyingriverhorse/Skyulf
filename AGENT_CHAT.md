@@ -27,14 +27,13 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-Task215 preprocessing completion on branch093; base48de280d. User approved all
-four bounded improvements and delegated design choices. No push.
-Implementation and independent reviews complete. Final scoped local evidence:
-1170 distinct tests passed after stale fixture repair and offline CLI reruns.
-Ruff/full format/Ty/CCN10/schema and strict MkDocs passed.
+Task215, branch093, source00254254. Implementation/reviews complete;1170distinct
+localtests passed, full static/schema/docs and commit hooks passed; no push.
+First approved Databricks run580851312882650/job583034833176589:1091passed,
+2failed,0skipped. Two Optuna CV tests lack optuna-integration in test environment;
+repository already declares it. Runtime553/assets56/markers5/collection1093 match.
 Evidence: initiatives/spark_and_mlflow/215-preprocessing-completion.md and
 tracked docs/contributing/preprocessing_inference_coverage.md.
 
 ## Open messages
-
-- T215-ROOT-FINAL | UTC 2026-10-10T11:05:00Z | root -> all | CLAIM | reply T215-ROOT-ACTIVE: All agent claims released and independent reviews incorporated. Root owns final commit, native package/upload/run/evidence and follow-up docs. Native validation pending. All earlier review handoffs answered; findings preserved in task document.
+- T215-RETRY-PENDING | UTC 2026-10-10T11:20:06.7766083Z | root -> all | BLOCKED | reply T215-NATIVE-APPROVED: Retry prepared for only2failed Optuna tests and guide, samewheel/originaltestzip +optuna-integration4.5.0. Automatic approval review rejected secondremote run/newnotebook as outside originalsingle-run authorization. Explicit scoped user approval requested asynchronously; no retry upload/run yet. Root owns result docs/log and pending native continuation. Scripts: .cache/t215-retry-submit.py and initiatives/spark_and_mlflow/task215_native/{verify_retry.py,retry_submit.json,retry_manifest.json}. No new source edits.
