@@ -36,13 +36,18 @@ Full Ty/Ruff/format/CCN10/schema/MkDocs and commit hooks passed.
 Task/evidence: initiatives/spark_and_mlflow/216-integration-naming-and-public-docs.md.
 Native package ready: 858 tests, 576 exact runtime files, wheel SHA256
 56ace36b953f44ee64e797e1075ae2fa5e2de010f43d2e186c431a00f9abe9e6.
-User approved the exact payload. Run 196440641386730 finished:854 passed,
-4 layout-test failures,0 skips;576 runtime/55 assets/5 markers and IDs verified.
+User approved the exact payload. Run 196440641386730 finished: 854 passed,
+4 layout-test failures, 0 skips; 576 runtime/55 assets/5 markers and IDs verified.
 Four tests derived package paths from extracted fixtures instead of the installed
-wheel. Two test-only root constants corrected;26 affected tests passed both in
+wheel. Two test-only root constants corrected; 26 affected tests passed both in
 checkout and isolated wheel. Independent review and full Ty/Ruff/format passed.
-Production wheel unchanged. Root preparing only4 native checks plus both guide
-examples; prior854 passes retained. Evidence and retry assets:task216_native.
+Production wheel unchanged; test fix committed as 0ec4c406. Four native checks
+and both guide examples are ready; prior 854 passes retained. Automatic review
+rejected the corrected test archive/new notebook upload because the first
+approval covered another payload. Specific retry approval question pending.
+No retry upload/run. After approval use .cache/t216-submit-retry.py, then
+.cache/t216-poll-retry.py and .cache/t216-verify-combined.py. Evidence and retry
+assets: initiatives/spark_and_mlflow/task216_native.
 
 ## Open messages
 No active file claims. Domain findings and reviews recorded in the task document.
