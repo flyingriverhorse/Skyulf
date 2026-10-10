@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from ...data.delta_io.delta import history, table_identity
-from ...scoring.incremental.local_incremental import bounded_frame
+from ...scoring.incremental.incremental_batch import bounded_frame
 from ...shared._contracts import column_name
 from .monitoring_config import MonitorConfig
 
@@ -114,7 +114,7 @@ def validate_receipt(
     return version
 
 
-def _window_receipts(spark: Any, config: MonitorConfig, start: datetime, end: datetime) -> dict:
+def window_receipts(spark: Any, config: MonitorConfig, start: datetime, end: datetime) -> dict:
     """Bound history transfer and reject writes whose source provenance is unavailable."""
     functions = importlib.import_module("pyspark.sql.functions")
     rows = (
@@ -136,7 +136,7 @@ def _window_receipts(spark: Any, config: MonitorConfig, start: datetime, end: da
     return receipt_index(records)
 
 
-def _prediction_columns(frame: Any, keys: tuple[str, ...], probabilities: int) -> tuple[str, ...]:
+def prediction_columns(frame: Any, keys: tuple[str, ...], probabilities: int) -> tuple[str, ...]:
     """Select only raw saved model outputs, excluding unrelated business projections."""
     columns = (*keys, "run_id", "prediction", *(f"probability_{i}" for i in range(probabilities)))
     if "scoring_status" in frame.columns:
@@ -163,15 +163,15 @@ def read_current_observation(
     prediction_version = snapshot_at(
         spark, config.prediction_table, end - timedelta(microseconds=1)
     )
-    receipts = _window_receipts(spark, config, start, end)
-    frame = _model_predictions(
+    receipts = window_receipts(spark, config, start, end)
+    frame = model_predictions(
         read_snapshot(spark, config.prediction_table, prediction_version),
         config,
         version,
         keys,
         probabilities,
     )
-    columns = _prediction_columns(frame, keys, probabilities)
+    columns = prediction_columns(frame, keys, probabilities)
     selected = frame.where(functions.col("run_id").isin(list(receipts)))
     predictions = bounded_frame(selected, columns, keys, config.max_rows, config.max_bytes)
     current, used, observed = _read_matching_features(
@@ -215,7 +215,9 @@ def _read_matching_features(
     frames, used = [], []
     for run_id in predictions["run_id"].unique():
         item = receipts[run_id]
-        source_version = _source_version(item["receipt"], config, version, source_id, target_id)
+        source_version = prediction_source_version(
+            item["receipt"], config, version, source_id, target_id
+        )
         batch_keys = selected.where(functions.col("run_id") == run_id).select(*keys)
         source = read_snapshot(spark, config.source_table, source_version)
         joined = source.join(batch_keys, list(keys), "inner")
@@ -244,7 +246,7 @@ def _read_matching_features(
     return current, used, observed
 
 
-def _model_predictions(
+def model_predictions(
     frame: Any, config: MonitorConfig, version: str, keys: tuple[str, ...], probabilities: int
 ) -> Any:
     """Normalize raw component outputs without confusing similarly named model-set branches."""
@@ -269,7 +271,7 @@ def _model_predictions(
     )
 
 
-def _source_version(
+def prediction_source_version(
     receipt: dict, config: MonitorConfig, version: str, source_id: str, target_id: str
 ) -> int:
     """Verify either ordinary output identity or its explicitly selected parent release."""

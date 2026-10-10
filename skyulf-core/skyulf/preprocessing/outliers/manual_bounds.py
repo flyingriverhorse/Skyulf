@@ -5,13 +5,15 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import ManualBoundsArtifact
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _apply_pandas_mask, _filter_y_polars
+from ._common import _apply_pandas_mask, _filter_y_polars, validate_fitted_bounds
 
 
 def _manual_bounds_col_mask_polars(col: str, bound: dict[str, Any]) -> Any:
@@ -40,6 +42,21 @@ def _manual_bounds_col_mask_pandas(series: pd.Series, bound: dict[str, Any]) -> 
 
 class ManualBoundsApplier(BaseApplier):
     """Drop rows outside the user-specified per-column lower/upper bounds."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved optional bounds without applying the row filter."""
+        local_state_fields(raw, "manual_bounds", {"type", "bounds"})
+        validate_fitted_bounds(raw["bounds"], partial=True)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Declare row-local filtering; prediction rejects requests that lose rows."""
+        if engine not in ("pandas", "polars"):
+            return None
+        ManualBoundsApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "filter", "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

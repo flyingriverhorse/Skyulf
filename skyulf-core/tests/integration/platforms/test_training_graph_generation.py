@@ -4,6 +4,7 @@ import json
 import runpy
 
 import pytest
+import yaml
 from test_databricks_bundle_generation import (  # noqa: F401
     _generate_project,
     _read_jobs,
@@ -39,12 +40,13 @@ def test_named_training_and_shap_graph(tmp_path, layout):
 
 @pytest.mark.parametrize("layout", ["model_competition", "multi_target"])
 def test_refresh_graph_after_model_rename(tmp_path, layout):
-    """Renamed Python declarations must update tasks, references and the early mismatch guard."""
+    """Renamed YAML declarations must update tasks, references and the early mismatch guard."""
     project = _generate_project(tmp_path, training_layout=layout, shap_enabled="true")
-    filename = "model_competition" if layout == "model_competition" else "multi_model"
-    path = project / f"src/modeling/{filename}.py"
-    names = list(runpy.run_path(str(path))["MODELS"])
-    path.write_text(path.read_text() + f'\nMODELS["renamed_model"] = MODELS.pop({names[0]!r})\n')
+    path = project / "config/training.yml"
+    document = yaml.safe_load(path.read_text())
+    names = list(document["models"])
+    document["models"]["renamed_model"] = document["models"].pop(names[0])
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     refresh = runpy.run_path(str(project / "src/tools/refresh_training_graph.py"))["refresh"]
     refreshed = refresh(project)
     tasks = {task["task_key"]: task for task in _read_jobs(project)["train"]["tasks"]}

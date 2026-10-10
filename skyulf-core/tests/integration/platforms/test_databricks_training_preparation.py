@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
+from skyulf.integrations.databricks.lifecycle import workflow as workflow
 
 
 def _config(engine, policy, version):
@@ -91,7 +91,7 @@ def test_legacy_automatic_sdk_preserves_its_champion_pin_compatibility(monkeypat
     monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="2"))
     monkeypatch.setattr(workflow, "ChallengerLifecycle", Mock())
     fit = Mock(side_effect=failure)
-    monkeypatch.setattr(workflow, "train_local_candidate", fit)
+    monkeypatch.setattr(workflow, "train_candidate", fit)
     with pytest.warns(DeprecationWarning), pytest.raises(RuntimeError) as caught:
         workflow.run_action(
             None, config, "train", experiment_name="test", artifact_path=tmp_path / "artifact"

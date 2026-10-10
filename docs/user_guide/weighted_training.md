@@ -4,8 +4,6 @@ Use a training column to control each observation's contribution to model fittin
 Weighting is optional. You can use sample weights, class weights, or both with
 compatible models.
 
-This guide describes the current development implementation, verified on
-2026-10-02 with Python 3.12.10, scikit-learn 1.8.0 and imbalanced-learn 0.14.1.
 The support tables describe specific contracts, not every possible combination
 of data, parameters and custom code.
 
@@ -13,7 +11,7 @@ of data, parameters and custom code.
 
 | Setting | Purpose | Where to configure it |
 | --- | --- | --- |
-| `weight_column` / `WEIGHT_COLUMN` | Name of the source column containing row weights | Bundle model file; see the layout table below |
+| `weight_column` | Name of the source column containing row weights | `config/training.yml`; see the layout table below |
 | `sample_weight` | Numeric vector passed to the model's `fit` call | Bundle extracts it automatically; direct Core callers pass it explicitly |
 | `class_weight` | Class-level weighting for a supported classifier | Model `params`; for tuning, `base_model.params` |
 | `synthetic_weight` | Weight assigned to new synthetic training rows | The sampling step's `params`, only when combining sample weights with synthetic sampling |
@@ -30,29 +28,32 @@ choose from compatible models. Ensemble member choices are also filtered.
 Multi-target branches choose independently. Runtime checks still validate edited
 model definitions after initialization.
 
-| Generated file | Setting |
+| Layout | Setting in `config/training.yml` |
 | --- | --- |
-| `src/modeling/single_model.py` | `WEIGHT_COLUMN = "importance"` |
-| `src/modeling/model_competition.py` | One shared `WEIGHT_COLUMN` for all candidates |
-| `src/modeling/multi_model.py` | Each `MODELS[branch_name]["workflow"]["weight_column"]` |
+| `single_model` | `defaults.weight_column` or the named model's `weight_column` |
+| `model_competition` | One shared `defaults.weight_column` for all candidates |
+| `multi_target` | Each named `models.<name>.weight_column` |
 
-For single-model training, edit the existing assignment:
+For a single model or shared competition setting:
 
-```python
-# src/modeling/single_model.py
-WEIGHT_COLUMN = "importance"  # Use None to disable sample weights.
+```yaml
+defaults:
+  weight_column: importance  # Use null to disable sample weights.
 ```
 
-For an existing multi-target branch, edit its workflow setting:
+For a multi-target model override:
 
-```python
-# src/modeling/multi_model.py, after the existing MODELS declaration
-MODELS["churn"]["workflow"]["weight_column"] = "importance"
+```yaml
+models:
+  churn:
+    weight_column: importance
 ```
 
-Replace `churn` with an actual branch name. Other branches retain their settings.
-There is no separate `weights.py`. The loader captures the model source and
-selected settings for training replay; scoring uses the saved fitted artifact.
+Replace `churn` with the existing model name and retain its other fields. Other
+models retain their own settings. There is no separate weights file. The loader
+captures selected settings for replay; scoring uses the saved fitted artifact.
+Older Python-configured projects can retain their existing `WEIGHT_COLUMN`
+setting, but must not also declare a competing YAML model owner.
 
 The weight column must exist in training data. Keep it out of `input_columns`
 and do not reuse it as a target, record key, group or time column. Weights must
@@ -64,19 +65,22 @@ See [Databricks Bundle setup](databricks_bundle.md) for the generated layout.
 
 ### Optional class weights
 
-For a direct classifier, add `"class_weight": "balanced"` to its existing
-`params`. For a generated tuner, edit the existing base model:
+For a direct classifier, set `class_weight` in the model's params. In a Bundle:
 
-```python
-# src/modeling/single_model.py, after the existing MODELING declaration
-# This example assumes MODELING is a tuner with a compatible classifier.
-MODELING["base_model"]["params"]["class_weight"] = "balanced"
-MODELING["search_space"].pop("class_weight", None)
+```yaml
+models:
+  churn:
+    model:
+      type: logistic_regression
+      params:
+        class_weight: balanced
 ```
 
-Removing the search axis keeps the value fixed. To tune class weights instead,
-keep the search axis and remove the fixed value from `base_model.params`.
-Use `None` to disable class weights. They apply to classification, not regression.
+For tuning, keep this value fixed in the model params and remove any competing
+`class_weight` search axis, or remove the fixed value and supply that axis in
+`tuning.search_space`. Direct Core tuner configurations place fixed parameters
+under `base_model.params`. Use YAML `null` (Python `None`) to disable class
+weights. They apply to classification, not regression.
 When both are enabled, sample and class weights are combined once, using the
 rows supplied to that fit after any resampling. Native estimators retain their
 own class-weight rules. Since the [scikit-learn 1.7 change](https://scikit-learn.org/1.7/whats_new/v1.7.html#sklearn-linear-model), LogisticRegression with
@@ -87,25 +91,21 @@ factors from label counts and multiplies them by the supplied row weights.
 
 ### Add SMOTE with sample weights
 
-Keep `WEIGHT_COLUMN = "importance"` in the model file. Separately, add this step
-to the list returned by `build_preprocessing()` in
-`src/features/preprocessing.py`:
+Keep `weight_column: importance` in the training settings. Separately, add
+this step to the selected recipe in `config/preprocessing.yml`:
 
-```python
-{
-    "name": "balance",
-    "transformer": "Oversampling",
-    "params": {
-        "method": "smote",
-        "synthetic_weight": "class_mean",
-        "random_state": 42,
-    },
-}
+```yaml
+- name: balance
+  transformer: Oversampling
+  params:
+    method: smote
+    synthetic_weight: class_mean
+    random_state: 42
 ```
 
 Place it after the transformations needed to produce valid numeric features.
 Preserve the other steps in your recipe. Use the training preprocessing recipe,
-not `pre_split.py`: synthetic sampling must not learn from held-out rows.
+not `config/pre_split.yml`: synthetic sampling must not learn from held-out rows.
 
 The resulting flow is:
 
@@ -197,9 +197,9 @@ the separate `fit(sample_weight=...)` argument.
 
 ## Model support
 
-The catalog audit fitted 34 model choices and compared supported models with
-independent estimator references: 32 passed; the two KNN final models were
-correctly rejected. Optional XGBoost/LightGBM packages must be installed.
+The models below support the documented sample-weight contract. KNN final
+estimators do not accept row weights. Install the optional XGBoost/LightGBM
+packages when selecting those model families.
 
 | Group | Models |
 | --- | --- |
@@ -302,36 +302,14 @@ See [cross-validation](cross_validation.md),
 [hyperparameter tuning](hyperparameter_tuning.md) and
 [preprocessing placement](preprocessing_placement.md).
 
-## Verification scope
+## Verify your configured recipe
 
-For a concrete two-case cloud proof with actual fit inputs, saved artifacts and
-independent reference comparisons, see
-[Single-Model Sampling Weight Acceptance](sampling_weight_acceptance.md).
+Follow [Verify sampling and sample weights](sampling_weight_acceptance.md) to
+compare actual fit inputs, saved/reloaded predictions and an independent estimator
+reference. Keep the source snapshot and training/holdout membership fixed, and
+check alignment after sampling rather than relying only on metadata or row counts.
 
-The weight-focused suite recorded 679 passes and three optional CLI skips; those
-CLI checks passed separately using the real CLI. Tests inspect actual estimator
-fit inputs, compare sampling geometry with imbalanced-learn, and check exact
-weight alignment through CV/refit. The preprocessing inventory used the real H3
-package; its sentence-embedding transport check used a controlled encoder.
-
-Live Databricks acceptance covered SMOTE with voting, stacking and calibration,
-plus two single-model Bundle trainings with different weight columns/class-weight
-settings. Saved-model predictions matched independent references; scoring worked
-without weight columns. Competition and multi-target generation/configuration
-were tested locally, not through a complete cloud lifecycle for every layout.
-
-The final clean full-Core rerun on 2026-10-03 passed: **13,848 passed, 662 skipped,
-zero failures/errors**, in 28 minutes 39 seconds; process exit code **0**.
-Branch-aware total coverage reached **90.01%**, passing the unchanged **90%** CI
-gate. This replaces the earlier incomplete verification and 89.02% result.
-The margin above the gate is small.
-
-The run used fresh coverage data and temporary/cache directories. Hashes of all
-817 measured source/test/config files were identical before and after the run.
-Ruff, formatting, full CI Ty scope, CCN <= 10 and Bundle schema freshness also
-passed. No production code or tests needed changes during this verification.
-
-Skipped tests include optional Spark/Delta runtimes, opt-in Databricks CLI
-checks and benchmarks; they are not counted as passes. This was a local Windows
-run with the CI Core scope, not execution of every repository CI job or every
-optional-runtime lane.
+Validate the paths your workflow uses: direct fitting, CV/search, final refit,
+registered-model replay and publication. A check of one recipe or runtime does
+not establish every estimator/parameter combination or optional compute backend.
+Scoring should use the saved feature schema without requiring training weights.

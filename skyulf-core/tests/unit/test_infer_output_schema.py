@@ -206,7 +206,7 @@ def test_scalers_passthrough_schema(cls) -> None:
             "Winsorize",
             WinsorizeCalculator,
             pd.DataFrame({"x": list(range(1, 7)), "y": [0, 0, 0, 0, 0, 0]}),
-            {"columns": ["x"], "lower_percentile": 10, "upper_percentile": 90},
+            {"columns": ["x"], "lower_percentile": 20, "upper_percentile": 80},
         ),
         (
             "LagFeatures",

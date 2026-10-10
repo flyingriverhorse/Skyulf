@@ -8,11 +8,7 @@ pytest.importorskip("xgboost")
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.partition_safety import require_partition_safe_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
@@ -92,8 +88,8 @@ def company_artifact(tmp_path, request):
         }
     )
     pipeline.fit(SplitDataset(train=data.iloc[:6], test=data.iloc[6:]), target_column="target")
-    save_local_pipeline(pipeline, tmp_path / "company")
-    return load_local_pipeline(tmp_path / "company")
+    save_pipeline(pipeline, tmp_path / "company")
+    return load_pipeline(tmp_path / "company")
 
 
 @pytest.mark.parametrize(
@@ -110,14 +106,14 @@ def test_company_pipeline_replays_frozen_state_across_partitions(company_artifac
         },
         index=[90, 1, 15, 3, 4],
     )
-    whole = predict_local_pipeline(query, company_artifact)
+    whole = predict_pipeline(query, company_artifact)
     singles = pd.concat(
-        [predict_local_pipeline(query.iloc[[i]], company_artifact) for i in range(len(query))]
+        [predict_pipeline(query.iloc[[i]], company_artifact) for i in range(len(query))]
     )
     uneven = pd.concat(
         [
-            predict_local_pipeline(query.iloc[:2], company_artifact),
-            predict_local_pipeline(query.iloc[2:], company_artifact),
+            predict_pipeline(query.iloc[:2], company_artifact),
+            predict_pipeline(query.iloc[2:], company_artifact),
         ]
     )
     pd.testing.assert_frame_equal(whole, singles)
@@ -137,7 +133,7 @@ def test_company_empty_and_null_partitions_preserve_features(company_artifact):
     populated = engineer.transform(query, preserve_rows=True)
     assert empty.columns.tolist() == populated.columns.tolist()
     assert populated.notna().all().all()
-    assert np.isfinite(predict_local_pipeline(query, company_artifact)["prediction"]).all()
+    assert np.isfinite(predict_pipeline(query, company_artifact)["prediction"]).all()
 
 
 @pytest.mark.parametrize("change", ["clip", "group", "mode", "encoder", "callback", "dart"])

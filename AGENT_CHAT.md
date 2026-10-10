@@ -25,13 +25,27 @@ The user requested removal of finished conversations; do not archive chat.
   report the dependency, and continue independent work. No recursive agents.
 - Markdown coordinates running sessions; it cannot wake an idle agent.
 
-## Current task
+## Latest handoff
 
-PR196 on branch092 targets master. User requests all project changes committed,
-pushed and PR failures repaired; backend/frontend/Core versions must be0.9.2.
-No merge requested. Root owns AGENT_CHAT.md and Delivery178; all implementation
-claims from reviewers are released. No pending Claude request.
+C218-COMMIT-DONE | 2026-10-10T21:10:08Z | Codex/root -> peers | RESULT | reply:C218-COMMIT-CLAIM
+Task218 DCO commit completed with title:
+feat(databricks): add guarded serving rollout and online feature lookup.
+See git log for final hash after this coordination-only amend. No push.
+All applicable pre-commit hooks passed (schema, whitespace, YAML/JSON, Ruff,
+format, full CI Ty and CCN10). Frontend hooks skipped: no frontend changes.
+Whole Ruff and strict MkDocs passed.539runtime/676test files still match the
+native final6 package; passed pytest groups were not repeated unchanged.
+Record: initiatives/spark_and_mlflow/218-rollout-online-features.md.
 
-## Open messages
-### pr196-repair-verification | 2026-10-06T17:43:05.6600036Z | Codex root -> peers | RESULT
-Root reviewed and accepts reviewer results; completed exchanges pr092-core-ci-review-result, pr092-core-package-fix-result, pr092-backend-version-fix-result, pr092-bucketing-fix-result and pr196-codacy-repairs-result are persisted in initiatives/spark_and_mlflow/178-pr196-ci-and-version092.md and ignored detailed diagnostics. Final Ruff/format/Ty/Lizard pass; security293/0, version15, tuning126, Polars90 per version1.44.1/2.0.0 plus original failing backend test pass. New0.9.2 wheel519 sources match checkout. Databricks skyulf refresh token invalid; no native upload/submission occurred, user explicitly deferred native verification. Root will commit repairs and monitor remote checks on new head; fresh native status remains explicitly unverified until the user resumes it. Prior SM23 deployment evidence remains in Delivery177.
+User next requests streaming but asks what publication selection enables.
+Explained: include_online_publication only adds a sync job; it does not make
+the endpoint use Lakebase. Native model lookup packaging and published features
+are separate prerequisites. Scope is not settled between continuous feature
+sync (Delta->Lakebase) and continuous prediction (Delta->prediction table).
+User answered the scope question with clarification questions, not a selection.
+No streaming implementation/config/cloud changes have been made.
+
+C218-COMMIT-RELEASE | 2026-10-10T21:10:08Z | Codex/root -> peers | RELEASE | reply:C218-COMMIT-DONE
+All Task218 source/test/docs/task/queue claims released. No peer question or
+active claim. Preserve the separate streaming scope discussion; no agent has
+been started for it. This coordination-only update is included in the commit.

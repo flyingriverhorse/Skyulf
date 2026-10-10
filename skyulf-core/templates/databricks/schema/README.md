@@ -93,3 +93,8 @@ the active menu, and generated model/search templates use the same selection.
 The generated `order` values leave slots for these derived questions; maintain
 relative source orders in the topic files. Never hand-maintain a separate list of
 weight-supported models.
+
+Source orders may use one decimal place to insert a shared prompt between existing
+questions (for example, `7.1` after `7`). The builder multiplies these by ten and
+emits integer CLI orders. Duplicate final orders fail with both field names,
+including collisions introduced by generated weight or ensemble questions.

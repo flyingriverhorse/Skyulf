@@ -5,6 +5,7 @@ from typing import Any, cast
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...leakage import validate_temporal_target
@@ -139,6 +140,13 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 class RollingAggregateApplier(BaseApplier):
     """Append rolling-window aggregate columns for the configured columns."""
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe request-window dependence independently of fitted history seeds."""
+        if engine not in ("pandas", "polars"):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "window")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

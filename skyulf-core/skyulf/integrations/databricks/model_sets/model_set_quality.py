@@ -11,15 +11,15 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 from ....inference.model_set import ModelSetArtifact
 from ...mlflow.lifecycle.validation import (
     ModelComparisonReport,
-    compare_registered_local_models,
+    compare_registered_pipeline_models,
     comparison_payload,
     quality_gate_results,
     quality_gates_pass,
 )
 from ...mlflow.registration.registry import resolve_model
 from ..jobs.shared.notebook_diagnostics import notebook_task
-from ..training.fitting import local_retraining
-from ..training.shared.local_training_evidence import (
+from ..training.fitting import candidate
+from ..training.shared.training_evidence import (
     load_candidate_evidence,
     validate_training_evidence,
 )
@@ -61,8 +61,8 @@ def _heldout(spark: Any, spec: Any, engine: str, evidence: Any, limits: dict) ->
         max_rows=min(spec.max_rows, limits["max_rows"]),
         max_bytes=min(spec.max_bytes, limits["max_bytes"]),
     )
-    frame = local_retraining.read_training_snapshot(spark, bounded)
-    _, heldout, _ = local_retraining.split_labeled_snapshot(frame, bounded, engine=engine)
+    frame = candidate.read_training_snapshot(spark, bounded)
+    _, heldout, _ = candidate.split_labeled_snapshot(frame, bounded, engine=engine)
     if evidence is not None:
         validate_training_evidence(
             evidence, spec, project_source_sha256=evidence["project_source_sha256"], heldout=heldout
@@ -110,7 +110,7 @@ def _evaluate_component(
     heldout = _heldout(
         spark, spec, engine, evidence, {"max_rows": max_rows, "max_bytes": max_bytes}
     )
-    fresh = compare_registered_local_models(
+    fresh = compare_registered_pipeline_models(
         candidate,
         previous,
         heldout,

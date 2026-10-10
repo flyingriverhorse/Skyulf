@@ -11,10 +11,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._artifacts import CastingArtifact
 from ._category_keys import category_key, category_key_expr
+from ._fitted_validation import _columns, local_boolean, local_state_fields
 from ._helpers import select_then_to_pandas
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -293,7 +295,16 @@ def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: boo
     # Use a small FIXED absolute tolerance rather than np.isclose's default
     # rtol=1e-5, which scales with magnitude and would let large fractional
     # values (e.g. 100000.001) slip through as "close enough" to integral.
-    fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
+    if numeric.dtype == object:
+        fractional_mask = numeric.map(
+            lambda value: (
+                pd.api.types.is_float(value)
+                and np.isfinite(value)
+                and abs(value - round(value)) >= 1e-9
+            )
+        )
+    else:
+        fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
     if not fractional_mask.any():
         return numeric
     if not coerce_on_error:
@@ -312,7 +323,7 @@ def _mask_out_of_range_or_raise(
     polars apply path which correctly nulls/raises via ``strict`` casts.
     """
     try:
-        info = np.iinfo(str(target_dtype))
+        info = np.iinfo(str(target_dtype).lower())
     except TypeError:
         # Unrecognized/non-integer dtype string: skip range-checking rather
         # than fail the cast outright.
@@ -354,8 +365,47 @@ _NULLABLE_INT_DTYPES = {
 }
 
 
+def _resolve_casting_dtype(dtype: Any) -> Any:
+    """Preserve explicitly nullable integer choices while resolving ordinary aliases."""
+    label = str(dtype)
+    if label in _NULLABLE_INT_DTYPES.values():
+        return dtype
+    return TYPE_ALIASES.get(label.lower(), dtype)
+
+
+def _parse_integer_scalar(value: Any, coerce_on_error: bool) -> Any:
+    """Keep native parsing while using Python scalars for exact integer-bound comparisons."""
+    parsed = pd.to_numeric(value, errors="coerce" if coerce_on_error else "raise")
+    return parsed.item() if isinstance(parsed, np.generic) else parsed
+
+
+def _integer_numeric_values(series: pd.Series, coerce_on_error: bool) -> pd.Series:
+    """Reparse ambiguous object values without promoting neighboring exact integers to floats."""
+    errors = "coerce" if coerce_on_error else "raise"
+    numeric = pd.to_numeric(series, errors=errors)
+    if series.dtype.kind in "iuO":
+        nullable = pd.to_numeric(series, errors=errors, dtype_backend="numpy_nullable")
+        if pd.api.types.is_integer_dtype(nullable.dtype):
+            numeric = nullable
+        elif series.dtype.kind == "O" and nullable.dtype.kind in ("f", "O"):
+            # ponytail: scalar parsing is slower; keep this fallback limited to
+            # ambiguous object integer casts until a lossless native batch parser exists.
+            numeric = pd.Series(
+                [
+                    _parse_integer_scalar(value, coerce_on_error)
+                    if pd.api.types.is_scalar(value)
+                    else numeric.iloc[position]
+                    for position, value in enumerate(series)
+                ],
+                index=series.index,
+                name=series.name,
+                dtype=object,
+            )
+    return numeric
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
-    numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
+    numeric = _integer_numeric_values(series, coerce_on_error)
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
     numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
     if numeric.isna().any():
@@ -427,6 +477,57 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
     return df_out, y
 
 
+def _validate_casting_types(type_map: Any) -> None:
+    """Check real pandas dtype specifications without changing their saved representation."""
+    if type(type_map) is not dict:
+        raise ValueError("Fitted casting types must be a dictionary.")
+    _columns(list(type_map))
+    for dtype in type_map.values():
+        if not isinstance(dtype, (str, np.dtype, pd.api.extensions.ExtensionDtype, type)):
+            raise ValueError("Invalid fitted casting dtype.")
+        try:
+            pd.api.types.pandas_dtype(dtype)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid fitted casting dtype.") from exc
+
+
+def _validate_casting_categories(raw: dict) -> None:
+    """Inspect learned vocabularies while preserving artifacts predating saved categories."""
+    if "categories" not in raw:
+        return
+    categories = raw["categories"]
+    expected = {col for col, dtype in raw["type_map"].items() if dtype == "category"}
+    if type(categories) is not dict or set(categories) != expected:
+        raise ValueError("Fitted categories must match categorical casting columns.")
+    for values in categories.values():
+        if type(values) is not list:
+            raise ValueError("Fitted casting categories must be lists.")
+        try:
+            pd.CategoricalDtype(categories=values)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid fitted casting categories.") from exc
+
+
+def _pandas_cast_context(state: dict) -> str:
+    """Account for request vocabularies and whole-column best-effort fallback failures."""
+    for col, dtype in state["type_map"].items():
+        if col in state.get("categories", {}):
+            continue
+        label = str(dtype).lower()
+        if label == "category":
+            return "global"
+        if not state["coerce_on_error"]:
+            continue
+        if label in ("string", "str", "object") or label.startswith(
+            ("float", "int", "uint", "bool", "datetime")
+        ):
+            continue
+        # Native astype can fail on a neighbor; best-effort then retains every
+        # original value in the column rather than the successful row casts.
+        return "global"
+    return "row"
+
+
 class CastingApplier(BaseApplier):
     """Cast each column named in ``type_map`` to its target dtype on the active engine.
 
@@ -444,6 +545,27 @@ class CastingApplier(BaseApplier):
     freeze the training vocabulary; unseen values become missing. Older
     artifacts without a vocabulary retain their original casting behavior.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect local dtype/vocabulary state without converting or relearning it."""
+        fields = {"type", "type_map", "coerce_on_error"}
+        if isinstance(raw, dict) and "categories" in raw:
+            fields.add("categories")
+        local_state_fields(raw, "casting", fields)
+        _validate_casting_types(raw["type_map"])
+        local_boolean(raw["coerce_on_error"], "coerce_on_error")
+        _validate_casting_categories(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local casts, including request-derived legacy pandas vocabularies."""
+        if engine not in ("pandas", "polars"):
+            return None
+        CastingApplier.validate_inference_state(state)
+        context = _pandas_cast_context(state) if engine == "pandas" else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -475,9 +597,8 @@ class CastingCalculator(BaseCalculator):
     ) -> SkyulfSchema:
         """Rewrite the dtype labels of ``input_schema`` for every column the config targets.
 
-        Unlike :meth:`fit`, this cannot check column presence against a frame, so
-        requested dtypes are applied unconditionally — a config naming an absent
-        column predicts a schema that apply will not actually produce.
+        The shared ``target_type`` overrides per-column choices, matching fit.
+        Columns absent from the input schema are skipped, as they are at runtime.
         """
         # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
@@ -485,11 +606,11 @@ class CastingCalculator(BaseCalculator):
         columns = config.get("columns", []) or []
         if target_type and columns:
             for col in columns:
-                column_types.setdefault(col, target_type)
+                column_types[col] = target_type
         new_schema = input_schema
         for col, dtype in column_types.items():
-            resolved = TYPE_ALIASES.get(str(dtype).lower(), str(dtype))
-            new_schema = new_schema.with_dtype(col, resolved)
+            resolved = _resolve_casting_dtype(dtype)
+            new_schema = new_schema.with_dtype(col, str(resolved))
         return new_schema
 
     @fit_method
@@ -510,10 +631,10 @@ class CastingCalculator(BaseCalculator):
         final_map: dict[str, Any] = {}
         for col, dtype in column_types.items():
             if col in X.columns:
-                final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)
+                final_map[col] = _resolve_casting_dtype(dtype)
 
         if target_type and columns:
-            resolved_type = TYPE_ALIASES.get(str(target_type).lower(), target_type)
+            resolved_type = _resolve_casting_dtype(target_type)
             for col in columns:
                 if col in X.columns:
                     final_map[col] = resolved_type

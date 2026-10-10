@@ -11,16 +11,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.inference.fitted_pipeline import predict_pipeline
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 from skyulf.integrations.databricks.training.thresholds.threshold_training import (
     calibration_partition,
 )
-from skyulf.integrations.databricks.training.tuning.local_cv import (
-    LocalCVSpec,
-    evaluate_training_cv,
-)
-from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
+from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 from skyulf.modeling._evaluation.thresholds import apply_thresholds
 
 
@@ -63,7 +60,7 @@ def recipe(policy):
 def fit_artifact(tmp_path, frame, policy, engine):
     """Exercise the production local artifact path with no remote services."""
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    return fit_local_workflow(
+    return fit_workflow(
         recipe(policy),
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -80,7 +77,7 @@ def test_manual_binary_uses_explicit_positive_class(tmp_path, engine):
     artifact = fit_artifact(
         tmp_path, frame, {"mode": "manual", "positive_class": "class_0", "value": 0.8}, engine
     )
-    output = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    output = predict_pipeline(frame.drop(columns="target"), artifact)
     expected = np.where(output.probability_0 >= 0.8, "class_0", "class_1")
     assert artifact.manifest.use_tuned_thresholds
     np.testing.assert_array_equal(output.prediction, expected)
@@ -96,7 +93,7 @@ def test_manual_multiclass_matches_scaled_argmax(tmp_path, engine):
         {"class": "class_1", "value": 0.5},
     ]
     artifact = fit_artifact(tmp_path, frame, {"mode": "manual", "thresholds": values}, engine)
-    output = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    output = predict_pipeline(frame.drop(columns="target"), artifact)
     expected = np.array(["class_0", "class_1", "class_2"])[
         np.argmax(output.filter(like="probability_").to_numpy() / [0.9, 0.5, 0.2], axis=1)
     ]
@@ -218,7 +215,7 @@ def test_off_preserves_native_classifier(tmp_path):
     """Disabled decision policies retain the existing native predict behavior."""
     frame = fixture_frame()
     artifact = fit_artifact(tmp_path, frame, {"mode": "off"}, "pandas")
-    output = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    output = predict_pipeline(frame.drop(columns="target"), artifact)
     assert not artifact.manifest.use_tuned_thresholds
     np.testing.assert_array_equal(
         output.prediction,
@@ -230,16 +227,13 @@ def test_off_preserves_native_classifier(tmp_path):
 
 def test_cv_evaluates_manual_decisions():
     """CV must score the deployed cutoff rather than the classifier's native decisions."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
 
     frame = fixture_frame()
     result = evaluate_training_cv(
         frame,
         recipe({"mode": "manual", "value": 0.0, "positive_class": "class_0"}),
-        LocalCVSpec(enabled=True, folds=3, method="stratified_k_fold"),
+        CVSpec(enabled=True, folds=3, method="stratified_k_fold"),
         target_column="target",
     )
     assert result is not None
@@ -273,7 +267,7 @@ def test_reference_coefficients_probabilities_and_holdout_independence(
         test=native_holdout if mode == "auto" else native.head(0),
         train_sample_weight=weights,
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         data,
         target_column="target",
@@ -291,7 +285,7 @@ def test_reference_coefficients_probabilities_and_holdout_independence(
     reference = LogisticRegression(max_iter=500).fit(
         scaler.transform(fitting[list("abcd")]), fitting.target, sample_weight=weights[positions]
     )
-    actual = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    actual = predict_pipeline(frame.drop(columns="target"), artifact)
     expected_probabilities = reference.predict_proba(scaler.transform(frame[list("abcd")]))
     np.testing.assert_allclose(
         actual.filter(like="probability_").to_numpy(), expected_probabilities, rtol=0, atol=1e-10
@@ -319,7 +313,7 @@ def test_reference_coefficients_probabilities_and_holdout_independence(
 def test_auto_cv_respects_split_metadata(tmp_path, method, search, engine):
     """Temporal/group metadata must guide calibration without becoming estimator inputs."""
     frame = fixture_frame()
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         method=method,
@@ -375,7 +369,7 @@ def test_competition_scores_saved_decision_policy(tmp_path):
     artifact = fit_artifact(
         tmp_path, frame, {"mode": "manual", "value": 0.0, "positive_class": "class_0"}, "pandas"
     )
-    cv = LocalCVSpec(enabled=True, folds=3, method="stratified_k_fold")
+    cv = CVSpec(enabled=True, folds=3, method="stratified_k_fold")
     result = evaluate_competition_candidate(
         frame,
         artifact,
@@ -387,7 +381,7 @@ def test_competition_scores_saved_decision_policy(tmp_path):
     )
     assert result["mean"] == pytest.approx(0.5)
     assert result["fold_scores"] == pytest.approx([0.5] * 3)
-    from skyulf.integrations.databricks.training.competition.local_competition import choose_winner
+    from skyulf.integrations.databricks.training.competition.competition import choose_winner
 
     result["candidate"] = "threshold_candidate"
     assert choose_winner([result], {"threshold_candidate"})["winner"] == "threshold_candidate"
@@ -396,7 +390,7 @@ def test_competition_scores_saved_decision_policy(tmp_path):
 @pytest.mark.parametrize("nested,expected", [(False, 8), (True, 14)])
 def test_threshold_competition_budget_includes_outer_searches(nested, expected):
     """Repeated threshold-aware fold searches must not bypass the declared search budget."""
-    from skyulf.integrations.databricks.training.competition.local_competition import (
+    from skyulf.integrations.databricks.training.competition.competition import (
         _pipeline_trial_bound,
     )
 
@@ -407,7 +401,7 @@ def test_threshold_competition_budget_includes_outer_searches(nested, expected):
         "strategy": "grid",
         "search_space": {"C": [0.1, 1.0]},
     }
-    cv = LocalCVSpec(enabled=True, folds=3, method="nested_cv" if nested else "stratified_k_fold")
+    cv = CVSpec(enabled=True, folds=3, method="nested_cv" if nested else "stratified_k_fold")
     assert _pipeline_trial_bound(config, cv) == expected
 
 
@@ -425,7 +419,7 @@ def test_frozen_recipe_and_standalone_export_keep_positive_class(tmp_path):
     save_bundle(bundle, tmp_path / "standalone")
     restored = load_bundle(tmp_path / "standalone")
     actual = predict_local(frame.drop(columns="target"), restored)
-    expected = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    expected = predict_pipeline(frame.drop(columns="target"), artifact)
     assert restored.manifest.thresholds.positive_class == "class_0"
     np.testing.assert_array_equal(actual.prediction, expected.prediction)
 
@@ -440,7 +434,7 @@ def test_threshold_cv_chart_contract():
     report = evaluate_training_cv(
         fixture_frame(),
         recipe({"mode": "manual", "value": 0.8, "positive_class": "class_0"}),
-        LocalCVSpec(enabled=True, folds=2),
+        CVSpec(enabled=True, folds=2),
         target_column="target",
     )
     assert report is not None
@@ -460,7 +454,7 @@ def test_probability_incapable_model_fails(tmp_path, mode):
     config = recipe(policy)
     config["modeling"] = {"type": "svc", "params": {"probability": False}}
     with pytest.raises(ValueError, match="predict_proba|probabilit"):
-        fit_local_workflow(
+        fit_workflow(
             config,
             SplitDataset(train=frame, test=frame.head(0)),
             target_column="target",
@@ -542,7 +536,7 @@ def test_binary_competition_probability_metric_aliases(tmp_path, metric):
     artifact = fit_artifact(
         tmp_path, frame, {"mode": "manual", "positive_class": "class_0", "value": 0.8}, "pandas"
     )
-    cv = LocalCVSpec(enabled=True, folds=2, method="stratified_k_fold")
+    cv = CVSpec(enabled=True, folds=2, method="stratified_k_fold")
     result = evaluate_competition_candidate(
         frame,
         artifact,
@@ -563,7 +557,7 @@ def test_binary_competition_probability_metric_aliases(tmp_path, metric):
         max_bytes=10_000_000,
     )
     assert result["fold_scores"] == pytest.approx(expected["fold_scores"])
-    from skyulf.inference.local_evaluation import evaluate_local_holdout
+    from skyulf.inference.pipeline_evaluation import evaluate_holdout
 
-    heldout = evaluate_local_holdout(artifact, frame, target_column="target")
+    heldout = evaluate_holdout(artifact, frame, target_column="target")
     assert heldout[f"heldout_{metric}"] == pytest.approx(heldout[f"heldout_{base}"])

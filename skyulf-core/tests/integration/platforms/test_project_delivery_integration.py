@@ -14,9 +14,9 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
 _FEATURE_SOURCE = '''"""A saved asset and external library define the nonlinear feature."""
 import json
@@ -67,7 +67,7 @@ def _fit_saved_package(tmp_path, engine="pandas"):
     rows = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 9.0, 19.0, 33.0]})
     native = pl.from_pandas(rows) if engine == "polars" else rows
     artifact_path = tmp_path / "local-artifact"
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -93,13 +93,13 @@ def test_saved_pipeline_assets_and_pins_replay_in_fresh_process(tmp_path, engine
     manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["project_requirements"] == [pin]
     query = pd.DataFrame({"x": [5.0, 6.0]})
-    np.testing.assert_allclose(predict_local_pipeline(query, artifact)["prediction"], [51.0, 73.0])
+    np.testing.assert_allclose(predict_pipeline(query, artifact)["prediction"], [51.0, 73.0])
     _remove_original_package(root)
     code = (
         "import json, sys, pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline\n"
-        "artifact = load_local_pipeline(sys.argv[1])\n"
-        "result = predict_local_pipeline(pd.DataFrame({'x': [5., 6.]}), artifact)\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline\n"
+        "artifact = load_pipeline(sys.argv[1])\n"
+        "result = predict_pipeline(pd.DataFrame({'x': [5., 6.]}), artifact)\n"
         "print(json.dumps({'predictions': result['prediction'].tolist(), "
         "'pins': artifact.manifest.project_requirements}))\n"
     )
@@ -119,7 +119,7 @@ def test_saved_pipeline_assets_and_pins_replay_in_fresh_process(tmp_path, engine
 @pytest.mark.parametrize("available", ["changed", "missing"])
 def test_saved_project_dependency_rejected_before_unpickle(tmp_path, monkeypatch, available):
     """Even a cached project module cannot bypass dependency verification during loading."""
-    from skyulf.inference import local_pipeline, project_dependencies
+    from skyulf.inference import fitted_pipeline, project_dependencies
 
     _, path, _, _ = _fit_saved_package(tmp_path)
     original_version = project_dependencies.version
@@ -137,19 +137,19 @@ def test_saved_project_dependency_rejected_before_unpickle(tmp_path, monkeypatch
         raise AssertionError("unpickle ran before project dependency verification")
 
     monkeypatch.setattr(project_dependencies, "version", installed_version)
-    monkeypatch.setattr(local_pipeline.pickle, "loads", forbid_unpickle)
+    monkeypatch.setattr(fitted_pipeline.pickle, "loads", forbid_unpickle)
     with pytest.raises(ValueError, match="Project dependency packaging"):
-        load_local_pipeline(path)
+        load_pipeline(path)
 
 
 def test_preloaded_mlflow_adapter_unpickles_before_project_context(tmp_path):
     """MLflow may serialize after loading context, but fresh workers need context first."""
     pytest.importorskip("mlflow")
     cloudpickle = pytest.importorskip("cloudpickle")
-    from skyulf.integrations.mlflow.models.local_model import SkyulfLocalPythonModel
+    from skyulf.integrations.mlflow.models.pipeline_model import SkyulfPipelinePythonModel
 
     root, path, _, _ = _fit_saved_package(tmp_path)
-    model = SkyulfLocalPythonModel()
+    model = SkyulfPipelinePythonModel()
     model.load_context(SimpleNamespace(artifacts={"local_pipeline": str(path)}))
     model.__dict__["_delivery_metadata"] = {"marker": "preserved"}
     saved = tmp_path / "python_model.pkl"
@@ -181,7 +181,7 @@ def test_preloaded_mlflow_adapter_unpickles_before_project_context(tmp_path):
 def test_mlflow_delivers_saved_assets_and_exact_external_pins(tmp_path, monkeypatch):
     """A real logged pyfunc must carry dependency pins and replay without original assets."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
@@ -195,7 +195,7 @@ def test_mlflow_delivers_saved_assets_and_exact_external_pins(tmp_path, monkeypa
     try:
         with track_run(config, run_name="project-delivery") as run:
             assert run.run_id is not None
-            model_uri = log_local_model(
+            model_uri = log_pipeline_model(
                 path, run_id=run.run_id, artifact_path="model", tracking_uri=tracking_uri
             )
         mlflow.set_tracking_uri(tracking_uri)

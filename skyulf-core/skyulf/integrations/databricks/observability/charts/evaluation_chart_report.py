@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ....mlflow.registration.registry import load_run_local_pipeline
+from ....mlflow.registration.registry import load_run_pipeline
 from .evaluation_chart_data import load_chart_sample
 from .evaluation_charts import chart_figure, diagnostic_charts, model_charts
 
@@ -54,7 +54,7 @@ def report_model(
     if sample is None:
         report["skipped"] = [metadata["reason"]]
         return report
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         f"runs:/{identity['run_id']}/model",
         digest=identity["model_digest"],
         tracking_uri=tracking_uri,

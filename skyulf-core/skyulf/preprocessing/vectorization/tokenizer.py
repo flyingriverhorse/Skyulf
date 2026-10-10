@@ -15,14 +15,18 @@ import pandas as pd
 import polars as pl
 from sklearn.feature_extraction.text import CountVectorizer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TokenizerArtifact
+from .._fitted_validation import local_boolean, local_state_fields
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import (
     _drop_and_concat,
     _drop_and_concat_polars,
     _text_series,
+    _validate_text_layout,
+    _validate_text_settings,
     apply_text_dual_engine,
     resolve_fit_text_valid_columns,
     validate_text_output_names,
@@ -70,7 +74,7 @@ def _tokenizer_apply_pandas(
         tokens = text.map(analyze)
         outputs[f"{col}__tokens"] = tokens.map(" ".join)  # ty: ignore[no-matching-overload]
         if add_token_count:
-            outputs[f"{col}__token_count"] = tokens.map(len)
+            outputs[f"{col}__token_count"] = tokens.map(len).astype("int64")
 
     return _drop_and_concat(X, outputs, valid_cols, drop_original), y
 
@@ -96,9 +100,13 @@ def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
         if series.dtype != pl.String:
             return None
         tokens = [analyze(text) for text in series.fill_null("").to_list()]
-        new_cols.append(pl.Series(f"{col}__tokens", [" ".join(toks) for toks in tokens]))
+        new_cols.append(
+            pl.Series(f"{col}__tokens", [" ".join(toks) for toks in tokens], dtype=pl.String)
+        )
         if add_token_count:
-            new_cols.append(pl.Series(f"{col}__token_count", [len(toks) for toks in tokens]))
+            new_cols.append(
+                pl.Series(f"{col}__token_count", [len(toks) for toks in tokens], dtype=pl.Int64)
+            )
 
     return _drop_and_concat_polars(X, pl.DataFrame(new_cols), valid_cols, drop_original)
 
@@ -115,6 +123,43 @@ class TokenizerApplier(BaseApplier):
     on every call. The polars path runs natively and falls back to pandas when a
     text column is not String dtype.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved analyzer configuration without constructing or executing it."""
+        fields = {
+            "type",
+            "columns",
+            "analyzer",
+            "lowercase",
+            "stop_words",
+            "ngram_range",
+            "output_columns",
+            "add_token_count",
+            "drop_original",
+        }
+        if not local_state_fields(raw, "tokenizer", fields, allow_empty=True):
+            return raw
+        _validate_text_layout(raw)
+        _validate_text_settings(raw["lowercase"], raw["stop_words"], raw["ngram_range"])
+        if raw["add_token_count"] is not None:
+            local_boolean(raw["add_token_count"], "add_token_count")
+        if not callable(raw["analyzer"]) and raw["analyzer"] not in ("word", "char", "char_wb"):
+            raise ValueError("Fitted tokenizer analyzer is unknown.")
+        expected = _build_tokenizer_artifact(raw, raw["columns"])["output_columns"]
+        if list(raw["output_columns"]) != expected:
+            raise ValueError("Fitted tokenizer output names disagree with its selected columns.")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe per-document tokenization without promising arbitrary callback behavior."""
+        if engine not in ("pandas", "polars"):
+            return None
+        TokenizerApplier.validate_inference_state(state)
+        if state and callable(state["analyzer"]):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

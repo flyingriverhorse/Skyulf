@@ -3,6 +3,7 @@ resources:
     monitoring:
       name: ${bundle.name}_monitoring
       tags: ${var.job_tags}
+      budget_policy_id: ${var.monitoring_budget_policy_id}
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -37,7 +38,7 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -81,7 +82,7 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -120,7 +121,7 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -143,7 +144,7 @@ resources:
       environments:
         - environment_key: monitoring
           spec:
-            client: "4"
+            client: ${var.monitoring_environment_version}
             dependencies:
               - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/requirements.txt

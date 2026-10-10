@@ -61,8 +61,8 @@ def _project(tmp_path, source_text=SOURCE, *, package=False):
 def test_project_code_and_fitted_state_survive_without_the_project_file(tmp_path, engine, recipe):
     """Inference must use saved training code/state even after the project file changes."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.inference.fitted_pipeline import predict_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     source_text = SOURCE
     if recipe == "custom_fixture":
@@ -82,7 +82,7 @@ def build_preprocessing():
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     if engine == "polars":
         frame = pl.from_pandas(frame)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -92,15 +92,15 @@ def build_preprocessing():
     )
     assert artifact.pipeline.feature_engineer.fitted_steps[1]["artifact"]["mean"] == 2.5
     assert artifact.manifest.project_source_sha256
-    expected = predict_local_pipeline(pd.DataFrame({"x": [5.0, 6.0]}), artifact)["prediction"]
+    expected = predict_pipeline(pd.DataFrame({"x": [5.0, 6.0]}), artifact)["prediction"]
     source.write_text(
         "raise RuntimeError('edited project must not run during inference')", encoding="utf-8"
     )
     code = """
 import json, sys, pandas as pd
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-artifact = load_local_pipeline(sys.argv[1])
-print(json.dumps(predict_local_pipeline(pd.DataFrame({"x": [5., 6.]}), artifact)["prediction"].tolist()))
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+artifact = load_pipeline(sys.argv[1])
+print(json.dumps(predict_pipeline(pd.DataFrame({"x": [5., 6.]}), artifact)["prediction"].tolist()))
 """
     loaded = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path / "artifact")],
@@ -245,10 +245,7 @@ def test_tuning_hook_is_bounded_and_ignored_for_ordinary_model(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_project_custom_fit_is_repeated_inside_cv_folds(tmp_path, monkeypatch, engine):
     """Custom learned preprocessing must never reuse a full-data mean inside CV."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
 
@@ -273,7 +270,7 @@ def test_project_custom_fit_is_repeated_inside_cv_folds(tmp_path, monkeypatch, e
     result = evaluate_training_cv(
         frame,
         config["pipeline"],
-        LocalCVSpec(enabled=True, folds=3, shuffle=False),
+        CVSpec(enabled=True, folds=3, shuffle=False),
         target_column="target",
     )
     assert result is not None
@@ -286,8 +283,8 @@ def test_mlflow_custom_code_loads_in_a_fresh_process(tmp_path, monkeypatch, engi
     """The complete MLflow package must predict without access to the project source."""
     mlflow = pytest.importorskip("mlflow")
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
@@ -295,7 +292,7 @@ def test_mlflow_custom_code_loads_in_a_fresh_process(tmp_path, monkeypatch, engi
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     if engine == "polars":
         frame = pl.from_pandas(frame)
-    fit_local_workflow(
+    fit_workflow(
         config["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -308,7 +305,7 @@ def test_mlflow_custom_code_loads_in_a_fresh_process(tmp_path, monkeypatch, engi
         TrackingConfig(enabled=True, tracking_uri=uri, experiment_name="project"), run_name="custom"
     ) as run:
         assert run.run_id is not None
-        model_uri = log_local_model(
+        model_uri = log_pipeline_model(
             tmp_path / "artifact", run_id=run.run_id, artifact_path="model", tracking_uri=uri
         )
     downloaded = mlflow.artifacts.download_artifacts(artifact_uri=model_uri, tracking_uri=uri)
@@ -332,13 +329,13 @@ print(json.dumps(model.predict(pd.DataFrame({"x": [5.,6.]}))["prediction"].tolis
 def test_changed_packaged_source_is_rejected_before_import(tmp_path):
     """A damaged code snapshot cannot execute before its checksum is checked."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.inference.fitted_pipeline import load_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     config, _ = _project(tmp_path)
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [3.0, 5.0, 7.0]})
     path = tmp_path / "artifact"
-    fit_local_workflow(
+    fit_workflow(
         config["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -350,14 +347,14 @@ def test_changed_packaged_source_is_rejected_before_import(tmp_path):
         "raise RuntimeError('must not execute')", encoding="utf-8"
     )
     with pytest.raises(ValueError, match="source checksum"):
-        load_local_pipeline(path)
+        load_pipeline(path)
 
 
 def test_two_saved_code_versions_keep_their_own_transformations(tmp_path):
     """Loading another model's same-named classes cannot replace the first model's code."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.integrations.databricks.projects.project import load_project_workflow
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     source = tmp_path / "preprocessing.py"
@@ -374,7 +371,7 @@ def test_two_saved_code_versions_keep_their_own_transformations(tmp_path):
             {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
             source,
         )
-        fit_local_workflow(
+        fit_workflow(
             config["pipeline"],
             SplitDataset(train=frame, test=frame[:0]),
             target_column="target",
@@ -384,9 +381,9 @@ def test_two_saved_code_versions_keep_their_own_transformations(tmp_path):
         )
     code = """
 import json, sys, pandas as pd
-from skyulf.inference.local_pipeline import load_local_pipeline
-first = load_local_pipeline(sys.argv[1])
-second = load_local_pipeline(sys.argv[2])
+from skyulf.inference.fitted_pipeline import load_pipeline
+first = load_pipeline(sys.argv[1])
+second = load_pipeline(sys.argv[2])
 print(json.dumps([
     float(model.pipeline.feature_engineer.transform(pd.DataFrame({"x": [3.]}))["x"].iloc[0])
     for model in (first, second, first)

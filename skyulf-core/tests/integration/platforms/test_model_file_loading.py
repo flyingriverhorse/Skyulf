@@ -106,12 +106,12 @@ def test_legacy_json_model_loads_without_single_file(tmp_path):
 
 def test_saved_model_parameters_replay_without_editable_file(tmp_path):
     """Saved training plans must retain resolved parameters after project files change."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
-    from skyulf.integrations.databricks.training.local_branches import (
+    from skyulf.integrations.databricks.training.branches import (
         TrainingBranch,
         branch_training_payload,
         restore_training_branches,
     )
+    from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
 
     features, modeling = _project(tmp_path)
     path = modeling / "single_model.py"
@@ -122,7 +122,7 @@ def test_saved_model_parameters_replay_without_editable_file(tmp_path):
     config = load_project_workflow(_single_config(), features)
     branch = TrainingBranch(
         name="result",
-        spec=LocalTrainingSpec(
+        spec=TrainingSpec(
             table="workspace.test.rows",
             version=0,
             record_key_columns=("id",),

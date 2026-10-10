@@ -11,8 +11,40 @@ from math import isfinite
 from numbers import Real
 from typing import Any
 
+import numpy as np
+import polars as pl
+
 from ...utils import detect_numeric_columns, resolve_columns
 from .._helpers import decimal_columns_to_float
+
+
+def divide_polars_column(X: Any, column: pl.Expr | pl.Series, scale: Any) -> Any:
+    """Keep native bulk division and promotion identical across eager and lazy batches."""
+    denominator = scale if scale != 0 else 1.0
+    divided = column / denominator
+    if isinstance(column, pl.Series):
+        return divided
+    dtype = X.lazy().select(column).collect_schema().dtypes()[0]
+    if not (dtype in (pl.Float32, pl.Float64) or (dtype.is_integer() and dtype != pl.Int128)):
+        return divided
+    output_dtype = X.lazy().select(divided).collect_schema().dtypes()[0]
+    if output_dtype not in (pl.Float32, pl.Float64):
+        return divided
+    denominator = denominator.item() if isinstance(denominator, np.generic) else denominator
+    return column.cast(output_dtype).map_batches(
+        lambda values: values / denominator, return_dtype=output_dtype, is_elementwise=True
+    )
+
+
+def validate_scaler_vector(value: Any, size: int, *, nonnegative: bool = False) -> None:
+    """Inspect saved numeric arrays, retaining NaN statistics from all-null columns."""
+    if type(value) is not list or len(value) != size:
+        raise ValueError("Fitted scaler arrays must match the fitted columns.")
+    for item in value:
+        if not isinstance(item, Real) or isinstance(item, bool):
+            raise ValueError("Fitted scaler arrays must contain real numbers.")
+        if item in (float("inf"), float("-inf")) or (nonnegative and item < 0):
+            raise ValueError("Fitted scaler arrays contain invalid statistics.")
 
 
 def validate_scaling_range(value: Any, name: str) -> tuple[Any, Any]:

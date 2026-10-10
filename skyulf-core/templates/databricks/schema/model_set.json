@@ -67,7 +67,7 @@
     "type": "string",
     "default": "",
     "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-    "description": "6. Multi-model outputs | Prefix for each model view: <prefix>_<branch>. Blank = <project_name>_predictions. Customize individual names or select models in src/modeling/model_set.py",
+    "description": "6. Multi-model outputs | Prefix for each model view: <prefix>_<branch>. Blank = <project_name>_predictions. Customize individual names or select models in config/inference.yml (model_set)",
     "skip_prompt_if": {
       "anyOf": [
         {

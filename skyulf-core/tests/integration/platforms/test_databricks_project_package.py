@@ -11,9 +11,9 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import predict_local_pipeline
+from skyulf.inference.fitted_pipeline import predict_pipeline
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
 
 def _package(root):
@@ -50,12 +50,14 @@ def _config():
 def test_package_artifact_loads_without_editable_modules(tmp_path, engine):
     """Relative-imported custom classes must load from saved code in a fresh interpreter."""
     root = _package(tmp_path / "features")
+    (root / "groups").mkdir()
+    (root / "groups/company.py").write_text("raise AssertionError('Spark producer')\n")
     config = load_project_workflow(_config(), root)
     assert config["pre_split_steps"][0]["pre_split"]["required_columns"] == ["is_test"]
     rows = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [3.0, 5.0, 7.0, 9.0]})
     if engine == "polars":
         rows = pl.from_pandas(rows)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=rows, test=rows[:0]),
         target_column="target",
@@ -63,15 +65,15 @@ def test_package_artifact_loads_without_editable_modules(tmp_path, engine):
         max_rows=10,
         max_bytes=10000,
     )
-    expected = predict_local_pipeline(pd.DataFrame({"x": [5.0, 6.0]}), artifact)["prediction"]
+    expected = predict_pipeline(pd.DataFrame({"x": [5.0, 6.0]}), artifact)["prediction"]
     assert artifact.pipeline.feature_engineer.fitted_steps[0]["artifact"]["mean"] == 2.5
     for path in root.rglob("*.py"):
         path.write_text("raise RuntimeError('editable project must not load')\n", encoding="utf-8")
     code = (
         "import json, sys, pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline\n"
-        "artifact = load_local_pipeline(sys.argv[1])\n"
-        "print(json.dumps(predict_local_pipeline(pd.DataFrame({'x':[5.,6.]}), artifact)['prediction'].tolist()))\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline\n"
+        "artifact = load_pipeline(sys.argv[1])\n"
+        "print(json.dumps(predict_pipeline(pd.DataFrame({'x':[5.,6.]}), artifact)['prediction'].tolist()))\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path / "artifact")],
@@ -98,6 +100,50 @@ def test_package_helper_changes_isolate_registered_versions(tmp_path):
     )
 
 
+def test_spark_groups_do_not_change_model_source_or_consume_its_budget(tmp_path):
+    """Upstream producers must not enter saved inference code or its source-size limit."""
+    root = _package(tmp_path / "features")
+    before = load_project_workflow(_config(), root)
+    (root / "groups").mkdir()
+    (root / "groups/company.py").write_text(
+        "raise AssertionError('Spark producer is not a model hook')\n#" + "x" * 65536,
+        encoding="utf-8",
+    )
+    after = load_project_workflow(_config(), root)
+    assert after["pipeline"]["project_python_source"] == before["pipeline"]["project_python_source"]
+    assert after["pipeline"]["preprocessing"] == before["pipeline"]["preprocessing"]
+
+
+def test_model_helpers_can_still_use_nested_groups_packages(tmp_path):
+    """Only the reserved top-level producer directory is excluded from feature snapshots."""
+    from skyulf.inference.project_code import load_project_module
+
+    root = _package(tmp_path / "features")
+    helpers = root / "custom/groups"
+    helpers.mkdir()
+    (helpers / "__init__.py").write_text("VALUE = 7\n", encoding="utf-8")
+    init = root / "__init__.py"
+    init.write_text(init.read_text(encoding="utf-8") + "\nfrom .custom.groups import VALUE\n")
+    config = load_project_workflow(_config(), root)
+    saved = load_project_module(config["pipeline"]["project_python_source"])
+    assert saved.VALUE == 7
+
+
+def test_non_feature_package_still_captures_groups_modules(tmp_path):
+    """Composition and generic callers must not silently lose helpers named groups."""
+    from skyulf.inference.project_code import load_project_module
+    from skyulf.integrations.databricks.model_sets.model_set_project import (
+        capture_set_composition,
+    )
+
+    root = tmp_path / "src/composition"
+    (root / "groups").mkdir(parents=True)
+    (root / "__init__.py").write_text("from .groups import VALUE\n")
+    (root / "groups/__init__.py").write_text("VALUE = 11\n")
+    source = capture_set_composition({"config_path": str(tmp_path / "config/training.yml")})
+    assert load_project_module(source).VALUE == 11
+
+
 def test_package_snapshot_rejects_missing_init_and_oversize(tmp_path):
     """Incomplete or oversized packages cannot silently drop source from model delivery."""
     root = tmp_path / "features"
@@ -112,14 +158,11 @@ def test_package_snapshot_rejects_missing_init_and_oversize(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_package_custom_filter_and_fold_learning_remain_separate(tmp_path, monkeypatch, engine):
     """Filtering precedes splitting while custom fitted means use each CV training fold."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         split_labeled_snapshot,
     )
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
     from skyulf.preprocessing.base import BaseCalculator
     from skyulf.registry import NodeRegistry
 
@@ -133,7 +176,7 @@ def test_package_custom_filter_and_fold_learning_remain_separate(tmp_path, monke
             "is_test": [False] * 12 + [True] * 4,
         }
     )
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.labels",
         version=0,
         record_key_columns=("id",),
@@ -164,7 +207,7 @@ def test_package_custom_filter_and_fold_learning_remain_separate(tmp_path, monke
     report = evaluate_training_cv(
         eligible,
         config["pipeline"],
-        LocalCVSpec(enabled=True, folds=3, shuffle=False),
+        CVSpec(enabled=True, folds=3, shuffle=False),
         target_column="target",
     )
     assert report is not None

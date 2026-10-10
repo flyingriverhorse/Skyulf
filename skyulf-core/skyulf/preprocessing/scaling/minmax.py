@@ -1,16 +1,20 @@
 """Min-max scaler node (scale features into a given range)."""
 
+import math
 from typing import Any, cast
 
 import numpy as np
 import polars as pl
 from sklearn.preprocessing import MinMaxScaler
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import _normalize
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import MinMaxScalerArtifact
+from .._fitted_validation import _columns, _fields, fitted_columns
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -23,7 +27,23 @@ from ._common import _select_subset_pandas, _select_subset_polars, validate_scal
 
 
 class MinMaxScalerApplier(BaseApplier):
-    """Rescale the selected columns into the fitted ``feature_range``."""
+    """Rescale selected columns or replay an explicit empty selection unchanged.
+
+    Empty artifacts declare identity only with an explicit empty column recipe.
+    Automatic selections and non-finite learned coefficients remain unreviewed.
+    """
+
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return _minmax_state(raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        if not state and (not user_picked_no_columns(raw) or raw.get("_auto_columns")):
+            raise ValueError("An empty scaler artifact requires explicit empty columns.")
+        return _minmax_config(fitted_columns(_minmax_values(raw), state or {"columns": []}), state)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -64,7 +84,14 @@ class MinMaxScalerApplier(BaseApplier):
         return X_out, _y
 
 
-@NodeRegistry.register("MinMaxScaler", MinMaxScalerApplier)
+@NodeRegistry.register(
+    "MinMaxScaler",
+    MinMaxScalerApplier,
+    execution_capabilities=(
+        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
+    ),
+)
 @node_meta(
     id="MinMaxScaler",
     name="Min-Max Scaler",
@@ -123,3 +150,66 @@ def _fit_minmax(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[
         "feature_range": feature_range,
         "columns": cols,
     }
+
+
+def _minmax_values(raw: dict) -> dict:
+    """Normalize only the exact tuple range emitted by the built-in scaler fit."""
+    if type(raw) is not dict:
+        raise ValueError("MinMax state and configuration require a plain mapping.")
+    values = dict(raw)
+    bounds = values.get("feature_range")
+    if type(bounds) is tuple:
+        values["feature_range"] = list(bounds)
+    return _normalize(values)
+
+
+def _minmax_range(bounds: Any) -> None:
+    """Keep the fitted affine range explicit, finite and strictly increasing."""
+    _finite_vector(bounds, 2)
+    try:
+        validate_scaling_range(bounds, "feature_range")
+    except ValueError as exc:
+        raise ValueError("MinMax feature_range must be strictly increasing.") from exc
+
+
+def _finite_vector(values: Any, size: int) -> None:
+    """Require aligned finite numeric coefficients without coercion or custom arrays."""
+    if type(values) is not list or len(values) != size:
+        raise ValueError("MinMax statistic vectors must align with fitted columns.")
+    if any(type(value) not in (int, float) for value in values):
+        raise ValueError("MinMax statistics require finite numeric scalars.")
+    try:
+        finite = all(math.isfinite(value) for value in values)
+    except OverflowError as exc:
+        raise ValueError("MinMax statistics exceed finite numeric bounds.") from exc
+    if not finite:
+        raise ValueError("MinMax statistics require finite numeric scalars.")
+
+
+def _minmax_state(raw: dict) -> dict:
+    """Inspect the scalar artifact actually executed instead of admitting a native scaler."""
+    state = _minmax_values(raw)
+    if not state:
+        return state
+    _fields(state, {"type", "columns", "min", "scale", "data_min", "data_max", "feature_range"})
+    columns = _columns(state["columns"])
+    if state["type"] != "minmax_scaler" or not columns:
+        raise ValueError("MinMax requires nonempty fitted affine state.")
+    _minmax_range(state["feature_range"])
+    for name in ("min", "scale", "data_min", "data_max"):
+        _finite_vector(state[name], len(columns))
+    if any(value <= 0 for value in state["scale"]):
+        raise ValueError("MinMax fitted scales must be positive.")
+    if any(low > high for low, high in zip(state["data_min"], state["data_max"], strict=True)):
+        raise ValueError("MinMax fitted extrema are inverted.")
+    return state
+
+
+def _minmax_config(params: dict, state: dict) -> dict:
+    """Bind defaults and explicit range options to the saved fitted column contract."""
+    resolved = {"feature_range": [0, 1], **params}
+    _fields(resolved, {"columns", "feature_range"})
+    _minmax_range(resolved["feature_range"])
+    if state and resolved["feature_range"] != state["feature_range"]:
+        raise ValueError("Configured MinMax range disagrees with fitted state.")
+    return resolved

@@ -28,7 +28,7 @@ def serving_identity(config: MonitorConfig) -> dict:
     }
 
 
-def _spark_dtype(dtype: str) -> str:
+def spark_dtype(dtype: str) -> str:
     """Map declared fitted scalar types without inferring types from live request values."""
     normalized = normalized_dtype(dtype)
     types = {
@@ -51,16 +51,16 @@ def _spark_dtype(dtype: str) -> str:
 
 def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tuple, str]:
     """Project component inputs and standard outputs without mixing sibling targets."""
-    from skyulf.inference.local_scoring import prediction_output_schema  # noqa: PLC0415
+    from skyulf.inference.pipeline_scoring import prediction_output_schema  # noqa: PLC0415
 
     manifest = artifact.manifest
     inputs = tuple(
-        (name, _spark_dtype(dtype))
+        (name, spark_dtype(dtype))
         for name, dtype in zip(manifest.input_columns, manifest.input_dtypes, strict=True)
     )
     prefix = f"{config.model_set_branch}__" if config.model_set_branch else ""
     outputs = tuple(
-        (prefix + c.name, _spark_dtype(c.dtype)) for c in prediction_output_schema(artifact)
+        (prefix + c.name, spark_dtype(c.dtype)) for c in prediction_output_schema(artifact)
     )
     if config.model_set_branch or artifact.pipeline.config.get("project_scoring") is not None:
         outputs += ((prefix + "scoring_status", "string"),)

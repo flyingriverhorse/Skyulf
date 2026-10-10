@@ -1,4 +1,4 @@
-# MLflow model registry (development)
+# MLflow model registry
 
 Skyulf keeps model publication and model selection as explicit operations. The
 registry adapter is optional: importing the core package does not import MLflow,
@@ -60,13 +60,9 @@ and `digest` fields are read from the packaged MLflow model metadata; they are
 validation data, not a second feature-engineering implementation.
 
 For Unity Catalog, pass a three-part model name (`catalog.schema.model`) and a
-`databricks-uc` registry URI. Tracking and registry URIs remain separate. The
-local tests cover configuration validation and separate stores. A live
-Databricks serverless Spark Connect 4.2.0 test registered and loaded a
-Polars-trained regression bundle, then verified both Spark inference modes.
-A separate restricted service principal loaded an allowed model and received
-`RegistryAccessError` for a model without `EXECUTE` permission. This evidence
-does not establish compatibility with every compute type or registry backend.
+`databricks-uc` registry URI. Tracking and registry URIs remain separate. Grant the job identity the model
+permissions required by its operation, including `EXECUTE` for loading a UC model.
+Validate the recorded dependencies and artifact contract on the selected compute.
 
 Load the selected artifact with `load_registered_bundle`. It uses the pinned
 name/version and the package's declared bundle path, rejects paths outside the
@@ -74,10 +70,10 @@ downloaded package, and checks the package/bundle digest against `resolved.diges
 The same bundle can then be passed to `predict_local` or either Spark inference
 mode, subject to their existing schema and FE capabilities.
 
-For fitted pandas/Polars packages created with `log_local_model`, use
-`load_registered_local_pipeline(resolved, ...)` instead. It verifies the
+For fitted pandas/Polars packages created with `log_pipeline_model`, use
+`load_registered_pipeline(resolved, ...)` instead. It verifies the
 declared local artifact path, scope, engine and payload digest against the
-pinned registry version. That package supports whole-frame local inference;
+pinned registry version. That package supports whole-frame pandas/Polars inference;
 it does not become a Spark bundle merely because it is registered.
 
 ```python
@@ -93,7 +89,7 @@ assert bundle.semantic_digest == resolved.digest
 
 ## How the adapters use Skyulf Core
 
-The Databricks local workflow calls Skyulf Core's existing pipeline fit and
+The Databricks Python workflow calls Skyulf Core's existing pipeline fit and
 prediction methods. Its UC reader and Delta writer handle transport and
 publication; they do not reimplement feature engineering or model behavior.
 The MLflow adapter packages that same saved pipeline, resolves a registry
@@ -106,10 +102,10 @@ For example, a training job can log every available held-out metric to
 its own MLflow run without implementing a second evaluator:
 
 ```python
-from skyulf.inference.local_evaluation import evaluate_local_holdout
+from skyulf.inference.pipeline_evaluation import evaluate_holdout
 from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
-metrics = evaluate_local_holdout(artifact, heldout, target_column="target")
+metrics = evaluate_holdout(artifact, heldout, target_column="target")
 with track_run(
     TrackingConfig(enabled=True, experiment_name="customer-risk"),
     run_name="candidate-training",
@@ -117,7 +113,7 @@ with track_run(
     run.log_metrics(metrics)
 ```
 
-## Compare a local challenger before promotion
+## Compare a candidate before promotion
 
 For a fitted pandas/Polars pipeline, resolve both registered versions to
 concrete identities and evaluate them on the **same held-out labeled rows**.
@@ -129,7 +125,7 @@ It accepts a row/memory budget and rejects incompatible tasks or class labels.
 
 ```python
 from skyulf.integrations.mlflow.registration.registry import resolve_model
-from skyulf.integrations.mlflow.lifecycle.validation import compare_registered_local_models
+from skyulf.integrations.mlflow.lifecycle.validation import compare_registered_pipeline_models
 
 candidate = resolve_model(
     "catalog.schema.customer_risk", version="2", registry_uri="databricks-uc"
@@ -137,7 +133,7 @@ candidate = resolve_model(
 champion = resolve_model(
     "catalog.schema.customer_risk", alias="champion", registry_uri="databricks-uc"
 )
-report = compare_registered_local_models(
+report = compare_registered_pipeline_models(
     candidate,
     champion,
     heldout,  # bounded pandas or Polars frame with raw inputs and true labels
@@ -185,7 +181,7 @@ candidate. Merely registering or comparing a model never assigns an alias.
 
 An orchestrator can explicitly create `ChallengerLifecycle` from
 `skyulf.integrations.mlflow.lifecycle.challenger` and pass its `registered` method as
-`train_local_candidate(..., on_registered=...)`. This nominates a registered
+`train_candidate(..., on_registered=...)`. This nominates a registered
 contender before comparison, with `validation_status=pending`. After evaluation,
 `stage_challenger` records `passed` or `rejected`; `lifecycle.failed()` records
 `error` for a still-pending comparison without overwriting a completed result.
@@ -337,15 +333,6 @@ digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later
 alias move does not redirect the pinned reference.
 
-The `skyulf-core/tests/fixtures/databricks_batch_smoke.py` fixture logs a uniquely
-named test model, loads
-its concrete registry version, and compares known gold predictions through both
-Spark inference modes. It accepts pandas or Polars training and emits a partial
-validation report. Local SQLite/Spark evidence does not certify live Unity Catalog,
-wheel deployment, distributed admission, Delta publication or platform scale.
-
 Registry resolution/loading does not predict, mutate aliases, start Spark or
-write a table. HTTP/SQL endpoints remain later initiative tasks. The
-[local-engine Bundle](databricks_bundle.md) integrates the existing services;
-the monthly Spark/Delta runner has its own
-[batch contract](databricks_batch.md).
+write a table. Use the [Databricks Bundle](databricks_bundle.md) for generated jobs
+and the [batch publication guide](databricks_batch.md) for the Delta sink contract.

@@ -41,9 +41,9 @@ def test_numeric_ks_result_requires_probability(monkeypatch):
     frame.count.return_value = 4
     frame.agg.return_value.first.return_value = {"origin": 0.0, "std": 1.0}
     frame.schema.__getitem__.return_value.dataType.typeName.return_value = "double"
-    monkeypatch.setattr(drift, "_functions", MagicMock)
-    monkeypatch.setattr(drift, "_column", MagicMock())
-    monkeypatch.setattr(drift, "_exists", lambda value: False)
+    monkeypatch.setattr(drift, "spark_functions", MagicMock)
+    monkeypatch.setattr(drift, "spark_column", MagicMock())
+    monkeypatch.setattr(drift, "has_spark_rows", lambda value: False)
     monkeypatch.setattr(drift, "_numeric_frame", lambda *args: frame)
     monkeypatch.setattr(drift, "_cdf_statistics", lambda *args: (0.5, 1.0))
     monkeypatch.setattr(drift, "_histogram_metrics", lambda *args: (0.5, 0.5))

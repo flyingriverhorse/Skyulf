@@ -9,14 +9,14 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 from skyulf.integrations.databricks.training.competition.competition_evaluation import (
     competition_metric,
     evaluate_competition_candidate,
     validate_competition_preprocessing,
 )
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
 
 def _frame(engine="pandas", classification=False):
@@ -77,7 +77,7 @@ def _fit(
                 if isinstance(frame, pl.DataFrame)
                 else frame.drop(columns=[metadata])
             )
-    return fit_local_workflow(
+    return fit_workflow(
         config,
         SplitDataset(train=fit_frame, test=fit_frame.head(0)),
         target_column="target",
@@ -111,7 +111,7 @@ def test_fixed_and_tuned_share_membership(tmp_path, engine, method):
     if method == "time_series_split":
         frame["event"] = pd.date_range("2026-01-01", periods=len(frame), tz="UTC")
     frame = pl.from_pandas(frame) if engine == "polars" else frame
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         method=method,
@@ -154,7 +154,7 @@ def test_competition_target_encoding_keeps_same_positive_class(tmp_path, engine)
     frame["target"] = np.where(labels == 1, 10, 2)
     if engine == "polars":
         frame = pl.from_pandas(frame)
-    cv = LocalCVSpec(enabled=True, folds=3, method="stratified_k_fold")
+    cv = CVSpec(enabled=True, folds=3, method="stratified_k_fold")
     reports = []
     for encoded in (False, True):
         steps = (
@@ -162,7 +162,7 @@ def test_competition_target_encoding_keeps_same_positive_class(tmp_path, engine)
             if encoded
             else []
         )
-        artifact = fit_local_workflow(
+        artifact = fit_workflow(
             {
                 "preprocessing": steps,
                 "modeling": {"type": "logistic_regression", "params": {"max_iter": 1000}},
@@ -204,7 +204,7 @@ def test_classification_scores_string_labels_consistently(tmp_path, engine, meth
     if grouped:
         frame["entity"] = np.repeat(np.arange(20), 4)
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         inner_folds=2,
@@ -230,7 +230,7 @@ def test_nested_fixed_uses_same_requested_metric_and_outer_policy(tmp_path, engi
     if nested_type == "time_series_split":
         frame["event"] = pd.date_range("2026-01-01", periods=len(frame), tz="UTC")
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         inner_folds=2,
@@ -260,7 +260,7 @@ def test_ensemble_preserves_selected_members(tmp_path, engine, method, model):
     params = {"base_estimators": ["logistic_regression"] if classification else ["ridge"]}
     if model.startswith("stacking"):
         params.update(cv=2, final_estimator="logistic_regression" if classification else "ridge")
-    cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method=method)
+    cv = CVSpec(enabled=True, folds=2, inner_folds=2, method=method)
     artifact = _fit(tmp_path / model, native, cv, model=model, params=params)
     before = deepcopy(artifact.pipeline.config)
     result = _evaluate(
@@ -275,7 +275,7 @@ def test_ensemble_preserves_selected_members(tmp_path, engine, method, model):
 def test_nested_rejects_missing_or_nonfinite_outer_scores(tmp_path, bad_score):
     """A final best score must never rescue incomplete outer-fold evidence."""
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
+    cv = CVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
     artifact = _fit(tmp_path, frame, cv, search=True)
     result = artifact.pipeline.model_estimator.model[1]
     result.best_score = 99999.0
@@ -297,7 +297,7 @@ def test_nested_rejects_missing_or_nonfinite_outer_scores(tmp_path, bad_score):
 def test_nested_rejects_incompatible_reports(tmp_path, mutation):
     """Report validation must fail closed for stale or incompatible nested evidence."""
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
+    cv = CVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
     artifact = _fit(tmp_path, frame, cv, search=True)
     result = artifact.pipeline.model_estimator.model[1]
     if mutation == "missing_report":
@@ -319,7 +319,7 @@ def test_ordinary_rejects_one_failed_fold(tmp_path, monkeypatch):
     from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=3)
+    cv = CVSpec(enabled=True, folds=3)
     artifact = _fit(tmp_path, frame, cv)
     scores = iter([1.0, float("nan"), 2.0])
     monkeypatch.setattr(
@@ -332,7 +332,7 @@ def test_ordinary_rejects_one_failed_fold(tmp_path, monkeypatch):
 def test_shuffle_plan_is_not_kfold(tmp_path):
     """Repeated shuffle folds must hold out twenty percent rather than one K-fold share."""
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=3, method="shuffle_split")
+    cv = CVSpec(enabled=True, folds=3, method="shuffle_split")
     artifact = _fit(tmp_path, frame, cv)
     result = _evaluate(frame, artifact, cv)
     assert [fold["test_rows"] for fold in result["folds"]] == [16, 16, 16]
@@ -346,13 +346,13 @@ def test_shuffle_plan_is_not_kfold(tmp_path):
         ({"max_rows": True}, "positive integer"),
         ({"max_bytes": None}, "positive integer"),
         ({"target_column": "missing"}, "separate target"),
-        ({"cv": LocalCVSpec()}, "enabled CV"),
+        ({"cv": CVSpec()}, "enabled CV"),
     ],
 )
 def test_evaluation_admission(tmp_path, changes, match):
     """Invalid bounds and missing targets must fail before fold evaluation starts."""
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     artifact = _fit(tmp_path, frame, cv)
     arguments: dict[str, Any] = {
         "cv": cv,
@@ -378,7 +378,7 @@ def test_tuned_ensemble_keeps_selected_structure(tmp_path, engine, method, model
     params = {"base_estimators": ["logistic_regression"] if classification else ["ridge"]}
     if model.startswith("stacking"):
         params.update(cv=2, final_estimator="logistic_regression" if classification else "ridge")
-    cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method=method)
+    cv = CVSpec(enabled=True, folds=2, inner_folds=2, method=method)
     artifact = _fit(
         tmp_path,
         frame,
@@ -403,7 +403,7 @@ def test_fold_preprocessing_sees_training_members_only(tmp_path, monkeypatch, en
     from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter
 
     frame = _frame(engine)
-    cv = LocalCVSpec(enabled=True, folds=3)
+    cv = CVSpec(enabled=True, folds=3)
     artifact = _fit(tmp_path, frame, cv)
     observed = []
     original = FeatureEngineerFoldAdapter.fit_transform
@@ -428,7 +428,7 @@ def test_nested_threshold_reuses_outer_scores_without_refitting(tmp_path, monkey
     from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame(engine, classification=True)
-    cv = LocalCVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
+    cv = CVSpec(enabled=True, folds=2, inner_folds=2, method="nested_cv")
     artifact = _fit(
         tmp_path, frame, cv, "logistic_regression", search=True, metric="f1", threshold=True
     )
@@ -450,7 +450,7 @@ def test_nested_threshold_reuses_outer_scores_without_refitting(tmp_path, monkey
 def test_metric_conflicts_and_multiclass_binary_alias_fail(tmp_path):
     """A binary heldout name must never silently rank multiclass weighted scores."""
     frame = _frame(classification=True)
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     artifact = _fit(tmp_path / "binary", frame, cv, "logistic_regression", search=True, metric="f1")
     with pytest.raises(ValueError, match="search metric"):
         _evaluate(frame, artifact, cv, "heldout_accuracy")
@@ -481,7 +481,7 @@ def test_row_changing_candidate_preprocessing_is_rejected(transformer, params):
 def test_evaluator_rejects_validation_row_filtering(tmp_path):
     """Post-fit evaluation must enforce the same membership rules as source preflight."""
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     artifact = _fit(tmp_path, frame, cv)
     artifact.pipeline.config["preprocessing"].append(
         {"name": "filter", "transformer": "IQR", "params": {}}
@@ -495,7 +495,7 @@ def test_aggregate_overflow_cannot_produce_nonfinite_evidence(tmp_path, monkeypa
     from skyulf.integrations.databricks.training.competition import competition_evaluation
 
     frame = _frame()
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     artifact = _fit(tmp_path, frame, cv)
     monkeypatch.setattr(
         competition_evaluation, "fit_and_score_candidate_fold", lambda **kwargs: 1e308

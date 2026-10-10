@@ -9,12 +9,14 @@ stays at low CCN.
 
 import logging
 from collections.abc import Callable
+from numbers import Integral
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._artifacts import OversamplingArtifact, UndersamplingArtifact
@@ -31,6 +33,56 @@ logger = logging.getLogger(__name__)
 
 
 SamplerBuilder = Callable[[str, dict[str, Any]], Any | None]
+
+
+def _validate_resampling_state(raw: dict, kind: str, default_method: str) -> dict:
+    """Inspect effective dispatch fields, retaining defaults and unused saved options."""
+    if type(raw) is not dict or raw.get("type") != kind:
+        raise ValueError("Unexpected local resampling state type.")
+    if not isinstance(raw.get("method", default_method), str):
+        raise ValueError("Fitted resampling method must be a string.")
+    return raw
+
+
+def _over_context_known(state: dict) -> bool:
+    """Abstain for mixed row effects and custom estimator or strategy callbacks."""
+    method = state.get("method", "smote")
+    neighbors = {
+        "random_over": (),
+        "smote": ("k_neighbors",),
+        "adasyn": ("k_neighbors",),
+        "borderline_smote": ("k_neighbors", "m_neighbors"),
+        "svm_smote": ("k_neighbors", "m_neighbors"),
+        "kmeans_smote": ("k_neighbors",),
+    }
+    if method not in neighbors or callable(state.get("sampling_strategy")):
+        return False
+    if any(not isinstance(state.get(key, 5), Integral) for key in neighbors[method]):
+        return False
+    if method == "svm_smote" and state.get("svm_estimator") is not None:
+        return False
+    if method == "kmeans_smote":
+        estimator = state.get("kmeans_estimator")
+        return estimator is None or isinstance(estimator, Integral)
+    return True
+
+
+def _under_context_known(state: dict) -> bool:
+    """Describe only built-in selection without callbacks or replacement duplicates."""
+    method = state.get("method", "random_under_sampling")
+    if method not in (
+        "random_under_sampling",
+        "nearmiss",
+        "tomek_links",
+        "edited_nearest_neighbours",
+    ) or callable(state.get("sampling_strategy")):
+        return False
+    if method == "random_under_sampling":
+        replacement = state.get("replacement", False)
+        return isinstance(replacement, (bool, np.bool_)) and not replacement
+    if method in ("nearmiss", "edited_nearest_neighbours"):
+        return isinstance(state.get("n_neighbors", 3), Integral)
+    return True
 
 
 def _extract_y_polars(X: Any, y: Any, target_col: str | None) -> tuple[Any, Any]:
@@ -275,6 +327,21 @@ class OversamplingApplier(BaseApplier):
     reach a held-out split and inflate its metrics.
     """
 
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved sampler configuration without fitting optional estimators."""
+        return _validate_resampling_state(raw, "oversampling", "smote")
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Require the full class distribution; mixed SMOTETomek effects stay unknown."""
+        if engine not in ("pandas", "polars"):
+            return None
+        OversamplingApplier.validate_inference_state(state)
+        if not _over_context_known(state):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "expand", "global")
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Resample ``(X, y)`` with the configured over-sampler.
@@ -418,6 +485,21 @@ class UndersamplingApplier(BaseApplier):
     than for oversampling, because these samplers delete real rows rather than
     synthesise new ones.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved selection settings without loading the optional sampler package."""
+        return _validate_resampling_state(raw, "undersampling", "random_under_sampling")
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Require full class context; prediction still skips every sampling method."""
+        if engine not in ("pandas", "polars"):
+            return None
+        UndersamplingApplier.validate_inference_state(state)
+        if not _under_context_known(state):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "filter", "global")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:

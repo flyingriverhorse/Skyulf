@@ -289,7 +289,7 @@ class TestWinsorizeCalculator:
     def test_bounds_match_percentile_formula(self) -> None:
         """Bounds must equal the configured lower/upper percentiles of the data."""
         values = list(range(1, 101))  # 1..100
-        df = pd.DataFrame({"val": values})
+        df = pd.DataFrame({"val": pd.Series(values, dtype="float64")})
         params = WinsorizeCalculator().fit(
             df, {"columns": ["val"], "lower_percentile": 5.0, "upper_percentile": 95.0}
         )
@@ -369,14 +369,14 @@ class TestWinsorizeApplier:
         pl_out = WinsorizeApplier().apply(pl.from_pandas(df), params)
         np.testing.assert_allclose(pd_out["val"].to_numpy(), pl_out["val"].to_numpy())
 
-    def test_integer_column_cast_to_float_in_polars(self) -> None:
-        """Polars path casts to float64 before clipping to avoid integer truncation."""
+    def test_integer_column_keeps_integer_dtype_for_integral_bounds_in_polars(self) -> None:
+        """Integral learned bounds must retain the integer column instead of widening it."""
         df_pd = pd.DataFrame({"val": [1, 2, 3, 4, 5, 1000]})
         params = WinsorizeCalculator().fit(
             df_pd, {"columns": ["val"], "lower_percentile": 0.0, "upper_percentile": 80.0}
         )
         pl_out = WinsorizeApplier().apply(pl.from_pandas(df_pd), params)
-        assert pl_out["val"].dtype == pl.Float64
+        assert pl_out["val"].dtype == pl.Int64
 
 
 # ---------------------------------------------------------------------------
@@ -590,14 +590,16 @@ class TestRealShapedDataset:
 
 
 def test_winsorize_clips_nullable_int64_column_like_polars() -> None:
-    """F-10: clipping a nullable ``Int64`` column with float bounds raised
-    ``TypeError: Invalid value for dtype 'Int64'`` on the pandas path while
-    Polars (which casts to Float64 first) worked. Pandas must match.
-    """
+    """Fractional integer quantiles require an explicit float feature on both engines."""
     df_pd = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5, 100], dtype="Int64")})
     df_pl = pl.DataFrame({"a": [1, 2, 3, 4, 5, 100]})
     config = {"columns": ["a"], "lower_percentile": 5.0, "upper_percentile": 95.0}
 
+    for frame in (df_pd, df_pl):
+        with pytest.raises(ValueError, match="Casting"):
+            WinsorizeCalculator().fit(frame, config)
+    df_pd = df_pd.astype({"a": "float64"})
+    df_pl = df_pl.with_columns(pl.col("a").cast(pl.Float64))
     params_pd = dict(WinsorizeCalculator().fit(df_pd, config))
     params_pl = dict(WinsorizeCalculator().fit(df_pl, config))
     out_pd = WinsorizeApplier().apply(df_pd, params_pd)

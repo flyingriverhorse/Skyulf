@@ -15,14 +15,14 @@ def test_weighted_competition_preserves_recipe_and_registers(
 ):
     """Weight evidence must not change recipe identity across training task boundaries."""
     from skyulf.integrations.databricks.jobs.training.training_nodes import run_competition_training
-    from skyulf.integrations.databricks.training.fitting import local_retraining
-    from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
+    from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
 
     _, client, config, context, frame = staged
     _competition(config, engine)
     config.update(weight_column="w", reserved_weight_columns=["w"])
     frame["w"] = frame.x + 1.0
-    original_fit = local_retraining.fit_candidate
+    original_fit = candidate.fit_candidate
     recipes = []
 
     def fit_without_mutating_recipe(*args, **kwargs):
@@ -32,7 +32,7 @@ def test_weighted_competition_preserves_recipe_and_registers(
         recipes.append((before, deepcopy(kwargs["pipeline_config"])))
         return fitted
 
-    monkeypatch.setattr(local_retraining, "fit_candidate", fit_without_mutating_recipe)
+    monkeypatch.setattr(candidate, "fit_candidate", fit_without_mutating_recipe)
     prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
     loaded = _call(staged, "load_data", prepared.reference)
     split = _call(staged, "prepare_dataset", loaded.reference)
@@ -57,7 +57,7 @@ def test_weighted_competition_preserves_recipe_and_registers(
     _call(staged, "model_decision", prepared.reference)
     versions = client.search_model_versions(f"name='{config['model_name']}'")
     assert len(versions) == 1
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         f"runs:/{prepared.reference['run_id']}/model",
         digest=selected.output["model_digest"],
         tracking_uri=config["tracking_uri"],
@@ -88,7 +88,7 @@ def test_weighted_competition_rejects_changed_winner_config(staged, monkeypatch,
             tracking_uri=config["tracking_uri"],
             reference=split.reference,
         )
-    load = training_nodes.load_run_local_pipeline
+    load = training_nodes.load_run_pipeline
 
     def changed_artifact(*args, **kwargs):
         """Alter loaded config to exercise the independent adoption integrity check."""
@@ -96,7 +96,7 @@ def test_weighted_competition_rejects_changed_winner_config(staged, monkeypatch,
         artifact.pipeline.config[changed_section] = {}
         return artifact
 
-    monkeypatch.setattr(training_nodes, "load_run_local_pipeline", changed_artifact)
+    monkeypatch.setattr(training_nodes, "load_run_pipeline", changed_artifact)
     with pytest.raises(ValueError, match="Winning model configuration"):
         _call(staged, "select_best_model", split.reference)
     assert not client.search_registered_models()

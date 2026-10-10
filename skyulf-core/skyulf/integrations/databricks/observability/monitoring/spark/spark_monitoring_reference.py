@@ -12,11 +12,11 @@ from .....mlflow.shared._client import make_registry_client, require_mlflow
 from ....data.delta_io.delta import table_identity
 from ....jobs.shared.notebook_diagnostics import notebook_task
 from ....shared._contracts import table_name
-from ....training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
-from ....training.shared.local_training_evidence import validate_training_evidence
-from ..local.monitoring_performance import measure_holdout_values, performance_contract
+from ....training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
+from ....training.shared.training_evidence import validate_training_evidence
 from ..monitoring_config import MonitorConfig, json_digest, qualified_name
-from ..monitoring_reference import _document, load_monitoring_artifact
+from ..monitoring_performance import measure_holdout_values, performance_contract
+from ..monitoring_reference import load_monitoring_artifact, reference_document
 from ..monitoring_source_evidence import validate_source_evidence
 from ..monitoring_sources import read_snapshot
 from ..monitoring_store import OWNER, PROPERTY, ensure_owned_object
@@ -186,7 +186,7 @@ def prepare_spark_monitoring_reference(
         if table_identity(spark, spec.table) != source_id:
             raise ValueError("Training source was replaced while preparing monitoring reference.")
         client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
-        source_receipt = _document(
+        source_receipt = reference_document(
             client, evidence["training_run_id"], "monitoring_source_evidence.json"
         )
         validate_source_evidence(source_receipt, source, spec.source_columns, spec.dataset_id)

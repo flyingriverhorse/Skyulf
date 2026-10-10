@@ -1,0 +1,635 @@
+"""Offline configuration and preflight for bounded pandas/Polars scoring jobs.
+
+The SDK does not submit jobs or read Unity Catalog tables. The separate
+frame_batch adapter uses the declared table snapshot and period. The ``runtime``
+setting selects integration policy. ``standalone`` runs without Databricks
+services on any host; ``databricks`` enables workspace integration. Both can
+score a caller frame in the current Python process. UC Delta publication requires
+``runtime="databricks"``; distributed inference is selected separately with
+``inference_mode="spark"`` and retains its source, registry and engine checks.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+from urllib.parse import parse_qsl, urlsplit
+
+import pandas as pd
+import polars as pl
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from ....inference._manifest import ColumnSpec
+from ....inference.bundle import InferenceBundle, load_bundle, predict_local
+from ....inference.fitted_pipeline import (
+    FittedPipelineArtifact,
+    load_pipeline,
+)
+from ....inference.pipeline_scoring import score_pipeline, scoring_output_schema
+from ...mlflow.registration.registry import (
+    RegistryAccessError,
+    RegistryDependencyError,
+    RegistryError,
+    RegistryModelNotFoundError,
+    ResolvedModel,
+)
+from ..shared._contracts import table_name
+
+
+class InputSource(BaseModel):
+    """Select caller-owned rows or describe a pinned UC table read."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    kind: Literal["caller_frame", "uc_table"]
+    table: str | None = None
+    version: int | None = None
+    read_mode: Literal["snapshot", "incremental"] = "snapshot"
+    max_rows: int = Field(default=100_000, gt=0)
+    max_bytes: int = Field(default=128 * 1024 * 1024, gt=0)
+
+
+class ModelSelection(BaseModel):
+    """Choose one artifact contract and either a path or pinned registry selector."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    kind: Literal["local_pipeline", "portable_bundle"]
+    path: str | None = None
+    name: str | None = None
+    alias: str | None = None
+    version: str | None = None
+    tracking_uri: str | None = None
+    registry_uri: str | None = None
+
+    @field_validator("tracking_uri", "registry_uri")
+    @classmethod
+    def reject_embedded_credentials(cls, value: str | None) -> str | None:
+        """Keep credentials in the supported runtime provider, outside config."""
+        if value is not None:
+            parsed = urlsplit(value)
+            query = {key.lower() for key, _ in parse_qsl(parsed.query)}
+            if (
+                parsed.username
+                or parsed.password
+                or parsed.fragment
+                or any(
+                    marker in key
+                    for key in query
+                    for marker in ("token", "password", "secret", "credential", "api_key")
+                )
+            ):
+                raise ValueError("Store URI must not embed credentials.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_selector(self) -> ModelSelection:
+        """Require exactly one local path or one registry alias/version selector."""
+        if self.path is not None:
+            if not self.path.strip() or any(
+                value is not None
+                for value in (
+                    self.name,
+                    self.alias,
+                    self.version,
+                    self.tracking_uri,
+                    self.registry_uri,
+                )
+            ):
+                raise ValueError("A local path cannot be combined with registry settings.")
+        elif (
+            not self.name or not self.name.strip() or (self.alias is None) == (self.version is None)
+        ):
+            raise ValueError("A registry model needs a name and exactly one alias or version.")
+        _validate_registry_selector_values(self)
+        return self
+
+
+class OutputSink(BaseModel):
+    """Select returned predictions or a precreated UC Delta target."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    kind: Literal["return_frame", "uc_delta"]
+    table: str | None = None
+
+
+class WorkflowConfig(BaseModel):
+    """Immutable, serializable decisions for one pandas/Polars scoring job."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    runtime: Literal["standalone", "databricks", "spark"]
+    engine: Literal["pandas", "polars"]
+    source: InputSource
+    model: ModelSelection
+    sink: OutputSink
+    inference_mode: Literal["local", "spark"] = "local"
+    spark_udf_env_manager: Literal["local", "virtualenv"] = "virtualenv"
+    spark_udf_prediction_batch_rows: int = Field(default=10_000, gt=0, le=100_000)
+
+    @model_validator(mode="after")
+    def validate_inference_runtime(self) -> WorkflowConfig:
+        """Keep distributed inference separate from the saved local training engine."""
+        if self.inference_mode == "spark" and (
+            self.runtime != "databricks" or self.engine != "pandas"
+        ):
+            raise ValueError("Spark inference requires runtime='databricks' and engine='pandas'.")
+        if self.inference_mode == "spark":
+            self._validate_spark_source()
+        return self
+
+    def _validate_spark_source(self) -> None:
+        """Limit Spark mode to the distributed source and publication route it implements."""
+        if (
+            self.source.kind != "uc_table"
+            or self.source.read_mode != "incremental"
+            or self.source.version is not None
+            or self.sink.kind != "uc_delta"
+            or self.model.kind != "local_pipeline"
+            or self.model.path is not None
+            or self.model.version is None
+        ):
+            raise ValueError(
+                "Spark inference requires an incremental UC source, a pinned registry "
+                "local_pipeline model and a UC Delta sink."
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class PreflightIssue:
+    """Identify one incompatibility and an actionable repair."""
+
+    code: str
+    category: Literal["config", "source", "node", "model", "runtime", "sink"]
+    message: str
+    fix: str
+    phase: Literal["local", "remote"] = "local"
+
+
+@dataclass(frozen=True, slots=True)
+class PreflightResult:
+    """Keep local evidence separate from optional read-only registry evidence."""
+
+    issues: tuple[PreflightIssue, ...]
+    remote_checked: bool
+    model_version: str | None = None
+    model_digest: str | None = None
+    feature_order: tuple[str, ...] = ()
+    output_schema: tuple[ColumnSpec, ...] = ()
+
+    @property
+    def ready(self) -> bool:
+        """Permit prediction only after metadata and every compatibility check pass."""
+        return not self.issues and self.model_digest is not None
+
+    @property
+    def local_issues(self) -> tuple[PreflightIssue, ...]:
+        """Expose checks that did not need a registry or workspace read."""
+        return tuple(issue for issue in self.issues if issue.phase == "local")
+
+    @property
+    def remote_issues(self) -> tuple[PreflightIssue, ...]:
+        """Expose failures from an explicitly requested read-only model lookup."""
+        return tuple(issue for issue in self.issues if issue.phase == "remote")
+
+    @property
+    def output_columns(self) -> tuple[str, ...]:
+        """Expose output names in the saved model's column order."""
+        return tuple(column.name for column in self.output_schema)
+
+
+class PreflightError(ValueError):
+    """The selected workflow cannot safely start."""
+
+    def __init__(self, result: PreflightResult) -> None:
+        """Retain structured issues for CLI or job diagnostics."""
+        self.result = result
+        super().__init__("; ".join(f"{issue.code}: {issue.fix}" for issue in result.issues))
+
+
+def _config_issues(config: WorkflowConfig) -> list[PreflightIssue]:
+    """Reject invalid runtime, source and sink choices before artifact I/O."""
+    issues: list[PreflightIssue] = []
+    if config.runtime == "spark":
+        issues.append(
+            PreflightIssue(
+                "runtime_unsupported",
+                "runtime",
+                "Spark execution uses a separate batch runner.",
+                "Choose standalone or databricks; use the separate Spark batch runner for Spark inference.",
+            )
+        )
+    _collect_source_issues(config, issues)
+    if config.sink.kind == "uc_delta":
+        if config.runtime != "databricks":
+            issues.append(
+                PreflightIssue(
+                    "sink_runtime_mismatch",
+                    "sink",
+                    "UC Delta publication requires the Databricks runtime.",
+                    "Choose runtime='databricks' for this sink.",
+                )
+            )
+        if config.source.kind != "uc_table":
+            issues.append(
+                PreflightIssue(
+                    "sink_source_mismatch",
+                    "sink",
+                    "UC Delta publication requires a pinned UC source.",
+                    "Choose an existing UC source table and concrete Delta version.",
+                )
+            )
+        _collect_target_issues(config, issues)
+    elif config.sink.table is not None:
+        issues.append(
+            PreflightIssue(
+                "sink_conflict",
+                "sink",
+                "return_frame does not write a table.",
+                "Remove the sink table or select a supported writer later.",
+            )
+        )
+    return issues
+
+
+def preflight(
+    config: WorkflowConfig,
+    *,
+    artifact: FittedPipelineArtifact | InferenceBundle | None = None,
+    resolved: ResolvedModel | None = None,
+    probe_frame: pd.DataFrame | pl.DataFrame | None = None,
+) -> PreflightResult:
+    """Check selected contracts without network, pickle loading or job submission.
+
+    Pass an already validated artifact for full local checks. An optional small
+    probe exercises real fitted FE/model prediction before job submission.
+    Registry selection remains unresolved until explicit preparation.
+    """
+    if not isinstance(config, WorkflowConfig):
+        raise TypeError("config must be a WorkflowConfig.")
+    issues = _config_issues(config)
+    remote_checked = resolved is not None
+    _collect_reference_issues(config, resolved, issues)
+    if artifact is None:
+        issues.append(
+            PreflightIssue(
+                "artifact_unchecked",
+                "model",
+                "Artifact metadata is not available for preflight.",
+                "Load a trusted artifact and rerun preflight.",
+            )
+        )
+        return PreflightResult(tuple(issues), remote_checked)
+    if config.model.kind == "local_pipeline" and isinstance(artifact, FittedPipelineArtifact):
+        digest, feature_order, output = _local_pipeline_metadata(config, artifact, issues)
+    elif config.model.kind == "portable_bundle" and isinstance(artifact, InferenceBundle):
+        manifest = artifact.manifest
+        digest = artifact.semantic_digest
+        feature_order = artifact.feature_order
+        output = manifest.output_schema
+    else:
+        issues.append(
+            PreflightIssue(
+                "artifact_kind_mismatch",
+                "model",
+                "Selected artifact kind differs from the loaded package.",
+                "Choose the matching local_pipeline or portable_bundle contract.",
+            )
+        )
+        return PreflightResult(tuple(issues), remote_checked)
+    if resolved is not None and resolved.digest != digest:
+        issues.append(
+            PreflightIssue(
+                "model_digest_mismatch",
+                "model",
+                "Resolved registry digest differs from loaded artifact.",
+                "Reload the selected concrete version and verify its package.",
+                "remote",
+            )
+        )
+    _probe_prediction(probe_frame, config, artifact, issues)
+    return PreflightResult(
+        tuple(issues),
+        remote_checked,
+        resolved.version if resolved else None,
+        digest,
+        feature_order,
+        output,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedWorkflow:
+    """A verified pandas/Polars predictor bound to one loaded artifact and config."""
+
+    config: WorkflowConfig
+    artifact: FittedPipelineArtifact | InferenceBundle
+    preflight: PreflightResult
+
+    def predict(self, frame: pd.DataFrame | pl.DataFrame) -> pd.DataFrame:
+        """Score only a bounded caller-owned batch with the selected contract."""
+        if self.config.inference_mode == "spark":
+            raise ValueError("Use the distributed incremental runner for Spark inference.")
+        _check_frame_budget(frame, self.config.source)
+        if isinstance(self.artifact, FittedPipelineArtifact):
+            return score_pipeline(frame, self.artifact)
+        return predict_local(frame, self.artifact)
+
+
+def _check_frame_budget(frame: pd.DataFrame | pl.DataFrame, source: InputSource) -> None:
+    """Bound driver rows and in-memory frame bytes before any prediction."""
+    if not isinstance(frame, pd.DataFrame | pl.DataFrame):
+        raise TypeError("Workflow requires a pandas or Polars DataFrame.")
+    if len(frame) > source.max_rows:
+        raise ValueError("Input exceeds max_rows.")
+    size = (
+        int(frame.memory_usage(index=True, deep=True).sum())
+        if isinstance(frame, pd.DataFrame)
+        else frame.estimated_size()
+    )
+    if size > source.max_bytes:
+        raise ValueError("Input exceeds max_bytes.")
+
+
+def prepare_workflow(
+    config: WorkflowConfig, *, probe_frame: pd.DataFrame | pl.DataFrame | None = None
+) -> PreparedWorkflow:
+    """Load a trusted path or read a registry alias once, then run full preflight.
+
+    Registry access is read-only. Loading a package deserializes trusted pickle;
+    call this only for artifacts from a trusted producer. No job is submitted.
+    """
+    if not isinstance(config, WorkflowConfig):
+        raise TypeError("config must be a WorkflowConfig.")
+    issues = _config_issues(config)
+    if issues:
+        raise PreflightError(PreflightResult(tuple(issues), False))
+    selection = config.model
+    resolved = None
+    if selection.path is not None:
+        artifact = _load_selected_path(selection, selection.path)
+    else:
+        from ...mlflow.registration.registry import (  # noqa: PLC0415 - optional MLflow client boundary
+            load_registered_bundle,
+            load_registered_pipeline,
+            resolve_model,
+        )
+
+        if selection.name is None:
+            raise ValueError("Registry model name is missing.")
+        try:
+            resolved = resolve_model(
+                selection.name,
+                alias=selection.alias,
+                version=selection.version,
+                tracking_uri=selection.tracking_uri,
+                registry_uri=selection.registry_uri,
+            )
+            loader = (
+                load_registered_pipeline
+                if selection.kind == "local_pipeline"
+                else load_registered_bundle
+            )
+            artifact = loader(
+                resolved, tracking_uri=selection.tracking_uri, registry_uri=selection.registry_uri
+            )
+        except (RegistryError, OSError, ValueError) as exc:
+            code, fix = _registry_failure_help(exc)
+            issue = PreflightIssue(code, "model", str(exc), fix, "remote")
+            result = PreflightResult(
+                (issue,), True, resolved.version if resolved is not None else None
+            )
+            raise PreflightError(result) from exc
+    result = preflight(config, artifact=artifact, resolved=resolved, probe_frame=probe_frame)
+    if not result.ready:
+        raise PreflightError(result)
+    return PreparedWorkflow(config, artifact, result)
+
+
+def _validate_registry_selector_values(selection: ModelSelection) -> None:
+    """Validate alias text and a concrete positive version after selector cardinality."""
+    if selection.alias is not None and not selection.alias.strip():
+        raise ValueError("alias must be non-empty.")
+    if selection.version is not None and (
+        not selection.version.isascii()
+        or not selection.version.isdigit()
+        or int(selection.version) <= 0
+    ):
+        raise ValueError("version must be a concrete positive integer string.")
+
+
+def _collect_source_issues(config: WorkflowConfig, issues: list[PreflightIssue]) -> None:
+    """Append source selection issues before sink validation."""
+    if config.source.kind == "uc_table":
+        _collect_uc_source_issues(config, issues)
+    elif (
+        config.source.table is not None
+        or config.source.version is not None
+        or config.source.read_mode != "snapshot"
+    ):
+        issues.append(
+            PreflightIssue(
+                "source_conflict",
+                "source",
+                "A caller frame cannot also select a UC table or version.",
+                "Remove table and version from caller_frame input.",
+            )
+        )
+
+
+def _collect_target_issues(config: WorkflowConfig, issues: list[PreflightIssue]) -> None:
+    """Check the target name and reject source-target collisions."""
+    try:
+        if config.sink.table is None or len(config.sink.table.split(".")) != 3:
+            raise ValueError("A three-part UC target is required.")
+        table_name(config.sink.table)
+    except ValueError:
+        issues.append(
+            PreflightIssue(
+                "sink_invalid_target",
+                "sink",
+                "UC Delta publication requires a three-part target table.",
+                "Specify an existing catalog.schema.table target.",
+            )
+        )
+    if config.sink.table and config.sink.table.lower() == (config.source.table or "").lower():
+        issues.append(
+            PreflightIssue(
+                "sink_source_conflict",
+                "sink",
+                "Source and target tables must be different.",
+                "Choose a separate prediction target table.",
+            )
+        )
+
+
+def _collect_reference_issues(
+    config: WorkflowConfig, resolved: ResolvedModel | None, issues: list[PreflightIssue]
+) -> None:
+    """Append unresolved or mismatched registry identity issues before artifact checks."""
+    if config.model.name is not None and resolved is None:
+        issues.append(
+            PreflightIssue(
+                "model_unresolved",
+                "model",
+                "Registry identity and artifact metadata have not been checked.",
+                "Call prepare_workflow to resolve the alias once and load its pinned version.",
+            )
+        )
+    if resolved is not None and (
+        config.model.name != resolved.name
+        or (config.model.version is not None and config.model.version != resolved.version)
+        or resolved.model_uri != f"models:/{resolved.name}/{resolved.version}"
+    ):
+        issues.append(
+            PreflightIssue(
+                "model_reference_mismatch",
+                "model",
+                "Resolved model differs from the selected concrete identity.",
+                "Resolve the configured name and selector again before this job.",
+                "remote",
+            )
+        )
+
+
+def _local_pipeline_metadata(
+    config: WorkflowConfig, artifact: FittedPipelineArtifact, issues: list[PreflightIssue]
+) -> tuple[str, tuple[str, ...], tuple[ColumnSpec, ...]]:
+    """Check local fitted contracts and return their prediction metadata."""
+    manifest = artifact.manifest
+    digest = manifest.pipeline_sha256
+    feature_order = manifest.feature_columns
+    output = _local_output_schema(artifact)
+    if config.engine != manifest.fitted_engine:
+        issues.append(
+            PreflightIssue(
+                "engine_mismatch",
+                "runtime",
+                "Selected engine differs from the fitted local pipeline.",
+                f"Choose engine='{manifest.fitted_engine}' or refit the pipeline.",
+            )
+        )
+    if manifest.execution_scope != "whole_frame_local":
+        issues.append(
+            PreflightIssue(
+                "scope_unsupported",
+                "model",
+                "Local package is not eligible for whole-frame local scoring.",
+                "Use a package fitted for whole_frame_local.",
+            )
+        )
+    if artifact.pipeline.preprocessing_steps != artifact.pipeline.feature_engineer.steps_config:
+        issues.append(
+            PreflightIssue(
+                "node_contract_mismatch",
+                "node",
+                "Pipeline FE configuration differs from its fitted transformer.",
+                "Reload the original fitted artifact instead of changing its steps.",
+            )
+        )
+    _collect_estimator_issues(artifact, issues)
+
+    return digest, feature_order, output
+
+
+def _local_output_schema(artifact: FittedPipelineArtifact) -> tuple[ColumnSpec, ...]:
+    """Derive ordered prediction columns from the saved task and classes."""
+    return scoring_output_schema(artifact)
+
+
+def _collect_estimator_issues(
+    artifact: FittedPipelineArtifact, issues: list[PreflightIssue]
+) -> None:
+    """Check the fitted estimator class without changing or unwrapping absent models."""
+    estimator = artifact.pipeline.model_estimator
+    if estimator is None or estimator.model is None:
+        actual_model_class = None
+    else:
+        model = estimator._unwrap_tuned_model()
+        actual_model_class = f"{type(model).__module__}.{type(model).__qualname__}"
+    if actual_model_class != artifact.manifest.model_class:
+        issues.append(
+            PreflightIssue(
+                "model_contract_mismatch",
+                "model",
+                "Artifact model class differs from the fitted estimator.",
+                "Reload a complete fitted artifact without changing its metadata.",
+            )
+        )
+
+
+def _registry_failure_help(exc: Exception) -> tuple[str, str]:
+    """Map registry failures to their stable preflight code and repair."""
+    if isinstance(exc, RegistryAccessError):
+        code, fix = (
+            "registry_access_denied",
+            "Grant model read/EXECUTE to the job identity.",
+        )
+    elif isinstance(exc, RegistryModelNotFoundError):
+        code, fix = "registry_model_missing", "Check the model name and alias or version."
+    elif isinstance(exc, RegistryDependencyError):
+        code, fix = "mlflow_unavailable", "Install the optional MLflow extra."
+    else:
+        code, fix = "registry_or_artifact_invalid", "Check the trusted package metadata."
+    return code, fix
+
+
+def _probe_prediction(
+    probe_frame: pd.DataFrame | pl.DataFrame | None,
+    config: WorkflowConfig,
+    artifact: FittedPipelineArtifact | InferenceBundle,
+    issues: list[PreflightIssue],
+) -> None:
+    """Exercise an optional bounded prediction only after all contract checks pass."""
+    if probe_frame is not None and not issues:
+        try:
+            _check_frame_budget(probe_frame, config.source)
+            if isinstance(artifact, FittedPipelineArtifact):
+                score_pipeline(probe_frame, artifact)
+            else:
+                predict_local(probe_frame, artifact)
+        except (TypeError, ValueError, RuntimeError) as exc:
+            issues.append(
+                PreflightIssue(
+                    "prediction_probe_failed",
+                    "model",
+                    str(exc),
+                    "Fix the sample schema or fitted pipeline; replay a representative batch.",
+                )
+            )
+
+
+def _load_selected_path(
+    selection: ModelSelection, selected_path: str
+) -> FittedPipelineArtifact | InferenceBundle:
+    """Load the selected trusted local artifact and translate invalid package errors."""
+    path = Path(selected_path)
+    try:
+        artifact = load_pipeline(path) if selection.kind == "local_pipeline" else load_bundle(path)
+    except (OSError, ValueError) as exc:
+        issue = PreflightIssue(
+            "artifact_invalid",
+            "model",
+            str(exc),
+            "Select a trusted, complete artifact of the declared kind and compatible runtime.",
+        )
+        raise PreflightError(PreflightResult((issue,), False)) from exc
+    return artifact
+
+
+def _collect_uc_source_issues(config: WorkflowConfig, issues: list[PreflightIssue]) -> None:
+    """Check pinned snapshot or automatically selected incremental source settings."""
+    if (
+        not config.source.table
+        or (
+            config.source.read_mode == "snapshot"
+            and (config.source.version is None or config.source.version < 0)
+        )
+        or (config.source.read_mode == "incremental" and config.source.version is not None)
+    ):
+        issues.append(
+            PreflightIssue(
+                "source_unbounded",
+                "source",
+                "Snapshot reads need a fixed nonnegative version; incremental reads derive it.",
+                "Set a version for snapshot reads or omit it for incremental reads.",
+            )
+        )

@@ -15,17 +15,20 @@ from ..training.competition.competition_evaluation import (
     competition_metric,
     validate_competition_preprocessing,
 )
-from ..training.tuning.local_cv import LocalCVSpec
-from ..training.tuning.local_search import base_model_config
+from ..training.tuning.cv import CVSpec
+from ..training.tuning.search import base_model_config
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
-from ._project_files import modeling_hook, project_source, read_source, renamed_modeling_hook
+from ._project_files import modeling_hook, read_source, renamed_modeling_hook
 from .project import resolve_project_workflow, strict_json_value, validate_project_steps
 from .workflow_config import WORKFLOW_FIELDS, validate_workflow_pipeline
+from .yaml_config import project_training_config
+from .yaml_models import competition_candidates
+from .yaml_recipes import feature_project_source
 
 _CANDIDATE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}\Z")
 
 
-def _competition_settings(config: dict[str, Any]) -> tuple[LocalCVSpec, str, int]:
+def _competition_settings(config: dict[str, Any]) -> tuple[CVSpec, str, int]:
     """Require shared CV and bounded candidate/trial limits without coercion."""
     if config.get("training_layout") != "model_competition":
         raise ValueError("Competition requires training_layout=model_competition.")
@@ -40,7 +43,7 @@ def _competition_settings(config: dict[str, Any]) -> tuple[LocalCVSpec, str, int
         if type(value) is not int or not minimum <= value <= maximum:
             raise ValueError(f"{field} must be an integer from {minimum} to {maximum}.")
     metric = competition_metric(config.get("metric", ""), config.get("task", ""))
-    return LocalCVSpec.from_workflow(config), metric, config.get("competition_max_candidates", 8)
+    return CVSpec.from_workflow(config), metric, config.get("competition_max_candidates", 8)
 
 
 def _candidate_mapping(value: Any, limit: int) -> dict[str, Any]:
@@ -57,7 +60,7 @@ def _candidate_definition(value: Any) -> dict[str, Any]:
     """Keep candidate overrides limited to the model and a preprocessing recipe."""
     if type(value) is not dict or "modeling" not in value:
         raise ValueError("Each candidate must define modeling.")
-    if set(value) - {"modeling", "preprocessing_recipe", "decision_threshold"}:
+    if set(value) - {"modeling", "preprocessing_recipe", "decision_threshold", "explainability"}:
         raise ValueError(
             "Unknown candidate setting; shared workflow settings cannot be overridden."
         )
@@ -80,7 +83,7 @@ def _bind_candidate_metric(pipeline: dict[str, Any], metric: str) -> None:
 
 
 def _validate_candidate_pipeline(
-    pipeline: dict[str, Any], config: dict[str, Any], cv: LocalCVSpec, metric: str
+    pipeline: dict[str, Any], config: dict[str, Any], cv: CVSpec, metric: str
 ) -> None:
     """Validate task, preprocessing and authoritative CV without mutating saved recipes."""
     if set(pipeline) & WORKFLOW_FIELDS:
@@ -115,6 +118,10 @@ def _load_candidates(
     path: Path, task: str, limit: int
 ) -> tuple[dict[str, Any], str, dict[str, Any]]:
     """Capture and execute one bounded candidates hook with strict JSON output."""
+    yaml = project_training_config(path)
+    if yaml is not None:
+        candidates, source, weights = competition_candidates(yaml)
+        return _candidate_mapping(candidates, limit), source, weights
     hook = renamed_modeling_hook(modeling_hook(path, "model_competition.py"), "candidates.py")
     source = read_source(hook)
     module = load_project_module(source)
@@ -135,7 +142,7 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
     candidates, source, weights = _load_candidates(Path(path), config["task"], limit)
     config = {**deepcopy(config), **weights}
     validate_weight_roles(config)
-    shared_source = _competition_source(project_source(Path(path)))
+    shared_source = _competition_source(feature_project_source(Path(path)))
     result = deepcopy(config)
     resolved = {}
     common_steps = None
@@ -146,6 +153,8 @@ def load_competition_project(config: dict[str, Any], path: str | Path) -> dict[s
         local["pipeline"]["modeling"] = deepcopy(candidate["modeling"])
         if "decision_threshold" in candidate:
             local["pipeline"]["decision_threshold"] = deepcopy(candidate["decision_threshold"])
+        if "explainability" in candidate:
+            local["pipeline"]["explainability"] = deepcopy(candidate["explainability"])
         _bind_candidate_metric(local["pipeline"], metric)
         loaded = resolve_project_workflow(
             local,

@@ -11,7 +11,7 @@ import shutil
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -20,7 +20,7 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 
 if TYPE_CHECKING:
     from ....inference.bundle import InferenceBundle
-    from ....inference.local_pipeline import LocalPipelineArtifact
+    from ....inference.fitted_pipeline import FittedPipelineArtifact
 
 __all__ = [
     "RegistryAccessError",
@@ -30,8 +30,8 @@ __all__ = [
     "RegistryOperationError",
     "ResolvedModel",
     "load_registered_bundle",
-    "load_registered_local_pipeline",
-    "load_run_local_pipeline",
+    "load_registered_pipeline",
+    "load_run_pipeline",
     "register_model",
     "resolve_model",
 ]
@@ -194,33 +194,56 @@ def downloaded_registered_payload(
     try:
         package_uri, model = _registered_metadata(mlflow, client, resolved, tracking_uri, root)
         _payload_metadata(model, key, resolved.digest)
-        destination = _packaged_artifact_destination(root, model.flavors, key)
-        relative = destination.relative_to(root).as_posix()
-        if any(char in relative for char in "%?#:\\") or any(ord(char) < 32 for char in relative):
-            raise ValueError("Skyulf artifact path must be a contained, unambiguous URI path.")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        # MLflow keeps the full artifact prefix for models:/, but only the
-        # basename for direct download URIs returned by OSS registries.
-        download_root = root if urlparse(package_uri).scheme == "models" else destination.parent
-        try:
-            downloaded = _download_registered_entry(
-                mlflow,
-                client,
-                resolved,
-                tracking_uri,
-                _artifact_uri(package_uri, relative),
-                download_root,
+        if "skyulf_feature_store" in (model.metadata or {}):
+            local = _download_registered_entry(
+                mlflow, client, resolved, tracking_uri, package_uri, root
             )
-        except RegistryModelNotFoundError as exc:
-            raise ValueError(
-                "MLflow model is missing the Skyulf bundle artifact directory."
-            ) from exc
-        if downloaded.resolve() != destination or not destination.is_dir():
-            raise ValueError("Downloaded Skyulf artifact directory differs from its declared path.")
+            from ..models.feature_model import feature_package_models  # noqa: PLC0415
+
+            outer, _, _ = feature_package_models(local)
+            _payload_metadata(outer, key, resolved.digest)
+            yield local, outer
+            return
+        _download_payload_directory(
+            mlflow, client, resolved, tracking_uri, package_uri, root, model, key
+        )
         yield root, model
     except BaseException:
         shutil.rmtree(root, ignore_errors=True)
         raise
+
+
+def _download_payload_directory(
+    mlflow: Any,
+    client: Any,
+    resolved: ResolvedModel,
+    tracking_uri: str | None,
+    package_uri: str,
+    root: Path,
+    model: Any,
+    key: str,
+) -> None:
+    """Download only a validated ordinary payload using its store-specific path rule."""
+    destination = _packaged_artifact_destination(root, model.flavors, key)
+    relative = destination.relative_to(root).as_posix()
+    if any(char in relative for char in "%?#:\\") or any(ord(char) < 32 for char in relative):
+        raise ValueError("Skyulf artifact path must be a contained, unambiguous URI path.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # Models transport keeps the complete artifact prefix; OSS uses only its basename.
+    download_root = root if urlparse(package_uri).scheme == "models" else destination.parent
+    try:
+        downloaded = _download_registered_entry(
+            mlflow,
+            client,
+            resolved,
+            tracking_uri,
+            _artifact_uri(package_uri, relative),
+            download_root,
+        )
+    except RegistryModelNotFoundError as exc:
+        raise ValueError("MLflow model is missing the Skyulf bundle artifact directory.") from exc
+    if downloaded.resolve() != destination or not destination.is_dir():
+        raise ValueError("Downloaded Skyulf artifact directory differs from its declared path.")
 
 
 def load_registered_bundle(
@@ -264,13 +287,13 @@ def load_registered_bundle(
         return bundle
 
 
-def load_registered_local_pipeline(
+def load_registered_pipeline(
     resolved: ResolvedModel,
     *,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
-) -> "LocalPipelineArtifact":
-    """Load a trusted local pipeline from one concrete registered-model version.
+) -> "FittedPipelineArtifact":
+    """Load a trusted fitted pipeline from one concrete registered-model version.
 
     The package's declared artifact path and both digests are checked before the
     fitted pipeline is returned. A digest is an integrity check, not a signature.
@@ -292,12 +315,12 @@ def load_registered_local_pipeline(
         return load_local_package(local_path, model, resolved.digest)
 
 
-def load_run_local_pipeline(
+def load_run_pipeline(
     model_uri: str,
     *,
     digest: str,
     tracking_uri: str | None = None,
-) -> "LocalPipelineArtifact":
+) -> "FittedPipelineArtifact":
     """Load a trusted unregistered run package with the registered loader's checks."""
     _parse_runs_uri(model_uri)
     if not isinstance(digest, str) or not digest.strip():
@@ -311,21 +334,36 @@ def load_run_local_pipeline(
     return load_local_package(Path(local_path), model, digest)
 
 
-def load_local_package(local_path: Path, model: Any, digest: str) -> "LocalPipelineArtifact":
+def load_local_package(local_path: Path, model: Any, digest: str) -> "FittedPipelineArtifact":
     """Validate shared run and registry metadata, contained paths and fitted identity."""
     metadata = _payload_metadata(model, "local_pipeline", digest)
+    local_path, model, feature_lookup_json = unwrap_feature_package(local_path, model)
     artifact_path = packaged_artifact_path(Path(local_path), model.flavors, "local_pipeline")
-    from ....inference.local_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
-        load_local_pipeline,
+    from ....inference.fitted_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
+        load_pipeline,
     )
 
-    artifact = load_local_pipeline(artifact_path)
+    artifact = load_pipeline(artifact_path)
     if (
         artifact.manifest.pipeline_sha256 != digest
         or artifact.manifest.fitted_engine != metadata.get("skyulf_fitted_engine")
     ):
         raise ValueError("Loaded Skyulf local pipeline identity differs from resolved package.")
-    return artifact
+    return replace(artifact, feature_lookup_json=feature_lookup_json)
+
+
+def unwrap_feature_package(local_path: Path, model: Any) -> tuple[Path, Any, str | None]:
+    """Expose nested raw assets only after verifying the native feature envelope."""
+    if "skyulf_feature_store" not in (model.metadata or {}):
+        return local_path, model, None
+    from ...databricks.feature_store.lifecycle_config import binding_json  # noqa: PLC0415
+    from ..models.feature_model import (  # noqa: PLC0415
+        FEATURE_STORE_KEY,
+        feature_package_models,
+    )
+
+    outer, raw, raw_path = feature_package_models(local_path)
+    return raw_path, raw, binding_json(outer.metadata[FEATURE_STORE_KEY])
 
 
 def _packaged_bundle_path(package: Path, flavors: dict[str, Any]) -> Path:

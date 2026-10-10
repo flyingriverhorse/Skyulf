@@ -12,7 +12,7 @@ from .monitoring_config import (
     parse_performance_policies,
     store_namespace,
 )
-from .monitoring_store import _validate_activation_order, enroll_monitor, ensure_monitoring_store
+from .monitoring_store import enroll_monitor, ensure_monitoring_store, validate_activation_order
 
 
 def monitoring_destination(values: dict[str, str]) -> str | None:
@@ -128,7 +128,7 @@ def register_deployed_monitor(
     if receipt["model_name"] != workflow["model_name"]:
         raise ValueError("Activated model differs from the frozen workflow.")
     config = build_monitor_enrollment_config(workflow, values, receipt["new_version"])
-    _validate_activation_order(activation_started_ms)
+    validate_activation_order(activation_started_ms)
     ensure_monitoring_store(spark, *namespace.split("."))
     enroll_monitor(spark, namespace, config, activation_started_ms=activation_started_ms)
     if config.execution_engine == "spark" and config.enabled:

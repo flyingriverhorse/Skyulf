@@ -1,10 +1,10 @@
 """ADVANCED: a custom step written as a Calculator + Applier class pair.
 
-You normally do NOT need this. preprocessing_custom.py has the exact same
+You normally do NOT need this. ../preprocessing.py has the exact same
 step, rare_categories(), written with two plain functions (learn + apply).
 Compare both to see the difference:
 
-  Function version (preprocessing_custom.py)   Class version (this file)
+  Function version (../preprocessing.py)   Class version (this file)
   ------------------------------------------   -----------------------------------
   learn(df, y)  -> dict                        Calculator.fit(X, y, config) -> dict
   apply(df, state) -> the changed column       Applier.apply(X, y, state) -> whole table
@@ -17,8 +17,9 @@ or when the functions cannot do the job:
   - the learned state is not a small dict (e.g. a fitted scikit-learn object),
   - the step must remove columns (like one-hot encoding) or add/remove rows.
 
-How to use: in preprocessing.py import class_rare_categories and add
-class_rare_categories("city", min_share=0.05) to a recipe list.
+Select the factory in config/preprocessing.yml:
+  - custom: custom.advanced_class_step.class_rare_categories
+    params: {column: city, min_share: 0.05}
 """
 
 import polars as pl

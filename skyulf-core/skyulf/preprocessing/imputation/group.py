@@ -9,9 +9,11 @@ import polars as pl
 from ..._validation import raise_invalid_choice
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import _normalize
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, resolve_columns
 from .._artifacts import GroupImputerArtifact
+from .._fitted_validation import _columns, _fields, _scalar, fitted_columns
 from .._helpers import (
     auto_detect_numeric_columns,
     promote_configured_columns_to_float64,
@@ -20,6 +22,7 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._common import _imputation_config
 
 _NUMERIC_STRATEGIES = {"mean", "median"}
 _STRATEGIES = (*sorted(_NUMERIC_STRATEGIES), "most_frequent")
@@ -84,11 +87,17 @@ def _fill_columns(X: Any, config: dict[str, Any], group_by: str, strategy: str) 
     return columns
 
 
-def _training_frame(X: Any, columns: list[str], group_by: str) -> pd.DataFrame:
-    """Convert only the filled columns and the group key to pandas."""
+def _training_frame(X: Any, columns: list[str], group_by: str, strategy: str) -> pd.DataFrame:
+    """Convert selected columns, retaining integer group identities and modal values."""
     selected = [*columns, group_by]
     if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
-        return X.select(selected).to_pandas()
+        frame = X.select(selected).to_pandas()
+        exact = selected if strategy == "most_frequent" else [group_by]
+        for column in exact:
+            dtype = X.schema[column]
+            if dtype.is_integer() and dtype != pl.Int128:
+                frame[column] = pd.Series(X[column].to_list(), dtype=str(dtype))
+        return frame
     return to_pandas(X)[selected]
 
 
@@ -114,6 +123,27 @@ def _extend_categories(series: pd.Series, fills: pd.Series) -> pd.Series:
     return series
 
 
+def _pandas_group_fill(
+    keys: pd.Series, series: pd.Series, pairs: list[list], fallback: Any
+) -> pd.Series:
+    """Keep exact keys and integer fills through lookup, including an empty group map."""
+    mapping = dict(map(tuple, pairs))
+    native_float = pd.api.types.is_float_dtype(series.dtype) or all(
+        value is None or isinstance(value, (float, np.floating))
+        for value in [*mapping.values(), fallback]
+    )
+    lookup = pd.Series(
+        list(mapping.values()),
+        index=pd.Index(list(mapping), dtype=object),
+        dtype=None if native_float else object,
+    )
+    fills = keys.map(lookup)
+    if not native_float:
+        # Mapping an empty Series infers float64 even with an object-valued lookup.
+        fills = fills.astype(object)
+    return fills.where(fills.notna(), fallback) if fallback is not None else fills
+
+
 class GroupImputerApplier(BaseApplier):
     """Fill gaps with the training value of each row's group, then with the global value.
 
@@ -121,6 +151,16 @@ class GroupImputerApplier(BaseApplier):
     group had no observed value fall back to the column's global training
     value. The scoring batch's own values are never used to compute fills.
     """
+
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return _group_state(raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        return _imputation_config("GroupImputer", fitted_columns(raw, state), state)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -142,10 +182,9 @@ class GroupImputerApplier(BaseApplier):
             if column not in out.columns:
                 continue
             series = out[column]
-            group_fill = keys.map(dict(map(tuple, params["group_values"][column])))
-            fallback = params["fill_values"].get(column)
-            if fallback is not None:
-                group_fill = group_fill.fillna(fallback)
+            group_fill = _pandas_group_fill(
+                keys, series, params["group_values"][column], params["fill_values"].get(column)
+            )
             if numeric:
                 if not pd.api.types.is_float_dtype(series) or is_decimal_series(series):
                     series = pd.to_numeric(series).astype("float64")
@@ -224,14 +263,21 @@ def _polars_fill(
     GroupImputerApplier,
     execution_capabilities=tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             config_match=(("strategy", strategy),),
         )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for strategy in ("mean", "most_frequent")
+    )
+    + tuple(
+        ExecutionCapability(
+            engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
+        )
+        for engine in ("pandas", "polars")
     ),
 )
 @node_meta(
@@ -274,7 +320,7 @@ class GroupImputerCalculator(BaseCalculator):
         X = _native(X)
         _require_group_column(X.columns, group_by)
         columns = _fill_columns(X, config, group_by, strategy)
-        frame = _training_frame(X, columns, group_by)
+        frame = _training_frame(X, columns, group_by, strategy)
         fill_values = {}
         for column in columns:
             values = frame[column]
@@ -289,3 +335,45 @@ class GroupImputerCalculator(BaseCalculator):
             "group_values": {c: _group_values(frame, c, group_by, strategy) for c in columns},
             "fill_values": fill_values,
         }
+
+
+def _group_pairs(pairs: Any, numeric: bool) -> None:
+    """Require unique scalar group keys and finite per-group replacements."""
+    if type(pairs) is not list:
+        raise ValueError("Group replacements must be a list.")
+    keys = set()
+    for pair in pairs:
+        if type(pair) is not list or len(pair) != 2:
+            raise ValueError("Group replacements must contain key/value pairs.")
+        key, value = pair
+        _scalar(key)
+        _scalar(value)
+        if key is None or key in keys:
+            raise ValueError("Group keys must be non-null and unique.")
+        keys.add(key)
+        if numeric and type(value) not in (int, float):
+            raise ValueError("Group means must be numeric.")
+
+
+def _group_state(raw: dict) -> dict:
+    """Validate learned group maps and the global fallback without recomputing either."""
+    state = _normalize(raw)
+    _fields(state, {"type", "group_by", "strategy", "columns", "group_values", "fill_values"})
+    columns = _columns(state["columns"])
+    if state["type"] != "group_imputer" or state["strategy"] not in _STRATEGIES:
+        raise ValueError("Unsupported group imputer state.")
+    if type(state["group_by"]) is not str or state["group_by"] in columns:
+        raise ValueError("Invalid group key.")
+    _fields(state["group_values"], set(columns))
+    _fields(state["fill_values"], set(columns))
+    for column in columns:
+        fallback = state["fill_values"][column]
+        _scalar(fallback)
+        if state["strategy"] in _NUMERIC_STRATEGIES and type(fallback) not in (
+            int,
+            float,
+            type(None),
+        ):
+            raise ValueError("Global group means must be numeric.")
+        _group_pairs(state["group_values"][column], state["strategy"] in _NUMERIC_STRATEGIES)
+    return state

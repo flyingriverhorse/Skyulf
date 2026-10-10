@@ -13,8 +13,8 @@ from test_databricks_lifecycle_tasks import (  # noqa: F401 - real isolated regi
     staged,
 )
 
-from skyulf.inference.local_pipeline import predict_local_pipeline
-from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
+from skyulf.inference.fitted_pipeline import predict_pipeline
+from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
 
 
 def _classification(staged, engine, classes, mode):
@@ -59,12 +59,12 @@ def test_thresholds_survive_training_registration_and_decision(staged, engine, c
     registered = _call(staged, "train_register", prepared.reference)
     decided = _call(staged, "compare_decide", registered.reference)
     run_id = prepared.reference["run_id"]
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         f"runs:/{run_id}/model",
         digest=client.get_run(run_id).data.params["model_digest"],
         tracking_uri=config["tracking_uri"],
     )
-    output = predict_local_pipeline(frame[["x"]], artifact)
+    output = predict_pipeline(frame[["x"]], artifact)
     assert len(output) == len(frame)
     assert artifact.manifest.use_tuned_thresholds is (mode != "off")
     assert decided.reference["phase"] == "decide"
@@ -199,12 +199,12 @@ def test_original_target_labels_survive_registry_lifecycle(staged, engine, mode,
     registered = _call(staged, "train_register", prepared.reference)
     decided = _call(staged, "compare_decide", registered.reference)
     run_id = prepared.reference["run_id"]
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         f"runs:/{run_id}/model",
         digest=client.get_run(run_id).data.params["model_digest"],
         tracking_uri=config["tracking_uri"],
     )
-    output = predict_local_pipeline(frame[["x"]], artifact)
+    output = predict_pipeline(frame[["x"]], artifact)
     assert set(artifact.manifest.classes) == {"alpha", "beta", "gamma"}
     assert set(output.prediction).issubset(set(frame.target))
     assert decided.reference["phase"] == "decide"

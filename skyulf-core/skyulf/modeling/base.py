@@ -94,6 +94,20 @@ def _extract_xy_pandas_like(data: Any, target_column: str) -> tuple[Any, Any]:
     raise ValueError(f"Unexpected data type: {type(data)}")
 
 
+def _evaluation_split_coverage(
+    dataset: SplitDataset, name: str, report: ModelEvaluationReport | None
+) -> dict[str, Any] | None:
+    """Preserve saved exclusions and infer row counts only for evaluated splits."""
+    coverage = dataset.evaluation_coverage.get(name)
+    if coverage is not None:
+        return deepcopy(coverage)
+    if report is None:
+        return None
+    payload = getattr(dataset, name)
+    frame = payload[0] if isinstance(payload, tuple) else payload
+    return record_coverage(len(frame), len(frame))
+
+
 class BaseModelCalculator(ABC):
     """Fitting half of a model node: declares the problem type and trains the estimator.
 
@@ -611,11 +625,10 @@ class StatefulEstimator:
             payload = getattr(dataset, name)
             if payload is None:
                 continue
-            frame = payload[0] if isinstance(payload, tuple) else payload
-            coverage = deepcopy(dataset.evaluation_coverage.get(name))
-            if coverage is None:
-                coverage = record_coverage(len(frame), len(frame))
             report = reports.get(name)
+            coverage = _evaluation_split_coverage(dataset, name, report)
+            if coverage is None:
+                continue
             if report is None and coverage["excluded_rows"] != 0 and coverage["scored_rows"] == 0:
                 report = ModelEvaluationReport(
                     dataset_name=name,

@@ -25,9 +25,10 @@ class OfflineEncoder:
 
 @pytest.fixture(params=["pandas", "polars", "polars-wrapper"])
 def text_frame(request, monkeypatch):
-    """Exercise native engines and the supported Polars wrapper through public APIs."""
+    """Exercise native/wrapped frame APIs with model loading and asset packaging mocked."""
     monkeypatch.setenv("SKYULF_ENGINE", request.param.split("-")[0])
     monkeypatch.setattr(sentence_embedder, "_load_model", lambda name: OfflineEncoder())
+    monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
     data = {"text": ["hello", "world"], "keep": [1, 2]}
     if request.param == "pandas":
         return pd.DataFrame(data, index=pd.Index([20, 10], name="row"))

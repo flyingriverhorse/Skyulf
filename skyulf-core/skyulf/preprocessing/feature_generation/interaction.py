@@ -6,7 +6,8 @@ repeated columns, including powers of a single input. Generated names are
 deterministic so the same inputs always produce the same output column name.
 """
 
-from itertools import combinations, combinations_with_replacement
+from collections.abc import Iterator
+from itertools import combinations, combinations_with_replacement, zip_longest
 from typing import Any, cast
 
 import pandas as pd
@@ -14,7 +15,9 @@ import polars as pl
 
 from ..._validation import raise_invalid_choice
 from ...core.artifacts import FeatureInteractionArtifact
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import _normalize
 from ...registry import NodeRegistry
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -27,6 +30,9 @@ from ._common import _validate_generated_names
 _NAME_SEP = "_x_"
 _SUPPORTED_DEGREES = (2, 3, 4)
 _BIAS_COLUMN = "interaction_bias"
+_DEFAULT_OPTIONS = {"degree": 2, "interaction_only": True, "include_bias": False}
+_OPTIONS = {"columns", *_DEFAULT_OPTIONS}
+_STATE_FIELDS = _OPTIONS | {"type", "combinations", "feature_names"}
 
 
 def _interaction_name(columns: tuple[str, ...]) -> str:
@@ -60,9 +66,15 @@ def _resolve_combinations(
     Returns:
         A sorted list of column-name tuples, one per generated interaction.
     """
-    sorted_cols = sorted(columns)
-    combo_fn = combinations if interaction_only else combinations_with_replacement
-    return sorted(combo_fn(sorted_cols, degree))
+    return sorted(_iter_combinations(columns, degree, interaction_only))
+
+
+def _iter_combinations(
+    columns: list[str], degree: int, interaction_only: bool
+) -> Iterator[tuple[str, ...]]:
+    """Share the product definition between fit and bounded saved-state inspection."""
+    factory = combinations if interaction_only else combinations_with_replacement
+    return factory(sorted(columns), degree)
 
 
 def _multiply_columns_pandas(X: pd.DataFrame, combo: tuple[str, ...]) -> pd.Series:
@@ -109,7 +121,7 @@ def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
     exprs = _build_interaction_exprs(X, combos)
 
     if params.get("include_bias", False) and _BIAS_COLUMN not in X.columns:
-        exprs.append(pl.lit(1.0).alias(_BIAS_COLUMN))
+        exprs.append(pl.repeat(1.0, pl.len()).alias(_BIAS_COLUMN))
 
     if not exprs:
         return X, _y
@@ -146,13 +158,24 @@ def _build_interaction_feature_names(
 class FeatureInteractionApplier(BaseApplier):
     """Append the multiplicative interaction columns named by the artifact."""
 
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return interaction_state(raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        return interaction_config(raw, state)
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Compute each artifact combination as a column product and append it.
 
         A combination whose columns are absent from ``X`` is skipped rather than
         raising, so the node survives an upstream column drop; ``include_bias``
-        adds a constant 1.0 ``interaction_bias`` column. When no column is
+        adds a constant 1.0 ``interaction_bias`` column per existing row,
+        including zero rows when no input columns remain. When no column is
         generated the frame is returned unchanged. Generated product names must
         be unique and must not collide with existing columns. An existing bias
         column retains its established passthrough behavior.
@@ -171,7 +194,14 @@ class FeatureInteractionApplier(BaseApplier):
         )
 
 
-@NodeRegistry.register("FeatureInteraction", FeatureInteractionApplier)
+@NodeRegistry.register(
+    "FeatureInteraction",
+    FeatureInteractionApplier,
+    execution_capabilities=(
+        ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
+    ),
+)
 @node_meta(
     id="FeatureInteraction",
     name="Feature Interaction",
@@ -180,7 +210,7 @@ class FeatureInteractionApplier(BaseApplier):
         "Generate 2-way/3-way/4-way multiplicative interaction features between "
         "numeric columns, using deterministic regularization-friendly names."
     ),
-    params={"columns": [], "degree": 2, "interaction_only": True, "include_bias": False},
+    params={"columns": [], **_DEFAULT_OPTIONS},
     learns_from_data=False,
 )
 class FeatureInteractionCalculator(BaseCalculator):
@@ -206,10 +236,10 @@ class FeatureInteractionCalculator(BaseCalculator):
 
         _validate_interaction_columns(X_pd, cols)
 
-        degree = config.get("degree", 2)
+        degree = config.get("degree", _DEFAULT_OPTIONS["degree"])
         _validate_interaction_degree(degree)
-        interaction_only = config.get("interaction_only", True)
-        include_bias = config.get("include_bias", False)
+        interaction_only = config.get("interaction_only", _DEFAULT_OPTIONS["interaction_only"])
+        include_bias = config.get("include_bias", _DEFAULT_OPTIONS["include_bias"])
 
         combos = _resolve_combinations(cols, degree, interaction_only)
         feature_names = _build_interaction_feature_names(combos, include_bias)
@@ -230,3 +260,73 @@ class FeatureInteractionCalculator(BaseCalculator):
                 "feature_names": feature_names,
             },
         )
+
+
+def _columns(value: Any) -> list[str]:
+    """Require distinct named inputs before comparing canonical product definitions."""
+    if type(value) is not list or any(type(item) is not str or not item for item in value):
+        raise ValueError("Interaction columns must be a list of nonempty strings.")
+    if len(set(value)) != len(value):
+        raise ValueError("Interaction columns must be unique.")
+    return value
+
+
+def _options(value: dict) -> dict:
+    """Normalize input order while keeping degree and boolean switches type-exact."""
+    if type(value["degree"]) is not int:
+        raise ValueError("Interaction degree must be an integer from 2 through 4.")
+    try:
+        _validate_interaction_degree(value["degree"])
+    except ValueError as exc:
+        raise ValueError("Interaction degree must be an integer from 2 through 4.") from exc
+    if any(type(value[key]) is not bool for key in ("interaction_only", "include_bias")):
+        raise ValueError("Interaction switches must be booleans.")
+    return {**value, "columns": sorted(_columns(value["columns"]))}
+
+
+def interaction_state(raw: dict) -> dict:
+    """Reject changed combinations, names, defaults and ignored state fields."""
+    state = _normalize(raw)
+    if type(state) is not dict or set(state) != _STATE_FIELDS:
+        raise ValueError("Unexpected interaction state fields.")
+    if state["type"] != "feature_interaction":
+        raise ValueError("Wrong interaction artifact type.")
+    options = _options({key: state[key] for key in _OPTIONS})
+    if state["columns"] != options["columns"]:
+        raise ValueError("Saved interaction columns must be canonically ordered.")
+    _require_combinations(state, options)
+    names = _build_interaction_feature_names(
+        [tuple(combo) for combo in state["combinations"]], options["include_bias"]
+    )
+    if state["feature_names"] != names or len(set(names)) != len(names):
+        raise ValueError("Interaction feature names disagree with the saved products.")
+    return state
+
+
+def _require_combinations(state: dict, options: dict) -> None:
+    """Compare lazily so a malformed high-degree recipe cannot expand unbounded state."""
+    actual = state["combinations"]
+    if type(actual) is not list:
+        raise ValueError("Interaction combinations must be a list.")
+    expected = _iter_combinations(
+        options["columns"], options["degree"], options["interaction_only"]
+    )
+    for saved, required in zip_longest(actual, expected):
+        if required is None or saved != list(required):
+            raise ValueError("Interaction combinations disagree with the configured products.")
+
+
+def interaction_config(raw: dict, state: dict) -> dict:
+    """Bind the configured columns and options to the inspected fitted state."""
+    if type(raw) is not dict:
+        raise ValueError("Interaction configuration must be a plain mapping.")
+    params = _normalize(raw)
+    params.pop("target_column", None)
+    params.pop("_auto_columns", None)
+    resolved = {"columns": [], **_DEFAULT_OPTIONS, **params}
+    if set(resolved) != _OPTIONS:
+        raise ValueError("Unexpected interaction configuration fields.")
+    resolved = _options(resolved)
+    if resolved != {key: state[key] for key in _OPTIONS}:
+        raise ValueError("Interaction configuration disagrees with saved products.")
+    return resolved

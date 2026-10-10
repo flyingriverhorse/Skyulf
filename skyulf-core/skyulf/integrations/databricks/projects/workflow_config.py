@@ -12,19 +12,21 @@ from ....modeling.base import BaseModelCalculator
 from ....registry import NodeRegistry
 from ...mlflow.lifecycle.validation import validate_quality_policy
 from ..data.training.training_dates import training_date_spec
-from ..lifecycle.local_workflow import training_settings, training_spec, training_window_mode
+from ..lifecycle.workflow import training_settings, training_spec, training_window_mode
 from ..observability.charts.evaluation_chart_data import chart_settings
-from ..observability.reports.local_explanations import validate_explanation_config
-from ..scoring.local_sdk import ModelSelection
+from ..observability.reports.explanations import validate_explanation_config
 from ..scoring.shared.prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
+from ..scoring.workflow import ModelSelection
 from ..shared._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
 from ..training.thresholds.decision_thresholds import threshold_policy
-from ..training.tuning.local_cv import CV_FIELDS, LocalCVSpec
-from ..training.tuning.local_search import base_model_config, prepare_search_pipeline
+from ..training.tuning.cv import CV_FIELDS, CVSpec
+from ..training.tuning.search import base_model_config, prepare_search_pipeline
 from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_roles
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    "preprocessing_probe",
+    "feature_lookup",
     *WEIGHT_FIELDS,
     "evaluation_charts",
     "training_layout",
@@ -322,7 +324,7 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
         ),
     )
     _training_contract(config, action)
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     if action == "train":
         _validate_bundle_cv_holdout(config, cv)
         # Saved-model actions never execute the editable project training hooks.
@@ -343,7 +345,7 @@ def validate_project_settings(config: dict[str, Any]) -> dict[str, Any]:
     """
     checked = validate_workflow_config(config, action="score")
     _training_contract(checked, "train")
-    _validate_bundle_cv_holdout(checked, LocalCVSpec.from_workflow(checked))
+    _validate_bundle_cv_holdout(checked, CVSpec.from_workflow(checked))
     return checked
 
 
@@ -355,7 +357,7 @@ def _validate_layout(config: dict[str, Any], action: str) -> None:
     if "competition" in config and layout != "model_competition":
         raise ValueError("Competition candidates require training_layout=model_competition.")
     if layout == "model_competition" and action == "train":
-        from ..training.competition.local_competition import (  # noqa: PLC0415
+        from ..training.competition.competition import (  # noqa: PLC0415
             validate_competition_budget,
         )
         from .competition_project import validate_competition_config  # noqa: PLC0415
@@ -364,7 +366,7 @@ def _validate_layout(config: dict[str, Any], action: str) -> None:
         validate_competition_budget(config)
 
 
-def _validate_bundle_cv_holdout(config: dict[str, Any], cv: LocalCVSpec) -> None:
+def _validate_bundle_cv_holdout(config: dict[str, Any], cv: CVSpec) -> None:
     """Check policy isolation without resolving source versions or runtime dates."""
     if (
         cv.enabled
@@ -445,7 +447,8 @@ def _preview_training_source(checked: dict[str, Any], training_status: str) -> l
         f"Final holdout: {checked.get('split_strategy', 'random')} | "
         f"fraction={checked.get('test_size', 0.2)} | start={holdout_start}",
         f"Training: {training_status}",
-        "Pre-split cleanup (fixed normalization and training eligibility; edit build_pre_split_steps()):",
+        "Pre-split cleanup (fixed normalization and training eligibility; "
+        "edit config/pre_split.yml or the existing Python builder):",
     ]
 
 
@@ -460,7 +463,7 @@ def _preview_steps(steps: list[dict[str, Any]], empty_message: str) -> list[str]
     ]
 
 
-def _preview_model_and_scoring(checked: dict[str, Any], cv: LocalCVSpec) -> list[str]:
+def _preview_model_and_scoring(checked: dict[str, Any], cv: CVSpec) -> list[str]:
     """Describe the model, quality policy and scoring destination."""
     model = checked["pipeline"]["modeling"]
     if model["type"] == "hyperparameter_tuner":
@@ -490,7 +493,7 @@ def _preview_model_and_scoring(checked: dict[str, Any], cv: LocalCVSpec) -> list
     ]
 
 
-def _preview_search(checked: dict[str, Any], cv: LocalCVSpec) -> list[str]:
+def _preview_search(checked: dict[str, Any], cv: CVSpec) -> list[str]:
     """Describe the validated effective search without claiming fitted results."""
     pipeline = checked["pipeline"]
     model = pipeline["modeling"]
@@ -534,7 +537,7 @@ def _preview_search(checked: dict[str, Any], cv: LocalCVSpec) -> list[str]:
     return lines
 
 
-def _append_search_cv_preview(lines: list[str], cv: LocalCVSpec) -> None:
+def _append_search_cv_preview(lines: list[str], cv: CVSpec) -> None:
     """Explain the effective search fold policy and repeated nested-search budgets."""
     if cv.enabled:
         lines.append(f"Search CV: {cv.method}, {cv.folds} folds, training partition only.")
@@ -579,7 +582,7 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     This cannot check source values, installed worker dependencies or permissions.
     """
     checked = validate_workflow_config(config, action=action)
-    cv = LocalCVSpec.from_workflow(checked)
+    cv = CVSpec.from_workflow(checked)
     training_status = "configured (source data and permissions not checked)"
     try:
         validate_workflow_config(checked, action="train")
@@ -593,7 +596,10 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         "Fixed feature cleanup is saved as a pipeline prefix and applied once to raw model inputs; "
         "training row exclusions are not repeated during scoring."
     )
-    lines.append("Fold-local preprocessing (after final split; edit build_preprocessing()):")
+    lines.append(
+        "Fold-local preprocessing (after final split; "
+        "edit config/preprocessing.yml or the existing Python builder):"
+    )
     lines.extend(
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )

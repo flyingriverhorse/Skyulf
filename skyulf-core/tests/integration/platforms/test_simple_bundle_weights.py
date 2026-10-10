@@ -10,8 +10,8 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     split_labeled_snapshot,
     training_spec_payload,
 )
@@ -30,7 +30,7 @@ def _spec(**changes):
         "weight_column": "w",
         "reserved_weight_columns": ("w",),
     }
-    return LocalTrainingSpec(**(values | changes))
+    return TrainingSpec(**(values | changes))
 
 
 def test_split_keeps_weights_aligned_after_missing_labels():
@@ -49,7 +49,7 @@ def test_split_keeps_weights_aligned_after_missing_labels():
 def test_spec_roundtrip_and_inactive_source_preserve_identity():
     """Frozen replay restores tuples and generated inactive hooks preserve legacy IDs."""
     spec = _spec()
-    assert LocalTrainingSpec.from_payload(training_spec_payload(spec, "pandas")) == spec
+    assert TrainingSpec.from_payload(training_spec_payload(spec, "pandas")) == spec
     inactive = _spec(weight_column=None, reserved_weight_columns=())
     source = "DEFAULT_WEIGHTS = {'weight_column': None}\n"
     captured = replace(
@@ -69,10 +69,10 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
     """Every editable layout must deliver aligned user and native class weights to sklearn."""
     from test_simple_bundle_weight_config import _load, _project
 
-    from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
-    from skyulf.integrations.databricks.training.fitting.local_retraining import fit_candidate
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.inference.fitted_pipeline import predict_pipeline
+    from skyulf.integrations.databricks.lifecycle.workflow import training_spec
+    from skyulf.integrations.databricks.training.fitting.candidate import fit_candidate
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     workflow_config.update(
         training_window_mode="fixed_window" if strategy == "temporal" else "full_snapshot",
@@ -137,7 +137,7 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
             spec = replace(spec, drop_missing_labels=True)
             frame.loc[3, "target"] = None
         train, heldout, skipped = split_labeled_snapshot(frame, spec)
-        cv = LocalCVSpec(enabled=True, folds=3)
+        cv = CVSpec(enabled=True, folds=3)
         fitted = fit_candidate(
             None,
             spec,
@@ -154,11 +154,11 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
             from skyulf.integrations.databricks.training.competition.competition_training import (
                 fit_training_pipeline,
             )
-            from skyulf.integrations.databricks.training.fitting import local_retraining
+            from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
-            monkeypatch.setattr(local_retraining, "log_fitted_candidate", MagicMock())
+            monkeypatch.setattr(candidate, "log_fitted_candidate", MagicMock())
             monkeypatch.setattr(
-                local_retraining, "log_local_model", MagicMock(return_value="runs:/test/model")
+                candidate, "log_pipeline_model", MagicMock(return_value="runs:/test/model")
             )
             store = MagicMock()
             store.request = {"config": {**config, "tracking_uri": "unused"}}
@@ -174,7 +174,7 @@ def test_three_layouts_fit_real_weights_and_score_without_them(
                 )
                 assert len(row["fold_scores"]) == 3
         assert fitted.artifact.manifest.input_columns == ("x",)
-        predicted = predict_local_pipeline(pd.DataFrame({"x": [1.0, 2.0]}), fitted.artifact)
+        predicted = predict_pipeline(pd.DataFrame({"x": [1.0, 2.0]}), fitted.artifact)
         assert len(predicted) == 2
         assert fitted.artifact.pipeline.config["training_weights"]["count"] == len(train)
     assert len(seen) >= len(loaded) * 4
@@ -189,15 +189,15 @@ def test_competition_temporal_folds_use_actual_weight_permutation(
     import polars as pl
 
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
     from skyulf.integrations.databricks.training.competition.competition_evaluation import (
         evaluate_competition_candidate,
     )
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     frame = pd.DataFrame({"x": np.arange(80, dtype=float), "y": np.arange(80) * 2.0})
     config = {"preprocessing": [], "modeling": {"type": "linear_regression", "params": {}}}
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=frame, test=frame.head(0)),
         target_column="y",
@@ -208,7 +208,7 @@ def test_competition_temporal_folds_use_actual_weight_permutation(
     frame["event"] = pd.date_range("2026-01-01", periods=80, tz="UTC")
     frame = frame.sample(frac=1, random_state=37).reset_index(drop=True)
     weights = frame.x.to_numpy() + 1
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         shuffle=False,
@@ -241,7 +241,7 @@ def test_competition_temporal_folds_use_actual_weight_permutation(
     )
     assert len(seen) >= 3
     assert report["mean"] == pytest.approx(0, abs=1e-8)
-    from skyulf.integrations.databricks.training.tuning.local_cv import evaluate_training_cv
+    from skyulf.integrations.databricks.training.tuning.cv import evaluate_training_cv
 
     diagnostics = evaluate_training_cv(
         native, config, cv, target_column="y", event_column="event", sample_weight=weights
@@ -299,7 +299,7 @@ def test_weight_only_changes_are_not_fresh_but_manual_split_uses_new_weights(mon
     """Weight edits must not trigger automatic data freshness but must affect manual training."""
     from test_retraining_data import _assess, freshness
 
-    from skyulf.integrations.databricks.lifecycle.local_workflow import training_spec
+    from skyulf.integrations.databricks.lifecycle.workflow import training_spec
 
     fixture: Any = freshness
     state = fixture.__wrapped__(monkeypatch)
@@ -333,6 +333,9 @@ def test_legacy_dataset_id_omits_all_new_defaults():
         "pre_split_steps",
         "max_rows",
         "max_bytes",
+        "preprocessing_probe",
+        "feature_lookup_json",
+        "feature_binding_json",
     ):
         settings.pop(field)
     expected = hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
@@ -344,9 +347,9 @@ def test_bundle_search_transports_weights_through_temporal_refits(tmp_path, monk
     """Bundle search and final refit must receive row weights without exposing the source column."""
     from datetime import UTC, datetime
 
-    from skyulf.integrations.databricks.training.fitting.local_retraining import fit_candidate
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-    from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+    from skyulf.integrations.databricks.training.fitting.candidate import fit_candidate
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 
     spec = _spec(
         split_strategy="temporal",
@@ -364,7 +367,7 @@ def test_bundle_search_transports_weights_through_temporal_refits(tmp_path, monk
             "event": pd.date_range("2026-01-01", periods=80, tz="UTC"),
         }
     )
-    cv = LocalCVSpec(
+    cv = CVSpec(
         enabled=True,
         folds=3,
         shuffle=False,
@@ -437,6 +440,6 @@ def test_restore_verified_hook_source_never_executes_it():
         weights_python_source=source,
         weights_python_sha256=hashlib.sha256(source.encode()).hexdigest(),
     )
-    restored = LocalTrainingSpec.from_payload(training_spec_payload(spec, "pandas"))
+    restored = TrainingSpec.from_payload(training_spec_payload(spec, "pandas"))
     assert restored.weight_column == "w"
     assert restored.weights_python_source == source

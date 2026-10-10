@@ -16,22 +16,25 @@ pl = pytest.importorskip("polars")
 
 from skyulf.data.dataset import SplitDataset  # noqa: E402
 from skyulf.inference.bundle import ColumnSpec  # noqa: E402
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline  # noqa: E402
-from skyulf.inference.local_scoring import score_local_pipeline  # noqa: E402
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    save_pipeline,  # noqa: E402
+)
 from skyulf.inference.model_set import (  # noqa: E402
     ComponentReference,
     load_model_set,
     save_model_set,
 )
 from skyulf.inference.model_set_scoring import predict_model_set  # noqa: E402
-from skyulf.integrations.mlflow.models import local_model  # noqa: E402
+from skyulf.inference.pipeline_scoring import score_pipeline  # noqa: E402
+from skyulf.integrations.mlflow.models import pipeline_model  # noqa: E402
 from skyulf.integrations.mlflow.models.model_set import log_model_set  # noqa: E402
 from skyulf.pipeline import SkyulfPipeline  # noqa: E402
 
 
 def _prepare(frame, model):
     """Exercise only the documented public preparation entry point."""
-    return local_model.prepare_pyfunc_input(frame, model)
+    return pipeline_model.prepare_pyfunc_input(frame, model)
 
 
 def _artifact(path, engine="pandas", mode="echo", integer="Int64"):
@@ -105,13 +108,13 @@ def _artifact(path, engine="pandas", mode="echo", integer="Int64"):
     native = pl.from_pandas(frame) if engine == "polars" else frame
     pipeline = SkyulfPipeline(config)
     pipeline.fit(SplitDataset(train=native, test=native.head(0)), target_column="target")
-    save_local_pipeline(pipeline, path)
+    save_pipeline(pipeline, path)
     query = frame.drop(columns="target")
     query.index = pd.Index([8, 8, 2, -1], name="original")
-    return load_local_pipeline(path), query
+    return load_pipeline(path), query
 
 
-def _package(path, directory, logger=local_model.log_local_model):
+def _package(path, directory, logger=pipeline_model.log_pipeline_model):
     """Use explicit local tracking and a real pyfunc save/load boundary."""
     directory.mkdir(parents=True, exist_ok=True)
     uri = "sqlite:///" + (directory / "tracking.db").as_posix()
@@ -142,7 +145,7 @@ def test_nullable_round_trip_preserves_exact_values_and_input(nullable_model):
     artifact, query, model, _ = nullable_model
     original = query.copy(deep=True)
     wire = _prepare(query, model)
-    expected = score_local_pipeline(query, artifact)
+    expected = score_pipeline(query, artifact)
     result = model.predict(wire)
     pd.testing.assert_frame_equal(query, original)
     pd.testing.assert_frame_equal(result, expected)
@@ -160,7 +163,7 @@ def test_original_nullable_types_reach_fitted_imputers(engine, tmp_path):
     artifact, query = _artifact(tmp_path / "artifact", engine, mode="impute")
     query.loc[:, "value"] = pd.array([25, None, 40, None], dtype="Int64")
     model, _ = _package(tmp_path / "artifact", tmp_path / "tracking")
-    expected = score_local_pipeline(query, artifact)
+    expected = score_pipeline(query, artifact)
     result = model.predict(_prepare(query, model))
     pd.testing.assert_frame_equal(result, expected)
     assert result.prediction.notna().all()
@@ -255,7 +258,7 @@ def test_nullable_model_set_and_fresh_process(tmp_path):
     wire = _prepare(query, model)
     pd.testing.assert_frame_equal(model.predict(wire), expected)
     query.to_pickle(tmp_path / "input.pkl")
-    script = "import sys,pandas as pd,mlflow\nfrom skyulf.integrations.mlflow.models.local_model import prepare_pyfunc_input\nm=mlflow.pyfunc.load_model(sys.argv[1])\nx=pd.read_pickle(sys.argv[2])\nm.predict(prepare_pyfunc_input(x,m)).to_pickle(sys.argv[3])\n"
+    script = "import sys,pandas as pd,mlflow\nfrom skyulf.integrations.mlflow.models.pipeline_model import prepare_pyfunc_input\nm=mlflow.pyfunc.load_model(sys.argv[1])\nx=pd.read_pickle(sys.argv[2])\nm.predict(prepare_pyfunc_input(x,m)).to_pickle(sys.argv[3])\n"
     result = subprocess.run(
         [
             sys.executable,
@@ -289,9 +292,7 @@ def test_empty_missing_and_column_order_inputs(nullable_model, case):
     original = query.copy(deep=True)
     wire = _prepare(query, model)
     expected_input = query[["value", "flag", "x"]]
-    pd.testing.assert_frame_equal(
-        model.predict(wire), score_local_pipeline(expected_input, artifact)
-    )
+    pd.testing.assert_frame_equal(model.predict(wire), score_pipeline(expected_input, artifact))
     pd.testing.assert_frame_equal(query, original)
     assert wire.columns.equals(query.columns)
     assert wire.index.equals(query.index)
@@ -355,7 +356,7 @@ def test_unmapped_pandas_inputs_keep_native_signature(dtype, tmp_path):
     )
     pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
     path = tmp_path / "artifact"
-    save_local_pipeline(pipeline, path)
+    save_pipeline(pipeline, path)
     query = frame.drop(columns="target")
     if dtype.startswith("Float"):
         query.loc[1, "value"] = pd.NA
@@ -363,7 +364,7 @@ def test_unmapped_pandas_inputs_keep_native_signature(dtype, tmp_path):
     prepared = _prepare(query, model)
     pd.testing.assert_frame_equal(prepared, query)
     pd.testing.assert_frame_equal(
-        model.predict(prepared), score_local_pipeline(query, load_local_pipeline(path))
+        model.predict(prepared), score_pipeline(query, load_pipeline(path))
     )
     assert "skyulf_input_transport" not in model.metadata.metadata
     assert model.metadata.signature.inputs.input_types()[0] != mlflow.types.DataType.string
@@ -376,7 +377,7 @@ def test_unsupported_nullable_types_still_fail_at_logging(dtype, tmp_path):
     pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "linear_regression"}})
     pipeline.fit(SplitDataset(train=frame, test=frame.head(0)), target_column="target")
     path = tmp_path / "artifact"
-    save_local_pipeline(pipeline, path)
+    save_pipeline(pipeline, path)
     with pytest.raises(ValueError, match="cannot preserve.*dtype exactly"):
         _package(path, tmp_path / "tracking")
 
@@ -385,7 +386,7 @@ def test_legacy_nullable_package_keeps_native_replay(tmp_path):
     """Previously serialized adapters without a codec attribute still load and score."""
     artifact, query = _artifact(tmp_path / "artifact")
     query = query.iloc[[0, 2, 3]]
-    model = local_model.SkyulfLocalPythonModel()
+    model = pipeline_model.SkyulfPipelinePythonModel()
     del model._input_transport
     path = tmp_path / "legacy"
     inputs = mlflow.types.Schema(
@@ -404,7 +405,7 @@ def test_legacy_nullable_package_keeps_native_replay(tmp_path):
     )
     loaded = mlflow.pyfunc.load_model(path)
     pd.testing.assert_frame_equal(
-        loaded.predict(_prepare(query, loaded)), score_local_pipeline(query, artifact)
+        loaded.predict(_prepare(query, loaded)), score_pipeline(query, artifact)
     )
     assert loaded.unwrap_python_model().input_transport() is None
 
@@ -420,7 +421,7 @@ def test_saved_codec_is_validated_against_artifact(nullable_model, kind):
         spec["columns"]["value"] = "Int32" if str(query.value.dtype) == "Int64" else "Int64"
     else:
         spec["columns"].pop("flag")
-    adapter = local_model.SkyulfLocalPythonModel(spec)
+    adapter = pipeline_model.SkyulfPipelinePythonModel(spec)
     artifacts = model.metadata.flavors["python_function"]["artifacts"]
     path = Path(package) / artifacts["local_pipeline"]["path"]
     with pytest.raises(ValueError, match="fitted artifact schema"):
@@ -465,8 +466,8 @@ def test_model_set_restores_mixed_nullable_float_storage(engine, dtype, tmp_path
     )
     pipeline.fit(SplitDataset(train=native, test=native.head(0)), target_column="target")
     component = tmp_path / "component"
-    save_local_pipeline(pipeline, component)
-    artifact = load_local_pipeline(component)
+    save_pipeline(pipeline, component)
+    artifact = load_pipeline(component)
     path = tmp_path / "set"
     save_model_set(
         path,
@@ -500,7 +501,7 @@ def test_nullable_pyfunc_split_json_round_trip(nullable_model):
     original = query.copy(deep=True)
     wire = _prepare(query, model)
     restored = pd.read_json(StringIO(wire.to_json(orient="split")), orient="split", dtype=False)
-    expected = score_local_pipeline(query, artifact)
+    expected = score_pipeline(query, artifact)
     pd.testing.assert_frame_equal(model.predict(restored), expected)
     pd.testing.assert_frame_equal(query, original)
     assert restored.index.tolist() == [8, 8, 2, -1]

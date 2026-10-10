@@ -1,0 +1,35 @@
+version: 1
+defaults:
+  config_version: 1
+  training_layout: single_model
+  engine: pandas
+  preprocessing_probe: false
+  training_table: "{catalog}.{input_schema}.sm33_generated_source"
+  record_key_columns: [entity_id]
+  model_name: "{catalog}.{metadata_schema}.sm33_generated_model{resource_suffix}"
+  promotion_policy: manual_approval
+  evaluation_charts: {enabled: false}
+  task: regression
+  input_columns: [feature_value]
+  target_column: target
+  split_strategy: random
+  training_window_mode: full_snapshot
+  test_size: 0.2
+  random_state: 42
+  stratify: false
+  cv_enabled: false
+  filter_unavailable_results: false
+  max_rows: 10000
+  max_input_mb: 64
+  metric: heldout_rmse
+  min_improvement: 0
+models:
+  main:
+    model:
+      type: linear_regression
+    tuning:
+      strategy: random
+      metric: rmse
+      n_trials: 10
+      random_state: 42
+      search_space: {fit_intercept: [true, false]}

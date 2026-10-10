@@ -507,7 +507,7 @@ class TokenizerArtifact(TypedDict, total=False):
 
 
 class SentenceEmbedderArtifact(TypedDict, total=False):
-    """Sentence-embedder params: model id, embedding dimension and output column names."""
+    """Sentence encoder schema and immutable native model snapshot with exact runtime pins."""
 
     type: str
     columns: list[str]  # source text column(s)
@@ -516,6 +516,9 @@ class SentenceEmbedderArtifact(TypedDict, total=False):
     normalize: bool
     output_columns: list[str]  # indexed: ``{src}__emb__{i}``
     drop_original: bool
+    model_snapshot: bytes
+    model_sha256: str
+    model_requirements: tuple[str, ...]
 
 
 class AliasReplacementArtifact(TypedDict, total=False):

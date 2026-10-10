@@ -1,0 +1,32 @@
+resources:
+  jobs:
+    daily_rollout:
+      name: ${bundle.name}_daily_rollout
+      tags: ${var.job_tags}
+      budget_policy_id: ${var.monitoring_budget_policy_id}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: ${var.monitoring_timeout_seconds}
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+      tasks:
+        - task_key: daily_rollout
+          description: Verify one observed traffic stage or reconcile its durable request
+          timeout_seconds: ${var.monitoring_task_timeout_seconds}
+          max_retries: 0
+          disable_auto_optimization: true
+          environment_key: serving
+          notebook_task:
+            notebook_path: ../src/jobs/daily_rollout.py
+            base_parameters:
+              serving_config_path: ${workspace.file_path}/config/serving.yml
+      environments:
+        - environment_key: serving
+          spec:
+            client: ${var.monitoring_environment_version}
+            dependencies:
+              - ../dist/skyulf/*.whl
+              - -r ${workspace.file_path}/deployment/serving-requirements.txt

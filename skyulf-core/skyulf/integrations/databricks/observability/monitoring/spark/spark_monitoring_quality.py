@@ -4,33 +4,43 @@ from typing import Any
 
 from scipy.stats import fisher_exact
 
-from ..local.monitoring_metrics import _metric, _report_status, _validate_inputs
+from ..monitoring_metrics import (
+    monitoring_metric,
+    monitoring_report_status,
+    validate_monitoring_inputs,
+)
 from .spark_monitoring_drift import drift_evidence
 from .spark_monitoring_metrics import (
-    _column,
-    _exists,
-    _functions,
-    _numeric,
-    _scored,
-    _validate_keys,
     build_spark_performance_report,
+    has_spark_rows,
+    is_numeric_column,
+    scored_predictions,
+    spark_column,
+    spark_functions,
+    validate_record_keys,
 )
 
 
 def _missing(frame: Any, column: str) -> Any:
     """Match Core missingness: nulls everywhere plus NaN in numeric columns."""
-    missing = _column(column).isNull()
-    return missing | _functions().isnan(_column(column)) if _numeric(frame, column) else missing
+    missing = spark_column(column).isNull()
+    return (
+        missing | spark_functions().isnan(spark_column(column))
+        if is_numeric_column(frame, column)
+        else missing
+    )
 
 
 def _quality_counts(frame: Any, column: str) -> tuple[int, int, int, int]:
     """Collect a single aggregate row of population, missing, NaN and infinity counts."""
     if column not in frame.columns:
         return 0, 0, 0, 0
-    f = _functions()
-    numeric = _numeric(frame, column)
-    infinite = f.abs(_column(column).cast("double")) == float("inf") if numeric else f.lit(False)
-    nan = f.isnan(_column(column)) if numeric else f.lit(False)
+    f = spark_functions()
+    numeric = is_numeric_column(frame, column)
+    infinite = (
+        f.abs(spark_column(column).cast("double")) == float("inf") if numeric else f.lit(False)
+    )
+    nan = f.isnan(spark_column(column)) if numeric else f.lit(False)
     row = frame.agg(
         f.count("*").alias("total"),
         f.sum(_missing(frame, column).cast("long")).alias("missing"),
@@ -61,15 +71,18 @@ def _quality(reference: Any, current: Any, unscored: Any, column: str) -> list[d
     total, missing, nonfinite, infinite = _quality_counts(current, column)
     if not total:
         return [
-            _metric("quality", column, name) for name in ("missing_fraction", "nonfinite_fraction")
+            monitoring_metric("quality", column, name)
+            for name in ("missing_fraction", "nonfinite_fraction")
         ]
     baseline_total, baseline_missing, _, _ = _quality_counts(reference, column)
     issue = _missing_increase(missing, total, baseline_missing, baseline_total)
-    issue = issue or _exists(unscored.where(_missing(current, column)))
+    issue = issue or has_spark_rows(unscored.where(_missing(current, column)))
     baseline = baseline_missing / baseline_total if baseline_total else 0.0
     return [
-        _metric("quality", column, "missing_fraction", missing / total, baseline, issue),
-        _metric("quality", column, "nonfinite_fraction", nonfinite / total, issue=bool(infinite)),
+        monitoring_metric("quality", column, "missing_fraction", missing / total, baseline, issue),
+        monitoring_metric(
+            "quality", column, "nonfinite_fraction", nonfinite / total, issue=bool(infinite)
+        ),
     ]
 
 
@@ -88,7 +101,7 @@ def _features(
         metrics = [
             item
             for column in columns
-            for item in [_metric("drift", column, "unavailable"), *quality[column]]
+            for item in [monitoring_metric("drift", column, "unavailable"), *quality[column]]
         ]
         return metrics, 0, ["Reference or current feature data is empty."], True
     drift, count, notes, unavailable = drift_evidence(reference, current, columns, thresholds)
@@ -102,15 +115,17 @@ def _features(
 
 def _unscored(current: Any, predictions: Any, scored: Any, keys: tuple) -> Any:
     """Check prediction membership and retain absent or excluded current keys."""
-    if _exists(predictions):
-        if not _exists(current):
+    if has_spark_rows(predictions):
+        if not has_spark_rows(current):
             raise ValueError("A prediction key is absent from current records.")
-        known = current.select(*[_column(key) for key in keys])
-        if _exists(predictions.join(known, list(keys), "left_anti")):
+        known = current.select(*[spark_column(key) for key in keys])
+        if has_spark_rows(predictions.join(known, list(keys), "left_anti")):
             raise ValueError("A prediction key is absent from current records.")
-    if not _exists(scored):
+    if not has_spark_rows(scored):
         return current
-    return current.join(scored.select(*[_column(key) for key in keys]), list(keys), "left_anti")
+    return current.join(
+        scored.select(*[spark_column(key) for key in keys]), list(keys), "left_anti"
+    )
 
 
 def _report_issues(metrics: list[dict], performance: dict) -> tuple[bool, bool]:
@@ -140,10 +155,10 @@ def monitoring_report(
     thresholds: dict | None,
 ) -> dict:
     """Build the existing monitoring result contract without materializing populations."""
-    _validate_inputs(as_of, task, classes, thresholds)
-    _validate_keys(current, record_key_columns, "current")
-    _validate_keys(predictions, record_key_columns, "predictions")
-    scored, excluded = _scored(predictions, task, classes)
+    validate_monitoring_inputs(as_of, task, classes, thresholds)
+    validate_record_keys(current, record_key_columns, "current")
+    validate_record_keys(predictions, record_key_columns, "predictions")
+    scored, excluded = scored_predictions(predictions, task, classes)
     unscored = _unscored(current, predictions, scored, record_key_columns)
     performance = build_spark_performance_report(
         predictions,
@@ -160,7 +175,7 @@ def monitoring_report(
         reference, current, unscored, feature_columns, thresholds, reference_count, current_count
     )
     metrics.extend(
-        _metric("performance", target_column, name, value)
+        monitoring_metric("performance", target_column, name, value)
         for name, value in performance["values"].items()
     )
     notes = (
@@ -173,7 +188,7 @@ def monitoring_report(
     if not performance["scored_rows"]:
         notes.append("No current rows have a saved predicted output.")
     quality_issue, bad_performance = _report_issues(metrics, performance)
-    status = _report_status(
+    status = monitoring_report_status(
         reference_count, current_count, drifted, unavailable, quality_issue, bad_performance
     )
     return {

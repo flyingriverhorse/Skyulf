@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
@@ -112,6 +113,14 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 class LagFeaturesApplier(BaseApplier):
     """Append lagged copies of the configured columns, optionally within groups."""
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Retain the window dependency even when training history was saved."""
+        if engine not in ("pandas", "polars"):
+            return None
+        effect = "filter" if state.get("drop_na", False) else "preserve"
+        return ExecutionCapability(engine, "apply", "local", effect, "window")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

@@ -2,14 +2,18 @@
 
 import logging
 from copy import deepcopy
+from decimal import Decimal
+from numbers import Real
 from typing import Any, cast
 
 import pandas as pd
 
 from ..._validation import raise_invalid_choice
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import FeatureGenerationArtifact
+from .._fitted_validation import local_scalar, local_state_fields
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -55,8 +59,95 @@ def _validate_operation_types(operations: list[dict[str, Any]]) -> None:
             )
 
 
+def _validate_group_mapping(op: dict) -> None:
+    """Require fitted lookup dimensions while retaining unresolved fit-time no-ops."""
+    if "group_agg_mapping" not in op:
+        raise ValueError("FeatureGeneration group_agg requires fitted statistics; refit the node.")
+    mapping = op["group_agg_mapping"]
+    if mapping is None:
+        return
+    if type(mapping) is not dict or set(mapping) != {
+        "group_column",
+        "keys",
+        "values",
+        "null_value",
+    }:
+        raise ValueError("Fitted group aggregation mapping has unexpected fields.")
+    if not isinstance(mapping["group_column"], str):
+        raise ValueError("Fitted group aggregation requires a named group column.")
+    _validate_group_values(mapping)
+
+
+def _validate_group_values(mapping: dict) -> None:
+    """Inspect the learned lookup vectors without recomputing any aggregate."""
+    keys, values = mapping["keys"], mapping["values"]
+    if type(keys) not in (list, tuple) or type(values) not in (list, tuple):
+        raise ValueError("Fitted group keys and values must be ordered sequences.")
+    if len(keys) != len(values):
+        raise ValueError("Fitted group keys and values must have equal lengths.")
+    if any(
+        value is not None and not isinstance(value, Real)
+        for value in [*values, mapping["null_value"]]
+    ):
+        raise ValueError("Fitted aggregate values must be numeric or missing.")
+
+
+def _operation_context(op: dict, epsilon: Any, engine: str) -> str | None:
+    """Retain pandas string rendering and uncertain numeric fallback dependencies."""
+    kind = op.get("operation_type", "arithmetic")
+    if kind == "similarity":
+        if op.get("similarity_backend") is None:
+            return None
+        return "global" if engine == "pandas" else "row"
+    return _numeric_operation_context(op, epsilon, kind)
+
+
+def _numeric_operation_context(op: dict, epsilon: Any, kind: str) -> str | None:
+    """Avoid promising independent batches for nonnumeric fill or epsilon fallbacks."""
+    divides = kind == "ratio" or (kind == "arithmetic" and op.get("method") == "divide")
+    if divides and not isinstance(epsilon, Real):
+        return None
+    fill = op.get("fillna")
+    if kind == "arithmetic" and fill is not None and not isinstance(fill, Real):
+        return None
+    return "row"
+
+
 class FeatureGenerationApplier(BaseApplier):
     """Append the columns described by a feature-generation artifact."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved operations, pinned similarity and learned group lookup shapes."""
+        local_state_fields(
+            raw, "feature_generation", {"type", "operations", "epsilon", "allow_overwrite"}
+        )
+        operations = raw["operations"]
+        if type(operations) not in (list, tuple) or any(type(op) is not dict for op in operations):
+            raise ValueError(
+                "Fitted feature operations must be an ordered sequence of dictionaries."
+            )
+        if not isinstance(raw["allow_overwrite"], Decimal):
+            local_scalar(raw["allow_overwrite"], "allow_overwrite")
+        _validate_operation_types(operations)
+        for op in operations:
+            if op.get("operation_type") == "group_agg":
+                _validate_group_mapping(op)
+            if op.get("operation_type") == "similarity":
+                _validate_similarity_backend(op.get("similarity_backend"))
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved feature replay without granting arbitrary partition execution."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        FeatureGenerationApplier.validate_inference_state(state)
+        contexts = {_operation_context(op, state["epsilon"], engine) for op in state["operations"]}
+        if None in contexts:
+            return None
+        context = "global" if "global" in contexts else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

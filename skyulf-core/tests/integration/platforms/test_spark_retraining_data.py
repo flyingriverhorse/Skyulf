@@ -14,16 +14,16 @@ from skyulf.integrations.databricks.data.training.spark_retraining_data import (
     _require_supported_recipe,
     _row_hash,
 )
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
-    _partition_training_rows,
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
+    partition_training_rows,
 )
 
 
 def _spec(**changes):
     """Keep split fixtures independent of cloud configuration and model storage."""
     return replace(
-        LocalTrainingSpec(
+        TrainingSpec(
             table="a.b.c",
             version=1,
             record_key_columns=("id",),
@@ -41,7 +41,7 @@ def test_exact_split_ordinals(stratify):
     """Random metadata splitting must match sklearn membership rather than Spark hashes."""
     spec = _spec(stratify=stratify)
     frame = pd.DataFrame({"_ordinal": range(20), "y": [0, 1] * 10})
-    train, _ = _partition_training_rows(frame, spec)
+    train, _ = partition_training_rows(frame, spec)
     assert _metadata_train_ordinals(frame, spec) == train["_ordinal"].tolist()
 
 
@@ -51,7 +51,7 @@ def test_group_split_ordinals():
     frame = pd.DataFrame(
         {"_ordinal": range(20), "y": [0, 1] * 10, "group": [i // 2 for i in range(20)]}
     )
-    train, _ = _partition_training_rows(frame, spec)
+    train, _ = partition_training_rows(frame, spec)
     assert _metadata_train_ordinals(frame, spec) == train["_ordinal"].tolist()
 
 

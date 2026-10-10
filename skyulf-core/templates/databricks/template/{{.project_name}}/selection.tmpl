@@ -1,15 +1,5 @@
 {{- /* Generation-only selection: skip paths are relative to this directory. */ -}}
 {{- skip "selection" -}}
-{{- if ne .training_layout "single_model" -}}
-{{- skip "src/modeling/single_model.py" -}}
-{{- end -}}
-{{- if ne .training_layout "model_competition" -}}
-{{- skip "src/modeling/model_competition.py" -}}
-{{- end -}}
-{{- if ne .training_layout "multi_target" -}}
-{{- skip "src/modeling/multi_model.py" -}}
-{{- skip "src/modeling/model_set.py" -}}
-{{- end -}}
 {{- if eq .training_layout "multi_target" -}}
 {{- range $name := (regexp "[a-z_]+").FindAllString "initialize_run load_data prepare_dataset train_and_tune select_best_model validate_model register_model evaluate_model model_decision training_report" -1 -}}
 {{- skip (printf "src/jobs/%s.py" $name) -}}
@@ -39,4 +29,16 @@
 {{- if ne .auto_rebuild_on_cdf_expiry "true" -}}
 {{- skip "src/jobs/recover_predictions.py" -}}
 {{- skip "src/jobs/scoring_report.py" -}}
+{{- end -}}
+{{- if ne .include_daily_rollout "true" -}}
+{{- skip "resources/daily_rollout.job.yml" -}}
+{{- skip "src/jobs/daily_rollout.py" -}}
+{{- end -}}
+{{- if ne .include_online_publication "true" -}}
+{{- skip "resources/online_publication.job.yml" -}}
+{{- skip "src/jobs/online_publication.py" -}}
+{{- end -}}
+{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") -}}
+{{- skip "config/serving.yml" -}}
+{{- skip "deployment/serving-requirements.txt" -}}
 {{- end -}}

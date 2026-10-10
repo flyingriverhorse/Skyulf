@@ -22,15 +22,15 @@ def _missing_distribution(distribution):
 def missing_distribution(monkeypatch):
     """Keep source-checkout coverage independent of locally installed distributions."""
     monkeypatch.setattr(metadata, "version", _missing_distribution)
+    monkeypatch.setattr(core, "version", _missing_distribution)
 
 
 @pytest.fixture
-def source_module(tmp_path):
-    """Import a fresh copy without changing settings classes cached by other tests."""
+def source_checkout(monkeypatch, tmp_path):
+    """Resolve temporary manifests while executing the actual application module."""
     module_path = tmp_path / "backend" / "config" / "mixins" / "core.py"
-    module_path.parent.mkdir(parents=True)
-    module_path.write_text(CORE_MODULE.read_text(encoding="utf-8"), encoding="utf-8")
-    return module_path
+    monkeypatch.setattr(core, "__file__", str(module_path))
+    return tmp_path
 
 
 def test_current_checkout_version_ignores_working_directory(monkeypatch, tmp_path):
@@ -44,23 +44,23 @@ def test_current_checkout_version_ignores_working_directory(monkeypatch, tmp_pat
     assert expected == module["CoreMixin"].APP_VERSION
 
 
-def test_installed_distribution_precedes_source_manifest(monkeypatch, source_module, tmp_path):
+def test_installed_distribution_precedes_source_manifest(monkeypatch, source_checkout):
     """Installed release metadata must not be replaced by a nearby source checkout."""
-    monkeypatch.setattr(metadata, "version", lambda distribution: "7.8.9")
-    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
-    module = runpy.run_path(str(source_module))
-    assert module["CoreMixin"].APP_VERSION == "7.8.9"
+    monkeypatch.setattr(core, "version", lambda distribution: "7.8.9")
+    (source_checkout / "pyproject.toml").write_text(
+        '[project]\nversion = "1.2.3"\n', encoding="utf-8"
+    )
+    assert core._application_version() == "7.8.9"
 
 
 @pytest.mark.parametrize("installed_version", [None, "", "   "])
-def test_missing_metadata_version_uses_source(
-    monkeypatch, source_module, tmp_path, installed_version
-):
+def test_missing_metadata_version_uses_source(monkeypatch, source_checkout, installed_version):
     """Incomplete distribution metadata must not hide a usable project version."""
-    monkeypatch.setattr(metadata, "version", lambda distribution: installed_version)
-    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
-    module = runpy.run_path(str(source_module))
-    assert module["CoreMixin"].APP_VERSION == "1.2.3"
+    monkeypatch.setattr(core, "version", lambda distribution: installed_version)
+    (source_checkout / "pyproject.toml").write_text(
+        '[project]\nversion = "1.2.3"\n', encoding="utf-8"
+    )
+    assert core._application_version() == "1.2.3"
 
 
 @pytest.mark.parametrize(
@@ -77,12 +77,11 @@ def test_missing_metadata_version_uses_source(
         b'[project]\nversion = "   "\n',
     ],
 )
-def test_unusable_source_version_retains_development_fallback(source_module, tmp_path, manifest):
+def test_unusable_source_version_retains_development_fallback(source_checkout, manifest):
     """Missing or malformed source metadata must not prevent the backend from starting."""
     if manifest is not None:
-        (tmp_path / "pyproject.toml").write_bytes(manifest)
-    module = runpy.run_path(str(source_module))
-    assert module["CoreMixin"].APP_VERSION == "0.0.0-dev"
+        (source_checkout / "pyproject.toml").write_bytes(manifest)
+    assert core._application_version() == "0.0.0-dev"
 
 
 def test_app_version_environment_override_is_preserved(monkeypatch):

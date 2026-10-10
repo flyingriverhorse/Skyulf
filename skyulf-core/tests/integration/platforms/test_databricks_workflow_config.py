@@ -422,10 +422,7 @@ def test_reserved_output_and_cdf_columns_fail_before_compute(workflow_config, ch
 @pytest.mark.parametrize("megabytes", [1, 64, 256])
 def test_input_megabytes_reach_training_and_scoring_as_bytes(workflow_config, megabytes):
     """Readable Bundle units must preserve the same byte budget on both execution paths."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import (
-        _scoring_config,
-        training_spec,
-    )
+    from skyulf.integrations.databricks.lifecycle.workflow import _scoring_config, training_spec
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
 
     config = {key: value for key, value in workflow_config.items() if key != "max_bytes"}

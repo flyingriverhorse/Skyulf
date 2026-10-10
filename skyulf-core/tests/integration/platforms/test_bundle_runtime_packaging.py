@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -61,6 +62,23 @@ def test_build_copies_matching_wheel_and_records_its_digest(tmp_path):
     assert output.read_bytes() == source.read_bytes()
     assert receipt["sha256"] == hashlib.sha256(source.read_bytes()).hexdigest()
     assert receipt["version"] == "0.9.1"
+
+
+def test_generated_artifact_accepts_the_current_release(tmp_path):
+    """A newly generated project must accept the Core wheel from its source release."""
+    release = tomllib.loads((TEMPLATE.parents[4] / "pyproject.toml").read_text())["project"][
+        "version"
+    ]
+    source = _wheel(tmp_path / f"skyulf_core-{release}-py3-none-any.whl", version=release)
+    project = _build_project(tmp_path, source)
+    settings = json.loads((TEMPLATE / "deployment/artifact.json").read_text())
+    settings["source"] = str(source)
+    (project / "deployment/artifact.json").write_text(json.dumps(settings), encoding="utf-8")
+
+    result = _build(project)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["version"] == release
 
 
 @pytest.mark.parametrize("suffix", [".py", ".pyc"])

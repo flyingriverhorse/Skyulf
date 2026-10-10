@@ -11,10 +11,12 @@ import dataclasses
 import hashlib
 import inspect
 from collections.abc import Iterator
+from datetime import date, time, timedelta
 from types import ModuleType
 from typing import Any
 
 import numpy as np
+from pandas import Period
 from sklearn._loss import _loss  # ty: ignore[unresolved-import] - compiled sklearn module
 from sklearn.linear_model import (
     _sgd_fast,  # ty: ignore[unresolved-import] - compiled sklearn module
@@ -37,6 +39,7 @@ _TRANSIENT_ATTRIBUTES = frozenset({"last_transform_coverage_"})
 _BIT_GENERATOR_TYPES = frozenset(
     (np.random.PCG64, np.random.PCG64DXSM, np.random.MT19937, np.random.Philox, np.random.SFC64)
 )
+_NUMERIC_DTYPE_TYPES = frozenset(type(np.dtype(code)) for code in "?bhilqBHILQefdgFDG")
 
 
 def artifact_digest(obj: Any) -> bytes:
@@ -52,6 +55,7 @@ def artifact_digest(obj: Any) -> bytes:
     NumPy dtypes containing objects are unsupported because their raw bytes
     contain process-dependent pointers. Nesting beyond Python's recursion
     capacity also raises ``TypeError``, with an excessive-depth explanation.
+    Temporal scalars are unsupported; NumPy temporal arrays retain their encoding.
 
     The length-framed encoding replaces the original ambiguous encoding;
     previously stored artifact digests and fitted fingerprints must be
@@ -155,10 +159,16 @@ def _array_children(h: Any, obj: np.ndarray) -> Iterator[Any]:
 
 def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
     """Write framing and yield ordered children for recursion in the caller's frame."""
+    if isinstance(obj, (date, time, timedelta, Period, np.timedelta64)):
+        raise TypeError(
+            f"Cannot digest temporal scalar of type {type(obj)!r}: no canonical representation"
+        )
     if _feed_scalar(h, obj):
         return
     if isinstance(obj, np.ndarray):
         yield from _array_children(h, obj)
+    elif isinstance(obj, np.dtype):
+        _feed_numeric_dtype(h, obj)
     elif isinstance(obj, np.random.RandomState):
         h.update(b"randomstate:")
         yield obj.get_state()
@@ -170,6 +180,20 @@ def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
         yield from obj
     else:
         yield from _object_children(h, obj)
+
+
+def _feed_numeric_dtype(h: Any, dtype: np.dtype) -> None:
+    """Encode plain numeric dtype metadata without discarding unsupported structure."""
+    if (
+        dtype.kind not in "biufc"
+        or dtype.fields is not None
+        or dtype.subdtype is not None
+        or dtype.metadata is not None
+        or type(dtype) not in _NUMERIC_DTYPE_TYPES
+    ):
+        raise TypeError(f"Cannot digest dtype {dtype}: no canonical representation")
+    _feed_bytes(h, b"numpy-dtype", dtype.str.encode())
+    _feed_bytes(h, b"scalar-variant", dtype.char.encode())
 
 
 def _generator_children(h: Any, obj: np.random.Generator) -> Iterator[Any]:

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .....inference.project_code import load_project_module
-from ...lifecycle.local_workflow import resolve_target_config
+from ...lifecycle.workflow import resolve_target_config
 from ...model_sets.model_set_project import (
     capture_set_rules,
     load_project_model_set,
@@ -20,6 +20,8 @@ from ...model_sets.model_set_project import (
 )
 from ...projects._project_files import read_source, renamed_modeling_hook
 from ...projects.project import load_project_workflow
+from ...projects.yaml_config import read_training_config
+from ...projects.yaml_models import branch_base, training_branches
 from ...training.weights.weight_config import capture_branch_weights
 from ..shared.job_runtime import (
     lifecycle_widget_context,
@@ -107,9 +109,14 @@ def load_training_branch_configs(values: dict[str, str]) -> dict[str, dict[str, 
     base = read_notebook_config(values)
     _training_only(base, allow_set_handoff=True)
     modeling = Path(values["config_path"]).parent.parent / "src/modeling"
-    entries, source = _branch_entries(
-        renamed_modeling_hook(modeling / "multi_model.py", "branches.py")
+    yaml = read_training_config(Path(values["config_path"]).parent)
+    entries, source = (
+        training_branches(yaml)
+        if yaml is not None
+        else _branch_entries(renamed_modeling_hook(modeling / "multi_model.py", "branches.py"))
     )
+    if yaml is not None:
+        base = branch_base(base, yaml)
     weights = capture_branch_weights(source, entries)
     return {
         name: _branch_config(base, entry, values, modeling, weights[name])
@@ -168,15 +175,15 @@ def run_branch_training_notebook(
         settings, champion_versions = pin_model_set_baseline(
             settings, configs, project_endpoints(next(iter(configs.values())))
         )
-    from ...training.local_branches import (  # noqa: PLC0415 - load training services after preflight
+    from ...training.branches import (  # noqa: PLC0415 - load training services after preflight
         prepare_training_branches,
-        train_local_branches,
+        train_branches,
     )
 
     branches = prepare_training_branches(spark, configs, champion_versions=champion_versions)
     base = next(iter(configs.values()))
     with tempfile.TemporaryDirectory(prefix="skyulf-branches-") as directory:
-        outcome = train_local_branches(
+        outcome = train_branches(
             spark,
             branches,
             **project_endpoints(base),

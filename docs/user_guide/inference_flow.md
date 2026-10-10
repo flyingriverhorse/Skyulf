@@ -1,213 +1,168 @@
 # How inference works: pandas, Polars and Spark
 
-**Status: 0.9.0 development branch, SM-10 complete.** This guide explains how
-fitted feature engineering (FE) and a trained model are reused on new data.
+Inference reuses the preprocessing and model learned during training. The
+execution choice determines where those saved transformations run and which
+artifacts can be used. It does not fit a new imputer, scaler or model.
 
-The principle is the same in each path: **learn during training → save an
-artifact → apply the saved transformations → predict with the trained model.**
-Inference does not refit the imputer, scaler or model.
+For a runnable starting point, use the [Python SDK example](databricks_sdk.md#fit-and-score-a-small-batch)
+for a bounded frame, or the [Spark bundle example](inference_bundles.md#native-spark-fe-and-worker-model-inference)
+for distributed input. Install the model's recorded dependencies in each
+process that loads it.
 
-Supported pandas/Polars-to-Spark paths are tested to preserve the prediction
-function. This does not imply that every Python pipeline automatically works
-on Spark. Compatibility depends on each FE implementation, the recorded schema
-and the runtime environment.
+## What training saves
 
-## 1. What training saves
+![Training saves fitted transformations, model and schemas](../assets/diagrams/inference/training.svg)
 
-![Training produces fitted FE state, a Python model and schema metadata in one bundle](../assets/diagrams/inference/training.svg)
+[Editable diagram source](../assets/diagrams/inference/training.mmd)
 
-[Editable Mermaid source](../assets/diagrams/inference/training.mmd)
+A fitted pipeline artifact keeps the complete `SkyulfPipeline`, its fit engine,
+raw and model-feature schemas, dependency versions and content identities. Use
+`save_pipeline` and `load_pipeline` from `skyulf.inference.fitted_pipeline` for
+this format. `score_pipeline` from `skyulf.inference.pipeline_scoring` applies
+saved project scoring rules as well as the fitted preprocessing and model.
 
-Suppose we train this pipeline using pandas or Polars:
+An `InferenceBundle` uses a separate portable representation: `features.json`
+contains supported learned preprocessing state, `model.pkl` contains the fitted
+estimator, and `manifest.json` records schemas, versions and output contracts.
+Its explicit native Spark appliers turn saved state into Spark expressions;
+JSON does not translate arbitrary Python code into Spark code.
 
-```text
-SimpleImputer(mean) → StandardScaler → LinearRegression
-```
+Both formats contain trusted model payloads. Load artifacts only from controlled
+producers. A checksum detects changed bytes; it does not make pickle safe.
 
-The bundle contains the fitted FE state and input contract alongside the model:
+## The same learned transformation
 
-| Part | Saved information | Purpose during inference |
-| --- | --- | --- |
-| `features.json` | Step order, columns, learned fill values and scaler statistics | Reapply the same transformations |
-| `model.pkl` | The fitted sklearn estimator and learned parameters | Call the trained model's `predict` method |
-| `manifest.json` | Raw/model columns, order, dtypes, versions, output contract and content identities | Detect invalid inputs and incompatible packages |
-
-JSON does not translate Python code into Spark code. **We implement the code
-that applies the saved state.** For example, the Spark StandardScaler applier
-constructs native Spark expressions using the saved means and scales.
-
-The model is not converted into a Spark MLlib model. It remains the trained
-Python/sklearn estimator. In distributed inference, it runs on Spark workers.
-Model training here still uses the local pandas/Polars path. Fitting FE on Spark
-and training a model across a cluster are separate capabilities.
-
-## 2. Why the same row should receive the same prediction
-
-Consider two training rows: `amount=[10.0, 30.0]`, `target=[100.0, 300.0]`.
-The learned values in this example are:
+For training values `amount=[10.0, 30.0]` and `target=[100.0, 300.0]`, an imputer,
+standard scaler and linear regressor can learn:
 
 ```text
-Imputer: replace missing amount with 20.
-Scaler:  z = (amount - 20) / 10
-Model:   prediction = 100 × z + 200
+Fill missing amount with 20.
+z = (amount - 20) / 10
+prediction = 100 * z + 200
 ```
 
-Each inference path should apply these same learned values to new data:
-
-| Row key | New amount | After imputation | After scaling: z | Prediction |
+| Row key | New amount | After imputation | After scaling | Prediction |
 | --- | --- | --- | --- | --- |
 | 101 | 40.0 | 40.0 | 2.0 | 400.0 |
 | 102 | missing | 20.0 | 0.0 | 200.0 |
 
-Spark does not calculate a new mean for each partition. Workers do not train
-separate models. Each row uses the saved `20`, `10` and the same model parameters.
-Floating-point results are compared within appropriate numerical tolerances;
-bit-for-bit equality is not a universal guarantee.
+Supported execution paths reuse these same values. Workers do not compute a new
+mean per partition or train separate estimators. Floating-point comparisons use
+appropriate tolerances; universal bit-for-bit equality is not promised.
 
-## 3. Local inference — available
+## Whole-frame Python execution
 
-![Local inference applies FE to raw input and bypasses FE for prepared features](../assets/diagrams/inference/local.svg)
+![Python prediction applies saved preprocessing to raw input](../assets/diagrams/inference/whole_frame.svg)
 
-[Editable Mermaid source](../assets/diagrams/inference/local.mmd)
+[Editable diagram source](../assets/diagrams/inference/whole_frame.mmd)
 
-`predict_local(frame, bundle)` runs in one Python process:
+`score_pipeline(frame, artifact)` handles a pandas or Polars frame in one Python
+process. It validates the saved input contract and uses the recorded fit engine.
+This can be a workstation, a Databricks driver, or a cloud job. Supply the entire
+intended request within the configured row and byte budget.
 
-1. Validate the bundle and input schema.
-2. For an `input_stage="raw"` bundle, apply the saved FE to pandas/Polars input.
-3. Validate the resulting model columns and their order, then predict.
-4. Return a pandas DataFrame.
+The portable bundle API uses `predict_local(frame, bundle)` and returns a pandas
+DataFrame. For `input_stage="raw"`, it applies saved preprocessing first. A
+`features` bundle expects already prepared model features and bypasses
+preprocessing. Applying a scaler twice gives the wrong input; the API cannot
+infer from numeric values whether a column has already been scaled.
 
-An `input_stage="features"` bundle expects already prepared model features and
-bypasses FE. Applying the scaler again to `z=2` would produce the wrong model
-input. The raw/features distinction makes the caller's responsibility explicit;
-the system cannot determine from numbers alone whether scaling already happened.
+`runtime="standalone"` in `WorkflowConfig` selects general Python integration
+on any compute. `runtime="databricks"` enables Databricks integration and is
+required for UC Delta publication. The pandas/Polars `engine` and Bundle
+`inference_mode="local"`/`"spark"` are independent choices. The old SDK
+`runtime="local"` value is rejected; update existing workflow configurations.
 
-The new bundle API's initial support is narrower than the existing local pipeline
-API. Existing local transformations have not been removed because they are not
-yet supported by this new format.
+## Native Spark preprocessing and a Python model
 
-## 4. Native Spark FE + Python model — available
+![Spark transforms distributed input and sends prepared features to workers](../assets/diagrams/inference/spark_native.svg)
 
-![Distributed native Spark FE followed by the same Python model on worker batches](../assets/diagrams/inference/spark_native.svg)
+[Editable diagram source](../assets/diagrams/inference/spark_native.mmd)
 
-[Editable Mermaid source](../assets/diagrams/inference/spark_native.mmd)
+`predict_spark(..., mode="native_features")` accepts a raw-input portable bundle:
 
-Solid arrows show data flow. Dashed arrows show saved FE state or model payload
-transfer. Raw data is not collected into a pandas DataFrame on the driver.
+1. The driver checks supported transformations, schemas, versions and output contracts.
+2. Native Spark expressions apply the saved preprocessing state.
+3. Distributed checks validate unique, non-null row keys and row preservation.
+4. Worker iterators load the fitted model and predict on prepared feature batches.
+5. The result is a Spark DataFrame containing record keys and predictions.
 
-`predict_spark(..., mode="native_features")` follows these steps:
+The supported portable preprocessing chain is SimpleImputer `mean`/`constant`,
+StandardScaler, or an empty chain. Regression and classification are supported;
+classification returns probability columns in the saved class order and applies
+the saved threshold decisions. Unsupported native steps fail explicitly.
 
-1. The driver validates the bundle and execution request: supported FE, raw input,
-   a regression or classification model, column order/dtypes and compatible package versions.
-2. Spark FE appliers turn the learned rules into Spark expressions. Their model
-   output schema is checked before any data action.
-3. Spark validates unique, non-null row keys and applies FE across the distributed
-   frame. Key and row preservation are checked as well.
-4. Only prepared model features and row keys reach the Python workers.
-5. Each worker iterator loads the same model payload. It predicts on its
-   pandas/NumPy batches without applying FE again.
-6. The result is a Spark DataFrame containing `record_key_columns + prediction`; classifiers
-   also expose probability columns in the manifest class order.
+The whole table remains distributed. Only worker batches become pandas/NumPy
+inputs; there is no implicit collection into a driver frame. Model-call batch
+size does not cap Arrow transport allocation or total worker memory. Install
+compatible dependencies on both driver and workers.
 
-**Pandas describes the small piece being processed inside a worker.** The entire
-Spark table is not collected to the driver for local prediction. Spark continues
-distributing partitions across workers. The two workers in the diagram are
-illustrative; Spark determines the actual task and worker count.
+Prediction is lazy until a Spark action or sink write. Validation may execute
+separate distributed actions, returning bounded control results. Spark preserves
+key identity, not physical row order; downstream consumers join by keys.
 
-The model is loaded once per iterator and reused across prediction chunks.
-A new task, retry or later action may load it again. Spark does not guarantee
-physical row order, so results are matched by keys such as `id`. Keys do not
-automatically become model features.
+## Python preprocessing inside workers
 
-Validation executes some distributed actions and returns only bounded control
-results to the driver. Prediction remains a lazy Spark DataFrame: an action such
-as `show`, `collect` or writing to a sink executes model prediction. The runner
-does not itself write a table or schedule a monthly job.
+![Workers apply saved Python preprocessing and the fitted model](../assets/diagrams/inference/spark_python_planned.svg)
 
-## 5. Python FE + model inside workers — available in SM-10/SM-11
+[Editable diagram source](../assets/diagrams/inference/spark_python_planned.mmd)
 
-![Spark distributes raw batches and workers apply fitted Python FE and the model](../assets/diagrams/inference/spark_python_planned.svg)
+`predict_spark(..., mode="python_pipeline")` applies the portable bundle's
+supported preprocessing and model together within independent worker batches.
+It has the same portable preprocessing scope and supports regression and
+classification. Choosing this mode does not admit arbitrary fitted Python nodes.
 
-[Editable Mermaid source](../assets/diagrams/inference/spark_python_planned.mmd)
+A separate [certified MLflow pyfunc path](databricks_bundle.md#distributed-inference-settings)
+uses inspected pandas fitted-pipeline packages. Its admission rules include the
+exact fitted recipe, estimator, schema, source identity and worker environment.
+Its supported recipes differ from the portable bundle's native Spark appliers.
+Neither path silently falls back to collecting a distributed frame.
 
-`mode="python_pipeline"` distributes raw batches and runs compatible fitted
-Python FE together with the model inside each worker. The worker restores the
-frozen portable state once per iterator, applies it to each pandas batch, and
-then predicts with the same serialized regression model.
+## Rows, groups, windows and history
 
-This also keeps the dataset distributed. The distinction is where FE executes:
-native Spark expressions or Python code inside worker batches.
+The required context is the other data needed **at inference time**:
 
-Not every Python transformation is independent of batch boundaries:
+| Context | Caller responsibility | Example |
+| --- | --- | --- |
+| `row` | Supply the row and the saved model state | Imputation using a saved mean |
+| `group` | Supply the complete intended current group | A callback subtracting the current request's group mean |
+| `window` | Supply ordering and required prior/neighboring observations | Lag and rolling features |
+| `global` | Preserve the intended complete request population | Population-dependent fallback or active deduplication |
+| `unknown` | Inspect and validate the actual implementation | An undeclared custom callback |
 
-- **Apply saved, fixed bin boundaries:** each row can be handled independently,
-  provided the required state format, adapter and compatibility tests exist.
-- **Learn new bin boundaries from each batch:** changes the training transformation
-  and must not happen during inference.
-- **Rolling/lag:** a required preceding row may belong to another partition.
-  Independent batches can give incorrect results without explicit ordering and
-  window context.
+A fitted GroupImputer is commonly `row`: training already saved the per-group
+statistics and fallback. Looking up one row's group does not require the new
+request to contain all members of that group. A callback recomputing the group
+mean from incoming rows has a different contract.
 
-Being batch-independent does not automatically make a node supported today.
-Packaging, execution and compatibility checks must also be implemented. An
-unsupported native FE step will not silently fall back to this worker path.
-The current worker path accepts portable SimpleImputer `mean`/`constant`,
-StandardScaler and an empty FE chain. Regression and classification are both
-supported; classifiers preserve string, integer or boolean labels and the saved
-threshold decision rule.
+Built-in lag/rolling steps in carry mode can use
+`score_pipeline_with_history(..., history_state=...)`, which returns predictions
+and detached continuation state. The caller persists both atomically and controls
+concurrent writers. Whole-frame scoring preserves the frame supplied by the
+caller; it cannot discover missing group members or fetch earlier events.
+See [preprocessing diagnostics and context](preprocessing_context.md) for a
+runnable continuation example and the diagnostic's `requires_context` outcome.
 
-## 6. What compatibility means
+A passing sample diagnostic does not authorize independent Spark partitions or
+single-row endpoint requests. Declared row context, supported serialization and
+the execution adapter's fitted-state checks are separate requirements.
 
-**Training with pandas or Polars is not itself a problem.** When FE semantics,
-model features and the trained estimator are preserved, supported paths are
-expected and tested to produce matching predictions.
+## Choosing an artifact and execution path
 
-The limitation concerns arbitrary operations inside arbitrary artifacts:
+| Need | Entry point | Practical boundary |
+| --- | --- | --- |
+| Bounded pandas/Polars pipeline scoring | `score_pipeline` | Preserve required whole-frame context and the recorded fit engine |
+| Continued built-in temporal history | `score_pipeline_with_history` | Caller owns history storage and atomic publication |
+| Portable bundle in one process | `predict_local` | Supported portable state, raw or prepared-feature contract |
+| Portable Spark inference | `predict_spark` | Raw input, admitted portable preprocessing, keyed distributed output |
+| Certified fitted pandas model on Spark | Bundle `inference_mode="spark"` | Exact fitted recipe, model and worker environment must pass admission |
 
-| Situation | Current behavior |
-| --- | --- |
-| Supported imputer/scaler, compatible schema and runtime | Local/Spark prediction parity is tested |
-| FE without a supported Spark applier or portable-state codec | Unsupported by the new bundle/native path; no silent fallback |
-| Wrong feature order, missing columns or a different native FE output dtype | Error instead of silent correction |
-| Incompatible model/runtime versions | Error; prepare compatible driver and worker environments |
-| Nullable integer/boolean model-feature or Python-worker raw schema | The initial Spark runner rejects it before actions due to Arrow conversion risks |
-| An existing backend artifact dictionary supplied as a new bundle | Rejected; the backend adapter is planned for SM-18 |
+Existing `SkyulfPipeline.save/load` and backend `.joblib` files remain valid for
+their original consumers. A backend artifact dictionary is not an
+`InferenceBundle`; do not pass it directly to `build_bundle`. See
+[artifact formats and compatibility](inference_bundles.md#current-support-and-legacy-adapters).
 
-Current native FE support covers **SimpleImputer mean/constant and StandardScaler**;
-an empty FE chain is also supported. The first Spark model runner accepts **raw
-input and regression**. Local bundle classification support does not mean that
-distributed classification is complete; that validation gate is SM-11.
-
-Row keys can be integer/string/boolean. Integer/boolean model features require
-a non-nullable Spark schema; keys have a separate non-null value check.
-See the [bundle guide](inference_bundles.md) for detailed dtype, input-stage and
-runtime-version requirements.
-
-## 7. Relationship to existing artifacts
-
-Saving and loading the model together with fitted FE already existed in Skyulf.
-That principle is preserved. The new bundle carries the same kind of information
-with an explicit contract that the distributed runner can validate and execute.
-
-Existing `SkyulfPipeline.save/load` and backend `.joblib` paths remain available.
-This does not make every old file a direct `predict_spark` input. Building a new
-standalone bundle requires recorded schemas and supported FE; adapting the old
-backend artifact format is a separate delivery.
-
-| Inference path | Where FE runs | Where the model runs | Status |
-| --- | --- | --- | --- |
-| Local raw | Local pandas/Polars | The same local Python process | Available |
-| Local prepared features | Already prepared; FE is bypassed here | Local Python process | Available |
-| Spark native features | Native Spark operations | Spark Python worker batches | SM-11: raw regression/classification |
-| Spark Python pipeline | Python FE inside a Spark worker | Python model in the same worker | SM-11: raw regression/classification |
-
-Local/Spark describes where and how computation runs. Monthly batch scheduling,
-HTTP endpoints and SQL access describe how it is invoked; they are separate from
-the training or FE algorithm. MLflow packaging and registry loading are available;
-both Spark modes have passed a real Databricks serverless regression probe using
-a Polars-trained model from Unity Catalog. The monthly Delta runner has separate
-publication checks. Endpoints and reusable templates remain later stages.
-
-For runnable code, see the [Spark batch inference example](inference_bundles.md#native-spark-fe-and-worker-model-inference).
-The SVG diagrams on this page display without Mermaid support; each has an
-editable source linked above.
+Scheduling, Delta publication, HTTP serving and SQL invocation are separate
+integration choices. Use the [batch publication guide](databricks_batch.md),
+[MLflow packaging guide](mlflow_models.md) and [Bundle guide](databricks_bundle.md)
+for the corresponding contracts.

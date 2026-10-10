@@ -1,1 +1,1 @@
-"""Project custom steps connected to the pre-split and preprocessing builders."""
+"""Optional scoring callbacks and advanced Calculator/Applier examples."""

@@ -80,11 +80,11 @@ def test_only_winner_registered_after_shared_cv(staged, engine):
 
 def test_failed_candidate_prevents_registration(staged, monkeypatch):
     """A partial competition must never silently register its successful candidate."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
     _, client, config, _, _ = staged
     _competition(config)
-    fit = local_retraining.fit_candidate
+    fit = candidate.fit_candidate
 
     def fail_one(*args, **kwargs):
         """Fail the weak fit after the strong candidate can finish."""
@@ -92,7 +92,7 @@ def test_failed_candidate_prevents_registration(staged, monkeypatch):
             raise ValueError("deliberate candidate failure")
         return fit(*args, **kwargs)
 
-    monkeypatch.setattr(local_retraining, "fit_candidate", fail_one)
+    monkeypatch.setattr(candidate, "fit_candidate", fail_one)
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     with pytest.raises(ValueError, match="deliberate candidate failure"):
         _call(staged, "train", prepared.reference)
@@ -127,13 +127,13 @@ def test_shap_competition_preserves_winner_and_child_reports(staged):
 
 def test_cv_required_before_reading_source(staged, monkeypatch):
     """Competition cannot rank candidates by the independent final holdout."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
     _, client, config, _, _ = staged
     _competition(config)
     config["cv_enabled"] = False
     monkeypatch.setattr(
-        local_workflow, "prepare_training", lambda *a, **kw: pytest.fail("remote preparation")
+        workflow, "prepare_training", lambda *a, **kw: pytest.fail("remote preparation")
     )
     with pytest.raises(ValueError, match="cv_enabled"):
         _call(staged, "prepare", config=config, action="train", experiment_name="staged")
@@ -237,21 +237,21 @@ def test_mixed_model_families_and_search_strategies_register_one_winner(
 
 def test_winner_quality_failure_never_evaluates_runner_up(staged, monkeypatch):
     """A failed winner gate must leave the champion untouched without trying another candidate."""
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
     _, client, config, _, frame = staged
     frame["target"] += [0, 2] * 10
     _competition(config)
     config["quality_threshold"] = 0.0
     evaluated = []
-    evaluate = local_retraining.evaluate_candidate
+    evaluate = candidate.evaluate_candidate
 
     def record_evaluation(artifact, *args, **kwargs):
         """Record real heldout evaluations without changing their computed metrics."""
         evaluated.append(artifact.manifest.pipeline_sha256)
         return evaluate(artifact, *args, **kwargs)
 
-    monkeypatch.setattr(local_retraining, "evaluate_candidate", record_evaluation)
+    monkeypatch.setattr(candidate, "evaluate_candidate", record_evaluation)
     prepared = _call(staged, "prepare", config=config, action="train", experiment_name="staged")
     trained = _call(staged, "train", prepared.reference)
     assert evaluated == []
@@ -284,10 +284,10 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
     """Winner registration and scoring must restore its selected package without editable code."""
     import polars as pl
 
-    from skyulf.inference.local_pipeline import predict_local_pipeline
+    from skyulf.inference.fitted_pipeline import predict_pipeline
     from skyulf.inference.project_scoring import run_project_scoring
     from skyulf.integrations.databricks.projects.project import load_project_workflow
-    from skyulf.integrations.mlflow.registration.registry import load_run_local_pipeline
+    from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
 
     _, client, config, _, frame = staged
     _competition(config, "polars")
@@ -299,10 +299,10 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
     features.mkdir()
     template = (
         Path(__file__).resolve().parents[3]
-        / "templates/databricks/template/{{.project_name}}/src/features/custom/preprocessing_custom.py"
+        / "templates/databricks/template/{{.project_name}}/src/features/preprocessing.py"
     )
     shutil.copyfile(template, features / "custom.py")
-    shutil.copyfile(template.with_name("pre_split_custom.py"), features / "shared_filter.py")
+    shutil.copyfile(template.with_name("pre_split.py"), features / "shared_filter.py")
     pin = f"numpy=={importlib.metadata.version('numpy')}"
     features.joinpath("requirements.txt").write_text(pin, encoding="utf-8")
     features.joinpath("assets.json").write_text('["filter.json"]', encoding="utf-8")
@@ -343,7 +343,7 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
         "raise RuntimeError('edited')\n", encoding="utf-8"
     )
     registered = _register_in_fresh_process(tmp_path, config, frame, trained.reference)
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         trained.output["model_uri"],
         digest=registered["model_digest"],
         tracking_uri=config["tracking_uri"],
@@ -351,7 +351,7 @@ def test_winner_scores_with_captured_custom_recipe_after_project_edit(staged, tm
     pipeline: dict[str, Any] = dict(artifact.pipeline.config)
     scores = run_project_scoring(
         pl.DataFrame({"x": [20.0, 21.0, None], "category": ["known", "unseen", "known"]}),
-        lambda rows: predict_local_pipeline(rows, artifact),
+        lambda rows: predict_pipeline(rows, artifact),
         source=pipeline["project_python_source"],
         config=pipeline["project_scoring"],
         row_keys=[],
@@ -374,10 +374,10 @@ def _register_in_fresh_process(tmp_path, config, frame, reference):
     code = (
         "import json, sys, pandas as pd\n"
         "from pathlib import Path\n"
-        "from skyulf.integrations.databricks.training import local_retraining\n"
+        "from skyulf.integrations.databricks.training.fitting import candidate\n"
         "from skyulf.integrations.databricks.jobs.lifecycle.lifecycle_tasks import LifecycleContext, run_lifecycle_phase\n"
         "frame=pd.read_json(sys.argv[1], orient='table')\n"
-        "local_retraining.read_training_snapshot=lambda spark,spec: frame.copy()\n"
+        "candidate.read_training_snapshot=lambda spark,spec: frame.copy()\n"
         "reference=json.loads(Path(sys.argv[2]).read_text())\n"
         "result=run_lifecycle_phase(None, phase='evaluate_register', "
         "context=LifecycleContext(job_id='10',job_run_id='20'), "

@@ -8,7 +8,7 @@ from typing import Any
 
 from ...data.delta_io.delta import history
 from ...lifecycle._lifecycle_state import LifecycleContext, PhaseStore
-from ...observability.monitoring.local.monitoring import run_monitoring
+from ...observability.monitoring.monitoring import run_monitoring
 from ...observability.monitoring.monitoring_config import MonitorConfig, json_digest, qualified_name
 from ...observability.monitoring.monitoring_output import render_monitor_output
 from ...observability.monitoring.monitoring_registration import (

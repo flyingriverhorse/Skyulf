@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._helpers import select_rows_by_position
@@ -27,6 +28,25 @@ COLUMN_STEP = "ColumnFunction"
 FITTED_STEP = "FittedFunction"
 FILTER_STEP = "RowFilterFunction"
 _CODE_ONLY_TAG = "code_only"
+
+
+def _inference_context(context: str | None) -> dict[str, str]:
+    """Persist only explicit, valid context declarations in existing step payloads."""
+    if context is None:
+        return {}
+    if context not in ("row", "group", "window", "global"):
+        raise ValueError("inference_context must be row, group, window or global.")
+    return {"inference_context": context}
+
+
+def _function_capability(
+    state: dict, *, engine: str, row_effect: str = "preserve"
+) -> ExecutionCapability | None:
+    """Describe an explicit saved promise without resolving the project function."""
+    context = _inference_context(state.get("inference_context"))
+    if not context or engine not in ("pandas", "polars"):
+        return None
+    return ExecutionCapability(engine, "apply", "local", row_effect, context["inference_context"])
 
 
 def function_ref(fn: Callable[..., Any]) -> str:
@@ -243,6 +263,11 @@ class ColumnFunctionCalculator(BaseCalculator):
 class ColumnFunctionApplier(BaseApplier):
     """Apply the saved function to every split and inference batch identically."""
 
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Report only the explicit saved context; custom functions default to unknown."""
+        return _function_capability(state, engine=engine)
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:
         """Add or replace output columns without changing rows."""
@@ -278,6 +303,11 @@ class FittedFunctionCalculator(BaseCalculator):
 class FittedFunctionApplier(BaseApplier):
     """Apply saved state; the apply function never sees the target."""
 
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Report declared context without treating learned state as row independence."""
+        return _function_capability(state, engine=engine)
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:
         """Add or replace output columns using only the saved state."""
@@ -306,6 +336,11 @@ class RowFilterFunctionCalculator(BaseCalculator):
 
 class RowFilterFunctionApplier(BaseApplier):
     """Keep selected rows in their original order without editing any value."""
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Report the filter effect and its explicit saved input-context requirement."""
+        return _function_capability(state, engine=engine, row_effect="filter")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:
@@ -359,8 +394,13 @@ def column_step(
     output: str | list[str],
     replace: bool = False,
     params: dict[str, Any] | None = None,
+    inference_context: str | None = None,
 ) -> dict[str, Any]:
-    """Build a step that adds columns from ``function(df)`` or ``function(df, params)``."""
+    """Build columns from ``function(df)`` or ``function(df, params)``.
+
+    ``inference_context`` optionally declares row, group, window or global input
+    dependence for diagnostics. It does not authorize distributed execution.
+    """
     return {
         "name": name,
         "transformer": COLUMN_STEP,
@@ -369,6 +409,7 @@ def column_step(
             "output": _outputs(output),
             "replace": bool(replace),
             "params": _user_params(params),
+            **_inference_context(inference_context),
         },
     }
 
@@ -381,8 +422,13 @@ def fitted_step(
     output: str | list[str],
     replace: bool = False,
     params: dict[str, Any] | None = None,
+    inference_context: str | None = None,
 ) -> dict[str, Any]:
-    """Build a step whose ``learn(df, y)`` state is reused by ``apply(df, state)``."""
+    """Build a step reusing ``learn(df, y)`` state in ``apply(df, state)``.
+
+    ``inference_context`` optionally declares row, group, window or global input
+    dependence for diagnostics. Learned state alone supplies no such promise.
+    """
     return {
         "name": name,
         "transformer": FITTED_STEP,
@@ -392,6 +438,7 @@ def fitted_step(
             "output": _outputs(output),
             "replace": bool(replace),
             "params": _user_params(params),
+            **_inference_context(inference_context),
         },
     }
 
@@ -402,8 +449,13 @@ def filter_step(
     *,
     columns: list[str],
     params: dict[str, Any] | None = None,
+    inference_context: str | None = None,
 ) -> dict[str, Any]:
-    """Build a pre-split row filter that keeps rows where ``function(df)`` is True."""
+    """Build a pre-split filter keeping rows where ``function(df)`` is True.
+
+    ``inference_context`` optionally declares row, group, window or global input
+    dependence for diagnostics. Undeclared callback context remains unknown.
+    """
     if not isinstance(columns, list) or not columns or len(set(columns)) != len(columns):
         raise ValueError("filter columns must be a nonempty list of unique column names.")
     return {
@@ -413,6 +465,7 @@ def filter_step(
             "function": function_ref(function),
             "columns": list(columns),
             "params": _user_params(params),
+            **_inference_context(inference_context),
         },
         "pre_split": {
             "effect": "filter",

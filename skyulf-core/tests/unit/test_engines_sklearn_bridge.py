@@ -114,7 +114,7 @@ def test_to_sklearn_preserves_nonnumeric_columns(dtype: str, wrapped: bool) -> N
     frame = pd.DataFrame(
         {
             "number": pd.Series([1, None, 3], dtype="Int64"),
-            "label": pd.Series(["north", "south", "north"], dtype=dtype),
+            "label": pd.Series(["north", "south", None], dtype=dtype),
         }
     )
     data = EngineRegistry.wrap(frame) if wrapped else frame
@@ -122,8 +122,10 @@ def test_to_sklearn_preserves_nonnumeric_columns(dtype: str, wrapped: bool) -> N
     values, _ = SklearnBridge.to_sklearn(data)
 
     assert values.dtype == object
-    assert values[:, 1].tolist() == ["north", "south", "north"]
-    assert values[1, 0] is pd.NA
+    assert values[:2, 1].tolist() == ["north", "south"]
+    assert pd.isna(values[2, 1])
+    assert type(values[2, 1]) is type(frame["label"].iloc[2])
+    assert np.isnan(values[1, 0])
     assert values[[0, 2], 0].tolist() == [1, 3]
 
 

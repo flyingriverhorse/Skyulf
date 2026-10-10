@@ -1,12 +1,25 @@
 # Standalone inference bundles
 
-The 0.9.0 development API packages a fitted feature pipeline and a Python
+The bundle API packages a fitted feature pipeline and a Python
 estimator with an explicit inference contract. It supports local pandas/Polars
 prediction and native Spark FE followed by Python model inference on Spark workers.
 Importing `skyulf.inference` requires neither PySpark nor MLflow.
 
 Start with [How inference works](inference_flow.md) for training and inference
 diagrams and a worked example of reusing the same fitted FE and model.
+
+## Fitted pipeline or portable bundle?
+
+Use `FittedPipelineArtifact` from `skyulf.inference.fitted_pipeline` to save and
+restore the complete pandas/Polars pipeline with its recorded engine and schemas.
+`save_pipeline`, `load_pipeline` and `predict_pipeline` use that format. It carries
+the persisted `kind="local_pipeline"` and `execution_scope="whole_frame_local"`
+values for compatibility; those strings do not restrict it to a workstation.
+
+Use `InferenceBundle` for the explicitly portable preprocessing state and
+`predict_local`/`predict_spark` API described here. These two artifact formats are
+not interchangeable. [Preprocessing context](preprocessing_context.md) explains
+when a complete frame, groups or carried history are required.
 
 ## Raw data and prepared features
 
@@ -146,7 +159,7 @@ classification bundle and a Spark DataFrame. The fitted FE runs as native Spark 
 Only the prepared feature columns and row keys reach the Python workers;
 the estimator receives the features in the saved training order. Pandas/NumPy
 batches exist inside those workers, without collecting the dataset to the driver.
-Local training describes where the fit runs; it does not waive the matching
+Training fits the model in one Python process; it does not waive the matching
 runtime requirements above. Train/package and consume in compatible environments,
 even when switching from pandas or Polars inputs to Spark inputs.
 
@@ -237,9 +250,9 @@ classification. Prepared-feature bundles and streaming remain unsupported.
 Classification output includes `prediction` plus `probability_*` columns in the
 manifest class order. Saved tuning or pipeline thresholds are applied in the
 same precedence order as local inference. The Python FE worker mode is
-available for the portable row-independent path. Databricks,
-Spark Connect and worker-wheel isolation still require their later validation
-gates; local PySpark tests do not establish those deployment guarantees.
+available for the portable row-independent path. Each process needs the recorded
+runtime dependencies; validate packaging and worker environments on the actual
+Databricks or Spark Connect compute before running a production workload.
 
 ## Current support and legacy adapters
 
@@ -259,7 +272,7 @@ consumers; it does not relearn or replace those fitted transformations.
 | Existing artifact | Saved information and current consumer | New bundle bridge |
 | --- | --- | --- |
 | Standalone `SkyulfPipeline.save()` pickle | The pipeline object, fitted FE and model; `SkyulfPipeline.load(...).predict(...)` | Load with the existing API, then call `build_bundle` if recorded schemas and supported FE are present |
-| Backend job artifact, normally `.joblib` | Model, fitted FeatureEngineer, target/drop metadata, model feature order/dtypes and training engine; `DeploymentService` | Explicit adapter planned for SM-18; do not pass the dictionary to `build_bundle` |
+| Backend job artifact, normally `.joblib` | Model, fitted FeatureEngineer, target/drop metadata, model feature order/dtypes and training engine; `DeploymentService` | Not a bundle input; use its existing backend loader |
 | Estimator-only pickle | Whatever the producer saved in the estimator | External preprocessing is not recovered automatically; a fitted pipeline and its input contract are needed |
 
 The backend serving path already transforms raw input and aligns the result to
@@ -272,7 +285,8 @@ pipeline saved after schema capture can be loaded through that API and passed
 to `build_bundle`. Historical standalone artifacts without captured schemas
 must be fitted successfully again; the bundle does not invent missing column
 names or types. Backend artifact dictionaries are rejected. Their explicit
-adapter and threshold/label compatibility checks belong to SM-18.
+adapter would need to preserve threshold and target-label behavior; no implicit
+conversion is performed.
 
 Changing the inference engine does not make every fitted Python transformer a
 native Spark operation. For example, a future binning adapter must use the saved
@@ -289,8 +303,7 @@ does not include external feature engineering; log a fitted pipeline or provide
 a model wrapper that runs it. MLflow's
 [Spark UDF](https://mlflow.org/docs/latest/api_reference/python_api/mlflow.pyfunc.html#mlflow.pyfunc.spark_udf)
 executes Python model inference through pandas batches; it does not compile
-arbitrary Python transformations into native Spark expressions. Skyulf's MLflow
-adapter will expose the selected bundle contract in a later stage.
-
-MLflow/Unity Catalog, Databricks runtime validation, endpoints and template
-generation remain later stages of the [Spark work](spark.md).
+arbitrary Python transformations into native Spark expressions. Skyulf's [MLflow adapter](mlflow_models.md) packages the selected artifact
+contract. The certified fitted-pipeline pyfunc route has separate admission
+checks from this portable bundle format. See the [Databricks Bundle guide](databricks_bundle.md)
+for generated jobs, source snapshots and publication.

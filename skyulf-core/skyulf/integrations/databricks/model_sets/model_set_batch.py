@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes, output_scalar
+from skyulf.integrations.databricks.shared._frames import frame_bytes, output_scalar
 
 from ...mlflow.registration.registry import ResolvedModel
 from ..data.admission import BatchConflictError, PublishAdmission, validate_admission
@@ -22,6 +22,13 @@ from ..data.delta_io.cdf_recovery import (
     validate_recovery_binding,
 )
 from ..data.delta_io.delta import DeltaPublishError, table_identity
+from ..feature_store.scoring import (
+    feature_source_columns,
+    validate_feature_continuation,
+    validate_feature_receipt,
+    validate_feature_snapshot,
+    validate_feature_source,
+)
 from ..scoring.batch.spark_scoring import (
     DistributedRows,
     SparkSetExecution,
@@ -30,7 +37,7 @@ from ..scoring.batch.spark_scoring import (
     read_distributed_rows,
     score_distributed_set,
 )
-from ..scoring.incremental.local_incremental import (
+from ..scoring.incremental.incremental_batch import (
     SourceChangeRequiresRebuild,
     bounded_frame,
     check_incremental_bootstrap,
@@ -152,10 +159,11 @@ def _provision(
     """Create only an absent empty target after validating source and exact output types."""
     columns = _table_columns(artifact, publication)
     frame = spark.table(source)
-    for spec in artifact.manifest.input_schema:
-        column_name(spec.name)
-        if spec.name not in frame.columns:
-            raise ValueError(f"Scoring source is missing model-set input {spec.name!r}.")
+    validate_feature_source(frame, artifact)
+    for name in feature_source_columns(artifact):
+        column_name(name)
+        if name not in frame.columns:
+            raise ValueError(f"Scoring source is missing model-set input {name!r}.")
     for spec in artifact.manifest.record_key_schema:
         if not _key_type_matches(spec.dtype, frame.schema[spec.name].dataType.typeName()):
             raise ValueError("Source key types differ from the model-set manifest.")
@@ -278,6 +286,7 @@ def _publication_receipt(
     write_mode: str = "append",
     recovery_request: dict[str, Any] | None = None,
     execution: SparkSetExecution | None = None,
+    feature_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bind provenance, progress and component continuation to one atomic write."""
     receipt = {
@@ -300,6 +309,7 @@ def _publication_receipt(
     }
     if recovery_request is not None:
         receipt.update(recovery_receipt_fields(recovery_request))
+    receipt.update(feature_evidence or {})
     if execution is not None:
         receipt.update(
             inference_mode="spark",
@@ -373,6 +383,7 @@ def _commit_set(
     expected = receipt["expected_target_version"]
     if int(latest_source_version(spark, target)["version"]) != expected:
         raise BatchConflictError("Target changed while scoring the set.")
+    validate_feature_receipt(spark, receipt)
     try:
         output.write.format("delta").mode(mode).option("mergeSchema", "false").option(
             "partitionOverwriteMode", "static"
@@ -483,6 +494,7 @@ def _run_admitted_set(
     execution: SparkSetExecution | None = None,
 ) -> ModelSetBatchResult:
     """Hold the common target claim through snapshot selection and complete publication."""
+    feature_evidence = validate_feature_snapshot(spark, artifact)
     if table_identity(spark, source) != source_id or table_identity(spark, target) != target_id:
         raise BatchConflictError("Source or target changed during model-set admission.")
     functions = importlib.import_module("pyspark.sql.functions")
@@ -501,6 +513,7 @@ def _run_admitted_set(
         int(latest["version"]),
         recovery_request,
     )
+    validate_feature_continuation(previous, feature_evidence, rebuilding=write_mode == "overwrite")
     if noop:
         return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
     frame, source_rebuilt = _read_set_frame(
@@ -539,6 +552,7 @@ def _run_admitted_set(
         write_mode=write_mode,
         recovery_request=recovery_request,
         execution=execution,
+        feature_evidence=feature_evidence,
     )
     selected_columns = [
         name for name in publication_columns(artifact, publication) if name not in _METADATA
@@ -622,7 +636,8 @@ def _read_set_frame(
         selected, rebuilt = _select_set_source(spark, source, prior, upper, functions, policy)
         context = normalize_cdf_error() if prior is not None and not rebuilt else nullcontext()
         with context:
-            columns = tuple(column.name for column in artifact.manifest.input_schema)
+            validate_feature_source(selected, artifact)
+            columns = feature_source_columns(artifact)
             keys = artifact.manifest.record_key_columns
             frame = (
                 read_distributed_rows(selected, columns, keys, execution=execution)

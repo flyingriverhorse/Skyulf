@@ -9,20 +9,20 @@ import polars as pl
 from .....inference.project_code import load_project_module
 from ....mlflow.runs.tracking import TrackingRun
 from ...observability.reports.explanation_report import copy_winner_explanations
-from ..fitting import local_retraining as training
-from ..shared.local_training_evidence import evidence_digest
+from ..fitting import candidate as training
+from ..shared.training_evidence import evidence_digest
 from ..thresholds.decision_thresholds import needs_threshold_time
-from ..tuning.local_cv import LocalCVSpec
-from ..tuning.local_search import base_model_config
-from ..weights.local_weights import extract_training_weights
+from ..tuning.cv import CVSpec
+from ..tuning.search import base_model_config
+from ..weights.weights import extract_training_weights
+from .competition import choose_winner
 from .competition_evaluation import evaluate_competition_candidate
-from .local_competition import choose_winner
 
 
 def fit_competition(
     spark: Any,
     store: Any,
-    spec: training.LocalTrainingSpec,
+    spec: training.TrainingSpec,
     directory: Path,
     *,
     prepared_data: Any = None,
@@ -30,7 +30,7 @@ def fit_competition(
     """Train all requested candidates, preserve child evidence, then select one."""
     request = store.request
     config = request["config"]
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     partitions = prepared_data or training.read_training_partitions(
         spark,
         spec,
@@ -75,7 +75,7 @@ def _restore_source(pipeline: dict[str, Any]) -> None:
 def fit_training_pipeline(
     spark: Any,
     store: Any,
-    spec: training.LocalTrainingSpec,
+    spec: training.TrainingSpec,
     partitions: Any,
     path: Path,
     name: str,
@@ -83,7 +83,7 @@ def fit_training_pipeline(
 ) -> tuple[Any, dict[str, Any]]:
     """Finish or fail one child run while retaining exact fit and evaluation evidence."""
     config = store.request["config"]
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     created = store.client.create_run(
         store.client.get_run(store.run_id).info.experiment_id,
         run_name=name,
@@ -112,8 +112,11 @@ def fit_training_pipeline(
             engine=config["engine"],
             risk_category=config.get("risk_category"),
         )
-        model_uri = training.log_local_model(
-            path, run_id=created.info.run_id, tracking_uri=config["tracking_uri"]
+        model_uri = training.log_pipeline_model(
+            path,
+            run_id=created.info.run_id,
+            tracking_uri=config["tracking_uri"],
+            **training.feature_log_options(spark, fitted.spec),
         )
         frame = pl.from_pandas(partitions[1]) if config["engine"] == "polars" else partitions[1]
         frame, sample_weight = extract_training_weights(frame, spec.weight_column)

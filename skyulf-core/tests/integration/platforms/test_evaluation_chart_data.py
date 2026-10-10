@@ -138,23 +138,19 @@ def record_sample(run, fitted, settings):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_temporal_predictions_are_sampled_after_full_holdout_evaluation(tmp_path, engine):
     """Sampling must not change rolling features or lose the preceding heldout rows."""
-    from test_local_temporal_history import fitted_temporal_pipeline
+    from test_temporal_history import fitted_temporal_pipeline
 
-    from skyulf.inference.local_pipeline import (
-        load_local_pipeline,
-        predict_local_pipeline,
-        save_local_pipeline,
-    )
-    from skyulf.integrations.databricks.training.fitting.local_retraining import evaluate_candidate
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
+    from skyulf.integrations.databricks.training.fitting.candidate import evaluate_candidate
 
     fitted = fitted_candidate()
     path = tmp_path / "model"
-    save_local_pipeline(fitted_temporal_pipeline(engine), path)
-    artifact = load_local_pipeline(path)
+    save_pipeline(fitted_temporal_pipeline(engine), path)
+    artifact = load_pipeline(path)
     rows = pd.DataFrame(
         {"t": np.arange(20, 30, dtype=np.int64), "v": np.arange(20, 30, dtype=float)}
     )
-    expected = predict_local_pipeline(rows, artifact)
+    expected = predict_pipeline(rows, artifact)
     rows["target"] = np.arange(20, 30, dtype=float)
     client = ArtifactClient()
     evaluate_candidate(

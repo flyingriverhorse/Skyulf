@@ -13,6 +13,7 @@ SHARED_FIELDS = {
     "training_layout",
     "project_name",
     "engine",
+    "inference_mode",
     "catalog",
     "schema",
     "source_table_name",

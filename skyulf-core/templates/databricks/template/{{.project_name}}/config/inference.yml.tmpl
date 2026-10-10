@@ -1,0 +1,23 @@
+# Scoring controls and output destinations. No model is trained by this file.
+version: 1
+inference_mode: {{.inference_mode}}
+{{if eq .inference_mode "spark"}}spark_udf_env_manager: {{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}
+spark_udf_prediction_batch_rows: 10000
+{{end}}score_source_table: "{catalog}.{input_schema}.{{if .score_source_table_name}}{{.score_source_table_name}}{{else}}{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}{{end}}"
+prediction_table: "{catalog}.{output_schema}.{{if .prediction_table_name}}{{.prediction_table_name}}{{else}}{{.project_name}}_predictions{{end}}{resource_suffix}"
+score_model_selection: {{.score_model_selection}}
+{{if eq .score_model_selection "pinned_version"}}model_version: "1"
+{{end}}model_change_mode: {{.model_change_mode}}
+auto_rebuild_on_cdf_expiry: {{.auto_rebuild_on_cdf_expiry}}
+score_handoff: {{.score_handoff}}
+{{if eq .training_layout "multi_target"}}model_set:
+  model_name: "{catalog}.{metadata_schema}.{{if .model_set_name}}{{.model_set_name}}{{else}}{{.project_name}}_set{{end}}{resource_suffix}"
+  prediction_table: "{catalog}.{output_schema}.{{if .model_set_table_name}}{{.model_set_table_name}}{{else}}{{.project_name}}_set_scores{{end}}{resource_suffix}"
+  promotion_policy: {{.model_set_promotion_policy}}
+  combined_rules_path: ../features
+  source_change_policy: {{.source_change_policy}}
+  publication:
+    mode: {{.model_set_output_mode}}
+{{if eq .model_set_output_mode "separate_views"}}    model_view_template: "{catalog}.{output_schema}.{{if .model_view_prefix}}{{.model_view_prefix}}{{else}}{{.project_name}}_predictions{{end}}_{branch}{resource_suffix}"
+    combined_view: "{catalog}.{output_schema}.{{if .combined_view_name}}{{.combined_view_name}}{{else}}{{.project_name}}_business_results{{end}}{resource_suffix}"
+{{end}}{{end}}

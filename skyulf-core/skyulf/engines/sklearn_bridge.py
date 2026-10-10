@@ -158,12 +158,14 @@ class SklearnBridge:
     ) -> np.ndarray:
         """Replace nullable numeric sentinels without rounding observed integer values."""
         dtypes = data.dtypes if isinstance(data, pd.DataFrame) else [data.dtype]
-        # Mixed nullable numeric columns can retain pd.NA in an object array.
-        # Replace only missing sentinels; floating casts would round integer categories.
-        if (
-            all(dtype.kind in "biuf" for dtype in dtypes)
-            and any(isinstance(dtype, pd.api.extensions.ExtensionDtype) for dtype in dtypes)
-            and pd.isna(values).any()
-        ):
-            return data.to_numpy(na_value=np.nan)
+        # Normalize only numeric extension columns, even beside object features.
+        # Keep other sentinels and observed integers exactly as they arrived.
+        numeric = [
+            dtype.kind in "biuf" and isinstance(dtype, pd.api.extensions.ExtensionDtype)
+            for dtype in dtypes
+        ]
+        missing = pd.isna(values) & np.asarray(numeric)
+        if missing.any():
+            values = values.copy()
+            values[missing] = np.nan
         return values

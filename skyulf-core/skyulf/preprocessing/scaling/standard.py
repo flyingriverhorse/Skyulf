@@ -9,10 +9,12 @@ from sklearn.preprocessing import StandardScaler
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import validate_state
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import StandardScalerArtifact
+from .._fitted_validation import portable_config
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -55,6 +57,16 @@ class StandardScalerApplier(BaseApplier):
     data action. Its selected numeric columns become double when scaling is enabled.
     """
 
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return validate_state("StandardScaler", raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        return portable_config("StandardScaler", raw, state)
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Center and scale ``X`` with the fitted statistics on the active engine."""
@@ -81,15 +93,28 @@ class StandardScalerApplier(BaseApplier):
 
         mean_arr = np.array(mean) if mean is not None else np.zeros(len(cols))
         scale_arr = np.array(scale) if scale is not None else np.ones(len(cols))
+        schema = X.collect_schema()
 
         def _standardized_expr(col_name: str) -> Any:
             idx = cols.index(col_name)
-            e = pl.col(col_name)
+            e: Any = pl.col(col_name)
             if with_mean:
                 e = e - mean_arr[idx]
             if with_std:
                 s = scale_arr[idx]
-                e = e / (s if s != 0 else 1.0)
+                divided = e / (s if s != 0 else 1.0)
+                dtype = schema[col_name]
+                if s != 0 and (
+                    dtype in (pl.Float32, pl.Float64) or (dtype.is_integer() and dtype != pl.Int128)
+                ):
+                    output_dtype = X.lazy().select(divided).collect_schema()[col_name]
+                    if output_dtype in (pl.Float32, pl.Float64):
+                        # Use Polars' native promotion with batch-independent NumPy division.
+                        divided = cast(
+                            pl.Expr,
+                            np.divide(e, scale_arr[idx : idx + 1], dtype=str(output_dtype).lower()),
+                        )
+                e = divided
             return e.alias(col_name)
 
         exprs = [_standardized_expr(col_name) for col_name in valid]
@@ -140,14 +165,15 @@ class StandardScalerApplier(BaseApplier):
     )
     + tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             codec_version=1,
             config_match=(("with_mean", with_mean), ("with_std", with_std)),
         )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for with_mean in (True, False)
         for with_std in (True, False)
     ),

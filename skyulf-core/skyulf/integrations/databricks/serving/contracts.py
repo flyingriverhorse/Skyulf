@@ -29,7 +29,7 @@ class PinnedEndpointSpec:
             ("logging_schema", self.logging_schema),
             ("logging_table_prefix", self.logging_table_prefix),
         ):
-            if not _valid_uc(value):
+            if not is_uc_identifier(value):
                 raise ValueError(f"{label} must be a simple UC identifier.")
         if not isinstance(self.logging_mode, str) or self.logging_mode not in {
             "telemetry",
@@ -73,7 +73,7 @@ def _validate_selector(spec: PinnedEndpointSpec) -> None:
         raise ValueError("endpoint_name must be a safe 1-63 character endpoint name.")
     if not isinstance(spec.model_name, str) or len(spec.model_name.split(".")) != 3:
         raise ValueError("model_name must be a concrete catalog.schema.model UC name.")
-    if any(not _valid_uc(part) for part in spec.model_name.split(".")):
+    if any(not is_uc_identifier(part) for part in spec.model_name.split(".")):
         raise ValueError("model_name must be a concrete catalog.schema.model UC name.")
     if not isinstance(spec.model_version, str) or not _VERSION.fullmatch(spec.model_version):
         raise ValueError("model_version must be a concrete positive version.")
@@ -81,14 +81,16 @@ def _validate_selector(spec: PinnedEndpointSpec) -> None:
 
 @dataclass(frozen=True, slots=True)
 class PinnedEndpointPlan:
-    """A validated SDK create body and the inspected input column names."""
+    """A validated SDK create body and the inspected model input/output schemas."""
 
     spec: PinnedEndpointSpec
     config: dict[str, Any]
     input_columns: tuple[str, ...]
     input_schema: tuple[tuple[str, str], ...]
+    output_schema: tuple[tuple[str, str], ...] = ()
+    online_contract: str | None = None
 
 
-def _valid_uc(value: Any) -> bool:
+def is_uc_identifier(value: Any) -> bool:
     """Limit UC identifiers to an unquoted, unambiguous supported form."""
     return isinstance(value, str) and bool(_UC_PART.fullmatch(value)) and len(value) <= 255

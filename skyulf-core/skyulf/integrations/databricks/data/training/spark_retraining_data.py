@@ -11,22 +11,27 @@ from typing import Any, cast
 import pandas as pd
 
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
-from ...lifecycle.local_workflow import resolve_training_spec
+from ...lifecycle.workflow import resolve_training_spec
 from ...observability.monitoring.spark.spark_monitoring_reference import (
     load_spark_monitoring_reference,
     read_reference_population,
 )
 from ...observability.monitoring.spark.spark_monitoring_sources import require_unique_keys
-from ...training.fitting.local_retraining import (
-    LocalTrainingSpec,
-    _eligible_training_source,
-    _partition_training_rows,
-    _sample_training_source,
+from ...training.fitting.candidate import (
+    TrainingSpec,
+    eligible_training_source,
+    partition_training_rows,
+    sample_training_source,
     training_spec_payload,
 )
-from ...training.weights.local_weights import extract_training_weights
+from ...training.weights.weights import extract_training_weights
 from ..delta_io.delta import table_identity
-from .retraining_data import _comparison_spec, _compatible_specs, _filter_weight_columns, _scalar
+from .retraining_data import (
+    comparison_spec,
+    filter_weight_columns,
+    scalar_identity,
+    validate_compatible_specs,
+)
 from .training_dates import (
     TrainingDateSpec,
     instant_from_microseconds,
@@ -42,11 +47,11 @@ def _functions() -> Any:
 
 def _row_hash(values: Any) -> str:
     """Use the trainer's typed scalar encoding, including numeric widening equivalence."""
-    payload = json.dumps([_scalar(value) for value in values], separators=(",", ":"))
+    payload = json.dumps([scalar_identity(value) for value in values], separators=(",", ":"))
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _require_supported_recipe(spec: LocalTrainingSpec) -> None:
+def _require_supported_recipe(spec: TrainingSpec) -> None:
     """Reject transformations without an exact distributed eligibility adapter."""
     if set(spec.source_columns) & {"_ordinal", "_duplicates", "_survivor", "_weight_match"}:
         raise ValueError("Spark freshness source uses a reserved internal column name.")
@@ -105,7 +110,7 @@ def _manual_bounds(frame: Any, params: dict) -> Any:
     return frame
 
 
-def _deduplicate(frame: Any, params: dict, spec: LocalTrainingSpec) -> Any:
+def _deduplicate(frame: Any, params: dict, spec: TrainingSpec) -> Any:
     """Select canonical first/last survivors and reject conflicting target labels."""
     functions = _functions()
     window = importlib.import_module("pyspark.sql").Window
@@ -134,19 +139,19 @@ def _deduplicate(frame: Any, params: dict, spec: LocalTrainingSpec) -> Any:
     )
 
 
-def _ordering(spec: LocalTrainingSpec) -> list[str]:
+def _ordering(spec: TrainingSpec) -> list[str]:
     """Use precisely the original stable event/key order before sklearn splitting."""
     return ([spec.event_column] if spec.event_column else []) + list(spec.record_key_columns)
 
 
-def _eligible(frame: Any, spec: LocalTrainingSpec) -> Any:
+def _eligible(frame: Any, spec: TrainingSpec) -> Any:
     """Apply availability and supported row filters before selecting train membership."""
     floating = {
         field.name
         for field in frame.schema.fields
         if field.dataType.typeName() in {"float", "double"}
     }
-    frame = _eligible_training_source(frame, spec, floating)
+    frame = eligible_training_source(frame, spec, floating)
     for step in spec.pre_split_steps:
         if step["transformer"] == "Deduplicate":
             frame = _deduplicate(frame, step["params"], spec)
@@ -157,7 +162,7 @@ def _eligible(frame: Any, spec: LocalTrainingSpec) -> Any:
     return frame
 
 
-def _metadata_train_ordinals(metadata: pd.DataFrame, spec: LocalTrainingSpec) -> list[int]:
+def _metadata_train_ordinals(metadata: pd.DataFrame, spec: TrainingSpec) -> list[int]:
     """Run the existing exact split over bounded ordinals and label/group metadata only."""
     metadata = metadata.sort_values("_ordinal").reset_index(drop=True)
     if metadata[spec.target_column].isna().any():
@@ -168,12 +173,12 @@ def _metadata_train_ordinals(metadata: pd.DataFrame, spec: LocalTrainingSpec) ->
         metadata[spec.event_column] = pd.to_datetime(
             metadata[spec.event_column], unit="us", utc=True
         )
-    train, _ = _partition_training_rows(metadata, spec)
+    train, _ = partition_training_rows(metadata, spec)
     extract_training_weights(train, spec.weight_column)
     return train["_ordinal"].tolist()
 
 
-def _training_partition(frame: Any, spec: LocalTrainingSpec) -> Any:
+def _training_partition(frame: Any, spec: TrainingSpec) -> Any:
     """Join executor-generated exact split membership back to distributed feature values."""
     functions = _functions()
     window = importlib.import_module("pyspark.sql").Window
@@ -205,7 +210,7 @@ def _training_partition(frame: Any, spec: LocalTrainingSpec) -> Any:
     return frame.join(membership, "_ordinal", "left_semi").drop("_ordinal")
 
 
-def _source_size(record: Any, spec: LocalTrainingSpec) -> int:
+def _source_size(record: Any, spec: TrainingSpec) -> int:
     """Count exact serialized records and a conservative per-row pandas allocation bound."""
     values = record.asDict(recursive=True)
     for name in (spec.event_column, spec.result_available_at_column):
@@ -218,7 +223,7 @@ def _source_size(record: Any, spec: LocalTrainingSpec) -> int:
     return max(serialized, allocation)
 
 
-def _pandas_integer_columns(source: Any, spec: LocalTrainingSpec) -> list[str]:
+def _pandas_integer_columns(source: Any, spec: TrainingSpec) -> list[str]:
     """Validate scalar transport types and identify integer columns needing inference."""
     integer_types = {"byte", "short", "integer", "long"}
     scalar_types = integer_types | {
@@ -244,7 +249,7 @@ def _pandas_integer_columns(source: Any, spec: LocalTrainingSpec) -> list[str]:
     ]
 
 
-def _pandas_source_types(source: Any, spec: LocalTrainingSpec) -> Any:
+def _pandas_source_types(source: Any, spec: TrainingSpec) -> Any:
     """Reproduce column-wide pandas inference before any local eligibility filters.
 
     The trainer constructs pandas from Python records. An integer column with
@@ -268,7 +273,7 @@ def _pandas_source_types(source: Any, spec: LocalTrainingSpec) -> Any:
     )
 
 
-def _read_source(spark: Any, spec: LocalTrainingSpec) -> Any:
+def _read_source(spark: Any, spec: TrainingSpec) -> Any:
     """Pin a projected Delta read and retain the local training row and byte budgets."""
     functions = _functions()
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
@@ -285,7 +290,7 @@ def _read_source(spark: Any, spec: LocalTrainingSpec) -> Any:
             & (functions.col(spec.event_column) < instant_microseconds(cast(datetime, spec.cutoff)))
         )
     if spec.training_sample_rows is not None:
-        source, _ = _sample_training_source(source, spec)
+        source, _ = sample_training_source(source, spec)
     if source.limit(spec.max_rows + 1).count() > spec.max_rows:
         raise ValueError("Training source exceeds max_rows.")
     require_unique_keys(source, spec.record_key_columns, "training")
@@ -350,8 +355,8 @@ def _overlay_weights(saved: Any, current: Any, keys: tuple[str, ...], weights: s
 def _baseline(
     spark: Any,
     evidence: dict,
-    saved: LocalTrainingSpec,
-    current: LocalTrainingSpec,
+    saved: TrainingSpec,
+    current: TrainingSpec,
     source: Any,
     columns: list[str],
 ) -> Any:
@@ -359,7 +364,7 @@ def _baseline(
     functions = _functions()
     records = evidence["prepared_reference"]
     baseline = _counts(read_reference_population(spark, records["seen"]), columns)
-    weights = _filter_weight_columns(saved, current)
+    weights = filter_weight_columns(saved, current)
     if not weights:
         return baseline
     historical = read_reference_population(spark, records["source"])
@@ -372,7 +377,7 @@ def _baseline(
     )
     historical = _pandas_source_types(historical, saved)
     historical = _overlay_weights(historical, source, saved.record_key_columns, weights)
-    population = _eligible(historical, _comparison_spec(saved))
+    population = _eligible(historical, comparison_spec(saved))
     if saved.split_strategy == "temporal":
         population = population.where(
             functions.col(saved.event_column)
@@ -404,7 +409,7 @@ def assess_spark_training_data(spark: Any, monitor: Any, workflow: dict, now: da
     if identity != evidence["prepared_reference_source_table_id"]:
         raise ValueError("Training source physical identity differs from the prepared reference.")
     current = resolve_training_spec(spark, workflow, now)
-    _compatible_specs(saved, current)
+    validate_compatible_specs(saved, current)
     current = phase_training_spec(
         training_spec_payload(current, engine),
         workflow.get("pipeline", {}).get("project_python_source"),

@@ -42,10 +42,11 @@ class _AuditEmbeddingModel:
 
 @pytest.fixture
 def fixed_embedding_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Prevent optional dependency loading while keeping text normalization and replay real."""
+    """Mock model loading and packaging while keeping text normalization and replay real."""
     monkeypatch.setitem(
         sentence_embedder._MODEL_CACHE, "deep-audit-20260908", _AuditEmbeddingModel()
     )
+    monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
 
 
 _TEXT_NODES = [

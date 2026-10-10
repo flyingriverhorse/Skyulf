@@ -11,11 +11,11 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
 from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting import local_retraining as training
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting import candidate as training
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
 
 def _search_model(task="regression", strategy="grid"):
@@ -65,7 +65,7 @@ def test_temporal_tuner_artifact_does_not_require_ordering_metadata(tmp_path, en
     )
     config = {"preprocessing": [], "modeling": model}
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -75,9 +75,9 @@ def test_temporal_tuner_artifact_does_not_require_ordering_metadata(tmp_path, en
     )
     assert artifact.manifest.input_columns == ("x",)
     inputs = native.select("x") if isinstance(native, pl.DataFrame) else native[["x"]]
-    loaded = load_local_pipeline(tmp_path / "artifact")
+    loaded = load_pipeline(tmp_path / "artifact")
     pd.testing.assert_frame_equal(
-        predict_local_pipeline(inputs, artifact), predict_local_pipeline(inputs, loaded)
+        predict_pipeline(inputs, artifact), predict_pipeline(inputs, loaded)
     )
 
 
@@ -94,7 +94,7 @@ def test_pipeline_tuner_preserves_selected_ensemble_members(tmp_path):
         cv_enabled=True,
         cv_folds=2,
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         {"preprocessing": [], "modeling": model},
         SplitDataset(train=frame, test=frame.head(0)),
         target_column="target",
@@ -118,7 +118,7 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
 
     source = pd.DataFrame({"id": range(40), "x": np.arange(40, dtype=float)})
     source["target"] = (source.x % 2).astype(int) if task == "classification" else source.x * 2
-    spec = training.LocalTrainingSpec(
+    spec = training.TrainingSpec(
         table="workspace.test.search",
         version=1,
         record_key_columns=("id",),
@@ -133,7 +133,7 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
         ],
         "modeling": _search_model(task, "random"),
     }
-    cv = LocalCVSpec(enabled=cv_enabled, folds=2)
+    cv = CVSpec(enabled=cv_enabled, folds=2)
     effective = training.candidate_config(
         spec,
         pipeline,
@@ -212,7 +212,7 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
     model = fitted.artifact.pipeline.model_estimator._unwrap_tuned_model()
     assert model.n_estimators == 3
     native = pl.from_pandas(heldout[["x"]]) if engine == "polars" else heldout[["x"]]
-    reloaded = load_local_pipeline(tmp_path / "trained")
+    reloaded = load_pipeline(tmp_path / "trained")
     pd.testing.assert_frame_equal(
-        predict_local_pipeline(native, fitted.artifact), predict_local_pipeline(native, reloaded)
+        predict_pipeline(native, fitted.artifact), predict_pipeline(native, reloaded)
     )

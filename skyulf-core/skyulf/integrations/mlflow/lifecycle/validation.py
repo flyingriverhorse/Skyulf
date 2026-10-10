@@ -1,4 +1,4 @@
-"""Read-only comparison of pinned registered local pipeline versions."""
+"""Read-only comparison of pinned registered fitted pipeline versions."""
 
 import hashlib
 import json
@@ -10,9 +10,12 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
-from ....inference.local_evaluation import evaluate_local_holdout
-from ....inference.local_pipeline import LocalPipelineArtifact
-from ..registration.registry import ResolvedModel, load_registered_local_pipeline
+from ....inference.fitted_pipeline import FittedPipelineArtifact
+from ....inference.pipeline_evaluation import evaluate_holdout
+from ..registration.registry import (
+    ResolvedModel,
+    load_registered_pipeline,
+)
 
 _REGRESSION = {
     "heldout_mae",
@@ -254,9 +257,9 @@ def _validate_request(
 
 def _checked_artifact(
     reference: ResolvedModel, *, tracking_uri: str | None, registry_uri: str | None
-) -> LocalPipelineArtifact:
+) -> FittedPipelineArtifact:
     """Load one concrete artifact and confirm its registry digest."""
-    artifact = load_registered_local_pipeline(
+    artifact = load_registered_pipeline(
         reference, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
     if artifact.manifest.pipeline_sha256 != reference.digest:
@@ -265,7 +268,7 @@ def _checked_artifact(
 
 
 def _validate_artifact_pair(
-    candidate: LocalPipelineArtifact, champion: LocalPipelineArtifact | None
+    candidate: FittedPipelineArtifact, champion: FittedPipelineArtifact | None
 ) -> None:
     """Require comparable tasks, class labels and target normalization recipes."""
     if champion is None:
@@ -282,16 +285,16 @@ def _validate_artifact_pair(
 
 
 def _comparison_metrics(
-    candidate: LocalPipelineArtifact,
-    champion: LocalPipelineArtifact | None,
+    candidate: FittedPipelineArtifact,
+    champion: FittedPipelineArtifact | None,
     heldout: pd.DataFrame | pl.DataFrame,
     target_column: str,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
     """Evaluate the same labeled rows with both saved pipelines, without fitting."""
-    candidate_metrics = evaluate_local_holdout(candidate, heldout, target_column=target_column)
+    candidate_metrics = evaluate_holdout(candidate, heldout, target_column=target_column)
     if champion is None:
         return candidate_metrics, None
-    return candidate_metrics, evaluate_local_holdout(champion, heldout, target_column=target_column)
+    return candidate_metrics, evaluate_holdout(champion, heldout, target_column=target_column)
 
 
 def _selected_metric(metrics: dict[str, float], metric: str) -> float:
@@ -328,7 +331,7 @@ def _comparison_decision(
     return False, "insufficient_improvement"
 
 
-def compare_registered_local_models(
+def compare_registered_pipeline_models(
     candidate: ResolvedModel,
     champion: ResolvedModel | None,
     heldout: pd.DataFrame | pl.DataFrame,

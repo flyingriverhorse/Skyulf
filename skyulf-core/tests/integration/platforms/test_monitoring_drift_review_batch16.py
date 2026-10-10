@@ -7,7 +7,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
     build_monitoring_report,
 )
 

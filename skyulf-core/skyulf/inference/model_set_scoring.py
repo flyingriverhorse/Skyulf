@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -11,10 +10,17 @@ from typing import TYPE_CHECKING, Any
 import pandas as pd
 import polars as pl
 
-from ..preprocessing.time_series.history import TemporalHistorySession
 from ._manifest import ColumnSpec
-from .local_pipeline import load_local_pipeline, validate_local_input
-from .local_scoring import _preserve_history, score_local_pipeline
+from ._model_set_operations import apply_operation, validate_operation
+from .fitted_pipeline import (
+    load_pipeline,
+    validate_pipeline_input,
+)
+from .pipeline_scoring import (
+    _preserve_history,
+    pipeline_history_session,
+    score_pipeline,
+)
 from .project_code import load_project_module
 from .project_scoring import _check_rows, _json_copy, _resolve, _typed_column, _validate_rule
 
@@ -89,23 +95,28 @@ def _dependencies(rule: dict, branches: set[str]) -> None:
 def validate_model_set_composition(
     config: Any, source: str, components: Any, record_key_schema: Any
 ) -> dict[str, Any]:
-    """Validate saved output callbacks and explicit per-rule component eligibility."""
+    """Validate saved callbacks or declarative arithmetic and explicit rule eligibility."""
     config = _composition_config(config)
     if not config["outputs"]:
         model_set_schema(components, record_key_schema, config)
         return config
-    module = load_project_module(source)
+    module = None
     branches = {component.branch for component in components}
     names: set[str] = set()
     for rule in config["outputs"]:
         if type(rule) is not dict:
             raise ValueError("Model-set composition rules must be objects.")
         _dependencies(rule, branches)
-        _validate_rule(
-            {k: v for k, v in rule.items() if k != "required_components"},
-            output=True,
-            module=module,
-        )
+        if "operation" in rule:
+            validate_operation(rule, components)
+        else:
+            if module is None:
+                module = load_project_module(source)
+            _validate_rule(
+                {k: v for k, v in rule.items() if k != "required_components"},
+                output=True,
+                module=module,
+            )
         name = rule["name"].casefold()
         if name in names:
             raise ValueError("Composition rule names must be unique.")
@@ -176,7 +187,6 @@ def compose_model_set_outputs(
     result = predictions.copy(deep=True)
     if not config["outputs"]:
         return result
-    module = load_project_module(source)
     for rule in config["outputs"]:
         reasons = _rule_reasons(predictions, rule)
         eligible = reasons.isna()
@@ -186,11 +196,7 @@ def compose_model_set_outputs(
             )
         if eligible.any():
             selected = raw.loc[eligible].reset_index(drop=True)
-            values = _resolve(module, rule["function"])(
-                selected.copy(deep=True),
-                predictions.loc[eligible].reset_index(drop=True).copy(deep=True),
-                deepcopy(rule["params"]),
-            )
+            values = _composition_values(selected, predictions.loc[eligible], rule, source)
             _check_rows(values, selected, pd.DataFrame)
             _bounded(values, max_rows, max_bytes)
             if list(values.columns) != [col["name"] for col in rule["columns"]]:
@@ -208,6 +214,19 @@ def compose_model_set_outputs(
         result[f"{rule['name']}__exclusion_reason"] = reasons
         _bounded(result, max_rows, max_bytes)
     return result
+
+
+def _composition_values(
+    selected: pd.DataFrame, predictions: pd.DataFrame, rule: dict, source: str
+) -> pd.DataFrame:
+    """Keep declarative arithmetic independent of saved callback source loading."""
+    predictions = predictions.reset_index(drop=True).copy(deep=True)
+    if "operation" in rule:
+        return apply_operation(predictions, rule)
+    module = load_project_module(source)
+    return _resolve(module, rule["function"])(
+        selected.copy(deep=True), predictions, deepcopy(rule["params"])
+    )
 
 
 def _bounded(frame: pd.DataFrame | pl.DataFrame, max_rows: int, max_bytes: int) -> None:
@@ -259,26 +278,6 @@ def _raw_input(
     return raw[[column.name for column in artifact.manifest.input_schema]]
 
 
-def _history_context(local: Any, state: Any, bootstrap: bool) -> Any:
-    """Create component-local carry sessions without importing platform adapters."""
-    identities = [
-        step["artifact"]["history_id"]
-        for step in local.pipeline.feature_engineer.fitted_steps
-        if step["artifact"].get("history_mode") == "carry"
-    ]
-    if not identities:
-        if state is not None:
-            raise ValueError("Saved temporal history requires carry steps.")
-        return nullcontext(None)
-    if bootstrap:
-        state = {
-            "version": 1,
-            "model_id": local.manifest.pipeline_sha256,
-            "steps": dict.fromkeys(identities, []),
-        }
-    return TemporalHistorySession(local.manifest.pipeline_sha256, state)
-
-
 def _component_outcomes(result: pd.DataFrame, component: Any) -> pd.DataFrame:
     """Validate complete declared predictions and explicit per-component exclusions."""
     if list(result.columns) != [col.name for col in component.output_schema]:
@@ -313,10 +312,10 @@ def _score_component(
     max_bytes: int,
 ) -> tuple[pd.DataFrame, Any]:
     """Release one loaded component before advancing to the next model in the set."""
-    local = load_local_pipeline(artifact.directory / "components" / component.branch)
+    local = load_pipeline(artifact.directory / "components" / component.branch)
     selected = raw[[column.name for column in component.input_schema]].copy(deep=True)
     _bounded(selected, max_rows, max_bytes)
-    with _history_context(local, state, bootstrap) as session:
+    with pipeline_history_session(local, state, bootstrap=bootstrap) as session:
         result = _predict_component(selected, local, component)
         _check_rows(result, selected, pd.DataFrame)
         result = _component_outcomes(result, component)
@@ -329,8 +328,8 @@ def _score_component(
 def _predict_component(selected: pd.DataFrame, local: Any, component: Any) -> pd.DataFrame:
     """Validate empty inputs and preserve history without invoking an estimator."""
     if not selected.empty:
-        return score_local_pipeline(selected, local)
-    validate_local_input(selected, local)
+        return score_pipeline(selected, local)
+    validate_pipeline_input(selected, local)
     _preserve_history(local)
     return pd.DataFrame(
         {

@@ -6,11 +6,13 @@ import numpy as np
 import polars as pl
 from sklearn.preprocessing import RobustScaler
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import RobustScalerArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -20,7 +22,13 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _select_subset_pandas, _select_subset_polars, validate_scaling_range
+from ._common import (
+    _select_subset_pandas,
+    _select_subset_polars,
+    divide_polars_column,
+    validate_scaler_vector,
+    validate_scaling_range,
+)
 
 
 class RobustScalerApplier(BaseApplier):
@@ -28,6 +36,40 @@ class RobustScalerApplier(BaseApplier):
 
     Honors ``with_centering``/``with_scaling``; ``y`` is never modified.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved local flags and statistics without recalculating quantiles."""
+        if not local_state_fields(
+            raw,
+            "robust_scaler",
+            {
+                "type",
+                "columns",
+                "center",
+                "scale",
+                "quantile_range",
+                "with_centering",
+                "with_scaling",
+            },
+            allow_empty=True,
+        ):
+            return raw
+        columns = _columns(raw["columns"])
+        if type(raw["quantile_range"]) not in (list, tuple):
+            raise ValueError("Fitted robust scaler quantiles must be a pair of bounds.")
+        validate_scaling_range(raw["quantile_range"], "quantile_range")
+        _validate_robust_statistic(raw, "with_centering", "center", len(columns))
+        _validate_robust_statistic(raw, "with_scaling", "scale", len(columns))
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local saved apply context without granting worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        RobustScalerApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -53,12 +95,13 @@ class RobustScalerApplier(BaseApplier):
         exprs = []
         for col_name in valid:
             i = cols.index(col_name)
-            e = pl.col(col_name).cast(pl.Float64)
+            column = pl.col(col_name) if isinstance(X, pl.LazyFrame) else X.get_column(col_name)
+            e = column.cast(pl.Float64)
             if with_centering and center is not None:
                 e = e - center[i]
             if with_scaling and scale is not None:
                 s = scale[i]
-                e = e / (s if s != 0 else 1.0)
+                e = divide_polars_column(X, e, s)
             exprs.append(e.alias(col_name))
         return X.with_columns(exprs), _y
 
@@ -83,6 +126,16 @@ class RobustScalerApplier(BaseApplier):
 
         X_out[valid] = vals
         return X_out, _y
+
+
+def _validate_robust_statistic(state: dict, flag: str, field: str, size: int) -> None:
+    """Require each fitted array exactly when its saved boolean flag enables it."""
+    if not isinstance(state[flag], (bool, np.bool_)):
+        raise ValueError("Fitted robust scaler flags must be boolean.")
+    if state[flag]:
+        validate_scaler_vector(state[field], size, nonnegative=field == "scale")
+    elif state[field] is not None:
+        raise ValueError("Disabled robust scaler statistics must be None.")
 
 
 @NodeRegistry.register("RobustScaler", RobustScalerApplier)

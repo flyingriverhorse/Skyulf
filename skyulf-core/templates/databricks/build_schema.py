@@ -51,8 +51,19 @@ def render_schema(source: Path) -> str:
     if not properties:
         raise ValueError("No prompt properties found in schema topic files.")
     properties = _weight_questions(properties)
+    _validate_prompt_orders(properties)
     metadata["properties"] = dict(sorted(properties.items(), key=lambda item: item[1]["order"]))
     return _format_schema(metadata)
+
+
+def _validate_prompt_orders(properties: dict[str, Any]) -> None:
+    """Reject ambiguous CLI sequencing after all derived questions are inserted."""
+    owners: dict[int, str] = {}
+    for name, field in properties.items():
+        order = field["order"]
+        if order in owners:
+            raise ValueError(f"Duplicate prompt order {order}: {owners[order]}, {name}")
+        owners[order] = name
 
 
 def _weight_prefix(name: str) -> str:
@@ -162,7 +173,10 @@ def _weight_questions(properties: dict[str, Any]) -> dict[str, Any]:
     result = {}
     for name, original in properties.items():
         field = deepcopy(original)
-        field["order"] *= 10
+        scaled_order = field["order"] * 10
+        if not float(scaled_order).is_integer():
+            raise ValueError(f"{name}: prompt order must have at most one decimal place.")
+        field["order"] = int(scaled_order)
         if "skip_prompt_if" in field:
             field["skip_prompt_if"] = _weight_condition(field["skip_prompt_if"], choices)
         result[name] = field
@@ -210,8 +224,6 @@ def _format_schema(schema: dict[str, Any]) -> str:
 
 def _competition_ensemble_slots(fields: dict[str, Any]) -> dict[str, Any]:
     """Repeat the ensemble question group for the eight supported candidate slots."""
-    if any(not name.startswith("competition_ensemble_SLOT_") for name in fields):
-        raise ValueError("Ensemble question names must start with competition_ensemble_SLOT_.")
     result = {}
     for slot in range(1, 9):
         group = json.loads(json.dumps(fields).replace("SLOT", str(slot)))
@@ -219,6 +231,31 @@ def _competition_ensemble_slots(fields: dict[str, Any]) -> dict[str, Any]:
             field["order"] += 73 + (slot - 1) * len(fields)
             result[name] = field
     return result
+
+
+def _ensemble_base_questions(fields: dict[str, Any]) -> dict[str, Any]:
+    """Expand each task's first model and weight prompts without duplicate definitions."""
+    fields = deepcopy(fields)
+    for task in ("regression", "classification"):
+        prefix = f"competition_ensemble_SLOT_{task}_"
+        models = fields[prefix + "base_1"]["enum"]
+        for kind in ("base", "weight"):
+            prototype = fields.pop(prefix + kind + "_1")
+            for position, model in enumerate(models, 1):
+                name = f"{prefix}{kind}_{position}"
+                if name in fields:
+                    raise ValueError(f"Duplicate ensemble question: {name}")
+                field = deepcopy(prototype)
+                field["order"] += 2 * (position - 1)
+                field["description"] = field["description"].replace("model 1", f"model {position}")
+                if kind == "base":
+                    field["default"] = model
+                properties = field["skip_prompt_if"]["not"]["anyOf"][0]["properties"]
+                properties[prefix + "base_count"]["enum"] = [
+                    str(count) for count in range(max(2, position), len(models) + 1)
+                ]
+                fields[name] = field
+    return fields
 
 
 def _expand_topic(name: str, fields: dict[str, Any]) -> dict[str, Any]:
@@ -245,6 +282,9 @@ def _without_candidate_count(value: Any) -> Any:
 
 def _ensemble_questions(fields: dict[str, Any]) -> dict[str, Any]:
     """Reuse the same ensemble controls for single models, candidates and branches."""
+    if any(not name.startswith("competition_ensemble_SLOT_") for name in fields):
+        raise ValueError("Ensemble question names must start with competition_ensemble_SLOT_.")
+    fields = _ensemble_base_questions(fields)
     result = _competition_ensemble_slots(fields)
     payload = json.dumps(fields)
     single = payload.replace("competition_ensemble_SLOT_", "single_ensemble_")

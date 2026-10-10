@@ -80,7 +80,12 @@ def _calendar_config(node_type, features):
 def test_calendar_parsing_keeps_native_null_and_empty_input_contracts(engine, node_type, case):
     """All calendar paths must retain requested features for valid, missing, and empty inputs."""
     values, expected_months, expected_weeks = _CALENDAR_CASES[case]
-    frame = pd.DataFrame({"date": values}) if engine == "pandas" else pl.DataFrame({"date": values})
+    # Keep the empty calendar source nonnumeric instead of pandas' inferred float64.
+    frame = (
+        pd.DataFrame({"date": pd.Series(values, dtype="object" if case == "empty" else None)})
+        if engine == "pandas"
+        else pl.DataFrame({"date": values})
+    )
     week = "weekofyear" if node_type == "DateFeatures" else "week"
     config = _calendar_config(node_type, [week, "month"])
     artifact = NodeRegistry.get_calculator(node_type)().fit(frame, config)

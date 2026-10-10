@@ -7,10 +7,12 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import AliasReplacementArtifact
+from .._fitted_validation import _columns, local_scalar, local_state_fields
 from .._helpers import auto_detect_text_columns as _auto_detect_text_columns
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
@@ -85,6 +87,34 @@ class AliasReplacementApplier(BaseApplier):
     ``punctuation`` mode is the exception — it strips punctuation only,
     preserving case and spaces.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect resolved local alias rules without normalizing their saved values."""
+        if not local_state_fields(
+            raw,
+            "alias_replacement",
+            {"type", "columns", "alias_type", "custom_map"},
+            allow_empty=True,
+        ):
+            return raw
+        _columns(raw["columns"])
+        if raw["alias_type"] not in ("boolean", "country", "custom", "punctuation"):
+            raise ValueError("Unknown fitted alias type.")
+        if type(raw["custom_map"]) is not dict:
+            raise ValueError("Fitted custom aliases must be a dictionary.")
+        for key, value in raw["custom_map"].items():
+            local_scalar(key, "Custom aliases")
+            local_scalar(value, "Custom aliases")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe existing local row rules without promising engine or dtype parity."""
+        if engine not in ("pandas", "polars"):
+            return None
+        AliasReplacementApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

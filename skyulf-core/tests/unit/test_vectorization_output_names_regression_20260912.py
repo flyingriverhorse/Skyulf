@@ -36,10 +36,11 @@ class _EmbeddingModel:
     ids=["tokenizer", "count", "tfidf", "hashing", "embedding"],
 )
 def text_node(request, monkeypatch):
-    """Run the same public schema contract through every text-feature consumer."""
+    """Exercise public schemas with mocked embedding inference and asset packaging."""
     node, collision, config = request.param
     if node == "sentence_embedder":
         monkeypatch.setattr(sentence_embedder, "_load_model", lambda name: _EmbeddingModel())
+        monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
     return node, collision, {"columns": ["text"], **config}
 
 

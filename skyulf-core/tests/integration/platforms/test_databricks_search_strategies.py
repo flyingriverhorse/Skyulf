@@ -6,10 +6,10 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
-from skyulf.integrations.databricks.training.tuning.local_search_results import (
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
+from skyulf.integrations.databricks.training.tuning.search_results import (
     post_selection_cv,
     tuning_evidence,
     validate_search_membership,
@@ -54,13 +54,13 @@ def test_each_strategy_fits_a_persisted_selected_model(tmp_path, strategy: str) 
         pytest.importorskip("optuna_integration")
     rows = _rows()
     training, holdout = rows.iloc[:28], rows.iloc[28:]
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     effective = prepare_search_pipeline(
         _recipe(strategy), cv, target_column="target", event_column=None
     )
     validate_search_membership(training, effective, cv, target_column="target", event_column=None)
 
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         effective,
         SplitDataset(train=training, test=holdout),
         target_column="target",
@@ -80,7 +80,7 @@ def test_each_strategy_fits_a_persisted_selected_model(tmp_path, strategy: str) 
 def test_auto_core_space_fits_small_linear_model(tmp_path) -> None:
     """An empty candidate object must resolve a usable bounded Core search space."""
     rows = _rows()
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     requested = _recipe(
         "grid",
         base_model={"type": "linear_regression", "params": {"n_jobs": 1}},
@@ -89,7 +89,7 @@ def test_auto_core_space_fits_small_linear_model(tmp_path) -> None:
     )
     effective = prepare_search_pipeline(requested, cv, target_column="target", event_column=None)
     assert effective["modeling"]["search_space"]["fit_intercept"] == [True, False]
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         effective,
         SplitDataset(train=rows.iloc[:28], test=rows.iloc[28:]),
         target_column="target",
@@ -105,7 +105,7 @@ def test_auto_core_space_fits_small_linear_model(tmp_path) -> None:
 def test_selected_voting_ensemble_fits_with_structural_learners(tmp_path) -> None:
     """A selected ensemble's learner structure must survive candidate fitting."""
     rows = _rows()
-    cv = LocalCVSpec(enabled=True, folds=2)
+    cv = CVSpec(enabled=True, folds=2)
     requested = _recipe(
         "grid",
         base_model={
@@ -118,7 +118,7 @@ def test_selected_voting_ensemble_fits_with_structural_learners(tmp_path) -> Non
         max_candidates=1,
     )
     effective = prepare_search_pipeline(requested, cv, target_column="target", event_column=None)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         effective,
         SplitDataset(train=rows.iloc[:28], test=rows.iloc[28:]),
         target_column="target",
@@ -136,12 +136,12 @@ def test_nested_search_returns_saved_independent_outer_evaluation(tmp_path) -> N
     """Nested setup must expose independent outer searches from the saved training artifact."""
     rows = _rows()
     training, holdout = rows.iloc[:28], rows.iloc[28:]
-    cv = LocalCVSpec(enabled=True, folds=3, method="nested_cv")
+    cv = CVSpec(enabled=True, folds=3, method="nested_cv")
     effective = prepare_search_pipeline(
         _recipe("grid"), cv, target_column="target", event_column=None
     )
     validate_search_membership(training, effective, cv, target_column="target", event_column=None)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         effective,
         SplitDataset(train=training, test=holdout),
         target_column="target",
@@ -164,12 +164,12 @@ def test_cv_disabled_preserves_single_training_only_search(tmp_path) -> None:
     """The default CV-off mode still selects a model on one training split."""
     rows = _rows()
     training, holdout = rows.iloc[:28], rows.iloc[28:]
-    cv = LocalCVSpec(enabled=False)
+    cv = CVSpec(enabled=False)
     effective = prepare_search_pipeline(
         _recipe("grid"), cv, target_column="target", event_column=None
     )
     validate_search_membership(training, effective, cv, target_column="target", event_column=None)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         effective,
         SplitDataset(train=training, test=holdout),
         target_column="target",

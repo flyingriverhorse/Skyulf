@@ -1,6 +1,6 @@
-# MLflow model packaging (development)
+# MLflow model packaging
 
-## Library layout and compatibility
+## Library layout and upgrades
 
 MLflow implementation lives under `skyulf.integrations.mlflow`: `models` owns
 pyfunc adapters, `spark` owns distributed prediction and worker environments,
@@ -8,15 +8,17 @@ pyfunc adapters, `spark` owns distributed prediction and worker environments,
 owns registry resolution, and `runs` owns tracking. Shared client, signature and
 nullable transport helpers live in `shared`.
 
-Use these grouped paths in new code. Released flat import paths remain available
-through lazy `_compat` aliases, including classes referenced in saved models.
-The root still exports `TrackingConfig`, `TrackingRun` and `track_run` without
-loading the optional MLflow dependency. Worker wheels and source certificates
-continue to cover the entire `skyulf` package.
+Use these grouped paths directly. The former `local_model` and
+`local_feature_model` modules and their renamed APIs have been removed. Saved
+packages that reference removed paths may require rebuilding and logging with
+the current imports; see [upgrading integration code](databricks_sdk.md#upgrading-integration-code).
+The root exports `TrackingConfig`, `TrackingRun` and `track_run` without loading
+the optional MLflow dependency. Worker wheels and source certificates cover the
+entire `skyulf` package.
 
-## Fitted local pipelines (pandas or Polars)
+## Fitted pipelines (pandas or Polars)
 
-Use a **local pipeline artifact** when fitted preprocessing contains nodes that
+Use a **fitted pipeline artifact** when fitted preprocessing contains nodes that
 the portable Spark bundle does not yet support, such as categorical encoding or
 binning. This path saves the whole fitted pipeline, its recorded training engine,
 raw and model-feature column order and dtypes, dependency versions, and a payload
@@ -27,32 +29,32 @@ Spark-capable `InferenceBundle` described below.
 import mlflow
 import pandas as pd
 
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
+from skyulf.inference.fitted_pipeline import (
+    load_pipeline,
+    predict_pipeline,
+    save_pipeline,
 )
 from skyulf.integrations.mlflow import TrackingConfig, track_run
-from skyulf.integrations.mlflow.models.local_model import log_local_model
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 
 # fitted_pipeline was already trained on pandas or Polars data.
-save_local_pipeline(fitted_pipeline, "artifacts/local-pipeline")
+save_pipeline(fitted_pipeline, "artifacts/fitted-pipeline")
 config = TrackingConfig(
     enabled=True,
     tracking_uri="sqlite:///mlflow.db",
     experiment_name="customer-risk",
 )
 with track_run(config, run_name="fit-2026-09") as run:
-    model_uri = log_local_model(
-        "artifacts/local-pipeline",
+    model_uri = log_pipeline_model(
+        "artifacts/fitted-pipeline",
         run_id=run.run_id,
         artifact_path="model",
         tracking_uri=config.tracking_uri,
     )
 
 request_frame = pd.DataFrame({"age": [42.0], "income": [72000.0]})
-local = load_local_pipeline("artifacts/local-pipeline")
-local_predictions = predict_local_pipeline(request_frame, local)
+artifact = load_pipeline("artifacts/fitted-pipeline")
+direct_predictions = predict_pipeline(request_frame, artifact)
 mlflow.set_tracking_uri(config.tracking_uri)
 pyfunc_predictions = mlflow.pyfunc.load_model(model_uri).predict(request_frame)
 ```
@@ -82,7 +84,7 @@ columns keep numeric signatures and do not need this string transport.
 Use the public helper with a loaded model:
 
 ```python
-from skyulf.integrations.mlflow.models.local_model import prepare_pyfunc_input
+from skyulf.integrations.mlflow.models.pipeline_model import prepare_pyfunc_input
 
 loaded = mlflow.pyfunc.load_model(model_uri)
 # raw_frame contains the original, typed values expected by this artifact.
@@ -95,7 +97,7 @@ For example, an `Int64` column `[25, None, 40]` travels as
 the fitted cleaning steps. A pipeline with no suitable missing-value handler
 can still fail in its model. The helper preserves input order and index and
 does not mutate the caller's frame. It is needed only at the MLflow boundary;
-direct `predict_local_pipeline` calls continue to take native values.
+direct `predict_pipeline` calls continue to take native values.
 Call the helper once: it accepts native values and deliberately rejects
 already encoded strings. REST/JSON clients can send the declared strings and
 nulls directly; they do not call this Python helper.
@@ -127,19 +129,13 @@ prediction-output limitations. See
 
 For classifiers, the output is `prediction` followed by
 `probability_0`, `probability_1`, and so on in the saved model class order. Pass
-`use_tuned_thresholds=True` to `save_local_pipeline` only when the fitted
+`use_tuned_thresholds=True` to `save_pipeline` only when the fitted
 pipeline has stored tuned thresholds and those decisions are intended for this
 artifact; otherwise predictions use the estimator's default decision rule.
-The current parity evidence is deliberately narrow:
-
-| Model family | Fitted engines | Verified preprocessing and outputs |
-| --- | --- | --- |
-| scikit-learn linear regression | pandas, Polars | One-hot encoding; custom binning followed by one-hot encoding; `prediction` |
-| scikit-learn logistic regression | pandas, Polars | Class order, probabilities and explicit tuned decisions |
-
-Other model families, input dtypes, and context-dependent nodes need their own
-parity checks before production use. The manifest records the concrete model
-class so a later preflight can compare it with this evidence.
+Validate replay for the actual recipe, input dtypes and estimator you package.
+Use [preprocessing diagnostics](preprocessing_context.md) to inspect saved-state
+and request-context behavior; compare direct and pyfunc predictions with the
+same typed features. Diagnostic success does not grant worker eligibility.
 
 This package retains its `whole_frame_local` scope. It supports bounded local
 batch inference, including inside a Databricks Python task with the recorded
@@ -252,8 +248,9 @@ not an atomic publish operation and may overwrite files. Logging failures
 propagate to the caller even when tracking was configured with `warn`.
 Producer project files and the temporary source bundle path are excluded.
 
-This stage provides local MLflow pyfunc packaging. The optional registry adapter
-can now publish and resolve concrete local registry versions; live Unity Catalog,
-Databricks job delivery, Delta batch sinks, and Spark UDF/endpoint adapters
-remain later initiative tasks. Until those platform gates are complete,
-`load_model` plus `predict` is the supported pyfunc packaging contract.
+Use the [registry guide](mlflow_registry.md) to register a concrete run artifact
+and manage candidate/champion versions. The [Databricks Python SDK](databricks_sdk.md)
+adds pinned UC source reads and bounded Delta publication; the
+[Bundle guide](databricks_bundle.md) describes distributed scoring and deployment
+settings. Those integrations keep their own schema, context and admission checks;
+logging a model alone does not deploy it or create a prediction table.

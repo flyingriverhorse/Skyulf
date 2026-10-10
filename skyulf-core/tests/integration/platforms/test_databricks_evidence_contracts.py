@@ -11,9 +11,9 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
-from skyulf.integrations.databricks.lifecycle import local_workflow as workflow
-from skyulf.integrations.databricks.training.fitting import local_retraining as training
-from skyulf.integrations.databricks.training.shared import local_training_evidence as evidence
+from skyulf.integrations.databricks.lifecycle import workflow as workflow
+from skyulf.integrations.databricks.training.fitting import candidate as training
+from skyulf.integrations.databricks.training.shared import training_evidence as evidence
 from skyulf.integrations.mlflow.lifecycle.promotion import AliasChangeReceipt
 from skyulf.integrations.mlflow.lifecycle.validation import (
     ModelComparisonReport,
@@ -35,7 +35,7 @@ def _spec(temporal=False):
         if temporal
         else {}
     )
-    return training.LocalTrainingSpec(
+    return training.TrainingSpec(
         table="workspace.test.source",
         version=4,
         record_key_columns=("id",),
@@ -56,7 +56,7 @@ def test_saved_spec_roundtrip_preserves_identity_and_input(temporal, engine):
     payload = json.loads(json.dumps(training.training_spec_payload(spec, engine)))
     payload.pop("pre_split_steps")  # Existing approval evidence permits this absent field.
     original = deepcopy(payload)
-    restored = training.LocalTrainingSpec.from_payload(payload)
+    restored = training.TrainingSpec.from_payload(payload)
     assert restored == spec and restored.dataset_id == spec.dataset_id
     assert payload == original and isinstance(restored.record_key_columns, tuple)
 
@@ -163,7 +163,7 @@ def test_first_candidate_output_keeps_legacy_result_type():
     from skyulf.integrations.databricks.jobs.shared.job_runtime import BundleActionResult
 
     spec = _spec()
-    candidate = training.LocalCandidateResult(
+    candidate = training.CandidateResult(
         run_id="run",
         model_name="workspace.test.model",
         model_version="1",

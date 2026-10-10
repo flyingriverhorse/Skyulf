@@ -9,11 +9,7 @@ import pytest
 
 from skyulf.core.schema import SchemaMismatchError
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.model_set import ComponentReference, load_model_set, save_model_set
 from skyulf.inference.model_set_scoring import score_model_set
 from skyulf.pipeline import SkyulfPipeline
@@ -61,8 +57,8 @@ def typed_model_set(tmp_path):
     )
     pipeline.fit(frame, target_column="target")
     component_path = tmp_path / "component"
-    save_local_pipeline(pipeline, component_path)
-    local = load_local_pipeline(component_path)
+    save_pipeline(pipeline, component_path)
+    local = load_pipeline(component_path)
     reference = ComponentReference(name="typed", version="1", digest=local.manifest.pipeline_sha256)
     save_model_set(
         tmp_path / "set",
@@ -84,7 +80,7 @@ def test_model_set_preserves_date_and_other_native_types(typed_model_set, missin
             for name in ["date", "time", "category"]
         )
     original = query.clone()
-    expected = predict_local_pipeline(query.drop("id"), local)
+    expected = predict_pipeline(query.drop("id"), local)
     actual = score_model_set(query, artifact).frame
     assert actual["id"].tolist() == [2**53 + 1, 3, 2**53 + 3]
     np.testing.assert_allclose(actual["amount__prediction"].astype(float), expected["prediction"])
@@ -96,7 +92,7 @@ def test_model_set_preserves_exact_arrow_input_and_pandas_index(typed_model_set)
     artifact, local, query = typed_model_set
     pandas_query = query.to_pandas(use_pyarrow_extension_array=True)
     pandas_query.index = pd.Index([8, 2, 8], name="row")
-    expected = predict_local_pipeline(query.drop("id"), local)
+    expected = predict_pipeline(query.drop("id"), local)
     actual = score_model_set(pandas_query, artifact).frame
     assert actual.index.equals(pandas_query.index)
     np.testing.assert_allclose(actual["amount__prediction"].astype(float), expected["prediction"])
@@ -134,8 +130,8 @@ def test_model_set_preserves_large_nullable_integer_features(tmp_path):
     )
     pipeline.fit(frame, target_column="target")
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    local = load_local_pipeline(path)
+    save_pipeline(pipeline, path)
+    local = load_pipeline(path)
     reference = ComponentReference(name="large", version="1", digest=local.manifest.pipeline_sha256)
     artifact = save_model_set(
         tmp_path / "set",

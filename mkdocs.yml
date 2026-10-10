@@ -81,13 +81,16 @@ nav:
     - Installation: user_guide/installation.md
     - Spark (Development): user_guide/spark.md
     - Inference Bundles (Development): user_guide/inference_bundles.md
-    - Inference Flow (Development): user_guide/inference_flow.md
+    - Inference Flow: user_guide/inference_flow.md
+    - Preprocessing Diagnostics and Context: user_guide/preprocessing_context.md
     - MLflow Tracking (Development): user_guide/mlflow_tracking.md
     - MLflow Models (Development): user_guide/mlflow_models.md
     - MLflow Registry (Development): user_guide/mlflow_registry.md
     - Databricks Batch (Development): user_guide/databricks_batch.md
-    - Databricks Local SDK (Development): user_guide/databricks_local_sdk.md
-    - Databricks Local Bundle (Development): user_guide/databricks_bundle.md
+    - Databricks Python SDK: user_guide/databricks_sdk.md
+    - Gradual Serving Rollout: user_guide/databricks_serving_rollout.md
+    - Online Feature Lookup: user_guide/databricks_online_features.md
+    - Databricks Bundle: user_guide/databricks_bundle.md
     - Databricks Bundle Operator Walkthrough: user_guide/databricks_bundle_walkthrough.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
@@ -97,7 +100,7 @@ nav:
     - Validation vs scikit-learn: user_guide/validation_vs_sklearn.md
     - skyulf-core Configuration: user_guide/configuration.md
     - Weighted Training & Support: user_guide/weighted_training.md
-    - Sampling Weight Acceptance: user_guide/sampling_weight_acceptance.md
+    - Verify Sampling and Weights: user_guide/sampling_weight_acceptance.md
     - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
     - SHAP Explainability: user_guide/shap_explainability.md
     - Cross-Validation: user_guide/cross_validation.md

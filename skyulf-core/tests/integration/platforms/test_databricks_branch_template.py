@@ -161,7 +161,11 @@ def test_branch_notebook_rejects_repairs_and_operator_actions(tmp_path, workflow
 
 
 @pytest.mark.skipif(
-    not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI generation opt-in required"
+    not (
+        os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
+        or os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
+    ),
+    reason="CLI generation opt-in required",
 )
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
 @pytest.mark.parametrize("policy", ["manual_approval", "automatic"])
@@ -217,24 +221,31 @@ def test_multi_target_cli_graph_has_same_three_jobs(tmp_path, compute, policy, h
         jobs["score"]["tasks"][0]["notebook_task"]["notebook_path"] == "../src/jobs/score_models.py"
     )
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
-    assert "src/modeling/multi_model.py" in _synced_sources(project, bundle)
-    from skyulf.inference.project_code import load_project_module
+    assert "src/features/scoring.py" in _synced_sources(project, bundle)
+    from skyulf.integrations.databricks.projects.yaml_config import read_inference_config
 
-    factory = load_project_module((project / "src/modeling/model_set.py").read_text())
-    assert factory.build_model_set()["model_name"].endswith("sm33_generated_set{resource_suffix}")
-    assert factory.build_model_set()["combined_rules_path"] == "../features"
-    assert factory.build_model_set()["publication"] == {"mode": "all"}
-    assert factory.build_model_set()["promotion_policy"] == policy
+    settings = read_inference_config(project / "config")
+    assert settings is not None
+    model_set = settings["model_set"]
+    assert model_set["model_name"].endswith("sm33_generated_set{resource_suffix}")
+    assert model_set["combined_rules_path"] == "../features"
+    assert model_set["publication"] == {"mode": "all"}
+    assert model_set["promotion_policy"] == policy
 
 
 def test_branch_factory_is_generated_from_initializer_answers():
     """The former disabled sample must be replaced by an executable generated declaration."""
     assert not (TEMPLATE / "src/modeling/branches.py").exists()
-    assert (TEMPLATE / "src/modeling/multi_model.py.tmpl").is_file()
+    assert (TEMPLATE / "config/training.yml.tmpl").is_file()
+    assert not (TEMPLATE / "src/modeling").exists()
 
 
 @pytest.mark.skipif(
-    not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI generation opt-in required"
+    not (
+        os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
+        or os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
+    ),
+    reason="CLI generation opt-in required",
 )
 @pytest.mark.parametrize("task", ["regression", "classification"])
 def test_generated_branches_validate_with_either_base_task(tmp_path, workflow_config, task):
@@ -270,7 +281,7 @@ def test_generated_branches_validate_with_either_base_task(tmp_path, workflow_co
         branch_4_regression_model="voting_regressor",
         branch_4_cv_enabled="false",
     )
-    values["config_path"] = str(project / "config/workflow.json")
+    values["config_path"] = str(project / "config/training.yml")
     configs = load_training_branch_configs(values)
     checked = {
         name: validate_workflow_config(config, action="train") for name, config in configs.items()
@@ -323,7 +334,7 @@ def test_branch_notebook_passes_resolved_configs_to_service(
     from skyulf.integrations.databricks.jobs.training.branch_notebook import (
         run_branch_training_notebook,
     )
-    from skyulf.integrations.databricks.training import local_branches
+    from skyulf.integrations.databricks.training import branches as local_branches
 
     values, entries = _project(tmp_path, workflow_config)
     if explanations:
@@ -353,7 +364,7 @@ def test_branch_notebook_passes_resolved_configs_to_service(
         return_value=Result("parent", "workspace.inputs.source", 4, {"<cost>": {"version": "7"}})
     )
     monkeypatch.setattr(local_branches, "prepare_training_branches", prepare)
-    monkeypatch.setattr(local_branches, "train_local_branches", train)
+    monkeypatch.setattr(local_branches, "train_branches", train)
     display = Mock()
     dbutils = SimpleNamespace(widgets=SimpleNamespace(getAll=lambda: values), notebook=Mock())
     output = run_branch_training_notebook(
