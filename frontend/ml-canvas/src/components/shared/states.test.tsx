@@ -100,10 +100,11 @@ describe('LoadingState', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Crunching numbers');
   });
 
-  it('hides the spinner from assistive technology', () => {
+  it('hides the decorative loading logo from assistive technology', () => {
+    // The surrounding status text provides the accessible loading announcement.
     const { container } = render(<LoadingState />);
-    const spinner = container.querySelector('svg');
-    expect(spinner).not.toBeNull();
-    expect(spinner).toHaveAttribute('aria-hidden', 'true');
+    const logo = container.querySelector('video, img');
+    expect(logo).not.toBeNull();
+    expect(logo).toHaveAttribute('aria-hidden', 'true');
   });
 });

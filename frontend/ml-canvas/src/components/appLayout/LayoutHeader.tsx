@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
-import logoUrl from '../../../../../static/img/logo.png';
+import logoUrl from '../../../../../static/img/app_logo/ml_learning_swirl_yellow_v2.svg';
 import { NotificationCenter } from '../layout/NotificationCenter';
 
 interface LayoutHeaderProps {

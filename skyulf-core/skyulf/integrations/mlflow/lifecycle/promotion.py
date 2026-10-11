@@ -9,7 +9,7 @@ import hashlib
 import json
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
@@ -604,6 +604,8 @@ def _validated_report(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+    if report.holdout_reference is not None:
+        fresh = replace(fresh, holdout_reference=report.holdout_reference)
     if fresh != report or (require_eligible and not fresh.eligible):
         raise ValueError("Pinned comparison no longer matches the supplied report.")
     return comparison_digest(fresh)
@@ -648,6 +650,7 @@ def initialize_champion(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+    fresh = replace(fresh, holdout_reference=report.holdout_reference)
     if fresh != report:
         raise ValueError("Pinned first-champion comparison changed before initialization.")
     if not quality_gates_pass(fresh):

@@ -17,8 +17,8 @@ below. Those workflows use separate opt-in configuration and guides.
 
 ## 1. Inspect the model and prepare the endpoint
 
-Install the project's serving-compatible Skyulf wheel and MLflow dependencies
-in your notebook environment. Use the **same Skyulf source runtime that packaged
+Install `deployment/requirements.txt` with `uv pip install -r` in your
+notebook environment. Use the **same Skyulf source runtime that packaged
 the registered model**: admission checks source provenance, fitted artifact
 digest, partition safety, named input/output signature and nullable transport.
 Updating the local library does not silently upgrade an old model package.
@@ -304,8 +304,12 @@ enforced. This generated flow supports pandas single-model and competition
 training; multi-target policy transport and temporal feature lookups are rejected.
 No Spark scoring job or batch prediction table needs to run or exist.
 
-Configure `deployment/artifact.json` with the matching Skyulf Core source or wheel
-and release, and complete your Bundle target and ordinary training settings.
+Keep the published Core release pinned in `deployment/requirements.txt`
+(`skyulf-core[mlflow]==0.9.2`) and complete your Bundle target and ordinary training
+settings. Change only this requirement's version to upgrade Core and redeploy.
+The optional online jobs inherit this pin through `serving-requirements.txt`,
+which also installs the pinned feature-engineering SDK. Validate saved-model
+runtime compatibility before upgrading production.
 Provision and publish the feature source as described below, or use an existing
 publication maintained externally. Then validate, deploy and train:
 

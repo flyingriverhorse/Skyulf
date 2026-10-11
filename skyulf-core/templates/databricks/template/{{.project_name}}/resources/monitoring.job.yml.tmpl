@@ -146,5 +146,4 @@ resources:
           spec:
             client: ${var.monitoring_environment_version}
             dependencies:
-              - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/requirements.txt

@@ -196,9 +196,29 @@ is terminal for that rollout; starting again requires a new explicit rollout.
 After a successful promotion, both concrete served entities remain available.
 Retiring the previous model or changing SQL pins is a separate operator action.
 
-Native feature packages retain strict original training-snapshot verification.
-If their feature tables advance during the rollout, reconstructing the original
-heldout evidence can fail and promotion will remain blocked. Automatic promotion
-does not relax that check or substitute current features for historical ones.
-See [online features](databricks_online_features.md) for the separate serving
-freshness contract and its supported request shape.
+## Feature updates during a rollout
+
+New feature-bound candidates save their enriched training-time holdout at
+`lifecycle/data/holdout.parquet` in the candidate's MLflow run. The saved comparison
+binds its hash, owner run, schema, row and memory limits, split membership and
+model identity. Lifecycle training reuses its prepared holdout; SDK training
+records the same bounded artifact when needed.
+
+Final approval reloads those verified inputs and evaluates the fitted pipeline.
+Feature table versions may advance while the rollout runs: current feature
+values do not replace historical holdout values. The original source and feature
+table identities must still match. Missing or altered artifacts, changed split
+metadata, insufficient read budgets or a dropped and recreated table block approval.
+Retain the candidate run and its artifacts throughout the rollout and approval.
+
+Older candidates without this saved reference keep strict snapshot reconstruction.
+If a feature table has advanced, approval explains that no frozen holdout is
+available and remains blocked. Train a new candidate with the updated runtime;
+do not edit comparison artifacts to bypass that check.
+
+Online requests still use current published features and enforce their missing
+value and freshness policy. Historical holdout success does not replace fresh
+serving health, quality or final-stage observations. A shared feature failure can
+affect both versions; returning traffic to the champion does not repair that data.
+See [online features](databricks_online_features.md) for the serving freshness
+contract and supported request shape.

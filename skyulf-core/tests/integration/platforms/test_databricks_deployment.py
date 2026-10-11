@@ -72,11 +72,6 @@ def _resolve(project, target, state):
     state["config"].write_text(
         f"[offline]\nhost={state['host']}\ntoken=local-test-{state['id']}\n", encoding="utf-8"
     )
-    dist = project / "dist/skyulf"
-    dist.mkdir(parents=True, exist_ok=True)
-    (dist / "skyulf_core-0.9.1-py3-none-any.whl").write_text(
-        "Path resolution fixture only; no wheel is installed or executed.", encoding="utf-8"
-    )
     targets_path = project / "deployment/targets.yml"
     targets = yaml.safe_load(targets_path.read_text())
     for settings in targets["targets"].values():

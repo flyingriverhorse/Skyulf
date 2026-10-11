@@ -250,7 +250,7 @@ def _log_feature_options(
         }
     )
     with _active_logging_run(run_id, tracking_uri) as tracking:
-        sdk_path = f"skyulf_feature_source_{uuid4().hex}"
+        sdk_path = f"feature_source_{uuid4().hex}"
         logged = feature_engineering_client(client).log_model(
             model=options["python_model"],
             flavor=mlflow.pyfunc,

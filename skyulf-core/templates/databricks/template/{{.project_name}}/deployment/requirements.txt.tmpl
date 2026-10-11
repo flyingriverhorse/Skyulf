@@ -1,6 +1,7 @@
 # Shared training and scoring environment. Keep exact pins here.
 # Initial model/ensemble selections are included automatically. After editing
 # model Python files, update their optional packages here before redeploying.
+skyulf-core[mlflow]==0.9.2
 mlflow==3.16.1
 PyYAML==6.0.3
 {{if eq .include_online_serving "true"}}databricks-feature-engineering==0.18.1

@@ -114,7 +114,6 @@ def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
         parameters["publication_action"] = "{{job.parameters.publication_action}}"
     assert task["notebook_task"]["base_parameters"] == parameters
     assert resource["environments"][0]["spec"]["dependencies"] == [
-        "../dist/skyulf/*.whl",
         "-r ${workspace.file_path}/deployment/serving-requirements.txt",
     ]
     requirements = (TEMPLATE / "deployment/serving-requirements.txt.tmpl").read_text(

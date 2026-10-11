@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive,
   BarChart2, Activity, TrendingUp, Bug, Timer, ScrollText, X,
 } from 'lucide-react';
-import logoUrl from '../../../../../static/img/logo.png';
+import logoUrl from '../../../../../static/img/app_logo/ml_learning_swirl_yellow_v2.svg';
 
 interface SidebarProps {
   pathname: string;
@@ -49,7 +49,7 @@ function SidebarBrand({
   return (
     <div className={`h-14 shrink-0 ${isCollapsed ? 'px-4' : 'px-6'} border-b flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${isMobile ? 'justify-between' : ''}`}>
       <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-        <img src={logoUrl} alt="Skyulf logo" width={32} height={32} className="w-8 h-8 object-contain shrink-0" />
+        <img src={logoUrl} alt="Skyulf ML logo" width={32} height={32} className="w-8 h-8 object-contain shrink-0" />
         {!isCollapsed && (
           <h1 className="text-xl font-bold tracking-tight whitespace-nowrap text-foreground">
             Skyulf ML

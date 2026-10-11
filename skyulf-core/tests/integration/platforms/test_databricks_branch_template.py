@@ -3,7 +3,6 @@
 import ast
 import json
 import os
-import re
 import tomllib
 from copy import deepcopy
 from dataclasses import dataclass
@@ -17,8 +16,8 @@ import yaml
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
 
-def test_bundle_wheel_references_match_core_build_version():
-    """Generated jobs must install the wheel produced by the current Core release."""
+def test_bundle_requirement_matches_core_release_version():
+    """The shared requirement must name the release that produced the generated template."""
     core = Path(__file__).resolve().parents[3]
     metadata = tomllib.loads((core / "pyproject.toml").read_text())
     assert "version" in metadata["project"]["dynamic"]
@@ -30,19 +29,13 @@ def test_bundle_wheel_references_match_core_build_version():
         and node.func.id == "setup"
     )
     version = ast.literal_eval(next(item.value for item in setup.keywords if item.arg == "version"))
-    declared = json.loads((TEMPLATE / "deployment/artifact.json").read_text())
-    assert declared["version"] == version
+    requirements = (TEMPLATE / "deployment/requirements.txt.tmpl").read_text()
+    assert f"skyulf-core[mlflow]=={version}" in requirements.splitlines()
+    assert not (TEMPLATE / "deployment/artifact.json").exists()
     bundle = yaml.safe_load(
-        (TEMPLATE / "databricks.yml.tmpl").read_text().replace("{{.project_name}}", "wheel_check")
+        (TEMPLATE / "databricks.yml.tmpl").read_text().replace("{{.project_name}}", "release_check")
     )
-    artifact = bundle["artifacts"]["skyulf"]
-    assert artifact["type"] == "whl"
-    assert artifact["files"] == [{"source": "dist/skyulf/*.whl"}]
-    assert artifact["build"] == "uv run --no-project python src/tools/build_wheel.py"
-    for filename in ("train.job.yml.tmpl", "score.job.yml.tmpl"):
-        source = (TEMPLATE / "resources" / filename).read_text()
-        references = re.findall(r"(?m)^\s*-\s*(?:whl:\s*)?(\S+\.whl)\s*$", source)
-        assert references and set(references) == {"../dist/skyulf/*.whl"}
+    assert "artifacts" not in bundle
     assert f"Skyulf {version} Bundle:" in (TEMPLATE / "README.md.tmpl").read_text()
 
 

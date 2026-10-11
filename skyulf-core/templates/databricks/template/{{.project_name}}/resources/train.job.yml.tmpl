@@ -82,7 +82,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
@@ -233,7 +232,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
@@ -460,7 +458,6 @@ resources:
           spec:
             client: ${var.serverless_environment_version}
             dependencies:
-              - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/train-requirements.txt
 {{else}}
       job_clusters:

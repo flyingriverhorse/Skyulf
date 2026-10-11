@@ -34,6 +34,7 @@ from ...mlflow.lifecycle.validation import ModelComparisonReport, validate_quali
 from ...mlflow.registration.registry import resolve_model
 from ..shared._contracts import input_budget_bytes
 from ..training.fitting import candidate
+from ..training.shared.holdout_evidence import load_saved_holdout
 from ..training.shared.training_evidence import (
     load_candidate_evidence,
     validate_training_evidence,
@@ -247,8 +248,7 @@ def approve_saved_candidate(
         max_rows=min(spec.max_rows, config["max_rows"]),
         max_bytes=min(spec.max_bytes, max_bytes),
     )
-    frame = candidate.read_training_snapshot(spark, bounded_spec)
-    _, heldout, _ = candidate.split_labeled_snapshot(frame, bounded_spec, engine=engine)
+    heldout = _approval_holdout(client, spark, report, bounded_spec, engine)
     if filter_evidence is not None:
         validate_training_evidence(
             filter_evidence,
@@ -272,6 +272,20 @@ def approve_saved_candidate(
     return promote_candidate(
         report, native, expected_champion_version=expected_champion_version, **options
     )
+
+
+def _approval_holdout(client: Any, spark: Any, report: Any, spec: Any, engine: str) -> Any:
+    """Use comparison-bound rows or retain the strict reconstruction path for legacy evidence."""
+    if getattr(report, "holdout_reference", None) is not None:
+        return load_saved_holdout(client, spark, report, spec)
+    try:
+        frame = candidate.read_training_snapshot(spark, spec)
+        _, heldout, _ = candidate.split_labeled_snapshot(frame, spec, engine=engine)
+    except ValueError as exc:
+        raise ValueError(
+            f"Legacy candidate has no saved holdout; strict reconstruction failed: {exc}"
+        ) from exc
+    return heldout
 
 
 def _comparison_receipt_digest(event: Any, action: str, replay: bool) -> str:

@@ -78,6 +78,7 @@ class ModelComparisonReport:
     eligible: bool
     reason: str
     quality_gates: dict[str, float] | None = None
+    holdout_reference: dict[str, Any] | None = None
 
 
 def _validate_threshold(metric: str, value: float, field: str) -> None:
@@ -160,6 +161,8 @@ def comparison_payload(report: ModelComparisonReport) -> dict[str, Any]:
     payload = asdict(report)
     if not report.quality_gates:
         payload.pop("quality_gates")
+    if report.holdout_reference is None:
+        payload.pop("holdout_reference")
     return payload
 
 

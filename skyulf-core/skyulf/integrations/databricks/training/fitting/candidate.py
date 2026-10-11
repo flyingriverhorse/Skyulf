@@ -40,6 +40,7 @@ from ....mlflow.lifecycle.validation import (
 )
 from ....mlflow.registration.registry import ResolvedModel, register_model, resolve_model
 from ....mlflow.runs.tracking import TrackingConfig, track_run
+from ...data.delta_io.delta import table_identity
 from ...data.training.training_dates import (
     TrainingDateSpec,
     instant_from_microseconds,
@@ -65,6 +66,7 @@ from ...observability.reports.explanations import (
 )
 from ...scoring.batch.frame_batch import fit_workflow
 from ...shared._contracts import column_name, table_name
+from ..shared.holdout_evidence import save_holdout_reference
 from ..shared.preprocessing_checks import log_preprocessing_probe
 from ..shared.training_evidence import build_training_evidence, evidence_digest
 from ..shared.training_parameters import log_training_parameters
@@ -503,6 +505,7 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     if not isinstance(spec, TrainingSpec):
         raise TypeError("spec must be TrainingSpec.")
     spec = pin_training_lookup(spark, spec)
+    source_id = table_identity(spark, spec.table) if spec.feature_binding_json else None
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
@@ -539,6 +542,10 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
     retain_training_binding(spark, frame, spec)
+    if source_id is not None:
+        if table_identity(spark, spec.table) != source_id:
+            raise ValueError("Training source table identity changed while reading rows.")
+        frame.attrs["source_table_id"] = source_id
     if selection is not None:
         frame.attrs["training_selection"] = {**selection, "selected_rows": len(frame)}
     return frame
@@ -1264,6 +1271,10 @@ def compare_candidate(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+    if spec.feature_binding_json is not None:
+        report = replace(
+            report, holdout_reference=save_holdout_reference(run, native_holdout, spec, report)
+        )
     run.client.log_dict(run.run_id, comparison_payload(report), "candidate_comparison.json")
     run.client.log_dict(run.run_id, {"gates": quality_gate_results(report)}, "quality_gates.json")
     comparison_sha256 = comparison_digest(report)

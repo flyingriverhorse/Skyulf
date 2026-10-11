@@ -221,8 +221,8 @@ Distribution drift remains controlled separately by `on_drift`. Its cooldown
 and minimum new labeled training-row settings are shared request guards for
 either retraining trigger. Model evaluation and approval rules still apply.
 
-For an explicit schema/view upgrade, run `initialize_monitoring_store` with the updated wheel before
-updating the dashboard. This adds `performance_actions` and `performance_history`;
+For an explicit schema/view upgrade, run `initialize_monitoring_store` after installing the updated Core requirement
+and before updating the dashboard. This adds `performance_actions` and `performance_history`;
 the inventory and observation table schemas stay compatible. Producers using
 automatic performance retraining also need CREATE TABLE in the monitoring schema
 when the action table is absent, and SELECT/MODIFY on `performance_actions`.
@@ -399,7 +399,7 @@ New generated score jobs use `prepare_monitoring -> monitoring_ready -> monitor_
 where the final node is the native child-job call. Calculation, saved drift reports
 and guarded retraining belong to that child job. All projects can link to the same
 `monitoring_dashboard_url`. Existing projects need reviewed template/notebook and
-wheel updates followed by redeployment. The older asynchronous API's
+Core requirement updates followed by redeployment. The older asynchronous API's
 `monitoring_invocation_id` identifies a producer run for duplicate suppression;
 the new native job graph does not expose or require that setting.
 
@@ -686,5 +686,5 @@ A delayed score cannot replace an activated different version, and repairing an
 older activation cannot replace a newer activation. Enrollment-only repairs read
 the verified original receipt without repeating training or alias changes.
 The private activation-order metadata lives in inventory config_json; table
-schemas and model configuration digests are unchanged. Deploy the updated Skyulf wheel with model and monitoring jobs so all inventory
-readers understand it.
+schemas and model configuration digests are unchanged. Redeploy the updated Core
+requirement with model and monitoring jobs so all inventory readers understand it.

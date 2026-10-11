@@ -73,8 +73,12 @@ enforced. This generated flow supports pandas single-model and competition
 training; multi-target policy transport and temporal feature lookups are rejected.
 No Spark scoring job or batch prediction table needs to run or exist.
 
-Configure `deployment/artifact.json` with the matching Skyulf Core source or wheel
-and release, and complete your Bundle target and ordinary training settings.
+Keep the published Core release pinned in `deployment/requirements.txt`
+(`skyulf-core[mlflow]==0.9.2`) and complete your Bundle target and ordinary training
+settings. Change only this requirement's version to upgrade Core and redeploy.
+The optional online jobs inherit this pin through `serving-requirements.txt`,
+which also installs the pinned feature-engineering SDK. Validate saved-model
+runtime compatibility before upgrading production.
 Provision and publish the feature source as described below, or use an existing
 publication maintained externally. Then validate, deploy and train:
 
@@ -157,8 +161,9 @@ substitute for a recent feature timestamp.
 
 Provision an online store explicitly with the native Feature Engineering client
 and wait until it is `AVAILABLE`. Store provisioning is never a side effect of
-Skyulf prediction. Install `skyulf-core[feature-store,mlflow]` in a compatible
-Databricks environment and use the same Skyulf wheel for packaging and serving.
+Skyulf prediction. Install `deployment/serving-requirements.txt` with `uv pip install`
+in a compatible Databricks environment. Packaging and serving must use the same
+Core release and source runtime.
 
 Choose the store name and capacity when provisioning it in your selected
 workspace. Databricks manages the underlying Lakebase infrastructure. Bundle

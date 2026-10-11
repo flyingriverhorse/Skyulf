@@ -618,7 +618,7 @@ JSON. Put custom pairs in the features package and enable them in the appropriat
 builder. Approval and scoring use saved code, even after project source changes.
 See [setup and advanced inputs][setup] and [custom recipes][recipes].
 
-Install the matching Skyulf wheel in your local environment, then from this project:
+Install `deployment/train-requirements.txt` locally with `uv pip install`, then from this project:
 
 ```powershell
 python src/tools/preview.py --action train
@@ -631,21 +631,27 @@ not read source data or train. Keep data access/training out of imports and
 builders. For another target, pass `--catalog`, `--input-schema`, `--output-schema`,
 `--metadata-schema` and `--resource-suffix` using that target's bindings.
 
-## 2. Build and deploy
+## 2. Install and deploy
 
-Set `deployment/artifact.json` once: `source` is the path to a Skyulf Core source
-checkout or a release wheel, and `version` is the required Core release. Relative
-paths resolve from this project; keep the source outside generated `dist/skyulf/`.
-Bundle deployment prepares the wheel automatically,
-checks its package name and version, and records its SHA-256 in
-`dist/skyulf/build.json`. A content digest in the wheel's build tag gives changed
-bytes a distinct deployment/cache identity while preserving the release version
-required by existing saved models. The receipt matches the uploaded wheel bytes.
-To prepare it before strict validation:
+Core is installed from the package index through
+`skyulf-core[mlflow]==0.9.2` in `deployment/requirements.txt`. To upgrade Core,
+change only that requirement's version to a published release and redeploy.
+All generated jobs inherit this shared pin, including monitoring and optional
+online jobs.
+Use a Core release containing the same template revision. Templates from an
+unreleased source checkout need a corresponding package release first. Older
+packages can lack the YAML support used by smoke, preview, training and scoring,
+even with online jobs disabled. Package installation alone does not establish
+runtime compatibility. The job environment must have access to the package index.
+For local smoke and preview tools, install the same training environment:
 
 ```powershell
-uv run --no-project python src/tools/build_wheel.py
+uv pip install -r deployment/train-requirements.txt
 ```
+
+Saved models retain their producer's exact Core version and dependency checks.
+Test existing models against a changed environment before upgrading production;
+retrain and validate models when their saved runtime is incompatible.
 
 From this generated project, with your authenticated CLI profile:
 
@@ -1018,7 +1024,7 @@ Development targets also set `monitoring_enabled: "false"`,
 `monitoring_performance_policies: '{}'` and `on_drift: disabled`.
 The deployment-mode guard remains effective even if shared monitoring destinations
 or an enabled flag are inherited from common settings. Deploy all three updated jobs
-with the updated Skyulf wheel for this behavior to apply to an existing project.
+with the updated Core requirement for this behavior to apply to an existing project.
 
 Each repository registers its activated model before scoring, and its scored
 version after successful inference, directly in a shared
@@ -1155,7 +1161,7 @@ normalizers, custom pre-split filters or custom weight generators. Supported
 source weight columns remain subject to the training contract. Inspect that
 failure and use an explicit training run for unsupported recipes.
 Existing deployed projects must adopt the updated score job/notebooks/variables
-and install the updated wheel, then validate and redeploy; changing Skyulf's
+and update the Core requirement, then validate and redeploy; changing Skyulf's
 template files does not alter a previously deployed workspace job automatically.
 For a pause, retain the destination and set `monitoring_enabled: "false"`, then
 run scoring to publish the disabled registration. Removing only the destination
@@ -1338,5 +1344,5 @@ A delayed score cannot replace an activated different version, and repairing an
 older activation cannot replace a newer activation. Enrollment-only repairs read
 the verified original receipt without repeating training or alias changes.
 The private activation-order metadata lives in inventory config_json; table
-schemas and model configuration digests are unchanged. Deploy the updated Skyulf wheel with model and monitoring jobs so all inventory
-readers understand it.
+schemas and model configuration digests are unchanged. Redeploy the updated Core
+requirement with model and monitoring jobs so all inventory readers understand it.

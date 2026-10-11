@@ -64,7 +64,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
 {{if eq .auto_rebuild_on_cdf_expiry "true"}}
@@ -113,7 +112,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
         - task_key: scoring_report
@@ -156,7 +154,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
 {{end}}
@@ -210,7 +207,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
         - task_key: monitoring_ready
@@ -237,7 +233,6 @@ resources:
           spec:
             client: ${var.serverless_environment_version}
             dependencies:
-              - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/requirements.txt
 {{else}}
       job_clusters:

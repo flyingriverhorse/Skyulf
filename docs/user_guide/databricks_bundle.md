@@ -1557,12 +1557,19 @@ WHERE customer_id = 'C123';
 
 ## First run
 
-Set `deployment/artifact.json` to the Core source directory or release wheel and
-the expected Core version. The Bundle artifact build prepares the wheel, checks
-its identity and records its SHA-256 in `dist/skyulf/build.json`.
-The wheel filename includes its content digest as a build tag: changed bytes get
-a distinct deployment/cache identity while the release version stays compatible
-with existing saved model requirements. The receipt matches the uploaded bytes.
+Core is installed from the package index through
+`skyulf-core[mlflow]==0.9.2` in `deployment/requirements.txt`. Change that one
+version to a published release and redeploy to upgrade Core. Serverless and
+policy-cluster jobs share this pin, including monitoring and optional online jobs.
+Ensure the job environment can reach the package index.
+Use a Core release containing the same template revision. A template from an
+unreleased source checkout needs a corresponding package release before this
+requirements-only setup can run. Older packages can lack the YAML configuration
+support used by smoke, preview, training and scoring, even with online jobs disabled.
+Successful package installation does not establish runtime compatibility. For local smoke/preview,
+run `uv pip install -r deployment/train-requirements.txt` from the generated project.
+Saved models enforce their producer's runtime versions; validate compatibility
+or retrain before upgrading production.
 Edit `config/training.yml` for real source columns, split policy, budgets and
 model settings. Configure recipe lists in `config/preprocessing.yml` and custom
 calculations in `src/features/preprocessing.py`. Review scoring settings in
@@ -1570,7 +1577,6 @@ calculations in `src/features/preprocessing.py`. Review scoring settings in
 Enable Change Data Feed on the scoring source before later inserts arrive.
 
 ```powershell
-uv run --no-project python src/tools/build_wheel.py
 databricks bundle validate --strict -t dev --profile <profile>
 databricks bundle deploy -t dev --profile <profile>
 databricks bundle run train -t dev --profile <profile>

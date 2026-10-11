@@ -361,13 +361,18 @@ separation as enforced in production.
 
 ## Runtime packaging
 
-Set the Core source directory or release wheel and expected version in
-`artifact.json`. Bundle deploy runs `src/tools/build_wheel.py`; its verified
-output and SHA-256 receipt live in `dist/skyulf/`. Do not edit wheel paths in job
-resources. Run the build command once before strict validation of a fresh project.
-The wheel filename includes its content digest as a build tag. Changed bytes
-therefore get a distinct deployment/cache identity without changing the release
-version required by existing models. The receipt matches the uploaded bytes.
+`requirements.txt` installs `skyulf-core[mlflow]==0.9.2` from the package index.
+Change that one version to a published release to upgrade Core, then redeploy.
+Serverless environments and policy-cluster task libraries load the same shared
+requirements; monitoring and optional online jobs inherit the same Core pin.
+Ensure each job can reach the package index.
+Use a Core release containing the same template revision. Templates from an
+unreleased source checkout need a corresponding package release first. Older
+packages can lack the YAML support used by smoke, preview, training and scoring,
+even with online jobs disabled. Package installation alone does not establish
+runtime compatibility. Install `train-requirements.txt` locally for smoke and preview tools.
+Saved models retain exact producer runtime checks and certified worker source
+snapshots; validate compatibility or retrain before upgrading production.
 
 `requirements.txt` is shared by all three jobs and includes exact project pins from
 `src/features/requirements.txt`. `train-requirements.txt` adds optional report
