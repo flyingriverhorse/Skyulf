@@ -43,13 +43,61 @@ def test_serving_opt_ins_default_off_in_topic_and_generated_schema():
         assert generated["properties"][name]["default"] == "false"
 
 
+def test_publication_mode_prompt_is_conditional_and_defaults_to_triggered():
+    """Existing initialization answers keep their paused hourly publisher behavior."""
+    topic = json.loads((ROOT / "schema/serving.json").read_text(encoding="utf-8"))
+    mode = topic["online_publication_mode"]
+    assert mode["default"] == "TRIGGERED"
+    assert mode["enum"] == ["TRIGGERED", "CONTINUOUS"]
+    assert mode["skip_prompt_if"] == {
+        "properties": {"include_online_publication": {"const": "false"}}
+    }
+
+
+@CLI
+@pytest.mark.parametrize("serving", ["false", "true"])
+@pytest.mark.parametrize("mode", ["TRIGGERED", "CONTINUOUS"])
+def test_real_cli_publication_mode_controls_schedule_and_preserves_independent_setup(
+    tmp_path, serving, mode
+):
+    """Continuous publishers must have explicit controls and no repeating sync schedule."""
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(
+        tmp_path,
+        include_online_publication="true",
+        include_online_serving=serving,
+        online_publication_mode=mode,
+    )
+    config = yaml.safe_load((project / "config/serving.yml").read_text())
+    assert config["online_publication"]["publish_mode"] == mode
+    resource = yaml.safe_load((project / "resources/online_publication.job.yml").read_text())
+    job = resource["resources"]["jobs"]["online_publication"]
+    assert ("schedule" in job) is (mode == "TRIGGERED")
+    assert job["parameters"] == [{"name": "publication_action", "default": "start"}]
+    assert (
+        job["tasks"][0]["notebook_task"]["base_parameters"]["publication_action"]
+        == "{{job.parameters.publication_action}}"
+    )
+    assert (project / "resources/online_serving_setup.job.yml").is_file() is (serving == "true")
+    assert not (project / "resources/daily_rollout.job.yml").exists()
+
+
 @pytest.mark.parametrize("job", list(OPTIONAL))
 def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
     """Native job serialization must retain the guard against automatic retries."""
     jobs = pytest.importorskip("databricks.sdk.service.jobs")
     path = TEMPLATE / (OPTIONAL[job][0] + ".tmpl")
     assert path.is_file(), "Optional serving job resource is not implemented"
-    resource = yaml.safe_load(path.read_text(encoding="utf-8"))["resources"]["jobs"][job]
+    text = path.read_text(encoding="utf-8")
+    if job == "online_publication":
+        text = text.replace('{{if eq .online_publication_mode "TRIGGERED"}}', "").replace(
+            "{{end}}", ""
+        )
+        text = text.replace(
+            "{{`{{job.parameters.publication_action}}`}}", "{{job.parameters.publication_action}}"
+        )
+    resource = yaml.safe_load(text)["resources"]["jobs"][job]
     assert resource["max_concurrent_runs"] == 1
     assert resource["schedule"]["pause_status"] == "PAUSED"
     assert resource["schedule"]["timezone_id"] == "UTC"
@@ -61,9 +109,10 @@ def test_optional_jobs_have_paused_serial_schedules_and_pinned_runtime(job):
     assert jobs.Task.from_dict(task).as_dict().get("disable_auto_optimization") is True
     assert task["disable_auto_optimization"] is True
     assert "disable_auto_optimization" not in task["notebook_task"]
-    assert task["notebook_task"]["base_parameters"] == {
-        "serving_config_path": "${workspace.file_path}/config/serving.yml"
-    }
+    parameters = {"serving_config_path": "${workspace.file_path}/config/serving.yml"}
+    if job == "online_publication":
+        parameters["publication_action"] = "{{job.parameters.publication_action}}"
+    assert task["notebook_task"]["base_parameters"] == parameters
     assert resource["environments"][0]["spec"]["dependencies"] == [
         "../dist/skyulf/*.whl",
         "-r ${workspace.file_path}/deployment/serving-requirements.txt",

@@ -172,6 +172,70 @@ def test_online_job_exposes_pending_sync_without_claiming_readiness(api, monkeyp
     publish.assert_called_once()
 
 
+@pytest.mark.parametrize("action", ["start", "status", "stop", "restart"])
+def test_online_job_transports_continuous_mode_and_explicit_action(api, monkeypatch, action):
+    """The generated job must expose native lifecycle controls without extra writers."""
+    publish = Mock(return_value={"status": "SUBMITTED"})
+    status = Mock(return_value={"status": "RUNNING"})
+    resolve = Mock(return_value={"status": "INSPECTED"})
+    stop = Mock(return_value={"status": "STOP_REQUESTED"})
+    restart = Mock(return_value={"status": "SUBMITTED"})
+    for name, fn in [
+        ("publish_online_features", publish),
+        ("online_publication_status", status),
+        ("publication_receipt", resolve),
+        ("stop_online_publication", stop),
+        ("restart_online_publication", restart),
+    ]:
+        monkeypatch.setattr(api, name, fn)
+    settings = {
+        "enabled": True,
+        "exclusive_writer": True,
+        "source_table": "main.f.source",
+        "online_table": "main.f.online",
+        "online_store": "store",
+        "source_table_id": "id",
+        "publish_mode": "CONTINUOUS",
+    }
+    output = api.run_online_publication(None, settings, client=Mock(), action=action)
+    if action == "start":
+        assert publish.call_args.args[1].publish_mode == "CONTINUOUS"
+        resolve.assert_not_called()
+    else:
+        assert resolve.call_args.args[1].publish_mode == "CONTINUOUS"
+        publish.assert_not_called()
+    assert stop.call_count == (action == "stop")
+    assert restart.call_count == (action == "restart")
+    assert output["status"] == ("STOP_REQUESTED" if action == "stop" else "RUNNING")
+
+
+def test_online_job_rejects_unknown_action_before_native_calls(api, monkeypatch):
+    """Misspelled control commands must not silently submit publication updates."""
+    publish = Mock()
+    monkeypatch.setattr(api, "publish_online_features", publish)
+    with pytest.raises(ValueError, match="action"):
+        api.run_online_publication(
+            None, {"enabled": True, "exclusive_writer": True}, client=Mock(), action="reset"
+        )
+    publish.assert_not_called()
+
+
+def test_online_notebook_transports_job_action_widget(api, monkeypatch):
+    """The notebook must honor Bundle control parameters while older callers default to start."""
+    sdk = pytest.importorskip("databricks.sdk")
+    monkeypatch.setattr(sdk, "WorkspaceClient", Mock())
+    monkeypatch.setattr(api, "_notebook_settings", Mock(return_value={"enabled": True}))
+    runner = Mock(return_value={"status": "STOP_REQUESTED"})
+    monkeypatch.setattr(api, "run_online_publication", runner)
+    dbutils = Mock()
+    dbutils.widgets.getAll.return_value = {"publication_action": "stop"}
+    api.run_online_publication_notebook(None, dbutils)
+    assert runner.call_args.kwargs["action"] == "stop"
+    dbutils.widgets.getAll.return_value = {}
+    api.run_online_publication_notebook(None, dbutils)
+    assert runner.call_args.kwargs["action"] == "start"
+
+
 def test_evidence_artifact_readback_checks_full_content(api, tmp_path):
     """MLflow acknowledgement alone is insufficient to accept producer evidence."""
     from skyulf.integrations.databricks.serving.rollout_evidence import RolloutEvidenceResult

@@ -27,60 +27,21 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Latest handoff
 
-C223-S01-DONE | 2026-10-11T10:26:44Z | Codex/root -> peers | RESULT | reply:C223-S01-CLAIM
-S01 accepted: independent online Bundle selection, saved policy transport,
-publication checks and explicit setup. Full evidence: Task219 section 8;
-Task220 C28 now Var; Task221 S01 slice complete; Task223 1/8, S02 READY.
-Ponytail task review R1/R2 fixed and scoped review approved. Local union 296;
-gate-touched 93 / key-repair 61; packaging 19 passed, 16 existing opt-in skips.
-Full Ruff/Ty/format/CCN/schema passed; 539 runtime source paths/hashes match
-native wheel d6c1ea5138a19e4c1c620340db73e0537dde1fc58ed272409eb0ed2225df2230.
-Generated train 899233885811218 and setup 629217288820446 SUCCESS; native reload
-869340957682179 SUCCESS. Actual request key request_entity maps feature PK entity.
-Live 3 -> 23, missing/stale saved guard traces, restore 3 passed. Owned endpoint,
-publication/UC online table, pipeline, store verified absent. Original endpoint
-skyulf-raw-d35721fd-v1 same ID/config and READY. Offline evidence and four paused/
-unscheduled Bundle jobs retained, no active runs. Cleanup details in Task219.
-78 document link targets and diff-check passed. No MkDocs/full suite/pre-commit:
-no commit intended. Branch 093, HEAD ef390899, index clean; no stage/commit/push.
-Internal source/tests/docs changes remain for user review. S02 not started.
-Implementation/review reports and native receipts remain under
-.superpowers/sdd/223-delivery-order-tracker/. Do not delete uncommitted evidence.
-
-C223-S01-RELEASE | 2026-10-11T10:26:44Z | Codex/root -> peers | RELEASE | reply:C223-S01-DONE
-All S01 claims released; no unanswered peer questions. Prior completed cleanup
-and implementation exchanges compacted after their evidence reached 224/219.
-
-C223-COMMIT-CLAIM | 2026-10-11T10:50:08Z | Codex/root -> peers | CLAIM | reply:C223-S01-DONE
-User authorized S01 commit, then S02 implementation. S01 native run states and
-539-file runtime/wheel hashes verified unchanged. Claim commit review/staging and
-these exact paths (only docs/changelog may receive edits before S01 commit):
-docs/user_guide/databricks_online_features.md
-docs/user_guide/databricks_sdk.md
-initiatives/spark_and_mlflow/README.md
-skyulf-core/skyulf/integrations/databricks/feature_store/lifecycle_config.py
-skyulf-core/skyulf/integrations/databricks/feature_store/online_publication.py
-skyulf-core/skyulf/integrations/databricks/feature_store/training.py
-skyulf-core/skyulf/integrations/databricks/jobs/serving_job.py
-skyulf-core/skyulf/integrations/databricks/lifecycle/workflow.py
-skyulf-core/skyulf/integrations/databricks/model_sets/model_set_project.py
-skyulf-core/skyulf/integrations/databricks/projects/workflow_config.py
-skyulf-core/skyulf/integrations/databricks/serving/online_endpoints.py
-skyulf-core/skyulf/integrations/databricks/training/fitting/candidate.py
-skyulf-core/templates/databricks/databricks_template_schema.json
-skyulf-core/templates/databricks/schema/serving.json
-skyulf-core/templates/databricks/template/{{.project_name}}/SERVING.md
-skyulf-core/templates/databricks/template/{{.project_name}}/config/serving.yml.tmpl
-skyulf-core/templates/databricks/template/{{.project_name}}/config/training.yml.tmpl
-skyulf-core/templates/databricks/template/{{.project_name}}/deployment/requirements.txt.tmpl
-skyulf-core/templates/databricks/template/{{.project_name}}/selection.tmpl
-skyulf-core/templates/databricks/template/{{.project_name}}/src/tools/build_wheel.py
-skyulf-core/tests/integration/platforms/test_bundle_runtime_packaging.py
-skyulf-core/tests/integration/platforms/test_feature_training_lifecycle.py
-skyulf-core/tests/integration/platforms/test_online_feature_model.py
-skyulf-core/tests/integration/platforms/test_online_publication.py
-skyulf-core/tests/integration/platforms/test_serving_job.py
-skyulf-core/tests/integration/platforms/test_serving_jobs_template.py
-skyulf-core/templates/databricks/template/{{.project_name}}/resources/online_serving_setup.job.yml.tmpl
-skyulf-core/templates/databricks/template/{{.project_name}}/src/jobs/online_serving_setup.py
-changelog/0.9.x.md
+C225-CLOSE | 2026-10-11T11:43:23Z | Codex/root -> peers | RELEASE | reply:C225-RESET
+User authorized full project cleanup and S02 commit; no push or S03 implementation.
+All parent claims released at commit handoff. Detailed results and actual commit
+identity are recorded in Task225 and Task219 section 10; Task223 is the delivery tracker.
+S02 runtime matches the tested wheel (539 Python paths/bytes); independent review
+R1/R2/R3 resolved. Prior affected tests 134 and repair subset 79 passed (not summed).
+Fresh Ruff/format/schema, strict MkDocs, full CI Ty/CCN10 and pre-commit passed.
+No frontend changes; frontend hooks skipped. Passing pytest was not repeated.
+Cloud reset verified: 49 jobs, 199 runs, 188 tables/views, 51 UC models, 18 schemas,
+2 volumes, 28 experiments, 4 dashboards and 1 custom endpoint removed.
+All 47 selected workspace roots absent (34 direct deletions, 13 already absent).
+Fresh inventory plus 94 GETs passed; user objects/jobs/runs/active experiments,
+pipelines, online stores and Lakebase projects are empty. Legacy registry disabled.
+Platform catalogs/default schemas, 12 foundation endpoints, unrelated sample
+dashboard and STOPPED starter warehouse preserved. Local evidence retained under
+.superpowers/sdd/225-databricks-reset and prior task directories.
+Progress 2/8; next S03 feature-update/rollout/champion acceptance needs fresh fixtures.
+No pending peer questions or review requests. Completed exchanges recorded and compacted.

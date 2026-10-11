@@ -8,13 +8,18 @@ resources:
       queue:
         enabled: true
       timeout_seconds: ${var.monitoring_timeout_seconds}
+      parameters:
+        - name: publication_action
+          default: start
+{{if eq .online_publication_mode "TRIGGERED"}}
       schedule:
         quartz_cron_expression: "0 0 * * * ?"
         timezone_id: UTC
         pause_status: PAUSED
+{{end}}
       tasks:
         - task_key: online_publication
-          description: Request native TRIGGERED synchronization for the pinned feature source
+          description: Explicit native publication start, status, stop or restart for the pinned source
           timeout_seconds: ${var.monitoring_task_timeout_seconds}
           max_retries: 0
           disable_auto_optimization: true
@@ -23,6 +28,7 @@ resources:
             notebook_path: ../src/jobs/online_publication.py
             base_parameters:
               serving_config_path: ${workspace.file_path}/config/serving.yml
+              publication_action: "{{`{{job.parameters.publication_action}}`}}"
       environments:
         - environment_key: serving
           spec:

@@ -4,8 +4,14 @@ Güncelleme: 11 Ekim 2026.
 
 Bu klasör iç planları, uygulama kararlarını ve doğrulama kanıtlarını tutar.
 Yeni çalışma için [219–222 uygulama sırası ve takip](223-delivery-order-tracker.md)
-belgesinden başla. Bu kapsamda **1/8 adım tamamlandı**. S01 online Bundle
-kurulumu native kabulden geçti; sıradaki adım **S02 — CONTINUOUS publication**.
+belgesinden başla. Bu kapsamda **2/8 adım tamamlandı**: S01 online Bundle
+kurulumu ve S02 CONTINUOUS publication native kabulden geçti. Sırada
+**S03 — Feature güncellenirken rollout ve champion** var. Kod/commit kanıtı
+219 ve 223'te, 11 Ekim workspace sıfırlaması 225'te tutulur; push yapılmadı.
+
+Eski test tabloları, modelleri, jobları ve ilgili workspace kaynakları kullanıcı
+isteğiyle kaldırıldı. Önceki cloud bağlantıları tarihsel kanıttır; yeni kabul
+çalışması yeni fixture oluşturmalıdır. Yerel raporlar ve paketler korundu.
 
 Projenin genel görev durumu ve diğer bağımlılıkları için
 [OPEN_QUEUE_updated.md](OPEN_QUEUE_updated.md) esas alınır. 223 yalnız seçilen
@@ -21,6 +27,7 @@ Projenin genel görev durumu ve diğer bağımlılıkları için
 | [221 — Entegrasyon ve kabul](221-integration-completion-and-acceptance-plan.md) | Feature güncellemeleri, rollout/champion geçişi ve MLflow dataset Inputs için ortak kabul planı. |
 | [222 — Monitoring ayrıntıları](222-monitoring-detail-views-gap-plan.md) | Mevcut kanıtların tablo ve ayrıntı görünümlerinde sunulması. |
 | [224 — Klasör temizliği](224-folder-cleanup.md) | Kaldırılan geçici çıktılar ve eski planlar; korunan kanıtlar ve temizlik kontrolü. |
+| [225 — Databricks sıfırlaması](225-databricks-reset.md) | Silinen cloud kaynakları, korunan platform kaynakları ve fresh API doğrulaması. |
 
 223'teki isteğe bağlı işler ve ertelenen kapsamlar ana sekiz adımdan ayrıdır.
 Dağıtık model eğitimi ile sürekli tahmin akışı bu sıraya dahil değildir.

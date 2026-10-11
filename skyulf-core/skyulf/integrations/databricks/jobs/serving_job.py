@@ -12,7 +12,10 @@ from ..data.admission import SingleWriterAdmission
 from ..feature_store.online_publication import (
     OnlinePublicationSpec,
     online_publication_status,
+    publication_receipt,
     publish_online_features,
+    restart_online_publication,
+    stop_online_publication,
 )
 from ..observability.monitoring.monitoring_config import MonitorConfig
 from ..serving.contracts import PinnedEndpointSpec
@@ -181,20 +184,38 @@ def run_daily_rollout(
 
 
 def run_online_publication(
-    spark: Any, settings: dict[str, Any], *, client: Any, feature_client: Any = None
+    spark: Any,
+    settings: dict[str, Any],
+    *,
+    client: Any,
+    feature_client: Any = None,
+    action: str = "start",
 ) -> dict[str, Any]:
-    """Submit one native sync and report its current status without polling or retries."""
+    """Perform one explicit native publication action without polling or automatic retries."""
     if not _enabled(settings):
         return {"status": "DISABLED"}
+    if action not in {"start", "status", "stop", "restart"}:
+        raise ValueError("Publication action must be start, status, stop or restart.")
     spec = OnlinePublicationSpec(
         **{
             name: settings[name]
             for name in ("source_table", "online_table", "online_store", "source_table_id")
-        }
+        },
+        publish_mode=settings.get("publish_mode", "TRIGGERED"),
     )
-    receipt = publish_online_features(
-        spark, spec, admission=SingleWriterAdmission(), feature_client=feature_client
-    )
+    admission = SingleWriterAdmission()
+    if action == "start":
+        receipt = publish_online_features(
+            spark, spec, admission=admission, feature_client=feature_client, client=client
+        )
+    else:
+        receipt = publication_receipt(client, spec)
+        if action == "stop":
+            return stop_online_publication(client, receipt, admission=admission)
+        if action == "restart":
+            receipt = restart_online_publication(
+                spark, receipt, client=client, admission=admission, feature_client=feature_client
+            )
     return online_publication_status(client, receipt)
 
 
@@ -298,7 +319,8 @@ def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         return {"status": "DISABLED"}
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415
 
-    return run_online_publication(spark, settings, client=WorkspaceClient())
+    action = dbutils.widgets.getAll().get("publication_action", "start")
+    return run_online_publication(spark, settings, client=WorkspaceClient(), action=action)
 
 
 def run_online_serving_setup_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:

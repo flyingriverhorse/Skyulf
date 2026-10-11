@@ -43,8 +43,10 @@ The three serving selections are independent and default to `"false"`.
 `include_online_serving` adds an unscheduled `online_serving_setup` job and its
 notebook. It installs the native Feature Engineering dependency for training
 even when another project owns publication. Initialization creates files only.
-The publisher remains an optional paused hourly `TRIGGERED` job; continuous
-publication is not configured by this template.
+Selecting `include_online_publication: "true"` asks for
+`online_publication_mode`: `TRIGGERED` (default) keeps the paused hourly job;
+`CONTINUOUS` generates explicit start/status/stop/restart controls without a
+periodic schedule. The mode is independent of online serving and rollout.
 
 Complete the generated `config/training.yml` defaults, retaining the source,
 label, split and model settings for your project. For example:
@@ -104,6 +106,7 @@ online_serving:
       source_table_id: "REPLACE_WITH_DESCRIBE_DETAIL_ID"
       online_table: features.online.customer_features
       online_store: customer-features
+      publish_mode: TRIGGERED # Match the existing publication; use CONTINUOUS for a stream.
 ```
 
 Use actual resolved UC names here; the source table must be the model's saved
@@ -196,6 +199,7 @@ publication = OnlinePublicationSpec(
     online_table="features.online.customer_values",
     online_store="customer-features",
     source_table_id=detail["id"],
+    publish_mode="TRIGGERED", # Default; choose CONTINUOUS to start a native stream.
 )
 receipt = publish_online_features(
     spark,
@@ -210,7 +214,9 @@ This validates the source table identity, CDF, key declarations and actual key
 rows before requesting a `TRIGGERED` sync. Source and publication writers must
 share the declared exclusive ownership; the adapter does not lock outside
 writers or change the source schema for you. It publishes all source columns.
-Temporal source tables and continuous streaming are not enabled by this adapter.
+Temporal source tables remain unsupported. `CONTINUOUS` starts native feature
+synchronization and releases the writer admission after submission, allowing
+subsequent source writes. No caller process needs to keep running.
 
 Inspect status later without submitting another sync:
 
@@ -226,6 +232,117 @@ or canceled update. Keep the receipt and update ID for inspection. The recorded
 source version is the version checked during preflight, not a guarantee that
 native latest-value publication copied precisely that snapshot. Verify an actual
 endpoint lookup when testing propagation.
+
+## Operate continuous feature publication
+
+Select `online_publication_mode: "CONTINUOUS"` together with
+`include_online_publication: "true"` in the Bundle initialization answers. Complete
+the generated publisher configuration with the actual resources:
+
+```yaml
+online_publication:
+  enabled: true
+  exclusive_writer: true
+  publish_mode: CONTINUOUS
+  source_table: features.customer.current_values
+  source_table_id: "REPLACE_WITH_DESCRIBE_DETAIL_ID"
+  online_table: features.online.customer_values
+  online_store: customer-features
+```
+
+After configuring exclusive source/publication ownership and deploying the Bundle,
+run one explicit operation at a time:
+
+```bash
+databricks bundle validate -t test
+databricks bundle deploy -t test
+databricks bundle run online_publication -t test --params publication_action=start
+databricks bundle run online_publication -t test --params publication_action=status
+databricks bundle run online_publication -t test --params publication_action=stop
+databricks bundle run online_publication -t test --params publication_action=status
+# Wait until pipeline_state is IDLE or FAILED, then explicitly restart:
+databricks bundle run online_publication -t test --params publication_action=restart
+```
+
+`RUNNING` describes pipeline activity, including resource provisioning; it is not
+first-sync completion or entity freshness. Inspect `pipeline_state`, `update_id`,
+`update_state`, `synchronization_state`, `first_sync_completed` and
+`last_sync_end_timestamp` separately. A failed update or synchronization is
+reported by the inspected `status` command as `FAILED` even if the pipeline still
+reports running during recovery.
+`STOP_REQUESTED` is a submitted stop; check again for `STOPPING` or `STOPPED`.
+Restart requires native `pipeline_state` to be `IDLE` or `FAILED`. Overall
+`status=FAILED` can coexist with a `RUNNING` or `STOPPING` pipeline; stop active
+compute first and inspect its pipeline state. A restart receipt keeps its new
+update ID and reports `PENDING` until that update appears in native metadata.
+Earlier update/synchronization failures do not establish failure of that attempt.
+Once its acknowledged update appears, that update/pipeline activity decides the
+attempt status; synchronization failure labels remain separately visible because
+they can lag an intentional cancellation or restart. An intentionally stopped
+pipeline can therefore report native `pipeline_state=IDLE` alongside overall
+`status=FAILED` and `update_state=CANCELED` from the last operation.
+The model's saved missing/stale guard still validates every prediction request.
+
+A repeated continuous `start` inspects and reuses the active pipeline without
+submitting another update. Restart uses the same pipeline after a confirmed stop
+or failure. Calls that time out or lose a response are not retried automatically;
+inspect native status before another action. Changing `publish_mode` on an existing
+publication is rejected. Stop and inspect the existing pipeline, then explicitly
+plan the new publication and model-routing migration with its resource owner;
+this adapter never drops or recreates an online table.
+
+With `TRIGGERED`, the same `start` command requests one sync and the generated
+hourly schedule remains `PAUSED` until you deliberately enable it. `status` inspects
+the latest native update; `SYNCED` does not attest entity freshness. Continuous
+stop/restart controls require a continuous publication. If online serving uses an
+external publication, set its `online_serving.publications[].publish_mode` to that
+publication's actual mode before setup.
+
+The SDK exposes the same operations without a Bundle:
+
+```python
+from skyulf.integrations.databricks.feature_store import (
+    publication_receipt,
+    restart_online_publication,
+    stop_online_publication,
+)
+
+# publication is an OnlinePublicationSpec with publish_mode="CONTINUOUS".
+receipt = publication_receipt(workspace, publication)
+print(online_publication_status(workspace, receipt))
+print(stop_online_publication(workspace, receipt, admission=SingleWriterAdmission()))
+# Inspect status in a later cell; restart only when pipeline_state is IDLE or FAILED.
+receipt = restart_online_publication(
+    spark, receipt, client=workspace, feature_client=features,
+    admission=SingleWriterAdmission(),
+)
+```
+
+If the source was dropped, replaced or became inaccessible, the guarded SDK
+control fails closed during binding checks, even for stop. The resource owner
+must inspect permissions, the saved receipt, online table source/store properties
+and native pipeline identity before stopping through the native API. For example,
+after that ownership review, verify the remaining publication metadata:
+
+```python
+saved = receipt["spec"]
+online = workspace.tables.get(saved["online_table"])
+synced = workspace.database.get_synced_database_table(name=saved["online_table"])
+pipeline_id = receipt["pipeline_id"]
+assert online.pipeline_id == synced.data_synchronization_status.pipeline_id == pipeline_id
+assert (online.properties or {}).get("source_table") == saved["source_table"]
+assert synced.spec.source_table_full_name == saved["source_table"]
+assert synced.effective_database_instance_name == saved["online_store"]
+print(workspace.pipelines.get(pipeline_id=pipeline_id))
+# Resource owner only: after confirming this saved pipeline is the intended resource.
+workspace.pipelines.stop(pipeline_id=pipeline_id)
+```
+
+This recovery stops pipeline compute and does not alter the source table or
+publication. If metadata or ownership cannot be confirmed, resolve that with
+the resource owner before any mutation. Inspect native pipeline state after the
+stop request. Restart still requires restored, valid source identity/access and
+all normal source preflight checks.
 
 ## Save the freshness policy with the model
 

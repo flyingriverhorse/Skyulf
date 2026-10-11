@@ -1,4 +1,4 @@
-"""Submit explicit latest-feature syncs through native Databricks Feature Engineering."""
+"""Operate explicit latest-feature syncs through native Databricks Feature Engineering."""
 
 import re
 import time
@@ -28,6 +28,7 @@ class OnlinePublicationSpec:
     online_table: str
     online_store: str
     source_table_id: str
+    publish_mode: str = "TRIGGERED"
 
     def __post_init__(self) -> None:
         """Reject ambiguous resources before opening a Spark or workspace connection."""
@@ -43,6 +44,8 @@ class OnlinePublicationSpec:
             raise ValueError("online_store must be a safe 1-63 character store name.")
         if not isinstance(self.source_table_id, str) or not self.source_table_id.strip():
             raise ValueError("source_table_id must identify the existing Delta table.")
+        if self.publish_mode not in ("TRIGGERED", "CONTINUOUS"):
+            raise ValueError("publish_mode must be TRIGGERED or CONTINUOUS.")
 
 
 def _require_cdf_source(spark: Any, spec: OnlinePublicationSpec) -> None:
@@ -51,7 +54,7 @@ def _require_cdf_source(spark: Any, spec: OnlinePublicationSpec) -> None:
     if detail is None or (detail["format"], detail["id"]) != ("delta", spec.source_table_id):
         raise ValueError("Online feature source must be the selected existing Delta table.")
     if detail["properties"].get("delta.enableChangeDataFeed") != "true":
-        raise ValueError("TRIGGERED online publication requires Change Data Feed.")
+        raise ValueError("Online publication requires Change Data Feed.")
 
 
 def _source_contract(spark: Any, spec: OnlinePublicationSpec, client: Any) -> dict[str, Any]:
@@ -154,8 +157,15 @@ def _validate_existing_publication(
     primary_keys: tuple[str, ...],
 ) -> None:
     """Keep UC identities separate from Delta identities and inspect native routing."""
-    source = client.tables.get(spec.source_table)
     table = client.tables.get(spec.online_table)
+    synced = _bound_synced_table(client, spec, table)
+    _validate_publication_keys(synced, lookup, spec.source_table, primary_keys)
+    _require_first_sync(synced, table.pipeline_id)
+
+
+def _bound_synced_table(client: Any, spec: OnlinePublicationSpec, table: Any) -> Any:
+    """Check native routing and publication mode independently of completed data sync."""
+    source = client.tables.get(spec.source_table)
     properties = table.properties or {}
     if table.browse_only is True or (
         table.full_name,
@@ -170,8 +180,8 @@ def _validate_existing_publication(
         synced.spec.source_table_full_name,
     ) != (spec.online_table, spec.online_store, spec.source_table):
         raise ValueError("Publication source or effective online store differs from its binding.")
-    _validate_publication_keys(synced, lookup, spec.source_table, primary_keys)
-    _require_first_sync(synced, table.pipeline_id)
+    _require_publication_mode(synced, spec)
+    return synced
 
 
 def _validate_publication_keys(
@@ -215,14 +225,95 @@ def _require_first_sync(synced: Any, pipeline_id: str | None) -> None:
         raise ValueError("Publication requires an inspectable pipeline and a completed first sync.")
 
 
+def _workspace_client(client: Any) -> Any:
+    """Use the supplied native workspace identity or lazily resolve the current one."""
+    if client is not None:
+        return client
+    from databricks.sdk import WorkspaceClient  # noqa: PLC0415 - optional integration
+
+    return WorkspaceClient()
+
+
+def _require_shared_admission(admission: PublishAdmission) -> None:
+    """Reject local-only ownership before any native publication mutation."""
+    if getattr(admission, "local_only", True) is not False or not callable(
+        getattr(admission, "hold", None)
+    ):
+        raise ValueError("Online publication requires explicit shared writer admission.")
+
+
+def _require_publication_mode(synced: Any, spec: OnlinePublicationSpec) -> None:
+    """Reject implicit native mode migrations without dropping or recreating tables."""
+    mode = getattr(synced.spec.scheduling_policy, "value", synced.spec.scheduling_policy)
+    if mode != spec.publish_mode:
+        raise ValueError(
+            f"Publication mode is {mode}, requested {spec.publish_mode}; operator migration "
+            "required. Stop and inspect the existing pipeline, then explicitly plan a new "
+            "publication and update model routing. This adapter never deletes a publication."
+        )
+
+
+def _existing_publication(client: Any, spec: OnlinePublicationSpec) -> tuple[Any, Any] | None:
+    """Bind public source, store, mode and pipeline metadata before reuse or mutation."""
+    from databricks.sdk.errors import NotFound  # noqa: PLC0415 - optional integration
+
+    try:
+        table = client.tables.get(spec.online_table)
+    except NotFound:
+        return None
+    synced = _bound_synced_table(client, spec, table)
+    pipeline_id = table.pipeline_id
+    if not pipeline_id or synced.data_synchronization_status.pipeline_id != pipeline_id:
+        raise ValueError("Existing publication has no matching inspectable pipeline.")
+    pipeline = client.pipelines.get(pipeline_id=pipeline_id)
+    if pipeline.pipeline_id != pipeline_id:
+        raise ValueError("Native pipeline belongs to a different publication.")
+    if pipeline.spec is None or bool(pipeline.spec.continuous) != (
+        spec.publish_mode == "CONTINUOUS"
+    ):
+        raise ValueError("Native pipeline mode differs from the publication mode; inspect it.")
+    return synced, pipeline
+
+
+def publication_receipt(client: Any, spec: OnlinePublicationSpec) -> dict[str, Any]:
+    """Resolve configured publication controls without storing a second lifecycle registry."""
+    existing = _existing_publication(client, spec)
+    if existing is None:
+        raise ValueError("Publication does not exist; explicitly start it first.")
+    return {
+        "spec": asdict(spec),
+        "pipeline_id": existing[1].pipeline_id,
+        "submitted_at_ms": 0,
+        "status": "INSPECTED",
+    }
+
+
+def _continuous_start(
+    client: Any, spec: OnlinePublicationSpec, existing: tuple[Any, Any], receipt: dict[str, Any]
+) -> dict[str, Any]:
+    """Reuse active native streams and start one update only after a confirmed stop/failure."""
+    pipeline = existing[1]
+    receipt["pipeline_id"] = pipeline.pipeline_id
+    state = getattr(pipeline.state, "value", pipeline.state)
+    if state in {"IDLE", "FAILED"}:
+        result = client.pipelines.start_update(pipeline_id=pipeline.pipeline_id)
+        if not isinstance(result.update_id, str) or not result.update_id:
+            raise ValueError("Native restart returned no inspectable update ID; inspect pipeline.")
+        return {**receipt, "update_id": result.update_id}
+    if state in {"RUNNING", "STARTING", "DEPLOYING", "RECOVERING", "RESETTING", "STOPPING"}:
+        return _continuous_status(client, {**receipt, "submitted_at_ms": 0}, existing)
+    raise ValueError(f"Native pipeline cannot be started in state {state}; inspect pipeline.")
+
+
 def publish_online_features(
     spark: Any,
     spec: OnlinePublicationSpec,
     *,
     admission: PublishAdmission,
     feature_client: Any = None,
+    client: Any = None,
 ) -> dict[str, Any]:
-    """Validate and request one native TRIGGERED sync without claiming completion.
+    """Validate and explicitly start native publication without claiming first-sync readiness.
 
     The caller must serialize publication and source writers with the same
     admission authority and restrict external writes. The SDK publishes latest
@@ -230,25 +321,34 @@ def publish_online_features(
     preflight version, not an attested online version. Native sync is repeatable;
     this adapter does not provide an exactly-once request token or retry after an
     ambiguous failure. Inspect the native pipeline before retrying such a call.
+    CONTINUOUS reuses the configured pipeline; an active start makes no mutation.
+    Admission covers preflight and submission only, never the stream's lifetime.
     """
     if not isinstance(spec, OnlinePublicationSpec):
         raise TypeError("spec must be OnlinePublicationSpec.")
-    if getattr(admission, "local_only", True) is not False or not callable(
-        getattr(admission, "hold", None)
-    ):
-        raise ValueError("Online publication requires explicit shared writer admission.")
-    client = feature_engineering_client(feature_client)
+    _require_shared_admission(admission)
+    workspace = _workspace_client(client)
+    features = feature_engineering_client(feature_client)
     with admission.hold(spec.source_table_id):
-        store = _available_store(client, spec.online_store)
-        snapshot = _source_contract(spark, spec, client)
+        store = _available_store(features, spec.online_store)
+        snapshot = _source_contract(spark, spec, features)
+        existing = _existing_publication(workspace, spec)
         if snapshot_table(spark, spec.source_table) != snapshot:
             raise ValueError("Online feature source changed during preflight; retry validation.")
         submitted_at = time.time_ns() // 1_000_000
-        published = client.publish_table(
+        receipt = {
+            "spec": asdict(spec),
+            "source_snapshot": snapshot,
+            "submitted_at_ms": submitted_at,
+            "status": "SUBMITTED",
+        }
+        if spec.publish_mode == "CONTINUOUS" and existing is not None:
+            return _continuous_start(workspace, spec, existing, receipt)
+        published = features.publish_table(
             online_store=store,
             source_table_name=spec.source_table,
             online_table_name=spec.online_table,
-            publish_mode="TRIGGERED",
+            publish_mode=spec.publish_mode,
         )
         if (
             getattr(published, "online_table_name", None) != spec.online_table
@@ -256,13 +356,7 @@ def publish_online_features(
             or not published.pipeline_id
         ):
             raise ValueError("Native publication returned no matching table and pipeline receipt.")
-        return {
-            "spec": asdict(spec),
-            "source_snapshot": snapshot,
-            "pipeline_id": published.pipeline_id,
-            "submitted_at_ms": submitted_at,
-            "status": "SUBMITTED",
-        }
+        return {**receipt, "pipeline_id": published.pipeline_id}
 
 
 def _publication_identity(receipt: dict[str, Any]) -> tuple[str, int]:
@@ -283,6 +377,8 @@ def online_publication_status(client: Any, receipt: dict[str, Any]) -> dict[str,
     checks every request. Retain the returned update ID for operator inspection.
     """
     pipeline, started = _publication_identity(receipt)
+    if OnlinePublicationSpec(**receipt["spec"]).publish_mode == "CONTINUOUS":
+        return _continuous_status(client, receipt)
     updates = client.pipelines.list_updates(pipeline_id=pipeline, max_results=1).updates or []
     if not updates:
         return {**receipt, "status": "PENDING"}
@@ -296,3 +392,114 @@ def online_publication_status(client: Any, receipt: dict[str, Any]) -> dict[str,
     state = getattr(update.state, "value", update.state)
     status = {"COMPLETED": "SYNCED", "FAILED": "FAILED", "CANCELED": "FAILED"}.get(state, "PENDING")
     return {**receipt, "status": status, "update_id": update.update_id, "update_state": state}
+
+
+def _bound_continuous_publication(client: Any, receipt: dict[str, Any]) -> tuple[Any, Any]:
+    """Prevent forged receipt selectors from controlling an unrelated pipeline."""
+    pipeline_id, _ = _publication_identity(receipt)
+    spec = OnlinePublicationSpec(**receipt["spec"])
+    if spec.publish_mode != "CONTINUOUS":
+        raise ValueError("Continuous lifecycle controls require publish_mode=CONTINUOUS.")
+    existing = _existing_publication(client, spec)
+    if existing is None or existing[1].pipeline_id != pipeline_id:
+        raise ValueError("Receipt pipeline differs from the configured publication pipeline.")
+    return existing
+
+
+def _continuous_status(
+    client: Any, receipt: dict[str, Any], existing: tuple[Any, Any] | None = None
+) -> dict[str, Any]:
+    """Report stream activity, first sync and update identity as separate native evidence."""
+    synced, pipeline = existing or _bound_continuous_publication(client, receipt)
+    state = getattr(pipeline.state, "value", pipeline.state)
+    sync_end = getattr(synced.data_synchronization_status.last_sync, "sync_end_timestamp", None)
+    result = {
+        **receipt,
+        "status": {"IDLE": "STOPPED"}.get(state, state),
+        "pipeline_state": state,
+        "first_sync_completed": bool(sync_end),
+        "last_sync_end_timestamp": sync_end,
+        "synchronization_state": getattr(
+            synced.data_synchronization_status.detailed_state,
+            "value",
+            synced.data_synchronization_status.detailed_state,
+        ),
+    }
+    updates = (
+        client.pipelines.list_updates(pipeline_id=pipeline.pipeline_id, max_results=1).updates or []
+    )
+    if _pending_continuous_update(receipt, updates):
+        result["status"] = "PENDING"
+        result.pop("update_state", None)
+        return result
+    _continuous_update(result, pipeline.pipeline_id, updates)
+    return result
+
+
+def _pending_continuous_update(receipt: dict[str, Any], updates: list[Any]) -> bool:
+    """Wait for the submitted attempt instead of adopting an eventually consistent old update."""
+    if receipt["submitted_at_ms"] == 0:
+        return False
+    if not updates:
+        return True
+    update = updates[0]
+    requested = receipt.get("update_id")
+    if requested is not None:
+        return update.update_id != requested
+    return update.creation_time is None or update.creation_time < receipt["submitted_at_ms"]
+
+
+def _continuous_update(result: dict[str, Any], pipeline_id: str, updates: list[Any]) -> None:
+    """Keep failed synchronization/update evidence visible during native recovery."""
+    if updates:
+        update = updates[0]
+        if (
+            update.pipeline_id != pipeline_id
+            or not isinstance(update.update_id, str)
+            or not update.update_id
+        ):
+            raise ValueError("Native publication update has no matching inspectable update ID.")
+        result.update(
+            update_id=update.update_id, update_state=getattr(update.state, "value", update.state)
+        )
+    if result.get("update_state") == "FAILED" or (
+        result["submitted_at_ms"] == 0 and "FAILED" in (result["synchronization_state"] or "")
+    ):
+        result["status"] = "FAILED"
+
+
+def stop_online_publication(
+    client: Any, receipt: dict[str, Any], *, admission: PublishAdmission
+) -> dict[str, Any]:
+    """Request native continuous stop once, after checking its public publication binding."""
+    _require_shared_admission(admission)
+    spec = OnlinePublicationSpec(**receipt["spec"])
+    with admission.hold(spec.source_table_id):
+        existing = _bound_continuous_publication(client, receipt)
+        result = _continuous_status(client, receipt, existing)
+        if result["pipeline_state"] in {"IDLE", "FAILED", "STOPPING"}:
+            return result
+        client.pipelines.stop(pipeline_id=receipt["pipeline_id"])
+        return {**result, "status": "STOP_REQUESTED"}
+
+
+def restart_online_publication(
+    spark: Any,
+    receipt: dict[str, Any],
+    *,
+    client: Any,
+    admission: PublishAdmission,
+    feature_client: Any = None,
+) -> dict[str, Any]:
+    """Restart a confirmed stopped or failed native stream after source preflight checks."""
+    existing = _bound_continuous_publication(client, receipt)
+    state = getattr(existing[1].state, "value", existing[1].state)
+    if state not in {"IDLE", "FAILED"}:
+        raise ValueError("Restart requires a stopped or failed pipeline; stop and inspect first.")
+    return publish_online_features(
+        spark,
+        OnlinePublicationSpec(**receipt["spec"]),
+        client=client,
+        admission=admission,
+        feature_client=feature_client,
+    )

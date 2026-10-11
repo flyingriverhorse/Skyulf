@@ -20,6 +20,7 @@
       source_table_id: ""
       online_table: ""
       online_store: ""
+      publish_mode: {{if eq .include_online_publication "true"}}{{.online_publication_mode}}{{else}}TRIGGERED{{end}} # Match the existing publication's mode.
 
 {{end -}}
 rollout:
@@ -65,6 +66,7 @@ rollout:
 
 online_publication:
   enabled: false
+  publish_mode: {{.online_publication_mode}}
   # True only when source/publication writers share externally enforced exclusive access.
   exclusive_writer: false
   # Existing latest-value Delta feature table with CDF and NOT NULL primary keys.
