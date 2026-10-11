@@ -1,7 +1,9 @@
 """Real saved online guards through both fitted engines and native envelopes."""
 
+import json
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -148,17 +150,42 @@ def online_package(online_artifact, tmp_path, monkeypatch, request):
         required_features=("x", "fresh_at"), freshness=(("fresh_at", 60.0),)
     )
     try:
-        uri = logger(
-            path,
-            training_set=native,
-            lookup_spec=spec,
-            lookup_binding=binding,
-            run_id=run_id,
-            artifact_path="model",
-            tracking_uri=tracking_uri,
-            client=NativeSignatureClient(tmp_path / "sdk", native),
-            online_policy=policy,
-        )
+        native_client = NativeSignatureClient(tmp_path / "sdk", native)
+        if request.param == "pipeline":
+            from skyulf.integrations.databricks.feature_store import snapshots, training
+            from skyulf.integrations.databricks.feature_store.lifecycle_config import binding_json
+            from skyulf.integrations.mlflow.models import feature_model
+
+            saved_spec = SimpleNamespace(
+                feature_lookup_json=json.dumps(serialize_feature_spec(spec)),
+                feature_binding_json=binding_json(binding),
+                online_policy_json=json.dumps(policy.to_dict()),
+                input_columns=tuple(inputs),
+                target_column=None,
+                source_columns=("id", *inputs),
+            )
+            monkeypatch.setattr(training, "logging_training_set", lambda *args: native)
+            monkeypatch.setattr(snapshots, "validate_snapshots", lambda *args: None)
+            monkeypatch.setattr(
+                feature_model,
+                "log_feature_pipeline_model",
+                lambda *args, **kwargs: logger(*args, client=native_client, **kwargs),
+            )
+            uri = training.log_training_feature_model(
+                path, spark=object(), spec=saved_spec, run_id=run_id, tracking_uri=tracking_uri
+            )
+        else:
+            uri = logger(
+                path,
+                training_set=native,
+                lookup_spec=spec,
+                lookup_binding=binding,
+                run_id=run_id,
+                artifact_path="model",
+                tracking_uri=tracking_uri,
+                client=native_client,
+                online_policy=policy,
+            )
         local = Path(
             mlflow.artifacts.download_artifacts(artifact_uri=uri, tracking_uri=tracking_uri)
         )
@@ -304,6 +331,34 @@ def test_prepare_online_endpoint_inspects_real_native_package(online_package, mo
     assert plan.input_columns == ("id",)
     assert plan.input_schema == (("id", "int64"),)
     assert plan.config["config"]["served_entities"][0]["entity_version"] == "1"
+    from unittest.mock import Mock
+
+    checked = Mock()
+    monkeypatch.setattr(online_endpoints, "validate_online_publications", checked)
+    workspace, spark, feature_client = object(), object(), object()
+    publications = ()
+    online_endpoints.prepare_online_endpoint(
+        spec,
+        tracking_uri="sqlite:///:memory:",
+        registry_uri="sqlite:///:memory:",
+        publications=publications,
+        client=workspace,
+        spark=spark,
+        feature_client=feature_client,
+    )
+    checked.assert_called_once_with(
+        spark, binding, publications, client=workspace, feature_client=feature_client
+    )
+    checked.side_effect = ValueError("Publication is not ready")
+    with pytest.raises(ValueError, match="Publication"):
+        online_endpoints.prepare_online_endpoint(
+            spec,
+            tracking_uri="sqlite:///:memory:",
+            registry_uri="sqlite:///:memory:",
+            publications=publications,
+            client=workspace,
+            spark=spark,
+        )
     raw.flavors["python_function"]["config"][ONLINE_FEATURES_KEY]["freshness"][0][1] = 999.0
     raw.save(str(raw_path / "MLmodel"))
     with pytest.raises(ValueError, match="policy"):

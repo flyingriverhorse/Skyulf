@@ -27,20 +27,60 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Latest handoff
 
-C224-CLEAN-DONE | 2026-10-10T22:14:41Z | Codex/root -> peers | RESULT | reply:none
-Completed authorized permanent local cleanup after user explicitly approved
-the disclosed scope. Removed 765 generated pytest directory roots and 12
-superseded plans: 141795 files / 3005573871 content bytes. All 777 targets
-confirmed absent; no remaining failure. Retained 8199 prior files; only
-README intentionally changed. Other 8198 size/mtime checks, 232 document
-SHA256 checks, 509 baseline link targets and 30 new document links passed.
-README points to Task223 (S01 READY, 0/8) and OPEN_QUEUE_updated.md.
-Evidence and 12 plan-to-result mappings: 224-folder-cleanup.md. Removed the
-three temporary inventory/result JSON helpers after checks. No ACL changes.
-No source-code/cloud/public-doc changes; no runtime tests or MkDocs build.
-git diff --check passed; no commit/push, branch 093, HEAD 1e4802cd.
-Nine deleted plans and README are tracked; three deleted plans and Task224
-are ignored. Task223 previous handoff is recorded in its own document.
+C223-S01-DONE | 2026-10-11T10:26:44Z | Codex/root -> peers | RESULT | reply:C223-S01-CLAIM
+S01 accepted: independent online Bundle selection, saved policy transport,
+publication checks and explicit setup. Full evidence: Task219 section 8;
+Task220 C28 now Var; Task221 S01 slice complete; Task223 1/8, S02 READY.
+Ponytail task review R1/R2 fixed and scoped review approved. Local union 296;
+gate-touched 93 / key-repair 61; packaging 19 passed, 16 existing opt-in skips.
+Full Ruff/Ty/format/CCN/schema passed; 539 runtime source paths/hashes match
+native wheel d6c1ea5138a19e4c1c620340db73e0537dde1fc58ed272409eb0ed2225df2230.
+Generated train 899233885811218 and setup 629217288820446 SUCCESS; native reload
+869340957682179 SUCCESS. Actual request key request_entity maps feature PK entity.
+Live 3 -> 23, missing/stale saved guard traces, restore 3 passed. Owned endpoint,
+publication/UC online table, pipeline, store verified absent. Original endpoint
+skyulf-raw-d35721fd-v1 same ID/config and READY. Offline evidence and four paused/
+unscheduled Bundle jobs retained, no active runs. Cleanup details in Task219.
+78 document link targets and diff-check passed. No MkDocs/full suite/pre-commit:
+no commit intended. Branch 093, HEAD ef390899, index clean; no stage/commit/push.
+Internal source/tests/docs changes remain for user review. S02 not started.
+Implementation/review reports and native receipts remain under
+.superpowers/sdd/223-delivery-order-tracker/. Do not delete uncommitted evidence.
 
-C224-CLEAN-RELEASE | 2026-10-10T22:14:41Z | Codex/root -> peers | RELEASE | reply:C224-CLEAN-DONE
-Released all claimed paths. No open peer questions or active claims.
+C223-S01-RELEASE | 2026-10-11T10:26:44Z | Codex/root -> peers | RELEASE | reply:C223-S01-DONE
+All S01 claims released; no unanswered peer questions. Prior completed cleanup
+and implementation exchanges compacted after their evidence reached 224/219.
+
+C223-COMMIT-CLAIM | 2026-10-11T10:50:08Z | Codex/root -> peers | CLAIM | reply:C223-S01-DONE
+User authorized S01 commit, then S02 implementation. S01 native run states and
+539-file runtime/wheel hashes verified unchanged. Claim commit review/staging and
+these exact paths (only docs/changelog may receive edits before S01 commit):
+docs/user_guide/databricks_online_features.md
+docs/user_guide/databricks_sdk.md
+initiatives/spark_and_mlflow/README.md
+skyulf-core/skyulf/integrations/databricks/feature_store/lifecycle_config.py
+skyulf-core/skyulf/integrations/databricks/feature_store/online_publication.py
+skyulf-core/skyulf/integrations/databricks/feature_store/training.py
+skyulf-core/skyulf/integrations/databricks/jobs/serving_job.py
+skyulf-core/skyulf/integrations/databricks/lifecycle/workflow.py
+skyulf-core/skyulf/integrations/databricks/model_sets/model_set_project.py
+skyulf-core/skyulf/integrations/databricks/projects/workflow_config.py
+skyulf-core/skyulf/integrations/databricks/serving/online_endpoints.py
+skyulf-core/skyulf/integrations/databricks/training/fitting/candidate.py
+skyulf-core/templates/databricks/databricks_template_schema.json
+skyulf-core/templates/databricks/schema/serving.json
+skyulf-core/templates/databricks/template/{{.project_name}}/SERVING.md
+skyulf-core/templates/databricks/template/{{.project_name}}/config/serving.yml.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/config/training.yml.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/deployment/requirements.txt.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/selection.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/src/tools/build_wheel.py
+skyulf-core/tests/integration/platforms/test_bundle_runtime_packaging.py
+skyulf-core/tests/integration/platforms/test_feature_training_lifecycle.py
+skyulf-core/tests/integration/platforms/test_online_feature_model.py
+skyulf-core/tests/integration/platforms/test_online_publication.py
+skyulf-core/tests/integration/platforms/test_serving_job.py
+skyulf-core/tests/integration/platforms/test_serving_jobs_template.py
+skyulf-core/templates/databricks/template/{{.project_name}}/resources/online_serving_setup.job.yml.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/src/jobs/online_serving_setup.py
+changelog/0.9.x.md

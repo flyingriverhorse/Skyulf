@@ -37,7 +37,7 @@ def test_serving_opt_ins_default_off_in_topic_and_generated_schema():
     assert source.is_file(), "Serving job opt-in schema is not implemented"
     topic = json.loads(source.read_text(encoding="utf-8"))
     generated = json.loads((ROOT / "databricks_template_schema.json").read_text(encoding="utf-8"))
-    for name in ("include_daily_rollout", "include_online_publication"):
+    for name in ("include_daily_rollout", "include_online_publication", "include_online_serving"):
         assert topic[name]["default"] == "false"
         assert topic[name]["enum"] == ["false", "true"]
         assert generated["properties"][name]["default"] == "false"
@@ -143,3 +143,45 @@ def test_real_cli_renders_only_requested_serving_jobs(tmp_path, daily, online):
     assert config["rollout"]["smoke_records"] == []
     assert config["online_publication"]["source_table_id"] == ""
     assert "verdict" not in json.dumps(config) and "PASS" not in json.dumps(config)
+
+
+@CLI
+@pytest.mark.parametrize(
+    "publication,serving",
+    [("false", "false"), ("true", "false"), ("false", "true"), ("true", "true")],
+)
+def test_online_setup_generation_is_independent_of_publication_and_rollout(
+    tmp_path, publication, serving
+):
+    """External publication users need the same training and setup runtime as publishers."""
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(
+        tmp_path, include_online_publication=publication, include_online_serving=serving
+    )
+    enabled = serving == "true"
+    assert (project / "resources/online_serving_setup.job.yml").is_file() is enabled
+    assert (project / "src/jobs/online_serving_setup.py").is_file() is enabled
+    assert not (project / "resources/daily_rollout.job.yml").exists()
+    assert (project / "resources/online_publication.job.yml").is_file() is (publication == "true")
+    if enabled:
+        config = yaml.safe_load((project / "config/serving.yml").read_text())
+        assert config["online_serving"]["enabled"] is False
+        assert config["online_serving"]["publications"][0]["source_table_id"] == ""
+        training = yaml.safe_load((project / "config/training.yml").read_text())["defaults"]
+        assert training["online_features"]["required_features"] == []
+        assert training["online_features"]["freshness"][0]["max_age_seconds"] is None
+        assert training["feature_lookup"]["lookups"][0]["feature_names"] == []
+        from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+
+        parsed = read_training_config(project / "config")
+        assert parsed is not None
+        assert parsed["defaults"]["online_features"] == training["online_features"]
+        requirements = (project / "deployment/requirements.txt").read_text()
+        assert "databricks-feature-engineering==0.18.1" in requirements
+        resource = yaml.safe_load((project / "resources/online_serving_setup.job.yml").read_text())
+        job = resource["resources"]["jobs"]["online_serving_setup"]
+        assert "schedule" not in job
+        assert job["max_concurrent_runs"] == 1
+        assert job["tasks"][0]["max_retries"] == 0
+        assert (project / "deployment/serving-requirements.txt").is_file()

@@ -243,10 +243,14 @@ def training_spec(config: dict[str, Any]) -> TrainingSpec:
         raise ValueError(
             "Set training_version to an explicit nonnegative Delta version before train."
         )
-    from ..feature_store.lifecycle_config import workflow_lookup_json  # noqa: PLC0415
+    from ..feature_store.lifecycle_config import (  # noqa: PLC0415
+        workflow_lookup_json,
+        workflow_online_policy_json,
+    )
 
     return TrainingSpec(
         preprocessing_probe=config.get("preprocessing_probe", False),
+        online_policy_json=workflow_online_policy_json(config),
         feature_lookup_json=workflow_lookup_json(config),
         table=config["training_table"],
         version=version,

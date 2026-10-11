@@ -38,7 +38,11 @@
 {{- skip "resources/online_publication.job.yml" -}}
 {{- skip "src/jobs/online_publication.py" -}}
 {{- end -}}
-{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") -}}
+{{- if ne .include_online_serving "true" -}}
+{{- skip "resources/online_serving_setup.job.yml" -}}
+{{- skip "src/jobs/online_serving_setup.py" -}}
+{{- end -}}
+{{- if and (ne .include_daily_rollout "true") (ne .include_online_publication "true") (ne .include_online_serving "true") -}}
 {{- skip "config/serving.yml" -}}
 {{- skip "deployment/serving-requirements.txt" -}}
 {{- end -}}

@@ -205,23 +205,34 @@ def test_evidence_artifact_readback_checks_full_content(api, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "entrypoint", ["run_daily_rollout_notebook", "run_online_publication_notebook"]
+    "entrypoint",
+    [
+        "run_daily_rollout_notebook",
+        "run_online_publication_notebook",
+        "run_online_serving_setup_notebook",
+    ],
 )
 def test_notebook_entrypoints_return_mappings_for_generated_summary(api, tmp_path, entrypoint):
     """Generated notebook summary and exit serialize the same mapping exactly once."""
     path = tmp_path / "serving.yml"
-    path.write_text("rollout:\n  enabled: false\nonline_publication:\n  enabled: false\n")
+    path.write_text(
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+    )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(path)
     result = getattr(api, entrypoint)(None, dbutils)
     assert result == {"status": "DISABLED"}
 
 
-@pytest.mark.parametrize("job_name", ["daily_rollout", "online_publication"])
+@pytest.mark.parametrize(
+    "job_name", ["daily_rollout", "online_publication", "online_serving_setup"]
+)
 def test_real_disabled_notebook_exits_with_one_json_object(tmp_path, job_name):
     """The actual template and runtime must agree before any remote work is enabled."""
     config = tmp_path / "serving.yml"
-    config.write_text("rollout:\n  enabled: false\nonline_publication:\n  enabled: false\n")
+    config.write_text(
+        "rollout:\n  enabled: false\nonline_publication:\n  enabled: false\nonline_serving:\n  enabled: false\n"
+    )
     dbutils = Mock()
     dbutils.widgets.get.return_value = str(config)
     dbutils.widgets.getAll.return_value = {}
@@ -235,3 +246,54 @@ def test_real_disabled_notebook_exits_with_one_json_object(tmp_path, job_name):
     )
     dbutils.notebook.exit.assert_called_once()
     assert json.loads(dbutils.notebook.exit.call_args.args[0]) == {"status": "DISABLED"}
+
+
+def test_online_setup_uses_external_publication_and_actual_request_schema(api, monkeypatch):
+    """Setup must inspect a concrete model and publications before submitting one create."""
+    from skyulf.integrations.databricks.serving.contracts import (
+        PinnedEndpointPlan,
+        PinnedEndpointSpec,
+    )
+
+    spec = PinnedEndpointSpec("online", "main.models.online", "3", "main", "logs", "online")
+    plan = PinnedEndpointPlan(spec, {}, ("id", "segment"), (("id", "int64"), ("segment", "string")))
+    events = []
+    prepare = Mock(side_effect=lambda *args, **kwargs: events.append("prepare") or plan)
+    create = Mock(side_effect=lambda *args: events.append("create"))
+    monkeypatch.setattr(api, "prepare_online_endpoint", prepare, raising=False)
+    monkeypatch.setattr(api, "create_pinned_endpoint", create, raising=False)
+    publication = {
+        "source_table": "main.f.latest",
+        "source_table_id": "delta-id",
+        "online_table": "main.f.online",
+        "online_store": "store",
+    }
+    settings = {
+        "enabled": True,
+        "exclusive_writer": True,
+        "endpoint": asdict(spec),
+        "publications": [publication],
+        "tracking_uri": "databricks",
+        "registry_uri": "databricks-uc",
+    }
+    workspace, features, spark = Mock(), Mock(), Mock()
+    output = api.run_online_serving_setup(
+        spark, settings, client=workspace, feature_client=features
+    )
+    assert events == ["prepare", "create"]
+    assert output["status"] == "SUBMITTED"
+    assert output["request_example"] == {"dataframe_records": [{"id": 0, "segment": "example"}]}
+    assert prepare.call_args.kwargs["publications"][0].source_table_id == "delta-id"
+    assert prepare.call_args.kwargs["client"] is workspace
+    assert prepare.call_args.kwargs["spark"] is spark
+    features.publish_table.assert_not_called()
+
+
+def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
+    """An opt-in without operator pins must fail before opening serving writes."""
+    workspace = Mock()
+    with pytest.raises(ValueError, match="online_serving"):
+        api.run_online_serving_setup(
+            None, {"enabled": True, "exclusive_writer": True}, client=workspace
+        )
+    assert workspace.mock_calls == []

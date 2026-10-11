@@ -12,6 +12,19 @@ defaults:
   config_version: 1
   training_layout: {{.training_layout}}
   engine: {{.engine}}
+{{if eq .include_online_serving "true"}}  # Complete these declarations before training; all lookup outputs must be input_columns.
+  # Use pandas and non-temporal lookups. Each lookup needs a fitted DOUBLE UTC epoch field.
+  feature_lookup:
+    lookups:
+      - table_name: ""
+        lookup_key: []
+        feature_names: []
+  online_features:
+    required_features: []
+    freshness:
+      - column: ""
+        max_age_seconds: null
+{{end}}
   preprocessing_probe: false # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
   training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
 {{if ne .training_version "null"}}  training_version: {{.training_version}}

@@ -23,7 +23,20 @@ package native entity-key lookups with saved completeness and freshness checks.
 See [gradual serving rollout](databricks_serving_rollout.md) to increase a
 challenger's traffic by 10 percentage points per passing 24-hour stage and
 automatically promote it after its final 100% stage passes. The optional Bundle
-jobs start paused and disabled; neither workflow requires a batch prediction sink.
+scheduled jobs start paused and disabled; neither workflow requires a batch prediction sink.
+
+For generated online setup, select `include_online_serving: "true"` independently
+of `include_online_publication` and `include_daily_rollout`. Configure
+`feature_lookup` and `online_features` in `config/training.yml`, train and register,
+then configure `online_serving` in `config/serving.yml` with the concrete version
+and existing publication bindings. Deploy and run `online_serving_setup` explicitly.
+Its returned request example follows the inspected native signature, including
+required source fields beyond entity keys. The
+[complete init, config, deploy and request example](databricks_online_features.md#generate-train-and-set-up-an-online-bundle)
+also covers externally managed publication. Python callers can invoke
+`skyulf.integrations.databricks.jobs.serving_job.run_online_serving_setup`
+with the same section, Spark session and authenticated workspace client; the
+helper composes the existing native model and pinned endpoint APIs.
 
 ## Upgrading integration code
 

@@ -196,13 +196,42 @@ def workflow_lookup_json(config: dict[str, Any]) -> str | None:
     value = config.get("feature_lookup")
     if value is None:
         return None
-    if config.get("engine") != "pandas" or config.get("inference_mode") != "spark":
+    if config.get("engine") != "pandas" or (
+        config.get("inference_mode") != "spark" and config.get("online_features") is None
+    ):
         raise ValueError("feature_lookup requires engine=pandas and inference_mode=spark.")
     spec = parse_lookup_config(
         value, label=config["target_column"], input_columns=tuple(config["input_columns"])
     )
     assert spec is not None
     return json.dumps(serialize_feature_spec(spec), sort_keys=True, separators=(",", ":"))
+
+
+def workflow_online_policy_json(config: dict[str, Any]) -> str | None:
+    """Freeze explicit online guards independently of publication and batch scoring."""
+    from .online_policy import OnlineFeaturePolicy  # noqa: PLC0415
+
+    value = config.get("online_features")
+    if value is None:
+        return None
+    if config.get("engine") != "pandas" or config.get("training_layout") == "multi_target":
+        raise ValueError("online_features requires pandas single-model or competition training.")
+    if config.get("feature_lookup") is None:
+        raise ValueError("online_features requires feature_lookup.")
+    item = _mapping(value, {"required_features", "freshness"}, "online_features")
+    freshness = item.get("freshness")
+    if not isinstance(freshness, list):
+        raise ValueError("online_features.freshness must be a list of age rules.")
+    rules = [
+        _mapping(rule, {"column", "max_age_seconds"}, "online freshness") for rule in freshness
+    ]
+    if any(set(rule) != {"column", "max_age_seconds"} for rule in rules):
+        raise ValueError("Online freshness rules require column and max_age_seconds.")
+    policy = OnlineFeaturePolicy(
+        required_features=_names(item.get("required_features"), "online required_features"),
+        freshness=tuple((rule["column"], rule["max_age_seconds"]) for rule in rules),
+    )
+    return json.dumps(policy.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 def bind_lookup_tables(value: Any, bindings: dict[str, str]) -> dict[str, Any]:

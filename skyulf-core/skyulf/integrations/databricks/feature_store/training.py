@@ -12,6 +12,7 @@ from .lifecycle_config import (
     parse_feature_binding,
     serialize_feature_spec,
 )
+from .online_policy import OnlineFeaturePolicy
 from .runtime import create_feature_training_set, feature_engineering_client, validate_feature_input
 
 
@@ -42,6 +43,8 @@ def training_lookup(spec: Any) -> FeatureTrainingSpec | None:
     if spec.feature_lookup_json is None:
         if spec.feature_binding_json is not None:
             raise ValueError("feature_binding_json requires feature_lookup_json.")
+        if getattr(spec, "online_policy_json", None) is not None:
+            raise ValueError("Online policy requires feature_lookup_json.")
         return None
     lookup = _declared_lookup(spec.feature_lookup_json)
     if lookup.label != spec.target_column or not set(lookup.feature_names).issubset(
@@ -54,11 +57,32 @@ def training_lookup(spec: Any) -> FeatureTrainingSpec | None:
         if name not in {*spec.input_columns, spec.target_column}
     )
     result = replace(lookup, exclude_columns=exclude)
+    _validate_online_training(spec, result)
     if spec.feature_binding_json is not None:
         binding = parse_feature_binding(spec.feature_binding_json)
         if deserialize_feature_spec(binding["lookup_spec"]) != result:
             raise ValueError("Pinned feature binding differs from the training lookup.")
     return result
+
+
+def _validate_online_training(spec: Any, lookup: FeatureTrainingSpec) -> None:
+    """Check declared columns now; the logger validates their actual fitted dtypes."""
+    policy = training_online_policy(spec)
+    if policy is None:
+        return
+    if any(item.timestamp_columns for item in lookup.lookups):
+        raise ValueError("Online training requires non-temporal feature lookups.")
+    policy.validate_lookup(lookup, dict.fromkeys(spec.input_columns, "float64"))
+
+
+def training_online_policy(spec: Any) -> OnlineFeaturePolicy | None:
+    """Restore the saved guard without consulting mutable workflow configuration."""
+    value = getattr(spec, "online_policy_json", None)
+    if value is None:
+        return None
+    if not isinstance(value, str) or len(value.encode("utf-8")) > 64 * 1024:
+        raise ValueError("Online policy must be a bounded JSON string.")
+    return OnlineFeaturePolicy.from_dict(json.loads(value))
 
 
 def pin_training_lookup(spark: Any, spec: Any) -> Any:
@@ -206,6 +230,7 @@ def log_training_feature_model(
         run_id=run_id,
         artifact_path="model",
         tracking_uri=tracking_uri,
+        online_policy=training_online_policy(spec),
     )
     validate_snapshots(spark, binding["lookup_evidence"]["feature_tables"])
     return uri

@@ -1,5 +1,27 @@
 # Optional jobs remain paused until these pins are configured and verified.
 # The rollout must already be initialized; the daily job never creates endpoints.
+{{if eq .include_online_serving "true"}}online_serving:
+  enabled: false
+  # Exclusive endpoint creation ownership; an existing endpoint is never overwritten.
+  exclusive_writer: false
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  endpoint:
+    endpoint_name: ""
+    model_name: ""
+    model_version: "" # A concrete registered version, never an alias.
+    logging_catalog: ""
+    logging_schema: ""
+    logging_table_prefix: ""
+    logging_mode: telemetry
+  # Exactly one existing accessible online copy per lookup source, including external publication.
+  publications:
+    - source_table: ""
+      source_table_id: ""
+      online_table: ""
+      online_store: ""
+
+{{end -}}
 rollout:
   enabled: false
   # True only when this serialized job has exclusive endpoint and alias write access.

@@ -6,6 +6,13 @@
     "enum": ["false", "true"],
     "description": "Online serving | Add a paused daily traffic rollout job? Uses an explicitly initialized rollout, verified monitoring, 10 percentage-point stages lasting at least 24 hours, and guarded champion promotion after the final stage passes. Configure config/serving.yml before enabling."
   },
+  "include_online_serving": {
+    "order": 906,
+    "type": "string",
+    "default": "false",
+    "enum": ["false", "true"],
+    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running."
+  },
   "include_online_publication": {
     "order": 905,
     "type": "string",

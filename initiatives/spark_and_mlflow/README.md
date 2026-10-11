@@ -4,8 +4,8 @@ Güncelleme: 11 Ekim 2026.
 
 Bu klasör iç planları, uygulama kararlarını ve doğrulama kanıtlarını tutar.
 Yeni çalışma için [219–222 uygulama sırası ve takip](223-delivery-order-tracker.md)
-belgesinden başla. Bu kapsamda **0/8 adım tamamlandı**; ilk adım **S01 — mevcut
-TRIGGERED yayınlama ile online model/endpoint kurulumunu Bundle'a bağlamak**.
+belgesinden başla. Bu kapsamda **1/8 adım tamamlandı**. S01 online Bundle
+kurulumu native kabulden geçti; sıradaki adım **S02 — CONTINUOUS publication**.
 
 Projenin genel görev durumu ve diğer bağımlılıkları için
 [OPEN_QUEUE_updated.md](OPEN_QUEUE_updated.md) esas alınır. 223 yalnız seçilen

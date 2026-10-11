@@ -56,15 +56,20 @@ def _validate_integration_layout(
 
 
 def _validate_unique_runtime_modules(names: list[str], label: str) -> None:
-    """Reject previous package locations retained by an incremental wheel build."""
+    """Reject ancestor-package copies retained after a move into a subpackage."""
     modules = [
-        Path(name).stem
+        Path(name).with_suffix("")
         for name in names
         if name.endswith((".py", ".pyc"))
         and not name.startswith("_compat/")
         and Path(name).stem != "__init__"
     ]
-    if len(modules) != len(set(modules)):
+    module_paths = set(modules)
+    if len(modules) != len(module_paths) or any(
+        ancestor / module.name in module_paths
+        for module in module_paths
+        for ancestor in module.parents[1:]
+    ):
         raise ValueError(
             f"Core wheel contains stale duplicate {label} modules. Clean the source "
             "checkout's generated build directory and rebuild the wheel before deployment."

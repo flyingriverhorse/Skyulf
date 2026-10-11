@@ -15,6 +15,9 @@ from ..feature_store.online_publication import (
     publish_online_features,
 )
 from ..observability.monitoring.monitoring_config import MonitorConfig
+from ..serving.contracts import PinnedEndpointSpec
+from ..serving.endpoints import create_pinned_endpoint
+from ..serving.online_endpoints import prepare_online_endpoint
 from ..serving.rollout import (
     RolloutResult,
     advance_rollout,
@@ -195,6 +198,69 @@ def run_online_publication(
     return online_publication_status(client, receipt)
 
 
+def run_online_serving_setup(
+    spark: Any, settings: dict[str, Any], *, client: Any, feature_client: Any = None
+) -> dict[str, Any]:
+    """Inspect the saved policy and external publication, then create one new endpoint.
+
+    No publisher or batch scoring task is required. SUBMITTED is not readiness;
+    inspect the endpoint and query its returned schema after native startup.
+    An existing endpoint is never overwritten and creation is never retried.
+    """
+    if not _enabled(settings):
+        return {"status": "DISABLED"}
+    spec, publications = _online_setup_contract(settings)
+    plan = prepare_online_endpoint(
+        spec,
+        tracking_uri=settings["tracking_uri"],
+        registry_uri=settings["registry_uri"],
+        spark=spark,
+        publications=publications,
+        client=client,
+        feature_client=feature_client,
+    )
+    example = {
+        "int32": 0,
+        "int64": 0,
+        "float32": 0.0,
+        "float64": 0.0,
+        "bool": False,
+        "string": "example",
+    }
+    create_pinned_endpoint(client, plan)
+    return {
+        "status": "SUBMITTED",
+        "endpoint_name": spec.endpoint_name,
+        "model_uri": spec.model_uri,
+        "input_schema": [list(column) for column in plan.input_schema],
+        "request_example": {
+            "dataframe_records": [{name: example[dtype] for name, dtype in plan.input_schema}]
+        },
+    }
+
+
+def _online_setup_contract(
+    settings: dict[str, Any],
+) -> tuple[PinnedEndpointSpec, tuple[OnlinePublicationSpec, ...]]:
+    """Reject incomplete operator pins before reading or writing native resources."""
+    required = {"endpoint", "publications", "tracking_uri", "registry_uri"}
+    if not required.issubset(settings) or not isinstance(settings["endpoint"], dict):
+        raise ValueError(
+            "online_serving requires endpoint, publications, tracking_uri and registry_uri."
+        )
+    rows = settings["publications"]
+    if not isinstance(rows, list) or not rows or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("online_serving.publications must contain explicit publication bindings.")
+    try:
+        return PinnedEndpointSpec(**settings["endpoint"]), tuple(
+            OnlinePublicationSpec(**row) for row in rows
+        )
+    except TypeError as exc:
+        raise ValueError(
+            "online_serving endpoint or publication fields are incomplete or unknown."
+        ) from exc
+
+
 def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:
     """Read the explicit deployed YAML file and reject malformed selected settings."""
     import yaml  # noqa: PLC0415 - optional integration dependency
@@ -233,3 +299,13 @@ def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
     from databricks.sdk import WorkspaceClient  # noqa: PLC0415
 
     return run_online_publication(spark, settings, client=WorkspaceClient())
+
+
+def run_online_serving_setup_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
+    """Create the explicitly configured endpoint using the notebook workspace identity."""
+    settings = _notebook_settings(dbutils, "online_serving")
+    if not settings["enabled"]:
+        return {"status": "DISABLED"}
+    from databricks.sdk import WorkspaceClient  # noqa: PLC0415
+
+    return run_online_serving_setup(spark, settings, client=WorkspaceClient())

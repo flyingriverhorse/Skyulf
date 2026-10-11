@@ -13,6 +13,7 @@ from ...mlflow.registration.registry import (
     resolve_model,
 )
 from ..feature_store.online_policy import ONLINE_FEATURES_KEY, OnlineFeaturePolicy
+from ..feature_store.online_publication import OnlinePublicationSpec, validate_online_publications
 from ..shared.json_contracts import finite_json_digest
 from .contracts import PinnedEndpointPlan, PinnedEndpointSpec
 from .endpoints import build_pinned_endpoint
@@ -73,6 +74,10 @@ def prepare_online_endpoint(
     *,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
+    spark: Any = None,
+    publications: tuple[OnlinePublicationSpec, ...] | None = None,
+    client: Any = None,
+    feature_client: Any = None,
 ) -> PinnedEndpointPlan:
     """Inspect one pinned native package and admit its verified source request schema.
 
@@ -82,7 +87,8 @@ def prepare_online_endpoint(
     the saved freshness guard checks values, not their online-store provenance.
     Current pinned certification admits pandas fitted artifacts only. Raw Polars
     packages can retain this policy but are not certified for endpoint admission.
-    Registry reads only: this function never creates or changes an endpoint.
+    Optional publication pins additionally verify source identity, access and
+    unambiguous online routing. This function never creates or changes resources.
     """
     import mlflow  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
@@ -99,10 +105,10 @@ def prepare_online_endpoint(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
+    registry = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
     path = Path(
         download_registered_package(
-            mlflow, client, spec.model_name, spec.model_version, tracking_uri
+            mlflow, registry, spec.model_name, spec.model_version, tracking_uri
         )
     )
     outer, raw, raw_path = feature_package_models(path)
@@ -118,6 +124,14 @@ def prepare_online_endpoint(
     plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=raw)
     mlflow.pyfunc.load_model(str(raw_path))
     schema = online_request_schema(raw_path.parent / "feature_spec.yaml", outer.signature)
+    if publications is not None:
+        validate_online_publications(
+            spark,
+            outer.metadata[FEATURE_STORE_KEY],
+            publications,
+            client=client,
+            feature_client=feature_client,
+        )
     return replace(
         plan,
         input_columns=tuple(name for name, _ in schema),

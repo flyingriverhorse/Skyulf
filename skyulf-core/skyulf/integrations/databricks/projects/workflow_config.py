@@ -27,6 +27,7 @@ _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
     "preprocessing_probe",
     "feature_lookup",
+    "online_features",
     *WEIGHT_FIELDS,
     "evaluation_charts",
     "training_layout",

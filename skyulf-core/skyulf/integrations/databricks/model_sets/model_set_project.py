@@ -331,6 +331,10 @@ def package_training_model_set(
     registry_uri: str,
 ) -> ResolvedModel:
     """Register one frozen candidate from a fully completed multi-target training run."""
+    if any(getattr(branch.spec, "online_policy_json", None) is not None for branch in branches):
+        raise ValueError(
+            "Online policy transport for multi-target model-set packaging is unsupported."
+        )
     _completed_parent(outcome, branches, tracking_uri, registry_uri)
     source = spark.read.option("versionAsOf", outcome.source_version).table(outcome.source_table)
     keys = _record_key_schema(source, branches[0].spec.record_key_columns)

@@ -131,6 +131,7 @@ class TrainingSpec:
     training_evidence_sha256: str | None = None
     feature_lookup_json: str | None = None
     feature_binding_json: str | None = None
+    online_policy_json: str | None = None
     preprocessing_probe: bool = False
 
     @classmethod
@@ -325,7 +326,7 @@ class TrainingSpec:
     def _identity_settings(self) -> dict[str, Any]:
         """Keep optional lookup and weight controls out of older unbound identities."""
         settings = asdict(self)
-        for field in ("feature_lookup_json", "feature_binding_json"):
+        for field in ("feature_lookup_json", "feature_binding_json", "online_policy_json"):
             if settings[field] is None:
                 settings.pop(field)
         return settings

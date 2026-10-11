@@ -12,6 +12,138 @@ must use pandas and supported independent-row preprocessing. The initial online
 request contract supports non-temporal scalar source inputs. It does not omit
 required source fields to make an incompatible model appear to accept only keys.
 
+## Generate, train and set up an online Bundle
+
+From a Skyulf checkout, save these selections as `online-init.json`, completing
+the ordinary project, source and target answers when prompted:
+
+```json
+{
+  "project_name": "customer_online",
+  "engine": "pandas",
+  "training_layout": "single_model",
+  "task": "regression",
+  "input_columns": "total_spend, feature_updated_at",
+  "record_key_columns": "customer_id",
+  "include_online_serving": "true",
+  "include_online_publication": "false",
+  "include_daily_rollout": "false",
+  "score_handoff": "disabled",
+  "scoring_mode": "manual",
+  "promotion_policy": "manual_approval"
+}
+```
+
+```bash
+databricks bundle init ./skyulf-core/templates/databricks --config-file online-init.json --output-dir ./generated
+cd generated/customer_online
+```
+
+The three serving selections are independent and default to `"false"`.
+`include_online_serving` adds an unscheduled `online_serving_setup` job and its
+notebook. It installs the native Feature Engineering dependency for training
+even when another project owns publication. Initialization creates files only.
+The publisher remains an optional paused hourly `TRIGGERED` job; continuous
+publication is not configured by this template.
+
+Complete the generated `config/training.yml` defaults, retaining the source,
+label, split and model settings for your project. For example:
+
+```yaml
+feature_lookup:
+  lookups:
+    - table_name: "{catalog}.{input_schema}.customer_features"
+      lookup_key: [customer_id]
+      feature_names: [total_spend, feature_updated_at]
+online_features:
+  required_features: [total_spend, feature_updated_at]
+  freshness:
+    - column: feature_updated_at
+      max_age_seconds: 3600.0
+```
+
+All lookup features must be declared in `input_columns`; the required features
+must cover them exactly. Choose a maximum age for each lookup's freshness field.
+Empty generated placeholders fail validation. The policy is frozen into the
+training specification and carried through prepare, fit, log and registration.
+The original feature-table snapshot binding and fitted preprocessing remain
+enforced. This generated flow supports pandas single-model and competition
+training; multi-target policy transport and temporal feature lookups are rejected.
+No Spark scoring job or batch prediction table needs to run or exist.
+
+Configure `deployment/artifact.json` with the matching Skyulf Core source or wheel
+and release, and complete your Bundle target and ordinary training settings.
+Provision and publish the feature source as described below, or use an existing
+publication maintained externally. Then validate, deploy and train:
+
+```bash
+databricks bundle validate -t test
+databricks bundle deploy -t test
+databricks bundle run train -t test
+```
+
+Take the **concrete registered version** from the training result and complete
+`online_serving` in `config/serving.yml`:
+
+```yaml
+online_serving:
+  enabled: true
+  exclusive_writer: true
+  tracking_uri: databricks
+  registry_uri: databricks-uc
+  endpoint:
+    endpoint_name: customer-online-v3
+    model_name: models.risk.customer_online
+    model_version: "3"
+    logging_catalog: ops
+    logging_schema: serving
+    logging_table_prefix: customer_online_v3
+    logging_mode: telemetry
+  publications:
+    - source_table: features.customer.customer_features
+      source_table_id: "REPLACE_WITH_DESCRIBE_DETAIL_ID"
+      online_table: features.online.customer_features
+      online_store: customer-features
+```
+
+Use actual resolved UC names here; the source table must be the model's saved
+lookup source with the same Delta identity. Configure exclusive endpoint writer
+permissions before setting `exclusive_writer: true`. The setup identity must be
+able to inspect the source, publication and store; the serving identity also
+needs access to the online features. Grant visibility of all publications for
+these sources and prevent concurrent publication changes during setup. UC
+enumeration covers the setup identity's visible inventory, not hidden resources.
+Setup rejects missing, mismatched or ambiguous accessible publications and requires
+evidence of a completed first sync before admitting creation. It reports a
+validation error while the first sync is incomplete; it does not poll or republish.
+
+```bash
+databricks bundle deploy -t test
+databricks bundle run online_serving_setup -t test
+```
+
+The setup result reports `SUBMITTED`, `model_uri`, `input_schema` and a typed
+`request_example` derived from the actual native signature. Replace its example
+values with a real entity and all other required request values. Wait for native
+endpoint readiness, then send that request body to
+`POST /serving-endpoints/customer-online-v3/invocations` or use
+`query_named_records` below. A setup submission does not establish feature
+availability. Rerunning setup never overwrites an existing endpoint; inspect an
+ambiguous creation result before taking another action.
+
+Save the returned `request_example` object as `request.json`, replace its sample
+values, and query after the endpoint reports readiness:
+
+```bash
+databricks serving-endpoints get customer-online-v3
+databricks serving-endpoints query customer-online-v3 --json @request.json
+```
+
+Required source metadata can survive in the native signature, even when excluded
+from estimator inputs. Inspect `input_schema`; do not assume every model accepts
+keys alone. Direct REST callers can override fetched values. Freshness validation
+checks the received values and does not attest their source.
+
 ## Create a latest-value source and an online store
 
 Use a Unity Catalog Delta feature table containing one current row per entity.
@@ -24,6 +156,13 @@ Provision an online store explicitly with the native Feature Engineering client
 and wait until it is `AVAILABLE`. Store provisioning is never a side effect of
 Skyulf prediction. Install `skyulf-core[feature-store,mlflow]` in a compatible
 Databricks environment and use the same Skyulf wheel for packaging and serving.
+
+Choose the store name and capacity when provisioning it in your selected
+workspace. Databricks manages the underlying Lakebase infrastructure. Bundle
+initialization does not create that infrastructure: `online_store` in
+`config/serving.yml` refers to this existing store. `source_table` identifies
+the Delta source, while `online_table` names the destination as
+`catalog.schema.table`; prepare that destination catalog and schema first.
 
 ```python
 from databricks.feature_engineering import FeatureEngineeringClient

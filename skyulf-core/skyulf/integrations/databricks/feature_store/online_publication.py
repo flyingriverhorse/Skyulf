@@ -8,6 +8,7 @@ from typing import Any
 from ..data.admission import PublishAdmission
 from ..shared._contracts import table_name
 from .config import FeatureLookupSpec, FeatureTrainingSpec, validate_uc_name
+from .lifecycle_config import deserialize_feature_spec, parse_feature_binding
 from .runtime import feature_engineering_client
 from .snapshots import snapshot_table
 from .table_checks import validate_feature_tables
@@ -88,6 +89,130 @@ def _available_store(client: Any, name: str) -> Any:
     if state != "AVAILABLE":
         raise ValueError(f"Online store is not AVAILABLE: {state}.")
     return store
+
+
+def validate_online_publications(
+    spark: Any,
+    binding: dict[str, Any],
+    publications: tuple[OnlinePublicationSpec, ...],
+    *,
+    client: Any,
+    feature_client: Any = None,
+) -> None:
+    """Verify existing accessible online copies against the model's saved lookup binding.
+
+    Public UC metadata enumerates copies; native synced-table reads verify their
+    effective stores and first completed sync. Enumeration is limited to the
+    caller's visibility. Operators must grant full publication visibility and
+    prevent concurrent publication changes during setup. No resources are created
+    or published here, and a completed sync does not attest entity freshness.
+    """
+    binding = parse_feature_binding(binding)
+    declared = {spec.source_table: spec for spec in publications}
+    expected = {row["table_name"]: row for row in binding["lookup_evidence"]["feature_tables"]}
+    if len(declared) != len(publications) or set(declared) != set(expected):
+        raise ValueError("Publication bindings must cover each saved lookup source exactly once.")
+    lookups = deserialize_feature_spec(binding["lookup_spec"])
+    copies = _accessible_publications(client, set(expected))
+    features = feature_engineering_client(feature_client)
+    for name, spec in declared.items():
+        if spec.source_table_id != expected[name]["table_id"]:
+            raise ValueError("Publication Delta identity differs from the saved training binding.")
+        if copies[name.casefold()] != [spec.online_table]:
+            raise ValueError("Publication must be the sole accessible online copy of its source.")
+        _available_store(features, spec.online_store)
+        _source_contract(spark, spec, features)
+        primary_keys = tuple(features.get_table(name=name).primary_keys)
+        _validate_existing_publication(client, spec, lookups, primary_keys)
+
+
+def _accessible_publications(client: Any, sources: set[str]) -> dict[str, list[str]]:
+    """Enumerate public UC source properties without relying on unavailable list APIs."""
+    found: dict[str, list[str]] = {name.casefold(): [] for name in sources}
+    for catalog in client.catalogs.list(include_browse=True):
+        kind = getattr(catalog, "catalog_type", None)
+        if getattr(kind, "value", kind) == "SYSTEM_CATALOG":
+            continue
+        for schema in client.schemas.list(catalog_name=catalog.name, include_browse=True):
+            for table in client.tables.list(
+                catalog_name=catalog.name,
+                schema_name=schema.name,
+                include_browse=True,
+                omit_columns=True,
+                omit_properties=False,
+            ):
+                source = (table.properties or {}).get("source_table", "").casefold()
+                if source in found:
+                    found[source].append(table.full_name)
+    return found
+
+
+def _validate_existing_publication(
+    client: Any,
+    spec: OnlinePublicationSpec,
+    lookup: FeatureTrainingSpec,
+    primary_keys: tuple[str, ...],
+) -> None:
+    """Keep UC identities separate from Delta identities and inspect native routing."""
+    source = client.tables.get(spec.source_table)
+    table = client.tables.get(spec.online_table)
+    properties = table.properties or {}
+    if table.browse_only is True or (
+        table.full_name,
+        properties.get("source_table"),
+        properties.get("source_table_id"),
+    ) != (spec.online_table, spec.source_table, source.table_id):
+        raise ValueError("Publication UC source identity or read access differs from its binding.")
+    synced = client.database.get_synced_database_table(name=spec.online_table)
+    if (
+        synced.name,
+        synced.effective_database_instance_name,
+        synced.spec.source_table_full_name,
+    ) != (spec.online_table, spec.online_store, spec.source_table):
+        raise ValueError("Publication source or effective online store differs from its binding.")
+    _validate_publication_keys(synced, lookup, spec.source_table, primary_keys)
+    _require_first_sync(synced, table.pipeline_id)
+
+
+def _validate_publication_keys(
+    synced: Any, lookup: FeatureTrainingSpec, source: str, primary_keys: tuple[str, ...]
+) -> None:
+    """Check feature-table keys while preserving positional request-column mappings."""
+    keys = tuple(synced.spec.primary_key_columns or ())
+    if (
+        synced.spec.timeseries_key
+        or keys != primary_keys
+        or any(
+            item.timestamp_columns or len(item.lookup_key) != len(keys)
+            for item in lookup.lookups
+            if item.table_name == source
+        )
+    ):
+        raise ValueError("Publication primary keys differ from the saved non-temporal lookup.")
+
+
+def _require_first_sync(synced: Any, pipeline_id: str | None) -> None:
+    """Reject provisioning or failed copies even when their UC metadata already exists."""
+    provision = synced.unity_catalog_provisioning_state
+    status = synced.data_synchronization_status
+    state = getattr(status, "detailed_state", None)
+    online = {
+        "SYNCED_TABLE_ONLINE",
+        "SYNCED_TABLE_ONLINE_NO_PENDING_UPDATE",
+        "SYNCED_TABLE_ONLINE_TRIGGERED_UPDATE",
+        "SYNCED_TABLE_ONLINE_CONTINUOUS_UPDATE",
+    }
+    if (
+        getattr(provision, "value", provision) != "ACTIVE"
+        or getattr(state, "value", state) not in online
+    ):
+        raise ValueError("Publication is not active with a healthy online synchronization state.")
+    if (
+        not pipeline_id
+        or status.pipeline_id != pipeline_id
+        or not getattr(status.last_sync, "sync_end_timestamp", None)
+    ):
+        raise ValueError("Publication requires an inspectable pipeline and a completed first sync.")
 
 
 def publish_online_features(

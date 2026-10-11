@@ -108,6 +108,32 @@ def test_reorganized_wheel_keeps_private_compatibility_aliases(tmp_path):
     assert validate(source, "0.9.1") is None
 
 
+@pytest.mark.parametrize(
+    "modules",
+    [
+        ("data/delta_io/delta.py", "features/delta.py"),
+        ("feature_store/config.py", "features/config.py"),
+        ("feature_store/monitoring.py", "observability/monitoring/monitoring.py"),
+        ("feature_store/runtime.py", "features/runtime.py"),
+        ("lifecycle/workflow.py", "scoring/workflow.py"),
+    ],
+)
+def test_wheel_accepts_independent_packages_with_matching_module_names(tmp_path, modules):
+    """Distinct released packages may reuse names without preventing Bundle deployment."""
+    source = _wheel(tmp_path / "skyulf_core-0.9.1-py3-none-any.whl")
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("skyulf/integrations/databricks/jobs/shared/job_runtime.py", "")
+        for module in modules:
+            archive.writestr(f"skyulf/integrations/databricks/{module}", "")
+    project = _build_project(tmp_path, source)
+
+    result = _build(project)
+
+    assert result.returncode == 0, result.stderr
+    receipt = json.loads(result.stdout)
+    assert (project / "dist/skyulf" / receipt["filename"]).read_bytes() == source.read_bytes()
+
+
 @pytest.mark.parametrize("suffix", [".py", ".pyc"])
 def test_nested_wheel_rejects_previous_group_build_cache(tmp_path, suffix):
     """Intermediate build files must not create a second copy of runtime globals."""
