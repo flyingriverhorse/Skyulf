@@ -117,7 +117,8 @@ def read_yaml_mapping(path: str | Path) -> dict[str, Any]:
     source = read_source(Path(path))
     try:
         _check_tokens(yaml, source)
-        result = yaml.load(source, Loader=UniqueLoader)
+        # SafeLoader subclass adds duplicate-key checks; Python object tags stay disabled.
+        result = yaml.load(source, Loader=UniqueLoader)  # nosec B506
     except yaml.YAMLError as exc:
         raise ValueError(f"{Path(path).name}: invalid YAML: {exc}") from exc
     if type(result) is not dict:

@@ -80,6 +80,87 @@ insert-only CDF windows, no-op replay, model-change policies and optional
 set outputs commit together. Successful scoring retains the monitoring child-job
 and native dashboard-refresh handoff.
 
+### Monitoring investigation and training lineage
+
+In the shared dashboard, open **Overview → Issues to investigate** for the latest
+recorded health, quality, drift and active performance-policy issues. The native table
+paginates the complete list; the counter includes all filtered issues. Filter by registered
+model, version and monitoring context before following **Evidence run** to the
+monitoring run or **Model version** to its concrete registry entry. Missing,
+never-observed, failed, stale and insufficient-label evidence stays distinct.
+Disabled monitoring and disabled policies create no new failures.
+
+Use the **shared filters** on the left: **Model**, **Monitored version** and
+**Context**. Model names include catalog and schema, so there are no separate
+catalog/schema controls. Context includes environment, project and a short monitor
+ID. The selection persists between pages; there are no competing model controls
+inside the pages. Date, feature, metric, target and job controls refine only the
+page where they appear.
+
+**All models**, **All versions** and **All contexts** are the initial selections.
+Drift and Model performance include every matching model/version/context, with
+the latest result selected independently for each identity. Disabled policies and
+identities without measurements remain visible. Choose Model, Version and Context
+to narrow the portfolio. Online serving lists matching endpoint contexts separately.
+Incompatible explicit selections stay empty; clear Version and Context when
+switching models. An explicitly selected model
+never falls back to another model.
+
+| Page | Scope | What to use it for |
+| --- | --- | --- |
+| Overview | All models with the initial All selections; otherwise all matching registrations. | Four summary counts, prioritized issues, current status distributions and daily trends. |
+| Training and lineage | All matching model/version/context identities. | Compare concrete versions, owning training runs and recorded provenance. |
+| Drift and data quality | Every matching model/version/context, with its own latest observation. | Separate feature PSI comparisons and drift histories, with detailed quality measurements. |
+| Model performance | Every matching model/version/context, including disabled and unmeasured policies. | Per-identity prediction/label coverage, metric history, policy comparisons and classification evidence. |
+| Online serving | All matching serving enrollments, separated by model/version/context; choose Model to narrow them. | Distinguish monitored and served versions; inspect captured counts and latency per observation in tables and three window charts. |
+| Execution and compute | The explicitly selected workspace and job, independently of model filters. | Job runs, estimated attributed cost and available compute telemetry. |
+
+Drift and Performance time charts and date filters use **Data window end (UTC)**.
+For data from 09:00 to 10:00, the point appears at 10:00 even if checks ran later.
+**Calculated at** records that later execution time separately. Drift counts use
+whole numbers; the tooltip includes the full window and calculation time.
+
+**Latest policy result for every model** lists each identity's own metric, baseline,
+current score, allowed limit, improvement direction and result. Accuracy, F1 and
+RMSE policies can appear together. A latest-metric table shows observed values
+by identity and target. The two time charts use separate model/metric panels
+with independent scales, so scores with different units are not mixed. Each policy
+panel compares **Current**, **Baseline** and **Tolerance boundary**. Changing
+**Chart metric** affects the observed-metric table and time chart, leaving each policy's
+configured metric intact. An accuracy baseline of 0.96 and absolute tolerance of
+0.10 give a lower limit of 0.86; an error metric has an upper limit. Missing scores
+remain unavailable, and a newer missing result never revives an older success.
+
+**Latest prediction coverage by model** replaces the three shared counters with
+one row per identity: predictions, matched outcomes and label coverage for its
+latest full observation. Confusion-matrix rows are also grouped by model/version/context.
+Counts, scores and windows from different identities are never combined. The three
+Serving history charts remain above their detailed tables.
+
+On **Execution and compute**, copy Workspace and Job ID from **Recent accessible
+jobs** into the two input controls. The list includes one-off runs from the last
+30 days, independently of model enrollment. Inputs also accept IDs not yet listed;
+telemetry and billing may arrive later. Neither input silently selects a job.
+
+Lineage tables retain unresolved NULL versions explicitly.
+
+Inspect creation time, the owning training run, recorded algorithm, artifact
+digest and available source evidence. **Training run** opens that exact run's
+native Inputs and artifacts. Historical versions remain concrete.
+**Aliases at capture** has a capture
+timestamp and describes a metadata snapshot, not historical deployment identity.
+
+New monitoring observations capture bounded lineage metadata in the existing
+report; dashboard refresh only rereads saved evidence. Retrying an observation
+preserves its first snapshot and prepared Spark references. Older reports show
+`not_recorded`; metadata permission failures show `unavailable`. Missing links,
+creation time or code evidence are not inferred. Store owners can explicitly run
+`initialize_monitoring_store` to refresh owned view definitions; ordinary runs
+create missing compatible views. Read-only viewers keep their own permissions.
+
+The generated project's `src/monitoring/README.md` explains the shared store,
+dashboard refresh setup and independent optional retraining policies.
+
 Initialize a project from a Skyulf checkout:
 
 ```powershell

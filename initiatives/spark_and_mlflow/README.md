@@ -6,9 +6,14 @@ Bu klasör iç planları, uygulama kararlarını ve doğrulama kanıtlarını tu
 Yeni çalışma için [219–222 uygulama sırası ve takip](223-delivery-order-tracker.md)
 belgesinden başla. Bu kapsamda **4/8 adım tamamlandı**: S01 online Bundle,
 S02 CONTINUOUS publication, S03 feature güncellenirken rollout/champion ve
-S04 MLflow dataset Inputs. **Sırada S05 — Monitoring sorun/model ayrıntısı var.**
-S03/branding commit `9a45ebec`; S04 yerel ve native kabulden geçti ve bu
-teslimata dahildir. S04 test kaynakları temizlendi, 14/14 API kontrolü geçti.
+S04 MLflow dataset Inputs. **S05 kodu/native kabulü hazır; yayımlanmış örneklerin
+görsel incelemesi bekleniyor.** All artık model/sürüm/context başına ayrı politika
+ve grafiklerle 22 kimliği birlikte gösterir. S06 öncesinde PR197 düzeltmeleri ve
+Kayra uygulama markası tamamlandı; S06 henüz başlamadı. Yerel kontroller geçti;
+değişiklikler gönderilmediği için yeni hosted CI sonucu henüz yok.
+S03/branding commit `9a45ebec`; S04 commit `044a82cf`. S05, portfolio, PR197
+düzeltmeleri ve Kayra markası bu değişiklik grubundadır; push yapılmadı.
+S04 test kaynakları temizlendi, 14/14 API kontrolü geçti.
 Kanıtlar 221 bölüm 13'te ve yerel raporlarda. Gerçek 24 saatlik gözlem
 G01 ve şirket hedefi kabulü G02 ayrıdır. Kod/commit kanıtı 219, 221 ve 223'te,
 11 Ekim workspace sıfırlaması 225'te tutulur. Push yapılmadı.
@@ -16,6 +21,22 @@ G01 ve şirket hedefi kabulü G02 ayrıdır. Kod/commit kanıtı 219, 221 ve 223
 Eski test tabloları, modelleri, jobları ve ilgili workspace kaynakları kullanıcı
 isteğiyle kaldırıldı. Önceki cloud bağlantıları tarihsel kanıttır; yeni kabul
 çalışması yeni fixture oluşturmalıdır. Yerel raporlar ve paketler korundu.
+
+S05'in yeni `skyulf_s05_demo_08b67d12` örnekleri kullanıcı incelemesi için
+**korunuyor**: regresyon örnekleri, bunlardan kaydedilen peer model ve yeni sınıflandırıcı;
+3 model adı, 21 izleme bağlamı,
+22 sürüm/context satırı, 36 sorun satırı.
+[Dashboard](https://dbc-45604623-c18b.cloud.databricks.com/dashboardsv3/01f1c590fcce1921b6ffadbdf1539e4b/published?o=7474646244882000)
+ve [örnekleri inceleme rehberi](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#notebook/3844438932488600).
+Gerçek endpoint: 51 istek, 48 başarı, 3 beklenen HTTP 400 ve 960 tahmin;
+native monitoring `232015313477946` başarılı. Girdiler/etiketler sentetiktir.
+Kullanıcı Drift/Performance ve tam sayı eksenini onayladı. Son yerleşim veri aralığı
+bitişini açıklar ve Serving grafiklerini yukarı taşır. All görünümü için 79 yerel
+test, 35 native dataset, 41 widget sorgusu ve 4 filtre senaryosu geçti;
+son görsel inceleme bekleniyor.
+Önceki temsili Serving bağlamları ayrı ve sentetik olarak işaretli kalır.
+Kanıt: `.superpowers/sdd/223-delivery-order-tracker/s05-portfolio/verification-report.md`.
+
 
 Projenin genel görev durumu ve diğer bağımlılıkları için
 [OPEN_QUEUE_updated.md](OPEN_QUEUE_updated.md) esas alınır. 223 yalnız seçilen

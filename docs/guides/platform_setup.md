@@ -1,6 +1,6 @@
 # Full Platform Setup
 
-This guide walks you through deploying the complete Skyulf platform — backend API, Celery workers, Redis, and the web UI.
+This guide walks you through deploying the complete Kayra application by Skyulf — backend API, Celery workers, Redis, and the web UI.
 
 > **Just want the Python library?** See [Installation](../user_guide/installation.md) to `pip install skyulf-core` and skip this page.
 

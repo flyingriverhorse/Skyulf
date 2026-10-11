@@ -68,8 +68,9 @@ def _branch_sections_md(
         for i, t in enumerate(terminals)
     )
     return (
-        f"# Skyulf pipeline — `{dataset_name or dataset_id}` (multi-branch)\n\n"
-        f"_Config fingerprint: `{config_fingerprint(cfg)}`._\n\n"
+        f"# Kayra pipeline — `{dataset_name or dataset_id}` (multi-branch)\n\n"
+        f"_Auto-exported from the Kayra canvas by Skyulf. "
+        f"Config fingerprint: `{config_fingerprint(cfg)}`._\n\n"
         f"This pipeline has **{len(terminals)} training branches**. "
         f"Each branch is trained, evaluated, and persisted independently.\n\n"
         f"**Branches:**\n{items}\n\n"
@@ -201,8 +202,9 @@ def _compact_branch_summary_md(
         for i, t in enumerate(terminals)
     )
     return (
-        f"# Skyulf pipeline — `{dataset_name or dataset_id}` (compact, multi-branch)\n\n"
-        f"_Config fingerprint: `{config_fingerprint(cfg)}`._\n\n"
+        f"# Kayra pipeline — `{dataset_name or dataset_id}` (compact, multi-branch)\n\n"
+        f"_Auto-exported from the Kayra canvas by Skyulf. "
+        f"Config fingerprint: `{config_fingerprint(cfg)}`._\n\n"
         f"This pipeline has **{len(terminals)} training branches**. Each branch builds "
         f"its own `SkyulfPipeline`, fits on the same training frame, and saves "
         f"its artifact independently — deploy / score each model separately.\n\n"

@@ -127,7 +127,7 @@ def rollout_plan_from_dict(value: dict[str, Any]) -> RolloutEndpointPlan:
                 tuple(item) if isinstance(item, list) else item for item in saved[field]
             )
         plans.append(PinnedEndpointPlan(**saved))
-    plan = build_rollout_endpoint(*plans)
+    plan = build_rollout_endpoint(champion=plans[0], challenger=plans[1])
     if finite_json_digest(asdict(plan)) != finite_json_digest(value):
         raise ValueError("Rollout plan differs from its admitted composition.")
     return plan

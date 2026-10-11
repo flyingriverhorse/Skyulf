@@ -102,7 +102,8 @@ def _construct_model(model_name: str | bytes) -> Any:
         import torch  # noqa: PLC0415 - optional nlp extra
 
         # Like pipeline.pkl, this is executable state from a trusted producer.
-        model = torch.load(BytesIO(model_name), map_location="cpu", weights_only=False)
+        # Full encoder/tokenizer snapshots require pickle; checksums are not authentication.
+        model = torch.load(BytesIO(model_name), map_location="cpu", weights_only=False)  # nosec B614
         if type(model) is not SentenceTransformer or model.get_backend() != "torch":
             raise ValueError("Saved sentence encoder must be a native PyTorch SentenceTransformer.")
         return model.eval()

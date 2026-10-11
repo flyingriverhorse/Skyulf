@@ -24,6 +24,9 @@ def _custom_step(package_name: str, declaration: dict[str, Any]) -> dict[str, An
     relative, name = custom_reference(declaration["custom"])
     module_name = f"{package_name}.{relative}"
     try:
+        # The generated snapshot passes its digest-qualified __name__; YAML capture
+        # requires this relative module inside the saved trusted project package.
+        # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
         module = import_module(module_name)
         factory = getattr(module, name)
     except (ImportError, AttributeError) as exc:

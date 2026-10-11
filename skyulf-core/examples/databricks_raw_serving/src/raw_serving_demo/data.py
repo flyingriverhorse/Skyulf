@@ -18,6 +18,7 @@ def create_raw(spark, namespace, config):
         raise ValueError("Demo cohort sizes must be integers between 32 and 10000")
     # CREATE deliberately fails on an existing schema: this demo never overwrites one.
     spark.sql(f"CREATE SCHEMA {namespace}").collect()
+    # The namespace allowlist and bounded exact integers above constrain all SQL values.
     spark.sql(f"""
         CREATE TABLE {namespace}.raw_customers USING DELTA AS
         WITH complete AS (
@@ -38,7 +39,7 @@ def create_raw(spark, namespace, config):
           CAST(age + income * 0.0003 - tenure * 0.3 + sin(id) * 8 > 55 AS BIGINT) churn,
           CASE WHEN id < {train} THEN 'train' ELSE 'score' END cohort
         FROM complete
-    """).collect()
+    """).collect()  # nosec B608
     version = spark.sql(f"DESCRIBE HISTORY {namespace}.raw_customers LIMIT 1").first().version
     return {"source_version": int(version), "raw_rows": train + predict}
 

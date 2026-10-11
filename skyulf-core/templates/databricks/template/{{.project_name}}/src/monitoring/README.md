@@ -67,6 +67,8 @@ for deliberately refreshing view definitions.
 | `metric_history` (view) | Create if absent | Reuse; expand stored report metrics for dashboard queries. |
 | `performance_actions` (Delta) | Create if absent | Append request and skip receipts without rewriting observations. |
 | `performance_history` (view) | Create if absent | Reuse; join performance evidence with the latest applicable action. |
+| `monitoring_issues` (view) | Create if absent | Reuse; read current health and recorded quality, drift and active-policy issues. |
+| `model_version_details` (view) | Create if absent | Reuse; read concrete version lineage and bounded metadata snapshots from existing reports. |
 
 One store serves all enrolled models; inventory, observations and action history
 are shared rather than recreated per model or score run. Spark reference
@@ -119,6 +121,53 @@ No monitoring-engine question is added to initialization; measurement uses Spark
 Dashboard deployment is configuration, not metric calculation. Run monitoring to
 save new measurements, then the native task refreshes the published datasets.
 The dashboard retains the selected store across all project layouts.
+
+## Investigate a model or version
+
+Start on **Overview → Issues to investigate**. The table uses native pagination, with failures first, then recorded
+quality/drift/performance issues, then missing or stale evidence. The counter gives the full filtered issue count, including rows on later pages. One model can have multiple issues; this is an issue count,
+not a model count. Use shared Model, Monitored version and Context filters to narrow
+the list. Disabled monitoring and disabled performance policies do not create
+new failures. Never-observed, no-data, failed, stale and insufficient-label
+results keep their distinct recorded reasons. Missing metric values remain empty.
+
+Open a concrete **Model version** link for the registry entry, or **Evidence run**
+for the monitoring run that recorded that issue. The latter is separate from the
+owning training run. A missing link means its exact run/experiment identity was
+not recorded or is unavailable; it does not mean the issue is healthy.
+
+Use the **shared filter panel** for Model, Monitored version and Context.
+These choices persist across Overview, Training and lineage, Drift and quality,
+Model performance and Online serving. Model names include catalog and schema.
+Drift and Performance include every matching identity, selecting its latest
+evidence independently. Execution and compute has a separate Workspace/Job scope.
+The full page scope table and optional controls are described under Dashboard layout below.
+
+**Training and lineage** shows every identity matching the shared filters.
+Choosing All models / All versions / All contexts shows all available identities; an obsolete or incompatible
+selection leaves empty tables and never substitutes the latest different model.
+Each table includes its model, version and context. Historical observed versions
+retain their concrete identities, while NULL versions explicitly say unresolved.
+The page shows creation time, owning training run, recorded algorithm, artifact
+digest and available code evidence. Open **Training run** to inspect that run's
+native Inputs and artifacts. A source commit is shown only when the owning run
+already records `mlflow.source.git.commit`; a project Python source digest is
+shown only when the saved artifact records one.
+
+**Aliases at capture** describes the concrete version's alias metadata when the
+monitoring reference was loaded, alongside **Captured at**. It does not describe
+historical deployment identity or guarantee today's registry alias assignment.
+New observations refresh the bounded snapshot in existing `evidence_json`.
+Retrying the same observation preserves the first saved snapshot and does not
+invalidate prepared Spark references. Dashboard refresh only rereads saved
+evidence; it makes no per-row registry calls and does not move aliases.
+
+Older reports can show **not_recorded**, never-observed enrollments have no
+training metadata, and optional metadata permission failures show **unavailable**
+with a reason. Missing creation/code/alias fields remain unavailable rather than
+inferred. Existing store owners can run `initialize_monitoring_store` explicitly
+to refresh owned view definitions; ordinary runs create missing compatible views
+without replacing existing ones. Viewers retain their own data permissions.
 
 ## Enable each independent model repository
 
@@ -432,25 +481,39 @@ acceptance thresholds or notifications are enabled by the dashboard.
 
 ## Dashboard layout
 
-The five pages are Overview, Drift and data quality, Model performance, Execution
-and compute, and Online serving. Start with Overview for enrolled model health;
-use the detailed pages to inspect the evidence behind a status.
+Use the **shared filters** on the left: **Model**, **Monitored version** and
+**Context**. Model names include catalog and schema, so there are no separate
+catalog/schema controls. Context includes environment, project and a short monitor
+ID. The selection persists between pages; there are no competing model controls
+inside the pages. Date, feature, metric, target and job controls refine only the
+page where they appear.
 
-Overview summarizes enrollments in the configured monitoring store, with catalog,
-schema, model and version filters. Models registered elsewhere appear only after
-enrollment in this store. Counts represent monitoring enrollments; two projects
-can monitor the same model.
+**All models**, **All versions** and **All contexts** are the initial selections.
+Drift and Model performance include every matching model/version/context, with
+the latest result selected independently for each identity. Disabled policies and
+identities without measurements remain visible. Choose Model, Version and Context
+to narrow the portfolio. Online serving lists matching endpoint contexts separately.
+Incompatible explicit selections stay empty; clear Version and Context when
+switching models. An explicitly selected model
+never falls back to another model.
 
-Four counters show distinct registered models, monitoring registrations,
-scoring-input tables and prediction-output tables. A monitoring registration is
-one environment/project/model identity, including paused entries; the same model
-can have multiple registrations. For example, five models can produce six
-registrations when one model is monitored by two projects. The compact mapping lists each model/version
-and its input, prediction and optional actual-outcome table. A shared table counts
-once even when several model-set components use it.
+| Page | Scope | What to use it for |
+| --- | --- | --- |
+| Overview | All models with the initial All selections; otherwise all matching registrations. | Four summary counts, prioritized issues, current status distributions and daily trends. |
+| Training and lineage | All matching model/version/context identities. | Compare concrete versions, owning training runs and recorded provenance. |
+| Drift and data quality | Every matching model/version/context, with its own latest observation. | Separate feature PSI comparisons and drift histories, with detailed quality measurements. |
+| Model performance | Every matching model/version/context, including disabled and unmeasured policies. | Per-identity prediction/label coverage, metric history, policy comparisons and classification evidence. |
+| Online serving | All matching serving enrollments, separated by model/version/context; choose Model to narrow them. | Distinguish monitored and served versions; inspect captured counts and latency per observation in tables and three window charts. |
+| Execution and compute | The explicitly selected workspace and job, independently of model filters. | Job runs, estimated attributed cost and available compute telemetry. |
 
-Overview places Drift and data quality and Latest saved performance immediately
-after the top inventory counters, before the daily charts and model/table map.
+Overview puts the issue list before trends. Four counters show distinct registered
+models, monitoring registrations, issue rows and distinct scoring-input tables.
+The issue count can exceed the registration count because one observation may
+have several issues. The model/table mapping includes prediction and optional
+label tables; shared tables count once. Two compact status distributions show
+feature/data health and performance-policy status separately, including missing
+evidence and disabled registrations. These are current registration counts, not
+prediction rows or daily totals.
 
 Two line charts show daily drift and performance-policy checks. Each counts one
 enrollment per UTC window day using the latest saved window, then measurement and
@@ -459,53 +522,31 @@ missing or failed evidence stays unavailable. Unrecorded days are gaps, not zero
 checks or carried-forward healthy models. These are daily recorded checks, not
 historical snapshots of fleet health.
 
-Overview separates **Drift and data quality** from **Model performance**. The
-first group's Healthy status means the measured input checks passed; it does not
-mean accuracy met its baseline. Measurement issues (the stored `degraded` status)
-also belong to drift/quality, rather than the performance-loss counter.
+Healthy feature/data status does not mean accuracy met its baseline. The
+performance distribution compares each enrollment's current configuration and
+concrete version against its latest saved policy window. Within tolerance and
+Performance loss require usable, sufficiently recent evidence. Insufficient
+evidence includes missing checks, unavailable labels/baselines and stale windows.
+Policy disabled and Monitoring disabled remain distinct states.
 
-Performance counts compare the latest saved policy window for each enrollment's
-current configuration and concrete model version. Within tolerance and Performance
-loss require usable, sufficiently recent policy evidence. Insufficient evidence
-includes missing checks, unavailable labels/baselines and stale windows. Policy
-disabled is an explicit `off` policy, not a missing report. Disabled enrollments
-are excluded from active performance counts and remain visible in the enrollment
-inventory on Drift and data quality. Detailed policy evidence stays on Model
-performance. Overview includes a compact model/table mapping; the detailed
-enrollment inventory remains on Drift and data quality.
-The catalog, schema, model and version filters apply to both counter groups.
 Freshness uses the latest completed UTC policy window after `label_delay_hours`:
-the saved window becomes stale when it trails that window by more than the
-enrollment's `expected_interval_hours`. Future or immature windows cannot count
-as measured success. The label is Latest saved performance; it is not a live
-assessment of outcomes that have not arrived yet.
+a window becomes stale when it trails that boundary by more than
+`expected_interval_hours`. Future or immature windows cannot count as success.
+The dashboard does not initiate training. Retraining retains its independent
+opt-in and request guards; historical losses remain visible even when the latest
+window has insufficient evidence.
 
-These counters do not initiate training. Performance loss may be report-only or
-still lack the required consecutive windows; retraining retains the independent
-opt-in and shared request guards described above. Historical losses remain on
-Model performance even when the newest policy window has insufficient evidence.
-
-Drift and performance use model, version and monitoring-context selectors. Choices
-come from both current inventory and saved history, including models that have not
-yet been observed. The context label includes environment/project and a short
-monitor identifier. Empty selectors choose the most recently measured matching
-context. Drift shows the resolved identity and latest health status; performance
-uses the model/version/context selectors directly without a separate Selected
-model table. Explicit selections never combine separate monitor identities. Clear
-an old context selection when switching to a model from another project.
-
-The drift/quality page keeps two tables and adds two charts for one selected
-model/version: the latest observation's top ten feature PSI values beside each
-feature's own limit, and feature counts with drift or unavailable checks over
-measurement time. Each feature is counted once even if multiple checks flag it;
-the count chart uses full monitoring date/time and the SQL session timezone,
-rather than ambiguous abbreviated hour labels. Monitoring time is when checks
-were calculated; scoring time is when predictions were committed.
-The Current monitoring enrollments table follows the drift/quality details and
-lists the store's full current inventory independently of chart selectors. It
-retains parent model-set details but omits the long Monitoring identity column.
-The underlying identity remains in the dataset so separate enrollments are not
-merged. Use the context selector above for one model's detailed charts.
+The drift/quality page keeps two history tables and separates charts by
+model/version/context. Each identity shows its latest observation's top ten
+feature PSI values beside their own limits, plus feature counts with drift or
+unavailable checks over time. Each feature is counted once within its observation
+even if multiple checks flag it. The count axis uses whole numbers; compact UTC date/time labels keep
+the chart readable. Hover to see the full window and calculation timestamp.
+For example, data from 09:00 to 10:00 appears at 10:00 even if the checks ran at
+11:30. Drift and Performance date filters use the same window end as their
+time charts. Calculation time remains available separately in the details.
+The matching-identity table shows which contexts the shared filters include.
+The full model/table inventory remains on Overview.
 
 KS p-value is excluded from decisions. Unavailable checks are shown separately,
 and missing values never become zero. PSI is only one drift check; the counts
@@ -528,55 +569,76 @@ Performance metrics appear as dynamic pivot columns, so selecting a regression
 model shows its regression metrics, while classification shows its available
 metrics, including G-score and AUC. Same-time reports get deterministic observation
 suffixes so the pivot cannot merge distinct reports/monitors. Blank cells remain
-unavailable, never zero. Three snapshot cards show predictions, matched outcomes
-and label coverage from exactly the latest full observation. A failed latest
-measurement clears these counts rather than reviving an older success.
+unavailable, never zero. **Latest prediction coverage by model** replaces the
+three shared counters with one row per model/version/context. Each row shows
+predictions, matched outcomes and label coverage from that identity's latest
+full observation. A failed latest measurement clears its counts rather than
+reviving an older success. Counts and coverage are never aggregated across
+models, contexts or observation windows.
 
-The compact performance page starts with model/version/context selectors and these cards,
-then the selected metric and its trend. Policy checks have their own summary,
-baseline/current/limit chart and an eight-column history table. The policy chart
-uses the latest saved policy's metric independently of the observed chart metric;
-selecting MAE does not hide an RMSE policy. The latest policy summary ranks by
-window end before measurement time: a late historical degradation cannot replace
-a newer unavailable window. Disabled policies are explicitly labeled disabled.
+The performance page starts with matching identities, then policy results and
+policy history. Prediction coverage and observed metrics follow below.
+**Latest policy result for every model** gives
+each identity its own row with metric, baseline, current score, allowed limit,
+improvement direction, result, explanation and training action. Accuracy, F1 and
+RMSE policies can coexist, with separate model/metric chart panels and independent
+scales. The policy charts use each identity's latest saved policy metric;
+selecting MAE in **Chart metric** does not hide an RMSE policy. Current is the
+observed metric, Baseline is its reference value, and Tolerance boundary is the
+permitted limit.
+An accuracy baseline of 0.96 with an absolute tolerance of 0.10 gives a lower
+limit of 0.86. For an error metric, exceeding the upper limit indicates loss.
+Missing scores are unavailable and must not be interpreted as zero.
+The latest policy summary ranks by
+window end before measurement time for each identity: a late historical degradation
+cannot replace a newer unavailable window. Disabled policies are explicitly
+labeled disabled, and identities without a saved check show No policy evidence.
 The Performance checks table is the history of those per-window comparisons.
 Performance result means Within tolerance, Performance loss, Insufficient evidence
 or Policy disabled. Training action is separate: loss can be report-only, awaiting
 further checks, skipped or actually requested. Eligible is not already submitted.
 Full reasons, source references and request IDs remain in `performance_history`
 and the job's saved reports. Classification
-matrix availability sits beside the confusion matrix; the full metric matrix
+matrix availability appears below the confusion matrix; the full metric matrix
 follows below.
 
-Performance pairs a latest-observation bar chart with a time series for one
-selected model, version and metric. Both use the same metric and units; their
-legends identify whether higher or lower is better. The bar remains useful
-when only one observation exists. A latest unavailable measurement stays blank,
+Performance pairs a latest-observation metric table with time series in separate
+model/version/context and metric panels. Each panel keeps its own units and
+scale; legends identify whether higher or lower is better. The table identifies
+each metric, value, target and window even when only one observation exists.
+A latest unavailable measurement stays blank,
 rather than falling back to an older measured value.
 The metric selector defaults to an available MAE, weighted F1, accuracy or other
-saved metric for the selected context. A single observation does not establish a trend. The chart
-does not combine different monitor identities for the same model/version. Metric
-selection does not remove columns from the performance table. Latest-observation
-charts choose the latest saved report before applying date/feature/target filters;
-those filters can hide its bars but do not choose an older report. The PSI chart
-shows the top ten features before feature filtering; use the tables for the rest.
+saved metric independently for each matching context. Selecting a metric narrows
+the observed table and time chart to identities with that metric. A single observation does not
+establish a trend. The charts never combine different monitor identities or windows.
+Metric selection does not remove columns from the full metric-history table.
+Latest-observation views choose the latest saved report before applying
+date/feature/target filters; those filters can hide its values but do not choose
+an older report. The PSI chart
+shows at most ten features per identity before feature filtering; use the tables
+for the rest.
 Dashboard refresh
 reads stored results and does not trigger new monitoring calculations.
 
-Latest PSI and performance bars use the newest saved report for that context,
+Latest PSI bars and the observed-metric table use the newest saved report for each context,
 ranked by observation window and measurement time. A newer empty or failed report
-does not resurrect an older measured bar. Historical trend charts retain history.
+does not resurrect an older measured value. Historical trend charts retain history.
 The drift context summary exposes the newest report status even when charts are empty.
 Mature performance-window-only reports stay in policy history; they do not replace
 the full feature observation, current model health or confusion matrix.
 
-The confusion matrix uses the latest report's saved bounded class counts, with
-actual classes on rows and predictions on columns. Numeric class indices preserve
-identity when display labels collide. Measured zeros are real counts; unavailable
+The confusion-matrix pivot separates model/version/context first, then shows
+actual classes on rows and predictions on columns from each identity's latest
+report. Counts from different identities are never combined. Numeric class indices
+preserve identity when display labels collide. Measured zeros are real counts; unavailable
 classification, regression and historical reports without a stored matrix show an
 explicit status. The matrix is independent of history date and target filters.
 
 ### Execution and compute
+
+This page has its own Workspace and Job selection. Shared model filters do not
+attribute a job's spend to one model; a job may process several models.
 
 This page requires SELECT access to `system.lakeflow.jobs`,
 `system.lakeflow.job_run_timeline`, `system.lakeflow.job_task_run_timeline`,
@@ -584,9 +646,11 @@ This page requires SELECT access to `system.lakeflow.jobs`,
 `system.billing.list_prices`. Dashboard readers need these permissions themselves;
 a permission error is not evidence of zero usage. The portable dashboard leaves
 workspace and job selections empty. Deployment-specific defaults may select exact
-owned IDs after verification. Job suggestions match current job names to enrolled
-project names with `_train`, `_score` and `_monitoring` suffixes; this is a discovery
-aid, not proof that all project costs are attributed to that job.
+owned IDs after verification. **Recent accessible jobs** lists jobs with runs in the last 30 days, including
+one-off submissions and jobs whose names do not follow the Bundle convention.
+Copy Workspace and Job ID from that table into the two input controls. Both
+inputs accept exact IDs even when system metadata has not arrived. The list is
+independent of model enrollment and does not establish model cost attribution.
 
 Both workspace ID and job ID must match before execution or billing rows are
 shown. Execution details summarize the last 30 days of run timeline records.
@@ -613,16 +677,31 @@ than displaying zero CPU or memory. CPU and memory trends show averages over tim
 
 ### Online serving
 
-This page shows saved aggregate observations for enabled serving enrollments.
-Locate the Endpoint, Served version, Branch and Monitor ID columns to identify the
-exact serving context. The same model can have several separate enrollments.
+All matching contexts are visible initially; choose **Model** to narrow them.
+**Monitored version** filters the
+component model's concrete version; **Context** narrows its monitoring registration.
+The identity table separately shows Endpoint, Served model, Served version and
+Branch. A model-set parent can have a different name/version from the monitored
+component. Explicit mismatched selections stay empty. Only enabled serving
+enrollments are included.
 
 | Table | Scope |
 | --- | --- |
-| Latest serving status | One latest full observation per enrollment and current configuration, ordered by window end, measurement time and report ID. |
-| Observed windows | The latest 100 saved full observations across enabled serving enrollments and their current configurations. |
+| Selected model and serving scope | Selection guidance and number of matching current contexts. |
+| Endpoint and model identity | Monitored model/version versus served model/version and branch. |
+| Latest observation per context | Latest full observation per matching enrollment and current configuration, ordered by window end, measurement time and report ID. |
+| Observation history | All matching saved full observations, with native pagination and an optional history window-end filter; there is no global 100-row cutoff. |
 
-Both tables show Successful requests, Failed requests, Mean latency (ms) and
+Three charts above the detailed tables show captured requests, captured errors
+and mean model latency by request-window end, with each context kept separate.
+The history date control does not change the latest snapshot. **Observation
+status** describes the saved monitoring result, not live endpoint availability.
+Request counts and latency stay per observation: windows may overlap, and
+model-set branches may describe the same parent requests. Do not sum these rows
+as unique traffic or average their latency means into an endpoint SLA. Tables
+preserve those boundaries without a misleading cumulative traffic chart.
+
+Observation tables show Requests in window, Successes, Errors, Mean latency (ms) and
 Max latency (ms). These come from captured inference logs; a request can contain
 multiple prediction rows. Logging is asynchronous and custom-model HTTP 4xx/5xx
 errors may be absent, so these counts do not measure all endpoint traffic.
@@ -669,7 +748,8 @@ Import monitoring helpers from the domain modules below. Paths are relative to
 | `model_sets/model_set_project.py`, `model_sets/monitoring_model_set.py` | Enroll pinned components after activation and scoring. |
 
 The existing template's `src/monitoring/monitoring.lvdash.json` defines SQL,
-filters and five pages. `src/tools/configure_monitoring_dashboard.py` connects one
+shared investigation filters and six content pages.
+`src/tools/configure_monitoring_dashboard.py` connects one
 shared dashboard and its native refresh task to the existing project. The normal
 project variables select monitoring storage, and `resources/monitoring.job.yml`
 contains its separate Spark measurement/report/retraining job. No separate

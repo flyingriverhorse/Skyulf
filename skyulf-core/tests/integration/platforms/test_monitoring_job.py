@@ -1,5 +1,6 @@
 """One failed model cannot disappear or prevent other models from being monitored."""
 
+import json
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
@@ -103,6 +104,24 @@ def test_completed_report_reuses_mlflow_run(tmp_path):
     second = _log_observation(config, row, report, {}, uri, "monitor")
     assert first == second
     assert len(client.search_runs([experiment])) == 1
+    evidence = json.loads(row["evidence_json"])
+    assert evidence["monitoring_experiment_id"] == experiment
+    assert evidence["monitoring_link_status"] == "recorded"
+
+
+def test_navigation_metadata_failure_preserves_valid_observation(monkeypatch):
+    """An optional run-link permission error must not turn measured metrics into a failure."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring
+
+    client = Mock()
+    client.get_run.side_effect = PermissionError("unavailable")
+    monkeypatch.setattr(monitoring, "make_tracking_client", lambda uri: client)
+    row = {"status": "healthy"}
+    monitoring._record_monitoring_run_link(row, {}, "run", None)
+    assert row["status"] == "healthy"
+    assert (
+        json.loads(row["evidence_json"])["monitoring_link_status"] == "unavailable:PermissionError"
+    )
 
 
 def test_notebook_fails_after_results_are_saved(tmp_path, monkeypatch):

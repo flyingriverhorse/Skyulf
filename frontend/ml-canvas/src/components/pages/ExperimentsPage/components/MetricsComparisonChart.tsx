@@ -141,7 +141,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
             <MetricDirectionBadge direction={getMetricDirection(activeMetric)} />
             <span>
               {getMetricDirection(activeMetric) === 'unknown'
-                ? 'Skyulf cannot rank this metric — read the bars against your own objective.'
+                ? 'Kayra cannot rank this metric — read the bars against your own objective.'
                 : `Taller bars are ${getMetricDirection(activeMetric) === 'higher' ? 'better' : 'worse'} for this metric.`}
             </span>
           </div>

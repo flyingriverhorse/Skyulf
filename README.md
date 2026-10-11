@@ -34,9 +34,9 @@
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/skyulf-core?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%2Fmonth)](https://pepy.tech/projects/skyulf-core)
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues)
 
-> **Skyulf:** The Visual MLOps Builder
+> **Kayra:** The Visual MLOps Builder — by Skyulf
 
-Skyulf is a self-hosted, privacy-first MLOps platform. It is designed to be the "glue" that holds your data science workflow together (with export notebook option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+Kayra is Skyulf’s self-hosted, privacy-first MLOps application. Its backend API and visual canvas share the standalone `skyulf-core` Python library. It is designed to be the "glue" that holds your data science workflow together (with export notebook option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
 ## What is the meaning of Skyulf?
 
@@ -88,7 +88,7 @@ python run_skyulf.py
 The `run_skyulf.py` script will automatically start the FastAPI server.
 
 **Optional: Celery & Redis**
-By default, Skyulf uses Celery and Redis for robust background task management. However, for simple local testing or environments where you cannot run Redis, you can disable this dependency.
+By default, Kayra uses Celery and Redis for robust background task management. However, for simple local testing or environments where you cannot run Redis, you can disable this dependency.
 
 Add this to your `.env` file:
 ```ini
@@ -155,7 +155,7 @@ uv add "skyulf-core[eda,viz,tuning,preprocessing-imbalanced,modeling-xgboost]"
 
 ## Using Skyulf as a Library
 
-Skyulf isn't just a web application; its core logic is available as a standalone Python library (`skyulf-core`). You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building. Using EDA is a great way to get started and it is really easy to use.
+`skyulf-core` is Skyulf's standalone Python library and powers Kayra. You can use it in your own scripts or Jupyter notebooks for powerful EDA and pipeline building. Using EDA is a great way to get started and it is really easy to use.
 
 ### Example: Automated EDA
 
@@ -216,7 +216,7 @@ We maintain a detailed changelog of all major updates, new features, and archite
 
 ## Workflow Overview
 
-The high-level flow from dataset to model training inside Skyulf:
+The high-level flow from dataset to model training inside Kayra:
 
 <p align="center">
 	<img src="static/img/image.png" alt="Dataset → Train/Val/Test split → Celery-driven model trainer" width="520">

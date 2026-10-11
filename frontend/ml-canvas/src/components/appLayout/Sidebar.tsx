@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive,
   BarChart2, Activity, TrendingUp, Bug, Timer, ScrollText, X,
 } from 'lucide-react';
-import logoUrl from '../../../../../static/img/app_logo/ml_learning_swirl_yellow_v2.svg';
+import logoUrl from '../../../../../static/img/app_logo/logo.png';
 
 interface SidebarProps {
   pathname: string;
@@ -49,10 +49,10 @@ function SidebarBrand({
   return (
     <div className={`h-14 shrink-0 ${isCollapsed ? 'px-4' : 'px-6'} border-b flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${isMobile ? 'justify-between' : ''}`}>
       <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-        <img src={logoUrl} alt="Skyulf ML logo" width={32} height={32} className="w-8 h-8 object-contain shrink-0" />
+        <img src={logoUrl} alt="Kayra logo" width={32} height={32} className="w-8 h-8 object-contain shrink-0" />
         {!isCollapsed && (
           <h1 className="text-xl font-bold tracking-tight whitespace-nowrap text-foreground">
-            Skyulf ML
+            Kayra
           </h1>
         )}
       </div>
@@ -126,6 +126,7 @@ function ThemeControl({
         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
         {!isCollapsed && (isDarkMode ? 'Light Mode' : 'Dark Mode')}
       </button>
+      <p className={isCollapsed ? 'sr-only' : 'text-center text-xs text-muted-foreground'}>by Skyulf</p>
     </div>
   );
 }

@@ -1,12 +1,12 @@
-# Skyulf
+# Skyulf: Kayra and skyulf-core
 
 > **The Visual MLOps Builder** — Drag-and-drop machine learning without writing code.
 
-Skyulf is a self-hosted, privacy-first MLOps platform. Bring your data, clean it visually, engineer features with a node-based canvas, train models, and deploy — all in one place.
+Kayra is the self-hosted visual MLOps application by Skyulf. Its backend and frontend use `skyulf-core`, Skyulf’s standalone Python library. Bring your data, clean it visually, engineer features with a node-based canvas, train models, and deploy — all in one place.
 
 ---
 
-## Why Skyulf?
+## Why Kayra?
 
 | Feature | What you get |
 |---------|-------------|
@@ -28,7 +28,7 @@ Skyulf is a self-hosted, privacy-first MLOps platform. Bring your data, clean it
 pip install skyulf-core
 ```
 
-### Full platform (backend + frontend)
+### Kayra (backend + frontend)
 
 ```bash
 git clone https://github.com/flyingriverhorse/Skyulf.git
@@ -45,7 +45,7 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000) to access the dashboard.
 
 ## Architecture
 
-Skyulf is built on three components with strict boundaries:
+Kayra is built on three components with strict boundaries:
 
 - **Frontend**: React + TypeScript + React Flow (visual ML canvas)
 - **Backend**: FastAPI + Celery + Redis (API, jobs, persistence)

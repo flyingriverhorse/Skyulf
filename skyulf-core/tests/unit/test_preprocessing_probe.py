@@ -2,6 +2,9 @@
 
 import json
 from copy import deepcopy
+from importlib import util
+from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -14,6 +17,23 @@ from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
 from skyulf.registry import NodeRegistry
+
+
+def test_optimized_probe_keeps_required_comparison_and_schema_guards():
+    """Python optimization must not erase failed probe preconditions."""
+    from skyulf.inference import preprocessing_probe
+    from skyulf.inference._probe_frames import ProbeFailure
+
+    spec = util.spec_from_file_location(preprocessing_probe.__name__, preprocessing_probe.__file__)
+    assert spec is not None
+    optimized = util.module_from_spec(spec)
+    source = Path(preprocessing_probe.__file__).read_text(encoding="utf-8")
+    exec(compile(source, preprocessing_probe.__file__, "exec", optimize=1), optimized.__dict__)
+    with pytest.raises(ProbeFailure, match="missing_expected_output"):
+        optimized._execute_check("chunks:1", {}, pd.DataFrame(), None, (5, 1024))
+    artifact = SimpleNamespace(pipeline=SimpleNamespace(_inference_schemas=None))
+    with pytest.raises(ValueError, match="Missing fitted inference schemas"):
+        optimized._finish({"status": "passed"}, artifact, pd.DataFrame())
 
 
 def _artifact(tmp_path, engine="pandas", steps=None):

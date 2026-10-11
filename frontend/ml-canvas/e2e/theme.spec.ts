@@ -44,7 +44,7 @@ test('the real logo loads on desktop and mobile with reduced motion', async ({ p
   await mockBackend(page);
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/canvas');
-  const logo = page.locator('#app-sidebar').getByRole('img', { name: 'Skyulf logo' });
+  const logo = page.locator('#app-sidebar').getByRole('img', { name: 'Kayra logo', exact: true });
   await expect(logo).toBeVisible();
   expect(await logo.evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await page.setViewportSize({ width: 390, height: 700 });

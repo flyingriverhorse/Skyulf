@@ -1,6 +1,6 @@
 # Backend API Reference
 
-The Skyulf backend exposes a REST API on port `8000` by default.
+The Kayra backend exposes a REST API on port `8000` by default.
 Interactive docs are available at [`/docs`](http://127.0.0.1:8000/docs) (Swagger UI)
 and [`/redoc`](http://127.0.0.1:8000/redoc) (ReDoc) when `DEBUG=true`.
 

@@ -1,7 +1,28 @@
 """Monitoring reconstructs real registered training references without fitting again."""
 
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared real-store fixture
+
+
+def test_optional_training_metadata_permission_failure_is_explicit():
+    """A missing lineage link cannot fabricate metadata or prevent valid measurement."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_reference
+
+    client = Mock()
+    client.get_run.side_effect = PermissionError("no navigation permission")
+    model = SimpleNamespace(run_id="owning", creation_timestamp=1000, aliases=[])
+    artifact = SimpleNamespace(
+        pipeline=SimpleNamespace(config={"modeling": {"type": "linear_regression"}}),
+        manifest=SimpleNamespace(project_source_sha256=None),
+    )
+    metadata = monitoring_reference._model_metadata(client, model, artifact)
+    assert metadata["status"] == "unavailable"
+    assert metadata["reason"] == "training_run_metadata:PermissionError"
+    assert metadata["training_experiment_id"] is None
+    assert metadata["aliases"] == []
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -34,6 +55,22 @@ def test_registered_reference_replays_training_membership(staged, monkeypatch, e
     assert 0 < len(reference) < len(frame)
     assert spec.version == 4
     assert evidence["model_version"] == "1"
+    metadata = evidence["model_metadata"]
+    assert metadata["status"] == "recorded"
+    assert metadata["created_at"] and metadata["captured_at"]
+    assert metadata["algorithm"] == "linear_regression"
+    assert metadata["training_experiment_id"]
+    assert set(metadata) == {
+        "status",
+        "captured_at",
+        "created_at",
+        "aliases",
+        "algorithm",
+        "project_source_sha256",
+        "training_experiment_id",
+        "reason",
+        "training_source_commit",
+    }
     frame["id"] += 1000
     with pytest.raises(ValueError):
         monitoring_reference.load_monitoring_reference(

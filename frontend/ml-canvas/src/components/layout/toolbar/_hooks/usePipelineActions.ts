@@ -85,7 +85,7 @@ export function usePipelineActions(): PipelineActions {
       const url = URL.createObjectURL(resp.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `skyulf_pipeline_${currentDatasetId}_${mode}.ipynb`;
+      a.download = `kayra_pipeline_${currentDatasetId}_${mode}.ipynb`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

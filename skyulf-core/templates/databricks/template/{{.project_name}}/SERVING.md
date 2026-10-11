@@ -53,9 +53,7 @@ spec = PinnedEndpointSpec(
     logging_schema="serving",
     logging_table_prefix="risk_v7",
 )
-endpoint = prepare_pinned_endpoint(
-    spec, tracking_uri="databricks", registry_uri="databricks-uc"
-)
+endpoint = prepare_pinned_endpoint(spec, tracking_uri="databricks", registry_uri="databricks-uc")
 print("Inputs:", endpoint.input_schema)
 print("Outputs:", endpoint.output_schema)
 print("Endpoint configuration:", endpoint.config)

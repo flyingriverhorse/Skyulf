@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -96,8 +97,34 @@ def load_monitoring_artifact(
         "dataset_id": spec.dataset_id,
         "training_evidence_sha256": spec.training_evidence_sha256,
         "reference_population": "training_partition_excluding_holdout",
+        "model_metadata": _model_metadata(client, model, artifact),
     }
     return artifact, spec, filters, evidence | parent
+
+
+def _model_metadata(client: Any, model: Any, artifact: Any) -> dict:
+    """Capture only operator lineage fields, preserving optional metadata failures."""
+    created = getattr(model, "creation_timestamp", None)
+    aliases = getattr(model, "aliases", None)
+    metadata = {
+        "status": "recorded",
+        "reason": None,
+        "captured_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.fromtimestamp(created / 1000, UTC).isoformat() if created else None,
+        "aliases": sorted(aliases) if aliases is not None else None,
+        "algorithm": artifact.pipeline.config.get("modeling", {}).get("type"),
+        "project_source_sha256": artifact.manifest.project_source_sha256,
+        "training_experiment_id": None,
+        "training_source_commit": None,
+    }
+    try:
+        run = client.get_run(model.run_id)
+        metadata["training_experiment_id"] = str(run.info.experiment_id)
+        metadata["training_source_commit"] = run.data.tags.get("mlflow.source.git.commit")
+    except Exception as exc:  # noqa: BLE001 - optional link metadata cannot invalidate metrics
+        metadata["status"] = "unavailable"
+        metadata["reason"] = f"training_run_metadata:{type(exc).__name__}"
+    return metadata
 
 
 def _verify_model_set(

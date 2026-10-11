@@ -203,7 +203,8 @@ def workflow_lookup_json(config: dict[str, Any]) -> str | None:
     spec = parse_lookup_config(
         value, label=config["target_column"], input_columns=tuple(config["input_columns"])
     )
-    assert spec is not None
+    if spec is None:
+        raise ValueError("An enabled feature lookup must produce a lookup specification.")
     return json.dumps(serialize_feature_spec(spec), sort_keys=True, separators=(",", ":"))
 
 

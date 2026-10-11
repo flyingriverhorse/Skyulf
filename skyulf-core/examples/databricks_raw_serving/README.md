@@ -130,9 +130,9 @@ An application can send raw values without writing a table. After preparing
 ```python
 from skyulf.integrations.databricks.serving import query_named_records
 
-response = query_named_records(client, plan, [
-    {"age": 35.0, "income": None, "tenure": 12.0, "segment": "Mass"}
-])
+response = query_named_records(
+    client, plan, [{"age": 35.0, "income": None, "tenure": 12.0, "segment": "Mass"}]
+)
 print(response.predictions)
 ```
 

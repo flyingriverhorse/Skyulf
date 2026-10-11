@@ -253,12 +253,12 @@ describe('Toolbar experiment controls', () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: width < 720 ? 'Export PNG' : 'PNG (high-DPI)' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Canvas exported as PNG'));
-    expect(exportCanvasToPng).toHaveBeenCalledWith('skyulf-canvas.png');
+    expect(exportCanvasToPng).toHaveBeenCalledWith('kayra-canvas.png');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: width < 720 ? 'Export SVG' : 'SVG (vector)' }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Canvas exported as SVG'));
-    expect(exportCanvasToSvg).toHaveBeenCalledWith('skyulf-canvas.svg');
+    expect(exportCanvasToSvg).toHaveBeenCalledWith('kayra-canvas.svg');
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Notebook (full)' }));
     expect(vi.mocked(usePipelineActions).mock.results[0]!.value.exportNotebook).toHaveBeenCalledWith('full');

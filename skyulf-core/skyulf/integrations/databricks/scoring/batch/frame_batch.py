@@ -22,7 +22,7 @@ from .....inference.fitted_pipeline import (
     load_pipeline,
     save_pipeline,
 )
-from .....inference.pipeline_evaluation import (
+from .....inference.pipeline_evaluation import (  # noqa: F401 - public compatibility re-export
     evaluate_holdout as evaluate_holdout,
 )
 from .....inference.pipeline_scoring import scoring_counts

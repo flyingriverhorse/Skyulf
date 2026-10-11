@@ -628,7 +628,8 @@ def _empty_incremental_predictions(
 ) -> pd.DataFrame:
     """Commit an empty bootstrap tail without invoking estimators that require rows."""
     artifact = prepared.artifact
-    assert isinstance(artifact, FittedPipelineArtifact)
+    if not isinstance(artifact, FittedPipelineArtifact):
+        raise TypeError("Empty incremental scoring requires a FittedPipelineArtifact.")
     for step in artifact.pipeline.feature_engineer.fitted_steps:
         params = step["artifact"]
         if params.get("history_mode") == "carry":

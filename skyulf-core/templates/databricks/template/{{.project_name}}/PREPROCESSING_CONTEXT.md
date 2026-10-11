@@ -64,9 +64,7 @@ requests receive the returned JSON-compatible state:
 from skyulf.inference.pipeline_scoring import score_pipeline_with_history
 
 first = score_pipeline_with_history(first_batch, artifact)
-second = score_pipeline_with_history(
-    next_batch, artifact, history_state=first.history
-)
+second = score_pipeline_with_history(next_batch, artifact, history_state=first.history)
 predictions = second.frame
 next_history = second.history
 ```
@@ -145,6 +143,7 @@ Applier class, alongside its existing `apply`:
 ```python
 from skyulf.core.capabilities import ExecutionCapability
 
+
 # Inside your existing Applier class:
 @staticmethod
 def inference_capability(state, *, engine):
@@ -198,20 +197,34 @@ from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 
-training = pd.DataFrame({
-    "segment": ["A", "A", "B", "B", "A", "B"],
-    "income": [100.0, 300.0, 1000.0, 1400.0, 200.0, 1200.0],
-    "target": [1.0, 3.0, 10.0, 14.0, 2.0, 12.0],
-})
-pipeline = SkyulfPipeline({
-    "preprocessing": [
-        {"name": "fill_income", "transformer": "GroupImputer",
-         "params": {"columns": ["income"], "group_by": "segment", "strategy": "mean"}},
-        {"name": "encode_segment", "transformer": "OneHotEncoder",
-         "params": {"columns": ["segment"], "handle_unknown": "ignore", "max_categories": None}},
-    ],
-    "modeling": {"type": "linear_regression"},
-})
+training = pd.DataFrame(
+    {
+        "segment": ["A", "A", "B", "B", "A", "B"],
+        "income": [100.0, 300.0, 1000.0, 1400.0, 200.0, 1200.0],
+        "target": [1.0, 3.0, 10.0, 14.0, 2.0, 12.0],
+    }
+)
+pipeline = SkyulfPipeline(
+    {
+        "preprocessing": [
+            {
+                "name": "fill_income",
+                "transformer": "GroupImputer",
+                "params": {"columns": ["income"], "group_by": "segment", "strategy": "mean"},
+            },
+            {
+                "name": "encode_segment",
+                "transformer": "OneHotEncoder",
+                "params": {
+                    "columns": ["segment"],
+                    "handle_unknown": "ignore",
+                    "max_categories": None,
+                },
+            },
+        ],
+        "modeling": {"type": "linear_regression"},
+    }
+)
 pipeline.fit(
     SplitDataset(train=training, test=training.iloc[:0]),
     target_column="target",
@@ -223,10 +236,12 @@ save_pipeline(pipeline, artifact_path)
 artifact = load_pipeline(artifact_path)
 
 # These are model inputs, including missing income and a previously unseen segment.
-sample = pd.DataFrame({
-    "segment": ["A", "B", "NEW"],
-    "income": [None, 1600.0, None],
-})
+sample = pd.DataFrame(
+    {
+        "segment": ["A", "B", "NEW"],
+        "income": [None, 1600.0, None],
+    }
+)
 report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
 
 print(report["status"])
@@ -234,9 +249,7 @@ for step in report["steps"]:
     print(step["name"], step.get("context"), step["status"])
 
 # Optional: persist diagnostic evidence locally. No prediction table is written.
-Path("preprocessing_report.json").write_text(
-    json.dumps(report, indent=2), encoding="utf-8"
-)
+Path("preprocessing_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 ```
 
 Expected summary:
@@ -411,26 +424,46 @@ from skyulf.inference.pipeline_scoring import score_pipeline_with_history
 from skyulf.inference.preprocessing_probe import probe_fitted_preprocessing
 from skyulf.pipeline import SkyulfPipeline
 
-observations = pd.DataFrame({
-    "time": range(10),
-    "value": np.arange(1.0, 11.0),
-    "target": np.arange(1.0, 11.0) * 3,
-})
-pipeline = SkyulfPipeline({
-    "preprocessing": [
-        {"name": "lag", "transformer": "LagFeatures", "params": {
-            "columns": ["value"], "lags": [1], "sort_by": "time",
-            "history_mode": "carry",
-        }},
-        {"name": "fill", "transformer": "SimpleImputer", "params": {
-            "columns": ["value_lag_1"], "strategy": "mean",
-        }},
-        {"name": "drop_clock", "transformer": "DropMissingColumns", "params": {
-            "columns": ["time"], "missing_threshold": None,
-        }},
-    ],
-    "modeling": {"type": "linear_regression"},
-})
+observations = pd.DataFrame(
+    {
+        "time": range(10),
+        "value": np.arange(1.0, 11.0),
+        "target": np.arange(1.0, 11.0) * 3,
+    }
+)
+pipeline = SkyulfPipeline(
+    {
+        "preprocessing": [
+            {
+                "name": "lag",
+                "transformer": "LagFeatures",
+                "params": {
+                    "columns": ["value"],
+                    "lags": [1],
+                    "sort_by": "time",
+                    "history_mode": "carry",
+                },
+            },
+            {
+                "name": "fill",
+                "transformer": "SimpleImputer",
+                "params": {
+                    "columns": ["value_lag_1"],
+                    "strategy": "mean",
+                },
+            },
+            {
+                "name": "drop_clock",
+                "transformer": "DropMissingColumns",
+                "params": {
+                    "columns": ["time"],
+                    "missing_threshold": None,
+                },
+            },
+        ],
+        "modeling": {"type": "linear_regression"},
+    }
+)
 pipeline.fit(
     SplitDataset(train=observations.iloc[:8], test=observations.iloc[8:]),
     target_column="target",
@@ -444,7 +477,9 @@ first = score_pipeline_with_history(requests.iloc[:1], artifact)
 # JSON round-trip represents transporting the proposed state to another call.
 state = json.loads(json.dumps(first.history))
 second = score_pipeline_with_history(
-    requests.iloc[1:], load_pipeline(artifact_path), history_state=state,
+    requests.iloc[1:],
+    load_pipeline(artifact_path),
+    history_state=state,
 )
 expected = score_pipeline_with_history(requests, artifact)
 np.testing.assert_allclose(

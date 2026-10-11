@@ -358,8 +358,8 @@ def compact_summary_md(
 ) -> str:
     """Build the compact notebook's title markdown: fingerprint, handoff intent, graph summary."""
     return (
-        f"# Skyulf pipeline — `{dataset_name or dataset_id}` (compact)\n\n"
-        f"_Auto-exported from the Skyulf canvas. Config fingerprint: "
+        f"# Kayra pipeline — `{dataset_name or dataset_id}` (compact)\n\n"
+        f"_Auto-exported from the Kayra canvas by Skyulf. Config fingerprint: "
         f"`{config_fingerprint(cfg)}`._\n\n"
         f"This notebook runs the saved pipeline end-to-end via `SkyulfPipeline`. "
         f"It is meant for **production / inference handoff**: fit once on the training set, "
@@ -477,7 +477,7 @@ def _data_path_guidance_md(data_path: str, resolved_from_db: bool) -> str:
     """
     if resolved_from_db:
         provenance = (
-            f"The exporter pre-filled `DATA_PATH` with the path Skyulf knows: "
+            f"The exporter pre-filled `DATA_PATH` with the path Kayra knows: "
             f"`{data_path}`. **If you're running this notebook on a different machine "
             f"or the file has moved, edit the path below.**"
         )
@@ -537,8 +537,8 @@ def full_summary_md(
 ) -> str:
     """Build the full notebook's title markdown: fingerprint, per-cell intent, and topology."""
     return (
-        f"# Skyulf pipeline — `{dataset_name or dataset_id}` (full)\n\n"
-        f"_Auto-exported from the Skyulf canvas. Config fingerprint: "
+        f"# Kayra pipeline — `{dataset_name or dataset_id}` (full)\n\n"
+        f"_Auto-exported from the Kayra canvas by Skyulf. Config fingerprint: "
         f"`{config_fingerprint(cfg)}`._\n\n"
         f"Each preprocessing node is rendered as its own cell so you can\n"
         f"tweak parameters, swap nodes, or inspect intermediate state.\n\n"

@@ -144,10 +144,10 @@ def assert_same(expected: Frame, actual: Frame, reason: str = "output_mismatch")
         raise ProbeFailure(reason)
     try:
         if isinstance(expected, pd.DataFrame):
-            assert isinstance(actual, pd.DataFrame)
-            assert_pandas_equal(expected, actual, check_exact=True, check_index_type=False)
+            assert_pandas_equal(
+                expected, cast(pd.DataFrame, actual), check_exact=True, check_index_type=False
+            )
         else:
-            assert isinstance(actual, pl.DataFrame)
-            assert_polars_equal(expected, actual, check_exact=True)
+            assert_polars_equal(expected, cast(pl.DataFrame, actual), check_exact=True)
     except (AssertionError, TypeError, ValueError):
         raise ProbeFailure(reason) from None

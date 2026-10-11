@@ -221,7 +221,8 @@ def log_training_feature_model(
     binding = parse_feature_binding(spec.feature_binding_json)
     lookup = training_lookup(spec)
     native = logging_training_set(spark, spec)
-    assert lookup is not None
+    if lookup is None:
+        raise ValueError("Feature model logging requires a feature lookup.")
     uri = log_feature_pipeline_model(
         path,
         training_set=native,

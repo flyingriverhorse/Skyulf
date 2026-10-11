@@ -143,7 +143,8 @@ def _execute_check(
     """Use unchanged apply code for full, repeated, partitioned and reordered requests."""
     if name == "full":
         return _apply_checked(record, frame, *budgets)
-    assert expected is not None
+    if expected is None:
+        raise ProbeFailure("missing_expected_output")
     if name.startswith("chunks:"):
         _check_chunks(record, frame, expected, int(name.split(":")[1]), budgets)
     elif name == "reverse":
@@ -267,7 +268,8 @@ def _finish(report: dict, artifact: FittedPipelineArtifact, frame: Frame) -> dic
         report["feature_schema"] = "not_run"
         return report
     schemas = artifact.pipeline._inference_schemas
-    assert schemas is not None
+    if schemas is None:
+        raise ValueError("Missing fitted inference schemas.")
     try:
         schemas[1].assert_compatible(
             SkyulfSchema.from_dataframe(frame), check_dtypes=True, check_order=True

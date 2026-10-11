@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import logoUrl from '../../../../../static/img/app_logo/ml_learning_swirl_yellow_v2.svg';
-import animationUrl from '../../../../../static/img/app_logo/Swirl Logo Animation.mp4';
+import logoUrl from '../../../../../static/img/app_logo/logo.png';
+import { LoadingLogoAnimation } from './LoadingLogoAnimation';
 
 /** Animate the application mark during loading unless reduced motion is requested. */
 export function LoadingLogo() {
@@ -14,18 +14,7 @@ export function LoadingLogo() {
   }, []);
 
   return animate ? (
-    <video
-      src={animationUrl}
-      poster={logoUrl}
-      autoPlay
-      muted
-      loop
-      playsInline
-      width={64}
-      height={64}
-      className="h-16 w-16 rounded-xl object-cover"
-      aria-hidden="true"
-    />
+    <LoadingLogoAnimation logoUrl={logoUrl} />
   ) : (
     <img src={logoUrl} alt="" width={64} height={64} className="h-16 w-16 object-contain" aria-hidden="true" />
   );

@@ -104,7 +104,12 @@ def build_feature_group(
         }
     else:
         namespace: dict[str, Any] = {"__name__": "skyulf_feature_transform"}
-        exec(compile(source, group.transform.split(":")[0], "exec"), namespace)  # noqa: S102
+        # Trusted project code only: contained bounded source and pinned digest checked above.
+        # This runs with job-owner privileges; it is not a sandbox for untrusted Python.
+        # nosemgrep: python.lang.security.audit.exec-detected.exec-detected, python_exec_rule-exec-used
+        exec(  # nosec B102 # noqa: S102 # pylint: disable=exec-used
+            compile(source, group.transform.split(":")[0], "exec"), namespace
+        )
         transform = namespace.get(group.transform.split(":")[1])
         if not callable(transform):
             raise ValueError(f"Feature transform function is missing: {group.transform}.")

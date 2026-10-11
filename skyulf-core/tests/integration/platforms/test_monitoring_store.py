@@ -35,6 +35,26 @@ def test_result_identity_retries_and_late_labels():
     assert first["model_name"] == "models.risk.score"
 
 
+def test_optional_metadata_refresh_preserves_observation_identity():
+    """Registry metadata refreshes must not duplicate the same measured observation."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
+
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    report = {"status": "healthy", "current_rows": 4, "metrics": []}
+    evidence = {"model_digest": "verified", "training_run_id": "training"}
+    first = result_row(config(), "2", now, now, now, report, evidence)
+    refresh = result_row(
+        config(),
+        "2",
+        now,
+        now,
+        now,
+        report,
+        evidence | {"model_metadata": {"captured_at": "later", "aliases": ["champion"]}},
+    )
+    assert first["report_id"] == refresh["report_id"]
+
+
 def test_inventory_keeps_namespace_and_selection():
     """The dashboard must distinguish same-named models in different catalogs."""
     from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
@@ -127,6 +147,19 @@ def test_owned_incompatible_schema_requires_explicit_migration():
     spark.createDataFrame.return_value.schema.simpleString.return_value = "struct<new:string>"
     with pytest.raises(ValueError, match="schema differs"):
         initialize_monitoring_store(spark, "ops", "monitoring")
+    assert all(call.args[0].startswith("SHOW TBLPROPERTIES") for call in spark.sql.call_args_list)
+
+
+@pytest.mark.parametrize("view", ["monitoring_issues", "model_version_details"])
+def test_new_investigation_view_ownership_is_checked_before_any_mutation(view):
+    """An existing foreign investigation view must block the whole initializer."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: name.endswith(view)
+    spark.sql.return_value.first.return_value = {"value": "foreign"}
+    with pytest.raises(ValueError, match="ownership"):
+        store.initialize_monitoring_store(spark, "ops", "monitoring")
     assert all(call.args[0].startswith("SHOW TBLPROPERTIES") for call in spark.sql.call_args_list)
 
 

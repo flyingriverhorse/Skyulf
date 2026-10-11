@@ -180,6 +180,7 @@ def _log_observation(
     """Keep monitoring metrics in their own run rather than changing training evaluation."""
     existing = _finished_observation(row["report_id"], tracking_uri, experiment_name)
     if existing is not None:
+        _record_monitoring_run_link(row, evidence, existing, tracking_uri)
         return existing
     tracking = TrackingConfig(
         enabled=experiment_name is not None,
@@ -187,6 +188,7 @@ def _log_observation(
         experiment_name=experiment_name,
     )
     with track_run(tracking, run_name=f"monitor-{config.project}-{row['report_id'][:12]}") as run:
+        _record_monitoring_run_link(row, evidence, run.run_id, tracking_uri)
         run.set_tags(
             {
                 "skyulf.monitoring.id": config.monitor_id,
@@ -207,6 +209,21 @@ def _log_observation(
             }
         )
         return run.run_id
+
+
+def _record_monitoring_run_link(
+    row: dict, evidence: dict, run_id: str | None, tracking_uri: str | None
+) -> None:
+    """Persist only exact experiment identity; unavailable links do not invalidate metrics."""
+    if run_id is None:
+        return
+    try:
+        info = make_tracking_client(tracking_uri).get_run(run_id).info
+        evidence["monitoring_experiment_id"] = str(info.experiment_id)
+        evidence["monitoring_link_status"] = "recorded"
+    except Exception as exc:  # noqa: BLE001 - optional navigation evidence is best effort
+        evidence["monitoring_link_status"] = f"unavailable:{type(exc).__name__}"
+    row["evidence_json"] = json.dumps(evidence, sort_keys=True, allow_nan=False)
 
 
 def _finished_observation(

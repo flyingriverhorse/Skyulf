@@ -31,8 +31,9 @@ def _merge_rows(spark: Any, frame: Any, table: str, grain: tuple[str, ...]) -> N
     condition = " AND ".join(f"target.{column_name(k)} = source.{column_name(k)}" for k in grain)
     changes = " OR ".join(f"NOT(target.{name} <=> source.{name})" for name in names)
     try:
+        # Every interpolated name is allowlisted; the view name is a generated UUID.
         spark.sql(
-            f"MERGE INTO {table_name(table)} AS target USING `{view}` AS source "
+            f"MERGE INTO {table_name(table)} AS target USING `{view}` AS source "  # nosec B608
             f"ON {condition} WHEN MATCHED AND ({changes}) THEN UPDATE SET * "
             "WHEN NOT MATCHED THEN INSERT *"
         )

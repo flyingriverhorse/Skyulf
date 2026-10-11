@@ -115,6 +115,7 @@ The shipped `src/features/groups/activity.py` produces two features in one pass:
 ```python
 from pyspark.sql import functions as F
 
+
 def compute_features(frame):
     """Aggregate transactions at the declared observation grain."""
     return frame.groupBy("company_id", "observed_at").agg(

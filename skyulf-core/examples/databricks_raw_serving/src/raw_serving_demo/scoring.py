@@ -21,7 +21,7 @@ from skyulf.integrations.mlflow.registration.registry import (
     resolve_model,
 )
 
-from .data import bounded_pandas, read_cohort
+from .data import bounded_pandas, read_cohort, validate_namespace
 from .training import STORES
 
 
@@ -107,6 +107,9 @@ def rest_predictions(spark, client, plan, namespace, source_version, config):
 
 def sql_predictions(spark, client, plan, namespace, source_version, *, function_ddl=None):
     """Use a typed UC SQL function over raw rows; Spark owns the output table write."""
+    validate_namespace(namespace)
+    if type(source_version) is not int or source_version < 0:
+        raise ValueError("Explicit nonnegative Delta version required")
     function = build_serving_sql_function(
         plan, f"{namespace}.predict_customer_v{plan.spec.model_version}"
     )
@@ -117,6 +120,8 @@ def sql_predictions(spark, client, plan, namespace, source_version, *, function_
         spark.sql(function_ddl).collect()
     call = function.call_sql(table_alias="raw")
     table = f"{namespace}.predictions_ai_query"
+    # Identifiers and version are validated above; the frozen endpoint spec and
+    # typed function builder validate the model URI and generated call.
     query = f"""
       CREATE TABLE {table} USING DELTA AS
       SELECT customer_id, result.*, {source_version} AS source_version,
@@ -126,7 +131,7 @@ def sql_predictions(spark, client, plan, namespace, source_version, *, function_
         FROM {namespace}.raw_customers VERSION AS OF {source_version} AS raw
         WHERE raw.cohort = 'score'
       )
-    """
+    """  # nosec B608
     print(query, flush=True)
     spark.sql(query).collect()
     return {
@@ -135,6 +140,12 @@ def sql_predictions(spark, client, plan, namespace, source_version, *, function_
         "function": function.function_name,
         "sql": query,
     }
+
+
+def _require_verification(condition, message):
+    """Keep acceptance checks active when Python runs with optimization enabled."""
+    if not condition:
+        raise ValueError(message)
 
 
 def verify(spark, client, plan, namespace, source_version, config):
@@ -153,9 +164,15 @@ def verify(spark, client, plan, namespace, source_version, config):
             spark.table(f"{namespace}.{table_name}").orderBy("customer_id"),
             config["prediction_rows"],
         )
-        assert actual.customer_id.tolist() == source.customer_id.tolist(), "Exact key mismatch"
-        assert actual.model_uri.eq(plan.spec.model_uri).all(), "Model version mismatch"
-        assert actual.source_version.eq(source_version).all(), "Delta version mismatch"
+        _require_verification(
+            actual.customer_id.tolist() == source.customer_id.tolist(), "Exact key mismatch"
+        )
+        _require_verification(
+            actual.model_uri.eq(plan.spec.model_uri).all(), "Model version mismatch"
+        )
+        _require_verification(
+            actual.source_version.eq(source_version).all(), "Delta version mismatch"
+        )
         for column in expected:
             np.testing.assert_allclose(
                 actual[column],
@@ -167,13 +184,17 @@ def verify(spark, client, plan, namespace, source_version, config):
         errors[method] = float(
             np.max(np.abs(actual[expected.columns].to_numpy() - expected.to_numpy()))
         )
-    assert source[config["raw_columns"]].isna().any().any(), "Null-input case missing"
-    assert source.segment.eq("NewSegment").any(), "Unseen-category case missing"
-    assert list(plan.input_columns) == config["raw_columns"], (
-        "Endpoint must accept only raw columns"
+    _require_verification(
+        source[config["raw_columns"]].isna().any().any(), "Null-input case missing"
+    )
+    _require_verification(source.segment.eq("NewSegment").any(), "Unseen-category case missing")
+    _require_verification(
+        list(plan.input_columns) == config["raw_columns"], "Endpoint must accept only raw columns"
     )
     batch_exists = spark.catalog.tableExists(f"{namespace}.batch_predictions")
-    assert batch_exists == config["write_batch_predictions"], "Unexpected batch publication"
+    _require_verification(
+        batch_exists == config["write_batch_predictions"], "Unexpected batch publication"
+    )
     return {
         "status": "PASS",
         "rows_per_method": len(source),
