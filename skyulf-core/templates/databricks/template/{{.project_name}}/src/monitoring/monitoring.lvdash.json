@@ -85,7 +85,8 @@
         " AND (COALESCE(:drift_monitor, '') IN ('', 'All contexts') OR monitor_context = :drift_monitor)\n",
         "\n",
         ")\n",
-        "SELECT source.* FROM (WITH wide AS (\n",
+        "SELECT concat(source.model_name, ' / v', COALESCE(source.model_version, 'unresolved'), ' / ', source.monitor_id) AS model_identity,\n",
+        " source.* FROM (WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, window_start, window_end, measured_at, observed_at, column_name, measurement_status,\n",
         "MAX(CASE WHEN metric_name = 'psi' THEN value END) AS psi,\n",
         "MAX(CASE WHEN metric_name = 'ks_statistic' THEN value END) AS ks_statistic,\n",
@@ -188,7 +189,8 @@
         " AND (COALESCE(:drift_monitor, '') IN ('', 'All contexts') OR monitor_context = :drift_monitor)\n",
         "\n",
         ")\n",
-        "SELECT source.* FROM (WITH wide AS (\n",
+        "SELECT concat(source.model_name, ' / v', COALESCE(source.model_version, 'unresolved'), ' / ', source.monitor_id) AS model_identity,\n",
+        " source.* FROM (WITH wide AS (\n",
         "SELECT monitor_id, report_id, model_catalog, model_schema, model_name, model_version, window_start, window_end, measured_at, observed_at, column_name, measurement_status,\n",
         "MAX(CASE WHEN metric_name = 'psi' THEN value END) AS psi,\n",
         "MAX(CASE WHEN metric_name = 'ks_statistic' THEN value END) AS ks_statistic,\n",
@@ -393,7 +395,8 @@
         " AND (COALESCE(:trend_monitor, '') IN ('', 'All contexts') OR monitor_context = :trend_monitor)\n",
         "\n",
         ")\n",
-        "SELECT source.* FROM (WITH observations AS (\n",
+        "SELECT concat(source.model_name, ' / v', COALESCE(source.model_version, 'unresolved'), ' / ', source.monitor_id) AS model_identity,\n",
+        " source.* FROM (WITH observations AS (\n",
         " SELECT DISTINCT report_id, monitor_id, model_name, model_version, column_name, measured_at\n",
         " FROM metric_history WHERE category = 'performance'\n",
         "), numbered AS (\n",
@@ -503,7 +506,8 @@
         " WHEN 'accuracy' THEN 2 ELSE 3 END, metric_name) AS metric_rank\n",
         " FROM available_metrics\n",
         ")\n",
-        "SELECT source.report_id, source.monitor_id, source.model_catalog, source.model_schema,\n",
+        "SELECT concat(concat(source.model_name, ' / v', COALESCE(source.model_version, 'unresolved'), ' / ', source.monitor_id), ' / ', upper(source.metric_name)) AS model_panel,\n",
+        " source.report_id, source.monitor_id, source.model_catalog, source.model_schema,\n",
         " source.model_name, source.model_version, source.window_start, source.window_end, source.measured_at, source.observed_at,\n",
         " source.column_name, source.metric_name, source.value,\n",
         " concat(upper(source.metric_name), CASE WHEN source.metric_name IN ('mae','mse','rmse','mape','log_loss')\n",
@@ -705,11 +709,13 @@
         " ORDER BY value DESC NULLS LAST, column_name) AS feature_rank\n",
         " FROM ranked WHERE report_rank = 1 AND metric_name = 'psi'\n",
         "), top_features AS (SELECT * FROM feature_ranked WHERE feature_rank <= 10)\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_panel,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, observed_at, measurement_status, column_name, value AS plot_value,\n",
         " 'Measured PSI' AS series FROM top_features\n",
         "UNION ALL\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_panel,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, observed_at, measurement_status, column_name, threshold AS plot_value,\n",
         " 'PSI limit' AS series FROM top_features\n",
         "ORDER BY column_name, series"
@@ -801,12 +807,14 @@
         " GROUP BY report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, observed_at, measurement_status, column_name\n",
         ")\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_identity,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, observed_at, measurement_status, column_name,\n",
         " drifted_feature AS feature_count,\n",
         " 'Drift detected' AS series FROM features\n",
         "UNION ALL\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_identity,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, observed_at, measurement_status, column_name,\n",
         " unavailable_feature AS feature_count,\n",
         " 'Checks unavailable' AS series FROM features\n",
@@ -916,7 +924,8 @@
         " FROM monitoring_results WHERE NOT (status = 'no_data'\n",
         " AND get_json_object(report_json, '$.performance') IS NOT NULL\n",
         " AND get_json_object(report_json, '$.current_rows') IS NULL))\n",
-        "SELECT history.* FROM history JOIN latest_reports\n",
+        "SELECT concat(history.model_name, ' / v', COALESCE(history.model_version, 'unresolved'), ' / ', history.monitor_id) AS model_identity,\n",
+        " history.* FROM history JOIN latest_reports\n",
         " ON history.report_id = latest_reports.report_id\n",
         "WHERE latest_reports.report_rank = 1 ORDER BY column_name"
       ],
@@ -1009,7 +1018,8 @@
         " AND (COALESCE(:trend_monitor, '') IN ('', 'All contexts') OR monitor_context = :trend_monitor)\n",
         "\n",
         ")\n",
-        "SELECT source.*,\n",
+        "SELECT concat(source.model_name, ' / v', COALESCE(source.model_version, 'unresolved'), ' / ', source.monitor_id) AS model_identity,\n",
+        " source.*,\n",
         " CASE WHEN source.status IN ('disabled', 'off', 'policy_off') THEN 'Policy disabled'\n",
         " WHEN source.status = 'degraded' THEN 'Performance loss'\n",
         " WHEN source.status = 'healthy' THEN 'Within tolerance'\n",
@@ -1111,13 +1121,16 @@
         " AND source.model_version IS NOT DISTINCT FROM metric.model_version AND source.metric = metric.metric_name\n",
         " AND metric.metric_rank = 1\n",
         ")\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id), ' / ', upper(metric)) AS model_panel,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, metric AS metric_name, current_value AS value, 'Current' AS series FROM selected\n",
         "UNION ALL\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id), ' / ', upper(metric)) AS model_panel,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, metric AS metric_name, baseline_value AS value, 'Baseline' AS series FROM selected\n",
         "UNION ALL\n",
-        "SELECT report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
+        "SELECT concat(concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id), ' / ', upper(metric)) AS model_panel,\n",
+        " report_id, monitor_id, model_catalog, model_schema, model_name, model_version,\n",
         " window_start, window_end, measured_at, metric AS metric_name, threshold_value AS value, 'Tolerance boundary' AS series FROM selected\n",
         "ORDER BY measured_at, report_id, series"
       ],
@@ -1320,7 +1333,8 @@
         " AND source.model_version IS NOT DISTINCT FROM context.model_version\n",
         "), latest_report AS (SELECT * FROM ranked_reports WHERE report_rank = 1)\n",
         "\n",
-        "SELECT context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
+        "SELECT concat(context.model_name, ' / v', COALESCE(context.model_version, 'unresolved'), ' / ', context.monitor_id) AS model_identity,\n",
+        " context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
         " report_id, window_end, measured_at,\n",
         " CASE WHEN report_id IS NULL THEN 'never_observed'\n",
         " WHEN status = 'failed' THEN 'failed'\n",
@@ -1421,7 +1435,8 @@
         " AND source.model_version IS NOT DISTINCT FROM context.model_version\n",
         "), latest_report AS (SELECT * FROM ranked_reports WHERE report_rank = 1)\n",
         "\n",
-        "SELECT report_id, monitor_id, model_name, model_version, measured_at,\n",
+        "SELECT concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_identity,\n",
+        " report_id, monitor_id, model_name, model_version, measured_at,\n",
         " cell.actual_index, cell.predicted_index,\n",
         " concat(cast(cell.actual_index AS STRING), ': ', cell.actual_label) AS actual_class,\n",
         " concat(cast(cell.predicted_index AS STRING), ': ', cell.predicted_label) AS predicted_class,\n",
@@ -1829,7 +1844,8 @@
         " AND source.model_version IS NOT DISTINCT FROM context.model_version\n",
         "), latest_policy AS (SELECT * FROM policy_ranked WHERE policy_rank = 1)\n",
         "\n",
-        "SELECT context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
+        "SELECT concat(context.model_name, ' / v', COALESCE(context.model_version, 'unresolved'), ' / ', context.monitor_id) AS model_identity,\n",
+        " context.monitor_id, context.model_name, context.model_version, context.monitor_context,\n",
         " report_id, window_end, metric, direction, baseline_value, current_value, threshold_value,\n",
         " CASE WHEN report_id IS NULL THEN 'No policy evidence'\n",
         " WHEN status IN ('disabled', 'off', 'policy_off') THEN 'Policy disabled'\n",
@@ -5902,7 +5918,7 @@
                     },
                     {
                       "name": "model_panel",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_panel`"
                     }
                   ],
                   "disaggregated": true
@@ -5917,10 +5933,14 @@
                   "fieldName": "plot_value",
                   "displayName": "PSI",
                   "scale": {
-                    "type": "quantitative"
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
                   },
                   "format": {
-                    "type": "number",
+                    "type": "number-plain",
+                    "abbreviation": "none",
                     "decimalPlaces": {
                       "type": "max",
                       "places": 3
@@ -5956,7 +5976,7 @@
                 "showTitle": true,
                 "title": "Which features changed?",
                 "showDescription": true,
-                "description": "Top ten features from the latest full observation of each identity, compared with their own limits."
+                "description": "Latest observation per model/version/context. Top ten PSI values and their own limits. Scroll for more panels; select Context to show one."
               },
               "mark": {
                 "layout": "group"
@@ -5971,6 +5991,10 @@
                   "column": {
                     "type": "count",
                     "value": 2
+                  },
+                  "row": {
+                    "type": "count",
+                    "value": 2
                   }
                 }
               }
@@ -5980,7 +6004,7 @@
             "x": 0,
             "y": 11,
             "width": 12,
-            "height": 16
+            "height": 12
           }
         },
         {
@@ -6018,7 +6042,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": false
@@ -6026,53 +6050,122 @@
               }
             ],
             "spec": {
-              "version": 1,
-              "widgetType": "custom-vega-viz",
-              "data": {
-                "queryName": "main_query"
-              },
+              "version": 3,
+              "widgetType": "bar",
               "encodings": {
-                "fields": [
-                  {
-                    "fieldName": "window_start"
+                "x": {
+                  "fieldName": "window_end",
+                  "displayName": "Data window end (UTC)",
+                  "scale": {
+                    "type": "categorical"
                   },
-                  {
-                    "fieldName": "window_end"
+                  "axis": {
+                    "labelAngle": 0
                   },
-                  {
-                    "fieldName": "measured_at"
-                  },
-                  {
-                    "fieldName": "report_id"
-                  },
-                  {
-                    "fieldName": "series"
-                  },
-                  {
-                    "fieldName": "features"
-                  },
-                  {
-                    "fieldName": "model_identity"
+                  "format": {
+                    "type": "date-time",
+                    "date": "locale-number-month",
+                    "time": "locale-hour-minute"
                   }
-                ]
-              },
-              "jsonSpec": {
-                "type": "vega-lite",
-                "spec": "{\"$schema\": \"https://vega.github.io/schema/vega-lite/v6.json\", \"data\": {\"name\": \"databricks_query\"}, \"config\": {\"view\": {\"stroke\": null}, \"axis\": {\"labelFontSize\": 11, \"titleFontSize\": 12, \"gridColor\": \"#e5e7eb\"}}, \"transform\": [{\"calculate\": \"utcFormat(toDate(datum.window_start), '%Y-%m-%d %H:%M:%S UTC')\", \"as\": \"start_time\"}, {\"calculate\": \"utcFormat(toDate(datum.window_end), '%Y-%m-%d %H:%M:%S UTC')\", \"as\": \"end_time\"}, {\"calculate\": \"utcFormat(toDate(datum.measured_at), '%Y-%m-%d %H:%M:%S UTC')\", \"as\": \"calculated_time\"}], \"facet\": {\"field\": \"model_identity\", \"type\": \"nominal\", \"header\": {\"title\": null, \"labelLimit\": 430, \"labelExpr\": \"[replace(split(datum.label, ' / ')[0], /^.*\\\\./, ''), split(datum.label, ' / ')[1] + ' / ' + slice(split(datum.label, ' / ')[2], 0, 12)]\"}}, \"columns\": 2, \"spec\": {\"mark\": {\"type\": \"bar\", \"cornerRadiusTopLeft\": 2, \"cornerRadiusTopRight\": 2}, \"encoding\": {\"x\": {\"field\": \"window_end\", \"type\": \"ordinal\", \"sort\": \"ascending\", \"title\": \"Data window end (UTC)\", \"axis\": {\"labelExpr\": \"[utcFormat(toDate(datum.value), '%d %b'), utcFormat(toDate(datum.value), '%H:%M')]\", \"labelAngle\": 0, \"labelOverlap\": true, \"labelLimit\": 75}}, \"xOffset\": {\"field\": \"series\", \"type\": \"nominal\"}, \"y\": {\"field\": \"features\", \"type\": \"quantitative\", \"title\": \"Features\", \"scale\": {\"zero\": true, \"domainMin\": 0}, \"axis\": {\"format\": \"d\", \"values\": {\"expr\": \"sequence(0, floor(domain('child_y')[1]) + 1, max(1, ceil(domain('child_y')[1] / 5)))\"}}, \"stack\": null}, \"color\": {\"field\": \"series\", \"type\": \"nominal\", \"title\": null, \"scale\": {\"domain\": [\"Drift detected\", \"Checks unavailable\"], \"range\": [\"#DC2626\", \"#D97706\"]}, \"legend\": {\"orient\": \"bottom\"}}, \"tooltip\": [{\"field\": \"start_time\", \"type\": \"nominal\", \"title\": \"Data window start\"}, {\"field\": \"end_time\", \"type\": \"nominal\", \"title\": \"Data window end\"}, {\"field\": \"calculated_time\", \"type\": \"nominal\", \"title\": \"Calculated at\"}, {\"field\": \"series\", \"type\": \"nominal\", \"title\": \"Check\"}, {\"field\": \"features\", \"type\": \"quantitative\", \"title\": \"Features\", \"format\": \"d\"}, {\"field\": \"report_id\", \"type\": \"nominal\", \"title\": \"Report\"}]}, \"width\": 400, \"height\": 160}, \"resolve\": {\"scale\": {\"y\": \"independent\", \"x\": \"independent\", \"xOffset\": \"independent\"}}}"
+                },
+                "y": {
+                  "fieldName": "features",
+                  "displayName": "Features",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 0
+                    }
+                  },
+                  "axis": {
+                    "hideLabels": true
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Drift detected",
+                        "color": "#DC2626"
+                      },
+                      {
+                        "value": "Checks unavailable",
+                        "color": "#D97706"
+                      }
+                    ]
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "window_start",
+                    "displayName": "Data window start (UTC)",
+                    "format": {
+                      "type": "date-time",
+                      "date": "year-month-day",
+                      "time": "locale-hour-minute-second"
+                    }
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Calculated at (UTC)",
+                    "format": {
+                      "type": "date-time",
+                      "date": "year-month-day",
+                      "time": "locale-hour-minute-second"
+                    }
+                  },
+                  {
+                    "fieldName": "report_id",
+                    "displayName": "Report"
+                  }
+                ],
+                "label": {
+                  "show": true
+                }
               },
               "frame": {
                 "showTitle": true,
                 "title": "How many features show drift?",
                 "showDescription": true,
-                "description": "Distinct features in each data window. Whole-number counts; hover for the full window and calculation time. Repeated observations of a window may overlap."
+                "description": "Whole-number counts per model/version/context and data window. Red: drift. Orange: unavailable checks. Scroll for more panels; select Context to show one."
+              },
+              "mark": {
+                "layout": "group"
+              },
+              "facet": {
+                "type": "wrap",
+                "fieldName": "model_identity",
+                "scale": {
+                  "type": "categorical"
+                },
+                "layout": {
+                  "column": {
+                    "type": "count",
+                    "value": 2
+                  },
+                  "row": {
+                    "type": "count",
+                    "value": 2
+                  }
+                }
               }
             }
           },
           "position": {
             "x": 0,
-            "y": 27,
+            "y": 23,
             "width": 12,
-            "height": 40
+            "height": 12
           }
         },
         {
@@ -6134,7 +6227,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": true
@@ -6208,7 +6301,7 @@
           },
           "position": {
             "x": 0,
-            "y": 67,
+            "y": 35,
             "width": 12,
             "height": 6
           }
@@ -6224,7 +6317,7 @@
           },
           "position": {
             "x": 0,
-            "y": 73,
+            "y": 41,
             "width": 12,
             "height": 1
           }
@@ -6268,7 +6361,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": true
@@ -6336,7 +6429,7 @@
           },
           "position": {
             "x": 0,
-            "y": 74,
+            "y": 42,
             "width": 12,
             "height": 6
           }
@@ -6875,7 +6968,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     },
                     {
                       "name": "metric_name",
@@ -6951,7 +7044,7 @@
                     },
                     {
                       "name": "model_panel",
-                      "expression": "concat(concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`), ' / ', upper(`metric_name`))"
+                      "expression": "`model_panel`"
                     },
                     {
                       "name": "report_id",
@@ -6967,42 +7060,90 @@
               }
             ],
             "spec": {
-              "version": 1,
-              "widgetType": "custom-vega-viz",
-              "data": {
-                "queryName": "main_query"
-              },
+              "version": 3,
+              "widgetType": "scatter",
               "encodings": {
-                "fields": [
+                "x": {
+                  "fieldName": "window_end",
+                  "displayName": "Data window end (UTC)",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "format": {
+                    "type": "date-time",
+                    "date": "locale-number-month",
+                    "time": "locale-hour-minute"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "metric_label",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
                   {
-                    "fieldName": "window_end"
+                    "fieldName": "measured_at",
+                    "displayName": "Calculated at (UTC)",
+                    "format": {
+                      "type": "date-time",
+                      "date": "year-month-day",
+                      "time": "locale-hour-minute-second"
+                    }
                   },
                   {
-                    "fieldName": "value"
-                  },
-                  {
-                    "fieldName": "metric_label"
-                  },
-                  {
-                    "fieldName": "model_panel"
-                  },
-                  {
-                    "fieldName": "report_id"
-                  },
-                  {
-                    "fieldName": "measured_at"
+                    "fieldName": "report_id",
+                    "displayName": "Report"
                   }
                 ]
-              },
-              "jsonSpec": {
-                "type": "vega-lite",
-                "spec": "{\"$schema\": \"https://vega.github.io/schema/vega-lite/v6.json\", \"data\": {\"name\": \"databricks_query\"}, \"facet\": {\"field\": \"model_panel\", \"type\": \"nominal\", \"header\": {\"title\": null, \"labelLimit\": 440, \"labelExpr\": \"[split(datum.label, ' / ')[3], replace(split(datum.label, ' / ')[0], /^.*\\\\./, '') + ' / ' + split(datum.label, ' / ')[1], slice(split(datum.label, ' / ')[2], 0, 12)]\"}}, \"columns\": 2, \"spec\": {\"width\": 400, \"height\": 170, \"mark\": {\"type\": \"line\", \"point\": true, \"invalid\": \"break-paths-show-domains\"}, \"encoding\": {\"x\": {\"field\": \"window_end\", \"type\": \"temporal\", \"title\": \"Data window end (UTC)\", \"scale\": {\"type\": \"utc\"}, \"axis\": {\"labelExpr\": \"[utcFormat(datum.value, '%d %b'), utcFormat(datum.value, '%H:%M:%S')]\", \"labelAngle\": 0, \"tickCount\": 4, \"labelOverlap\": true}}, \"y\": {\"field\": \"value\", \"type\": \"quantitative\", \"title\": \"Metric value\", \"scale\": {\"zero\": false}, \"axis\": {\"format\": \".4~g\"}}, \"color\": {\"field\": \"metric_label\", \"type\": \"nominal\", \"title\": null, \"legend\": {\"orient\": \"bottom\"}}, \"tooltip\": [{\"field\": \"model_panel\", \"type\": \"nominal\", \"title\": \"Model / policy metric\"}, {\"field\": \"window_end\", \"type\": \"temporal\", \"title\": \"Window end (UTC)\", \"format\": \"%Y-%m-%d %H:%M:%S\"}, {\"field\": \"measured_at\", \"type\": \"temporal\", \"title\": \"Calculated at (UTC)\", \"format\": \"%Y-%m-%d %H:%M:%S\"}, {\"field\": \"metric_label\", \"type\": \"nominal\", \"title\": \"Series\"}, {\"field\": \"value\", \"type\": \"quantitative\", \"format\": \".4~g\"}, {\"field\": \"report_id\", \"type\": \"nominal\", \"title\": \"Report\"}]}}, \"resolve\": {\"scale\": {\"y\": \"independent\", \"x\": \"independent\", \"color\": \"independent\"}}, \"config\": {\"view\": {\"stroke\": null}, \"axis\": {\"labelFontSize\": 11, \"titleFontSize\": 12, \"gridColor\": \"#e5e7eb\"}}}"
               },
               "frame": {
                 "showTitle": true,
                 "title": "Observed performance over time",
                 "showDescription": true,
-                "description": "Separate model/metric panels. With no Chart metric selected, each identity uses its own available default metric."
+                "description": "Saved scores by model/version/context/metric. No Chart metric: each identity's default. Missing scores have no point. Scroll for more panels; select Context to narrow."
+              },
+              "mark": {
+                "size": 1,
+                "opacity": 0.85
+              },
+              "facet": {
+                "type": "wrap",
+                "fieldName": "model_panel",
+                "scale": {
+                  "type": "categorical"
+                },
+                "layout": {
+                  "column": {
+                    "type": "count",
+                    "value": 2
+                  },
+                  "row": {
+                    "type": "count",
+                    "value": 2
+                  }
+                }
               }
             }
           },
@@ -7010,7 +7151,7 @@
             "x": 0,
             "y": 44,
             "width": 12,
-            "height": 42
+            "height": 12
           }
         },
         {
@@ -7060,7 +7201,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     },
                     {
                       "name": "baseline_value",
@@ -7168,7 +7309,7 @@
                     },
                     {
                       "name": "model_panel",
-                      "expression": "concat(concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`), ' / ', upper(`metric_name`))"
+                      "expression": "`model_panel`"
                     },
                     {
                       "name": "report_id",
@@ -7184,42 +7325,90 @@
               }
             ],
             "spec": {
-              "version": 1,
-              "widgetType": "custom-vega-viz",
-              "data": {
-                "queryName": "main_query"
-              },
+              "version": 3,
+              "widgetType": "scatter",
               "encodings": {
-                "fields": [
+                "x": {
+                  "fieldName": "window_end",
+                  "displayName": "Data window end (UTC)",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "format": {
+                    "type": "date-time",
+                    "date": "locale-number-month",
+                    "time": "locale-hour-minute"
+                  }
+                },
+                "y": {
+                  "fieldName": "value",
+                  "displayName": "Metric value",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 4
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "series",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
                   {
-                    "fieldName": "window_end"
+                    "fieldName": "measured_at",
+                    "displayName": "Calculated at (UTC)",
+                    "format": {
+                      "type": "date-time",
+                      "date": "year-month-day",
+                      "time": "locale-hour-minute-second"
+                    }
                   },
                   {
-                    "fieldName": "value"
-                  },
-                  {
-                    "fieldName": "series"
-                  },
-                  {
-                    "fieldName": "model_panel"
-                  },
-                  {
-                    "fieldName": "report_id"
-                  },
-                  {
-                    "fieldName": "measured_at"
+                    "fieldName": "report_id",
+                    "displayName": "Report"
                   }
                 ]
-              },
-              "jsonSpec": {
-                "type": "vega-lite",
-                "spec": "{\"$schema\": \"https://vega.github.io/schema/vega-lite/v6.json\", \"data\": {\"name\": \"databricks_query\"}, \"facet\": {\"field\": \"model_panel\", \"type\": \"nominal\", \"header\": {\"title\": null, \"labelLimit\": 440, \"labelExpr\": \"[split(datum.label, ' / ')[3], replace(split(datum.label, ' / ')[0], /^.*\\\\./, '') + ' / ' + split(datum.label, ' / ')[1], slice(split(datum.label, ' / ')[2], 0, 12)]\"}}, \"columns\": 2, \"spec\": {\"width\": 400, \"height\": 170, \"mark\": {\"type\": \"line\", \"point\": true, \"invalid\": \"break-paths-show-domains\"}, \"encoding\": {\"x\": {\"field\": \"window_end\", \"type\": \"temporal\", \"title\": \"Data window end (UTC)\", \"scale\": {\"type\": \"utc\"}, \"axis\": {\"labelExpr\": \"[utcFormat(datum.value, '%d %b'), utcFormat(datum.value, '%H:%M:%S')]\", \"labelAngle\": 0, \"tickCount\": 4, \"labelOverlap\": true}}, \"y\": {\"field\": \"value\", \"type\": \"quantitative\", \"title\": \"Metric value\", \"scale\": {\"zero\": false}, \"axis\": {\"format\": \".4~g\"}}, \"color\": {\"field\": \"series\", \"type\": \"nominal\", \"title\": null, \"legend\": {\"orient\": \"bottom\"}}, \"tooltip\": [{\"field\": \"model_panel\", \"type\": \"nominal\", \"title\": \"Model / policy metric\"}, {\"field\": \"window_end\", \"type\": \"temporal\", \"title\": \"Window end (UTC)\", \"format\": \"%Y-%m-%d %H:%M:%S\"}, {\"field\": \"measured_at\", \"type\": \"temporal\", \"title\": \"Calculated at (UTC)\", \"format\": \"%Y-%m-%d %H:%M:%S\"}, {\"field\": \"series\", \"type\": \"nominal\", \"title\": \"Series\"}, {\"field\": \"value\", \"type\": \"quantitative\", \"format\": \".4~g\"}, {\"field\": \"report_id\", \"type\": \"nominal\", \"title\": \"Report\"}]}}, \"resolve\": {\"scale\": {\"y\": \"independent\", \"x\": \"independent\", \"color\": \"shared\"}}, \"config\": {\"view\": {\"stroke\": null}, \"axis\": {\"labelFontSize\": 11, \"titleFontSize\": 12, \"gridColor\": \"#e5e7eb\"}}}"
               },
               "frame": {
                 "showTitle": true,
                 "title": "Is performance within its allowed limit?",
                 "showDescription": true,
-                "description": "Separate model/metric panels: Current = observed score, Baseline = reference, Tolerance boundary = allowed limit. Chart metric does not change the policy. Missing scores remain gaps."
+                "description": "Current, Baseline and Tolerance boundary per model/version/context/metric. Independent of Chart metric; missing scores have no point. Scroll for more panels."
+              },
+              "mark": {
+                "size": 1,
+                "opacity": 0.85
+              },
+              "facet": {
+                "type": "wrap",
+                "fieldName": "model_panel",
+                "scale": {
+                  "type": "categorical"
+                },
+                "layout": {
+                  "column": {
+                    "type": "count",
+                    "value": 2
+                  },
+                  "row": {
+                    "type": "count",
+                    "value": 2
+                  }
+                }
               }
             }
           },
@@ -7273,7 +7462,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": true
@@ -7377,7 +7566,7 @@
           },
           "position": {
             "x": 0,
-            "y": 86,
+            "y": 56,
             "width": 12,
             "height": 1
           }
@@ -7406,7 +7595,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ]
                 }
@@ -7468,7 +7657,7 @@
           },
           "position": {
             "x": 0,
-            "y": 87,
+            "y": 57,
             "width": 12,
             "height": 8
           }
@@ -7496,7 +7685,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": true
@@ -7536,7 +7725,7 @@
           },
           "position": {
             "x": 0,
-            "y": 95,
+            "y": 65,
             "width": 12,
             "height": 5
           }
@@ -7552,7 +7741,7 @@
           },
           "position": {
             "x": 0,
-            "y": 100,
+            "y": 70,
             "width": 12,
             "height": 1
           }
@@ -7592,7 +7781,7 @@
                     },
                     {
                       "name": "model_identity",
-                      "expression": "concat(`model_name`, ' / v', COALESCE(`model_version`, 'unresolved'), ' / ', `monitor_id`)"
+                      "expression": "`model_identity`"
                     }
                   ],
                   "disaggregated": false
@@ -7660,7 +7849,7 @@
           },
           "position": {
             "x": 0,
-            "y": 101,
+            "y": 71,
             "width": 12,
             "height": 8
           }
@@ -7676,7 +7865,7 @@
           },
           "position": {
             "x": 0,
-            "y": 109,
+            "y": 79,
             "width": 12,
             "height": 2
           }

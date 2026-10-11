@@ -46,6 +46,10 @@ SHARED_FIELDS = {
     "model_set_table_name",
     "model_view_prefix",
     "combined_view_name",
+    "include_online_publication",
+    "include_online_serving",
+    "include_daily_rollout",
+    "online_publication_mode",
 }
 
 
@@ -53,6 +57,7 @@ SHARED_FIELDS = {
     "settings",
     [
         {},
+        {"include_online_publication": "true", "online_publication_mode": "CONTINUOUS"},
         {
             "task": "classification",
             "cv_enabled": "true",

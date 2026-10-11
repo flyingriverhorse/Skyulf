@@ -106,6 +106,13 @@ Incompatible explicit selections stay empty; clear Version and Context when
 switching models. An explicitly selected model
 never falls back to another model.
 
+The Drift and Performance charts show up to two columns and two rows of panels
+at once; scroll inside a chart to see the remaining identities. Fewer panels use
+the available width. The dashboard card itself keeps a fixed, compact height.
+Selecting one model can still leave several panels when that model has multiple
+versions or monitoring contexts. Select **Monitored version** and **Context** to
+narrow it further.
+
 | Page | Scope | What to use it for |
 | --- | --- | --- |
 | Overview | All models with the initial All selections; otherwise all matching registrations. | Four summary counts, prioritized issues, current status distributions and daily trends. |
@@ -118,14 +125,16 @@ never falls back to another model.
 Drift and Performance time charts and date filters use **Data window end (UTC)**.
 For data from 09:00 to 10:00, the point appears at 10:00 even if checks ran later.
 **Calculated at** records that later execution time separately. Drift counts use
-whole numbers; the tooltip includes the full window and calculation time.
+whole-number bar labels; the tooltip includes the full window and calculation time.
 
 **Latest policy result for every model** lists each identity's own metric, baseline,
 current score, allowed limit, improvement direction and result. Accuracy, F1 and
 RMSE policies can appear together. A latest-metric table shows observed values
 by identity and target. The two time charts use separate model/metric panels
 with independent scales, so scores with different units are not mixed. Each policy
-panel compares **Current**, **Baseline** and **Tolerance boundary**. Changing
+panel compares **Current**, **Baseline** and **Tolerance boundary**.
+Each saved performance value is a point; missing values have no point and are
+not joined by a line. Changing
 **Chart metric** affects the observed-metric table and time chart, leaving each policy's
 configured metric intact. An accuracy baseline of 0.96 and absolute tolerance of
 0.10 give a lower limit of 0.86; an error metric has an upper limit. Missing scores

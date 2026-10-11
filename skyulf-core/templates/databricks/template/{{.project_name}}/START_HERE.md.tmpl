@@ -27,7 +27,7 @@ start with [Preprocessing and custom features](PREPROCESSING.md).
 | Shared Spark feature tables | `src/features/groups/`, `config/features.yml` | Compute shared features, refresh the feature graph, and run it before downstream training/scoring. |
 | Business output rules | `src/features/scoring.py` | Check typed output columns and required components before retraining. |
 | Workspace, schemas, Run-as identities and job permissions | `deployment/targets.yml`, `deployment/variables.yml` | Review the selected target and downstream job permissions. |
-| Core release | `deployment/requirements.txt` | Change the version in `skyulf-core[mlflow]==0.9.2`, install locally and redeploy. |
+| Core release | `deployment/requirements.txt` | Change the version in `skyulf-core[mlflow]==0.9.3`, install locally and redeploy. |
 | Runtime dependencies | `deployment/requirements.txt`, `src/features/requirements.txt` | Install and verify matching versions before deployment. |
 | Monitoring tables, labels and retraining policies | Target variables in `deployment/targets.yml` | Start with performance `mode: report`; inspect saved evidence before enabling retraining. |
 | Job task graph | `resources/*.job.yml` | Validate the Bundle after regenerating the training graph when declarations change. |

@@ -150,7 +150,7 @@ def test_spark_inference_still_requires_explicit_policy():
 
 
 def test_training_spec_serialization_keeps_saved_keys():
-    """The renamed dataclass must reproduce the pre-move persisted selection payload."""
+    """Optional online controls must preserve old saved keys and restore absent defaults."""
     from skyulf.integrations.databricks import TrainingSpec
     from skyulf.integrations.databricks.training.fitting.candidate import training_spec_payload
 
@@ -167,7 +167,12 @@ def test_training_spec_serialization_keeps_saved_keys():
     payload = training_spec_payload(spec, "pandas")
     restored = TrainingSpec.from_payload(json.loads(json.dumps(payload)))
     assert restored == spec
-    digest = sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    historical = dict(payload)
+    assert historical.pop("online_policy_json") is None
+    assert TrainingSpec.from_payload(json.loads(json.dumps(historical))) == spec
+    digest = sha256(
+        json.dumps(historical, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     assert digest == "4bb82749d44838f7c6e438f195784e2ff1efa79b91423516ab71600f0ec3e147"
 
 

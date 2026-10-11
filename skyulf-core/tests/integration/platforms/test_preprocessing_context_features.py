@@ -43,16 +43,22 @@ RECIPES = {
     "IQR": {"columns": ["x"], "multiplier": 1.5},
     "ZScore": {"columns": ["x"], "threshold": 3.0},
     "EllipticEnvelope": {"columns": ["x"], "contamination": 0.1, "random_state": 42},
-    "count_vectorizer": {"columns": ["text"], "drop_original": True},
+    "count_vectorizer": {"columns": ["text"], "drop_original": True, "stop_words": ["red"]},
     "hashing_vectorizer": {
         "columns": ["text"],
         "n_features": 8,
         "norm": "none",
         "alternate_sign": False,
         "drop_original": True,
+        "stop_words": ["red"],
     },
-    "tfidf_vectorizer": {"columns": ["text"], "drop_original": True},
-    "tokenizer": {"columns": ["text"], "drop_original": True, "add_token_count": True},
+    "tfidf_vectorizer": {"columns": ["text"], "drop_original": True, "stop_words": ["red"]},
+    "tokenizer": {
+        "columns": ["text"],
+        "drop_original": True,
+        "add_token_count": True,
+        "stop_words": ["red"],
+    },
     "H3Index": {"lat_col": "lat", "lon_col": "lon", "resolution": 9},
 }
 DETECTORS = {"IQR", "ZScore", "EllipticEnvelope"}
@@ -162,7 +168,7 @@ def _replay(directory):
         np.testing.assert_array_equal(
             actual, np.concatenate([artifact.pipeline.predict(c) for c in chunks])
         )
-        assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == digest
+        assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == digest, node
         with pytest.raises(UnsupportedExecutionError):
             require_partition_safe_pipeline(artifact)
         statuses[node] = step["status"]

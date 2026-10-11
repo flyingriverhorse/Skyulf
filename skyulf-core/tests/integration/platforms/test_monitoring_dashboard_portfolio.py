@@ -4,16 +4,67 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 ASSET = (
     Path(__file__).resolve().parents[3]
     / "templates/databricks/template/{{.project_name}}/src/monitoring/monitoring.lvdash.json"
 )
 
 
+@pytest.mark.parametrize(
+    "widget_name",
+    ["drift_psi", "drift_trend", "performance_trend", "performance_policy_trend"],
+)
+def test_model_panels_reflow_inside_a_compact_scrollable_widget(widget_name: str) -> None:
+    """Filtering to fewer identities must not leave fixed-width plots in a portfolio-sized box."""
+    dashboard = json.loads(ASSET.read_text(encoding="utf-8"))
+    entry = next(
+        entry
+        for page in dashboard["pages"]
+        for entry in page["layout"]
+        if entry["widget"]["name"] == widget_name
+    )
+    spec = entry["widget"]["spec"]
+    assert spec["widgetType"] in {"bar", "scatter"}
+    assert spec["facet"]["layout"] == {
+        "column": {"type": "count", "value": 2},
+        "row": {"type": "count", "value": 2},
+    }
+    assert entry["position"]["height"] <= 12
+    numeric_axis = "x" if widget_name == "drift_psi" else "y"
+    assert spec["encodings"][numeric_axis]["scale"]["domain"] == {"type": "per-facet"}
+
+
 def _dataset(name: str) -> str:
     """Read the shipped query instead of duplicating its selection logic in tests."""
     dashboard = json.loads(ASSET.read_text(encoding="utf-8"))
     return "".join(next(d for d in dashboard["datasets"] if d["name"] == name)["queryLines"])
+
+
+@pytest.mark.parametrize(
+    "widget_name",
+    ["drift_psi", "drift_trend", "performance_trend", "performance_policy_trend"],
+)
+def test_facet_identity_is_a_dataset_column(widget_name: str) -> None:
+    """Cached dashboard results need a real grouping column to populate model panels."""
+    dashboard = json.loads(ASSET.read_text(encoding="utf-8"))
+    widget = next(
+        entry["widget"]
+        for page in dashboard["pages"]
+        for entry in page["layout"]
+        if entry["widget"]["name"] == widget_name
+    )
+    spec = widget["spec"]
+    facet_field = (
+        spec["facet"]["fieldName"]
+        if "facet" in spec
+        else json.loads(spec["jsonSpec"]["spec"])["facet"]["field"]
+    )
+    query = widget["queries"][0]["query"]
+    field = next(field for field in query["fields"] if field["name"] == facet_field)
+    assert field["expression"] == f"`{facet_field}`"
+    assert f"AS {facet_field}" in _dataset(query["datasetName"])
 
 
 def _connection() -> sqlite3.Connection:
@@ -154,9 +205,10 @@ def test_unresolved_version_keeps_a_readable_portfolio_identity() -> None:
         for field in widget["queries"][0]["query"]["fields"]
         if field["name"] == "model_identity"
     )
+    tail = _dataset("performance_policy_snapshot").split("), policy_ranked AS (", 1)[1]
     with _connection() as connection:
         label = connection.execute(
-            f"SELECT {expression} FROM chosen_context WHERE monitor_id = 'none'"
+            f"SELECT {expression} FROM (WITH policy_ranked AS ({tail}) WHERE monitor_id = 'none'"
         ).fetchone()[0]
     assert label == "model-c / vunresolved / none"
 

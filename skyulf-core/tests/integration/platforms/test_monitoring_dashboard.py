@@ -209,8 +209,11 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                     refs = encodings["rows"] + encodings["columns"] + encodings["cell"]["fields"]
                 else:
                     refs = encodings.get("columns", []) or [
-                        value for value in encodings.values() if isinstance(value, dict)
+                        value
+                        for value in encodings.values()
+                        if isinstance(value, dict) and "fieldName" in value
                     ]
+                    refs += encodings.get("extra", [])
                 if "facet" in spec:
                     refs = [*refs, spec["facet"]]
                 assert all(ref["fieldName"] in selected for ref in refs)
@@ -218,7 +221,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                     1
                     if widget_type == "custom-vega-viz"
                     else 3
-                    if widget_type in {"line", "bar", "pivot"}
+                    if widget_type in {"line", "bar", "scatter", "pivot"}
                     else 2
                 )
     assert filters <= seen_filters
@@ -272,19 +275,19 @@ def test_history_keeps_metric_identity_and_units_separate() -> None:
         if w.get("spec", {}).get("widgetType") in {"bar", "line", "custom-vega-viz"}
     } == {"drift_psi", "drift_trend"}
     performance_charts = {
-        w["name"]: json.loads(w["spec"]["jsonSpec"]["spec"])
+        w["name"]: w["spec"]
         for w in _widgets(performance_page)
-        if w.get("spec", {}).get("widgetType") == "custom-vega-viz"
+        if w.get("spec", {}).get("widgetType") == "scatter"
     }
     assert set(performance_charts) == {
         "performance_trend",
         "performance_policy_trend",
     }
     for chart in performance_charts.values():
-        assert chart["facet"]["field"] == "model_panel"
-        assert chart["resolve"]["scale"]["y"] == "independent"
-        assert chart["spec"]["mark"]["type"] == "line"
-        assert chart["spec"]["mark"]["invalid"] == "break-paths-show-domains"
+        assert chart["facet"]["fieldName"] == "model_panel"
+        assert chart["encodings"]["y"]["scale"]["domain"] == {"type": "per-facet"}
+        # Points cannot interpolate across unavailable scores or invent zero values.
+        assert chart["encodings"]["y"]["fieldName"] == "value"
     assert "drift_chart" not in datasets and "quality_chart" not in datasets
     assert "outcome_summary" in "".join(datasets["performance_measurements"]["queryLines"])
 
@@ -313,20 +316,16 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     assert "FROM monitoring_results" in psi
     assert "window_end DESC" in psi
     assert "metric_name <> 'ks_test_p_value'" in datasets["drift_trend"]
-    chart = json.loads(widgets["drift_trend"]["spec"]["jsonSpec"]["spec"])
-    encoding = chart["spec"]["encoding"]
-    assert chart["facet"]["field"] == "model_identity"
-    assert chart["resolve"]["scale"] == {
-        "x": "independent",
-        "y": "independent",
-        "xOffset": "independent",
-    }
-    assert encoding["x"]["field"] == "window_end"
+    chart = widgets["drift_trend"]["spec"]
+    encoding = chart["encodings"]
+    assert chart["facet"]["fieldName"] == "model_identity"
+    assert encoding["y"]["scale"]["domain"] == {"type": "per-facet"}
+    assert encoding["x"]["fieldName"] == "window_end"
     assert encoding["x"]["axis"]["labelAngle"] == 0
-    assert "sequence(0" in encoding["y"]["axis"]["values"]["expr"]
-    assert "max(1," in encoding["y"]["axis"]["values"]["expr"]
-    assert encoding["y"]["stack"] is None
-    assert encoding["y"]["axis"]["format"] == "d"
+    assert chart["mark"]["layout"] == "group"
+    assert encoding["y"]["axis"]["hideLabels"] is True
+    assert encoding["label"]["show"] is True
+    assert encoding["y"]["format"]["decimalPlaces"]["places"] == 0
     latest = datasets["performance_latest"]
     assert "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in latest
     assert "value IS NOT NULL" not in latest
@@ -353,8 +352,8 @@ def test_history_charts_and_date_filters_use_the_data_window() -> None:
     dashboard = _dashboard()
     widgets = {w["name"]: w for p in dashboard["pages"] for w in _widgets(p)}
     for name in ("performance_trend", "performance_policy_trend"):
-        chart = json.loads(widgets[name]["spec"]["jsonSpec"]["spec"])
-        assert chart["spec"]["encoding"]["x"]["field"] == "window_end"
+        chart = widgets[name]["spec"]
+        assert chart["encodings"]["x"]["fieldName"] == "window_end"
     for name in ("filter_measured_at_drift_quality", "filter_measured_at_performance"):
         for query in widgets[name]["queries"]:
             assert query["query"]["fields"] == [
@@ -455,12 +454,10 @@ def test_performance_policy_evidence_and_trend_bind_to_saved_view() -> None:
     assert {"model_identity", "window_end", "threshold_value", "action_label"} <= columns
     assert len(columns) == 9
     assert all(field in datasets["performance_policy"] for field in evidence_fields)
-    line = widgets["performance_policy_trend"]
-    assert line["spec"]["widgetType"] == "custom-vega-viz"
-    chart = json.loads(line["spec"]["jsonSpec"]["spec"])
-    assert chart["spec"]["mark"]["type"] == "line"
-    assert chart["spec"]["encoding"]["color"]["field"] == "series"
-    assert line["queries"][0]["query"]["datasetName"] == "performance_policy_series"
+    chart = widgets["performance_policy_trend"]
+    assert chart["spec"]["widgetType"] == "scatter"
+    assert chart["spec"]["encodings"]["color"]["fieldName"] == "series"
+    assert chart["queries"][0]["query"]["datasetName"] == "performance_policy_series"
     for field in ("model_name", "model_version"):
         control = widgets[
             {
@@ -782,7 +779,7 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     dashboard = _dashboard()
     dataset = next(d for d in dashboard["datasets"] if d["name"] == "performance_policy")
     sql = "".join(dataset["queryLines"])
-    labels = sql.split("SELECT source.*,", 1)[1].split("FROM (SELECT", 1)[0]
+    labels = sql.split("source.*,", 1)[1].split("FROM (SELECT", 1)[0]
     with sqlite3.connect(":memory:") as connection:
         cases = [
             ("healthy", "none", "Within tolerance", "No training requested"),

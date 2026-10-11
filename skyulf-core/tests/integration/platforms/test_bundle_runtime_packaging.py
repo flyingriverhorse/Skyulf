@@ -2,9 +2,23 @@
 
 import os
 import shutil
+from pathlib import Path
 
 import pytest
 import yaml
+
+
+@pytest.fixture
+def core_requirement():
+    """Read the source pin whose release alignment is checked by the branch-template contract."""
+    template = (
+        Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
+    )
+    return next(
+        line
+        for line in (template / "deployment/requirements.txt.tmpl").read_text().splitlines()
+        if line.startswith("skyulf-core[")
+    )
 
 
 @pytest.mark.skipif(
@@ -13,7 +27,9 @@ import yaml
 )
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 @pytest.mark.parametrize("compute", ["serverless", "policy_cluster"])
-def test_generated_jobs_install_core_from_one_shared_requirement(tmp_path, layout, compute):
+def test_generated_jobs_install_core_from_one_shared_requirement(
+    tmp_path, layout, compute, core_requirement
+):
     """Every generated job must obtain the same release without a local Core checkout or wheel."""
     from packaging.requirements import Requirement
     from test_databricks_bundle_generation import _generate_project
@@ -29,7 +45,7 @@ def test_generated_jobs_install_core_from_one_shared_requirement(tmp_path, layou
     requirements = (project / "deployment/requirements.txt").read_text().splitlines()
     core = [Requirement(line) for line in requirements if line.startswith("skyulf-core")]
     assert len(core) == 1
-    assert str(core[0].specifier) == "==0.9.2"
+    assert str(core[0]) == core_requirement
     assert core[0].extras == {"mlflow"}
     assert core[0].url is None
     assert not (project / "deployment/artifact.json").exists()
@@ -73,7 +89,9 @@ def test_generated_jobs_install_core_from_one_shared_requirement(tmp_path, layou
     os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") != "1" or not shutil.which("databricks"),
     reason="Requires explicitly enabled offline Bundle CLI generation.",
 )
-def test_publication_without_serving_inherits_feature_client_requirement(tmp_path):
+def test_publication_without_serving_inherits_feature_client_requirement(
+    tmp_path, core_requirement
+):
     """Publication needs its native feature client even when endpoint setup is disabled."""
     from test_databricks_bundle_generation import _generate_project
 
@@ -82,7 +100,7 @@ def test_publication_without_serving_inherits_feature_client_requirement(tmp_pat
     )
     shared = (project / "deployment/requirements.txt").read_text()
     serving = (project / "deployment/serving-requirements.txt").read_text()
-    assert "skyulf-core[mlflow]==0.9.2" in shared
+    assert core_requirement in shared.splitlines()
     assert "databricks-feature-engineering==0.18.1" not in shared
     assert "-r requirements.txt" in serving
     assert "databricks-feature-engineering==0.18.1" in serving

@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 from pandas import Period
 from sklearn._loss import _loss  # ty: ignore[unresolved-import] - compiled sklearn module
+from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer, TfidfVectorizer
 from sklearn.linear_model import (
     _sgd_fast,  # ty: ignore[unresolved-import] - compiled sklearn module
 )
@@ -271,10 +272,14 @@ def _compiled_loss_state(obj: Any) -> Any:
 
 def _object_state(obj: Any) -> dict[str, Any]:
     """Exclude routines, imported modules and scoring diagnostics from fitted state."""
-    return {
+    state = {
         name: value
         for name, value in vars(obj).items()
         if name not in _TRANSIENT_ATTRIBUTES
         and not inspect.isroutine(value)
         and not isinstance(value, ModuleType)
     }
+    if type(obj) in (CountVectorizer, HashingVectorizer, TfidfVectorizer):
+        # sklearn caches id(stop_words) to skip validation; the address is not learned state.
+        state.pop("_stop_words_id", None)
+    return state

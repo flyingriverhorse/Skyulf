@@ -303,7 +303,7 @@ training; multi-target policy transport and temporal feature lookups are rejecte
 No Spark scoring job or batch prediction table needs to run or exist.
 
 Keep the published Core release pinned in `deployment/requirements.txt`
-(`skyulf-core[mlflow]==0.9.2`) and complete your Bundle target and ordinary training
+(`skyulf-core[mlflow]==0.9.3`) and complete your Bundle target and ordinary training
 settings. Change only this requirement's version to upgrade Core and redeploy.
 The optional online jobs inherit this pin through `serving-requirements.txt`,
 which also installs the pinned feature-engineering SDK. Validate saved-model
