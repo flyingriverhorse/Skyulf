@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -99,8 +100,10 @@ def test_feature_frame_fits_real_pipeline_and_keeps_saved_lineage(
     bound_spec, monkeypatch, tmp_path
 ):
     """Prepared native features must reach actual fitting without losing their snapshot receipt."""
+    mlflow = pytest.importorskip("mlflow")
     from skyulf.integrations.databricks.training.fitting import candidate as fitting
     from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+    from skyulf.integrations.mlflow.runs.tracking import TrackingRun
 
     frame = pd.DataFrame(
         {
@@ -114,14 +117,21 @@ def test_feature_frame_fits_real_pipeline_and_keeps_saved_lineage(
         }
     )
     frame.attrs["feature_lookup"] = json.loads(bound_spec.feature_binding_json)
+    frame.attrs.update(source_table_id="original-delta-id", source_uc_table_id="original-uc-id")
     train, holdout, unavailable = fitting.split_labeled_snapshot(frame, bound_spec)
     monkeypatch.setattr(fitting, "pin_fit_lookup", lambda *args: bound_spec)
     config = {"preprocessing": [], "modeling": {"type": "linear_regression"}}
+    uri = f"sqlite:///{(tmp_path / 'feature.db').as_posix()}"
+    client = mlflow.MlflowClient(tracking_uri=uri)
+    experiment = client.create_experiment(
+        "features", artifact_location=(tmp_path / "runs").as_uri()
+    )
+    run = TrackingRun(client=client, run_id=client.create_run(experiment).info.run_id, enabled=True)
     fitted = fitting.fit_candidate(
         None,
         bound_spec,
         config,
-        run=Mock(),
+        run=run,
         pipeline_config=config,
         artifact_path=tmp_path / "model",
         engine="pandas",
@@ -133,3 +143,16 @@ def test_feature_frame_fits_real_pipeline_and_keeps_saved_lineage(
     assert fitted.training_rows == 4 and fitted.holdout_rows == 2
     result = fitting.evaluate_holdout(fitted.artifact, fitted.holdout, target_column="target")
     assert result["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
+    fitting.log_fitted_candidate(run, fitted, config, engine="pandas", risk_category=None)
+    fitting.log_fitted_candidate(run, fitted, config, engine="pandas", risk_category=None)
+    inputs = client.get_run(run.run_id).inputs.dataset_inputs
+    assert len(inputs) == 2
+    provenance = json.loads(
+        Path(client.download_artifacts(run.run_id, "dataset_inputs.json")).read_text()
+    )
+    for item in inputs:
+        source = json.loads(item.dataset.source)
+        assert source["delta_table_id"] == "original-uc-id"
+        assert source["skyulf"]["source_table_id"] == "original-delta-id"
+        assert provenance["feature_lookup"] == json.loads(bound_spec.feature_binding_json)
+        assert provenance["feature_lookup"]["lookup_evidence"]["feature_tables"][0]["version"] == 4

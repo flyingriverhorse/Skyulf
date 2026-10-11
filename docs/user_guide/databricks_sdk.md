@@ -70,6 +70,13 @@ Polars. The run logs the Skyulf config, source and code identities, fitted model
 held-out metrics and `candidate_comparison.json`. It registers a new concrete
 model version but never assigns `@challenger` or `@champion`.
 
+The model-producing run also exposes native MLflow **Inputs** for the actual
+`training` and `holdout` frames. These preserve the pinned source version and
+bounded split profiles; `dataset_inputs.json` links the source, sampling, split
+and optional feature lookup evidence. See
+[training datasets in Inputs](mlflow_tracking.md#training-datasets-in-inputs)
+for the fields and the distinction between lineage metadata and saved data rows.
+
 ```python
 from datetime import UTC, datetime
 from skyulf.integrations.databricks import TrainingSpec, train_candidate

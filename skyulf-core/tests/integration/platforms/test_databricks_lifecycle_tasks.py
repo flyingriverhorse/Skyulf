@@ -1,5 +1,6 @@
 """Durable lifecycle stages use saved MLflow artifacts across isolated calls."""
 
+import hashlib
 import importlib
 import importlib.util
 import json
@@ -175,6 +176,7 @@ def staged(tmp_path, monkeypatch):
     client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
     client.create_experiment("staged", artifact_location=(tmp_path / "runs").as_uri())
     frame = pd.DataFrame({"id": range(20), "x": range(20), "target": range(0, 40, 2)})
+    frame.attrs.update(source_table_id="delta-log-id", source_uc_table_id="uc-object-id")
     monkeypatch.setattr(candidate, "read_training_snapshot", lambda spark, spec: frame.copy())
     monkeypatch.setattr(workflow, "read_training_snapshot", lambda spark, spec: frame.copy())
     config = {
@@ -212,6 +214,90 @@ def _call(staged, phase, reference=None, **kwargs):
         tracking_uri=config["tracking_uri"],
         **kwargs,
     )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("readable", [False, True])
+def test_training_inputs_follow_exact_registered_run(staged, engine, readable):
+    """Actual split metadata must survive task boundaries without attaching to a caller run."""
+    mlflow = pytest.importorskip("mlflow")
+    _, client, config, _, frame = staged
+    frame["weight"] = [1.0] * len(frame)
+    config.update(engine=engine, training_version=0, weight_column="weight")
+    config["pre_split_steps"] = [
+        {
+            "name": "eligible",
+            "transformer": "ManualBounds",
+            "params": {"bounds": {"x": {"lower": 2}}},
+        }
+    ]
+    previous_uri = mlflow.get_tracking_uri()
+    mlflow.set_tracking_uri(config["tracking_uri"])
+    try:
+        with mlflow.start_run(
+            experiment_id=client.get_experiment_by_name("staged").experiment_id
+        ) as caller:
+            initialized = _call(
+                staged,
+                "initialize" if readable else "prepare",
+                config=config,
+                action="train",
+                experiment_name="staged",
+            )
+            if readable:
+                loaded = _call(staged, "load_data", initialized.reference)
+                split = _call(staged, "prepare_dataset", loaded.reference)
+                trained = _call(staged, "train", split.reference)
+                selected = _call(staged, "select_best_model", trained.reference)
+                registered = _call(staged, "evaluate_register", selected.reference)
+            else:
+                registered = _call(staged, "train_register", initialized.reference)
+            assert mlflow.active_run().info.run_id == caller.info.run_id
+            assert not client.get_run(caller.info.run_id).inputs.dataset_inputs
+    finally:
+        mlflow.set_tracking_uri(previous_uri)
+    run_id = initialized.reference["run_id"]
+    versions = client.search_model_versions(f"name='{config['model_name']}'")
+    assert len(versions) == 1 and versions[0].run_id == run_id
+    inputs = client.get_run(run_id).inputs.dataset_inputs
+    assert len(inputs) == 2
+    by_context = {
+        {tag.key: tag.value for tag in item.tags}["mlflow.data.context"]: item for item in inputs
+    }
+    assert set(by_context) == {"training", "holdout"}
+    evidence = json.loads(
+        Path(client.download_artifacts(run_id, "training_filter_evidence.json")).read_text()
+    )
+    provenance = json.loads(
+        Path(client.download_artifacts(run_id, "dataset_inputs.json")).read_text()
+    )
+    provenance_digest = hashlib.sha256(
+        json.dumps(
+            provenance, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+        ).encode()
+    ).hexdigest()
+    for context, item in by_context.items():
+        source = json.loads(item.dataset.source)
+        tags = {tag.key: tag.value for tag in item.tags}
+        assert item.dataset.source_type == "delta_table"
+        assert source["delta_table_name"] == config["training_table"]
+        assert source["delta_table_version"] == 0
+        assert source["delta_table_id"] == "uc-object-id"
+        assert source["skyulf"]["source_table_id"] == "delta-log-id"
+        assert source["skyulf"]["provenance_artifact"] == "dataset_inputs.json"
+        assert source["skyulf"]["provenance_sha256"] == provenance_digest
+        assert provenance["training_evidence"] == evidence
+        assert provenance["training_spec"]["weight_column"] == "weight"
+        assert mlflow.data.get_source(item).to_dict()["delta_table_id"] == "uc-object-id"
+        assert json.loads(tags["skyulf.feature_columns"]) == ["x"]
+        assert tags["skyulf.target_column"] == "target"
+        assert tags["skyulf.weight_column"] == "weight"
+        assert json.loads(item.dataset.profile)["num_rows"] == evidence[f"{context}_rows"]
+        assert {column["name"] for column in json.loads(item.dataset.schema)["mlflow_colspec"]} == {
+            "x",
+            "target",
+        }
+    assert registered.reference["run_id"] == run_id
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

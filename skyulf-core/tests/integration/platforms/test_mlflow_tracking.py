@@ -1,6 +1,7 @@
 """Contract tests for the optional MLflow tracking adapter."""
 
 import importlib.util
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -264,3 +265,48 @@ def test_warn_policy_preserves_body_result_when_logging_fails(
     assert result == 42
     assert run.run_id == "warn-run"
     assert run.tracking_error == "tracking unavailable"
+
+
+def test_dataset_inputs_are_explicit_idempotent_and_isolated(tmp_path: Path) -> None:
+    """Dataset retries must retain one Input on the owning run despite a different active run."""
+    mlflow = pytest.importorskip("mlflow")
+    pandas = pytest.importorskip("pandas")
+    from mlflow.entities import Dataset, DatasetInput, InputTag
+
+    uri = f"sqlite:///{(tmp_path / 'inputs.db').as_posix()}"
+    config = tracking.TrackingConfig(enabled=True, tracking_uri=uri, experiment_name="inputs")
+    client = tracking.make_tracking_client(uri)
+    experiment_id = tracking.get_or_create_experiment(client, "inputs")
+    previous_uri = mlflow.get_tracking_uri()
+    mlflow.set_tracking_uri(uri)
+    try:
+        with mlflow.start_run(experiment_id=experiment_id) as caller:
+            data = mlflow.data.from_pandas(
+                pandas.DataFrame({"x": [1.0, 2.0], "target": [2.0, 4.0]}),
+                targets="target",
+                name="actual_training",
+            )
+            dataset_input = DatasetInput(
+                Dataset(**data.to_dict()), [InputTag("mlflow.data.context", "training")]
+            )
+            with tracking.track_run(config, run_name="model") as run:
+                run.log_inputs([dataset_input])
+                run.log_inputs([dataset_input])
+                assert mlflow.active_run().info.run_id == caller.info.run_id
+            assert not client.get_run(caller.info.run_id).inputs.dataset_inputs
+    finally:
+        mlflow.set_tracking_uri(previous_uri)
+    stored = client.get_run(run.run_id).inputs.dataset_inputs
+    assert len(stored) == 1
+    assert {tag.key: tag.value for tag in stored[0].tags}["mlflow.data.context"] == "training"
+    assert json.loads(stored[0].dataset.profile)["num_rows"] == 2
+
+
+def test_dataset_input_logging_respects_disabled_and_warn_policy() -> None:
+    """Optional Input logging must preserve the same no-op and failure policy as metrics."""
+    tracking.TrackingRun().log_inputs([])
+    error = RuntimeError("Inputs unavailable")
+    client = SimpleNamespace(log_inputs=Mock(side_effect=error))
+    run = tracking.TrackingRun(client=client, run_id="model", enabled=True, failure_policy="warn")
+    run.log_inputs([])
+    assert run.tracking_error == "Inputs unavailable"

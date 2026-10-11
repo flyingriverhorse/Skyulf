@@ -199,6 +199,7 @@ def test_real_candidates_keep_independent_labels_and_replay_plan(
         )
         results.append(result)
         assert client.get_run(result.parent_run_id).info.status == "FINISHED"
+        assert not client.get_run(result.parent_run_id).inputs.dataset_inputs
         assert _artifact(client, result.parent_run_id, "branch_training_plan.json") == plan
         progress = _artifact(client, result.parent_run_id, "branch_training_progress.json")
         assert progress["status"] == "complete"
@@ -209,6 +210,15 @@ def test_real_candidates_keep_independent_labels_and_replay_plan(
             assert child.data.tags["mlflow.parentRunId"] == result.parent_run_id
             assert child.data.tags["skyulf.training.branch"] == name
             assert child.data.tags["skyulf.training.plan_sha256"] == result.plan_sha256
+            assert (
+                client.get_model_version(candidate.model_name, candidate.model_version).run_id
+                == candidate.run_id
+            )
+            assert len(child.inputs.dataset_inputs) == 2
+            for item in child.inputs.dataset_inputs:
+                tags = {tag.key: tag.value for tag in item.tags}
+                assert tags["skyulf.target_column"] == name
+                assert json.loads(tags["skyulf.feature_columns"]) == ["x"]
             assert (
                 candidate.training_rows + candidate.holdout_rows
                 == {"amount": 57, "category": 55, "ensemble": 52}[name]

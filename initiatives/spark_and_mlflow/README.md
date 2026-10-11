@@ -4,10 +4,12 @@ Güncelleme: 11 Ekim 2026.
 
 Bu klasör iç planları, uygulama kararlarını ve doğrulama kanıtlarını tutar.
 Yeni çalışma için [219–222 uygulama sırası ve takip](223-delivery-order-tracker.md)
-belgesinden başla. Bu kapsamda **3/8 adım tamamlandı**: S01 online Bundle,
-S02 CONTINUOUS publication ve S03 feature güncellenirken rollout/champion.
-**Sırada S04 — MLflow dataset Inputs var.** S03 yerel ve native kabulden geçti;
-test kaynakları temizlendi, kanıtlar yerelde korundu. Gerçek 24 saatlik gözlem
+belgesinden başla. Bu kapsamda **4/8 adım tamamlandı**: S01 online Bundle,
+S02 CONTINUOUS publication, S03 feature güncellenirken rollout/champion ve
+S04 MLflow dataset Inputs. **Sırada S05 — Monitoring sorun/model ayrıntısı var.**
+S03/branding commit `9a45ebec`; S04 yerel ve native kabulden geçti ve bu
+teslimata dahildir. S04 test kaynakları temizlendi, 14/14 API kontrolü geçti.
+Kanıtlar 221 bölüm 13'te ve yerel raporlarda. Gerçek 24 saatlik gözlem
 G01 ve şirket hedefi kabulü G02 ayrıdır. Kod/commit kanıtı 219, 221 ve 223'te,
 11 Ekim workspace sıfırlaması 225'te tutulur. Push yapılmadı.
 

@@ -69,6 +69,7 @@ from ...shared._contracts import column_name, table_name
 from ..shared.holdout_evidence import save_holdout_reference
 from ..shared.preprocessing_checks import log_preprocessing_probe
 from ..shared.training_evidence import build_training_evidence, evidence_digest
+from ..shared.training_inputs import capture_training_uc_id, log_training_inputs
 from ..shared.training_parameters import log_training_parameters
 from ..thresholds.decision_thresholds import threshold_policy
 from ..tuning.cv import CV_FIELDS, CVSpec, evaluate_training_cv
@@ -505,7 +506,8 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     if not isinstance(spec, TrainingSpec):
         raise TypeError("spec must be TrainingSpec.")
     spec = pin_training_lookup(spark, spec)
-    source_id = table_identity(spark, spec.table) if spec.feature_binding_json else None
+    source_id = table_identity(spark, spec.table)
+    uc_id = capture_training_uc_id(spec.table)
     _pre_split_columns(
         spec.pre_split_steps,
         spec.target_column,
@@ -542,10 +544,13 @@ def read_training_snapshot(spark: Any, spec: TrainingSpec) -> pd.DataFrame:
     selected = source.orderBy(*ordering).limit(spec.max_rows + 1)
     frame = _materialize_training_rows(selected, spec, names)
     retain_training_binding(spark, frame, spec)
-    if source_id is not None:
-        if table_identity(spark, spec.table) != source_id:
-            raise ValueError("Training source table identity changed while reading rows.")
-        frame.attrs["source_table_id"] = source_id
+    if table_identity(spark, spec.table) != source_id:
+        raise ValueError("Training source table identity changed while reading rows.")
+    frame.attrs["source_table_id"] = source_id
+    if uc_id is not None:
+        if capture_training_uc_id(spec.table) != uc_id:
+            raise ValueError("Training source Unity Catalog identity changed while reading rows.")
+        frame.attrs["source_uc_table_id"] = uc_id
     if selection is not None:
         frame.attrs["training_selection"] = {**selection, "selected_rows": len(frame)}
     return frame
@@ -862,6 +867,7 @@ class _FittedCandidate:
     cv_results: dict[str, Any] | None
     source_frame: pd.DataFrame
     evidence_holdout: pd.DataFrame
+    training_frame: Any
 
 
 def candidate_config(
@@ -1079,6 +1085,7 @@ def fit_candidate(
         cv_results,
         frame,
         holdout,
+        native_train,
     )
 
 
@@ -1184,11 +1191,9 @@ def log_fitted_candidate(
         "pre_split_filters.json",
     )
     run.client.log_dict(run.run_id, evidence, "training_filter_evidence.json")
-    run.client.log_dict(
-        run.run_id,
-        source_evidence(frame, spec.source_columns, spec.dataset_id),
-        "monitoring_source_evidence.json",
-    )
+    source_receipt = source_evidence(frame, spec.source_columns, spec.dataset_id)
+    run.client.log_dict(run.run_id, source_receipt, "monitoring_source_evidence.json")
+    log_training_inputs(run, fitted, training_spec_payload(spec, engine), source_receipt)
     if spec.training_sample_rows is not None:
         run.client.log_dict(
             run.run_id,

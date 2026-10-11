@@ -232,6 +232,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "weights_python_sha256",
         "feature_lookup_json",
         "feature_binding_json",
+        "online_policy_json",
     ):
         old.pop(key)
     for key in ("start", "holdout_start", "cutoff", "result_cutoff"):
@@ -248,6 +249,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "weights_python_sha256",
         "feature_lookup_json",
         "feature_binding_json",
+        "online_policy_json",
     ):
         saved.pop(key)
     saved["event_time_parsing"] = spec.event_time_parsing

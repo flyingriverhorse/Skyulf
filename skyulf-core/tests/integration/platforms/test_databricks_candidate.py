@@ -89,7 +89,8 @@ def test_split_rejects_event_after_label_and_unpinned_source():
         _spec(version=None)
 
 
-def test_reader_pins_projects_and_limits_before_collecting(monkeypatch):
+@pytest.mark.parametrize("native", [False, True])
+def test_reader_pins_projects_and_limits_before_collecting(monkeypatch, native):
     """Training must not materialize a whole unversioned Delta table."""
     source = MagicMock()
     source.read.format.return_value = source.read
@@ -103,6 +104,15 @@ def test_reader_pins_projects_and_limits_before_collecting(monkeypatch):
     row["event_time"] = int(row["event_time"].value // 1000)
     row["label_at"] = int(row["label_at"].value // 1000)
     source.toLocalIterator.return_value = iter([row])
+    source.sql.return_value.first.return_value = {"format": "delta", "id": "original-delta-id"}
+    if native:
+        sdk = pytest.importorskip("databricks.sdk")
+        monkeypatch.setenv("DATABRICKS_RUNTIME_VERSION", "test-runtime")
+        workspace = MagicMock()
+        workspace.tables.get.return_value.table_id = "uc-object-id"
+        monkeypatch.setattr(sdk, "WorkspaceClient", lambda: workspace)
+    else:
+        monkeypatch.delenv("DATABRICKS_RUNTIME_VERSION", raising=False)
     monkeypatch.setattr(retraining, "normalize_training_dates", lambda frame, **kwargs: frame)
     frame = retraining.read_training_snapshot(source, _spec())
     source.read.option.assert_called_once_with("versionAsOf", 4)
@@ -111,6 +121,8 @@ def test_reader_pins_projects_and_limits_before_collecting(monkeypatch):
     source.limit.assert_called_once_with(11)
     assert len(frame) == 1
     assert frame.iloc[0]["event_time"] == _frame().iloc[0]["event_time"]
+    assert frame.attrs["source_table_id"] == "original-delta-id"
+    assert frame.attrs.get("source_uc_table_id") == ("uc-object-id" if native else None)
 
 
 def test_split_rejects_naive_times_without_an_explicit_timezone():
@@ -211,6 +223,7 @@ def test_failed_candidate_never_mutates_champion(monkeypatch, tmp_path):
             log_params=lambda *args, **kwargs: None,
             set_tags=lambda *args, **kwargs: None,
             log_metrics=lambda *args, **kwargs: None,
+            log_inputs=lambda *args, **kwargs: None,
         )
 
     monkeypatch.setattr(retraining, "track_run", fake_run)
@@ -318,6 +331,9 @@ def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_pa
     assert run.data.tags["test_data_version"] == str(_spec().version)
     assert "training_data.json" in artifacts
     model_tags = client.get_model_version(f"candidate_{engine}", "1").tags
+    assert client.get_model_version(f"candidate_{engine}", "1").run_id == result.run_id
+    assert run.inputs is not None
+    assert len(run.inputs.dataset_inputs) == 2
     assert model_tags["engine"] == engine
     assert model_tags["model_type"] == "linear_regression"
     assert model_tags["train_data_destination"] == _spec().table

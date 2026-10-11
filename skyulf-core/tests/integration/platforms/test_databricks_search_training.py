@@ -114,6 +114,7 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
     monkeypatch, tmp_path, engine, task, cv_enabled
 ):
     """Search folds, final refit and saved predictions must share one training-only recipe."""
+    pytest.importorskip("mlflow")
     from skyulf.pipeline._pipeline import _PipelineTuningPreprocessor
 
     source = pd.DataFrame({"id": range(40), "x": np.arange(40, dtype=float)})
@@ -167,6 +168,7 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
         log_config=Mock(),
         log_params=Mock(),
         log_metrics=Mock(),
+        log_inputs=Mock(),
         set_tags=Mock(),
     )
     fitted = training.fit_candidate(
@@ -186,6 +188,22 @@ def test_candidate_search_isolates_holdout_and_logs_selected_artifact(
     assert snapshots[-1] == train_values
     assert all(values <= train_values and not values & heldout_values for values in snapshots)
     assert any(len(values) < len(train_values) for values in snapshots)
+    run.log_inputs.assert_called_once()
+    inputs = run.log_inputs.call_args.args[0]
+    by_context = {
+        {tag.key: tag.value for tag in item.tags}["mlflow.data.context"]: item for item in inputs
+    }
+    assert len(inputs) == 2 and set(by_context) == {"training", "holdout"}
+    for context, rows in (("training", 32), ("holdout", 8)):
+        item = by_context[context]
+        tags = {tag.key: tag.value for tag in item.tags}
+        assert json.loads(item.dataset.profile)["num_rows"] == rows
+        assert json.loads(tags["skyulf.feature_columns"]) == ["x"]
+        assert tags["skyulf.target_column"] == "target"
+        assert {column["name"] for column in json.loads(item.dataset.schema)["mlflow_colspec"]} == {
+            "x",
+            "target",
+        }
     assert fitted.cv_results is None
     evidence = documents["tuning.json"]
     assert evidence["n_trials"] == 2

@@ -76,6 +76,15 @@ def test_only_winner_registered_after_shared_cv(staged, engine):
         Path(client.download_artifacts(parent, "competition/selection.json")).read_text()
     )
     assert receipt["winner"] == "strong"
+    parent_inputs = client.get_run(parent).inputs.dataset_inputs
+    assert versions[0].run_id == parent
+    assert len(parent_inputs) == 2
+    for run in runs:
+        child_inputs = client.get_run(run.info.run_id).inputs.dataset_inputs
+        assert len(child_inputs) == 2
+        assert {item.dataset.digest for item in child_inputs} == {
+            item.dataset.digest for item in parent_inputs
+        }
 
 
 def test_failed_candidate_prevents_registration(staged, monkeypatch):

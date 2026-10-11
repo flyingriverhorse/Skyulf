@@ -1130,6 +1130,13 @@ Tasks exchange durable MLflow references. Source and split datasets are bounded
 Parquet artifacts under `lifecycle/data/`, with digests and membership metadata
 checked before reuse. The experiment therefore stores training rows as well as
 model evidence; its access and retention policies apply to those rows.
+The model-producing run's **Inputs** tab separately lists native MLflow
+`training` and `holdout` datasets, including their actual split profiles and
+pinned source version. **Artifacts > dataset_inputs.json** preserves the split,
+sampling and optional feature lookup provenance. These metadata entries reuse
+the already materialized frames; they do not trigger another source read or fit.
+See [training datasets in Inputs](mlflow_tracking.md#training-datasets-in-inputs)
+for competition and multi-target run ownership and the limits of source replay.
 Computation and lifecycle changes reuse existing Core services; no additional
 control tables or jobs are introduced. See the
 [task graph and operator walkthrough](databricks_bundle_walkthrough.md#the-two-jobs-and-their-tasks).
