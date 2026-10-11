@@ -1,5 +1,6 @@
 """One failed model cannot disappear or prevent other models from being monitored."""
 
+import json
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
@@ -8,7 +9,7 @@ import pytest
 
 def test_models_are_enrolled_before_failures_and_other_models_continue(monkeypatch):
     """A missing registry model remains visible while independent observations still complete."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     enrolled, saved = [], []
     monkeypatch.setattr(
@@ -50,7 +51,7 @@ def test_models_are_enrolled_before_failures_and_other_models_continue(monkeypat
 
 def test_disabled_models_remain_enrolled_without_observation(monkeypatch):
     """Operators can pause a monitor without losing its inventory and historical results."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     enroll, observe = Mock(), Mock()
     monkeypatch.setattr(monitoring, "enroll_monitor", enroll)
@@ -81,9 +82,7 @@ def test_disabled_models_remain_enrolled_without_observation(monkeypatch):
 def test_completed_report_reuses_mlflow_run(tmp_path):
     """A retry after a persistence failure must not create a second finished evidence run."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks.observability.monitoring.local.monitoring import (
-        _log_observation,
-    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring import _log_observation
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )
@@ -105,11 +104,29 @@ def test_completed_report_reuses_mlflow_run(tmp_path):
     second = _log_observation(config, row, report, {}, uri, "monitor")
     assert first == second
     assert len(client.search_runs([experiment])) == 1
+    evidence = json.loads(row["evidence_json"])
+    assert evidence["monitoring_experiment_id"] == experiment
+    assert evidence["monitoring_link_status"] == "recorded"
+
+
+def test_navigation_metadata_failure_preserves_valid_observation(monkeypatch):
+    """An optional run-link permission error must not turn measured metrics into a failure."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring
+
+    client = Mock()
+    client.get_run.side_effect = PermissionError("unavailable")
+    monkeypatch.setattr(monitoring, "make_tracking_client", lambda uri: client)
+    row = {"status": "healthy"}
+    monitoring._record_monitoring_run_link(row, {}, "run", None)
+    assert row["status"] == "healthy"
+    assert (
+        json.loads(row["evidence_json"])["monitoring_link_status"] == "unavailable:PermissionError"
+    )
 
 
 def test_notebook_fails_after_results_are_saved(tmp_path, monkeypatch):
     """A model failure remains queryable and also makes the scheduled job visibly fail."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = {
@@ -126,7 +143,7 @@ def test_notebook_fails_after_results_are_saved(tmp_path, monkeypatch):
 
 def test_invalid_notebook_cutoff_does_not_create_tables(monkeypatch):
     """Malformed observation cutoffs must fail before provisioning the central namespace."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = {"as_of": "not-a-date"}
@@ -139,7 +156,7 @@ def test_invalid_notebook_cutoff_does_not_create_tables(monkeypatch):
 
 def test_inventory_run_does_not_overwrite_concurrent_producer_settings(monkeypatch):
     """Reading the inventory must never re-enroll an older snapshot over another repo's update."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     rows = [
         {

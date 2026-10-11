@@ -80,12 +80,12 @@ def _project(tmp_path, recipe=None):
 def test_function_steps_predict_in_a_fresh_process_without_the_project_file(tmp_path, engine):
     """Saved source and learned state must be enough for inference."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import predict_local_pipeline
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
+    from skyulf.inference.fitted_pipeline import predict_pipeline
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
 
     config, source = _project(tmp_path)
     frame = _frame(engine)
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         SplitDataset(train=frame, test=frame[:0]),
         target_column="target",
@@ -97,14 +97,14 @@ def test_function_steps_predict_in_a_fresh_process_without_the_project_file(tmp_
     assert fitted[1]["artifact"]["state"] == {"medians": {"A": 200.0, "B": 500.0}}
     assert artifact.manifest.project_source_sha256
     rows = pd.DataFrame({"income": [700.0, 50.0], "age": [70.0, 5.0], "city": ["B", "NEW"]})
-    expected = predict_local_pipeline(rows, artifact)["prediction"].tolist()
+    expected = predict_pipeline(rows, artifact)["prediction"].tolist()
     source.write_text("raise RuntimeError('edited project must not run')", encoding="utf-8")
     code = """
 import json, sys, pandas as pd
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-artifact = load_local_pipeline(sys.argv[1])
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+artifact = load_pipeline(sys.argv[1])
 rows = pd.DataFrame({"income": [700., 50.], "age": [70., 5.], "city": ["B", "NEW"]})
-print(json.dumps(predict_local_pipeline(rows, artifact)["prediction"].tolist()))
+print(json.dumps(predict_pipeline(rows, artifact)["prediction"].tolist()))
 """
     loaded = subprocess.run(
         [sys.executable, "-c", code, str(tmp_path / "artifact")],
@@ -129,10 +129,7 @@ def test_named_recipes_give_models_different_features(tmp_path):
 
 def test_fitted_step_learns_inside_every_cv_fold(tmp_path, monkeypatch):
     """Learned state must come from fold training rows, never all rows."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import (
-        LocalCVSpec,
-        evaluate_training_cv,
-    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
     from skyulf.preprocessing.function_steps import FittedFunctionCalculator
 
     config, _ = _project(tmp_path)
@@ -158,7 +155,7 @@ def test_fitted_step_learns_inside_every_cv_fold(tmp_path, monkeypatch):
     result = evaluate_training_cv(
         frame,
         config["pipeline"],
-        LocalCVSpec(enabled=True, folds=3, shuffle=False),
+        CVSpec(enabled=True, folds=3, shuffle=False),
         target_column="target",
     )
     assert result is not None
@@ -210,7 +207,7 @@ def _pre_split_project(tmp_path):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_function_filter_passes_pre_split_admission_and_keeps_survivors(tmp_path, engine):
     """Function filters obey the fixed pre-split contract: select rows, never edit values."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
+    from skyulf.integrations.databricks.training.fitting.candidate import (
         apply_pre_split_step,
         validate_pre_split_step,
     )
@@ -255,9 +252,7 @@ def test_function_filter_is_reused_for_scoring_with_reasons(tmp_path):
 
 def test_function_filter_from_unloaded_source_is_rejected():
     """A filter must belong to loaded project source, not an arbitrary module."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        validate_pre_split_step,
-    )
+    from skyulf.integrations.databricks.training.fitting.candidate import validate_pre_split_step
     from skyulf.preprocessing import filter_step
 
     step = filter_step("adult_only", adult_outside_project, columns=["age"])
@@ -324,9 +319,9 @@ def test_function_recipe_trains_and_scores_in_a_fresh_process(
         pytest.importorskip("mlflow")
     from skyulf.data.dataset import SplitDataset
     from skyulf.integrations.databricks.projects.project import load_project_workflow
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         split_labeled_snapshot,
     )
 
@@ -351,7 +346,7 @@ def test_function_recipe_trains_and_scores_in_a_fresh_process(
             "target": np.arange(1, 21) * 2.0 + 1,
         }
     )
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.rows",
         version=0,
         record_key_columns=("id",),
@@ -367,7 +362,7 @@ def test_function_recipe_trains_and_scores_in_a_fresh_process(
         train=pl.from_pandas(train) if engine == "polars" else train,
         test=pl.from_pandas(heldout) if engine == "polars" else heldout,
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         data,
         target_column="target",
@@ -383,12 +378,12 @@ def test_function_recipe_trains_and_scores_in_a_fresh_process(
     (root / "__init__.py").write_text("raise RuntimeError('edited recipe')\n", encoding="utf-8")
     code = (
         "import json, sys, pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline\n"
-        "from skyulf.inference.local_scoring import score_local_pipeline\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline\n"
+        "from skyulf.inference.pipeline_scoring import score_pipeline\n"
         "rows = pd.DataFrame({'category':['A','NEW',None], 'amount':[5.,10.,15.]})\n"
         "if sys.argv[2] == 'mlflow':\n"
         "    import mlflow\n    result = mlflow.pyfunc.load_model(sys.argv[1]).predict(rows)\n"
-        "else:\n    result = score_local_pipeline(rows, load_local_pipeline(sys.argv[1]))\n"
+        "else:\n    result = score_pipeline(rows, load_pipeline(sys.argv[1]))\n"
         "print(json.dumps({'status': result.scoring_status.tolist()}))\n"
     )
     loaded = subprocess.run(
@@ -406,7 +401,7 @@ def _log_model(tmp_path):
     """Package the artifact through MLflow and download it for a fresh pyfunc load."""
     import mlflow
 
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
@@ -415,7 +410,7 @@ def _log_model(tmp_path):
         run_name="functions",
     ) as run:
         assert run.run_id is not None
-        model_uri = log_local_model(
+        model_uri = log_pipeline_model(
             tmp_path / "artifact", run_id=run.run_id, artifact_path="model", tracking_uri=uri
         )
     return mlflow.artifacts.download_artifacts(artifact_uri=model_uri, tracking_uri=uri)
@@ -508,7 +503,7 @@ def test_function_pre_split_matches_core_filters_for_training_and_scoring(tmp_pa
     from skyulf.integrations.databricks.scoring.shared.scoring_pre_split import (
         pre_split_exclusion_reasons,
     )
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
+    from skyulf.integrations.databricks.training.fitting.candidate import (
         apply_pre_split_step,
         validate_pre_split_step,
     )
@@ -530,9 +525,7 @@ def test_function_pre_split_matches_core_filters_for_training_and_scoring(tmp_pa
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_function_filter_that_edits_its_input_cannot_edit_the_snapshot(tmp_path, engine):
     """A careless function sees a copy, so pre-split still only selects rows."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        apply_pre_split_step,
-    )
+    from skyulf.integrations.databricks.training.fitting.candidate import apply_pre_split_step
 
     step = _parity_steps(tmp_path, "careless")[0]
     source = _ages(engine)
@@ -543,12 +536,12 @@ def test_function_filter_that_edits_its_input_cannot_edit_the_snapshot(tmp_path,
 
 def test_function_filter_rejecting_every_row_stops_training_clearly(tmp_path):
     """An empty training snapshot must fail before a model is fitted."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         split_labeled_snapshot,
     )
 
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.rows",
         version=0,
         record_key_columns=("id",),
@@ -573,8 +566,8 @@ import pandas as pd
 
 from skyulf.preprocessing import filter_step, fitted_step
 
-from .custom.pre_split_custom import minimum_completeness
-from .custom.preprocessing_custom import frequency_encoding
+from .pre_split import minimum_completeness
+from .preprocessing import frequency_encoding
 
 COLUMNS = ["category", "region"]
 
@@ -621,10 +614,10 @@ def _template_project(tmp_path, recipe):
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
     root = tmp_path / recipe / "features"
-    (root / "custom").mkdir(parents=True)
-    for name in ("__init__.py", "preprocessing_custom.py", "pre_split_custom.py"):
-        source = TEMPLATE_FEATURES / "custom" / name
-        (root / "custom" / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    root.mkdir(parents=True)
+    for name in ("preprocessing.py", "pre_split.py"):
+        source = TEMPLATE_FEATURES / name
+        (root / name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     (root / "__init__.py").write_text(TEMPLATE_PARITY, encoding="utf-8")
     config = {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}
     return load_project_workflow(config, root, preprocessing_recipe=recipe, pre_split_recipe=recipe)
@@ -649,9 +642,7 @@ def test_template_class_steps_and_function_steps_agree(tmp_path, engine):
     from skyulf.integrations.databricks.scoring.shared.scoring_pre_split import (
         pre_split_exclusion_reasons,
     )
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        apply_pre_split_step,
-    )
+    from skyulf.integrations.databricks.training.fitting.candidate import apply_pre_split_step
 
     batch = pd.DataFrame({"category": ["a", "zzz", None], "region": [None, "y", None]})
     outcomes = []

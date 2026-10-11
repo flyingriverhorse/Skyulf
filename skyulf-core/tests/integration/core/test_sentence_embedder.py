@@ -4,6 +4,9 @@ All tests mock ``_load_model`` at the module level to avoid downloading
 sentence-transformer weights.  The mock model returns deterministic random
 embeddings of a fixed dimension so the tests run without any network access or
 optional ``sentence-transformers`` package.
+
+Asset capture is also mocked to retain legacy-shaped artifacts. These tests
+verify node behavior; the optional artifact tests prove real snapshot/reload.
 """
 
 from typing import Any
@@ -54,6 +57,14 @@ _dimension_helper_cases = TestCaseLoader(
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def mock_asset_capture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bypass torch packaging only in this module of fake-encoder behavior tests."""
+    monkeypatch.setattr(
+        "skyulf.preprocessing.vectorization.sentence_embedder._snapshot_model", lambda model: {}
+    )
 
 
 @pytest.fixture

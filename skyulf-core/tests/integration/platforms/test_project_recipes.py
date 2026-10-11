@@ -16,7 +16,7 @@ from skyulf.integrations.databricks.projects.project import load_project_workflo
 
 CUSTOM = (
     Path(__file__).resolve().parents[3]
-    / "templates/databricks/template/{{.project_name}}/src/features/custom"
+    / "templates/databricks/template/{{.project_name}}/src/features"
 )
 
 
@@ -24,11 +24,11 @@ def _project(tmp_path):
     """Build one package whose inactive default registers no custom classes."""
     root = tmp_path / "features"
     root.mkdir()
-    for filename in ("preprocessing_custom.py", "pre_split_custom.py"):
+    for filename in ("preprocessing.py", "pre_split.py"):
         shutil.copyfile(CUSTOM / filename, root / filename)
     root.joinpath("__init__.py").write_text(
-        "from .preprocessing_custom import frequency_encoding\n"
-        "from .pre_split_custom import minimum_completeness\n"
+        "from .preprocessing import frequency_encoding\n"
+        "from .pre_split import minimum_completeness\n"
         "def build_preprocessing(recipe='default'):\n"
         "    if recipe == 'default': return []\n"
         "    if recipe not in ('category', 'other'): raise ValueError('Unknown recipe')\n"
@@ -94,11 +94,11 @@ def test_phase_selections_do_not_select_each_other(tmp_path):
 
 def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
     """Fresh replay must register nondefault custom classes from both branch selections."""
-    from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
-    from skyulf.integrations.databricks.training.local_branches import (
+    from skyulf.integrations.databricks.training.branches import (
         TrainingBranch,
         branch_training_payload,
     )
+    from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
 
     root = _project(tmp_path)
     branches = []
@@ -109,7 +109,7 @@ def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
             preprocessing_recipe=column,
             pre_split_recipe=column,
         )
-        spec = LocalTrainingSpec(
+        spec = TrainingSpec(
             table="workspace.test.rows",
             version=0,
             record_key_columns=("id",),
@@ -137,7 +137,7 @@ def test_saved_branch_plan_restores_selected_custom_registrations(tmp_path):
     code = (
         "import json, sys\n"
         "from pathlib import Path\n"
-        "from skyulf.integrations.databricks.training.local_branches import "
+        "from skyulf.integrations.databricks.training.branches import "
         "restore_training_branches, branch_training_payload\n"
         "from skyulf.registry import NodeRegistry\n"
         "payload = json.loads(Path(sys.argv[1]).read_text())\n"
@@ -223,9 +223,9 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
     if transport == "mlflow":
         pytest.importorskip("mlflow")
     from skyulf.data.dataset import SplitDataset
-    from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        LocalTrainingSpec,
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.fitting.candidate import (
+        TrainingSpec,
         split_labeled_snapshot,
     )
 
@@ -242,7 +242,7 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
             "target": np.arange(1, 21) * 2.0 + 1,
         }
     )
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.rows",
         version=0,
         record_key_columns=("id",),
@@ -258,7 +258,7 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
         train=pl.from_pandas(train) if engine == "polars" else train,
         test=pl.from_pandas(heldout) if engine == "polars" else heldout,
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config["pipeline"],
         data,
         target_column="target",
@@ -275,12 +275,12 @@ def test_selected_recipes_fit_and_reload_in_fresh_process(tmp_path, monkeypatch,
         path.write_text("raise RuntimeError('edited recipe')\n", encoding="utf-8")
     code = (
         "import json, sys, pandas as pd\n"
-        "from skyulf.inference.local_pipeline import load_local_pipeline\n"
-        "from skyulf.inference.local_scoring import score_local_pipeline\n"
+        "from skyulf.inference.fitted_pipeline import load_pipeline\n"
+        "from skyulf.inference.pipeline_scoring import score_pipeline\n"
         "rows = pd.DataFrame({'category':['A','NEW',None], 'amount':[5.,10.,15.]})\n"
         "if sys.argv[2] == 'mlflow':\n"
         "    import mlflow\n    result = mlflow.pyfunc.load_model(sys.argv[1]).predict(rows)\n"
-        "else:\n    result = score_local_pipeline(rows, load_local_pipeline(sys.argv[1]))\n"
+        "else:\n    result = score_pipeline(rows, load_pipeline(sys.argv[1]))\n"
         "print(json.dumps({'status': result.scoring_status.tolist(), "
         "'predictions': result.prediction.iloc[:2].tolist()}))\n"
     )
@@ -301,7 +301,7 @@ def _log_model(tmp_path):
     """Exercise the actual MLflow artifact packaging and fresh-process pyfunc loader."""
     import mlflow
 
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
@@ -310,7 +310,7 @@ def _log_model(tmp_path):
         run_name="recipes",
     ) as run:
         assert run.run_id is not None
-        model_uri = log_local_model(
+        model_uri = log_pipeline_model(
             tmp_path / "artifact", run_id=run.run_id, artifact_path="model", tracking_uri=uri
         )
     return mlflow.artifacts.download_artifacts(artifact_uri=model_uri, tracking_uri=uri)

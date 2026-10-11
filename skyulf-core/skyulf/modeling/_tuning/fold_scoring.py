@@ -22,6 +22,29 @@ def _fold_step(estimator: Any) -> FoldAwareModelStep | None:
     return estimator if isinstance(estimator, FoldAwareModelStep) else None
 
 
+def _original_evaluation_labels(preprocessor: Any, mapping: dict[Any, Any], y: Any) -> Any:
+    """Decode one known target space, rejecting ambiguous custom adapter outputs."""
+    decode = getattr(preprocessor, "original_target_labels", None)
+    if decode is not None:
+        decoded = decode(y)
+        if decoded is not None:
+            return decoded
+    labels = np.asarray(y)
+    values = set(labels.tolist())
+    encoded = values <= mapping.keys()
+    original = values <= set(mapping.values())
+    if encoded and original and any(mapping[label] != label for label in values):
+        raise ValueError(
+            "Ambiguous evaluation target space; preprocessing must expose "
+            "original_target_labels to decode its transformed evaluation labels."
+        )
+    if encoded:
+        return np.asarray([mapping[label] for label in labels])
+    if original:
+        return labels
+    raise ValueError("Evaluation target labels are absent from the fitted target mapping.")
+
+
 def prepare_fold_evaluation(
     estimator: Any, X: Any, y: Any, *, allow_empty: bool = False
 ) -> tuple[Any, Any, Any, dict[str, Any]]:
@@ -33,9 +56,7 @@ def prepare_fold_evaluation(
     X, y = step._ensure_frames(X, y)
     X_t, y_t, coverage = transform_evaluation(step.preprocessor_, X, y, allow_empty=allow_empty)
     if step.label_map_ is not None:
-        # Some custom preprocessors encode only during fit; preserve labels
-        # already in the public class space instead of replacing them with NaN.
-        y_t = np.asarray([step.label_map_.get(label, label) for label in np.asarray(y_t)])
+        y_t = _original_evaluation_labels(step.preprocessor_, step.label_map_, y_t)
 
     # Preserve response methods/classes without applying preprocessing again.
     # Copies also leave the real fitted pipeline intact if the scorer raises.

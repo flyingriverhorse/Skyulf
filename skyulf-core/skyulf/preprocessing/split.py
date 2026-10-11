@@ -25,6 +25,7 @@ import polars as pl
 from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from sklearn.utils.validation import check_consistent_length
 
+from ..core.capabilities import ExecutionCapability
 from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
@@ -32,6 +33,7 @@ from ..modeling._sample_weights import validate_sample_weight
 from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ._artifacts import FeatureTargetSplitArtifact, SplitArtifact
+from ._fitted_validation import local_state_fields
 from ._helpers import is_polars
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator
@@ -603,6 +605,22 @@ def _maybe_split_xy_member(data: Any, target_col: str) -> tuple[Any, Any]:
 
 class FeatureTargetSplitApplier(BaseApplier):
     """Separate the target column from the features without moving any rows."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved target name without executing feature/target extraction."""
+        local_state_fields(raw, "feature_target_split", {"type", "target_column"})
+        if not isinstance(raw["target_column"], str) or not raw["target_column"]:
+            raise ValueError("Fitted target_column must be a nonempty string.")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe native pair extraction; pipelines omit this training-only marker."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        FeatureTargetSplitApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     def apply(
         self,

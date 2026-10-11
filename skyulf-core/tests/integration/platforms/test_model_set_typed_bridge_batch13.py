@@ -9,13 +9,9 @@ import pytest
 
 from skyulf.core.schema import SchemaMismatchError
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.inference.model_set import ComponentReference, load_model_set, save_model_set
-from skyulf.inference.model_set_scoring import score_model_set
+from skyulf.inference.model_set_scoring import predict_model_set, score_model_set
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -61,8 +57,8 @@ def typed_model_set(tmp_path):
     )
     pipeline.fit(frame, target_column="target")
     component_path = tmp_path / "component"
-    save_local_pipeline(pipeline, component_path)
-    local = load_local_pipeline(component_path)
+    save_pipeline(pipeline, component_path)
+    local = load_pipeline(component_path)
     reference = ComponentReference(name="typed", version="1", digest=local.manifest.pipeline_sha256)
     save_model_set(
         tmp_path / "set",
@@ -84,7 +80,7 @@ def test_model_set_preserves_date_and_other_native_types(typed_model_set, missin
             for name in ["date", "time", "category"]
         )
     original = query.clone()
-    expected = predict_local_pipeline(query.drop("id"), local)
+    expected = predict_pipeline(query.drop("id"), local)
     actual = score_model_set(query, artifact).frame
     assert actual["id"].tolist() == [2**53 + 1, 3, 2**53 + 3]
     np.testing.assert_allclose(actual["amount__prediction"].astype(float), expected["prediction"])
@@ -96,7 +92,7 @@ def test_model_set_preserves_exact_arrow_input_and_pandas_index(typed_model_set)
     artifact, local, query = typed_model_set
     pandas_query = query.to_pandas(use_pyarrow_extension_array=True)
     pandas_query.index = pd.Index([8, 2, 8], name="row")
-    expected = predict_local_pipeline(query.drop("id"), local)
+    expected = predict_pipeline(query.drop("id"), local)
     actual = score_model_set(pandas_query, artifact).frame
     assert actual.index.equals(pandas_query.index)
     np.testing.assert_allclose(actual["amount__prediction"].astype(float), expected["prediction"])
@@ -134,8 +130,8 @@ def test_model_set_preserves_large_nullable_integer_features(tmp_path):
     )
     pipeline.fit(frame, target_column="target")
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    local = load_local_pipeline(path)
+    save_pipeline(pipeline, path)
+    local = load_pipeline(path)
     reference = ComponentReference(name="large", version="1", digest=local.manifest.pipeline_sha256)
     artifact = save_model_set(
         tmp_path / "set",
@@ -146,3 +142,86 @@ def test_model_set_preserves_large_nullable_integer_features(tmp_path):
     actual = score_model_set(query, artifact).frame
     assert actual["id"].tolist() == [3, 1, 2]
     np.testing.assert_allclose(actual["amount__prediction"].astype(float), [10.0, 20.0, 30.0])
+
+
+@pytest.fixture(params=[pl.Boolean, pl.Enum(["a", "b"])], ids=["boolean", "enum"])
+def strict_native_model_set(request, tmp_path):
+    """Persist a component that consumes a Boolean or Enum through fitted encoding."""
+    values = [True, False] if request.param == pl.Boolean else ["a", "b"]
+    frame = pl.DataFrame(
+        {
+            "category": pl.Series(values * 6, dtype=request.param),
+            "x": np.arange(12.0),
+            "target": np.arange(12.0) * 2,
+        }
+    )
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "encode",
+                    "transformer": "OneHotEncoder",
+                    "params": {
+                        "columns": ["category"],
+                        "drop_original": True,
+                        "include_missing": True,
+                    },
+                }
+            ],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    pipeline.fit(frame, target_column="target")
+    path = tmp_path / "component"
+    save_pipeline(pipeline, path)
+    local = load_pipeline(path)
+    reference = ComponentReference(
+        name="native", version="1", digest=local.manifest.pipeline_sha256
+    )
+    artifact = save_model_set(
+        tmp_path / "set",
+        {"amount": (reference, path)},
+        record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+    )
+    query = frame.drop("target").head(3).with_columns(pl.Series("id", [2**53 + 1, 3, 2**53 + 3]))
+    return artifact, local, query
+
+
+@pytest.mark.parametrize("all_null", [False, True])
+def test_model_set_preserves_boolean_and_enum_features(strict_native_model_set, all_null):
+    """Typed native features must give the same predictions as the saved component directly."""
+    artifact, local, query = strict_native_model_set
+    if all_null:
+        query = query.with_columns(pl.lit(None, dtype=query.schema["category"]).alias("category"))
+    original = query.clone()
+    expected = predict_pipeline(query.drop("id"), local)
+    actual = predict_model_set(query, artifact)
+    assert actual["id"].tolist() == query["id"].to_list()
+    np.testing.assert_allclose(actual["amount__prediction"].astype(float), expected["prediction"])
+    assert query.equals(original)
+
+
+def test_model_set_validates_empty_native_features(strict_native_model_set):
+    """Empty requests retain their declared Boolean or Enum schema without calling an estimator."""
+    artifact, _, query = strict_native_model_set
+    actual = predict_model_set(query.head(0), artifact)
+    assert actual.empty
+    assert actual.columns.tolist() == [
+        "id",
+        "amount__prediction",
+        "amount__scoring_status",
+        "amount__exclusion_reason",
+    ]
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_model_set_rejects_wrong_boolean_or_enum_schema(strict_native_model_set, empty):
+    """Native preservation must not coerce incorrect String inputs into the fitted schema."""
+    artifact, local, query = strict_native_model_set
+    invalid = query.with_columns(pl.col("category").cast(pl.String))
+    if empty:
+        invalid = invalid.head(0)
+    with pytest.raises(SchemaMismatchError, match="category"):
+        predict_pipeline(invalid.drop("id"), local)
+    with pytest.raises(SchemaMismatchError, match="category"):
+        predict_model_set(invalid, artifact)

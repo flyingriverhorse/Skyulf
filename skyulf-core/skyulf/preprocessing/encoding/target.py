@@ -10,6 +10,7 @@ import polars as pl
 from sklearn.preprocessing import LabelEncoder, TargetEncoder
 from sklearn.utils.multiclass import type_of_target
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
@@ -17,6 +18,7 @@ from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TargetEncoderArtifact
+from .._fitted_validation import local_state_fields
 from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -111,6 +113,55 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     return _replace_target_encoded_pandas(X, y, valid_cols, encoded)
 
 
+def _validate_target_categories(encoder: Any, count: int) -> None:
+    """Check feature/category axes without interpreting or coercing learned scalar labels."""
+    if encoder.n_features_in_ != count:
+        raise ValueError("Fitted target encoder feature count disagrees.")
+    categories = encoder.categories_
+    if not isinstance(categories, (list, tuple)) or len(categories) != count:
+        raise ValueError("Fitted target categories must align with selected columns.")
+    if any(
+        not isinstance(values, np.ndarray) or values.ndim != 1 or not len(values)
+        for values in categories
+    ):
+        raise ValueError("Fitted target categories must be nonempty vectors.")
+
+
+def _target_output_width(encoder: Any) -> int:
+    """Validate saved class labels and mean dimensions without deriving new statistics."""
+    if encoder.target_type_ not in ("binary", "continuous", "multiclass"):
+        raise ValueError("Unknown fitted target encoder target type.")
+    classes = encoder.classes_
+    if encoder.target_type_ != "continuous" and (
+        not isinstance(classes, np.ndarray) or classes.ndim != 1 or not len(classes)
+    ):
+        raise ValueError("Fitted target classes must be a nonempty vector.")
+    width = len(classes) if encoder.target_type_ == "multiclass" else 1
+    mean = np.asarray(encoder.target_mean_)
+    shape = (width,) if encoder.target_type_ == "multiclass" else ()
+    if mean.shape != shape or mean.dtype.kind not in "fi":
+        raise ValueError("Fitted target mean disagrees with the target output shape.")
+    return width
+
+
+def _validate_target_statistics(encoder: Any) -> None:
+    """Bind full-data inference maps to their saved feature and target-class dimensions."""
+    width = _target_output_width(encoder)
+    encodings = encoder.encodings_
+    if (
+        not isinstance(encodings, (list, tuple))
+        or len(encodings) != len(encoder.categories_) * width
+    ):
+        raise ValueError("Fitted target encoding count disagrees with learned categories.")
+    for index, values in enumerate(encodings):
+        if (
+            not isinstance(values, np.ndarray)
+            or values.dtype.kind not in "fi"
+            or values.shape != (len(encoder.categories_[index // width]),)
+        ):
+            raise ValueError("Fitted target encoding vectors disagree with category counts.")
+
+
 class TargetEncoderApplier(BaseApplier):
     """Replace categorical columns with the target statistics the fitted encoder learned.
 
@@ -121,6 +172,41 @@ class TargetEncoderApplier(BaseApplier):
     per class. Multiclass output names must not collide with retained columns;
     conflicts raise ``ValueError`` before any input values are replaced.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved full-data encoder while leaving cross-fitted training values alone."""
+        if not local_state_fields(
+            raw, "target_encoder", {"type", "columns", "encoder_object"}, allow_empty=True
+        ):
+            return raw
+        columns = raw["columns"]
+        if not isinstance(columns, (list, tuple)) or any(not isinstance(c, str) for c in columns):
+            raise ValueError("Fitted target encoder columns must be ordered strings.")
+        encoder = raw["encoder_object"]
+        required = {
+            "n_features_in_",
+            "categories_",
+            "target_type_",
+            "classes_",
+            "target_mean_",
+            "encodings_",
+        }
+        if type(encoder) is not TargetEncoder or not required.issubset(vars(encoder)):
+            raise ValueError("Expected a fitted TargetEncoder.")
+        if any(callable(value) for value in vars(encoder).values()):
+            raise ValueError("Overridden target estimator methods are unsupported.")
+        _validate_target_categories(encoder, len(columns))
+        _validate_target_statistics(encoder)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved target-statistic lookups without refitting or admitting workers."""
+        if engine not in ("pandas", "polars"):
+            return None
+        TargetEncoderApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

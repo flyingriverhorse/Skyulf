@@ -151,7 +151,16 @@ def _sql(dataset):
 
 def _rows(database, dataset):
     """Execute production SQL without replacing its joins, filters or ranking."""
-    return [dict(row) for row in database.execute(_sql(dataset))]
+    return [dict(row) for row in database.execute(_sql(dataset), _defaults(dataset))]
+
+
+def _defaults(dataset):
+    """Exercise the same initial parameter values that the published dashboard uses."""
+    source = next(d for d in _dashboard()["datasets"] if d["name"] == dataset)
+    return {
+        p["keyword"]: p["defaultSelection"]["values"]["values"][0]["value"]
+        for p in source.get("parameters", [])
+    }
 
 
 def _daily(database, dataset):
@@ -186,18 +195,17 @@ def test_distinct_counters_keep_model_versions_and_shared_tables_together(databa
         "unique_models_count",
         "enrolled_contexts_count",
         "source_tables_count",
-        "prediction_tables_count",
     ):
         assert name in widgets, f"Overview is missing {name}"
         expression = widgets[name]["queries"][0]["query"]["fields"][0]["expression"]
         counts[name] = database.execute(
-            f"SELECT {expression} FROM ({_sql('overview_inventory')})"
+            f"SELECT {expression} FROM ({_sql('overview_inventory')})",
+            _defaults("overview_inventory"),
         ).fetchone()[0]
     assert counts == {
         "unique_models_count": 2,
         "enrolled_contexts_count": 3,
         "source_tables_count": 2,
-        "prediction_tables_count": 1,
     }
     rows = _rows(database, "overview_inventory")
     missing = next(row for row in rows if row["monitor_id"] == "m3")
@@ -341,9 +349,16 @@ def test_window_day_is_utc_not_measurement_arrival_or_session_day(database, data
 def test_overview_filters_mapping_and_chart_layout_are_complete():
     """All additions follow existing selectors and show compact, non-overlapping content."""
     page = next(p for p in _dashboard()["pages"] if p["name"] == "overview")
-    widgets = {item["widget"]["name"]: item["widget"] for item in page["layout"]}
-    for field in ("model_catalog", "model_schema", "model_name", "model_version"):
-        bound = {q["query"]["datasetName"] for q in widgets[f"filter_{field}_overview"]["queries"]}
+    global_page = next(
+        p for p in _dashboard()["pages"] if p["pageType"] == "PAGE_TYPE_GLOBAL_FILTERS"
+    )
+    widgets = {
+        item["widget"]["name"]: item["widget"]
+        for source in (page, global_page)
+        for item in source["layout"]
+    }
+    for name in ("filter_model", "filter_version", "filter_context"):
+        bound = {q["query"]["datasetName"] for q in widgets[name]["queries"]}
         assert bound >= NEW_DATASETS
     table = widgets["model_table_mapping"]
     columns = {c["fieldName"] for c in table["spec"]["encodings"]["columns"]}
@@ -371,9 +386,9 @@ def test_overview_filters_mapping_and_chart_layout_are_complete():
         assert p["x"] + p["width"] <= 12
         assert not occupied & cells
         occupied |= cells
-    assert {
-        "within_tolerance_count",
-        "performance_loss_count",
-        "healthy_count",
-        "drift_count",
-    } <= widgets.keys()
+    assert {"health_status_breakdown", "performance_status_breakdown"} <= widgets.keys()
+    assert sum(w.get("spec", {}).get("widgetType") == "counter" for w in widgets.values()) == 4
+    assert (
+        widgets["performance_status_breakdown"]["queries"][0]["query"]["fields"][1]["expression"]
+        == "COUNT(*)"
+    )

@@ -45,7 +45,7 @@ def test_prediction_source_join_remains_distributed_and_pinned(spark, monkeypatc
     monkeypatch.setattr(sources, "snapshot_at", lambda *args: 8)
     monkeypatch.setattr(
         sources,
-        "_window_receipts",
+        "window_receipts",
         lambda *args: {
             "r": {
                 "receipt": {

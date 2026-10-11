@@ -211,8 +211,8 @@ def test_xgb_unshuffled_cv_handles_a_class_absent_from_each_training_fold(labels
 def test_xgb_local_mlflow_artifact_preserves_original_labels(tmp_path, monkeypatch, engine):
     """The real MLflow pyfunc package must reload the encoded estimator and original class axis."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
 
     monkeypatch.chdir(tmp_path)
@@ -226,14 +226,14 @@ def test_xgb_local_mlflow_artifact_preserves_original_labels(tmp_path, monkeypat
     )
     pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="target")
     artifact_path = tmp_path / "local-artifact"
-    save_local_pipeline(pipeline, artifact_path)
+    save_pipeline(pipeline, artifact_path)
     tracking_uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
     previous_uri = mlflow.get_tracking_uri()
     try:
         config = TrackingConfig(enabled=True, tracking_uri=tracking_uri, experiment_name="xgb")
         with track_run(config, run_name="original-labels") as run:
             assert run.run_id is not None
-            model_uri = log_local_model(
+            model_uri = log_pipeline_model(
                 artifact_path,
                 run_id=run.run_id,
                 artifact_path="model",
@@ -244,7 +244,7 @@ def test_xgb_local_mlflow_artifact_preserves_original_labels(tmp_path, monkeypat
     finally:
         mlflow.set_tracking_uri(previous_uri)
 
-    artifact = load_local_pipeline(artifact_path)
+    artifact = load_pipeline(artifact_path)
     assert artifact.manifest.classes == ("a", "b", "c")
     np.testing.assert_array_equal(result["prediction"], pipeline.predict(X))
     assert pipeline.model_estimator is not None
@@ -321,12 +321,8 @@ def test_xgb_public_fit_rejects_nonclassification_targets(route, invalid):
 def test_xgb_explicit_target_encoder_preserves_core_and_artifact_contracts(
     tmp_path, engine, labels
 ):
-    """An explicit target encoder keeps Core codes and restores original labels for artifacts."""
-    from skyulf.inference.local_pipeline import (
-        load_local_pipeline,
-        predict_local_pipeline,
-        save_local_pipeline,
-    )
+    """An explicit target encoder restores original labels in Core and saved artifacts."""
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 
     X, y = _data(labels)
     train = X.assign(target=y)
@@ -354,13 +350,13 @@ def test_xgb_explicit_target_encoder_preserves_core_and_artifact_contracts(
     target_encoder = LabelEncoder().fit(y.astype(str))
     original_classes = target_encoder.classes_.astype(y.dtype)
     path = tmp_path / "encoded-target"
-    save_local_pipeline(pipeline, path)
-    artifact = load_local_pipeline(path)
-    served = predict_local_pipeline(X, artifact)
+    save_pipeline(pipeline, path)
+    artifact = load_pipeline(path)
+    served = predict_pipeline(X, artifact)
 
     np.testing.assert_array_equal(model.classes_, np.arange(len(labels)))
-    assert set(core_predictions) == set(range(len(labels)))
-    np.testing.assert_array_equal(served["prediction"], original_classes[core_predictions])
+    assert set(core_predictions) == set(labels)
+    np.testing.assert_array_equal(served["prediction"], core_predictions)
     assert artifact.manifest.classes == tuple(original_classes)
     probability_columns = [f"probability_{index}" for index in range(len(labels))]
     np.testing.assert_allclose(served[probability_columns].to_numpy(), core_probabilities)

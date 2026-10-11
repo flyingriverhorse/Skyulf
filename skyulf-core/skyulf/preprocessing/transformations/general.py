@@ -8,15 +8,18 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import PowerTransformer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import EngineName, get_engine
 from ...registry import NodeRegistry
 from .._artifacts import GeneralTransformationArtifact
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._ops import _PANDAS_OPS, _POLARS_OPS, _apply_polars_op
-from ._power_common import build_pretrained_power_transformer
+from ._power_common import build_pretrained_power_transformer, validate_power_parameters
+from .simple import _validate_simple_rule
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +89,28 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
 class GeneralTransformationApplier(BaseApplier):
     """Apply per-column simple ops or fitted Box-Cox/Yeo-Johnson transforms."""
 
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect ordered saved rules while retaining the existing simple-rule checks."""
+        local_state_fields(raw, "general_transformation", {"type", "transformations"})
+        rules = raw["transformations"]
+        if type(rules) not in (list, tuple):
+            raise ValueError("GeneralTransformation rules must be a list or tuple.")
+        for rule in rules:
+            _validate_general_rule(rule)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Separate pointwise formulas from batch-dependent power failure fallback."""
+        if engine not in ("pandas", "polars"):
+            return None
+        GeneralTransformationApplier.validate_inference_state(state)
+        has_power = any(rule.get("method") in _POWER_METHODS for rule in state["transformations"])
+        return ExecutionCapability(
+            engine, "apply", "local", "preserve", "global" if has_power else "row"
+        )
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Run each configured transformation on the active engine; ``y`` passes through."""
@@ -134,6 +159,20 @@ class GeneralTransformationApplier(BaseApplier):
                 continue
             df_out[col] = op(pd.to_numeric(df_out[col], errors="coerce"), item)
         return df_out, _y
+
+
+def _validate_general_rule(rule: Any) -> None:
+    """Keep fitted power fields separate from the already inspected fixed formulas."""
+    if type(rule) is not dict:
+        raise ValueError("GeneralTransformation rules must be dictionaries.")
+    if rule.get("method") not in _POWER_METHODS:
+        _validate_simple_rule(rule)
+        return
+    if set(rule) - {"column", "method", "lambdas", "standardize", "scaler_params"}:
+        raise ValueError("Unexpected fitted power rule fields.")
+    if not isinstance(rule.get("column"), str):
+        raise ValueError("Fitted power column must be a string.")
+    validate_power_parameters(rule, 1)
 
 
 def _fit_power_for_column(

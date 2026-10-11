@@ -63,7 +63,7 @@ def capture_branch_weights(source: str, entries: Mapping[str, Any]) -> dict[str,
 
 
 def validate_weight_roles(config: Mapping[str, Any]) -> None:
-    """Protect declared weights using workflow or LocalTrainingSpec column names."""
+    """Protect declared weights using workflow or TrainingSpec column names."""
     active = _weight_column(config.get("weight_column"))
     reserved = config.get("reserved_weight_columns", [])
     if not isinstance(reserved, (list, tuple)):

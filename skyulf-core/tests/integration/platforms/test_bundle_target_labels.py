@@ -13,14 +13,11 @@ from test_bundle_decision_thresholds import fixture_frame, recipe
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.pandas_engine import SkyulfPandasWrapper
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
-from skyulf.inference.local_evaluation import evaluate_local_holdout
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.tuning.local_cv import (
-    LocalCVSpec,
-    evaluate_training_cv,
-)
-from skyulf.integrations.databricks.training.tuning.local_search import prepare_search_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+from skyulf.inference.pipeline_evaluation import evaluate_holdout
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
+from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
 from skyulf.preprocessing.encoding.label import LabelEncoderApplier, LabelEncoderCalculator
 from skyulf.preprocessing.encoding.ordinal import OrdinalEncoderApplier, OrdinalEncoderCalculator
 
@@ -58,7 +55,7 @@ def test_encoded_target_keeps_original_decisions_and_metrics(
         else (native.iloc[:180], native.iloc[180:])
     )
     path = tmp_path / "model"
-    fitted = fit_local_workflow(
+    fitted = fit_workflow(
         config,
         SplitDataset(train=train, test=holdout),
         target_column="target",
@@ -66,12 +63,12 @@ def test_encoded_target_keeps_original_decisions_and_metrics(
         max_rows=1000,
         max_bytes=10_000_000,
     )
-    artifact = load_local_pipeline(path)
+    artifact = load_pipeline(path)
     features = frame.iloc[180:].drop(columns="target")
-    prediction = predict_local_pipeline(features, artifact)
+    prediction = predict_pipeline(features, artifact)
     assert set(artifact.manifest.classes) == set(labels)
     assert set(prediction.prediction).issubset(set(labels))
-    np.testing.assert_array_equal(prediction, predict_local_pipeline(features, fitted))
+    np.testing.assert_array_equal(prediction, predict_pipeline(features, fitted))
     probabilities = prediction.filter(like="probability_").to_numpy()
     order = list(artifact.manifest.classes)
     expected_order = list(reversed(labels)) if encoder == "ordinal" else labels
@@ -98,7 +95,7 @@ def test_encoded_target_keeps_original_decisions_and_metrics(
             np.argmax(probabilities / [weights[label] for label in order], axis=1)
         ]
         np.testing.assert_array_equal(prediction.prediction, expected)
-    metrics = evaluate_local_holdout(artifact, holdout, target_column="target")
+    metrics = evaluate_holdout(artifact, holdout, target_column="target")
     actual = frame.iloc[180:].target
     assert metrics["heldout_balanced_accuracy"] == pytest.approx(
         balanced_accuracy_score(actual, prediction.prediction)
@@ -125,7 +122,7 @@ def test_original_binary_positive_class_is_resolved_after_encoding(tmp_path):
             "params": {"columns": ["target"], "categories_order": "class_1,class_0"},
         }
     )
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=frame.iloc[:180], test=frame.iloc[180:]),
         target_column="target",
@@ -133,7 +130,7 @@ def test_original_binary_positive_class_is_resolved_after_encoding(tmp_path):
         max_rows=1000,
         max_bytes=10_000_000,
     )
-    prediction = predict_local_pipeline(frame.iloc[180:].drop(columns="target"), artifact)
+    prediction = predict_pipeline(frame.iloc[180:].drop(columns="target"), artifact)
     position = artifact.manifest.classes.index("class_0")
     expected = np.where(prediction[f"probability_{position}"] >= 0.7, "class_0", "class_1")
     np.testing.assert_array_equal(prediction.prediction, expected)
@@ -186,7 +183,7 @@ def test_target_encoding_preserves_original_scalar_types(tmp_path, engine, kind)
     config = recipe({"mode": "auto"})
     config["preprocessing"].append({"name": "encode", "transformer": "LabelEncoder", "params": {}})
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -223,7 +220,7 @@ def test_encoded_sampling_cv_and_reload_keep_original_labels(tmp_path, engine, m
             {"name": "encode_again", "transformer": "LabelEncoder", "params": {}},
         ]
     )
-    cv = LocalCVSpec(enabled=True, folds=2, method="stratified_k_fold")
+    cv = CVSpec(enabled=True, folds=2, method="stratified_k_fold")
     if search:
         config["modeling"] = {
             "type": "hyperparameter_tuner",
@@ -235,7 +232,7 @@ def test_encoded_sampling_cv_and_reload_keep_original_labels(tmp_path, engine, m
     config = prepare_search_pipeline(config, cv, target_column="target", event_column=None)
     native = pl.from_pandas(frame) if engine == "polars" else frame
     report = evaluate_training_cv(native, config, cv, target_column="target")
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -243,7 +240,7 @@ def test_encoded_sampling_cv_and_reload_keep_original_labels(tmp_path, engine, m
         max_rows=1000,
         max_bytes=10_000_000,
     )
-    prediction = predict_local_pipeline(frame.drop(columns="target"), artifact)
+    prediction = predict_pipeline(frame.drop(columns="target"), artifact)
     assert set(artifact.manifest.classes) == {"class_0", "class_1", "class_2"}
     assert set(prediction.prediction).issubset(set(frame.target))
     assert report is not None and len(report["decision_threshold_folds"]) == 2

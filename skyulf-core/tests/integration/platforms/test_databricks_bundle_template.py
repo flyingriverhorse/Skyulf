@@ -76,9 +76,9 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
 
 def _workflow():
     """Use the public library that generated notebooks delegate to."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
 
-    return local_workflow
+    return workflow
 
 
 @pytest.mark.parametrize("prefix", ["event", "result"])
@@ -251,155 +251,26 @@ def _output():
 def _render_default_config(
     record_key="entity_id", risk_category="", inference_mode="local", compute_mode="serverless"
 ):
-    """Resolve default branches for offline checks; real CLI tests cover Go rendering."""
-    template = WORKFLOW.parents[2] / "config/workflow.json.tmpl"
-    schema = json.loads(
-        (WORKFLOW.parents[4] / "databricks_template_schema.json").read_text(encoding="utf-8")
+    """Check resolved defaults using a real CLI snapshot verified by generation tests."""
+    from skyulf.integrations.databricks.projects.yaml_config import (
+        read_training_config,
+        read_workflow_config,
     )
-    values = {key: spec["default"] for key, spec in schema["properties"].items()}
-    values.update(
-        project_name="customer_model",
-        record_key_columns=record_key,
-        risk_category=risk_category,
-        inference_mode=inference_mode,
-        compute_mode=compute_mode,
-    )
-    content = template.read_text(encoding="utf-8")
-    # These optional fields are absent for this helper's default full-snapshot
-    # configuration. Actual CLI cases cover their selected, non-default forms.
-    for name in (
-        "lookback_days",
-        "holdout_days",
-        "window_timezone",
-        "holdout_months",
-        "result_availability_lag_hours",
-        "cv_group_column",
-        "cv_test_size",
-        "cv_max_train_size",
-        "monthly_lookback_months",
-        "event_column",
-        "result_available_at_column",
-        "start",
-        "holdout_start",
-        "cutoff",
-        "result_cutoff",
-    ):
-        content = re.sub(r'{{if [^{}]+}}  "' + name + r'": [^\n]*,\n{{end}}', "", content)
-    content = re.sub(r'{{if eq \.shap_enabled "true"}}.*?{{end}}', "", content, flags=re.DOTALL)
-    content = (
-        content[content.index("{\n") :]
-        .replace("{{$window}}", "full_snapshot")
-        .replace("{{$split}}", "random")
-        .replace("{{$cv_enabled}}", "false")
-    )
-    content = content.replace(
-        '{{if $competition}}  "competition_max_trials": {{.competition_max_trials}},\n'
-        '  "competition_max_candidates": 8,\n{{end}}',
-        "",
-    )
-    content = content.replace(
-        '{{if or (eq .cv_type "time_series_split") '
-        '(and (eq .cv_type "nested_cv") (eq .cv_nested_type "time_series_split"))}}false'
-        '{{else if eq .cv_type "shuffle_split"}}true{{else}}{{.cv_shuffle}}{{end}}',
-        "true",
-    )
-    worker_environment = (
+    from skyulf.integrations.databricks.projects.yaml_models import single_model
+
+    directory = Path(__file__).parent / "fixtures/databricks_yaml_defaults/config"
+    config = read_workflow_config(directory / "training.yml")
+    declarations = read_training_config(directory)
+    assert declarations is not None
+    config = single_model(declarations, config)
+    config["record_key_columns"] = [record_key]
+    config["risk_category"] = risk_category or None
+    config["inference_mode"] = inference_mode
+    config["spark_udf_env_manager"] = (
         "local" if inference_mode == "spark" and compute_mode == "serverless" else "virtualenv"
     )
-    content = content.replace(
-        '{{if and (eq .inference_mode "spark") (eq .compute_mode "serverless")}}'
-        "local{{else}}virtualenv{{end}}",
-        worker_environment,
-    )
-    # This lightweight resolver checks non-model defaults. The actual Go CLI
-    # exercises the conditional Basic/Advanced modeling block separately.
-    content = re.sub(
-        r'    "modeling": .*?(?=\n  }\n}\s*$)',
-        '    "modeling": {"type": "linear_regression", "params": {}}',
-        content,
-        flags=re.DOTALL,
-    )
-    content = content.replace(
-        '{{if eq $window "rolling_days"}}{{.lookback_days}}{{else}}null{{end}}',
-        "null",
-    ).replace(
-        '{{if and (eq $window "rolling_days") (eq $split "temporal")}}'
-        "{{.holdout_days}}{{else}}null{{end}}",
-        "null",
-    )
-    content = content.replace(
-        '{{if and (eq $window "rolling_calendar") (eq $split "temporal")}}'
-        "{{.holdout_months}}{{else}}null{{end}}",
-        "null",
-    ).replace(
-        '{{if eq .filter_unavailable_results "true"}}'
-        "{{.result_availability_lag_hours}}{{else}}null{{end}}",
-        "null",
-    )
-    content = content.replace(
-        "{{if .prediction_table_name}}{{.prediction_table_name}}{{else}}{{.project_name}}_predictions{{end}}",
-        "{{.project_name}}_predictions",
-    )
-    for name in (
-        "risk_category",
-        "event_time_format",
-        "event_time_timezone",
-        "result_time_format",
-        "result_time_timezone",
-        "event_column",
-        "cv_group_column",
-        "result_available_at_column",
-        "start",
-        "holdout_start",
-        "cutoff",
-        "result_cutoff",
-    ):
-        content = content.replace(
-            "{{if ." + name + '}}"{{.' + name + '}}"{{else}}null{{end}}',
-            json.dumps(values[name] or None),
-        )
-    content = (
-        content.replace(
-            '{{if eq .task "classification"}}{{.classification_metric}}{{else}}{{.regression_metric}}{{end}}',
-            "heldout_rmse",
-        )
-        .replace(
-            '{{if eq .task "classification"}}{{.classification_model}}{{else}}{{.regression_model}}{{end}}',
-            "linear_regression",
-        )
-        .replace(
-            "{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}",
-            "customer_model_source",
-        )
-        .replace(
-            "{{if .score_source_table_name}}{{.score_source_table_name}}"
-            "{{else}}customer_model_source{{end}}",
-            "customer_model_source",
-        )
-    )
-    content = content.replace(
-        '{{if eq $window "rolling_calendar"}}{{.monthly_lookback_months}}{{else}}null{{end}}',
-        "null",
-    ).replace(
-        '{{if eq $window "rolling_calendar"}}"{{.window_timezone}}"{{else}}null{{end}}',
-        "null",
-    )
-    for name in ("record_key_columns", "input_columns"):
-        expression = (
-            '[{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .'
-            + name
-            + ' -1}}{{if $i}}, {{end}}"{{$column}}"{{end}}]'
-        )
-        content = content.replace(
-            expression, json.dumps([v.strip() for v in values[name].split(",")])
-        )
-    content = content.replace(
-        '{{if .cv_inner_folds}}  "cv_inner_folds": {{.cv_inner_folds}},\n{{end}}',
-        f'  "cv_inner_folds": {values["cv_inner_folds"]},' if values["cv_inner_folds"] else "",
-    )
-    for name, value in values.items():
-        content = content.replace("{{." + name + "}}", str(value))
-    return json.loads(content)
+    config = json.loads(json.dumps(config).replace("sm33_generated", "customer_model"))
+    return config
 
 
 @pytest.mark.parametrize("inference_mode", ["local", "spark"])
@@ -442,7 +313,7 @@ def test_company_cost_tag_example_keeps_the_generic_cluster_choice():
 
 
 def test_generated_config_keeps_company_output_in_each_target():
-    """The actual JSON template must bind its outputs separately in every target."""
+    """The generated YAML snapshot must bind outputs separately in every target."""
     workflow = _workflow()
     config = _render_default_config()
     outputs = {}
@@ -492,7 +363,7 @@ def test_generated_date_rules_do_not_assume_a_source_timezone():
     """Source timestamps need explicit interpretation independent of the job schedule."""
     config = _render_default_config()
     for name in ("event_time_parsing", "result_time_parsing"):
-        assert config[name] == {"format": None, "timezone": None, "date_only": "reject"}
+        assert name not in config
 
 
 def test_generated_config_has_no_admission_or_alias_state():
@@ -584,8 +455,8 @@ def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
     assert "heldout_f1" in properties["classification_metric"]["enum"]
     assert properties["quality_threshold"]["type"] == "string"
     assert properties["quality_threshold"]["default"] == "null"
-    config = (WORKFLOW.parents[2] / "config/workflow.json.tmpl").read_text(encoding="utf-8")
-    assert '"score_model_selection": "{{.score_model_selection}}"' in config
+    config = (WORKFLOW.parents[2] / "config/inference.yml.tmpl").read_text(encoding="utf-8")
+    assert "score_model_selection: {{.score_model_selection}}" in config
     assert _render_default_config()["metric"] == "heldout_rmse"
     jobs = "\n".join(
         (WORKFLOW.parents[2] / f"resources/{name}.job.yml.tmpl").read_text(encoding="utf-8")

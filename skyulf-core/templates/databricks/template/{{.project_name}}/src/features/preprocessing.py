@@ -1,102 +1,166 @@
-"""PREPROCESSING: prepare the columns before the model sees them.
+"""YOUR OWN PREPROCESSING STEPS. Select them in config/preprocessing.yml.
 
-Runs AFTER the train/test split. A step that learns something (an average,
-a mapping) learns it from training rows only; scoring reuses what was learned.
+A step is one or two plain pandas functions plus a small "factory" function
+that wraps them. YAML selects the factory and passes params as keyword arguments:
 
-HOW TO USE
-  1. Put steps in the list of _default_recipe() below. They run top to bottom.
-     You can mix two kinds of step in one list:
-       - Built-in step: a dict naming a Skyulf node, e.g.
-           {"name": "fill", "transformer": "SimpleImputer",
-            "params": {"columns": ["income"], "strategy": "mean"}}
-         See all of them: python src/tools/preview.py --list-preprocessors
-       - Your own step: a function from custom/preprocessing_custom.py, e.g.
-           frequency_encoding(columns=["city"])
-         Uncomment its import line below first.
-  2. Check: python src/tools/preview.py --action train
+  - custom: preprocessing.frequency_encoding
+    params: {columns: [category]}
 
-RECIPES
-  A recipe is a named list of steps. Single-model training always uses
-  "default". multi_model.py and model_competition.py choose a recipe per model,
-  e.g. "preprocessing_recipe": "example_all".
-  Recipes starting with "example_" are ready-made lists to read or copy from;
-  they do nothing unless a model selects them. "none" means no steps.
+Built-in steps and ordered lists live only in config/preprocessing.yml.
+These functions learn from training rows after the split; scoring reuses saved state.
+See PREPROCESSING.md for a complete example.
+
+Two kinds of step:
+
+  column_step  - nothing to learn. One function:
+                   fn(df) -> the new column
+                 Example below: log_feature.
+
+  fitted_step  - something to learn from training data (a mean, a mapping...).
+                 Two functions:
+                   learn(df, y)     -> dict   runs on TRAINING rows only
+                   apply(df, state) -> column runs on train, test AND scoring rows,
+                                       state is the dict learn() returned
+                 Skyulf saves the dict with the model, so scoring uses exactly
+                 what was learned in training. Examples: frequency_encoding,
+                 rare_categories.
+
+Rules:
+  - Write normal top-level `def` functions (no lambda).
+  - df is a pandas copy (also for Polars models); return one value per row.
+  - learn() returns a plain dict: string keys, numbers/strings/lists, no NaN.
+  - params={...} is passed to your functions as their last argument.
+  - replace=True overwrites an existing column; otherwise output must be new.
+
+custom/advanced_class_step.py shows rare_categories written as a class pair
+(Calculator/Applier), so you can compare both ways.
 """
 
-from .custom import preprocessing_custom
+import numpy as np
+import pandas as pd
 
-# from .custom.preprocessing_custom import frequency_encoding, log_feature, rare_categories
-# from .custom.preprocessing_custom import city_region  # needs an asset, see its Example 4
+from skyulf.preprocessing import column_step, fitted_step
 
-
-def build_preprocessing(recipe="default"):
-    """Return the step list of one named recipe."""
-    recipes = {
-        "default": _default_recipe,
-        "none": lambda: [],
-        "example_frequency": _example_frequency,
-        "example_imputer": _example_imputer,
-        "example_imputer_frequency": lambda: _example_imputer() + _example_frequency(),
-        "example_all": _example_all,
-    }
-    if recipe not in recipes:
-        raise ValueError(f"Unknown preprocessing recipe: {recipe}. Choose from {list(recipes)}.")
-    return recipes[recipe]()
+# ---------------------------------------------------------------------------
+# Example 1 - column_step: a new column, nothing learned.
+#   log_feature("income")  ->  adds log_income = log(1 + income)
+# ---------------------------------------------------------------------------
 
 
-def _default_recipe():
-    """Your main recipe. Empty until you uncomment or add steps."""
-    return [
-        # Built-in steps:
-        # {"name": "impute", "transformer": "SimpleImputer",
-        #  "params": {"columns": ["feature_value"], "strategy": "mean"}},
-        # {"name": "scale", "transformer": "StandardScaler",
-        #  "params": {"columns": ["feature_value"]}},
-        # Fill each row with its own category's median (learned on training rows):
-        # {"name": "group_fill", "transformer": "GroupImputer",
-        #  "params": {"columns": ["feature_value"], "group_by": "category",
-        #             "strategy": "median"}},
-        # Cap values at fixed limits; no rows are removed:
-        # {"name": "cap", "transformer": "ClipValues",
-        #  "params": {"bounds": {"feature_value": {"lower": 0, "upper": 1000}}}},
-        # Your own steps (custom/preprocessing_custom.py):
-        # log_feature("feature_value"),
-        # rare_categories("category", min_share=0.05),
-        # frequency_encoding(columns=["category"]),
-        # city_region(),  # reads assets/city_region.json
-        # Time-based history (after the split). observation_time must be an
-        # input column and differ from the job's event_column:
-        # {"name": "recent_value", "transformer": "RollingAggregate",
-        #  "params": {"columns": ["feature_value"], "window": 5,
-        #             "sort_by": "observation_time", "group_by": ["entity"],
-        #             "history_mode": "carry", "history_max_rows": 1000,
-        #             "history_max_bytes": 48000}},
-        # {"name": "drop_clock", "transformer": "DropMissingColumns",
-        #  "params": {"columns": ["observation_time"], "missing_threshold": None}},
-    ]
+def log1p_value(df, params):
+    """Return log(1 + value); negative values count as 0."""
+    return np.log1p(df[params["column"]].clip(lower=0))
 
 
-def _example_frequency():
-    """Only encode category by its training frequency."""
-    return [preprocessing_custom.frequency_encoding(columns=["category"])]
+def log_feature(column):
+    """Add log_<column> next to the original column."""
+    return column_step(
+        f"log_{column}", log1p_value, output=f"log_{column}", params={"column": column}
+    )
 
 
-def _example_imputer():
-    """Only fill missing feature_value with its training average."""
-    return [
+# ---------------------------------------------------------------------------
+# Example 2 - fitted_step without the target: frequency encoding.
+#   training city: A, A, B, null  ->  learns {"A": 0.5, "B": 0.25}
+#   scoring  city: A, NEW, null   ->  0.5, 0.0, 0.0  (replaces the column)
+# ---------------------------------------------------------------------------
+
+
+def learn_frequencies(df, y, params):
+    """Learn: share of training rows per category (null is not a category)."""
+    if len(df) == 0:
+        raise ValueError("Frequency encoding requires nonempty training rows.")
+    return {column: (df[column].value_counts() / len(df)).to_dict() for column in params["columns"]}
+
+
+def apply_frequencies(df, state, params):
+    """Apply: look up the saved share; unseen or null categories get 0."""
+    return pd.DataFrame(
         {
-            "name": "impute",
-            "transformer": "SimpleImputer",
-            "params": {"columns": ["feature_value"], "strategy": "mean"},
-        },
-    ]
+            column: df[column].map(state[column]).astype(float).fillna(0.0)
+            for column in params["columns"]
+        }
+    )
 
 
-def _example_all():
-    """Built-in and own steps together, in the order they run."""
-    return [
-        *_example_imputer(),  # built-in: fill missing feature_value
-        preprocessing_custom.log_feature("feature_value"),  # own: new column, nothing learned
-        preprocessing_custom.rare_categories("category"),  # own: rare values -> "Other"
-        preprocessing_custom.frequency_encoding(columns=["category"]),  # own: category -> number
-    ]
+def frequency_encoding(columns):
+    """Replace string category columns with their training frequency."""
+    if not isinstance(columns, (list, tuple)) or not columns:
+        raise ValueError("Frequency columns must be a nonempty list of column names.")
+    if any(not isinstance(column, str) or not column for column in columns):
+        raise ValueError("Frequency columns must be nonempty column names.")
+    if len(set(columns)) != len(columns):
+        raise ValueError("Frequency columns must be unique.")
+    columns = list(columns)
+    return fitted_step(
+        "frequency_encoding",
+        learn_frequencies,
+        apply_frequencies,
+        output=columns,
+        replace=True,
+        params={"columns": columns},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Example 3 - fitted_step that cleans a text column: group rare categories.
+# The same step is written as a class pair in custom/advanced_class_step.py.
+#   rare_categories("city", min_share=0.05)
+#   training city: 60% London, 38% Paris, 2% Oslo  ->  learns ["London", "Paris"]
+#   scoring  city: London, Oslo, Tokyo, null        ->  London, Other, Other, null
+#   Fewer, more stable categories help one-hot or frequency encoding afterwards,
+#   and a city never seen in training cannot break scoring.
+# ---------------------------------------------------------------------------
+
+
+def learn_common_categories(df, y, params):
+    """Learn: categories that cover at least min_share of the training rows."""
+    shares = df[params["column"]].value_counts() / len(df)
+    common = shares[shares >= params["min_share"]].index
+    return {"keep": sorted(str(category) for category in common)}
+
+
+def apply_common_categories(df, state, params):
+    """Apply: keep learned categories and nulls; everything else becomes `other`."""
+    values = df[params["column"]].astype(object)  # object: "Other" is allowed as a value
+    keep = values.isna() | values.astype(str).isin(state["keep"])
+    return values.where(keep, params["other"])
+
+
+def rare_categories(column, min_share=0.05, other="Other"):
+    """Replace categories seen in less than min_share of training rows with `other`."""
+    if not 0 < min_share < 1:
+        raise ValueError("min_share must be between 0 and 1, e.g. 0.05 for 5%.")
+    params = {"column": column, "min_share": min_share, "other": other}
+    return fitted_step(
+        f"rare_{column}",
+        learn_common_categories,
+        apply_common_categories,
+        output=column,
+        replace=True,
+        params=params,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Example 4 - using a data file (asset). Inactive: uncomment to try.
+#   1. Create src/features/assets/city_region.json  {"London": "UK", "Vilnius": "LT"}
+#   2. In src/features/assets.json set   "files": ["assets/city_region.json"]
+#   3. Uncomment the code below, then select custom: preprocessing.city_region in YAML.
+#   The file is saved with the model; editing it later needs a new training run.
+# ---------------------------------------------------------------------------
+
+# import json
+#
+# from skyulf.inference.project_package import read_project_asset
+#
+#
+# def region_of_city(df):
+#     """Map each city to its region with the saved lookup file."""
+#     regions = json.loads(read_project_asset(__package__, "assets/city_region.json"))
+#     return df["city"].map(regions)
+#
+#
+# def city_region():
+#     """Add a region column from the city column."""
+#     return column_step("city_region", region_of_city, output="region")

@@ -254,36 +254,20 @@ training state, changing held-out labels must not change features, and replay
 must preserve the fitted schema and unknown-value policy. Registry flags alone
 are insufficient evidence for these properties.
 
-## Validation record for this audit
+## Validate prediction context
 
-Follow-up on 2026-09-26: the temporal review rejects missing declared sort columns,
-invalid direct lag shifts, and rolling the known current target. Backend admission
-reuses the Core target rule. Relevant suites passed 1,981 Core and 1,731 backend
-tests; Ruff, ty and strict MkDocs passed. The new temporal regression tests also
-pin grouped causal prefixes and the absence of an automatic history buffer.
+Temporal features require declared sort columns and valid lag/window settings.
+Do not roll a target that is unavailable at prediction time. A causal training
+split does not itself provide missing prediction history: supply the intended
+batch context, or use configured built-in carry history with explicit continuation.
+
 See [temporal placement and history](preprocessing_placement.md#target-encoders-lags-and-rolling-windows)
-for the remaining prediction-time availability and batch-boundary responsibilities.
+for availability rules and [preprocessing diagnostics and context](preprocessing_context.md)
+for saved-state checks and a runnable history example. Diagnostic sample parity
+is separate from leakage prevention and worker/endpoint admission.
 
-The final consolidated runs completed on 2026-09-08:
-
-| Layer | Passing tests | Scope |
-|---|---:|---|
-| Core | 3,476 | Entire unit directory plus leakage JSON contracts, preprocessing integration, native tuning/CV refit, raw text target context, and repeated row boundaries |
-| Backend | 1,608 | Admission and operation JSON contracts, real graph execution, fold refit/stress, gate units, and preprocessing/pipeline units |
-| Frontend | 193 | Leakage preflight, operation modes, selected training context, and error-detail regressions |
-
-These are 5,277 passing test cases across the consolidated suites, not a claim
-that every possible input or graph has been exhausted. The 69 skipped core cases
-are opt-in or disabled performance/benchmark cases, not failed leakage cases.
-Dependency, alias, dataframe-conversion, and build-chunk warnings remain.
-
-Changed-source Ruff and ty checks passed. Frontend lint and the production build
-passed. Example 09's script ran successfully; its notebook ran all 12 code cells
-in a real Jupyter kernel with all assertions passing. Six SVG diagrams, three
-embedded notebook SVG attachments, and the executed notebook schema were also
-validated. Mermaid sources accompany the SVGs; mkdocs was deliberately not run.
-
-Backend submission tests replace external dispatch/storage services rather than
-launch a production Celery/DB deployment. Pretrained embedding behavior uses a
-model double. Legacy numeric HashEncoder artifacts preserve historical buckets;
-refit to adopt the new versioned, batch-invariant numeric normalization.
+When extending preprocessing, use the regression strategy above on the actual
+engine, data types and source/serving boundaries. Verify fit/save/load/apply with
+representative nulls, unknown values and request boundaries. Legacy numeric
+HashEncoder artifacts preserve their original buckets; refit the whole pipeline
+to adopt the versioned batch-invariant numeric normalization.

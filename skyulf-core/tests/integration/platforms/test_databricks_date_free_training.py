@@ -10,7 +10,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.training.fitting import local_retraining as retraining
+from skyulf.integrations.databricks.training.fitting import candidate as retraining
 from skyulf.integrations.mlflow.lifecycle.validation import comparison_payload
 
 
@@ -26,7 +26,7 @@ def _spec(**changes):
         "max_bytes": 100000,
     }
     settings.update(changes)
-    return retraining.LocalTrainingSpec(**settings)
+    return retraining.TrainingSpec(**settings)
 
 
 def _frame():
@@ -54,7 +54,7 @@ def test_date_free_split_fits_both_engines_and_ignores_source_order(tmp_path, en
     assert set(train.x).isdisjoint(heldout.x)
     native_train = pl.from_pandas(train) if engine == "polars" else train
     native_heldout = pl.from_pandas(heldout) if engine == "polars" else heldout
-    artifact = retraining.fit_local_workflow(
+    artifact = retraining.fit_workflow(
         {"preprocessing": [], "modeling": {"type": "linear_regression"}},
         SplitDataset(train=native_train, test=native_train.head(0)),
         target_column="target",
@@ -62,7 +62,7 @@ def test_date_free_split_fits_both_engines_and_ignores_source_order(tmp_path, en
         max_rows=100,
         max_bytes=100000,
     )
-    metrics = retraining.evaluate_local_holdout(artifact, native_heldout, target_column="target")
+    metrics = retraining.evaluate_holdout(artifact, native_heldout, target_column="target")
     assert metrics["heldout_rmse"] == pytest.approx(0, abs=1e-8)
 
 
@@ -177,7 +177,7 @@ def test_direct_training_rejects_regression_stratification_before_read(monkeypat
     reader = Mock(side_effect=AssertionError("source opened"))
     monkeypatch.setattr(retraining, "read_training_snapshot", reader)
     with pytest.raises(ValueError, match="classification"):
-        retraining.train_local_candidate(
+        retraining.train_candidate(
             None,
             _spec(stratify=True),
             {"preprocessing": [], "modeling": {"type": "linear_regression"}},
@@ -240,7 +240,7 @@ def test_available_null_target_fails_and_temporal_cutoffs_are_independent():
 
 def test_date_free_monthly_pins_full_latest_snapshot_and_invocation_result_cutoff():
     """Monthly execution dates must not create an implicit event window for random training."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import resolve_training_spec
+    from skyulf.integrations.databricks.lifecycle.workflow import resolve_training_spec
 
     config = {
         "training_table": "workspace.test.labels",
@@ -279,12 +279,12 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
 
     import mlflow
 
-    from skyulf.integrations.databricks.lifecycle import local_approval, local_workflow
+    from skyulf.integrations.databricks.lifecycle import approval, workflow
 
     frame = _frame()
     reader = Mock(return_value=frame)
     monkeypatch.setattr(retraining, "read_training_snapshot", reader)
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", reader)
+    monkeypatch.setattr(workflow, "read_training_snapshot", reader)
     uri = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
     client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
     client.create_experiment("random", artifact_location=(tmp_path / "runs").as_uri())
@@ -316,7 +316,7 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         },
     }
     expected_train, expected_heldout, _ = retraining.split_labeled_snapshot(frame, _spec())
-    original_fit = retraining.fit_local_workflow
+    original_fit = retraining.fit_workflow
     observed_fit_rows = []
 
     def fit_only_training(config, data, **options):
@@ -328,8 +328,8 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         observed_fit_rows.append(len(actual))
         return original_fit(config, data, **options)
 
-    monkeypatch.setattr(retraining, "fit_local_workflow", fit_only_training)
-    candidate = local_workflow.run_action(
+    monkeypatch.setattr(retraining, "fit_workflow", fit_only_training)
+    candidate = workflow.run_action(
         None, config, "train", experiment_name="random", artifact_path=tmp_path / "artifact"
     )
     digest = hashlib.sha256(
@@ -354,9 +354,7 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
         candidate.run_id, {**saved, "holdout_key_sha256": "a" * 64}, "candidate_training_spec.json"
     )
     with pytest.raises(ValueError, match="Saved training snapshot"):
-        local_approval.load_candidate_evidence(
-            client, "random_model", candidate.model_version, digest
-        )
+        approval.load_candidate_evidence(client, "random_model", candidate.model_version, digest)
     client.log_dict(candidate.run_id, saved, "candidate_training_spec.json")
     config.update(
         training_table="workspace.changed.table",
@@ -376,13 +374,13 @@ def test_random_candidate_approval_replays_saved_membership_after_config_changes
     changed["id"] += 100
     reader.return_value = changed
     with pytest.raises(ValueError, match="membership"):
-        local_approval.approve_local_candidate(None, config, **args)
+        approval.approve_candidate(None, config, **args)
     reader.return_value = frame.iloc[::-1]
-    receipt = local_approval.approve_local_candidate(None, config, **args)
+    receipt = approval.approve_candidate(None, config, **args)
     assert receipt.new_version == candidate.model_version
     pinned = reader.call_args.args[1]
     assert pinned.table == "workspace.test.labels" and pinned.version == 4
     assert pinned.random_state == 42 and pinned.test_size == 0.2
     assert pinned.holdout_key_sha256 == candidate.holdout_key_sha256
-    assert local_approval.approve_local_candidate(None, config, **args) == receipt
+    assert approval.approve_candidate(None, config, **args) == receipt
     assert len(client.search_model_versions("name = 'random_model'")) == 1

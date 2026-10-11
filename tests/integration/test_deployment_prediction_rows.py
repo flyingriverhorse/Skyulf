@@ -181,7 +181,7 @@ async def test_winsorize_http_retains_all_rows_and_applies_the_saved_bounds(depl
     client, promote = deployed_client
     artifact = _artifact("winsorize", "pandas")
     await promote(artifact)
-    data = pd.DataFrame({"x": [20, 1000, 40]})
+    data = pd.DataFrame({"x": [20.0, 1000.0, 40.0]})
     engineer = artifact["feature_engineer"]
     assert isinstance(engineer, FeatureEngineer)
     expected = artifact["model"].predict(engineer.transform(data))

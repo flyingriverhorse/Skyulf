@@ -35,6 +35,9 @@ def test_export_uses_readable_configuration_without_canvas_ids(mode, branched):
     builder = ne._build_full_notebook if mode == "full" else ne._build_compact_notebook
     notebook = builder(_PipelineIn(nodes=nodes), "data", "data.csv")
     source = "".join("".join(cell["source"]) for cell in notebook["cells"])
+    assert source.startswith("# Kayra pipeline")
+    assert "by Skyulf" in source
+    assert "from skyulf.pipeline import SkyulfPipeline" in source
     assert all(node_id not in source for node_id in ids)
     assert "_step01" not in source
     assert "_steps.append" not in source

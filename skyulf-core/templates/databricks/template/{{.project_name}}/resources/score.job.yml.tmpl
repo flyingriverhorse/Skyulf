@@ -40,7 +40,7 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -64,7 +64,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
 {{if eq .auto_rebuild_on_cdf_expiry "true"}}
@@ -89,7 +88,7 @@ resources:
               workflow_contract: "3"
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -113,7 +112,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
         - task_key: scoring_report
@@ -132,7 +130,7 @@ resources:
               workflow_contract: "3"
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -156,7 +154,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
 {{end}}
@@ -184,7 +181,7 @@ resources:
               deployed_score_handoff: "{{.score_handoff}}"
               deployed_auto_rebuild_on_cdf_expiry: "{{.auto_rebuild_on_cdf_expiry}}"
               score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
               output_schema: ${var.output_schema}
@@ -210,7 +207,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/requirements.txt
 {{end}}
         - task_key: monitoring_ready
@@ -237,7 +233,6 @@ resources:
           spec:
             client: ${var.serverless_environment_version}
             dependencies:
-              - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/requirements.txt
 {{else}}
       job_clusters:

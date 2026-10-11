@@ -8,47 +8,47 @@ __path__ = [*__path__, str(Path(__file__).with_name("_compat"))]
 
 from .data.training.training_dates import TrainingDateSpec
 from .scoring.batch.batch import BatchResult, BatchSpec, run_batch
-from .scoring.batch.local_batch import (
-    LocalScoreResult,
-    LocalSourceSpec,
-    evaluate_local_holdout,
-    fit_local_workflow,
-    read_local_source,
-    score_local_source,
+from .scoring.batch.frame_batch import (
+    ScoreResult,
+    SourceSpec,
+    evaluate_holdout,
+    fit_workflow,
+    read_source,
+    score_source,
 )
-from .scoring.incremental.local_incremental import (
+from .scoring.incremental.incremental_batch import (
     IncrementalBatchResult,
-    run_incremental_local_batch,
+    run_incremental_batch,
 )
-from .scoring.local_publish import run_local_batch
-from .scoring.local_sdk import (
+from .scoring.publish import run_frame_batch
+from .scoring.workflow import (
     InputSource,
-    LocalWorkflowConfig,
     ModelSelection,
     OutputSink,
     PreflightError,
     PreflightIssue,
     PreflightResult,
-    PreparedLocalWorkflow,
-    preflight_local,
-    prepare_local_workflow,
+    PreparedWorkflow,
+    WorkflowConfig,
+    preflight,
+    prepare_workflow,
 )
-from .training.fitting.local_retraining import (
-    LocalCandidateResult,
-    LocalTrainingSpec,
+from .training.fitting.candidate import (
+    CandidateResult,
+    TrainingSpec,
     read_training_snapshot,
     split_labeled_snapshot,
-    train_local_candidate,
+    train_candidate,
 )
 
 if TYPE_CHECKING:
-    from .training.local_branches import (
+    from .training.branches import (
         BranchTrainingResult,
         TrainingBranch,
         branch_training_payload,
         prepare_training_branches,
         restore_training_branches,
-        train_local_branches,
+        train_branches,
     )
 
 _BRANCH_EXPORTS = {
@@ -57,7 +57,7 @@ _BRANCH_EXPORTS = {
     "branch_training_payload",
     "prepare_training_branches",
     "restore_training_branches",
-    "train_local_branches",
+    "train_branches",
 }
 
 
@@ -65,46 +65,46 @@ def __getattr__(name: str) -> Any:
     """Load training orchestration only after low-level alias imports have finished."""
     if name not in _BRANCH_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    from .training import local_branches  # noqa: PLC0415 - avoid promotion/admission import cycle
+    from .training import branches  # noqa: PLC0415 - avoid promotion/admission import cycle
 
-    value = getattr(local_branches, name)
+    value = getattr(branches, name)
     globals()[name] = value
     return value
 
 
 __all__ = [
+    "evaluate_holdout",
+    "fit_workflow",
+    "read_source",
+    "score_source",
+    "run_incremental_batch",
+    "run_frame_batch",
+    "preflight",
+    "prepare_workflow",
+    "train_candidate",
+    "train_branches",
     "BatchResult",
     "BatchSpec",
     "BranchTrainingResult",
     "IncrementalBatchResult",
     "InputSource",
-    "LocalWorkflowConfig",
-    "LocalScoreResult",
-    "LocalSourceSpec",
-    "LocalCandidateResult",
-    "LocalTrainingSpec",
+    "WorkflowConfig",
+    "ScoreResult",
+    "SourceSpec",
+    "CandidateResult",
+    "TrainingSpec",
     "ModelSelection",
     "OutputSink",
     "PreflightError",
     "PreflightIssue",
     "PreflightResult",
-    "PreparedLocalWorkflow",
+    "PreparedWorkflow",
     "TrainingDateSpec",
     "TrainingBranch",
     "branch_training_payload",
-    "evaluate_local_holdout",
-    "fit_local_workflow",
-    "preflight_local",
-    "prepare_local_workflow",
     "prepare_training_branches",
-    "read_local_source",
     "read_training_snapshot",
     "restore_training_branches",
     "run_batch",
-    "run_incremental_local_batch",
-    "run_local_batch",
-    "score_local_source",
     "split_labeled_snapshot",
-    "train_local_candidate",
-    "train_local_branches",
 ]

@@ -3,7 +3,7 @@
     "order": 0,
     "type": "string",
     "default": "single_model",
-    "description": "Training layout: single_model = guided model setup; multi_target = shared setup, then define target/model recipes in src/modeling/multi_model.py and score them as one versioned model set; model_competition = compare candidates for one target using shared CV, then select one winner; select models below and generate editable src/modeling/model_competition.py",
+    "description": "Training layout: single_model = guided model setup; multi_target = shared setup, then define target/model recipes in config/training.yml and score them as one versioned model set; model_competition = compare candidates for one target using shared CV, then select one winner; select models below and generate editable config/training.yml",
     "enum": [
       "single_model",
       "multi_target",
@@ -113,7 +113,7 @@
     }
   },
   "training_version": {
-    "order": 13,
+    "order": 12.1,
     "type": "string",
     "default": "null",
     "description": "1. Data | Training table snapshot number from Databricks table History, e.g. 0 or 12 (not a model version). null = resolve latest once at run start; an explicit version pins that snapshot for manual and scheduled runs",

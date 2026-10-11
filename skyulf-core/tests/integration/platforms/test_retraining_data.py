@@ -8,9 +8,9 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.lifecycle import local_workflow
+from skyulf.integrations.databricks.lifecycle import workflow
 from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
-from skyulf.integrations.databricks.training.fitting import local_retraining
+from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
 
 @pytest.fixture
@@ -44,11 +44,11 @@ def freshness(monkeypatch):
     def reference(spark, monitor, **kwargs):
         """Provide the same saved split that the registry evidence would verify."""
         saved = state.get("saved_config", state["config"])
-        spec = local_workflow.training_spec(
-            local_workflow.training_settings({**saved, "training_version": 0}, now)
+        spec = workflow.training_spec(
+            workflow.training_settings({**saved, "training_version": 0}, now)
         )
         spec = replace(spec, **state.get("saved_spec_overrides", {}))
-        train, _, _ = local_retraining.split_labeled_snapshot(
+        train, _, _ = candidate.split_labeled_snapshot(
             snapshot(None, spec), spec, engine=saved["engine"]
         )
         artifact = SimpleNamespace(
@@ -57,7 +57,7 @@ def freshness(monkeypatch):
         )
         return artifact, spec, train, {"model_version": "1"}
 
-    monkeypatch.setattr(local_retraining, "read_training_snapshot", snapshot)
+    monkeypatch.setattr(candidate, "read_training_snapshot", snapshot)
     monkeypatch.setattr(retraining_data, "load_monitoring_reference", reference)
     history = SimpleNamespace(
         select=lambda *args: SimpleNamespace(

@@ -1,6 +1,7 @@
 """Elliptic Envelope outlier node (Gaussian covariance estimation)."""
 
 import logging
+from numbers import Real
 from typing import Any
 
 import numpy as np
@@ -8,16 +9,18 @@ import pandas as pd
 import polars as pl
 from sklearn.covariance import EllipticEnvelope
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import EllipticEnvelopeArtifact
+from .._fitted_validation import local_boolean, local_state_fields
 from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _apply_pandas_mask, _filter_y_polars
+from ._common import _apply_pandas_mask, _filter_y_polars, validate_detector_warnings
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +91,72 @@ def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
     return mask
 
 
+def _validate_elliptic_array(value: Any, shape: tuple[int, ...]) -> None:
+    """Require the finite univariate numeric arrays used by saved covariance prediction."""
+    if not isinstance(value, np.ndarray) or value.shape != shape or value.dtype.kind not in "fi":
+        raise ValueError("Fitted EllipticEnvelope arrays have invalid shape or dtype.")
+    if not np.isfinite(value).all():
+        raise ValueError("Fitted EllipticEnvelope arrays must be finite.")
+
+
+def _validate_elliptic_model(model: Any) -> None:
+    """Inspect the actual sklearn model without fitting, predicting or rebuilding it."""
+    required = {
+        "n_features_in_",
+        "location_",
+        "covariance_",
+        "precision_",
+        "offset_",
+        "store_precision",
+    }
+    if type(model) is not EllipticEnvelope or not required.issubset(vars(model)):
+        raise ValueError("Expected a fitted EllipticEnvelope model.")
+    if any(callable(value) for value in vars(model).values()):
+        raise ValueError("Overridden EllipticEnvelope methods are unsupported.")
+    if model.n_features_in_ != 1:
+        raise ValueError("Fitted EllipticEnvelope models must be univariate.")
+    local_boolean(model.store_precision, "store_precision")
+    _validate_elliptic_array(model.location_, (1,))
+    _validate_elliptic_array(model.covariance_, (1, 1))
+    if model.store_precision:
+        _validate_elliptic_array(model.precision_, (1, 1))
+    if (
+        isinstance(model.offset_, bool)
+        or not isinstance(model.offset_, Real)
+        or not np.isfinite(model.offset_)
+    ):
+        raise ValueError("Fitted EllipticEnvelope offset must be finite and numeric.")
+
+
 class EllipticEnvelopeApplier(BaseApplier):
     """Drop rows that any fitted per-column EllipticEnvelope model flags as an outlier."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved envelopes and skipped-column metadata without estimating covariance."""
+        if not local_state_fields(
+            raw,
+            "elliptic_envelope",
+            {"type", "models", "contamination", "warnings"},
+            allow_empty=True,
+        ):
+            return raw
+        models = raw["models"]
+        if type(models) is not dict:
+            raise ValueError("Fitted EllipticEnvelope models must be a dictionary.")
+        for model in models.values():
+            _validate_elliptic_model(model)
+        validate_detector_warnings(raw["warnings"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fitted row filtering with nonfinite rows preserved by the native applier."""
+        if engine not in ("pandas", "polars"):
+            return None
+        EllipticEnvelopeApplier.validate_inference_state(state)
+        effect = "filter" if state.get("models") else "preserve"
+        return ExecutionCapability(engine, "apply", "local", effect, "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

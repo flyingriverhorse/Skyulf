@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft7Validator
 
+from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+
 ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
 
 
@@ -67,11 +69,17 @@ def test_cli_competition_keeps_three_jobs_and_task_matching_placeholder(
     tmp_path, task, compute_mode
 ):
     """Real CLI rendering must enable common CV and retain the existing lifecycle graph."""
-    from test_databricks_bundle_generation import CLI, PROFILE, _generate_project, _read_jobs
+    from test_databricks_bundle_generation import (
+        CLI,
+        OFFLINE_CLI,
+        PROFILE,
+        _generate_project,
+        _read_jobs,
+    )
 
     from skyulf.integrations.databricks.projects.project import load_project_workflow
 
-    if not CLI or not PROFILE:
+    if not CLI or not (PROFILE or OFFLINE_CLI):
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE to opt into installed CLI generation.")
     project = _generate_project(
         tmp_path,
@@ -80,18 +88,16 @@ def test_cli_competition_keeps_three_jobs_and_task_matching_placeholder(
         compute_mode=compute_mode,
         cluster_policy_name="existing_policy",
     )
-    config = json.loads((project / "config/workflow.json").read_text())
+    config = read_workflow_config(project / "config/training.yml")
     assert config["training_layout"] == "model_competition"
     assert config["cv_enabled"] is True
     assert config["competition_max_trials"] == 1000
     assert config["competition_max_candidates"] == 8
-    assert config["pipeline"]["modeling"]["type"] == (
-        "logistic_regression" if task == "classification" else "ridge_regression"
-    )
+    assert config["pipeline"]["modeling"] == {}
     jobs = _read_jobs(project)
     assert set(jobs) == {"train", "score", "monitoring"}
     assert all(task["task_key"] != "train_models" for task in jobs["train"]["tasks"])
-    assert (project / "src/modeling/model_competition.py").is_file()
+    assert not (project / "src/modeling").exists()
     loaded = load_project_workflow(config, project / "src/features")
     assert {
         item["task_key"] for item in jobs["train"]["tasks"] if item["task_key"].startswith("train_")

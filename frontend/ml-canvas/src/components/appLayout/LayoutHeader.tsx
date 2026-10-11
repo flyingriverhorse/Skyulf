@@ -1,6 +1,6 @@
 import React from 'react';
 import { Menu } from 'lucide-react';
-import logoUrl from '../../../../../static/img/logo.png';
+import logoUrl from '../../../../../static/img/app_logo/logo.png';
 import { NotificationCenter } from '../layout/NotificationCenter';
 
 interface LayoutHeaderProps {
@@ -30,7 +30,7 @@ export function LayoutHeader({
             <Menu size={20} />
           </button>
           <img src={logoUrl} alt="" width={28} height={28} className="ml-2 h-7 w-7 object-contain" />
-          <span className="ml-2 font-semibold text-foreground">Skyulf ML</span>
+          <span className="ml-2 font-semibold text-foreground">Kayra</span>
           {pathname !== '/canvas' && <div className="ml-auto"><NotificationCenter /></div>}
         </div>
       )}

@@ -7,84 +7,91 @@ from functools import reduce
 from operator import and_, or_
 from typing import Any
 
-from ..local.monitoring_metrics import (
-    _CLASSIFICATION_METRICS,
-    _REGRESSION_METRICS,
-    _validate_inputs,
+from ..monitoring_metrics import (
+    CLASSIFICATION_METRICS,
+    REGRESSION_METRICS,
+    validate_monitoring_inputs,
 )
 
 MAX_CLASSES = 256
 
 
-def _functions() -> Any:
+def spark_functions() -> Any:
     """Keep Spark optional until a distributed entry point is invoked."""
     return importlib.import_module("pyspark.sql.functions")
 
 
-def _column(name: str) -> Any:
+def spark_column(name: str) -> Any:
     """Quote literal column names, including dots and embedded backticks."""
-    return _functions().col("`" + name.replace("`", "``") + "`")
+    return spark_functions().col("`" + name.replace("`", "``") + "`")
 
 
-def _finite(value: Any) -> Any:
+def finite_spark_value(value: Any) -> Any:
     """Recognize finite numeric Spark values without collecting observations."""
-    f = _functions()
+    f = spark_functions()
     return value.isNotNull() & ~f.isnan(value) & (f.abs(value.cast("double")) != float("inf"))
 
 
-def _numeric(frame: Any, name: str) -> bool:
+def is_numeric_column(frame: Any, name: str) -> bool:
     """Inspect schema metadata without coercing numeric-looking strings."""
     types = importlib.import_module("pyspark.sql.types")
     return isinstance(frame.schema[name].dataType, types.NumericType)
 
 
-def _exists(frame: Any) -> bool:
+def has_spark_rows(frame: Any) -> bool:
     """Return existence through a bounded distributed count, never a raw row."""
     return bool(frame.limit(1).count())
 
 
-def _validate_keys(frame: Any, keys: tuple[str, ...], name: str) -> None:
+def validate_record_keys(frame: Any, keys: tuple[str, ...], name: str) -> None:
     """Validate complete unique composite keys using distributed aggregates."""
     if not keys or len(set(keys)) != len(keys):
         raise ValueError("Record key columns must be distinct and nonempty.")
-    if not _exists(frame):
+    if not has_spark_rows(frame):
         return
     if set(keys) - set(frame.columns):
         raise ValueError(f"{name} is missing record key columns.")
     bad = [
-        ~_finite(_column(key)) if _numeric(frame, key) else _column(key).isNull() for key in keys
+        ~finite_spark_value(spark_column(key))
+        if is_numeric_column(frame, key)
+        else spark_column(key).isNull()
+        for key in keys
     ]
-    if _exists(frame.where(reduce(or_, bad))):
+    if has_spark_rows(frame.where(reduce(or_, bad))):
         raise ValueError(f"{name} has a null record key.")
     key_frame = frame.select(
-        *[_column(key).alias(f"key_{index}") for index, key in enumerate(keys)]
+        *[spark_column(key).alias(f"key_{index}") for index, key in enumerate(keys)]
     )
-    if _exists(key_frame.groupBy(*key_frame.columns).count().where("count > 1")):
+    if has_spark_rows(key_frame.groupBy(*key_frame.columns).count().where("count > 1")):
         raise ValueError(f"{name} has duplicate record keys.")
 
 
-def _scored(predictions: Any, task: str, classes: tuple) -> tuple[Any, int]:
+def scored_predictions(predictions: Any, task: str, classes: tuple) -> tuple[Any, int]:
     """Reject invalid outputs independently of whether outcomes have arrived."""
     if "scoring_status" not in predictions.columns:
         scored, excluded = predictions, 0
     else:
-        status = _column("scoring_status")
-        if _exists(predictions.where(status.isNull() | ~status.isin("predicted", "excluded"))):
+        status = spark_column("scoring_status")
+        if has_spark_rows(
+            predictions.where(status.isNull() | ~status.isin("predicted", "excluded"))
+        ):
             raise ValueError("scoring_status must be predicted or excluded.")
         scored = predictions.where(status == "predicted")
         excluded = predictions.where(status == "excluded").count()
-    if not _exists(scored):
+    if not has_spark_rows(scored):
         return scored, excluded
     if "prediction" not in scored.columns:
         raise ValueError("Predictions need a prediction column.")
-    valid = _column("prediction").isin(list(classes))
+    valid = spark_column("prediction").isin(list(classes))
     if task == "regression":
         valid = (
-            _finite(_column("prediction"))
-            if _numeric(scored, "prediction")
-            else _functions().lit(False)
+            finite_spark_value(spark_column("prediction"))
+            if is_numeric_column(scored, "prediction")
+            else spark_functions().lit(False)
         )
-    if _exists(scored.where(~_functions().coalesce(valid, _functions().lit(False)))):
+    if has_spark_rows(
+        scored.where(~spark_functions().coalesce(valid, spark_functions().lit(False)))
+    ):
         raise ValueError("Saved prediction does not match the model output contract.")
     return scored, excluded
 
@@ -97,7 +104,7 @@ def _probability_names(scored: Any, classes: tuple, task: str) -> tuple[str, ...
     expected = tuple(f"probability_{index}" for index in range(len(classes)))
     if task != "classification" or set(columns) != set(expected):
         raise ValueError("Prediction probabilities must match saved classes.")
-    if _exists(scored) and any(not _numeric(scored, name) for name in expected):
+    if has_spark_rows(scored) and any(not is_numeric_column(scored, name) for name in expected):
         raise ValueError("Prediction probabilities must be finite numbers.")
     return expected
 
@@ -105,26 +112,26 @@ def _probability_names(scored: Any, classes: tuple, task: str) -> tuple[str, ...
 def _probabilities(scored: Any, classes: tuple, task: str) -> tuple[str, ...]:
     """Validate all predicted probability vectors against saved class order."""
     expected = _probability_names(scored, classes, task)
-    if not expected or not _exists(scored):
+    if not expected or not has_spark_rows(scored):
         return expected
-    values = [_column(name) for name in expected]
-    valid = reduce(and_, [_finite(value) & value.between(0, 1) for value in values])
-    valid = valid & (_functions().abs(sum(values) - 1) <= 1e-6)
-    if _exists(scored.where(~valid)):
+    values = [spark_column(name) for name in expected]
+    valid = reduce(and_, [finite_spark_value(value) & value.between(0, 1) for value in values])
+    valid = valid & (spark_functions().abs(sum(values) - 1) <= 1e-6)
+    if has_spark_rows(scored.where(~valid)):
         raise ValueError("Prediction probabilities must be finite, in [0, 1] and sum to one.")
     return expected
 
 
 def _eligible(labels: Any, available: str, cutoff: datetime, keys: tuple, target: str) -> Any:
     """Validate availability before filtering, then enforce only eligible key uniqueness."""
-    if labels is None or not _exists(labels):
+    if labels is None or not has_spark_rows(labels):
         return None
     if target not in labels.columns or available not in labels.columns:
         raise ValueError("Labels need target and availability columns.")
-    f = _functions()
+    f = spark_functions()
     types = importlib.import_module("pyspark.sql.types")
     dtype = labels.schema[available].dataType
-    value = _column(available)
+    value = spark_column(available)
     if isinstance(dtype, types.TimestampType):
         parsed, valid = value, value.isNotNull()
     elif isinstance(dtype, types.StringType):
@@ -132,39 +139,43 @@ def _eligible(labels: Any, available: str, cutoff: datetime, keys: tuple, target
         valid = value.rlike(r"(?i)[T ].*(Z|[+-]\d{2}(?::?\d{2})?)$") & parsed.isNotNull()
     else:
         raise ValueError("Invalid or naive label availability timestamp.")
-    if _exists(labels.where(~f.coalesce(valid, f.lit(False)))):
+    if has_spark_rows(labels.where(~f.coalesce(valid, f.lit(False)))):
         raise ValueError("Invalid or naive label availability timestamp.")
     eligible = labels.where(parsed <= f.lit(cutoff))
-    if not _exists(eligible):
+    if not has_spark_rows(eligible):
         return None
-    _validate_keys(eligible, keys, "labels")
+    validate_record_keys(eligible, keys, "labels")
     return eligible
 
 
 def _join_pairs(scored: Any, labels: Any, keys: tuple, target: str) -> Any:
     """Project internal join keys so user columns cannot collide with evidence aliases."""
-    key_aliases = [_column(key).alias(f"__sm_key_{index}") for index, key in enumerate(keys)]
-    truth = labels.select(*key_aliases, _column(target).alias("__sm_truth"))
+    key_aliases = [spark_column(key).alias(f"__sm_key_{index}") for index, key in enumerate(keys)]
+    truth = labels.select(*key_aliases, spark_column(target).alias("__sm_truth"))
     output_columns = [name for name in scored.columns if name.startswith("probability_")]
     outputs = scored.select(
-        *key_aliases, _column("prediction"), *[_column(name) for name in output_columns]
+        *key_aliases, spark_column("prediction"), *[spark_column(name) for name in output_columns]
     )
     return outputs.join(truth, [f"__sm_key_{index}" for index in range(len(keys))], "inner")
 
 
 def _pairs(scored: Any, labels: Any, keys: tuple, target: str, task: str, classes: tuple) -> Any:
     """Join eligible labels with unambiguous internal aliases and finite outcome filtering."""
-    if labels is None or not _exists(scored):
+    if labels is None or not has_spark_rows(scored):
         return None
     pairs = _join_pairs(scored, labels, keys, target)
-    actual = _column("__sm_truth")
+    actual = spark_column("__sm_truth")
     if task == "regression":
-        return pairs.where(_finite(actual)) if _numeric(pairs, "__sm_truth") else None
+        return (
+            pairs.where(finite_spark_value(actual))
+            if is_numeric_column(pairs, "__sm_truth")
+            else None
+        )
     present = actual.isNotNull()
-    if _numeric(pairs, "__sm_truth"):
-        present = present & ~_functions().isnan(actual)
+    if is_numeric_column(pairs, "__sm_truth"):
+        present = present & ~spark_functions().isnan(actual)
     pairs = pairs.where(present)
-    if _exists(pairs.where(~actual.isin(list(classes)))):
+    if has_spark_rows(pairs.where(~actual.isin(list(classes)))):
         raise ValueError("Prediction and label classes must match saved classes.")
     return pairs
 
@@ -184,8 +195,11 @@ def _regression_values(summary: dict) -> dict[str, float]:
 
 def _regression(pairs: Any) -> dict[str, float]:
     """Reduce regression populations to one stable finite-metric summary row."""
-    f = _functions()
-    truth, guess = _column("__sm_truth").cast("double"), _column("prediction").cast("double")
+    f = spark_functions()
+    truth, guess = (
+        spark_column("__sm_truth").cast("double"),
+        spark_column("prediction").cast("double"),
+    )
     error = truth - guess
     summary = (
         pairs.agg(
@@ -271,7 +285,7 @@ def _performance(
     pairs = _pairs(scored, labels, keys, target, task, classes)
     count = 0 if pairs is None else pairs.count()
     if count < 2:
-        names = _REGRESSION_METRICS if task == "regression" else _CLASSIFICATION_METRICS
+        names = REGRESSION_METRICS if task == "regression" else CLASSIFICATION_METRICS
         return (
             dict.fromkeys(names),
             count,
@@ -310,11 +324,11 @@ def build_spark_performance_report(
     classes: tuple = (),
 ) -> dict:
     """Measure saved Spark outputs with distributed joins and bounded summary collection."""
-    _validate_inputs(as_of, task, classes, None)
+    validate_monitoring_inputs(as_of, task, classes, None)
     if len(classes) > MAX_CLASSES:
         raise ValueError(f"Monitoring supports at most {MAX_CLASSES} saved classes.")
-    _validate_keys(predictions, record_key_columns, "predictions")
-    scored, excluded = _scored(predictions, task, classes)
+    validate_record_keys(predictions, record_key_columns, "predictions")
+    scored, excluded = scored_predictions(predictions, task, classes)
     probabilities = _probabilities(scored, classes, task)
     eligible = _eligible(
         labels, result_available_at_column, as_of, record_key_columns, target_column

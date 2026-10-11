@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.jobs.shared import job_runtime
-from skyulf.integrations.databricks.lifecycle import local_workflow
-from skyulf.integrations.databricks.training.fitting import local_retraining
+from skyulf.integrations.databricks.lifecycle import workflow
+from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
 mlflow = pytest.importorskip("mlflow")
 
@@ -25,8 +25,8 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
             "label_at": pd.to_datetime(["2026-01-11"] * 8 + ["2026-02-11"] * 4, utc=True),
         }
     )
-    monkeypatch.setattr(local_retraining, "read_training_snapshot", lambda *args: frame)
-    monkeypatch.setattr(local_workflow, "read_training_snapshot", lambda *args: frame)
+    monkeypatch.setattr(candidate, "read_training_snapshot", lambda *args: frame)
+    monkeypatch.setattr(workflow, "read_training_snapshot", lambda *args: frame)
     store = f"sqlite:///{(tmp_path / 'registry.db').as_posix()}"
     client = mlflow.MlflowClient(tracking_uri=store, registry_uri=store)
     client.create_experiment("lifecycle", artifact_location=(tmp_path / "mlruns").as_uri())
@@ -100,7 +100,7 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
         """Fail after nomination to preserve evidence for a registered contender."""
         raise RuntimeError("comparison unavailable")
 
-    monkeypatch.setattr(local_retraining, "compare_registered_local_models", comparison_fails)
+    monkeypatch.setattr(candidate, "compare_registered_pipeline_models", comparison_fails)
     with pytest.raises(RuntimeError, match="comparison unavailable"):
         run(5)
     assert str(client.get_model_version_by_alias("lifecycle_model", "champion").version) == "2"

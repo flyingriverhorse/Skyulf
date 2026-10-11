@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoadingLogo } from './LoadingLogo';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Tailwind size classes, e.g. "h-4 w-32". */
@@ -11,7 +12,7 @@ export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
 export const Skeleton: React.FC<SkeletonProps> = ({ className = '', circle = false, ...rest }) => (
   <div
     aria-hidden="true"
-    className={`animate-pulse bg-slate-200 dark:bg-slate-700 ${circle ? 'rounded-full' : 'rounded-md'} ${className}`}
+    className={`animate-pulse motion-reduce:animate-none bg-slate-200 dark:bg-slate-700 ${circle ? 'rounded-full' : 'rounded-md'} ${className}`}
     {...rest}
   />
 );
@@ -19,6 +20,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className = '', circle = fal
 /** Page-level skeleton used inside `<Suspense fallback>` for lazy routes. */
 export const PageSkeleton: React.FC = () => (
   <div className="flex h-full w-full flex-col gap-4 p-6">
+    <div role="status" aria-label="Loading page"><LoadingLogo /></div>
     <Skeleton className="h-8 w-1/3" />
     <Skeleton className="h-4 w-1/2" />
     <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">

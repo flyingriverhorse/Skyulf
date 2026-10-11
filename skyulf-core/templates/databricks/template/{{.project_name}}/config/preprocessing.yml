@@ -1,0 +1,58 @@
+# Ordered model transformations, fitted on training rows after the split.
+# Select a recipe with preprocessing_recipe in config/training.yml (default: default).
+# Built-ins use transformer + params. Custom factories live in src/features/preprocessing.py.
+# Example recipes remain inactive until selected. Adapt their columns to your inputs.
+version: 1
+recipes:
+  default: []
+  none: []
+  example_frequency:
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [category]}
+  example_imputer:
+    - name: impute
+      transformer: SimpleImputer
+      params: {columns: [feature_value], strategy: mean}
+  example_imputer_frequency:
+    - name: impute
+      transformer: SimpleImputer
+      params: {columns: [feature_value], strategy: mean}
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [category]}
+  example_all:
+    - name: impute
+      transformer: SimpleImputer
+      params: {columns: [feature_value], strategy: mean}
+    - custom: preprocessing.log_feature
+      params: {column: feature_value}
+    - custom: preprocessing.rare_categories
+      params: {column: category}
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [category]}
+
+# More built-ins to add to a selected list (never enabled by these comments):
+# - name: scale
+#   transformer: StandardScaler
+#   params: {columns: [feature_value]}
+# - name: group_fill
+#   transformer: GroupImputer
+#   params: {columns: [feature_value], group_by: category, strategy: median}
+# - name: cap
+#   transformer: ClipValues
+#   params: {bounds: {feature_value: {lower: 0, upper: 1000}}}
+# Time-based history needs an input observation_time different from event_column:
+# - name: recent_value
+#   transformer: RollingAggregate
+#   params:
+#     columns: [feature_value]
+#     window: 5
+#     sort_by: observation_time
+#     group_by: [entity]
+#     history_mode: carry
+#     history_max_rows: 1000
+#     history_max_bytes: 48000
+# - name: drop_clock
+#   transformer: DropMissingColumns
+#   params: {columns: [observation_time], missing_threshold: null}
+# Asset example: enable Example 4 in src/features/preprocessing.py first.
+# - custom: preprocessing.city_region

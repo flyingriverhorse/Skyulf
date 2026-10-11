@@ -197,7 +197,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
     <ModalShell isOpen={isOpen} onClose={onClose} title="Add Data Source" size="md">
       <div className="p-4">
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-            Connects a remote source that Skyulf re-reads on demand. Amazon S3 is the only
+            Connects a remote source that Kayra re-reads on demand. Amazon S3 is the only
             connected source type today — for a local file, use{' '}
             <span className="font-medium text-slate-700 dark:text-slate-300">Upload File</span> on
             the Data Sources page instead.

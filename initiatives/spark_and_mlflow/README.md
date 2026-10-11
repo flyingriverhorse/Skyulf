@@ -1,66 +1,87 @@
-# Spark and MLflow initiative
+# Spark ve MLflow çalışma kayıtları
 
-Updated: 2026-09-22. **SM-00–SM-16 are complete for their documented scopes;
-SM-26 is next.** Target: [0.9.0 — Unreleased](../../changelog/0.9.x.md).
-The first new deliverable is a pandas/Polars Databricks Bundle for bounded
-training and monthly local prediction. Spark can handle UC table I/O, while
-Spark FE/model execution becomes a later Bundle option. Read the current
-[queue](OPEN_QUEUE.md) for the authoritative status and order.
+Güncelleme: 11 Ekim 2026.
 
-## Reading order
+Bu klasör iç planları, uygulama kararlarını ve doğrulama kanıtlarını tutar.
+Yeni çalışma için [219–222 uygulama sırası ve takip](223-delivery-order-tracker.md)
+belgesinden başla. Bu kapsamda **4/8 adım tamamlandı**: S01 online Bundle,
+S02 CONTINUOUS publication, S03 feature güncellenirken rollout/champion ve
+S04 MLflow dataset Inputs. **S05 kodu/native kabulü hazır; yayımlanmış örneklerin
+görsel incelemesi bekleniyor.** All artık model/sürüm/context başına ayrı politika
+ve grafiklerle 22 kimliği birlikte gösterir. S06 öncesinde PR197 düzeltmeleri ve
+Kayra uygulama markası tamamlandı; S06 henüz başlamadı. Yerel kontroller geçti;
+değişiklikler gönderilmediği için yeni hosted CI sonucu henüz yok.
+S03/branding commit `9a45ebec`; S04 commit `044a82cf`. S05, portfolio, PR197
+düzeltmeleri ve Kayra markası bu değişiklik grubundadır; push yapılmadı.
+S04 test kaynakları temizlendi, 14/14 API kontrolü geçti.
+Kanıtlar 221 bölüm 13'te ve yerel raporlarda. Gerçek 24 saatlik gözlem
+G01 ve şirket hedefi kabulü G02 ayrıdır. Kod/commit kanıtı 219, 221 ve 223'te,
+11 Ekim workspace sıfırlaması 225'te tutulur. Push yapılmadı.
 
-1. [OPEN_QUEUE.md](OPEN_QUEUE.md): current task status and order.
-2. [HANDOFF.md](HANDOFF.md): verified baseline and execution boundaries.
-3. [04-databricks-integration-plan.md](04-databricks-integration-plan.md): local-first adapters.
-4. [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md): separate Bundle plan and two-month UC table rehearsal.
-5. [01-core-spark-plan.md](01-core-spark-plan.md),
-   [02-inference-plan.md](02-inference-plan.md) and
-   [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md): earlier task detail.
-6. [ARCHITECTURE.md](ARCHITECTURE.md) and [VALIDATION.md](VALIDATION.md): contracts and gates.
+Eski test tabloları, modelleri, jobları ve ilgili workspace kaynakları kullanıcı
+isteğiyle kaldırıldı. Önceki cloud bağlantıları tarihsel kanıttır; yeni kabul
+çalışması yeni fixture oluşturmalıdır. Yerel raporlar ve paketler korundu.
 
-Historical research:
+S05'in yeni `skyulf_s05_demo_08b67d12` örnekleri kullanıcı incelemesi için
+**korunuyor**: regresyon örnekleri, bunlardan kaydedilen peer model ve yeni sınıflandırıcı;
+3 model adı, 21 izleme bağlamı,
+22 sürüm/context satırı, 36 sorun satırı.
+[Dashboard](https://dbc-45604623-c18b.cloud.databricks.com/dashboardsv3/01f1c590fcce1921b6ffadbdf1539e4b/published?o=7474646244882000)
+ve [örnekleri inceleme rehberi](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#notebook/3844438932488600).
+Gerçek endpoint: 51 istek, 48 başarı, 3 beklenen HTTP 400 ve 960 tahmin;
+native monitoring `232015313477946` başarılı. Girdiler/etiketler sentetiktir.
+Kullanıcı Drift/Performance ve tam sayı eksenini onayladı. Son yerleşim veri aralığı
+bitişini açıklar ve Serving grafiklerini yukarı taşır. All görünümü için 79 yerel
+test, 35 native dataset, 41 widget sorgusu ve 4 filtre senaryosu geçti;
+son görsel inceleme bekleniyor.
+Önceki temsili Serving bağlamları ayrı ve sentetik olarak işaretli kalır.
+Kanıt: `.superpowers/sdd/223-delivery-order-tracker/s05-portfolio/verification-report.md`.
 
-- [Readiness review](reports/2026-09-21-spark-databricks-readiness.md)
-- [Source, node and test inventory](reports/2026-09-21-spark-core-inventory.md)
 
-These reports describe their inspected commits, not the current branch.
-The original planning HEAD was `2397c11648c27645a4ee332412a503c394c1c2f2`;
-branch `090` and local master later advanced past the 0.8.24 merge point
-`97536eae20e5422220f9824bc591ceb05576ee50`. That restored the current
-Polars/ContextVar engine behavior, so the older pandas-default observation is
-historical. SM-00 recorded a 231-test baseline and two Spark smoke tests.
-The user guide is [Spark](../../docs/user_guide/spark.md). This initiative
-does not change the global default engine.
+Projenin genel görev durumu ve diğer bağımlılıkları için
+[OPEN_QUEUE_updated.md](OPEN_QUEUE_updated.md) esas alınır. 223 yalnız seçilen
+219–222 kapsamının sırasını takip eder; genel kuyruktaki işleri kapatmaz.
 
-## Completed foundation and next deliverable
+## Güncel belgeler
 
-The initial SimpleImputer/StandardScaler Spark paths, compatible Python-worker
-inference, MLflow packaging/registry and a selected serverless Delta batch path
-have documented evidence through SM-16. This does not cover every node or model.
-The next deliverable strengthens fitted pandas/Polars packaging and uses it in
-a generated local-engine Bundle. Its monthly output is tested across two
-consecutive months and source versions with one pinned model version. The
-second run scores only the new month. See the separate SM-20 plan.
+| Belge | Rolü |
+| --- | --- |
+| [223 — Uygulama sırası ve takip](223-delivery-order-tracker.md) | S01–S08 sırası, ön koşullar, kabul ölçütleri ve ilerleme. |
+| [219 — Online kurulum ve yayın modları](219-online-serving-setup-continuous-publication.md) | Online lookup ayarlarını model/endpoint kurulumuna bağlama ve CONTINUOUS publication tasarımı. |
+| [220 — Template yetenek karşılaştırması](220-dbml-template-capability-comparison.md) | Var olan, kısmi ve eksik yeteneklerin envanteri; tek bir uygulama görevi değildir. |
+| [221 — Entegrasyon ve kabul](221-integration-completion-and-acceptance-plan.md) | Feature güncellemeleri, rollout/champion geçişi ve MLflow dataset Inputs için ortak kabul planı. |
+| [222 — Monitoring ayrıntıları](222-monitoring-detail-views-gap-plan.md) | Mevcut kanıtların tablo ve ayrıntı görünümlerinde sunulması. |
+| [224 — Klasör temizliği](224-folder-cleanup.md) | Kaldırılan geçici çıktılar ve eski planlar; korunan kanıtlar ve temizlik kontrolü. |
+| [225 — Databricks sıfırlaması](225-databricks-reset.md) | Silinen cloud kaynakları, korunan platform kaynakları ve fresh API doğrulaması. |
 
-## Working rules
+223'teki isteğe bağlı işler ve ertelenen kapsamlar ana sekiz adımdan ayrıdır.
+Dağıtık model eğitimi ile sürekli tahmin akışı bu sıraya dahil değildir.
 
-- The next task is **SM-26**. Complete each queue dependency before its consumer.
-- For each task, show a failing test, implement the narrow change and record
-  the passing gate. New tests have a docstring and a real assertion.
-- Recheck source paths before implementation; planned APIs are not current APIs.
-- A written file, passing local tests and a successful Databricks run are
-  separate claims. A DONE task records commands, results, runtime and commit
-  or working-tree state.
-- Commit and push are separate actions. A requested commit needs fresh checks
-  and DCO sign-off.
-- Core/SDK and the local UC output precede SM-20a. Backend/Canvas remains
-  parked SM-18; endpoints and streaming are not first-Bundle dependencies.
+## Önceki çalışmaların kanıtları
 
-## Related initiatives
+Numaralı teslimat, kabul ve native doğrulama raporları kendi çalışma anlarını
+belgeler. Kaynak commit, wheel, test komutu ve Databricks run bilgisi ilgili
+rapordan okunmalıdır. Eski bir planın gelecek zamanlı anlatımı, bugünkü eksik
+listesi olarak kullanılmamalıdır.
 
-Earlier MLflow proposals are historical input. This initiative uses explicit
-run scopes instead of
-global fit callbacks or mandatory backend-job tracking. The first Bundle has
-no Canvas work. Joblib/ONNX, Ray and deep-learning initiatives are not its
-prerequisites. Check shared artifact and pipeline files for concurrent changes
-before each implementation task.
+- [HANDOFF](HANDOFF.md), [ARCHITECTURE](ARCHITECTURE.md) ve
+  [VALIDATION](VALIDATION.md): önceki devir, mimari karar ve doğrulama kayıtları.
+- [İlk hazırlık incelemesi](reports/2026-09-21-spark-databricks-readiness.md) ve
+  [ilk kaynak envanteri](reports/2026-09-21-spark-core-inventory.md): tarihli
+  araştırma kayıtları; güncel durum için kuyruk ve ilgili teslimat raporu okunur.
+- `rehearsals/`: korunan doğrulama betikleri, loglar, paketler ve sonuç kayıtları.
+  Yeniden üretilebilen pytest geçici çıktıları tarihsel kanıtların yerine geçmez.
+
+Kullanıcı dokümantasyonu [docs](../../docs/index.md) altındadır. İç görev
+numaraları ve kişisel makine yolları public rehberlere taşınmaz.
+
+## Çalışma ve tamamlama kuralları
+
+- Uygulamadan önce güncel kodu ve görev bağımlılıklarını kontrol et.
+- Yazılmış plan, yerel test, Databricks kabulü ve üretim ortamı kabulünü ayrı
+  durumlar olarak kaydet. İlgili kod değiştiğinde eski kanıtı güncel sayma.
+- Kapanışa komut, sonuç ve doğrulanan revision/wheel bilgisi ekle; native çalışma
+  varsa run/resource bağlantısını da belirt.
+- Temizlikte aktif görevleri, başvurulan belgeleri ve benzersiz sonuç kanıtlarını
+  koru. Dosyanın eski veya görevin bitmiş olması tek başına silme gerekçesi değildir.
+- Commit ve push ayrı işlemlerdir; kullanıcının güncel talimatını izle.

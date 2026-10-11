@@ -56,7 +56,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -82,7 +82,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
@@ -207,7 +206,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
-              config_path: ${workspace.file_path}/config/workflow.json
+              config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}
@@ -233,7 +232,6 @@ resources:
 {{else}}
           job_cluster_key: skyulf
           libraries:
-            - whl: ../dist/skyulf/*.whl
             - requirements: ${workspace.file_path}/deployment/train-requirements.txt
 {{end}}
         - task_key: choose_action
@@ -460,7 +458,6 @@ resources:
           spec:
             client: ${var.serverless_environment_version}
             dependencies:
-              - ../dist/skyulf/*.whl
               - -r ${workspace.file_path}/deployment/train-requirements.txt
 {{else}}
       job_clusters:

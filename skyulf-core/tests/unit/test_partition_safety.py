@@ -9,11 +9,7 @@ import pytest
 
 from skyulf.core.capabilities import UnsupportedExecutionError
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -40,20 +36,17 @@ def artifact(tmp_path):
         }
     )
     pipeline.fit(SplitDataset(train=train.iloc[:4], test=train.iloc[4:]), target_column="y")
-    save_local_pipeline(pipeline, tmp_path / "artifact")
-    return load_local_pipeline(tmp_path / "artifact")
+    save_pipeline(pipeline, tmp_path / "artifact")
+    return load_pipeline(tmp_path / "artifact")
 
 
 def test_admitted_composition_matches_split_batches(artifact):
     """Missing rows and uneven batches must produce the same keyed model values."""
     evidence = _gate(artifact)
     query = pd.DataFrame({"x": [np.nan, 20.0, -1.0, np.nan, 7.0]}, index=[7, 3, 99, 1, 4])
-    whole = predict_local_pipeline(query, artifact)
+    whole = predict_pipeline(query, artifact)
     split = pd.concat(
-        [
-            predict_local_pipeline(query.iloc[s], artifact)
-            for s in [slice(0, 1), slice(1, 3), slice(3, 5)]
-        ]
+        [predict_pipeline(query.iloc[s], artifact) for s in [slice(0, 1), slice(1, 3), slice(3, 5)]]
     )
     pd.testing.assert_frame_equal(whole, split, atol=1e-12, rtol=1e-12)
     assert evidence.pipeline_sha256 == artifact.manifest.pipeline_sha256
@@ -167,12 +160,12 @@ def test_node_options_and_nullable_composition_parity(tmp_path, strategy, flags)
         }
     )
     pipeline.fit(SplitDataset(train=train.iloc[:4], test=train.iloc[4:]), target_column="y")
-    save_local_pipeline(pipeline, tmp_path / "options")
-    loaded = load_local_pipeline(tmp_path / "options")
+    save_pipeline(pipeline, tmp_path / "options")
+    loaded = load_pipeline(tmp_path / "options")
     certificate = _gate(loaded)
     query = pd.DataFrame({"x": pd.Series([None, 2**53 + 1, 2, None], dtype="Int64")})
-    whole = predict_local_pipeline(query, loaded)
-    split = pd.concat([predict_local_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
+    whole = predict_pipeline(query, loaded)
+    split = pd.concat([predict_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
     pd.testing.assert_frame_equal(whole, split)
     assert _gate(loaded) == certificate
 
@@ -187,12 +180,12 @@ def test_logistic_probability_and_threshold_parity(tmp_path, use_thresholds):
     pipeline.fit(SplitDataset(train=train.iloc[:6], test=train.iloc[6:]), target_column="y")
     if use_thresholds:
         pipeline._tuned_thresholds = {0: 0.4, 1: 0.6}
-    save_local_pipeline(pipeline, tmp_path / "classification", use_tuned_thresholds=use_thresholds)
-    loaded = load_local_pipeline(tmp_path / "classification")
+    save_pipeline(pipeline, tmp_path / "classification", use_tuned_thresholds=use_thresholds)
+    loaded = load_pipeline(tmp_path / "classification")
     certificate = _gate(loaded)
     query = pd.DataFrame({"x": [-8.0, 0.0, 0.001, 9.0]})
-    whole = predict_local_pipeline(query, loaded)
-    split = pd.concat([predict_local_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
+    whole = predict_pipeline(query, loaded)
+    split = pd.concat([predict_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
     pd.testing.assert_frame_equal(whole, split, atol=1e-14, rtol=1e-14)
     assert certificate.output_schema == (
         ("prediction", "int64"),
@@ -220,8 +213,8 @@ def test_reviewed_preserve_rows_skips_never_execute(artifact, node):
     engineer.fitted_steps.insert(0, record)
     certificate = _gate(artifact)
     query = pd.DataFrame({"x": [np.nan, 5.0, 5.0]})
-    expected = predict_local_pipeline(query, artifact)
-    actual = pd.concat([predict_local_pipeline(query.iloc[[i]], artifact) for i in range(3)])
+    expected = predict_pipeline(query, artifact)
+    actual = pd.concat([predict_pipeline(query.iloc[[i]], artifact) for i in range(3)])
     pd.testing.assert_frame_equal(expected, actual)
     assert certificate.steps[0].action == "skip_preserve_rows"
     assert len(actual) == 3
@@ -358,17 +351,17 @@ def tuned_artifact(tmp_path, request):
         }
     )
     pipeline.fit(SplitDataset(train=train.iloc[:8], test=train.iloc[8:]), target_column="y")
-    save_local_pipeline(pipeline, tmp_path / "tuned")
-    return load_local_pipeline(tmp_path / "tuned")
+    save_pipeline(pipeline, tmp_path / "tuned")
+    return load_pipeline(tmp_path / "tuned")
 
 
 def test_real_tuner_partition_and_composition_parity(tuned_artifact):
     """Generated tuned models retain regression or probability parity across batches."""
     evidence = _gate(tuned_artifact)
     query = pd.DataFrame({"x": [np.nan, -2.0, 3.0, 5.0]}, index=[9, 4, 6, 1])
-    whole = predict_local_pipeline(query, tuned_artifact)
+    whole = predict_pipeline(query, tuned_artifact)
     split = pd.concat(
-        [predict_local_pipeline(query.iloc[[i]], tuned_artifact) for i in range(len(query))]
+        [predict_pipeline(query.iloc[[i]], tuned_artifact) for i in range(len(query))]
     )
     pd.testing.assert_frame_equal(whole, split, rtol=1e-12, atol=1e-12)
     assert _gate(tuned_artifact) == evidence
@@ -430,11 +423,11 @@ def test_tuner_threshold_modes_preserve_batch_parity(tuned_artifact, tmp_path, p
     assert _gate(tuned_artifact).state_sha256 != before.state_sha256
     if pipeline_thresholds:
         pipeline._tuned_thresholds = {0: 0.3, 1: 0.7}
-    save_local_pipeline(pipeline, tmp_path / "thresholds", use_tuned_thresholds=pipeline_thresholds)
-    loaded = load_local_pipeline(tmp_path / "thresholds")
+    save_pipeline(pipeline, tmp_path / "thresholds", use_tuned_thresholds=pipeline_thresholds)
+    loaded = load_pipeline(tmp_path / "thresholds")
     evidence = _gate(loaded)
     query = pd.DataFrame({"x": [-0.9, 0.0, 0.5, np.nan]})
-    whole = predict_local_pipeline(query, loaded)
-    split = pd.concat([predict_local_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
+    whole = predict_pipeline(query, loaded)
+    split = pd.concat([predict_pipeline(query.iloc[[i]], loaded) for i in range(len(query))])
     pd.testing.assert_frame_equal(whole, split, rtol=1e-12, atol=1e-12)
     assert _gate(loaded) == evidence

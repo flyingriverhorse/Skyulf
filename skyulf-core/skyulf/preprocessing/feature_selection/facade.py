@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ..base import BaseApplier, BaseCalculator
@@ -14,9 +15,40 @@ from .variance import VarianceThresholdApplier, VarianceThresholdCalculator
 
 logger = logging.getLogger(__name__)
 
+_FS_APPLIERS = {
+    "variance_threshold": VarianceThresholdApplier,
+    "correlation_threshold": CorrelationThresholdApplier,
+    "univariate_selection": UnivariateSelectionApplier,
+    "model_based_selection": ModelBasedSelectionApplier,
+}
+
 
 class FeatureSelectionApplier(BaseApplier):
     """Route a fitted selection artifact to the applier that produced it."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Delegate inspection to the same saved discriminator used by local apply."""
+        if type(raw) is not dict:
+            raise ValueError("Local fitted selection state must be a dictionary.")
+        kind = raw.get("type")
+        if kind is not None and not isinstance(kind, str):
+            raise ValueError("Fitted selection type must be a string.")
+        owner = _FS_APPLIERS.get(kind)
+        if owner is not None:
+            owner.validate_inference_state(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Reuse the selected owner's context; unmatched saved types remain passthroughs."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        FeatureSelectionApplier.validate_inference_state(state)
+        owner = _FS_APPLIERS.get(state.get("type"))
+        if owner is not None:
+            return owner.inference_capability(state, engine=engine)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     def apply(
         self,

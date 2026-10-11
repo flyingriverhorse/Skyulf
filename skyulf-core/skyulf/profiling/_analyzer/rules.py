@@ -12,6 +12,7 @@ from sklearn.tree import (  # ty: ignore[unresolved-import]
 )
 
 from ...types import DEFAULT_RANDOM_STATE
+from ..correlations import _nan_to_null
 from ..schemas import RuleNode, RuleTree
 from ._utils import SKLEARN_AVAILABLE, _AnalyzerState
 
@@ -32,9 +33,7 @@ class RulesMixin(_AnalyzerState):
             return None
         try:
             limit = 100000
-            df_sample = self.df.select(  # type: ignore[attr-defined]
-                feature_cols + [target_col]
-            ).head(limit)
+            df_sample = _nan_to_null(self.df.select(feature_cols + [target_col]).head(limit))
 
             is_regression = self._determine_is_regression(task_type, df_sample, target_col)
             cat_cols, num_cols = self._split_feature_columns(df_sample, feature_cols)

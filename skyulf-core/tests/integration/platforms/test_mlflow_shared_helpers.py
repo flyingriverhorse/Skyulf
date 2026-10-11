@@ -30,7 +30,7 @@ def test_shared_dtype_preserves_adapter_aliases(dtype, expected):
 def test_local_dtype_wrapper_keeps_existing_entry_point():
     """Existing callers of the local adapter must retain the shared alias behavior."""
     pytest.importorskip("mlflow")
-    from skyulf.integrations.mlflow.models.local_model import normalized_dtype
+    from skyulf.integrations.mlflow.models.pipeline_model import normalized_dtype
 
     assert normalized_dtype("BOOLEAN") == _model_metadata.normalized_dtype("BOOLEAN") == "bool"
 
@@ -51,5 +51,50 @@ def test_snapshot_keeps_package_root_after_adapter_relocation(tmp_path, monkeypa
     }
     copied = {path.relative_to(snapshot) for path in snapshot.rglob("*.py")}
     assert copied == expected
-    assert (snapshot / "inference" / "local_pipeline.py").is_file()
+    assert (snapshot / "inference" / "fitted_pipeline.py").is_file()
     assert (snapshot / "pipeline" / "__init__.py").is_file()
+
+
+@pytest.mark.parametrize("supports_uv_project", [False, True])
+@pytest.mark.parametrize("certified", [False, True])
+def test_pyfunc_environment_only_packages_certified_workers(
+    tmp_path, monkeypatch, supports_uv_project, certified
+):
+    """Local models keep pins unchanged; worker snapshots and uv options remain opt-in."""
+    mlflow = pytest.importorskip("mlflow")
+
+    def save_without_uv(path):
+        """Expose an older save signature without executing model publication."""
+        raise AssertionError("Environment preparation must not save a model.")
+
+    def save_with_uv(path, uv_project_path=None):
+        """Expose the newer optional project argument without saving anything."""
+        raise AssertionError("Environment preparation must not save a model.")
+
+    monkeypatch.setattr(
+        mlflow.pyfunc, "save_model", save_with_uv if supports_uv_project else save_without_uv
+    )
+    snapshots = []
+    pins = ["skyulf-core==0.9.2", "mlflow==3.10.0"]
+
+    def snapshot(directory, requirements):
+        """Observe the existing wheel boundary without creating a second wheel fixture."""
+        snapshots.append((directory, list(requirements)))
+        return ["snapshot", "wheel.whl"], ["code/wheel.whl", requirements[1]], "source-hash"
+
+    monkeypatch.setattr(_spark_environment, "snapshot_worker_environment", snapshot)
+    options, digest = _spark_environment.pyfunc_environment(
+        tmp_path, pins, spark_certified=certified
+    )
+    expected = {"pip_requirements": ["skyulf-core==0.9.2", "mlflow==3.10.0"]}
+    if supports_uv_project:
+        expected["uv_project_path"] = str(tmp_path)
+    if certified:
+        expected.update(
+            code_paths=["snapshot", "wheel.whl"],
+            pip_requirements=["code/wheel.whl", "mlflow==3.10.0"],
+        )
+    assert options == expected
+    assert digest == ("source-hash" if certified else None)
+    assert snapshots == ([(tmp_path, pins)] if certified else [])
+    assert pins == ["skyulf-core==0.9.2", "mlflow==3.10.0"]

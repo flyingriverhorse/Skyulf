@@ -3,13 +3,33 @@
 import base64
 import csv
 import hashlib
+import inspect
 import io
 import shutil
 import zipfile
 from importlib.metadata import distribution
 from pathlib import Path
+from typing import Any
 
 import skyulf
+
+
+def pyfunc_environment(
+    directory: Path, requirements: list[str], *, spark_certified: bool
+) -> tuple[dict[str, Any], str | None]:
+    """Prepare local save options and snapshot runtime code only for certified workers."""
+    import mlflow  # noqa: PLC0415 - optional packaging boundary  # ty: ignore[unresolved-import]
+
+    options: dict[str, Any] = {"pip_requirements": requirements}
+    if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
+        options["uv_project_path"] = str(directory)
+    source_sha256 = None
+    if spark_certified:
+        code_paths, options["pip_requirements"], source_sha256 = snapshot_worker_environment(
+            directory, requirements
+        )
+        options["code_paths"] = code_paths
+    return options, source_sha256
 
 
 def package_source_root() -> Path:

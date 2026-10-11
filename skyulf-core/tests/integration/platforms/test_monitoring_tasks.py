@@ -206,9 +206,9 @@ def test_enrollment_notebook_uses_verified_result_and_frozen_workflow(monkeypatc
 def test_successful_scoring_publishes_monitor_request_without_recovery(monkeypatch):
     """The visible monitor task needs a pinned handoff even when CDF recovery is disabled."""
     from skyulf.integrations.databricks.jobs.shared import job_runtime
-    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
+    from skyulf.integrations.databricks.lifecycle.workflow import BundleActionResult
     from skyulf.integrations.databricks.observability.monitoring import monitoring_registration
-    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    from skyulf.integrations.databricks.scoring.incremental.incremental_batch import (
         IncrementalBatchResult,
     )
 
@@ -256,7 +256,7 @@ def test_scoring_window_uses_delta_commit_time_without_timezone_guessing():
 
 def test_post_score_observation_does_not_reenroll_old_config(monkeypatch):
     """A delayed measurement cannot overwrite a newer deployment's inventory record."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
 
     enroll = Mock()
     monkeypatch.setattr(monitoring, "enroll_monitor", enroll)

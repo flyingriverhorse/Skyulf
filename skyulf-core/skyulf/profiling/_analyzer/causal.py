@@ -136,7 +136,7 @@ class CausalMixin(_AnalyzerState):
             if df_numeric.height < 50:
                 return None
 
-            data = df_numeric.to_numpy()
+            data = df_numeric.cast(pl.Float64).to_numpy()
 
             try:
                 from causallearn.search.ConstraintBased.PC import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional eda extra

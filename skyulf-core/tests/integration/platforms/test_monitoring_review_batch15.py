@@ -7,11 +7,11 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.observability.monitoring import monitoring_sources as sources
-from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
     build_monitoring_report,
 )
-from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
-from skyulf.integrations.databricks.scoring.incremental.local_incremental import bounded_frame
+from skyulf.integrations.databricks.scoring.incremental.incremental_batch import bounded_frame
 
 AS_OF = datetime(2026, 10, 4, 12, tzinfo=UTC)
 

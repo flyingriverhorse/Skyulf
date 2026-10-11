@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from skyulf.integrations.databricks.shared._local_frames import frame_bytes
+from skyulf.integrations.databricks.shared._frames import frame_bytes
 
-from .....inference.local_pipeline import LocalPipelineArtifact
+from .....inference.fitted_pipeline import FittedPipelineArtifact
 from .....modeling._sample_weights import validate_sample_weight
 from .....modeling._tuning.cv_policy import (
     FrozenSplit,
@@ -35,9 +35,9 @@ from .....preprocessing.fold_adapter import (
 from .....registry import NodeRegistry
 from ..thresholds.decision_thresholds import threshold_policy
 from ..thresholds.threshold_cv import evaluate_threshold_cv
-from ..tuning.local_cv import CV_FIELDS, LocalCVSpec
-from ..tuning.local_search import base_model_config, validate_metric
-from ..tuning.local_search_results import tuning_evidence
+from ..tuning.cv import CV_FIELDS, CVSpec
+from ..tuning.search import base_model_config, validate_metric
+from ..tuning.search_results import tuning_evidence
 
 _MINIMIZE = {"mae", "mse", "rmse", "log_loss"}
 _BINARY_METRICS = {"f1", "precision", "recall", "roc_auc", "pr_auc"}
@@ -80,7 +80,7 @@ def validate_competition_preprocessing(pipeline: dict[str, Any]) -> None:
             )
 
 
-def build_cv_policy(cv: LocalCVSpec, metric: str, event_column: str | None) -> TuningConfig:
+def build_cv_policy(cv: CVSpec, metric: str, event_column: str | None) -> TuningConfig:
     """Translate the shared workflow controls without introducing splitter defaults."""
     fields = {name: getattr(cv, field) for name, field in CV_FIELDS.items()}
     return TuningConfig(
@@ -90,8 +90,8 @@ def build_cv_policy(cv: LocalCVSpec, metric: str, event_column: str | None) -> T
 
 def _validate_input(
     frame: Any,
-    artifact: LocalPipelineArtifact,
-    cv: LocalCVSpec,
+    artifact: FittedPipelineArtifact,
+    cv: CVSpec,
     target_column: str,
     max_rows: int,
     max_bytes: int,
@@ -99,8 +99,8 @@ def _validate_input(
     """Reject disabled CV, missing targets, and unbounded data before any fold fit."""
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Competition training data must be a pandas or Polars DataFrame.")
-    if not isinstance(artifact, LocalPipelineArtifact):
-        raise TypeError("Competition requires a fitted LocalPipelineArtifact.")
+    if not isinstance(artifact, FittedPipelineArtifact):
+        raise TypeError("Competition requires a fitted FittedPipelineArtifact.")
     if not cv.enabled:
         raise ValueError("Competition requires enabled CV.")
     if target_column not in frame.columns or target_column in artifact.manifest.input_columns:
@@ -144,7 +144,7 @@ def fold_membership_digest(frame: Any, policy: TuningConfig, plan: FrozenSplit) 
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
 
 
-def _candidate_recipe(artifact: LocalPipelineArtifact) -> tuple[Any, dict, dict | None]:
+def _candidate_recipe(artifact: FittedPipelineArtifact) -> tuple[Any, dict, dict | None]:
     """Resolve structural ensemble parameters and selected search parameters without state reuse."""
     pipeline: dict[str, Any] = dict(artifact.pipeline.config)
     selected = deepcopy(base_model_config(pipeline))
@@ -297,8 +297,8 @@ def _validate_objective(policy: TuningConfig, task: str, y: Any, modeling: dict)
 
 def evaluate_competition_candidate(
     frame: pd.DataFrame | pl.DataFrame,
-    artifact: LocalPipelineArtifact,
-    cv: LocalCVSpec,
+    artifact: FittedPipelineArtifact,
+    cv: CVSpec,
     *,
     target_column: str,
     metric: str,
@@ -377,7 +377,7 @@ def evaluate_competition_candidate(
 
 
 def _native_competition_frame(
-    frame: Any, artifact: LocalPipelineArtifact, cv: LocalCVSpec, target: str, event: str | None
+    frame: Any, artifact: FittedPipelineArtifact, cv: CVSpec, target: str, event: str | None
 ) -> Any:
     """Exclude metadata retained solely for another candidate's calibration policy."""
     columns = [*artifact.manifest.input_columns, target]
@@ -390,7 +390,7 @@ def _native_competition_frame(
 def _threshold_competition(
     frame: Any,
     pipeline: dict,
-    cv: LocalCVSpec,
+    cv: CVSpec,
     target: str,
     metric: str,
     scorer: str,

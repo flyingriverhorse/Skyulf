@@ -2,6 +2,8 @@
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
+from numbers import Integral
 from typing import Any, cast
 
 import numpy as np
@@ -9,10 +11,12 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import LabelEncoder
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import LabelEncoderArtifact
 from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
+from .._fitted_validation import local_scalar, local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._target import apply_target_encoder, fit_target_encoder
@@ -122,6 +126,54 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     return X_out, y_out
 
 
+def _validate_label_class_values(classes: Any) -> None:
+    """Require the sorted string keys learned by the native encoder."""
+    if not isinstance(classes, np.ndarray) or classes.ndim != 1:
+        raise ValueError("Fitted label classes must be a one-dimensional array.")
+    if any(not isinstance(value, str) for value in classes):
+        raise ValueError("Fitted label classes must contain string keys.")
+    if list(classes) != sorted(set(classes)):
+        raise ValueError("Fitted label classes must be unique and sorted.")
+
+
+def _validate_label_classes(encoder: Any, count: Any) -> None:
+    """Inspect the native sklearn vocabulary without calling fit or transform."""
+    if type(encoder) is not LabelEncoder or set(vars(encoder)) != {"classes_"}:
+        raise ValueError("Fitted label encoders must be native learned LabelEncoder instances.")
+    _validate_label_class_values(encoder.classes_)
+    if (
+        isinstance(count, (bool, np.bool_))
+        or not isinstance(count, Integral)
+        or count != len(encoder.classes_)
+    ):
+        raise ValueError("Fitted label class counts must match their vocabularies.")
+
+
+def _validate_label_columns(raw: dict) -> None:
+    """Check the saved feature selection and optional embedded target name."""
+    columns = raw["columns"]
+    if columns is not None and (
+        type(columns) not in (list, tuple) or any(not isinstance(col, str) for col in columns)
+    ):
+        raise ValueError("Fitted label columns must be strings in a list or tuple, or None.")
+    if "target_column" in raw and (
+        not isinstance(raw["target_column"], str) or "__target__" not in raw["encoders"]
+    ):
+        raise ValueError("Fitted embedded targets require a named target encoder.")
+
+
+def _validate_label_encoders(raw: dict) -> None:
+    """Check selected features and target vocabulary against saved class counts."""
+    encoders, counts = raw["encoders"], raw["classes_count"]
+    if type(encoders) is not dict or type(counts) is not dict or set(encoders) != set(counts):
+        raise ValueError("Fitted label encoders and class counts must have matching keys.")
+    _validate_label_columns(raw)
+    if set(encoders) - set(raw["columns"] or ()) - {"__target__"}:
+        raise ValueError("Fitted label encoders contain an unselected feature.")
+    for column, encoder in encoders.items():
+        _validate_label_classes(encoder, counts[column])
+
+
 class LabelEncoderApplier(BaseApplier):
     """Replace categorical values in place with the integer ids their fitted encoder assigned.
 
@@ -133,6 +185,29 @@ class LabelEncoderApplier(BaseApplier):
     their index and all native Series keep their name. Unencoded targets pass
     through unchanged, including lists and NumPy arrays.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect native learned classes without normalizing the fitted artifact."""
+        fields = {"type", "encoders", "columns", "classes_count", "missing_code"}
+        if isinstance(raw, dict):
+            fields.update(set(raw) & {"category_key_version", "target_column"})
+        local_state_fields(raw, "label_encoder", fields)
+        uses_category_keys(raw)
+        if not isinstance(raw["missing_code"], Decimal):
+            local_scalar(raw["missing_code"], "LabelEncoder missing code")
+        _validate_label_encoders(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Declare fixed lookups while retaining legacy feature rendering dependencies."""
+        if engine not in ("pandas", "polars"):
+            return None
+        LabelEncoderApplier.validate_inference_state(state)
+        legacy = state["columns"] and not uses_category_keys(state)
+        context = "global" if engine == "pandas" and legacy else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

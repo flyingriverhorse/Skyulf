@@ -29,7 +29,7 @@ def _module_path(path: Path, root: Path) -> str:
     return relative.as_posix()
 
 
-def _contained_file(root: Path, relative: str) -> Path:
+def contained_project_file(root: Path, relative: str) -> Path:
     """Require canonical relative paths without symlinks or platform-specific aliases."""
     parts = relative.split("/")
     if any(part in {"", ".", ".."} for part in parts) or any(
@@ -52,14 +52,16 @@ def _project_assets(root: Path) -> dict[str, str]:
     if not manifest.exists() and not manifest.is_symlink():
         return {}
     try:
-        entries = _asset_entries(json.loads(read_source(_contained_file(root, "assets.json"))))
+        entries = _asset_entries(
+            json.loads(read_source(contained_project_file(root, "assets.json")))
+        )
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError("Project assets.json must contain a JSON list of asset paths.") from exc
     entries = _validate_asset_entries(entries)
     assets = {}
     size = 0
     for relative in sorted(entries):
-        path = _contained_file(root, relative)
+        path = contained_project_file(root, relative)
         with path.open("rb") as stream:
             content = stream.read(MAX_PROJECT_SOURCE_BYTES + 1)
         size += len(content)
@@ -100,7 +102,7 @@ def _project_requirements(root: Path) -> tuple[str, ...]:
     manifest = root / "requirements.txt"
     if not manifest.exists() and not manifest.is_symlink():
         return ()
-    return parse_project_requirements(read_source(_contained_file(root, "requirements.txt")))
+    return parse_project_requirements(read_source(contained_project_file(root, "requirements.txt")))
 
 
 def _validate_package_files(files: dict[str, str]) -> None:
@@ -118,13 +120,28 @@ def _validate_package_files(files: dict[str, str]) -> None:
             raise ValueError(f"Project module conflicts with its package: {filename}.")
 
 
-def project_source(path: Path) -> str:
-    """Keep single-file snapshots compatible or archive a complete Python package."""
+def _package_sources(path: Path, exclude_feature_groups: bool) -> list[Path]:
+    """Separate upstream Spark producers from the model's executable feature package."""
+    candidates = (
+        filename
+        for filename in path.rglob("*.py")
+        if not (exclude_feature_groups and filename.relative_to(path).parts[0] == "groups")
+    )
+    return sorted(candidates, key=lambda item: item.relative_to(path).as_posix())
+
+
+def project_source(path: Path, *, exclude_feature_groups: bool = False) -> str:
+    """Archive model source, optionally excluding the reserved top-level groups folder.
+
+    Feature recipe callers exclude ``groups/``, whose Spark producers are pinned
+    by the upstream feature job. Other package callers retain every Python file.
+    Single-file snapshots and previously saved package replay remain unchanged.
+    """
     if not path.is_dir():
         return read_source(path)
     files = {}
     size = 0
-    for filename in sorted(path.rglob("*.py"), key=lambda item: item.relative_to(path).as_posix()):
+    for filename in _package_sources(path, exclude_feature_groups):
         relative = _module_path(filename, path)
         source = read_source(filename)
         size += len(source.encode("utf-8"))

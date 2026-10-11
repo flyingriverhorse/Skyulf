@@ -73,8 +73,8 @@ def fit_fixture(width, directory, model_prefix):
 
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.bundle import build_bundle
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
     from skyulf.pipeline import SkyulfPipeline
 
     columns = tuple(f"x{i}" for i in range(width))
@@ -105,11 +105,11 @@ def fit_fixture(width, directory, model_prefix):
     )
     pipeline.fit(SplitDataset(train=training, test=training.head(0)), target_column="target")
     artifact_path = directory / f"local_{width}"
-    save_local_pipeline(pipeline, artifact_path)
-    artifact = load_local_pipeline(artifact_path)
+    save_pipeline(pipeline, artifact_path)
+    artifact = load_pipeline(artifact_path)
     bundle = build_bundle(pipeline, input_stage="raw", feature_order=columns)
     with mlflow.start_run(run_name=f"sm58-width-{width}") as run:
-        uri = log_local_model(
+        uri = log_pipeline_model(
             artifact_path, run_id=run.info.run_id, artifact_path="model", tracking_uri="databricks"
         )
     registered = mlflow.register_model(uri, f"{model_prefix}_{width}")

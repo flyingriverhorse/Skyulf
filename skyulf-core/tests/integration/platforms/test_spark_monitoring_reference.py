@@ -44,6 +44,14 @@ def test_reference_read_uses_prepared_snapshot_and_rejects_different_artifact(mo
     )
     assert result[2] is frame
     assert read.call_count == 1
+    evidence["model_metadata"] = {"captured_at": "later", "aliases": ["champion"]}
+    assert reference.reference_id(config, evidence) == reference.reference_id(
+        config, prepared["evidence"]
+    )
+    refreshed = reference.load_spark_monitoring_reference(
+        None, config, tracking_uri=None, registry_uri=None
+    )
+    assert refreshed[3]["model_metadata"]["aliases"] == ["champion"]
     prepared["evidence"]["model_digest"] = "other"
     with pytest.raises(ValueError, match="identity"):
         reference.load_spark_monitoring_reference(

@@ -75,7 +75,7 @@ def _fisher_evidence(table: np.ndarray) -> tuple[float, float]:
     return float(fisher_exact(table).pvalue), minimum
 
 
-def _categorical_test(table: np.ndarray) -> tuple[str, float, float]:
+def categorical_drift_test(table: np.ndarray) -> tuple[str, float, float]:
     """Use exact binary/sparse tests and chi-square only for adequately populated cells."""
     from scipy.stats import chi2_contingency  # noqa: PLC0415 - optional SciPy boundary
 
@@ -121,7 +121,7 @@ def categorical_evidence(reference: list[str], current: list[str]) -> DriftEvide
         ],
         dtype=np.int64,
     )
-    test, p_value, minimum = _categorical_test(table)
+    test, p_value, minimum = categorical_drift_test(table)
     evidence = DriftEvidence(
         test=test,
         p_value=p_value,

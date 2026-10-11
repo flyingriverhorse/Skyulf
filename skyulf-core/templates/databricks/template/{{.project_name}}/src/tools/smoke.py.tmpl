@@ -1,4 +1,4 @@
-"""Check project configuration and source syntax without running editable hooks."""
+"""Check project configuration, syntax and saved package inputs without running hooks."""
 
 import argparse
 import json
@@ -16,7 +16,21 @@ def main():
     parser.add_argument("--metadata-schema", default="{{.schema}}")
     parser.add_argument("--resource-suffix", default="")
     args = parser.parse_args()
-    print(json.dumps(check_project(Path(__file__).resolve().parents[2], vars(args)), indent=2))
+    try:
+        result = check_project(Path(__file__).resolve().parents[2], vars(args))
+    except (OSError, ValueError, SyntaxError) as exc:
+        failure = {
+            "status": "failed",
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+            "project_hooks_executed": False,
+            "remote_operations": False,
+        }
+        if isinstance(exc, SyntaxError):
+            failure.update(file=exc.filename, line=exc.lineno, column=exc.offset)
+        print(json.dumps(failure, indent=2))
+        raise SystemExit(1) from None
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

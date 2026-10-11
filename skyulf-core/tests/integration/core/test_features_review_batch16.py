@@ -117,17 +117,25 @@ def test_epoch_units_survive_date_feature_artifact_replay(engine, unit, multipli
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_numeric_date_features_require_explicit_epoch_unit(engine):
+@pytest.mark.parametrize("dtype", ["Int64", "Float64"])
+@pytest.mark.parametrize(
+    "values", [[1704197040, 1704283440], [None, None], []], ids=["epochs", "all_null", "empty"]
+)
+def test_numeric_date_features_require_explicit_epoch_unit(engine, dtype, values):
     """Numeric timestamp units must never depend on the execution engine's implicit defaults."""
-    frame = _native(pd.DataFrame({"when": [1704197040, 1704283440]}), engine)
+    frame = _native(pd.DataFrame({"when": pd.Series(values, dtype=dtype)}), engine)
     with pytest.raises(ValueError, match="epoch_unit"):
         DateFeaturesCalculator().fit(frame, {"columns": ["when"]})
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_legacy_numeric_date_artifact_requires_refit(engine):
+@pytest.mark.parametrize("dtype", ["Int64", "Float64"])
+@pytest.mark.parametrize(
+    "values", [[1704197040], [None, None], []], ids=["epochs", "all_null", "empty"]
+)
+def test_legacy_numeric_date_artifact_requires_refit(engine, dtype, values):
     """A legacy artifact cannot silently choose a different numeric unit on another engine."""
-    frame = _native(pd.DataFrame({"when": [1704197040]}), engine)
+    frame = _native(pd.DataFrame({"when": pd.Series(values, dtype=dtype)}), engine)
     with pytest.raises(ValueError, match="epoch_unit|refit"):
         DateFeaturesApplier().apply(frame, {"columns": ["when"], "features": ["hour"]})
 

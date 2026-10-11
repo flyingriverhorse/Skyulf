@@ -1,6 +1,7 @@
 """Ordinal Encoder node (Calculator + Applier)."""
 
 from collections.abc import Mapping
+from numbers import Integral, Real
 from typing import Any, cast
 
 import numpy as np
@@ -8,6 +9,7 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import OrdinalEncoder
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
@@ -19,6 +21,7 @@ from .._category_keys import (
     category_order_keys,
     uses_category_keys,
 )
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import _parse_categories_order, detect_categorical_columns
@@ -159,6 +162,78 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
     return X_out, y_out
 
 
+def _validate_ordinal_encoder(encoder: Any, count: int) -> list[int]:
+    """Inspect the actual string-key estimator without running sklearn transformations."""
+    required = {
+        "categories_",
+        "n_features_in_",
+        "dtype",
+        "handle_unknown",
+        "unknown_value",
+        "_missing_indices",
+        "_infrequent_enabled",
+    }
+    if type(encoder) is not OrdinalEncoder or not required.issubset(vars(encoder)):
+        raise ValueError("Expected a fitted OrdinalEncoder.")
+    if any(callable(value) for key, value in vars(encoder).items() if key != "dtype"):
+        raise ValueError("Overridden ordinal estimator methods are unsupported.")
+    if encoder.n_features_in_ != count:
+        raise ValueError("Fitted ordinal feature count disagrees.")
+    categories = encoder.categories_
+    if not isinstance(categories, (list, tuple)) or len(categories) != count:
+        raise ValueError("Fitted ordinal categories must match selected columns.")
+    counts = [_validate_ordinal_categories(values) for values in categories]
+    _validate_ordinal_options(encoder, counts)
+    return counts
+
+
+def _validate_ordinal_categories(values: Any) -> int:
+    """Retain fitted category order and NumPy strings while checking vocabulary shape."""
+    if not isinstance(values, np.ndarray) or values.ndim != 1 or not len(values):
+        raise ValueError("Fitted ordinal categories must be nonempty vectors.")
+    if any(not isinstance(value, str) for value in values) or len(set(values)) != len(values):
+        raise ValueError("Fitted ordinal categories must contain unique string keys.")
+    return len(values)
+
+
+def _validate_ordinal_options(encoder: Any, counts: list[int]) -> None:
+    """Check the saved fixed lookup policy rather than refitting its configured categories."""
+    if encoder._infrequent_enabled or encoder._missing_indices != {}:
+        raise ValueError("Unsupported ordinal fitted grouping or missing-category state.")
+    if np.dtype(encoder.dtype) != np.dtype(np.float32):
+        raise ValueError("Fitted ordinal dtype disagrees.")
+    if encoder.handle_unknown not in ("error", "use_encoded_value"):
+        raise ValueError("Unknown fitted ordinal lookup policy.")
+    if encoder.handle_unknown == "error":
+        return
+    _validate_ordinal_unknown(encoder.unknown_value, counts)
+
+
+def _validate_ordinal_unknown(value: Any, counts: list[int]) -> None:
+    """Require the saved unknown code to remain distinct from fitted category positions."""
+    if not isinstance(value, Real):
+        raise ValueError("Fitted ordinal unknown value must be an integer or NaN.")
+    if not isinstance(value, Integral) and not np.isnan(value):
+        raise ValueError("Fitted ordinal unknown value must be an integer or NaN.")
+    if any(0 <= value < count for count in counts):
+        raise ValueError("Fitted ordinal unknown value overlaps known category codes.")
+
+
+def _validate_ordinal_features(raw: dict) -> None:
+    """Bind feature selection, fitted estimator and recorded vocabulary sizes."""
+    columns = raw["columns"]
+    if not isinstance(columns, (list, tuple)) or any(not isinstance(c, str) for c in columns):
+        raise ValueError("Fitted ordinal columns must be ordered strings.")
+    counts = _validate_ordinal_encoder(raw["encoder_object"], len(columns)) if columns else []
+    if not columns and raw["encoder_object"] is not None:
+        raise ValueError("An empty ordinal selection must not carry a feature encoder.")
+    if (
+        not isinstance(raw["categories_count"], (list, tuple))
+        or list(raw["categories_count"]) != counts
+    ):
+        raise ValueError("Fitted ordinal counts disagree with learned categories.")
+
+
 class OrdinalEncoderApplier(BaseApplier):
     """Replace categorical values in place with fitted ordinal indices, target included.
 
@@ -168,6 +243,47 @@ class OrdinalEncoderApplier(BaseApplier):
     value becomes ``unknown_value`` unless ``handle_unknown`` is ``"error"``.
     Encoded output is ``float32``, not integer.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect feature and optional target encoders without changing lookup provenance."""
+        fields = {"type", "columns", "encoder_object", "encoders", "categories_count"}
+        if isinstance(raw, dict):
+            fields.update({"category_key_version", "target_column"}.intersection(raw))
+        if not local_state_fields(raw, "ordinal", fields, allow_empty=True):
+            return raw
+        uses_category_keys(raw)
+        _validate_ordinal_features(raw)
+        OrdinalEncoderApplier._validate_targets(raw)
+        return raw
+
+    @staticmethod
+    def _validate_targets(raw: dict) -> None:
+        """Keep embedded-target routing separate from selected feature encoders."""
+        encoders = raw["encoders"]
+        if type(encoders) is not dict or set(encoders) - {"__target__"}:
+            raise ValueError("Unexpected fitted ordinal target encoders.")
+        if "__target__" in encoders:
+            _validate_ordinal_encoder(encoders["__target__"], 1)
+        if "target_column" in raw and (
+            not isinstance(raw["target_column"], str)
+            or raw["target_column"] in raw["columns"]
+            or "__target__" not in encoders
+        ):
+            raise ValueError("Fitted ordinal target routing disagrees with its encoders.")
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved ordinal lookups without enabling worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        OrdinalEncoderApplier.validate_inference_state(state)
+        # Legacy pandas datetime string formatting can depend on neighboring rows.
+        legacy_pandas = (
+            engine == "pandas" and state.get("columns") and not uses_category_keys(state)
+        )
+        context = "global" if legacy_pandas else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

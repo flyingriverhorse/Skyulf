@@ -33,6 +33,7 @@ def database():
     """Build the real input columns without requiring a local Spark installation."""
     connection = sqlite3.connect(":memory:")
     connection.row_factory = sqlite3.Row
+    connection.create_function("concat", -1, lambda *values: "".join(str(v) for v in values))
     connection.create_function("get_json_object", 2, _json_field)
     connection.create_function("test_now", 0, lambda: NOW)
     connection.create_function("floor", 1, lambda value: math.floor(value) if value else value)
@@ -48,7 +49,7 @@ def database():
     connection.executescript(
         "CREATE TABLE model_inventory (monitor_id TEXT, model_catalog TEXT, "
         "model_schema TEXT, model_name TEXT, enabled BOOLEAN, config_digest TEXT, "
-        "config_json TEXT, expected_interval_hours REAL);"
+        "config_json TEXT, expected_interval_hours REAL, environment TEXT, project TEXT);"
         "CREATE TABLE current_health (monitor_id TEXT, model_version TEXT);"
         "CREATE TABLE performance_history (monitor_id TEXT, config_digest TEXT, "
         "model_version TEXT, report_id TEXT, window_end TEXT, measured_at TEXT, "
@@ -70,7 +71,7 @@ def _enroll(database, monitor="monitor-1", *, mode="report", enabled=True, versi
     }
     database.execute(
         "INSERT INTO model_inventory VALUES (?, 'catalog', 'schema', "
-        "'catalog.schema.model', ?, 'current', ?, 24)",
+        "'catalog.schema.model', ?, 'current', ?, 24, 'prod', 'project')",
         (monitor, enabled, json.dumps(config)),
     )
     database.execute("INSERT INTO current_health VALUES (?, ?)", (monitor, version))
@@ -101,7 +102,11 @@ def _results(database) -> list[dict]:
     assert "overview_performance" in datasets, "Overview lacks independent performance evidence"
     sql = "".join(datasets["overview_performance"]["queryLines"])
     sql = sql.replace("current_timestamp()", "test_now()")
-    return [dict(row) for row in database.execute(sql).fetchall()]
+    defaults = {
+        p["keyword"]: p["defaultSelection"]["values"]["values"][0]["value"]
+        for p in datasets["overview_performance"].get("parameters", [])
+    }
+    return [dict(row) for row in database.execute(sql, defaults).fetchall()]
 
 
 @pytest.mark.parametrize(
@@ -239,16 +244,22 @@ def test_counts_are_enrollments_and_shared_selectors_include_performance(databas
     results = _results(database)
     assert sum(row["within_tolerance_count"] for row in results) == 2
     page = next(page for page in _dashboard()["pages"] if page["name"] == "overview")
-    widgets = {item["widget"]["name"]: item["widget"] for item in page["layout"]}
-    for field in ("model_catalog", "model_schema", "model_name", "model_version"):
+    global_page = next(
+        p for p in _dashboard()["pages"] if p["pageType"] == "PAGE_TYPE_GLOBAL_FILTERS"
+    )
+    widgets = {
+        item["widget"]["name"]: item["widget"]
+        for source in (page, global_page)
+        for item in source["layout"]
+    }
+    for name in ("filter_model", "filter_version", "filter_context"):
         assert any(
             query["query"]["datasetName"] == "overview_performance"
-            for query in widgets[f"filter_{field}_overview"]["queries"]
+            for query in widgets[name]["queries"]
         )
-    for counter in (
-        "within_tolerance_count",
-        "performance_loss_count",
-        "insufficient_evidence_count",
-        "policy_disabled_count",
-    ):
-        assert widgets[counter]["queries"][0]["query"]["datasetName"] == "overview_performance"
+    chart = widgets["performance_status_breakdown"]["queries"][0]["query"]
+    assert chart["datasetName"] == "overview_performance"
+    assert chart["fields"] == [
+        {"name": "performance_status", "expression": "`performance_status`"},
+        {"name": "contexts", "expression": "COUNT(*)"},
+    ]

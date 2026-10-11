@@ -1,5 +1,6 @@
 """Package-internal MLflow signature and portable artifact metadata helpers."""
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,16 @@ def mlflow_dtype(dtype: str) -> Any:
             "MLflow column signatures cannot preserve this bundle dtype exactly: "
             f"{dtype}. Use int32/int64, float32/float64, bool or string."
         ) from exc
+
+
+def column_schema(columns: Iterable[tuple[str, str]]) -> Any:
+    """Preserve named column order and reject scalar types MLflow cannot transport."""
+    from mlflow.types import (  # noqa: PLC0415 - optional dependency  # ty: ignore[unresolved-import]
+        ColSpec,
+        Schema,
+    )
+
+    return Schema([ColSpec(mlflow_dtype(dtype), name=name) for name, dtype in columns])
 
 
 def scrub_local_artifact_uri(model_path: Path, artifact_key: str = "bundle") -> None:

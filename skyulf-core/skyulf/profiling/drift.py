@@ -691,6 +691,48 @@ class DriftCalculator:
             distribution=None,
         )
 
+    def _numeric_frequencies(
+        self, reference: np.ndarray, current: np.ndarray, buckets: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Use distinct levels for discrete data and reference quantiles otherwise."""
+        levels = np.unique(reference)
+        if len(levels) <= buckets:
+            # Midpoints keep every level distinct and still detect fractional
+            # shifts. Doubled integer coordinates avoid rounded/overflowed edges.
+            integer_data = self._is_integer_array(reference)
+            boundaries = (
+                levels[:-1].astype(object) + levels[1:].astype(object)
+                if integer_data
+                else np.maximum(
+                    levels[:-1] / 2 + levels[1:] / 2,
+                    np.nextafter(levels[:-1], np.inf),
+                )
+            )
+            frequencies = [
+                np.bincount(
+                    np.searchsorted(
+                        boundaries,
+                        values.astype(object) * 2 if integer_data else values,
+                        side="right",
+                    ),
+                    minlength=len(levels),
+                )
+                / len(values)
+                for values in (reference, current)
+            ]
+            return frequencies[0], frequencies[1]
+
+        edges = np.unique(np.percentile(reference, np.linspace(0, 100, buckets + 1)))
+        if len(edges) < 2:
+            return np.ones(1), np.ones(1)
+        # Histogram drops out-of-range values; clipping preserves their mass.
+        reference = np.clip(reference, edges[0], edges[-1])
+        current = np.clip(current, edges[0], edges[-1])
+        return (
+            np.histogram(reference, edges)[0] / len(reference),
+            np.histogram(current, edges)[0] / len(current),
+        )
+
     def _calculate_psi(self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
         """Calculate Population Stability Index (PSI).
 
@@ -703,36 +745,17 @@ class DriftCalculator:
         is serialized into a JSON response, and Starlette's ``JSONResponse`` uses
         ``allow_nan=False``, which raises on non-finite floats).
         """
-        breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
-
         if len(expected) == 0 or len(actual) == 0:
             return 0.0
 
-        # Use percentiles from expected (reference) to define bins
         try:
             # Handle constant arrays
             if np.min(expected) == np.max(expected):
                 return 0.0
 
-            breakpoints = np.percentile(expected, breakpoints)
-
-            # Ensure unique breakpoints
-            breakpoints = np.unique(breakpoints)
-            if len(breakpoints) < 2:
-                return 0.0
-
-            # np.histogram silently drops any values outside the explicit bin
-            # edges instead of counting them in the first/last bin. Since the
-            # very scenario drift detection exists to catch is `actual`
-            # shifting entirely outside `expected`'s range, clip both arrays
-            # into [breakpoints[0], breakpoints[-1]] first so out-of-range
-            # values land in the boundary bin rather than vanishing.
-            expected = np.clip(expected, breakpoints[0], breakpoints[-1])
-            actual = np.clip(actual, breakpoints[0], breakpoints[-1])
-
-            # Calculate frequencies
-            expected_percents = np.histogram(expected, breakpoints)[0] / len(expected)
-            actual_percents = np.histogram(actual, breakpoints)[0] / len(actual)
+            expected_percents, actual_percents = self._numeric_frequencies(
+                expected, actual, buckets
+            )
 
             # Avoid division by zero
             expected_percents = np.where(expected_percents == 0, 0.0001, expected_percents)
@@ -763,23 +786,7 @@ class DriftCalculator:
             if np.min(reference) == np.max(reference):
                 return 0.0
 
-            # Use reference percentiles for binning (same as PSI)
-            breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
-            breakpoints = np.percentile(reference, breakpoints)
-            breakpoints = np.unique(breakpoints)
-
-            if len(breakpoints) < 2:
-                return 0.0
-
-            # See _calculate_psi: clip out-of-range values into the boundary
-            # bin instead of letting np.histogram silently drop them (which
-            # would otherwise mask the exact "current" shifted entirely
-            # outside "reference" scenario drift detection exists to catch).
-            reference = np.clip(reference, breakpoints[0], breakpoints[-1])
-            current = np.clip(current, breakpoints[0], breakpoints[-1])
-
-            ref_percents = np.histogram(reference, breakpoints)[0] / len(reference)
-            curr_percents = np.histogram(current, breakpoints)[0] / len(current)
+            ref_percents, curr_percents = self._numeric_frequencies(reference, current, buckets)
 
             # Smooth to avoid infinity
             ref_percents = np.where(ref_percents == 0, 0.0001, ref_percents)

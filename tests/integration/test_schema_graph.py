@@ -1,6 +1,7 @@
 """Tests for the pre-execution schema graph (C7 Phase B)."""
 
 import pandas as pd
+import pytest
 
 from backend.ml_pipeline._execution._schema_graph import (
     predict_schemas,
@@ -171,3 +172,29 @@ def test_schemas_to_dict_serialization() -> None:
 
 def test_schema_to_dict_none() -> None:
     assert schema_to_dict(None) is None
+
+
+@pytest.mark.parametrize(
+    "replacement,expected", [(None, {"x": "Int64", "other": "int64"}), ("text", {"other": "int64"})]
+)
+def test_value_replacement_schema_reaches_downstream_preview(replacement, expected) -> None:
+    """Preview transport must retain columns while propagating nullable or uncertain dtypes."""
+    seed = SkyulfSchema.from_columns(["x", "other"], {"x": "int64", "other": "int64"})
+    config = PipelineConfig(
+        pipeline_id="replacement-preview",
+        nodes=[
+            NodeConfig(node_id="loader", step_type="data_loader", params={}, inputs=[]),
+            NodeConfig(
+                node_id="replace",
+                step_type="ValueReplacement",
+                params={"columns": ["x"], "mapping": {"1": replacement}},
+                inputs=["loader"],
+            ),
+            NodeConfig(node_id="preview", step_type="data_preview", params={}, inputs=["replace"]),
+        ],
+    )
+    predicted = predict_schemas(config, initial_schemas={"loader": seed})
+    payload = schemas_to_dict(predicted)
+    assert payload["replace"] == {"columns": ["x", "other"], "dtypes": expected}
+    assert payload["preview"] == payload["replace"]
+    assert seed.dtypes == {"x": "int64", "other": "int64"}

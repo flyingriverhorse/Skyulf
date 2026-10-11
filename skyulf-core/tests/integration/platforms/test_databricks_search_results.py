@@ -9,9 +9,9 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
-from skyulf.integrations.databricks.training.tuning.local_search_results import (
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+from skyulf.integrations.databricks.training.tuning.search_results import (
     post_selection_cv,
     tuning_evidence,
     tuning_run_params,
@@ -51,8 +51,8 @@ def _artifact(tmp_path):
     pipeline = SkyulfPipeline(_pipeline())
     pipeline.fit(SplitDataset(train=frame.iloc[:20], test=frame.iloc[20:]), target_column="target")
     path = tmp_path / "artifact"
-    save_local_pipeline(pipeline, path)
-    return load_local_pipeline(path), frame.iloc[:20]
+    save_pipeline(pipeline, path)
+    return load_pipeline(path), frame.iloc[:20]
 
 
 def test_membership_rejects_small_nested_inner_class_folds() -> None:
@@ -68,7 +68,7 @@ def test_membership_rejects_small_nested_inner_class_folds() -> None:
         validate_search_membership(
             frame,
             config,
-            LocalCVSpec(enabled=True, folds=4, method="nested_cv"),
+            CVSpec(enabled=True, folds=4, method="nested_cv"),
             target_column="target",
             event_column=None,
         )
@@ -82,7 +82,7 @@ def test_membership_rejects_small_disabled_cv_shuffle_split() -> None:
     }
     with pytest.raises(ValueError, match="fold|rows"):
         validate_search_membership(
-            frame, config, LocalCVSpec(enabled=False), target_column="target", event_column=None
+            frame, config, CVSpec(enabled=False), target_column="target", event_column=None
         )
 
 
@@ -159,9 +159,7 @@ def test_run_params_preserve_large_spaces_in_artifact_without_oversized_previews
 def test_fitted_tuning_parameters_persist_in_mlflow_experiment(tmp_path) -> None:
     """Parameters visible in Experiments must match the saved fitted result, not a mock."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.integrations.databricks.training.fitting.local_retraining import (
-        _log_tuning_evidence,
-    )
+    from skyulf.integrations.databricks.training.fitting.candidate import _log_tuning_evidence
     from skyulf.integrations.mlflow.runs.tracking import TrackingRun
 
     artifact, _frame = _artifact(tmp_path)
@@ -233,7 +231,7 @@ def test_polars_nested_membership_accepts_viable_folds() -> None:
     validate_search_membership(
         frame,
         config,
-        LocalCVSpec(enabled=True, folds=4, method="nested_cv"),
+        CVSpec(enabled=True, folds=4, method="nested_cv"),
         target_column="target",
         event_column=None,
     )
@@ -248,7 +246,7 @@ def test_post_selection_cv_only_runs_for_nested_search(tmp_path) -> None:
         post_selection_cv(
             frame,
             artifact,
-            LocalCVSpec(enabled=True, folds=3, method="k_fold"),
+            CVSpec(enabled=True, folds=3, method="k_fold"),
             target_column="target",
         )
         is None
@@ -256,7 +254,7 @@ def test_post_selection_cv_only_runs_for_nested_search(tmp_path) -> None:
     report = post_selection_cv(
         frame,
         artifact,
-        LocalCVSpec(enabled=True, folds=3, method="nested_cv"),
+        CVSpec(enabled=True, folds=3, method="nested_cv"),
         target_column="target",
         event_column="event_time",
     )

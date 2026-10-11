@@ -889,12 +889,11 @@ def test_evaluate_train_split_dataframe_missing_target_returns_none():
     assert report["splits"]["train"] is None
 
 
-def test_evaluate_train_split_unsupported_type_returns_none():
-    """evaluate_split should return None for a train split of an unsupported type."""
+@pytest.mark.parametrize("split", ["train", "test", "validation"])
+def test_evaluate_unsupported_split_preserves_other_reports(split):
+    """Unsupported split payloads must not break valid reports or fabricate coverage."""
     dataset, _ = _classification_dataset()
-    unsupported_dataset = SplitDataset(
-        train=cast(Any, object()), test=dataset.test, validation=None
-    )
+    setattr(dataset, split, object())
     estimator = StatefulEstimator(
         calculator=LogisticRegressionCalculator(),
         applier=LogisticRegressionApplier(),
@@ -902,8 +901,13 @@ def test_evaluate_train_split_unsupported_type_returns_none():
     )
     good_dataset, _ = _classification_dataset()
     estimator.fit_predict(good_dataset, "target", config={})
-    report = estimator.evaluate(unsupported_dataset, "target")
-    assert report["splits"]["train"] is None
+    report = estimator.evaluate(dataset, "target")
+    assert report["splits"].get(split) is None
+    assert split not in report["raw_data"]["splits"]
+    valid = "test" if split == "train" else "train"
+    coverage = report["splits"][valid].coverage
+    assert coverage["input_rows"] == len(getattr(dataset, valid))
+    assert coverage["scored_rows"] == coverage["input_rows"]
 
 
 def test_evaluate_test_split_as_tuple_triggers_has_test_branch():

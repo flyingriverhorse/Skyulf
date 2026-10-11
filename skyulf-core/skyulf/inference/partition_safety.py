@@ -12,8 +12,7 @@ from typing import Any
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 from ..core.capabilities import UnsupportedExecutionError, require_capability
-from ..core.portable_pipeline import _config
-from ..core.portable_state import _pack, validate_state
+from ..core.portable_state import _pack
 from ..modeling._evaluation.thresholds import _class_threshold_array
 from ..modeling._tuning.engine import TuningApplier
 from ..modeling._tuning.schemas import TuningResult
@@ -30,8 +29,10 @@ from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
 from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
-from .local_pipeline import LocalPipelineArtifact
-from .local_scoring import prediction_output_schema
+from . import _partition_trees as batch_trees
+from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
+from .fitted_pipeline import FittedPipelineArtifact
+from .pipeline_scoring import prediction_output_schema
 
 _APPLIERS = {
     "SimpleImputer": SimpleImputerApplier,
@@ -82,7 +83,7 @@ def _reject(node: str, reason: str) -> UnsupportedExecutionError:
     return UnsupportedExecutionError(node, "apply", "pandas", reason)
 
 
-def _check_pipeline(artifact: LocalPipelineArtifact) -> None:
+def _check_pipeline(artifact: FittedPipelineArtifact) -> None:
     """Require reviewed orchestration, saved schemas and a pandas fit before inspection."""
     pipeline, manifest = artifact.pipeline, artifact.manifest
     if manifest.format_version != 2:
@@ -119,35 +120,30 @@ def _check_instance_methods(component: Any) -> None:
         raise _reject("pipeline", "Overridden inference methods are unsupported.")
 
 
-def _check_schemas(artifact: LocalPipelineArtifact) -> None:
+def _check_schemas(artifact: FittedPipelineArtifact) -> None:
     """Bind column order and dtype metadata to the fitted inference schemas."""
-    schemas = artifact.pipeline._inference_schemas
-    manifest = artifact.manifest
-    if schemas is None:
-        raise _reject("pipeline", "Missing fitted inference schemas.")
-    actual = tuple(
-        (schema.columns, tuple(schema.dtypes.get(name, "unknown") for name in schema.columns))
-        for schema in schemas
-    )
-    expected = (
-        (manifest.input_columns, manifest.input_dtypes),
-        (manifest.feature_columns, manifest.feature_dtypes),
-    )
-    if actual != expected:
-        raise _reject("pipeline", "Manifest and fitted input/output schemas disagree.")
+    try:
+        check_fitted_schemas(artifact)
+    except ValueError as exc:
+        raise _reject("pipeline", str(exc)) from exc
 
 
-def _check_model(artifact: LocalPipelineArtifact) -> Any:
+def _check_model(artifact: FittedPipelineArtifact) -> Any:
     """Admit only reviewed deterministic estimators and their exact prediction wrappers."""
     estimator = artifact.pipeline.model_estimator
     if type(estimator) is not StatefulEstimator:
         raise _reject("model", "Custom or absent model estimator is unsupported.")
     _check_instance_methods(estimator)
     model, actual_applier, tuning_result = _model_parts(estimator)
-    applier = _MODELS.get(type(model)) or batch_nodes.xgboost_applier(model)
+    applier = (
+        _MODELS.get(type(model))
+        or batch_trees.tree_applier(model)
+        or batch_nodes.xgboost_applier(model)
+    )
     if applier is None or type(actual_applier) is not applier:
         raise _reject(
-            "model", "Only reviewed exact linear, logistic and XGBRegressor models are admitted."
+            "model",
+            "Only reviewed exact linear, logistic, sklearn tree and XGBRegressor models are admitted.",
         )
     _check_instance_methods(model)
     if vars(actual_applier):
@@ -186,9 +182,12 @@ def _check_tuning_result(result: TuningResult, model: Any) -> None:
     thresholds = result.decision_thresholds
     if thresholds is None:
         return
-    if type(model) is not LogisticRegression or type(thresholds) is not dict:
+    if (
+        type(model) not in {LogisticRegression, *batch_trees.CLASSIFIERS}
+        or type(thresholds) is not dict
+    ):
         raise _reject(
-            "model", "Tuned thresholds require a LogisticRegression class-weight mapping."
+            "model", "Tuned thresholds require a reviewed classifier class-weight mapping."
         )
     if any(type(value) not in (int, float) for value in thresholds.values()):
         raise _reject("model", "Tuned thresholds must contain numeric scalar values.")
@@ -216,25 +215,6 @@ def _check_step_identity(record: dict, config: dict) -> None:
         raise ValueError("Carry history cannot execute on independent workers.")
 
 
-def _resolved_config(node: str, raw: dict, state: dict) -> dict:
-    """Normalize fitted defaults while rejecting changed explicit column selection."""
-    columns = raw.get("columns")
-    if (
-        isinstance(columns, list)
-        and not raw.get("_auto_columns")
-        and columns != state.get("columns", [])
-    ):
-        raise ValueError("Configured columns disagree with fitted columns.")
-    resolved = _config(node, raw, state)
-    if node == "SimpleImputer" and resolved["strategy"] == "constant":
-        fill = resolved["fill_value"]
-        if fill is not None and any(
-            value != fill for value in state.get("fill_values", {}).values()
-        ):
-            raise ValueError("Configured constant disagrees with fitted fill values.")
-    return resolved
-
-
 def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
     """Validate one known apply body without invoking its fit, apply or callbacks."""
     node, name = record["type"], record["name"]
@@ -249,19 +229,7 @@ def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
         )
     if NodeRegistry.get_calculator(node) is not _CALCULATORS[node]:
         raise ValueError("Unreviewed calculator registration.")
-    batch_only = node in batch_nodes.APPLIERS or (
-        node == "SimpleImputer" and record["artifact"].get("strategy") == "most_frequent"
-    )
-    state = (
-        batch_nodes.batch_state(node, record["artifact"])
-        if batch_only
-        else validate_state(node, record["artifact"])
-    )
-    resolve = batch_nodes.batch_config if batch_only else _resolved_config
-    params = resolve(node, record.get("params", {}), state)
-    recipe = resolve(node, config.get("params", {}), state)
-    if _pack(params) != _pack(recipe):
-        raise ValueError("Recipe configuration disagrees with fitted parameters.")
+    state, params, _ = resolve_fitted_step(record, config)
     require_capability(
         node,
         "apply",
@@ -298,7 +266,7 @@ def _steps(engineer: FeatureEngineer) -> tuple[PartitionStepEvidence, ...]:
     return tuple(result)
 
 
-def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> PartitionSafetyEvidence:
+def require_partition_safe_pipeline(artifact: FittedPipelineArtifact) -> PartitionSafetyEvidence:
     """Inspect a loaded trusted artifact and return immutable pandas-worker evidence.
 
     No Spark session, callback or model prediction is invoked. Loaders must first
@@ -306,8 +274,8 @@ def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> Partitio
     the driver certificate. Captured project source alone is not executable
     inference behavior and does not grant or remove node admission.
     """
-    if type(artifact) is not LocalPipelineArtifact:
-        raise TypeError("Expected a loaded LocalPipelineArtifact.")
+    if type(artifact) is not FittedPipelineArtifact:
+        raise TypeError("Expected a loaded FittedPipelineArtifact.")
     try:
         return _pipeline_evidence(artifact)
     except UnsupportedExecutionError:
@@ -316,7 +284,7 @@ def require_partition_safe_pipeline(artifact: LocalPipelineArtifact) -> Partitio
         raise _reject("pipeline", f"Malformed fitted inference state: {exc}") from exc
 
 
-def _pipeline_evidence(artifact: LocalPipelineArtifact) -> PartitionSafetyEvidence:
+def _pipeline_evidence(artifact: FittedPipelineArtifact) -> PartitionSafetyEvidence:
     """Build evidence after admission while keeping malformed metadata fail-closed."""
     _check_pipeline(artifact)
     steps = _steps(artifact.pipeline.feature_engineer)

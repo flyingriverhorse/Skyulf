@@ -81,3 +81,26 @@ test('best parameter history traps focus and restores its opener', async ({ page
   await expect(dialog).toHaveCount(0);
   await expect(opener).toBeFocused();
 });
+
+test('Escape immediately after help appears keeps the settings dialog open', async ({ page }) => {
+  // Visible help must consume Escape even before a passive document listener is ready.
+  await page.getByRole('combobox', { name: 'Search Method', exact: true }).selectOption('optuna');
+  await page.getByRole('button', { name: 'Search strategy settings', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Optuna Settings', exact: true });
+  await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+  await dialog.evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished)); });
+  const help = dialog.getByRole('button', { name: 'Help', exact: true }).first();
+  await help.evaluate(element => new Promise<void>(resolve => {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('[role="tooltip"]')) return;
+      observer.disconnect();
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      resolve();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    (element as HTMLElement).focus();
+  }));
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(help).toBeFocused();
+});

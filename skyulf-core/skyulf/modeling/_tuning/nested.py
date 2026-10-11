@@ -301,7 +301,7 @@ def _nested_report(
     aggregated = _aggregate_metrics([fold.get("metrics", {}) for fold in folds])
     aggregated.setdefault(cast(str, final.scoring_metric), {}).update(
         mean=float(np.mean(scores)),
-        std=float(np.std(scores)),
+        std=float(np.std(scores, ddof=1)) if len(scores) > 1 else 0.0,
         valid_folds=len(scores),
         total_folds=len(folds),
     )

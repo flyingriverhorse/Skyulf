@@ -7,17 +7,17 @@ import pytest
 
 def _saved_set(tmp_path, source="", config=None):
     """Use real fitted component bytes while isolating only the Delta transport."""
-    from tests.integration.platforms.test_local_pipeline_artifact import _fitted_pipeline
+    from tests.integration.platforms.test_fitted_pipeline_artifact import _fitted_pipeline
 
     from skyulf.inference._manifest import ColumnSpec
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
     from skyulf.integrations.mlflow.registration.registry import ResolvedModel
 
     pipeline, query = _fitted_pipeline("pandas")
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    digest = load_local_pipeline(path).manifest.pipeline_sha256
+    save_pipeline(pipeline, path)
+    digest = load_pipeline(path).manifest.pipeline_sha256
     artifact = save_model_set(
         tmp_path / "set",
         {

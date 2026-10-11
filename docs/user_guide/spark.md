@@ -1,18 +1,16 @@
-# Spark: development setup and current support
+# Spark: execution and environment setup
 
-Spark support is under development for 0.9.0. The optional dependency and
-runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
-available in the development checkout.
-**Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.**
-Their fitted pipeline can be exported and restored across pandas, Polars and Spark.
-The [standalone inference bundle](inference_bundles.md) packages this state with
-a fitted model and validates local raw/features prediction. The Spark runner
-applies native FE and runs a Python regression model in worker batches.
-Other native nodes remain under development. The separate
-[certified MLflow pyfunc route](databricks_bundle.md#distributed-inference-settings)
-supports admitted pandas regression/classification pipelines and independent model
-sets while reusing the Bundle's Delta publication and monitoring lifecycle.
-Installing the extra does not convert a pandas/Polars pipeline to Spark.
+Use Spark when the input should stay distributed. Native SimpleImputer
+`mean`/`constant` and StandardScaler support fit and apply; their portable state
+can be restored across pandas, Polars and Spark. A
+[portable inference bundle](inference_bundles.md) combines supported preprocessing
+with a fitted Python regression or classification model on workers.
+
+The separate [certified MLflow pyfunc route](databricks_bundle.md#distributed-inference-settings)
+uses inspected pandas fitted-pipeline packages and supports its own admitted
+recipes, estimators and model sets. Training those models still uses bounded
+pandas/Polars frames. Installing the Spark extra does not convert arbitrary
+Python preprocessing into distributed operations.
 
 [How inference works](inference_flow.md) explains how the saved FE and
 model are reused, with diagrams for local, native Spark and worker FE paths.
@@ -113,8 +111,8 @@ analysis, but these adapter operations do not collect rows or count them.
 The local `SkyulfDataFrame` protocol remains for pandas/Polars. Spark wrappers
 reject `len`, `shape`, `to_pandas`, `to_numpy` and `to_arrow` with
 `DistributedMaterializationError`. `SparkEngine.to_numpy` and `SklearnBridge`
-also reject distributed features or targets. Worker inference will have its own
-explicit entry point; it is not enabled by this adapter.
+also reject distributed features or targets. Worker inference uses the separate `predict_spark` or certified MLflow entry
+point; wrapping a DataFrame does not enable model execution.
 
 Skyulf neither creates nor retains a Spark session. Use your own
 `spark.createDataFrame(...)` to create input; `SparkEngine.from_pandas` and
@@ -124,11 +122,9 @@ responsibility. In particular, Spark's
 [`toPandas`](https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html)
 collects data into driver memory.
 
-Validation covers classic PySpark 4.0.3 locally and a limited live Databricks
-serverless Spark Connect 4.2.0 inference path. The latter loads a Polars-trained
-regression bundle from Unity Catalog and applies mean imputation/StandardScaler
-in both inference modes. It does not certify every Spark fit operation or compute
-type. Engine detection does not authorize local-only FE nodes on Spark input.
+Use a compatible classic PySpark or Databricks Spark Connect environment and
+validate the actual fitted recipe on that compute. Engine detection alone does
+not authorize pandas/Polars preprocessing nodes on Spark input.
 
 Serverless hides `spark.sql.caseSensitive`. Skyulf handles that specific
 unavailable-configuration condition with conservative case-insensitive collision
@@ -136,7 +132,7 @@ checks; unrelated connection and permission failures still propagate.
 
 ## Execution contracts
 
-The development API can validate a future execution request without starting
+The execution API can validate an execution request without starting
 Spark or changing the current pandas/Polars engine:
 
 ```python
@@ -155,7 +151,7 @@ not an engine. Unknown configuration fields and nonpositive/noninteger limits
 are rejected. These immutable objects declare requirements; they do not apply
 memory limits themselves. The Spark FeatureEngineer entry point validates actual
 key values as described below and enforces `state_max_bytes` for nodes declaring
-the portable codec. Model budgets belong to later inference stages.
+the portable codec. Model and prediction budgets belong to the separate inference entry point.
 
 ## Keyed Spark FeatureEngineer entry point
 
@@ -199,8 +195,8 @@ produce raw Spark outputs; wrapped inputs retain their wrapper convention.
 
 Every step must declare both fit and apply support before fitting starts. Apply
 also checks all fitted steps before execution. This path accepts native,
-row-preserving operations with row-local apply behavior. Worker Python, window,
-filtering and expansion paths require later implementations. SimpleImputer
+row-preserving operations with row-local apply behavior. This native FeatureEngineer path does not run worker Python, window,
+filtering or expansion operations. SimpleImputer
 mean/constant and StandardScaler are available; unsupported nodes or strategies fail before any
 validation action or fit. The runner normalizes registered node defaults before
 checking capabilities, so an omitted SimpleImputer strategy means `mean`, and
@@ -386,8 +382,9 @@ a single-pass training algorithm.
   because representable spacing near `1e12` is significant relative to its spread.
 
 Direct apply is lazy, with no Python UDF or data action. FeatureEngineer still
-executes the identity checks described above. This implementation has been tested
-on the local PySpark runtime; Databricks/Connect validation remains a later gate.
+executes the identity checks described above. Validate the same schema and saved
+state on the compute
+environment used by your job.
 
 ## Portable learned state
 
@@ -423,7 +420,8 @@ The v1 envelope contains `format_version`, `codec_version`, `node_type`,
 artifact retains its options, such as scaler centering/scaling flags. Unknown
 versions, nodes, fields, malformed tags, duplicate columns and inconsistent
 array lengths/counts are rejected. Actual input/output schemas and producer
-metadata are not inferred from statistics; they belong to later bundle metadata.
+metadata are not inferred from statistics; the inference bundle records those
+separate model-input and output contracts.
 
 Scalar tags distinguish integers, floats, strings, booleans and nulls. Integer
 tags use decimal strings to preserve large category values. Float tags preserve
@@ -448,7 +446,8 @@ The Spark runner validates each declared v1 artifact through the codec and
 enforces `ExecutionOptions.state_max_bytes` after fit and before transform
 validation actions. Direct node calls validate state structure but leave wire
 byte limits to explicit encode/decode callers. Use the FeatureEngineer methods
-below to package an ordered pipeline. Worker model loading remains a later stage.
+below to package an ordered pipeline. The inference bundle adds the fitted model
+and worker-loading contract.
 Codec tests also run without starting a JVM.
 
 ## Save and restore a fitted feature pipeline
@@ -533,16 +532,14 @@ file persistence. From the repository root, with Java configured as above:
 
 `skyulf-core/examples/spark_feature_engineering.py` owns and closes its local Spark
 session. Its `run_example(spark, state_path)` function accepts an existing session.
-The automated gate covers all nine fit/apply engine combinations, file round-trips,
-repartitioning to 1/2/7 partitions, reversed inputs, repeated apply and a 10,000-row
-fixture that rejects unbounded driver collection. Validation currently uses local
-PySpark; Databricks/Connect validation is still pending.
+Use representative nulls, dtypes and partitions when checking your own recipe;
+verify prediction output by record key rather than relying on Spark row order.
 
 ## Model inference after native FE
 
 Use `predict_spark(..., mode="native_features")` with a raw-input inference
 bundle to apply the supported saved transformations natively and run a Python
-regression model on Spark workers. The result is a Spark DataFrame containing
+regression or classification model on Spark workers. The result is a Spark DataFrame containing
 row keys and predictions. The full dataset remains distributed; pandas/NumPy
 are used for individual worker model batches.
 
@@ -556,10 +553,9 @@ execution requires explicit support for the transformations in that artifact.
 
 Distributed inference supports raw regression and classification in both modes,
 with the documented portable FE restrictions. Local training can use pandas or
-Polars. MLflow packaging and registry loading are available. Live Databricks
-serverless regression parity, monthly Delta publication, writer coordination
-and restricted-principal write denial have passed the selected SM-16 workflow.
-This does not extend cloud validation to every node or classification path.
+Polars. [MLflow packaging](mlflow_models.md), [registry loading](mlflow_registry.md)
+and [Delta publication](databricks_batch.md) have separate contracts. Check them
+on the selected compute with the fitted recipe and producer dependencies.
 
 ## Measuring inference capacity
 
@@ -600,37 +596,17 @@ process counters are unknown, not zero. Serverless does not expose the executor
 status store or caller-controlled Arrow allocation; those metrics remain
 unavailable. Model-call batch size alone cannot bound worker memory.
 
-### Initial SM-58 observations
+### Interpreting measurements
 
-The serverless comparison validated all three routes at 5 million rows with the
-two-feature linear fixture. At that width, 32 partitions were slower than 8,
-and 1,000-row model calls were slower than 10,000 at 32 partitions. Keep partition
-and batch choices tied to the measured workload rather than a row-count rule.
-This does not extend the admitted preprocessing/model list or prove memory safety
-for large estimators. Classic policy-cluster execution remains unverified because
-the validation workspace only supports serverless compute.
+Compare preparation, first action and repeated action separately. Changing
+partition count or model-call size can increase overhead as well as improve
+throughput; measure the actual feature width, model size and input distribution.
+Include publication when estimating end-to-end score-job latency.
 
-For 5 million rows, two features, eight partitions and 10,000-row model calls:
-
-| Route | Preparation | First action | Repeat action |
-| --- | --- | --- | --- |
-| Native features | 5.69 s | 3.66 s | 3.31 s |
-| Python pipeline | 1.02 s | 3.24 s | 3.15 s |
-| Certified pyfunc | 52.51 s | 4.02 s | 3.95 s |
-
-The complete 18-configuration run checked 108 million row predictions across
-repeats, with maximum absolute error below `1.8e-13`. Runtime: Python 3.12.3,
-Spark 4.2.0, MLflow 3.16.1, sklearn 1.8.0. These are action timings, not complete
-job latency. Pyfunc preparation includes package acquisition, verification and
-UDF construction; the benchmark does not separate those substeps.
-
-Separate warm worker probes measured median package-load times of 1.73–2.22 s.
-For 64 features and 10,000 probe rows, Python-process RSS after prediction was
-662.6–665.1 MiB, against 652.2–654.1 MiB before loading. These include the Python
-environment and imported libraries. Process lifetime peaks reached 912.4 MiB,
-which can include earlier work; they cannot establish a per-case memory ceiling.
-Full raw evidence is in the validation workspace at
-`/Volumes/workspace/skyulf_sm58_20261005/benchmark/ef875e95e0c24e87a64f38a314a5c7fa.json`.
+Keep benchmark outputs in your own schema or volume and record the runtime,
+package versions and parameters alongside the results. Worker process RSS includes
+libraries and the Python environment; its lifetime peak is not a per-call memory
+ceiling. A passing benchmark does not expand fitted-recipe admission.
 
 ## Capability declarations
 
@@ -690,6 +666,6 @@ Spark code, certify compatibility or make a window transform batch-independent.
 - **Unsupported node:** SimpleImputer mean/constant and StandardScaler are available. Other built-in
   native FE nodes are still being implemented; installing Spark does not enable them.
 
-MLflow tracking, Unity Catalog registration, Databricks jobs, serving endpoints
-and Bundle templates are separate integration stages. This page will gain
-tested fit/apply and inference examples as those capabilities are implemented.
+[MLflow packaging](mlflow_models.md), [registry resolution](mlflow_registry.md),
+and [Databricks Bundles](databricks_bundle.md) have separate integration contracts.
+Use their guides to configure deployment, publication and worker dependencies.

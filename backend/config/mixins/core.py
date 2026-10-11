@@ -34,13 +34,13 @@ _APP_VERSION = _application_version()
 class CoreMixin:
     """App identity and server configuration."""
 
-    APP_NAME: str = "Skyulf"
+    APP_NAME: str = "Kayra"
     # Single source of truth: pyproject.toml [project] version
     APP_VERSION: str = _APP_VERSION
-    APP_SUMMARY: str = "Skyulf MLops service surface for data, experimentation, and automation."
+    APP_SUMMARY: str = "Kayra MLOps service surface for data, experimentation, and automation."
     APP_DESCRIPTION: str = (
-        "Programmatic interface for Skyulf's MLops platform covering data ingestion, model lifecycle, "
-        "feature engineering, and analysis workflows."
+        "Programmatic interface for Kayra, the MLOps platform by Skyulf, covering data ingestion, "
+        "model lifecycle, feature engineering, and analysis workflows."
     )
     DEBUG: bool = False
     TESTING: bool = False

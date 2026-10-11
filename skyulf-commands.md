@@ -128,7 +128,7 @@ batch and review rules. Do not run pytest without a selector locally.
 .\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration/core/test_function_step_mutation.py -q --tb=short
 
 # Affected saved-model behavior and its integration consumer
-.\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration/platforms/test_local_pipeline_policy_identity.py skyulf-core/tests/integration/platforms/test_local_pipeline_artifact.py -q --tb=short
+.\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration/platforms/test_pipeline_policy_identity.py skyulf-core/tests/integration/platforms/test_fitted_pipeline_artifact.py -q --tb=short
 
 # Check moved imports and fixtures without executing tests
 .\.venv\Scripts\python.exe -m pytest skyulf-core/tests/integration --collect-only -q

@@ -1,9 +1,9 @@
 """Optional MLflow packaging for a complete pinned, locally executable model set."""
 
-import inspect
 import tempfile
 from collections.abc import Iterable
 from copy import deepcopy
+from dataclasses import replace
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -13,12 +13,15 @@ import pandas as pd
 
 from skyulf.integrations.mlflow.shared._client import make_tracking_client
 from skyulf.integrations.mlflow.shared._model_metadata import (
-    mlflow_dtype,
+    column_schema,
     normalized_dtype,
     scrub_local_artifact_uri,
 )
 
-from ....inference.local_pipeline import load_local_pipeline, read_bounded_artifact
+from ....inference.fitted_pipeline import (
+    load_pipeline,
+    read_bounded_artifact,
+)
 from ....inference.model_set import ModelSetArtifact, load_model_set
 from ....inference.model_set_scoring import model_set_output_schema, predict_model_set
 from ....inference.project_code import MAX_PROJECT_SOURCE_BYTES
@@ -26,10 +29,17 @@ from ....inference.project_dependencies import (
     parse_project_requirements,
     source_project_requirements,
 )
+from ...databricks.feature_store.online_policy import (
+    ONLINE_FEATURES_KEY,
+    OnlineFeaturePolicy,
+    saved_online_policy,
+    validate_online_features,
+)
 from ..registration.registry import (
     ResolvedModel,
     downloaded_registered_payload,
     packaged_artifact_path,
+    unwrap_feature_package,
     validate_concrete_version,
     validate_registry_options,
 )
@@ -40,7 +50,7 @@ from ..shared._nullable_transport import (
     transport_spec,
     validated_transport,
 )
-from ..spark._spark_environment import snapshot_worker_environment
+from ..spark._spark_environment import pyfunc_environment
 from ..spark._spark_output import (
     prepare_spark_output,
     require_spark_output,
@@ -53,7 +63,7 @@ from ..spark.spark_model import (
     optional_partition_certificate,
     validate_worker_certificate,
 )
-from .local_model import pip_requirements, validate_local_destination
+from .pipeline_model import pip_requirements, validate_model_destination
 
 
 class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
@@ -64,12 +74,14 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
         input_transport: dict[str, Any] | None = None,
         safety_certificate: dict[str, Any] | None = None,
         source_sha256: str | None = None,
+        online_policy: OnlineFeaturePolicy | None = None,
     ) -> None:
         """Defer loading fitted assets until MLflow supplies package context."""
         self._artifact: ModelSetArtifact | None = None
         self._input_transport = deepcopy(input_transport)
         self._safety_certificate = deepcopy(safety_certificate)
         self._source_sha256 = source_sha256
+        self._online_policy = None if online_policy is None else online_policy.to_dict()
 
     def __getstate__(self) -> dict[str, Any]:
         """Exclude process-local artifact paths and cached fitted objects."""
@@ -83,6 +95,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise ValueError("MLflow model is missing its model set artifact.") from exc
         self._artifact = load_model_set(path)
         self.input_transport()
+        saved_online_policy(
+            getattr(self, "_online_policy", None),
+            {column.name: column.dtype for column in self._artifact.manifest.input_schema},
+            getattr(context, "model_config", None),
+        )
         validate_worker_certificate(
             self._artifact,
             getattr(self, "_safety_certificate", None),
@@ -107,6 +124,11 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
             raise RuntimeError("SkyulfModelSetPythonModel.load_context() was not called.")
         if not isinstance(model_input, pd.DataFrame):
             raise TypeError("Skyulf model set pyfunc requires a pandas DataFrame.")
+        policy = saved_online_policy(
+            getattr(self, "_online_policy", None),
+            {column.name: column.dtype for column in self._artifact.manifest.input_schema},
+        )
+        validate_online_features(model_input, policy)
         spark_output = require_spark_output(params, getattr(self, "_safety_certificate", None))
         model_input = decode_frame(model_input, self.input_transport())
         model_input = restore_nullable_dtypes(
@@ -127,76 +149,74 @@ def log_model_set(
     tracking_uri: str | None = None,
 ) -> str:
     """Log a complete model set without selecting aliases or retaining producer paths."""
-    validate_local_destination(run_id, artifact_path, tracking_uri)
+    validate_model_destination(run_id, artifact_path, tracking_uri)
     artifact = load_model_set(local_artifact_path)
-    transport = transport_spec(
-        (column.name, column.dtype) for column in artifact.manifest.input_schema
-    )
-    requirements = _set_requirements(artifact)
-    certificate = optional_partition_certificate(artifact)
-    signature = _signature(artifact, spark_certified=certificate is not None)
     client = make_tracking_client(tracking_uri)
     client.get_run(run_id)
     with tempfile.TemporaryDirectory(prefix="skyulf-set-mlflow-") as directory:
         model_path = Path(directory) / "model"
-        options = {}
-        if "uv_project_path" in inspect.signature(mlflow.pyfunc.save_model).parameters:
-            options["uv_project_path"] = directory
-        source_sha256 = None
-        if certificate:
-            code_paths, requirements, source_sha256 = snapshot_worker_environment(
-                Path(directory), requirements
-            )
-            options["code_paths"] = code_paths
         mlflow.pyfunc.save_model(
             path=str(model_path),
-            python_model=SkyulfModelSetPythonModel(transport, certificate, source_sha256),
-            artifacts={"model_set": str(artifact.directory)},
-            signature=signature,
-            pip_requirements=requirements,
-            metadata={
-                "skyulf_artifact_kind": "model_set",
-                "skyulf_execution_scope": "whole_frame_local",
-                "model_set_digest": artifact.manifest.set_sha256,
-                **({TRANSPORT_KEY: transport} if transport else {}),
-                **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
-            },
             mlflow_model=mlflow.models.Model(run_id=run_id, artifact_path=artifact_path),
-            **options,
+            **model_set_save_options(artifact, Path(directory)),
         )
         scrub_local_artifact_uri(model_path, "model_set")
         client.log_artifacts(run_id, str(model_path), artifact_path=artifact_path)
     return f"runs:/{run_id}/{artifact_path}"
 
 
+def model_set_save_options(
+    artifact: ModelSetArtifact, directory: Path, *, online_policy: OnlineFeaturePolicy | None = None
+) -> dict[str, Any]:
+    """Build the identical set wrapper and immutable evidence for every logger."""
+    transport = transport_spec(
+        (column.name, column.dtype) for column in artifact.manifest.input_schema
+    )
+    certificate = optional_partition_certificate(artifact)
+    options, source_sha256 = pyfunc_environment(
+        directory, _set_requirements(artifact), spark_certified=bool(certificate)
+    )
+    return {
+        **options,
+        **(
+            {"model_config": {ONLINE_FEATURES_KEY: online_policy.to_dict()}}
+            if online_policy
+            else {}
+        ),
+        "python_model": SkyulfModelSetPythonModel(
+            transport, certificate, source_sha256, online_policy
+        ),
+        "artifacts": {"model_set": str(artifact.directory)},
+        "signature": _signature(artifact, spark_certified=certificate is not None),
+        "metadata": {
+            **({ONLINE_FEATURES_KEY: online_policy.to_dict()} if online_policy else {}),
+            "skyulf_artifact_kind": "model_set",
+            "skyulf_execution_scope": "whole_frame_local",
+            "model_set_digest": artifact.manifest.set_sha256,
+            **({TRANSPORT_KEY: transport} if transport else {}),
+            **({SAFETY_KEY: certificate, SOURCE_KEY: source_sha256} if certificate else {}),
+        },
+    }
+
+
 def _signature(artifact: ModelSetArtifact, *, spark_certified: bool = False) -> Any:
     """Require an exact MLflow scalar representation for every input and output."""
     from mlflow.models import ModelSignature  # noqa: PLC0415  # ty: ignore[unresolved-import]
-    from mlflow.types import ColSpec, Schema  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
     transport = transport_spec(
         (column.name, column.dtype) for column in artifact.manifest.input_schema
     )
     encoded = transport["columns"] if transport else {}
 
-    def schema(columns: Any, encode: bool = False) -> Any:
-        """Preserve names and order while rejecting lossy unsupported scalar types."""
-        return Schema(
-            [
-                ColSpec(
-                    mlflow_dtype(
-                        "string" if encode and c.name in encoded else normalized_dtype(c.dtype)
-                    ),
-                    name=c.name,
-                )
-                for c in columns
-            ]
-        )
-
     options = {"params": spark_output_params()} if spark_certified else {}
     return ModelSignature(
-        inputs=schema(artifact.manifest.input_schema, encode=True),
-        outputs=schema(model_set_output_schema(artifact)),
+        inputs=column_schema(
+            (c.name, "string" if c.name in encoded else normalized_dtype(c.dtype))
+            for c in artifact.manifest.input_schema
+        ),
+        outputs=column_schema(
+            (c.name, normalized_dtype(c.dtype)) for c in model_set_output_schema(artifact)
+        ),
         **options,
     )
 
@@ -205,9 +225,7 @@ def _set_requirements(artifact: ModelSetArtifact) -> list[str]:
     """Merge component and captured composition pins without producer URLs or conflicts."""
     requirements: dict[str, str] = {}
     for component in artifact.manifest.components:
-        pins = pip_requirements(
-            load_local_pipeline(artifact.directory / "components" / component.branch)
-        )
+        pins = pip_requirements(load_pipeline(artifact.directory / "components" / component.branch))
         _merge_requirements(requirements, pins)
     source = read_bounded_artifact(artifact.directory / "composition.py", MAX_PROJECT_SOURCE_BYTES)
     _merge_requirements(requirements, source_project_requirements(source.decode("utf-8")))
@@ -242,7 +260,8 @@ def load_registered_model_set(
         local,
         model,
     ):
+        local, model, feature_lookup_json = unwrap_feature_package(local, model)
         artifact = load_model_set(packaged_artifact_path(local, model.flavors, "model_set"))
         if artifact.manifest.set_sha256 != resolved.digest:
             raise ValueError("Loaded model set digest differs from resolved identity.")
-        return artifact
+        return replace(artifact, feature_lookup_json=feature_lookup_json)

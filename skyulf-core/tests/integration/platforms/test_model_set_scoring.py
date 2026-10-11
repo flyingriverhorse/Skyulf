@@ -113,7 +113,7 @@ def test_composition_requires_direct_unique_dependencies(dependencies):
 def fitted_set(tmp_path):
     """Fit independent feature contracts using both supported local engines."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
     from skyulf.pipeline import SkyulfPipeline
 
@@ -141,8 +141,8 @@ def fitted_set(tmp_path):
             split = SplitDataset(train=train.iloc[:5], test=train.iloc[5:])
         pipeline.fit(split, target_column="target")
         path = tmp_path / branch
-        save_local_pipeline(pipeline, path)
-        digest = load_local_pipeline(path).manifest.pipeline_sha256
+        save_pipeline(pipeline, path)
+        digest = load_pipeline(path).manifest.pipeline_sha256
         components[branch] = (
             ComponentReference(name="model_" + branch, version="1", digest=digest),
             path,
@@ -176,9 +176,9 @@ def test_fitted_mixed_engine_set_preserves_independent_outcomes(fitted_set, engi
 @pytest.mark.parametrize("dtype", [pl.Int8, pl.Int32, pl.Int64, pl.UInt64])
 def test_nullable_polars_integer_input_matches_component_prediction(tmp_path, dtype):
     """The model-set pandas boundary must preserve a nullable fitted integer contract."""
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-    from skyulf.inference.local_scoring import score_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
+    from skyulf.inference.pipeline_scoring import score_pipeline
     from skyulf.pipeline import SkyulfPipeline
 
     train = pl.DataFrame(
@@ -194,8 +194,8 @@ def test_nullable_polars_integer_input_matches_component_prediction(tmp_path, dt
     )
     pipeline.fit(train, target_column="target")
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    local = load_local_pipeline(path)
+    save_pipeline(pipeline, path)
+    local = load_pipeline(path)
     artifact = save_model_set(
         tmp_path / "set",
         {
@@ -209,7 +209,7 @@ def test_nullable_polars_integer_input_matches_component_prediction(tmp_path, dt
         record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
     )
     frame = pl.DataFrame({"id": [3, 1, 2], "x": pl.Series([None, 7, 8], dtype=dtype)})
-    expected = score_local_pipeline(frame.select("x"), local)
+    expected = score_pipeline(frame.select("x"), local)
 
     actual = _api().score_model_set(frame, artifact).frame
 
@@ -337,7 +337,7 @@ print(json.dumps({'a':float(result.a_value.iloc[0]), 'b':float(result.b_value.il
 def temporal_set(tmp_path):
     """Package separate temporal models so each branch owns its continuation."""
     from skyulf.data.dataset import SplitDataset
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
     from skyulf.pipeline import SkyulfPipeline
 
@@ -370,12 +370,12 @@ def temporal_set(tmp_path):
         )
         pipeline.fit(SplitDataset(train=native[:16], test=native[16:]), target_column="target")
         path = tmp_path / branch
-        save_local_pipeline(pipeline, path)
+        save_pipeline(pipeline, path)
         components[branch] = (
             ComponentReference(
                 name="temporal_" + branch,
                 version="1",
-                digest=load_local_pipeline(path).manifest.pipeline_sha256,
+                digest=load_pipeline(path).manifest.pipeline_sha256,
             ),
             path,
         )
@@ -438,7 +438,7 @@ def test_temporal_set_rejects_incompatible_history(temporal_set, change):
 def test_component_failure_never_returns_partial_set(fitted_set, monkeypatch):
     """Later component failures must prevent exposure of earlier successful outcomes."""
     api = _api()
-    original = api.score_local_pipeline
+    original = api.score_pipeline
     calls = []
 
     def failing(frame, artifact):
@@ -448,7 +448,7 @@ def test_component_failure_never_returns_partial_set(fitted_set, monkeypatch):
             raise RuntimeError("failed component")
         return original(frame, artifact)
 
-    monkeypatch.setattr(api, "score_local_pipeline", failing)
+    monkeypatch.setattr(api, "score_pipeline", failing)
     with pytest.raises(RuntimeError, match="failed component"):
         api.score_model_set(pd.DataFrame({"id": [1], "x": [2.0], "y": [3.0]}), fitted_set)
     assert calls == ["pandas", "polars"]
@@ -470,21 +470,21 @@ def test_empty_set_prediction_keeps_declared_schema(fitted_set):
 
 def test_empty_mixed_engine_string_inputs_keep_declared_output(tmp_path):
     """Empty string columns cannot block a complete refresh through Polars null inference."""
-    from tests.integration.platforms.test_local_pipeline_artifact import _fitted_pipeline
+    from tests.integration.platforms.test_fitted_pipeline_artifact import _fitted_pipeline
 
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
 
     components = {}
     for engine in ("pandas", "polars"):
         pipeline, _ = _fitted_pipeline(engine)
         path = tmp_path / engine
-        save_local_pipeline(pipeline, path)
+        save_pipeline(pipeline, path)
         components[engine] = (
             ComponentReference(
                 name=engine,
                 version="1",
-                digest=load_local_pipeline(path).manifest.pipeline_sha256,
+                digest=load_pipeline(path).manifest.pipeline_sha256,
             ),
             path,
         )

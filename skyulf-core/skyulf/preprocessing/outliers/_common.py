@@ -9,12 +9,42 @@ lost the outliers, and list targets crashed on one engine and no-oped on the
 other.
 """
 
+from decimal import Decimal
+from numbers import Real
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from .._helpers import select_rows_by_position
+
+
+def validate_detector_warnings(value: Any) -> None:
+    """Inspect fit-time diagnostic text without changing skipped-column provenance."""
+    if type(value) is not list or any(not isinstance(item, str) for item in value):
+        raise ValueError("Fitted detector warnings must be a list of strings.")
+
+
+def validate_fitted_bounds(bounds: Any, *, partial: bool) -> None:
+    """Inspect per-column saved numeric limits without changing their scalar types."""
+    if type(bounds) is not dict:
+        raise ValueError("Fitted bounds must be a dictionary.")
+    for bound in bounds.values():
+        _validate_bound(bound, partial=partial)
+
+
+def _validate_bound(bound: Any, *, partial: bool) -> None:
+    """Allow manual open limits while requiring both learned percentile limits."""
+    if type(bound) is not dict:
+        raise ValueError("Each fitted bound must be a dictionary.")
+    fields = {"lower", "upper"}
+    if set(bound) - fields or (not partial and set(bound) != fields):
+        raise ValueError("Unexpected fitted bound fields.")
+    for value in bound.values():
+        if value is None and partial:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (Real, Decimal)):
+            raise ValueError("Fitted limits must be real numeric scalars.")
 
 
 def _filter_y_polars(y: Any, mask_series: Any) -> Any:

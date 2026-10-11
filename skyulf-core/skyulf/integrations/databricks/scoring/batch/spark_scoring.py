@@ -7,6 +7,7 @@ from operator import or_
 from typing import Any
 
 from ...data.admission import BatchConflictError
+from ...feature_store.scoring import feature_binding, validate_feature_snapshot
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,8 @@ def read_distributed_rows(
 def validate_prepared_spark(prepared: Any) -> None:
     """Reject unsafe saved behavior before source selection or target provisioning."""
     if prepared.config.inference_mode == "local":
+        if feature_binding(prepared.artifact) is not None:
+            raise ValueError("Feature-packaged models require Spark inference for native lookup.")
         return
     from .....inference.partition_safety import require_partition_safe_pipeline  # noqa: PLC0415
 
@@ -86,7 +89,7 @@ def score_distributed_single(
     target: Any,
     *,
     replacing: bool,
-) -> tuple[Any, dict[str, int]]:
+) -> tuple[Any, dict[str, Any]]:
     """Produce keyed UDF output while reusing the single-model transaction protocol."""
     from ....mlflow.spark.spark_model import predict_spark_pyfunc  # noqa: PLC0415
 
@@ -103,7 +106,7 @@ def score_distributed_single(
         registry_uri=config.model.registry_uri,
     )
     reject_published_keys(output, target, keys, replacing=replacing)
-    return output, {}
+    return output, validate_feature_snapshot(spark, prepared.artifact)
 
 
 def reject_published_keys(
@@ -138,6 +141,10 @@ def prepare_spark_set_execution(
     if type(prediction_batch_rows) is not int or not 0 < prediction_batch_rows <= 100_000:
         raise ValueError("spark_udf_prediction_batch_rows must be between 1 and 100000.")
     if inference_mode == "local":
+        if feature_binding(artifact) is not None:
+            raise ValueError(
+                "Feature-packaged model sets require Spark inference for native lookup."
+            )
         return None
     from .....inference.model_set_partition_safety import (  # noqa: PLC0415
         require_partition_safe_model_set,

@@ -4,15 +4,15 @@ import importlib
 import math
 from typing import Any
 
-from .spark_monitoring_metrics import _column, _functions
+from .spark_monitoring_metrics import spark_column, spark_functions
 
 
 def _curve(pairs: Any, label: Any, probability: str) -> tuple[float, float, int, int]:
     """Aggregate tied-score ROC and precision-recall integrals on Spark executors."""
-    f = _functions()
+    f = spark_functions()
     window = importlib.import_module("pyspark.sql.window").Window
-    positive = (_column("__sm_truth") == f.lit(label)).cast("long")
-    curve = pairs.select(_column(probability).alias("score"), positive.alias("positive"))
+    positive = (spark_column("__sm_truth") == f.lit(label)).cast("long")
+    curve = pairs.select(spark_column(probability).alias("score"), positive.alias("positive"))
     curve = curve.groupBy("score").agg(f.sum("positive").alias("p"), f.count("*").alias("n"))
     order = window.orderBy(f.col("score").desc()).rowsBetween(
         window.unboundedPreceding, window.currentRow
@@ -35,9 +35,9 @@ def _curve(pairs: Any, label: Any, probability: str) -> tuple[float, float, int,
 
 def _log_loss(pairs: Any, classes: tuple, probabilities: tuple) -> float:
     """Use the same double-precision clipping as sklearn saved probability arrays."""
-    f = _functions()
+    f = spark_functions()
     terms = [
-        f.when(_column("__sm_truth") == f.lit(label), _column(name)).otherwise(0.0)
+        f.when(spark_column("__sm_truth") == f.lit(label), spark_column(name)).otherwise(0.0)
         for label, name in zip(classes, probabilities, strict=True)
     ]
     probability = f.greatest(
@@ -68,7 +68,7 @@ def _ovo(pairs: Any, classes: tuple, probabilities: tuple, present: list[int]) -
     comparisons = []
     for offset, first in enumerate(present):
         for second in present[offset + 1 :]:
-            subset = pairs.where(_column("__sm_truth").isin(classes[first], classes[second]))
+            subset = pairs.where(spark_column("__sm_truth").isin(classes[first], classes[second]))
             a = _curve(subset, classes[first], probabilities[first])
             b = _curve(subset, classes[second], probabilities[second])
             comparisons.append(((a[0] + b[0]) / 2, a[3]))

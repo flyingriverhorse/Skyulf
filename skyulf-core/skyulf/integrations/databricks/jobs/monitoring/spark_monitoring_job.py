@@ -5,7 +5,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from ...observability.monitoring.local.monitoring import run_monitoring
+from ...observability.monitoring.monitoring import run_monitoring
 from ...observability.monitoring.monitoring_config import MonitorConfig, json_digest
 from ...observability.monitoring.monitoring_registration import monitoring_destination
 from ...observability.monitoring.monitoring_sources import observation_window

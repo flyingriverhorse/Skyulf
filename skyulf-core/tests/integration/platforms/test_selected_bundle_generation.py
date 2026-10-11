@@ -1,32 +1,35 @@
 """Real CLI generation retains selected settings and their runtime defaults."""
 
-import json
 import os
-import runpy
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 import yaml
-from test_databricks_bundle_generation import _generate_project, _read_validated_config
+from test_databricks_bundle_generation import (
+    _generate_project,
+    _read_modeling,
+    _read_validated_config,
+)
+
+from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in"
+    not (
+        os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE")
+        or os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
+    ),
+    reason="CLI opt-in",
 )
 
 
-@pytest.mark.parametrize(
-    "layout,expected",
-    [
-        ("single_model", {"single_model.py"}),
-        ("model_competition", {"model_competition.py"}),
-        ("multi_target", {"multi_model.py", "model_set.py"}),
-    ],
-)
-def test_only_selected_modeling_files_are_generated(tmp_path, layout, expected):
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+def test_only_yaml_model_settings_are_generated(tmp_path, layout):
     """Unused layout hooks must not distract operators or become accidental owners."""
     project = _generate_project(tmp_path, training_layout=layout)
-    assert {path.name for path in (project / "src/modeling").glob("*.py")} == expected
+    assert not (project / "src/modeling").exists()
+    assert (project / "config/training.yml").is_file()
+    assert (project / "config/inference.yml").is_file()
     assert not (project / "selection").exists()
     assert _read_validated_config(project, action="train")["training_layout"] == layout
 
@@ -34,11 +37,8 @@ def test_only_selected_modeling_files_are_generated(tmp_path, layout, expected):
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 def test_unused_optional_training_settings_are_absent(tmp_path, layout):
     """Date-free random training keeps defaults without irrelevant null placeholders."""
-    from skyulf.integrations.databricks.lifecycle.local_workflow import (
-        training_settings,
-        training_spec,
-    )
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.lifecycle.workflow import training_settings, training_spec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate_project(
         tmp_path,
@@ -78,15 +78,14 @@ def test_unused_optional_training_settings_are_absent(tmp_path, layout):
     assert training_spec(training_settings(config, now)) == training_spec(
         training_settings(legacy, now)
     )
-    assert LocalCVSpec.from_workflow(config) == LocalCVSpec.from_workflow(legacy)
+    assert CVSpec.from_workflow(config) == CVSpec.from_workflow(legacy)
 
 
 @pytest.mark.parametrize("strategy", ["random", "grid", "optuna"])
 def test_unused_tuning_timeout_is_absent(tmp_path, strategy):
     """Default tuning must not expose a timeout setting with no selected value."""
     project = _generate_project(tmp_path, search_strategy=strategy)
-    module = runpy.run_path(str(project / "src/modeling/single_model.py"))
-    assert "timeout" not in module["build_modeling"]()
+    assert "timeout" not in _read_modeling(project)
 
 
 def test_selected_optional_settings_and_semantic_none_are_retained(tmp_path):
@@ -104,14 +103,14 @@ def test_selected_optional_settings_and_semantic_none_are_retained(tmp_path):
         event_time_timezone="UTC",
         model_params='{"alpha": 1.0, "max_iter": null}',
     )
-    config = json.loads((project / "config/workflow.json").read_text())
-    module = runpy.run_path(str(project / "src/modeling/single_model.py"))
+    config = read_workflow_config(project / "config/training.yml")
+    model = _read_modeling(project)
     assert config["lookback_days"] == 45
     assert config["holdout_days"] == 7
     assert config["event_column"] == "event_time"
-    assert module["WEIGHT_COLUMN"] is None
-    assert module["build_modeling"]()["timeout"] == 30
-    assert module["build_modeling"]()["base_model"]["params"]["max_iter"] is None
+    assert config.get("weight_column") is None
+    assert model["timeout"] == 30
+    assert model["base_model"]["params"]["max_iter"] is None
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])

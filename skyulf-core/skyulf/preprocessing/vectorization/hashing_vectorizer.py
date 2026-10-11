@@ -10,11 +10,13 @@ Output is **always dense**.  Column names use the indexed scheme
 """
 
 import logging
+from numbers import Integral
 from typing import Any
 
 import pandas as pd
 from sklearn.feature_extraction.text import HashingVectorizer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import HashingVectorizerArtifact
@@ -22,6 +24,8 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import (
     _sklearn_vectorizer_apply_pandas,
     _sklearn_vectorizer_apply_polars,
+    _validate_local_vectorizer,
+    _vectorizer_uses_callbacks,
     _warn_large_output,
     apply_text_dual_engine,
     resolve_fit_text_valid_columns,
@@ -52,6 +56,32 @@ class HashingVectorizerApplier(BaseApplier):
     is set. The polars path runs natively and falls back to a pandas round-trip
     when a text column is not String dtype.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect fixed dense width without hashing tokens or allocating the output."""
+        vectorizer = _validate_local_vectorizer(
+            raw, "hashing_vectorizer", HashingVectorizer, {"n_features", "norm"}
+        )
+        if vectorizer is not None:
+            width = raw["n_features"]
+            if not isinstance(width, Integral) or width != vectorizer.n_features:
+                raise ValueError("Fitted hashing width disagrees with the saved vectorizer.")
+            if len(raw["output_columns"]) != max(0, width):
+                raise ValueError("Fitted hashing output names have the wrong width.")
+            if raw["norm"] != vectorizer.norm:
+                raise ValueError("Fitted hashing norm disagrees with the saved vectorizer.")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe stateless document hashing while retaining native callback limits."""
+        if engine not in ("pandas", "polars"):
+            return None
+        HashingVectorizerApplier.validate_inference_state(state)
+        if state and _vectorizer_uses_callbacks(state["vectorizer_object"]):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

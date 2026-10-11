@@ -8,8 +8,8 @@ from unittest.mock import Mock
 
 import pytest
 from test_databricks_branch_template import _project
-from test_local_branches import tracked  # noqa: F401 - shared tracking fixture
 from test_model_set_project import _enable
+from test_training_branches import tracked  # noqa: F401 - shared tracking fixture
 
 
 def test_set_handoff_does_not_enable_component_handoff(tmp_path, workflow_config):

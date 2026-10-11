@@ -12,7 +12,7 @@ pytest.importorskip("matplotlib")
 pytest.importorskip("mlflow")
 from test_competition_lifecycle import _competition
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared fixture
-from test_local_branches import _configs, _data, tracked  # noqa: F401 - shared fixture
+from test_training_branches import _configs, _data, tracked  # noqa: F401 - shared fixture
 
 from skyulf.integrations.databricks.jobs.evaluation_chart_task import (
     generate_evaluation_charts,
@@ -191,7 +191,7 @@ def test_model_set_images_belong_to_each_independent_child(workflow_config, trac
     from skyulf.integrations.databricks.jobs.training import branch_tasks
     from skyulf.integrations.databricks.lifecycle._lifecycle_state import LifecycleContext
     from skyulf.integrations.databricks.model_sets import model_set_stages
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
     uri, client = tracked
     configs = _configs(workflow_config, store=uri)
@@ -199,7 +199,7 @@ def test_model_set_images_belong_to_each_independent_child(workflow_config, trac
     for config in configs.values():
         config["evaluation_charts"] = {"enabled": True, "max_rows": 9}
     monkeypatch.setattr(
-        local_retraining,
+        candidate,
         "read_training_snapshot",
         lambda spark, spec: _data().loc[:, list(spec.source_columns)].copy(),
     )

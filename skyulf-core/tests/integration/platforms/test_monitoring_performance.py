@@ -5,7 +5,9 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks.observability.monitoring.local import monitoring_metrics
+from skyulf.integrations.databricks.observability.monitoring import (
+    monitoring_metrics as monitoring_metrics,
+)
 
 
 def policy():
@@ -77,7 +79,7 @@ def test_policy_observes_completed_window_with_current_label_cutoff(monkeypatch)
     """Late labels must be evaluated after maturity against the original saved predictions."""
     from types import SimpleNamespace
 
-    from skyulf.integrations.databricks.observability.monitoring.local import (
+    from skyulf.integrations.databricks.observability.monitoring import (
         monitoring_performance as performance,
     )
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
@@ -310,7 +312,7 @@ def test_noop_without_new_commit_still_measures_mature_performance(monkeypatch):
 
 def test_population_identity_changes_when_label_table_is_replaced():
     """A same-name label replacement must not inherit a production baseline or failure streak."""
-    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_performance import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_performance import (
         population_contract,
     )
 
@@ -329,7 +331,7 @@ def test_failed_observation_retains_unavailable_policy_window(monkeypatch):
     import json
     from unittest.mock import Mock
 
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )

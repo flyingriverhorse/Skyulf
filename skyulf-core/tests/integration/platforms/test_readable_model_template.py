@@ -1,67 +1,51 @@
-"""Model declarations are editable Python with one clear owner per layout."""
+"""Model declarations use readable YAML with one clear owner per setting."""
 
-import ast
 import json
 import os
-import runpy
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3] / "templates/databricks"
+CLI_ENABLED = (
+    bool(os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"))
+    or os.environ.get("SKYULF_BUNDLE_OFFLINE_CLI") == "1"
+)
 
 
 def test_model_templates_use_readable_names():
-    """New projects must present the same file names as their documented training layouts."""
-    directory = ROOT / "template/{{.project_name}}/src/modeling"
-    for name in ("single_model", "model_competition", "multi_model"):
-        assert (directory / f"{name}.py.tmpl").is_file()
-    assert not (directory / "candidates.py.tmpl").exists()
-    assert not (directory / "branches.py.tmpl").exists()
+    """Every layout must share the documented training and inference entrypoints."""
+    directory = ROOT / "template/{{.project_name}}"
+    assert (directory / "config/training.yml.tmpl").is_file()
+    assert (directory / "config/inference.yml.tmpl").is_file()
+    assert not (directory / "src/modeling").exists()
 
 
-@pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
+@pytest.mark.skipif(not CLI_ENABLED, reason="CLI opt-in")
 @pytest.mark.parametrize(
-    "layout,name",
-    [
-        ("single_model", "single_model"),
-        ("model_competition", "model_competition"),
-        ("multi_target", "multi_model"),
-    ],
+    "layout,count", [("single_model", 1), ("model_competition", 2), ("multi_target", 2)]
 )
-def test_generated_settings_are_python_dicts(tmp_path, layout, name):
-    """Users must edit real model dictionaries instead of JSON inside Python strings."""
+def test_generated_settings_are_yaml_mappings(tmp_path, layout, count):
+    """Users edit plain model settings without embedded JSON strings or Python factories."""
     from test_databricks_bundle_generation import _generate_project
+
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
 
     project = _generate_project(tmp_path, training_layout=layout, competition_candidate_count="2")
-    source = (project / f"src/modeling/{name}.py").read_text()
-    tree = ast.parse(source)
-    assert any(isinstance(node, ast.Dict) for node in ast.walk(tree))
-    assert "json.loads" not in source
-    module = runpy.run_path(str(project / f"src/modeling/{name}.py"))
-    if layout == "single_model":
-        config = json.loads((project / "config/workflow.json").read_text())
-        assert config["pipeline"]["modeling"] == {}
-        assert module["build_modeling"]()["type"] == "hyperparameter_tuner"
-        assert module["DECISION_THRESHOLD"] == {"mode": "off"}
-    elif layout == "model_competition":
-        assert len(module["build_candidates"](task="regression")) == 2
-        assert all(
-            model["decision_threshold"] == {"mode": "off"}
-            for model in module["build_candidates"](task="regression").values()
-        )
-    else:
-        assert len(module["build_training_branches"]()) == 2
-        assert all(
-            model["workflow"]["pipeline"]["decision_threshold"] == {"mode": "off"}
-            for model in module["build_training_branches"]().values()
-        )
+    document = read_training_config(project / "config")
+    assert document is not None
+    assert len(document["models"]) == count
+    for entry in document["models"].values():
+        assert isinstance(entry["model"], dict)
+        assert isinstance(entry["tuning"]["search_space"], dict)
+        assert "decision_threshold" not in entry
+    assert not (project / "src/modeling").exists()
 
 
-@pytest.mark.skipif(not os.environ.get("SKYULF_BUNDLE_CLI_TEST_PROFILE"), reason="CLI opt-in")
-def test_explicit_json_initialization_becomes_equivalent_python_values(tmp_path):
-    """Booleans/null and quoted keywords or escaped strings must retain their exact values."""
-    from test_databricks_bundle_generation import _generate_project
+@pytest.mark.skipif(not CLI_ENABLED, reason="CLI opt-in")
+def test_explicit_json_initialization_becomes_equivalent_yaml_values(tmp_path):
+    """Booleans/null and escaped strings must retain exact values after YAML generation."""
+    from test_databricks_bundle_generation import _generate_project, _read_modeling
 
     params = {
         "enabled": True,
@@ -75,7 +59,6 @@ def test_explicit_json_initialization_becomes_equivalent_python_values(tmp_path)
         model_params=json.dumps(params).replace("/", r"\/"),
         search_space='{"fit_intercept": [true, false]}',
     )
-    module = runpy.run_path(str(project / "src/modeling/single_model.py"))
-    model = module["build_modeling"]()
+    model = _read_modeling(project)
     assert model["base_model"]["params"] == params
     assert model["search_space"] == {"fit_intercept": [True, False]}

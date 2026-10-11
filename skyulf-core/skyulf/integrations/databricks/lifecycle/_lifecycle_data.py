@@ -7,20 +7,16 @@ from typing import Any
 
 import pandas as pd
 
-from ..training.fitting import local_retraining as training
+from ..training.fitting import candidate as training
+from ..training.shared.holdout_evidence import save_frame_artifact
 from ..training.thresholds.decision_thresholds import needs_threshold_time
-from ..training.tuning.local_cv import LocalCVSpec
+from ..training.tuning.cv import CVSpec
 from ._lifecycle_state import PhaseStore
 
 
 def save_frame(store: PhaseStore, name: str, frame: pd.DataFrame) -> dict[str, Any]:
     """Log Parquet and its digest; keep pandas row-membership attributes in the receipt."""
-    with TemporaryDirectory(prefix="skyulf-stage-data-") as directory:
-        path = Path(directory) / f"{name}.parquet"
-        frame.to_parquet(path, index=False)
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        store.client.log_artifact(store.run_id, str(path), "lifecycle/data")
-    return {"sha256": digest, "rows": len(frame), "attrs": frame.attrs}
+    return save_frame_artifact(store.client, store.run_id, name, frame)
 
 
 def load_frame(store: PhaseStore, name: str, evidence: dict[str, Any]) -> pd.DataFrame:
@@ -40,7 +36,7 @@ def load_frame(store: PhaseStore, name: str, evidence: dict[str, Any]) -> pd.Dat
     return frame
 
 
-def load_source(spark: Any, store: PhaseStore, spec: training.LocalTrainingSpec) -> dict[str, Any]:
+def load_source(spark: Any, store: PhaseStore, spec: training.TrainingSpec) -> dict[str, Any]:
     """Materialize the bounded pinned source before any splitting or fitting."""
     frame = training.read_training_snapshot(spark, spec)
     return {
@@ -51,10 +47,10 @@ def load_source(spark: Any, store: PhaseStore, spec: training.LocalTrainingSpec)
     }
 
 
-def prepare_dataset(store: PhaseStore, spec: training.LocalTrainingSpec) -> dict[str, Any]:
+def prepare_dataset(store: PhaseStore, spec: training.TrainingSpec) -> dict[str, Any]:
     """Apply fixed eligibility/cleanup and persist raw training/holdout partitions."""
     config = store.request["config"]
-    cv = LocalCVSpec.from_workflow(config)
+    cv = CVSpec.from_workflow(config)
     frame = load_frame(store, "source", store.receipt("load_data")["output"]["source"])
     train, holdout, unavailable = training.split_labeled_snapshot(
         frame,

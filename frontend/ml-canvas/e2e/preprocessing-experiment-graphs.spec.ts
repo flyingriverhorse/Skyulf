@@ -152,7 +152,7 @@ test('canvas PNG and SVG exports download real rendered nodes', async ({ page })
     const pending = page.waitForEvent('download');
     await page.getByRole('menuitem', { name: `Export ${kind.toUpperCase()}`, exact: true }).click();
     const download = await pending;
-    expect(download.suggestedFilename()).toBe(`skyulf-canvas.${kind}`);
+    expect(download.suggestedFilename()).toBe(`kayra-canvas.${kind}`);
     expect(await download.failure()).toBeNull();
     const contents = await readFile((await download.path())!);
     if (kind === 'png') {

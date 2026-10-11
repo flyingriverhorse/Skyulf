@@ -16,7 +16,7 @@ outputs = rules AFTER prediction. These add columns such as a price band or an
 alert. They do not select training rows, train a model or change its prediction.
 
 Choose a mode and, when needed, skip unavailable target checks:
-- SCORING_MODE="pre_split": reuse the saved pre_split.py recipe.
+- SCORING_MODE="pre_split": reuse the saved config/pre_split.yml recipe.
 - SCORING_MODE="custom": use the two custom sections below instead.
 - SCORING_MODE="combined": pre-split first, custom eligibility on its survivors,
   then model prediction and custom outputs. The first exclusion reason is kept.
@@ -110,7 +110,7 @@ def build_output_rules():
 def build_combined_rules():
     """Return cross-model rules; the profit example stays disabled until configured."""
     return [
-        # Adapt these names to keys in modeling/multi_model.py, then uncomment.
+        # Adapt these names to model keys in config/training.yml, then uncomment.
         # required_components lists only the models this rule needs. A filtered
         # revenue or cost row excludes profit for that row; an unrelated model's
         # exclusion does not. Exceptions fail the job before new results are saved.

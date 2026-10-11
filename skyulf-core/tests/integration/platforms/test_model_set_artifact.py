@@ -9,14 +9,10 @@ import sys
 
 import numpy as np
 import pytest
-from tests.integration.platforms.test_local_pipeline_artifact import _fitted_pipeline
+from tests.integration.platforms.test_fitted_pipeline_artifact import _fitted_pipeline
 
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import (
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 
 
 def _api():
@@ -34,7 +30,7 @@ def components(tmp_path):
     for engine in ("pandas", "polars"):
         pipeline, _ = _fitted_pipeline(engine)
         path = tmp_path / engine
-        save_local_pipeline(pipeline, path)
+        save_pipeline(pipeline, path)
         digest = hashlib.sha256((path / "pipeline.pkl").read_bytes()).hexdigest()
         result[engine] = (digest, path)
     return result
@@ -61,11 +57,9 @@ def test_set_replays_exact_component_bytes_after_source_deletion(tmp_path, compo
         copied = artifact.directory / "components" / branch
         assert (copied / "pipeline.pkl").read_bytes() == (source / "pipeline.pkl").read_bytes()
         shutil.rmtree(source)
-        restored = load_local_pipeline(copied)
+        restored = load_pipeline(copied)
         _, query = _fitted_pipeline(branch)
-        np.testing.assert_allclose(
-            predict_local_pipeline(query, restored)["prediction"], [29, 18, 41]
-        )
+        np.testing.assert_allclose(predict_pipeline(query, restored)["prediction"], [29, 18, 41])
         assert restored.manifest.pipeline_sha256 == digest
     loaded = _api().load_model_set(artifact.directory)
     assert loaded.manifest == artifact.manifest
@@ -248,7 +242,7 @@ def test_conflicting_component_input_dtypes_fail(tmp_path, components):
     train = pd.DataFrame({"amount": [1, 2, 3, 4], "target": [2.0, 4.0, 6.0, 8.0]})
     pipeline.fit(SplitDataset(train=train, test=train), target_column="target")
     source = tmp_path / "integers"
-    save_local_pipeline(pipeline, source)
+    save_pipeline(pipeline, source)
     digest = hashlib.sha256((source / "pipeline.pkl").read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="dtype conflict"):
         _save(tmp_path, {"pandas": components["pandas"], "integers": (digest, source)})

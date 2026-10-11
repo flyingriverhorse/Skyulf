@@ -9,13 +9,12 @@ from pathlib import Path
 import pytest
 
 PACKAGE = "skyulf.integrations.mlflow"
-ROOT = Path(__file__).resolve().parents[3] / "skyulf/integrations/mlflow"
+ROOT = Path(importlib.import_module(PACKAGE).__file__).resolve().parent
 
 
 @pytest.mark.parametrize(
     "canonical, legacy",
     [
-        ("models.local_model", "local_model"),
         ("spark.spark_model", "spark_model"),
         ("lifecycle.promotion", "promotion"),
         ("registration.registry", "registry"),
@@ -42,7 +41,7 @@ def test_all_mlflow_aliases_preserve_module_and_saved_class_identity():
     import pickle
 
     aliases = [path.stem for path in (ROOT / "_compat").glob("*.py") if path.stem != "__init__"]
-    assert len(aliases) == 17
+    assert len(aliases) == 16
     classes = []
     for name in aliases:
         legacy = importlib.import_module(f"{PACKAGE}.{name}")
@@ -52,7 +51,7 @@ def test_all_mlflow_aliases_preserve_module_and_saved_class_identity():
                 restored = pickle.loads(f"c{PACKAGE}.{name}\n{class_name}\n.".encode())
                 assert restored is value
                 classes.append(class_name)
-    assert {"SkyulfPythonModel", "SkyulfLocalPythonModel", "ResolvedModel"} <= set(classes)
+    assert {"SkyulfPythonModel", "ResolvedModel"} <= set(classes)
 
 
 @pytest.mark.parametrize("legacy_first", [False, True])

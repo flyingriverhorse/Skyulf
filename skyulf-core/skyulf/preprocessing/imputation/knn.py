@@ -2,12 +2,15 @@
 
 from typing import Any
 
+import numpy as np
 from sklearn.impute import KNNImputer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import KNNImputerArtifact
+from .._fitted_validation import local_state_fields
 from .._helpers import (
     promote_configured_columns_to_float64,
     resolve_columns_then_to_numpy,
@@ -16,11 +19,49 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _sklearn_transform_subset, drop_all_missing_columns
+from ._common import (
+    _sklearn_transform_subset,
+    _validate_imputer_array,
+    _validate_local_imputer,
+    drop_all_missing_columns,
+)
+
+
+def _validate_knn_neighbors(imputer: KNNImputer, width: int) -> None:
+    """Inspect learned donor rows and their masks without recomputing neighbors."""
+    donors = getattr(imputer, "_fit_X", None)
+    if not isinstance(donors, np.ndarray) or donors.ndim != 2 or not len(donors):
+        raise ValueError("Fitted KNN donor rows must be a nonempty matrix.")
+    _validate_imputer_array(donors, (len(donors), width), "f")
+    _validate_imputer_array(getattr(imputer, "_mask_fit_X", None), donors.shape, "b")
+    valid = _validate_imputer_array(getattr(imputer, "_valid_mask", None), (width,), "b")
+    if not valid.all() and not imputer.keep_empty_features:
+        raise ValueError("Fitted KNN donor columns would change the saved output width.")
 
 
 class KNNImputerApplier(BaseApplier):
     """Fill missing values from the fitted k-nearest-neighbors imputer."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved neighbor estimator without refitting or normalizing it."""
+        fields = {"type", "imputer_object", "columns", "n_neighbors", "weights"}
+        if local_state_fields(raw, "knn_imputer", fields, allow_empty=True):
+            imputer = _validate_local_imputer(raw, KNNImputer)
+            _validate_knn_neighbors(imputer, len(raw["columns"]))
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe native neighbor replay; arbitrary metrics or weights stay undeclared."""
+        if engine not in {"pandas", "polars"}:
+            return None
+        KNNImputerApplier.validate_inference_state(state)
+        if state:
+            imputer = state["imputer_object"]
+            if callable(imputer.weights) or callable(imputer.metric):
+                return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

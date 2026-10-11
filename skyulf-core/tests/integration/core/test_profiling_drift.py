@@ -331,6 +331,90 @@ def test_calculate_drift_handles_empty_data_after_nulls() -> None:
     assert report.column_drifts == {}
 
 
+@pytest.mark.parametrize(
+    ("dtype", "offset"),
+    [(pl.Int64, 0), (pl.Float64, 0), (pl.Int64, 2**53), (pl.UInt64, 2**64 - 5)],
+)
+def test_numeric_drift_separates_top_discrete_values(dtype, offset) -> None:
+    """A swap between the highest ratings must retain both PSI and KL evidence."""
+    levels = [offset + value for value in range(5)]
+    reference = pl.DataFrame(
+        {
+            "rating": pl.Series(
+                [
+                    v
+                    for v, n in zip(levels, [200, 200, 200, 350, 50], strict=True)
+                    for _ in range(n)
+                ],
+                dtype=dtype,
+            )
+        }
+    )
+    current = pl.DataFrame(
+        {
+            "rating": pl.Series(
+                [
+                    v
+                    for v, n in zip(levels, [200, 200, 200, 50, 350], strict=True)
+                    for _ in range(n)
+                ],
+                dtype=dtype,
+            )
+        }
+    )
+
+    column = DriftCalculator(reference, current).calculate_drift().column_drifts["rating"]
+    metrics = {metric.metric: metric for metric in column.metrics}
+
+    assert metrics["psi"].value == pytest.approx(1.1675460894331877)
+    assert metrics["kl_divergence"].value == pytest.approx(0.5837730447165939)
+    assert metrics["psi"].has_drift and metrics["kl_divergence"].has_drift
+    assert column.drift_detected
+
+
+@pytest.mark.parametrize("current_value", [-1, 5])
+def test_discrete_numeric_drift_keeps_out_of_range_observations(current_value) -> None:
+    """Values outside discrete reference levels must contribute to boundary buckets."""
+    reference = pl.DataFrame({"rating": np.repeat(np.arange(5), 200)})
+    current = pl.DataFrame({"rating": [current_value] * 1000})
+
+    column = DriftCalculator(reference, current).calculate_drift().column_drifts["rating"]
+    metrics = {metric.metric: metric.value for metric in column.metrics}
+
+    assert metrics["psi"] > 1.0
+    assert metrics["kl_divergence"] > 1.0
+    assert column.drift_detected
+
+
+@pytest.mark.parametrize("lower", [0.0, 1.0, float(2**53)])
+def test_discrete_drift_preserves_adjacent_float_levels(lower) -> None:
+    """Rounded midpoints must not merge representably different float observations."""
+    levels = [lower, np.nextafter(lower, np.inf)]
+    reference = np.repeat(levels, [900, 100])
+    current = np.repeat(levels, [100, 900])
+    calc = DriftCalculator(pl.DataFrame({"x": reference}), pl.DataFrame({"x": current}))
+
+    assert calc._calculate_psi(reference, current) == pytest.approx(3.5155593237379514)
+    assert calc._calculate_kl(reference, current) == pytest.approx(1.7577796618689758)
+
+
+def test_discrete_drift_keeps_integer_boundaries_for_float_current() -> None:
+    """A float current column must not round distinct integer reference levels together."""
+    reference = np.repeat(np.array([2**53, 2**53 + 1], dtype=np.int64), [900, 100])
+    current = np.full(1000, float(2**53))
+    calc = DriftCalculator(pl.DataFrame({"x": reference}), pl.DataFrame({"x": current}))
+
+    reference_frequencies, current_frequencies = calc._numeric_frequencies(reference, current, 10)
+
+    np.testing.assert_allclose(reference_frequencies, [0.9, 0.1])
+    np.testing.assert_allclose(current_frequencies, [1.0, 0.0])
+    metrics = {
+        metric.metric: metric for metric in calc.calculate_drift().column_drifts["x"].metrics
+    }
+    assert metrics["psi"].has_drift
+    assert metrics["kl_divergence"].has_drift
+
+
 def test_calculate_psi_is_zero_for_constant_reference() -> None:
     """PSI should short-circuit to 0.0 when the reference array has no variance."""
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
@@ -535,7 +619,7 @@ def test_calculate_psi_handles_unexpected_exception(
 
     monkeypatch.setattr(drift_module.np, "percentile", boom)
     with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
-        psi = calc._calculate_psi(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+        psi = calc._calculate_psi(np.arange(20.0), np.arange(20.0))
     assert psi == 0.0
     assert "PSI computation failed" in caplog.text
     assert "RuntimeError: boom" in caplog.text
@@ -557,7 +641,7 @@ def test_calculate_kl_handles_unexpected_exception(
 
     monkeypatch.setattr(drift_module.np, "percentile", boom)
     with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
-        kl = calc._calculate_kl(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+        kl = calc._calculate_kl(np.arange(20.0), np.arange(20.0))
     assert kl == 0.0
     assert "KL divergence computation failed" in caplog.text
     assert "RuntimeError: boom" in caplog.text

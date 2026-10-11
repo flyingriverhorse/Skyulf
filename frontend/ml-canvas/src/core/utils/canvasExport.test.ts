@@ -33,8 +33,8 @@ it.each([exportCanvasToPng, exportCanvasToSvg])('returns null without a complete
 });
 
 it.each([
-  [exportCanvasToPng, toPng, 'skyulf-canvas.png', 'data:image/png;base64,test'],
-  [exportCanvasToSvg, toSvg, 'skyulf-canvas.svg', 'data:image/svg+xml;base64,test'],
+  [exportCanvasToPng, toPng, 'kayra-canvas.png', 'data:image/png;base64,test'],
+  [exportCanvasToSvg, toSvg, 'kayra-canvas.svg', 'data:image/svg+xml;base64,test'],
 ] as const)('fits, filters and restores the viewport while downloading with default options', async (exportCanvas, render, filename, url) => {
   // Export needs stable geometry and cleanup while preserving the download contract.
   const viewport = mountCanvas();

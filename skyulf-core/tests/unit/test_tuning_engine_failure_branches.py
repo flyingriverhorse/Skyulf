@@ -93,6 +93,7 @@ class TestParamHelpers:
         assert stripped == {"C": 1.0, "n_estimators": 10, "plain": 3}
 
     def test_collect_trials_from_cv_results(self):
+        """Legacy search results retain scores and expose absent fold coverage explicitly."""
         searcher = SimpleNamespace(
             cv_results_={
                 "params": [{"C": 1}, {"C": 2}],
@@ -101,8 +102,8 @@ class TestParamHelpers:
         )
         trials = TuningCalculator._collect_trials(searcher, TuningConfig(strategy="grid"))
         assert trials == [
-            {"params": {"C": 1}, "score": 0.8},
-            {"params": {"C": 2}, "score": 0.9},
+            {"params": {"C": 1}, "score": 0.8, "evaluation_coverage": []},
+            {"params": {"C": 2}, "score": 0.9, "evaluation_coverage": []},
         ]
 
     def test_collect_trials_without_results_is_empty(self):

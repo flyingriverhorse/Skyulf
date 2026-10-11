@@ -7,10 +7,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ....inference.local_pipeline import LocalPipelineArtifact, load_local_pipeline
-from ....inference.local_scoring import scoring_output_schema
+from ....inference.fitted_pipeline import FittedPipelineArtifact, load_pipeline
 from ....inference.model_set import ModelSetArtifact, load_model_set
 from ....inference.model_set_scoring import model_set_output_schema
+from ....inference.pipeline_scoring import scoring_output_schema
 from ...mlflow.registration.registry import (
     ResolvedModel,
     download_registered_package,
@@ -28,10 +28,10 @@ from .contracts import PinnedEndpointPlan, PinnedEndpointSpec
 
 
 def _artifact_schema(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> tuple[list[tuple[str, str]], tuple[Any, ...]]:
     """Read exact saved input and output fields from a fitted artifact."""
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         return (
             list(zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)),
             tuple(scoring_output_schema(artifact)),
@@ -47,7 +47,7 @@ def _artifact_schema(
 def _validate_identity(
     spec: PinnedEndpointSpec,
     resolved: ResolvedModel,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     metadata: Mapping[str, Any],
     certificate: dict[str, Any],
 ) -> None:
@@ -58,7 +58,7 @@ def _validate_identity(
         resolved.model_uri,
     ) != (spec.model_name, spec.model_version, spec.model_uri):
         raise ValueError("resolved registry model differs from the endpoint selector.")
-    local = isinstance(artifact, LocalPipelineArtifact)
+    local = isinstance(artifact, FittedPipelineArtifact)
     digest_key = "pipeline_sha256" if local else "model_set_sha256"
     metadata_key = "local_pipeline_digest" if local else "model_set_digest"
     digest = certificate[digest_key]
@@ -113,7 +113,7 @@ def build_pinned_endpoint(
     spec: PinnedEndpointSpec,
     *,
     resolved: ResolvedModel,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     package_info: Any,
 ) -> PinnedEndpointPlan:
     """Build a credential-free config from one inspected concrete registry package.
@@ -146,6 +146,7 @@ def build_pinned_endpoint(
     }
     if spec.logging_mode == "telemetry":
         config["telemetry_config"] = {
+            # Native CREATE requires all sinks; inference-only GET retains just logs.
             "table_names": {
                 "logs_table": spec.telemetry_logs_table,
                 "traces_table": spec.telemetry_traces_table,
@@ -164,7 +165,13 @@ def build_pinned_endpoint(
             },
             "usage_tracking_config": {"enabled": True},
         }
-    return PinnedEndpointPlan(spec, config, tuple(name for name, _ in inputs), tuple(inputs))
+    return PinnedEndpointPlan(
+        spec,
+        config,
+        tuple(name for name, _ in inputs),
+        tuple(inputs),
+        tuple((column.name, column.dtype) for column in outputs),
+    )
 
 
 def prepare_pinned_endpoint(
@@ -199,7 +206,7 @@ def prepare_pinned_endpoint(
     kind = metadata.get("skyulf_artifact_kind")
     if kind == "local_pipeline":
         artifact_path = packaged_artifact_path(package_path, package_info.flavors, kind)
-        artifact = load_local_pipeline(artifact_path)
+        artifact = load_pipeline(artifact_path)
     elif kind == "model_set":
         artifact_path = packaged_artifact_path(package_path, package_info.flavors, kind)
         artifact = load_model_set(artifact_path)
@@ -226,6 +233,9 @@ def _require_config(endpoint: Any, plan: PinnedEndpointPlan) -> None:
     entities = _field(_field(endpoint, "config"), "served_entities") or []
     if _field(endpoint, "name") != plan.spec.endpoint_name or len(entities) != 1:
         raise ValueError("Serving endpoint config differs from the pinned plan.")
+    identity = (_field(entities[0], "entity_name"), _field(entities[0], "entity_version"))
+    if identity != (plan.spec.model_name, plan.spec.model_version):
+        raise ValueError("Serving endpoint config differs from the pinned model selector.")
     for key, wanted in expected["config"]["served_entities"][0].items():
         if _value(_field(entities[0], key)) != wanted:
             raise ValueError("Serving endpoint config differs from the pinned plan.")
@@ -289,13 +299,13 @@ def require_pinned_endpoint_ready(client: Any, plan: PinnedEndpointPlan) -> Any:
 
 def _telemetry_request(client: Any, method: str, path: str, body: dict | None = None) -> Any:
     """Use the injected SDK transport without losing newer response fields."""
-    transport = _api_transport(client)
+    transport = api_transport(client)
     if body is None:
         return transport(method=method, path=path)
     return transport(method=method, path=path, body=body)
 
 
-def _api_transport(client: Any) -> Any:
+def api_transport(client: Any) -> Any:
     """Require the authenticated transport supplied by the caller's SDK client."""
     transport = getattr(getattr(client, "api_client", None), "do", None)
     if not callable(transport):
@@ -334,7 +344,7 @@ def query_named_records(
     """Send finite JSON named rows unchanged after exact schema and state checks."""
     from databricks.sdk.service import serving  # noqa: PLC0415
 
-    rows = _validated_rows(records, plan)
+    rows = validate_named_rows(records, plan)
     if client_request_id is not None and (
         not isinstance(client_request_id, str) or not client_request_id.strip()
     ):
@@ -347,7 +357,7 @@ def query_named_records(
     workspace_id = _field(getattr(client, "config", None), "workspace_id")
     if workspace_id:
         headers["X-Databricks-Workspace-Id"] = workspace_id
-    response = _api_transport(client)(
+    response = api_transport(client)(
         method="POST",
         path=f"/serving-endpoints/{plan.spec.endpoint_name}/invocations",
         body=body,
@@ -357,7 +367,7 @@ def query_named_records(
     return serving.QueryEndpointResponse.from_dict(response)
 
 
-def _validated_rows(
+def validate_named_rows(
     records: Sequence[Mapping[str, Any]], plan: PinnedEndpointPlan
 ) -> list[dict[str, Any]]:
     """Copy named rows after JSON and artifact-schema validation."""
@@ -366,12 +376,12 @@ def _validated_rows(
     ):
         raise ValueError("Serving dataframe_records columns differ from artifact inputs.")
     rows = [dict(row) for row in records]
-    _validate_json_rows(rows)
-    _validate_schema_rows(rows, plan.input_schema)
+    validate_json_rows(rows)
+    validate_schema_rows(rows, plan.input_schema)
     return rows
 
 
-def _validate_json_rows(rows: list[dict[str, Any]]) -> None:
+def validate_json_rows(rows: list[dict[str, Any]]) -> None:
     """Require finite JSON scalars before the SDK sees an inference request."""
     try:
         json.dumps(rows, allow_nan=False)
@@ -381,7 +391,7 @@ def _validate_json_rows(rows: list[dict[str, Any]]) -> None:
         raise ValueError("Serving dataframe_records require scalar values.")
 
 
-def _validate_schema_rows(
+def validate_schema_rows(
     rows: list[dict[str, Any]], input_schema: tuple[tuple[str, str], ...]
 ) -> None:
     """Check every named value against its saved artifact input type."""

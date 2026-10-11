@@ -11,8 +11,8 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting.local_retraining import LocalTrainingSpec
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting.candidate import TrainingSpec
 from skyulf.integrations.databricks.training.shared.training_parameters import (
     _parameter_value,
     log_training_parameters,
@@ -39,7 +39,7 @@ def fitted_parameters(tmp_path, request):
         {"x": range(24), "target": [i % 2 if classification else i * 2 for i in range(24)]}
     )
     native = pl.from_pandas(frame) if engine == "polars" else frame
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -47,7 +47,7 @@ def fitted_parameters(tmp_path, request):
         max_rows=50,
         max_bytes=100_000,
     )
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.test.source",
         version=1,
         record_key_columns=("id",),

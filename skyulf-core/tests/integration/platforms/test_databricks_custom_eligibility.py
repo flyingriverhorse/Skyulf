@@ -12,7 +12,7 @@ import pytest
 
 from skyulf.inference.project_code import load_project_module
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.training.fitting import local_retraining as training
+from skyulf.integrations.databricks.training.fitting import candidate as training
 from skyulf.registry import NodeRegistry
 
 SOURCE = """
@@ -92,7 +92,7 @@ def build_preprocessing():
 """
 
 
-def _spec(*, steps: tuple[dict[str, Any], ...] = (), **changes: Any) -> training.LocalTrainingSpec:
+def _spec(*, steps: tuple[dict[str, Any], ...] = (), **changes: Any) -> training.TrainingSpec:
     """Make model features distinct from eligibility and record identity fields."""
     values: dict[str, Any] = {
         "table": "workspace.test.labels",
@@ -105,7 +105,7 @@ def _spec(*, steps: tuple[dict[str, Any], ...] = (), **changes: Any) -> training
         "pre_split_steps": steps,
     }
     values.update(changes)
-    return training.LocalTrainingSpec(**values)
+    return training.TrainingSpec(**values)
 
 
 def _frame() -> pd.DataFrame:
@@ -368,15 +368,15 @@ def test_deduplicate_groups_on_prior_normalized_values(engine):
 def test_registered_custom_recipe_reloads_from_saved_source_in_fresh_process(tmp_path, monkeypatch):
     """Approval and score replay must work after project code changes on disk."""
     mlflow = pytest.importorskip("mlflow")
-    from skyulf.inference.local_pipeline import load_local_pipeline
-    from skyulf.integrations.databricks.lifecycle.local_approval import load_candidate_evidence
+    from skyulf.inference.fitted_pipeline import load_pipeline
+    from skyulf.integrations.databricks.lifecycle.approval import load_candidate_evidence
 
     monkeypatch.chdir(tmp_path)
     workflow = _project(tmp_path)
     spec = _spec(steps=tuple(workflow["pre_split_steps"]))
     monkeypatch.setattr(training, "read_training_snapshot", lambda spark, request: _frame())
     uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
-    candidate = training.train_local_candidate(
+    candidate = training.train_candidate(
         object(),
         spec,
         workflow["pipeline"],
@@ -390,7 +390,7 @@ def test_registered_custom_recipe_reloads_from_saved_source_in_fresh_process(tmp
         min_improvement=0.0,
         quality_threshold=100.0,
     )
-    artifact = load_local_pipeline(tmp_path / "artifact")
+    artifact = load_pipeline(tmp_path / "artifact")
     assert [step["transformer"] for step in artifact.pipeline.config["preprocessing"]] == [
         "ValueReplacement",
         "StandardScaler",
@@ -401,7 +401,7 @@ def test_registered_custom_recipe_reloads_from_saved_source_in_fresh_process(tmp
     )
     code = """
 import json, sys, mlflow, pandas as pd
-from skyulf.integrations.databricks.lifecycle.local_approval import load_candidate_evidence
+from skyulf.integrations.databricks.lifecycle.approval import load_candidate_evidence
 mlflow.set_tracking_uri(sys.argv[1])
 mlflow.set_registry_uri(sys.argv[1])
 client = mlflow.MlflowClient(tracking_uri=sys.argv[1], registry_uri=sys.argv[1])

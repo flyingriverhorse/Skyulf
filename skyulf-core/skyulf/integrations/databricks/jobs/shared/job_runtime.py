@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from ....mlflow.lifecycle.promotion import AliasChangeReceipt
-from ...lifecycle.local_approval import resolve_candidate_comparison_digest
-from ...lifecycle.local_workflow import BundleActionResult as BundleActionResult
-from ...lifecycle.local_workflow import (
+from ...lifecycle.approval import resolve_candidate_comparison_digest
+from ...lifecycle.workflow import BundleActionResult as BundleActionResult
+from ...lifecycle.workflow import (
     build_bundle_result,
     resolve_target_config,
     run_action,
@@ -205,7 +205,9 @@ def _role_action(task_role: str, parameters: dict[str, str]) -> str:
 
 def read_notebook_config(values: dict[str, str]) -> dict[str, Any]:
     """Load and bind the project once at the notebook's configuration boundary."""
-    config = json.loads(Path(values["config_path"]).read_text(encoding="utf-8"))
+    from ...projects.yaml_config import read_workflow_config  # noqa: PLC0415
+
+    config = read_workflow_config(values["config_path"])
     required = {"training_table", "score_source_table", "prediction_table", "model_name"}
     if not isinstance(config, dict) or any(
         not isinstance(config.get(key), str) for key in required

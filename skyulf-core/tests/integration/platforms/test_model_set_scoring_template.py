@@ -10,7 +10,9 @@ TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/
 
 def test_shared_scoring_exports_both_rule_stages_without_active_business_examples():
     """Consolidation must preserve normal pre-split scoring and keep business rules opt-in."""
-    module = load_project_module(project_source(TEMPLATE / "src/features"))
+    module = load_project_module(
+        project_source(TEMPLATE / "src/features", exclude_feature_groups=True)
+    )
     assert module.build_scoring() == {"reuse_pre_split": True, "skip_target_steps": False}
     assert module.build_combined_rules() == []
     assert module.build_model_rules() == module.build_scoring()
@@ -21,7 +23,9 @@ def test_profit_callback_preserves_negative_margins():
     """The sample business rule must subtract costs and retain loss-making results."""
     import pandas as pd
 
-    module = load_project_module(project_source(TEMPLATE / "src/features"))
+    module = load_project_module(
+        project_source(TEMPLATE / "src/features", exclude_feature_groups=True)
+    )
     inputs = pd.DataFrame({"id": [1, 2]}, index=[8, 3])
     predictions = pd.DataFrame(
         {"revenue__prediction": [100.0, 80.0], "cost__prediction": [60.0, 90.0]}, index=inputs.index

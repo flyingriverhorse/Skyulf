@@ -1,0 +1,30 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# Competition shares its pre-split recipe. Scoring can reuse the saved filters.
+# Custom factories live in src/features/pre_split.py. Examples are inactive until selected.
+version: 1
+recipes:
+  default: []
+  none: []
+  example_complete_inputs:
+    - custom: pre_split.minimum_completeness
+      params: {columns: [feature_value, category], min_present: 1}
+  example_all:
+    - custom: pre_split.minimum_completeness
+      params: {columns: [feature_value, category], min_present: 1}
+    - custom: pre_split.value_range
+      params: {column: feature_value, minimum: 0, maximum: 1000000}
+
+# Examples to add to a selected list; use your actual column names:
+# - name: known_target
+#   transformer: DropMissingRows
+#   params: {subset: [target], how: any}
+# - custom: pre_split.minimum_completeness
+#   params: {columns: [field_a, field_b, field_c], min_present: 2}
+# - custom: pre_split.value_range
+#   params: {column: age, minimum: 0, maximum: 120}
+# - custom: pre_split.allowed_values
+#   params: {column: country, values: [NL, DE, BE]}
+# Asset example: enable Example 4 in src/features/pre_split.py first.
+# - custom: pre_split.allowed_countries
+# A target-reading filter requires SKIP_TARGET_PRE_SPLIT_STEPS=True in scoring.py.

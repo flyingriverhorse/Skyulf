@@ -144,6 +144,8 @@ class DecompositionMixin(_AnalyzerState):
         self, temp_df: pl.DataFrame, split_col: str, measure_col: str | None, measure_agg: str
     ) -> pl.DataFrame | None:
         """Aggregate with a separate label expression so source names remain available."""
+        if temp_df.schema[split_col] == pl.Duration:
+            return None
         # Time.cast(String) omits fractional seconds and would merge distinct buckets.
         labels = (
             pl.col(split_col).dt.to_string("%H:%M:%S%.f")

@@ -12,12 +12,15 @@ from ....inference.project_code import (
     project_source_digest,
 )
 from ....inference.project_scoring import validate_scoring_config
-from ..training.fitting.local_ensemble import ENSEMBLE_MODELS
+from ..training.fitting.ensemble import ENSEMBLE_MODELS
 from ..training.thresholds.decision_thresholds import threshold_policy
-from ..training.tuning.local_search import bounded_space
+from ..training.tuning.search import bounded_space
 from ..training.weights.weight_config import capture_model_weights, validate_weight_roles
-from ._project_files import modeling_hook, project_source, read_source
+from ._project_files import modeling_hook, read_source
 from ._project_recipes import bind_recipe_source, recipe_label, recipe_steps
+from .yaml_config import project_training_config
+from .yaml_models import model_entries, single_model
+from .yaml_recipes import feature_project_source
 
 
 def strict_json_value(value: Any, filename: str = "ensemble.py") -> Any:
@@ -44,6 +47,9 @@ def _load_single_model(config: dict[str, Any], path: Path) -> dict[str, Any]:
     """Resolve editable model parameters once, keeping saved pipelines self-contained."""
     if config.get("training_layout", "single_model") != "single_model":
         return config
+    yaml = project_training_config(path)
+    if yaml is not None:
+        return single_model(yaml, config)
     hook = modeling_hook(path, "single_model.py")
     if not hook.is_file():
         return config
@@ -149,7 +155,7 @@ def load_project_workflow(
     pre_split_recipe: str | None = None,
     weight_settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Use Python-defined steps for training/preview and capture their exact source.
+    """Resolve YAML or Python phase recipes and capture their exact source for replay.
 
     Score and lifecycle approval load the saved artifact instead of this file.
     A nonempty JSON chain is rejected rather than silently overwritten.
@@ -172,10 +178,16 @@ def load_project_workflow(
     config = {**deepcopy(config), **deepcopy(weight_settings or {})}
     config = _load_single_model(config, Path(path))
     validate_weight_roles(config)
+    if config.get("training_layout", "single_model") == "single_model":
+        declarations = project_training_config(Path(path))
+        if declarations is not None:
+            entry = next(iter(model_entries(declarations).values()))
+            preprocessing_recipe = entry.get("preprocessing_recipe", preprocessing_recipe)
+            pre_split_recipe = entry.get("pre_split_recipe", pre_split_recipe)
     return resolve_project_workflow(
         config,
         path,
-        project_source(Path(path)),
+        feature_project_source(Path(path)),
         preprocessing_recipe=preprocessing_recipe,
         pre_split_recipe=pre_split_recipe,
     )
@@ -184,9 +196,15 @@ def load_project_workflow(
 def validate_project_steps(config: dict[str, Any]) -> None:
     """Reject JSON step chains before reading source that would replace them."""
     if config.get("pipeline", {}).get("preprocessing"):
-        raise ValueError("Configure preprocessing in the Python file; leave the JSON list empty.")
+        raise ValueError(
+            "Configure preprocessing in config/preprocessing.yml or the Python file; "
+            "leave the JSON list empty."
+        )
     if config.get("pre_split_steps"):
-        raise ValueError("Configure pre_split_steps in the Python file; leave the JSON list empty.")
+        raise ValueError(
+            "Configure pre_split_steps in config/pre_split.yml or the Python file; "
+            "leave the JSON list empty."
+        )
 
 
 def resolve_project_workflow(

@@ -15,14 +15,19 @@ from typing import Any
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import CountVectorizerArtifact
+from .._fitted_validation import local_boolean
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import (
     _join_text_columns,
     _sklearn_vectorizer_apply_pandas,
     _sklearn_vectorizer_apply_polars,
+    _validate_local_vectorizer,
+    _validate_vectorizer_vocabulary,
+    _vectorizer_uses_callbacks,
     _warn_large_output,
     apply_text_dual_engine,
     resolve_fit_text_columns,
@@ -54,6 +59,29 @@ class CountVectorizerApplier(BaseApplier):
     into sklearn, and it falls back to a full pandas round-trip when a text
     column is not String dtype.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved vocabulary and binary settings without fitting or transforming."""
+        vectorizer = _validate_local_vectorizer(
+            raw, "count_vectorizer", CountVectorizer, {"vocabulary", "max_features", "binary"}
+        )
+        if vectorizer is not None:
+            _validate_vectorizer_vocabulary(raw, vectorizer)
+            local_boolean(raw["binary"], "binary")
+            if raw["binary"] != vectorizer.binary:
+                raise ValueError("Fitted binary setting disagrees with the saved vectorizer.")
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fixed per-document counts without promising callback or memory safety."""
+        if engine not in ("pandas", "polars"):
+            return None
+        CountVectorizerApplier.validate_inference_state(state)
+        if state and _vectorizer_uses_callbacks(state["vectorizer_object"]):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

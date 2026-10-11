@@ -111,6 +111,73 @@ def test_cast_int_integer_strings() -> None:
     assert result.dtype in (np.int64, pd.Int64Dtype())
 
 
+@pytest.mark.parametrize("target", ["Int32", "Int64", "UInt64", pd.Int64Dtype(), pd.UInt64Dtype()])
+@pytest.mark.parametrize("config_style", ["column_types", "target_type"])
+def test_explicit_nullable_integer_target_survives_fit_schema_and_empty(target, config_style):
+    """An explicit nullable request must keep the same container without batch-dependent nulls."""
+    from skyulf.core.schema import SkyulfSchema
+
+    frame = pd.DataFrame({"x": ["1", None, "2"]}, index=[8, 3, 3])
+    config = (
+        {"column_types": {"x": target}}
+        if config_style == "column_types"
+        else {"columns": ["x"], "target_type": target}
+    )
+    calculator = CastingCalculator()
+    artifact = calculator.fit(frame, config)
+    schema = calculator.infer_output_schema(SkyulfSchema.from_columns(["x"]), config)
+    assert artifact["type_map"]["x"] == target
+    assert schema.dtypes["x"] == str(target)
+    expected = pd.DataFrame({"x": pd.array([1, None, 2], dtype=target)}, index=frame.index)
+    for positions in (slice(None), slice(0, 1), slice(0, 0)):
+        result = CastingApplier().apply(frame.iloc[positions], artifact)
+        pd.testing.assert_frame_equal(result, expected.iloc[positions])
+
+
+@pytest.mark.parametrize(
+    "source,target,expected",
+    [
+        (pd.Series([str(2**53 + 1), "bad"]), "int64", [2**53 + 1, None]),
+        (pd.Series([2**53 + 1, None], dtype=object), "int64", [2**53 + 1, None]),
+        (pd.Series([str(2**64 - 1), "bad"]), "uint64", [2**64 - 1, None]),
+        (pd.Series([2**53 + 1, 2**64 - 1], dtype="uint64"), "int64", [2**53 + 1, None]),
+        (pd.Series([-1, 2**53 + 1], dtype="int64"), "uint64", [None, 2**53 + 1]),
+    ],
+)
+def test_integer_cast_preserves_large_values_beside_missing_or_out_of_range(
+    source, target, expected
+):
+    """Null coercion must not round valid integer observations through an intermediate float."""
+    before = source.copy(deep=True)
+    output = _cast_int(source, "x", target, True)
+    nullable = "UInt64" if target == "uint64" else "Int64"
+    pd.testing.assert_series_equal(output, pd.Series(expected, dtype=nullable))
+    pd.testing.assert_series_equal(source, before)
+
+
+@pytest.mark.parametrize(
+    "values,dtype,target,expected",
+    [
+        ([1, 1.5, np.nan], "float32", "int16", [1, None, None]),
+        ([np.nan, np.nan], "float64", "int32", [None, None]),
+    ],
+)
+def test_integer_cast_preserves_native_float_null_masks(values, dtype, target, expected):
+    """Native nullable parsing must not turn existing floating NaNs into integer sentinels."""
+    output = _cast_int(pd.Series(values, dtype=dtype), "x", target, True)
+    pd.testing.assert_series_equal(output, pd.Series(expected, dtype=target.capitalize()))
+
+
+def test_integer_cast_retains_near_integer_best_effort_fallback():
+    """The repair must retain native safe-cast failure after fractional values are masked."""
+    frame = pd.DataFrame({"x": [1.0000000001, 1.1]})
+    with pytest.raises(TypeError, match="cannot safely cast"):
+        _cast_int(frame["x"].copy(), "x", "int32", True)
+    output = CastingApplier().apply(frame, {"type_map": {"x": "int32"}, "coerce_on_error": True})
+    pd.testing.assert_frame_equal(output, pd.DataFrame({"x": [1.0000000001, np.nan]}))
+    assert frame["x"].to_list() == [1.0000000001, 1.1]
+
+
 def test_cast_int_fractional_coerced_to_nan() -> None:
     """Fractional floats with coerce_on_error=True must be NaN-padded to Int64."""
     s = pd.Series([1.0, 2.7, 3.0])
@@ -465,6 +532,24 @@ def test_infer_output_schema_target_type_with_columns() -> None:
     result = CastingCalculator().infer_output_schema(schema, config)
     assert result.dtypes["x"] == "float64"
     assert result.dtypes["y"] == "float64"
+
+
+@pytest.mark.parametrize("target", ["float64", "Int64"])
+def test_casting_preview_uses_the_same_config_precedence_as_fit(target):
+    """The shared target_type must override a per-column type in both preview and execution."""
+    from skyulf.core.schema import SkyulfSchema
+
+    frame = pd.DataFrame({"x": [1, 2], "keep": [3, 4]})
+    config = {
+        "column_types": {"x": "string", "missing": "float"},
+        "columns": ["x"],
+        "target_type": target,
+    }
+    calculator = CastingCalculator()
+    state = calculator.fit(frame, config)
+    schema = calculator.infer_output_schema(SkyulfSchema.from_dataframe(frame), config)
+    assert schema == SkyulfSchema.from_dataframe(CastingApplier().apply(frame, state))
+    assert config["column_types"] == {"x": "string", "missing": "float"}
 
 
 def test_infer_output_schema_empty_config_returns_same_schema() -> None:

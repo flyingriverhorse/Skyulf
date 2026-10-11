@@ -591,6 +591,11 @@ def test_applied_output_parity_pandas_vs_polars(node_id: str) -> None:
     pl_x, pl_y, pl_error = _fit_and_apply(node_id, X_pl, y_pl, config)
     assert not pd_error, f"{node_id}: pandas {pd_error}"
     assert not pl_error, f"{node_id}: polars {pl_error}"
+    if node_id in {"GeneralBinning", "KBinsDiscretizer"}:
+        assert pl_x.schema["num_a_binned"] == pl.Int64
+        # Default to_pandas widens nullable integers; preserve the native codes.
+        bins = pd.Series(pl_x["num_a_binned"].to_list(), dtype="Int64")
+        pl_x = pl_x.to_pandas().assign(num_a_binned=bins)
     _assert_applied_outputs_equal(pd_x, pl_x, pd_y, pl_y, node_id)
 
 

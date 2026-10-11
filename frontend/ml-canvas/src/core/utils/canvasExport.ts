@@ -113,7 +113,7 @@ const baseOptions = {
 };
 
 export async function exportCanvasToPng(
-  filename = 'skyulf-canvas.png',
+  filename = 'kayra-canvas.png',
 ): Promise<string | null> {
   const pair = findCanvasAndViewport();
   if (!pair) return null;
@@ -136,7 +136,7 @@ export async function exportCanvasToPng(
 }
 
 export async function exportCanvasToSvg(
-  filename = 'skyulf-canvas.svg',
+  filename = 'kayra-canvas.svg',
 ): Promise<string | null> {
   const pair = findCanvasAndViewport();
   if (!pair) return null;

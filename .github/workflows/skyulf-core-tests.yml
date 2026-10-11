@@ -24,6 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12"]
+        shard: [0, 1, 2, 3]
+    env:
+      COVERAGE_FILE: .coverage.shard-${{ matrix.shard }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -51,36 +54,52 @@ jobs:
           echo "::endgroup::"
           echo "## 🧪 skyulf-core test suite" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Complexity report (lizard, CCN > 8)
-        run: |
-          echo "::group::Full-tree lizard report (CCN > 8, non-blocking)"
-          lizard skyulf-core/skyulf --CCN 8 -w || true
-          echo "::endgroup::"
-
-      - name: Complexity gate (lizard, CCN 10)
-        run: |
-          bash .github/scripts/run_check.sh "Lizard complexity gate (skyulf-core, CCN 10)" \
-            lizard skyulf-core/skyulf --CCN 10 -w
-
       - name: Run skyulf-core tests
-        # --cov=skyulf-core/skyulf scopes coverage to the package itself, so
-        # the ratchet floor can be enforced directly here without a separate
-        # "re-run and clobber coverage.xml" step (see git history for the CI
-        # bug that pattern used to cause when both suites shared one job).
-        # No -s: keeps captured stdout/print output out of the log for
-        # passing tests (still shown automatically for any failure).
-        # Report all failures in one run.
-        # Floor is 90 against a measured 96% (CI run 34032836551). The 45 it
-        # replaces was 51 points below the suite's actual coverage, so it could
-        # never fail and was not a ratchet at all. 90 keeps enough headroom for
-        # optional-extras variance between runners while still failing loudly
-        # if a whole subsystem loses its tests.
+        # Collect the complete suite normally, then assign whole files to four
+        # stable shards. The coverage job enforces the unchanged 90% floor only
+        # after every base shard and native runtime lane passes and combines.
         run: |
-          bash .github/scripts/run_check.sh "pytest skyulf-core/tests (coverage ≥ 90%)" \
-            pytest skyulf-core/tests -q --disable-warnings \
-              --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
-              --cov-report=xml:coverage-core.xml --cov-fail-under=90
+          bash .github/scripts/run_check.sh "pytest skyulf-core/tests shard ${{ matrix.shard }}/4" \
+            python .github/scripts/run_core_shard.py \
+              --shard-index "${{ matrix.shard }}" --shard-count 4 \
+              skyulf-core/tests -q --disable-warnings \
+              --cov=skyulf-core/skyulf --cov-branch --cov-report=
 
+      - name: Upload shard coverage data
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-core-shard-${{ matrix.shard }}
+          path: .coverage.shard-${{ matrix.shard }}
+          include-hidden-files: true
+          if-no-files-found: error
+
+  runtime-tests:
+    name: Native Spark and Delta tests
+    uses: ./.github/workflows/spark-tests.yml
+
+  coverage:
+    name: skyulf-core combined coverage
+    needs: [test, runtime-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Install dependencies (uv)
+        run: uv pip install --system -q -r requirements-ci.txt
+      - name: Download all shard coverage data
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-core-shard-*
+          merge-multiple: true
+      - name: Combine complete Core coverage and enforce the floor
+        run: |
+          bash .github/scripts/run_check.sh "Core combined branch coverage >= 90%" \
+            python .github/scripts/combine_core_coverage.py
       - name: Share Core coverage with SonarQube
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
@@ -88,18 +107,6 @@ jobs:
           name: coverage-core
           path: coverage-core.xml
           if-no-files-found: error
-
-      - name: Build and verify distributable wheel
-        run: |
-          echo "::group::Build skyulf-core wheel"
-          uv pip install --system build
-          rm -rf skyulf-core/dist
-          python -m build --outdir skyulf-core/dist skyulf-core
-          echo "::endgroup::"
-          bash .github/scripts/run_check.sh "isolated skyulf-core wheel install" \
-            python .github/scripts/verify_skyulf_core_distribution.py \
-              skyulf-core/dist/*.whl
-
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
@@ -107,6 +114,37 @@ jobs:
           flags: skyulf-core
           files: coverage-core.xml
           disable_search: true
+
+  package:
+    name: skyulf-core package and complexity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Install dependencies (uv)
+        run: uv pip install --system -q -r requirements-ci.txt
+      - name: Complexity report (lizard, CCN > 8)
+        run: |
+          echo "::group::Full-tree lizard report (CCN > 8, non-blocking)"
+          lizard skyulf-core/skyulf --CCN 8 -w || true
+          echo "::endgroup::"
+      - name: Complexity gate (lizard, CCN 10)
+        run: |
+          bash .github/scripts/run_check.sh "Lizard complexity gate (skyulf-core, CCN 10)" \
+            lizard skyulf-core/skyulf --CCN 10 -w
+      - name: Build and verify distributable wheel
+        run: |
+          echo "::group::Build skyulf-core wheel"
+          uv pip install --system build
+          python -m build --outdir skyulf-core/dist skyulf-core
+          echo "::endgroup::"
+          bash .github/scripts/run_check.sh "isolated skyulf-core wheel install" \
+            python .github/scripts/verify_skyulf_core_distribution.py \
+              skyulf-core/dist/*.whl
 
   skyulf-core-docker-smoke:
     name: Docker test image smoke test (skyulf-core standalone)

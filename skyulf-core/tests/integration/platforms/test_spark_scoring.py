@@ -5,14 +5,14 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
 
 import pytest
-from tests.integration.platforms.test_local_cdf_recovery import recovery_case as recovery_case
+from tests.integration.platforms.test_frame_cdf_recovery import recovery_case as recovery_case
 
-from skyulf.integrations.databricks.scoring.local_sdk import LocalWorkflowConfig
+from skyulf.integrations.databricks.scoring.workflow import WorkflowConfig
 
 
 def _config(**overrides):
     """Retain local training budgets independently of distributed inference."""
-    return LocalWorkflowConfig.model_validate(
+    return WorkflowConfig.model_validate(
         {
             "runtime": "databricks",
             "engine": "pandas",
@@ -73,7 +73,7 @@ def test_prediction_batch_limit_does_not_mutate_restricted_spark_settings(monkey
     "overrides",
     [
         {"engine": "polars"},
-        {"runtime": "local"},
+        {"runtime": "standalone"},
         {"spark_udf_env_manager": "conda"},
         {"spark_udf_prediction_batch_rows": 0},
         {"spark_udf_prediction_batch_rows": True},
@@ -104,9 +104,9 @@ def test_prepared_spark_predict_rejects_driver_execution():
     """Even a direct call to the prepared local API cannot silently ignore Spark mode."""
     import pandas as pd
 
-    from skyulf.integrations.databricks.scoring.local_sdk import PreparedLocalWorkflow
+    from skyulf.integrations.databricks.scoring.workflow import PreparedWorkflow
 
-    prepared = PreparedLocalWorkflow(_config(inference_mode="spark"), Mock(), Mock())
+    prepared = PreparedWorkflow(_config(inference_mode="spark"), Mock(), Mock())
     with pytest.raises(ValueError, match="distributed"):
         prepared.predict(pd.DataFrame({"x": [1.0]}))
 
@@ -147,21 +147,21 @@ def test_distributed_keys_reject_null_or_duplicate_population(monkeypatch, null_
 
 def test_unsupported_spark_model_fails_before_source_or_target(monkeypatch):
     """Even target provisioning must wait until partition safety is proven."""
-    from skyulf.integrations.databricks.lifecycle import local_workflow
+    from skyulf.integrations.databricks.lifecycle import workflow
     from skyulf.integrations.databricks.scoring.batch import spark_scoring
 
     prepared = SimpleNamespace(config=_config(inference_mode="spark"))
-    monkeypatch.setattr(local_workflow, "prepare_local_workflow", lambda config: prepared)
-    monkeypatch.setattr(local_workflow, "_scoring_config", lambda config: prepared.config)
-    monkeypatch.setattr(local_workflow, "scoring_target", lambda config: "db.target")
+    monkeypatch.setattr(workflow, "prepare_workflow", lambda config: prepared)
+    monkeypatch.setattr(workflow, "_scoring_config", lambda config: prepared.config)
+    monkeypatch.setattr(workflow, "scoring_target", lambda config: "db.target")
     monkeypatch.setattr(
         spark_scoring, "validate_prepared_spark", Mock(side_effect=ValueError("unsafe step"))
     )
     provision = Mock()
-    monkeypatch.setattr(local_workflow, "provision_prediction_table", provision)
+    monkeypatch.setattr(workflow, "provision_prediction_table", provision)
     spark = Mock()
     with pytest.raises(ValueError, match="unsafe step"):
-        local_workflow._run_scoring_action(
+        workflow._run_scoring_action(
             spark,
             {
                 "model_name": "db.model",
@@ -180,10 +180,10 @@ def test_unsupported_spark_model_fails_before_source_or_target(monkeypatch):
 @pytest.fixture
 def distributed_case(recovery_case, monkeypatch):
     """Exercise existing Delta/CDF lifecycle with driver materialization forbidden."""
-    from tests.integration.platforms.test_local_cdf_recovery import Frame
+    from tests.integration.platforms.test_frame_cdf_recovery import Frame
 
     from skyulf.integrations.databricks.scoring.batch.spark_scoring import DistributedRows
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = recovery_case
     config = store.prepared.config
@@ -220,7 +220,7 @@ def distributed_case(recovery_case, monkeypatch):
 
 def test_distributed_recovery_commits_pinned_snapshot_and_noop_replay(distributed_case):
     """Spark recovery must retain overwrite receipts, model pins and replay idempotence."""
-    from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
+    from tests.integration.platforms.test_frame_cdf_recovery import recover, recovery_request
 
     store = distributed_case
     request = recovery_request(store)
@@ -238,9 +238,9 @@ def test_distributed_recovery_commits_pinned_snapshot_and_noop_replay(distribute
 
 def test_distributed_worker_failure_keeps_previous_receipt(distributed_case, monkeypatch):
     """A failing UDF cannot publish a partial population or advance its watermark."""
-    from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
+    from tests.integration.platforms.test_frame_cdf_recovery import recover, recovery_request
 
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = distributed_case
     request = recovery_request(store)
@@ -255,10 +255,10 @@ def test_distributed_worker_failure_keeps_previous_receipt(distributed_case, mon
 
 def test_distributed_concurrent_target_change_prevents_write(distributed_case, monkeypatch):
     """The same commit guard must cover target changes during distributed execution."""
-    from tests.integration.platforms.test_local_cdf_recovery import recover, recovery_request
+    from tests.integration.platforms.test_frame_cdf_recovery import recover, recovery_request
 
     from skyulf.integrations.databricks.data.admission import BatchConflictError
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental as batch
+    from skyulf.integrations.databricks.scoring.incremental import incremental_batch as batch
 
     store = distributed_case
     request = recovery_request(store)

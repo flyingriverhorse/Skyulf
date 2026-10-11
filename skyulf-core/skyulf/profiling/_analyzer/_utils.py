@@ -65,7 +65,7 @@ def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count:
         return _integer_semantic_bucket(n_unique, count)
     if dtype == pl.Boolean:
         return "Boolean"
-    if dtype in (pl.Date, pl.Datetime, pl.Duration):
+    if dtype in (pl.Date, pl.Datetime):
         return "DateTime"
     if dtype in (pl.Utf8, pl.String):
         return _string_semantic_bucket(n_unique, count, null_count)

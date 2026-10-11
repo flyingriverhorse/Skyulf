@@ -71,7 +71,8 @@ async def test_download_is_a_compilable_notebook(export_app, mode):
         response = await client.post(f"/pipeline/probe/export-notebook?mode={mode}", json=config)
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/x-ipynb+json"
-    assert ".ipynb" in response.headers["content-disposition"]
+    assert 'filename="kayra_pipeline_' in response.headers["content-disposition"]
+    assert response.headers["content-disposition"].endswith(f'_{mode}.ipynb"')
     notebook = response.json()
     assert all("id" in cell for cell in notebook["cells"])
     assert len({cell["id"] for cell in notebook["cells"]}) == len(notebook["cells"])

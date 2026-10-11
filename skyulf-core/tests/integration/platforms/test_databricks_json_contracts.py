@@ -11,7 +11,7 @@ import pytest
         ("shared.json_contracts", "finite_json_digest"),
         ("observability.monitoring.monitoring_config", "json_digest"),
         ("observability.monitoring.performance.performance_policy", "_digest"),
-        ("training.shared.local_training_evidence", "evidence_digest"),
+        ("training.shared.training_evidence", "evidence_digest"),
     ]
 )
 def digest(request):

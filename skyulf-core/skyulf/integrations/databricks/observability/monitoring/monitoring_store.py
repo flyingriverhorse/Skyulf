@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from ...shared._contracts import table_name
 from .monitoring_config import MonitorConfig, json_digest, qualified_name, store_namespace
+from .monitoring_details import investigation_views, observation_identity
 
 OWNER = "skyulf.monitoring.v1"
 PROPERTY = "skyulf.monitoring.owner"
@@ -69,7 +70,7 @@ def result_row(
         "as_of": as_of.isoformat(),
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
-        "evidence": evidence,
+        "evidence": observation_identity(evidence),
     }
     catalog, schema, _ = config.model_name.split(".")
     return {
@@ -131,6 +132,8 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
         "metric_history",
         "performance_actions",
         "performance_history",
+        "monitoring_issues",
+        "model_version_details",
     )
     for name in names:
         ensure_owned_object(spark, f"{namespace}.{name}")
@@ -280,6 +283,7 @@ def monitoring_views(namespace: str) -> dict[str, str]:
         "current_health": current,
         "metric_history": metrics,
         "performance_history": performance_history_query(namespace),
+        **investigation_views(namespace),
     }
 
 
@@ -294,7 +298,7 @@ def enroll_monitor(
     """Upsert one producer's enrollment without creating or replacing central objects."""
     row = inventory_row(config, datetime.now(UTC))
     if activation_started_ms is not None:
-        _validate_activation_order(activation_started_ms)
+        validate_activation_order(activation_started_ms)
         row["config_json"] = _json(
             config.payload() | {"_activation_started_ms": activation_started_ms}
         )
@@ -340,7 +344,7 @@ def _inventory_config(row: Any) -> MonitorConfig:
     """Reject inconsistent controls so the runner and dashboard cannot disagree."""
     payload = json.loads(row["config_json"])
     if "_activation_started_ms" in payload:
-        _validate_activation_order(payload.pop("_activation_started_ms"))
+        validate_activation_order(payload.pop("_activation_started_ms"))
     config = MonitorConfig.from_dict(payload)
     expected = inventory_row(config, datetime.now(UTC))
     checked = set(expected) - {"updated_at", "config_json"}
@@ -349,7 +353,7 @@ def _inventory_config(row: Any) -> MonitorConfig:
     return config
 
 
-def _validate_activation_order(value: Any) -> None:
+def validate_activation_order(value: Any) -> None:
     """Accept only the original lifecycle run's positive MLflow start timestamp."""
     if type(value) is not int or value <= 0:
         raise ValueError("Activation order must be a positive lifecycle start timestamp.")

@@ -3,8 +3,8 @@
 from datetime import datetime
 from typing import Any
 
-from ..local.monitoring_performance import observe_performance_safely
 from ..monitoring_config import MonitorConfig
+from ..monitoring_performance import observe_performance_safely
 from ..monitoring_store import persist_report, result_row
 from ..performance.performance_policy import completed_performance_window
 from .spark_monitoring_reference import load_spark_monitoring_reference

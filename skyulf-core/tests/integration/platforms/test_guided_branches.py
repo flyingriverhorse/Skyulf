@@ -101,11 +101,13 @@ def _generate(tmp_path, **overrides):
 
 
 def _factory(project):
-    """Load generated Python exactly as the source-based branch runtime does."""
-    from skyulf.inference.project_code import load_project_module
+    """Load generated YAML through the same branch adapter as the notebook."""
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+    from skyulf.integrations.databricks.projects.yaml_models import training_branches
 
-    source = (project / "src/modeling/multi_model.py").read_text()
-    return load_project_module(source).build_training_branches
+    document = read_training_config(project / "config")
+    assert document is not None
+    return lambda: training_branches(document)[0]
 
 
 def _load_configs(project):
@@ -116,7 +118,7 @@ def _load_configs(project):
 
     return load_training_branch_configs(
         {
-            "config_path": str(project / "config/workflow.json"),
+            "config_path": str(project / "config/training.yml"),
             "catalog": "workspace",
             "input_schema": "inputs",
             "output_schema": "outputs",
@@ -132,7 +134,7 @@ def _load_configs(project):
 def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, count):
     """Initialized multi-target projects must contain every requested independent branch."""
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate(tmp_path, branch_count=count)
     factory = _factory(project)
@@ -143,7 +145,7 @@ def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, 
     configs = _load_configs(project)
     for name, config in configs.items():
         checked = validate_workflow_config(config, action="train")
-        LocalCVSpec.from_workflow(checked).validate_pipeline(
+        CVSpec.from_workflow(checked).validate_pipeline(
             checked["pipeline"], target_column=checked["target_column"]
         )
         assert checked["model_name"] == f"workspace.models.sm33_generated_{name}_dev"
@@ -153,7 +155,7 @@ def test_cli_branches_work_without_hand_edits_and_return_fresh_copies(tmp_path, 
 @pytest.mark.parametrize("strategy", ["grid", "random", "halving_grid", "halving_random", "optuna"])
 def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_path, strategy):
     """Changing one branch's tuning must preserve its sibling's model, space and recipe."""
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     project = _generate(
         tmp_path,
@@ -185,7 +187,7 @@ def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_pa
     )
     configs = _load_configs(project)
     for config in configs.values():
-        LocalCVSpec.from_workflow(config).validate_pipeline(
+        CVSpec.from_workflow(config).validate_pipeline(
             config["pipeline"], target_column=config["target_column"]
         )
     revenue, churn = configs["revenue"], configs["churn"]
@@ -211,7 +213,7 @@ def test_cli_mixed_branches_keep_independent_search_and_ensemble_settings(tmp_pa
 def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
     """Ordinary siblings must not inherit a nested branch's group or temporal metadata."""
     from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
-    from skyulf.integrations.databricks.training.tuning.local_cv import LocalCVSpec
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
 
     settings = {"branch_1_cv_group_column": "customer"} if policy == "group_k_fold" else {}
     if policy == "time_series_split":
@@ -224,22 +226,19 @@ def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
         branch_1_cv_inner_folds="2",
         **settings,
     )
-    config_path = project / "config/workflow.json"
-    base = json.loads(config_path.read_text())
-    base.update(cv_group_column="inherited_group", cv_inner_folds=9, event_column="old_event")
-    config_path.write_text(json.dumps(base))
     configs = _load_configs(project)
     for config in configs.values():
         checked = validate_workflow_config(config, action="train")
-        LocalCVSpec.from_workflow(checked).validate_pipeline(
+        CVSpec.from_workflow(checked).validate_pipeline(
             checked["pipeline"],
             target_column=checked["target_column"],
-            event_column=checked["event_column"],
+            event_column=checked.get("event_column"),
         )
     left, right = configs["branch_1"], configs["branch_2"]
     assert left["cv_inner_folds"] == 2 and left["cv_nested_type"] == policy
-    assert right["cv_inner_folds"] is None and right["cv_nested_type"] == "auto"
-    assert right["cv_group_column"] is None and right["event_column"] is None
+    assert CVSpec.from_workflow(right).inner_folds is None
+    assert CVSpec.from_workflow(right).nested_type == "auto"
+    assert right.get("cv_group_column") is None and right.get("event_column") is None
     if policy == "time_series_split":
         assert left["split_strategy"] == "temporal" and left["cv_shuffle"] is False
         assert left["training_window_mode"] == "rolling_calendar"
@@ -249,5 +248,5 @@ def test_cli_nested_branch_cv_clears_inherited_policy(tmp_path, policy):
 def test_cli_duplicate_branch_names_fail_before_silent_overwrite(tmp_path):
     """Two equal names must fail instead of silently dropping a requested target."""
     project = _generate(tmp_path, branch_1_name="duplicate", branch_2_name="duplicate")
-    with pytest.raises(ValueError, match="Duplicate branch declaration"):
+    with pytest.raises(ValueError, match="Duplicate configuration key"):
         _factory(project)

@@ -1,3 +1,4 @@
+{{- define "json_value" -}}{{.}}{{- end -}}
 {{- define "ensemble_params" -}}
 {{- $indent := or (index . "indent") "" -}}
 {{- $v := .values -}}{{- $p := .ensemble_prefix -}}{{- $task := .task -}}
@@ -8,58 +9,53 @@
 {{- $count := index $v (printf "%s%s_base_count" $p $task) -}}
 {
 {{$indent}}    "base_estimators": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{printf "%q" (index $v (printf "%s%s_base_%s%s" $p $task $base $suffix))}}{{end}}{{end}}],
-{{$indent}}    "tune_base_models": True,
+{{$indent}}    "tune_base_models": true,
 {{$indent}}    "n_jobs": 1{{if eq $task "classification"}},
-{{$indent}}    "calibrate_base_models": {{template "python_value" (index $v (printf "%scalibrate" $p))}},
+{{$indent}}    "calibrate_base_models": {{template "json_value" (index $v (printf "%scalibrate" $p))}},
 {{$indent}}    "calibration_cv": {{index $v (printf "%scalibration_cv" $p)}}{{end}}{{if (regexp "^voting_").MatchString .model}},
 {{$indent}}    "weights": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{index $v (printf "%s%s_weight_%s" $p $task $base)}}{{end}}{{end}}]{{if eq $task "classification"}},
 {{$indent}}    "voting": "{{index $v (printf "%svoting" $p)}}"{{end}}{{else}},
 {{$indent}}    "cv": {{index $v (printf "%scv" $p)}},
 {{$indent}}    "final_estimator": "{{index $v (printf "%s%s_final%s" $p $task $suffix)}}",
-{{$indent}}    "passthrough": {{template "python_value" (index $v (printf "%spassthrough" $p))}}{{end}}
+{{$indent}}    "passthrough": {{template "json_value" (index $v (printf "%spassthrough" $p))}}{{end}}
 {{$indent}}}
 {{- end -}}
 
 {{- define "modeling" -}}
-{{- $indent := or (index . "indent") "" -}}
-{{- $v := .values -}}{{- $p := .prefix -}}
+{{- $i := .indent -}}{{- $v := .values -}}{{- $p := .prefix -}}
 {{- $strategy := index $v (printf "%ssearch_strategy" $p) -}}
 {{- $custom := eq (index $v (printf "%ssearch_settings" $p)) "custom" -}}
 {{- $halving := or (eq $strategy "halving_grid") (eq $strategy "halving_random") -}}
-{{- $resource := "n_samples" -}}
-{{- if and $halving $custom -}}{{- $resource = index $v (printf "%ssearch_resource" $p) -}}{{- end -}}
-{{- $params := index $v (printf "%smodel_params" $p) -}}
-{{- $space := index $v (printf "%ssearch_space" $p) -}}
+{{- $resource := "n_samples" -}}{{- if and $halving $custom -}}{{- $resource = index $v (printf "%ssearch_resource" $p) -}}{{- end -}}
+{{- $params := index $v (printf "%smodel_params" $p) -}}{{- $space := index $v (printf "%ssearch_space" $p) -}}
 {{- $metric := index $v (printf "%s%s_search_metric" $p .task) -}}
-{{- if eq $v.training_layout "model_competition" -}}
-{{- $params = "{}" -}}{{- $space = "{}" -}}
-{{- $metric = (regexp "^heldout_").ReplaceAllString (index $v (printf "%s_metric" .task)) "" -}}
-{{- end -}}
-{
-{{$indent}}    "type": "hyperparameter_tuner",
-{{$indent}}    "base_model": {
-{{$indent}}        "type": "{{.model}}",
-{{$indent}}        "params": {{if and $params (ne $params "{}")}}{{template "python_value" $params}}{{else if (regexp "^(voting|stacking)_").MatchString .model}}{{template "ensemble_params" (map (pair "values" $v) (pair "ensemble_prefix" .ensemble_prefix) (pair "task" .task) (pair "model" .model) (pair "indent" (printf "%s        " $indent)))}}{{else}}{}{{end}}
-{{$indent}}    },
-{{$indent}}    "strategy": "{{$strategy}}",
-{{$indent}}    "metric": "{{$metric}}",
-{{$indent}}    "n_trials": {{index $v (printf "%ssearch_n_trials" $p)}},
-{{$indent}}    "random_state": {{index $v (printf "%ssearch_random_state" $p)}},
-{{$indent}}    "tune_threshold": {{template "python_value" (index $v (printf "%ssearch_tune_threshold" $p))}},
-{{if or (eq $strategy "grid") (eq $strategy "halving_grid")}}{{$indent}}    "max_candidates": {{index $v (printf "%ssearch_max_candidates" $p)}},
+{{- if eq $v.training_layout "model_competition" -}}{{- $params = "{}" -}}{{- $space = "{}" -}}{{- $metric = (regexp "^heldout_").ReplaceAllString (index $v (printf "%s_metric" .task)) "" -}}{{- end -}}
+{{$i}}model:
+{{$i}}  type: {{.model}}
+{{if and $params (ne $params "{}")}}{{$i}}  params: {{$params}}
+{{else if (regexp "^(voting|stacking)_").MatchString .model}}{{$i}}  params: {{template "ensemble_params" (map (pair "values" $v) (pair "ensemble_prefix" .ensemble_prefix) (pair "task" .task) (pair "model" .model) (pair "indent" (printf "%s  " $i)))}}
 {{end -}}
-{{if and (eq $strategy "optuna") $custom (ne (index $v (printf "%ssearch_timeout" $p)) "null")}}{{$indent}}    "timeout": {{template "python_value" (index $v (printf "%ssearch_timeout" $p))}},
+{{$i}}tuning:
+{{$i}}  strategy: {{$strategy}}
+{{$i}}  metric: {{$metric}}
+{{$i}}  n_trials: {{index $v (printf "%ssearch_n_trials" $p)}}
+{{$i}}  random_state: {{index $v (printf "%ssearch_random_state" $p)}}
+{{if eq (index $v (printf "%ssearch_tune_threshold" $p)) "true"}}{{$i}}  tune_threshold: true
 {{end -}}
-{{$indent}}    "strategy_params": {{if and $halving $custom}}{
-{{$indent}}        "factor": {{index $v (printf "%ssearch_factor" $p)}},
-{{$indent}}        "resource": "{{$resource}}",
-{{$indent}}        "min_resources": "{{if eq $resource "n_estimators"}}{{index $v (printf "%ssearch_estimator_min_resources" $p)}}{{else}}{{index $v (printf "%ssearch_min_resources" $p)}}{{end}}"{{if eq $resource "n_estimators"}},
-{{$indent}}        "max_resources": {{index $v (printf "%ssearch_max_resources" $p)}}{{end}}
-{{$indent}}    }{{else if and (eq $strategy "optuna") $custom}}{
-{{$indent}}        "sampler": "{{index $v (printf "%ssearch_sampler" $p)}}",
-{{$indent}}        "pruner": "{{index $v (printf "%ssearch_pruner" $p)}}",
-{{$indent}}        "pruning": {{template "python_value" (index $v (printf "%ssearch_pruning" $p))}}
-{{$indent}}    }{{else}}{}{{end}},
-{{$indent}}    "search_space": {{if and $space (ne $space "{}")}}{{template "python_value" $space}}{{else if and $params (ne $params "{}")}}{}{{else}}{{template "model_search_space" (map (pair "indent" (printf "%s    " $indent)) (pair "python" true) (pair "values" $v) (pair "model" .model) (pair "task" .task) (pair "strategy" $strategy) (pair "resource" $resource) (pair "ensemble_prefix" .ensemble_prefix))}}{{end}}
-{{$indent}}}
-{{- end -}}
+{{if or (eq $strategy "grid") (eq $strategy "halving_grid")}}{{$i}}  max_candidates: {{index $v (printf "%ssearch_max_candidates" $p)}}
+{{end -}}
+{{if and (eq $strategy "optuna") $custom (ne (index $v (printf "%ssearch_timeout" $p)) "null")}}{{$i}}  timeout: {{index $v (printf "%ssearch_timeout" $p)}}
+{{end -}}
+{{if and $halving $custom}}{{$i}}  strategy_params:
+{{$i}}    factor: {{index $v (printf "%ssearch_factor" $p)}}
+{{$i}}    resource: {{$resource}}
+{{$i}}    min_resources: "{{if eq $resource "n_estimators"}}{{index $v (printf "%ssearch_estimator_min_resources" $p)}}{{else}}{{index $v (printf "%ssearch_min_resources" $p)}}{{end}}"
+{{if eq $resource "n_estimators"}}{{$i}}    max_resources: {{index $v (printf "%ssearch_max_resources" $p)}}
+{{end -}}
+{{else if and (eq $strategy "optuna") $custom}}{{$i}}  strategy_params:
+{{$i}}    sampler: {{index $v (printf "%ssearch_sampler" $p)}}
+{{$i}}    pruner: {{index $v (printf "%ssearch_pruner" $p)}}
+{{$i}}    pruning: {{index $v (printf "%ssearch_pruning" $p)}}
+{{end -}}
+{{$i}}  search_space: {{if and $space (ne $space "{}")}}{{$space}}{{else if and $params (ne $params "{}")}}{}{{else}}{{template "model_search_space" (map (pair "values" $v) (pair "model" .model) (pair "task" .task) (pair "strategy" $strategy) (pair "resource" $resource) (pair "ensemble_prefix" .ensemble_prefix))}}{{end}}
+{{end -}}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle, type LucideIcon } from 'lucide-react';
 
@@ -15,11 +15,23 @@ export interface HelpTooltipProps {
  * Two placements: above the icon (Basic Training style) or below-left (Advanced Tuning style).
  */
 export const HelpTooltip: React.FC<HelpTooltipProps> = ({ text, placement = 'top', label = 'Help', icon: Icon = HelpCircle }) => {
+    const [open, setOpen] = useState(false);
     return (
         <Tooltip.Provider delayDuration={0}>
-            <Tooltip.Root>
+            <Tooltip.Root open={open} onOpenChange={setOpen}>
                 <Tooltip.Trigger asChild>
-                    <button type="button" aria-label={label} className="inline-flex shrink-0 rounded focus-ring">
+                    <button
+                        type="button"
+                        aria-label={label}
+                        className="inline-flex shrink-0 rounded focus-ring"
+                        onKeyDown={event => {
+                            // Handle immediate Escape before the portal's document listener mounts.
+                            if (event.key === 'Escape' && open) {
+                                event.stopPropagation();
+                                setOpen(false);
+                            }
+                        }}
+                    >
                         <Icon aria-hidden="true" className="w-3 h-3 text-gray-400 cursor-help" />
                     </button>
                 </Tooltip.Trigger>

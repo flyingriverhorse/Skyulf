@@ -8,7 +8,7 @@ enabled.
 
 import hashlib
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath, PureWindowsPath
@@ -72,6 +72,11 @@ class TrackingRun:
             return
         for key, value in _items(tags, "tags"):
             self._call(self.client.set_tag, self.run_id, key, str(value))
+
+    def log_inputs(self, datasets: Sequence[Any]) -> None:
+        """Log native DatasetInput records to this handle's run, preserving failure policy."""
+        if self.enabled:
+            self._call(self.client.log_inputs, self.run_id, datasets=datasets)
 
     def log_config(
         self, config: Mapping[str, object], *, artifact_file: str = "config.json"

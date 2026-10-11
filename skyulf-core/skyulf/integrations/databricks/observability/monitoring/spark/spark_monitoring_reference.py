@@ -12,11 +12,12 @@ from .....mlflow.shared._client import make_registry_client, require_mlflow
 from ....data.delta_io.delta import table_identity
 from ....jobs.shared.notebook_diagnostics import notebook_task
 from ....shared._contracts import table_name
-from ....training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
-from ....training.shared.local_training_evidence import validate_training_evidence
-from ..local.monitoring_performance import measure_holdout_values, performance_contract
+from ....training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
+from ....training.shared.training_evidence import validate_training_evidence
 from ..monitoring_config import MonitorConfig, json_digest, qualified_name
-from ..monitoring_reference import _document, load_monitoring_artifact
+from ..monitoring_details import observation_identity
+from ..monitoring_performance import measure_holdout_values, performance_contract
+from ..monitoring_reference import load_monitoring_artifact, reference_document
 from ..monitoring_source_evidence import validate_source_evidence
 from ..monitoring_sources import read_snapshot
 from ..monitoring_store import OWNER, PROPERTY, ensure_owned_object
@@ -26,7 +27,11 @@ def reference_id(config: MonitorConfig, evidence: dict) -> str:
     """Bind prepared populations to immutable model and verified training identities."""
     reference_config = replace(config, serving_endpoint=None) if config.serving_endpoint else config
     return json_digest(
-        {"monitor_id": reference_config.monitor_id, "evidence": evidence, "format": 1}
+        {
+            "monitor_id": reference_config.monitor_id,
+            "evidence": observation_identity(evidence),
+            "format": 1,
+        }
     )
 
 
@@ -121,7 +126,7 @@ def load_spark_monitoring_reference(
         config, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
     receipt = read_reference_metadata(spark, config, evidence)
-    if receipt["evidence"] != evidence:
+    if observation_identity(receipt["evidence"]) != observation_identity(evidence):
         raise ValueError("Prepared monitoring reference model/training identity differs.")
     train = read_reference_population(spark, receipt["tables"]["train"])
     baseline = _prepared_holdout(artifact, spec, config, receipt)
@@ -175,7 +180,7 @@ def prepare_spark_monitoring_reference(
     if ensure_owned_object(spark, name):
         with notebook_task(f"reference.reuse {identity}", None):
             receipt = read_reference_metadata(spark, config, evidence)
-            if receipt["evidence"] != evidence:
+            if observation_identity(receipt["evidence"]) != observation_identity(evidence):
                 raise ValueError("Prepared monitoring reference model/training identity differs.")
             for record in receipt["tables"].values():
                 read_reference_population(spark, record)
@@ -186,7 +191,7 @@ def prepare_spark_monitoring_reference(
         if table_identity(spark, spec.table) != source_id:
             raise ValueError("Training source was replaced while preparing monitoring reference.")
         client = make_registry_client(require_mlflow(), tracking_uri, registry_uri)
-        source_receipt = _document(
+        source_receipt = reference_document(
             client, evidence["training_run_id"], "monitoring_source_evidence.json"
         )
         validate_source_evidence(source_receipt, source, spec.source_columns, spec.dataset_id)

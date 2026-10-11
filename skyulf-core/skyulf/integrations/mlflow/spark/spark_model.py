@@ -6,10 +6,17 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from ....inference.local_pipeline import LocalPipelineArtifact
-from ....inference.local_scoring import scoring_output_schema
+from ....inference.fitted_pipeline import FittedPipelineArtifact
 from ....inference.model_set import ModelSetArtifact
 from ....inference.model_set_scoring import model_set_output_schema
+from ....inference.pipeline_scoring import scoring_output_schema
+from ...databricks.feature_store.scoring import (
+    feature_binding,
+    feature_source_columns,
+    native_feature_score,
+    validate_feature_snapshot,
+    validate_feature_source,
+)
 from ..registration.registry import download_registered_package, validate_registry_options
 from ..shared._client import make_registry_client
 from ..shared._model_metadata import mlflow_dtype, normalized_dtype
@@ -28,7 +35,7 @@ SOURCE_KEY = "skyulf_runtime_source_sha256"
 
 
 def partition_safety_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> dict[str, Any]:
     """Inspect the loaded payload and detach JSON-compatible certificate evidence."""
     from ....inference.model_set_partition_safety import (  # noqa: PLC0415
@@ -36,7 +43,7 @@ def partition_safety_certificate(
     )
     from ....inference.partition_safety import require_partition_safe_pipeline  # noqa: PLC0415
 
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         evidence = asdict(require_partition_safe_pipeline(artifact))
     elif isinstance(artifact, ModelSetArtifact):
         evidence = require_partition_safe_model_set(artifact)
@@ -46,7 +53,7 @@ def partition_safety_certificate(
 
 
 def optional_partition_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
 ) -> dict[str, Any] | None:
     """Add inspected evidence to new packages without narrowing existing local logging."""
     try:
@@ -61,7 +68,7 @@ def runtime_source_digest() -> str:
 
 
 def validate_worker_certificate(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     certificate: dict[str, Any] | None,
     source_sha256: str | None,
 ) -> None:
@@ -74,9 +81,9 @@ def validate_worker_certificate(
         raise ValueError("Spark worker runtime source differs from the packaged source.")
 
 
-def _contract(artifact: LocalPipelineArtifact | ModelSetArtifact) -> tuple[list, tuple]:
+def _contract(artifact: FittedPipelineArtifact | ModelSetArtifact) -> tuple[list, tuple]:
     """Return ordered artifact inputs and every declared prediction output."""
-    if isinstance(artifact, LocalPipelineArtifact):
+    if isinstance(artifact, FittedPipelineArtifact):
         inputs = list(
             zip(artifact.manifest.input_columns, artifact.manifest.input_dtypes, strict=True)
         )
@@ -115,7 +122,7 @@ def _validate_columns(frame: Any, inputs: list, keys: tuple[str, ...], outputs: 
 
 
 def _validate_model_keys(
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     keys: tuple[str, ...],
     inputs: list,
     outputs: tuple,
@@ -167,6 +174,22 @@ def _validate_package(info: Any, certificate: dict, inputs: list, outputs: tuple
         raise ValueError(
             "Pinned MLflow package lacks the certified Spark output transport contract."
         )
+
+
+def _scoring_package(artifact: Any, path: str, package: Any) -> Any:
+    """Validate the native feature envelope before applying unchanged raw pyfunc gates."""
+    binding = feature_binding(artifact)
+    packaged = (package.metadata or {}).get("skyulf_feature_store")
+    if packaged != binding:
+        raise ValueError("Pinned package feature lookup differs from the loaded artifact binding.")
+    if binding is None:
+        return package
+    from ..models.feature_model import feature_package_models  # noqa: PLC0415
+
+    outer, raw, _ = feature_package_models(path)
+    if outer.metadata.get("skyulf_feature_store") != binding:
+        raise ValueError("Pinned package feature lookup differs from the loaded artifact binding.")
+    return raw
 
 
 def _validate_package_identity(metadata: dict, certificate: dict) -> None:
@@ -268,7 +291,7 @@ def predict_spark_pyfunc(
     frame: Any,
     *,
     model_uri: str,
-    artifact: LocalPipelineArtifact | ModelSetArtifact,
+    artifact: FittedPipelineArtifact | ModelSetArtifact,
     record_key_columns: tuple[str, ...],
     env_manager: str,
     prediction_batch_rows: int = DEFAULT_PREDICTION_BATCH_ROWS,
@@ -289,10 +312,28 @@ def predict_spark_pyfunc(
     validate_prediction_batch_rows(prediction_batch_rows)
     certificate = partition_safety_certificate(artifact)
     inputs, outputs = _contract(artifact)
-    _validate_columns(frame, inputs, keys, outputs)
+    binding = feature_binding(artifact)
+    source_inputs = [(name, "") for name in feature_source_columns(artifact)] if binding else inputs
+    _validate_columns(frame, source_inputs, keys, outputs)
+    validate_feature_source(frame, artifact)
     _validate_model_keys(artifact, keys, inputs, outputs)
     package_path, package = _download_package(model_uri, tracking_uri, registry_uri)
-    _validate_package(package, certificate, inputs, outputs)
+    _validate_package(
+        _scoring_package(artifact, package_path, package), certificate, inputs, outputs
+    )
+    if binding is not None:
+        return _predict_feature_frame(
+            spark,
+            frame,
+            artifact,
+            model_uri,
+            keys,
+            outputs,
+            env_manager,
+            prediction_batch_rows,
+            tracking_uri,
+            registry_uri,
+        )
 
     import mlflow  # noqa: PLC0415  # ty: ignore[unresolved-import]
     from pyspark.sql import types  # noqa: PLC0415  # ty: ignore[unresolved-import]
@@ -309,6 +350,55 @@ def predict_spark_pyfunc(
         params={SPARK_OUTPUT_PARAM: True, SPARK_BATCH_ROWS_PARAM: prediction_batch_rows},
     )
     return _keyed_result(frame, keys, outputs, udf(named))
+
+
+def _predict_feature_frame(
+    spark: Any,
+    frame: Any,
+    artifact: Any,
+    model_uri: str,
+    keys: tuple[str, ...],
+    outputs: tuple,
+    env_manager: str,
+    prediction_batch_rows: int,
+    tracking_uri: str | None,
+    registry_uri: str | None,
+) -> Any:
+    """Expand the native SDK's prediction struct and verify exact source membership."""
+    from pyspark.sql import functions, types  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    validate_feature_snapshot(spark, artifact)
+    result_type = types.StructType(
+        [types.StructField(column.name, _spark_type(column.dtype), True) for column in outputs]
+    )
+    scored = native_feature_score(
+        frame,
+        model_uri=model_uri,
+        result_type=result_type,
+        env_manager=env_manager,
+        prediction_batch_rows=prediction_batch_rows,
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
+    )
+    if scored.schema["prediction"].dataType != result_type:
+        raise ValueError("Native feature prediction schema differs from the artifact contract.")
+    result = _keyed_result(scored, keys, outputs, functions.col("prediction"))
+    _validate_feature_keys(frame, result, keys)
+    validate_feature_snapshot(spark, artifact)
+    return result
+
+
+def _validate_feature_keys(source: Any, output: Any, keys: tuple[str, ...]) -> None:
+    """Require one output for every original key after potentially expanding SDK joins."""
+    from ...databricks.scoring.batch.spark_scoring import read_distributed_rows  # noqa: PLC0415
+
+    source_rows = read_distributed_rows(source, keys, keys)
+    output_rows = read_distributed_rows(output, keys, keys)
+    if len(source_rows) != len(output_rows):
+        raise ValueError("Native feature lookup changed source row cardinality.")
+    unexpected = output_rows.frame.join(source_rows.frame, on=list(keys), how="left_anti")
+    if unexpected.limit(1).count():
+        raise ValueError("Native feature lookup changed source record keys.")
 
 
 def _keyed_result(frame: Any, keys: tuple[str, ...], outputs: tuple, result: Any) -> Any:

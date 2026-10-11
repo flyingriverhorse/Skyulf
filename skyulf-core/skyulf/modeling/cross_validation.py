@@ -149,6 +149,7 @@ def perform_cross_validation(
     from ._tuning.history_policy import has_temporal_history  # noqa: PLC0415 - tuning import cycle
 
     sample_weight = prepare_weights(sample_weight, len(X), preprocessing)
+    y = _indexable_target(y)
     policy = policy_config(
         cv_type,
         n_folds,
@@ -176,7 +177,6 @@ def perform_cross_validation(
             progress_callback,
             sample_weight,
         )
-    y = _indexable_target(y)
     problem_type = calculator.problem_type
 
     if log_callback:

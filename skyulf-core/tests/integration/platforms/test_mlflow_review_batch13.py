@@ -11,13 +11,9 @@ import pytest
 mlflow = pytest.importorskip("mlflow")
 from mlflow.utils.async_logging.run_operations import RunOperations  # noqa: E402
 
-from skyulf.inference.local_pipeline import (  # noqa: E402
-    load_local_pipeline,
-    predict_local_pipeline,
-    save_local_pipeline,
-)
-from skyulf.integrations.mlflow.models import local_model  # noqa: E402
-from skyulf.integrations.mlflow.models.local_model import log_local_model  # noqa: E402
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
+from skyulf.integrations.mlflow.models import pipeline_model  # noqa: E402
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model  # noqa: E402
 from skyulf.integrations.mlflow.runs.tracking import (  # noqa: E402
     TrackingConfig,
     TrackingRun,
@@ -61,11 +57,11 @@ def _nullable_model(tmp_path, config, dtype):
     )
     pipeline.fit(frame, target_column="target")
     local_path = tmp_path / "local"
-    save_local_pipeline(pipeline, local_path)
-    local = load_local_pipeline(local_path)
+    save_pipeline(pipeline, local_path)
+    local = load_pipeline(local_path)
     with track_run(config, run_name="nullable") as run:
         assert run.run_id is not None
-        uri = log_local_model(
+        uri = log_pipeline_model(
             local_path, run_id=run.run_id, artifact_path="model", tracking_uri=config.tracking_uri
         )
     return mlflow.pyfunc.load_model(uri), local
@@ -90,15 +86,15 @@ def test_nullable_pyfunc_preserves_declared_input(
         values[1] = None
     query = pd.DataFrame({"x": pd.array(values, dtype=dtype)}, index=[19, 3, 19])
     before = query.copy(deep=True)
-    expected = predict_local_pipeline(query, local)
+    expected = predict_pipeline(query, local)
     if dtype in {"Int64", "boolean"}:
         # New packages explicitly require lossless string transport at this boundary.
         with pytest.raises(mlflow.exceptions.MlflowException, match="Failed to enforce schema"):
             model.predict(query)
         pd.testing.assert_frame_equal(query, before)
-    observer = Mock(wraps=local_model.score_local_pipeline)
-    monkeypatch.setattr(local_model, "score_local_pipeline", observer)
-    actual = model.predict(local_model.prepare_pyfunc_input(query, model))
+    observer = Mock(wraps=pipeline_model.score_pipeline)
+    monkeypatch.setattr(pipeline_model, "score_pipeline", observer)
+    actual = model.predict(pipeline_model.prepare_pyfunc_input(query, model))
     pd.testing.assert_frame_equal(actual, expected)
     pd.testing.assert_frame_equal(observer.call_args.args[0], query)
     if not missing:
@@ -106,7 +102,7 @@ def test_nullable_pyfunc_preserves_declared_input(
             {"x": {"Int64": "int64", "Float64": "float64", "boolean": "bool"}[dtype]}
         )
         pd.testing.assert_frame_equal(
-            model.predict(local_model.prepare_pyfunc_input(numpy_query, model)), expected
+            model.predict(pipeline_model.prepare_pyfunc_input(numpy_query, model)), expected
         )
         pd.testing.assert_frame_equal(observer.call_args.args[0], query)
     pd.testing.assert_frame_equal(query, before)
@@ -216,7 +212,7 @@ def test_nullable_pyfunc_does_not_cast_incompatible_transport(tmp_path, tracking
     with pytest.raises((mlflow.exceptions.MlflowException, ValueError, TypeError)):
         model.predict(query)
     with pytest.raises(ValueError, match="dtype"):
-        predict_local_pipeline(query, local)
+        predict_pipeline(query, local)
 
 
 def test_async_success_finishes_before_tracking_returns(tracking_store, monkeypatch):

@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import save_local_pipeline
+from skyulf.inference.fitted_pipeline import save_pipeline
 
 mlflow = pytest.importorskip("mlflow")
 
@@ -30,9 +30,9 @@ from skyulf.integrations.mlflow.lifecycle.promotion import (
 )
 from skyulf.integrations.mlflow.lifecycle.validation import (
     ModelComparisonReport,
-    compare_registered_local_models,
+    compare_registered_pipeline_models,
 )
-from skyulf.integrations.mlflow.models.local_model import log_local_model
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 from skyulf.integrations.mlflow.registration.registry import (
     RegistryAccessError,
     RegistryModelNotFoundError,
@@ -132,17 +132,17 @@ def case(tmp_path: Path):
         pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "linear_regression"}})
         pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="target")
         artifact_path = tmp_path / f"model-{int(offset)}"
-        save_local_pipeline(pipeline, artifact_path)
+        save_pipeline(pipeline, artifact_path)
         with track_run(tracking, run_name=f"fit-{offset}") as run:
             assert run.run_id is not None
-            model_uri = log_local_model(
+            model_uri = log_pipeline_model(
                 artifact_path, run_id=run.run_id, artifact_path="model", tracking_uri=uri
             )
         register_model(model_uri, name, tracking_uri=uri, registry_uri=uri)
     client.set_registered_model_alias(name, "champion", "1")
     candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
     champion = resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri)
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         champion,
         heldout,
@@ -247,7 +247,7 @@ def test_rejected_first_candidate_cannot_initialize_or_renominate(case):
         "tracking_uri": uri,
         "registry_uri": uri,
     }
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         None,
         heldout,
@@ -382,7 +382,7 @@ def test_stage_challenger_requires_validation_and_preserves_champion(case) -> No
 def test_rejected_challenger_is_visible_but_cannot_promote(case) -> None:
     """A contender's identity must not imply approval to replace champion."""
     client, uri, name, heldout, _, _ = case
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri),
         resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri),
         heldout,
@@ -449,7 +449,7 @@ def test_tied_v3_remains_challenger_through_rollback_and_v4_replaces_it(case) ->
         registry_uri=uri,
     )
     lifecycle.registered(candidate)
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri),
         heldout,
@@ -522,7 +522,7 @@ def _replace_challenger(case, *, replacement="nomination"):
 def _replacement_report(case, candidate):
     """Compare a real replacement artifact against the original champion's pinned holdout."""
     _, uri, name, heldout, _, _ = case
-    return compare_registered_local_models(
+    return compare_registered_pipeline_models(
         candidate,
         resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri),
         heldout,
@@ -693,7 +693,7 @@ def test_first_nominee_is_removed_from_challenger_when_initialized(case) -> None
         registry_uri=uri,
     )
     lifecycle.registered(candidate)
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         None,
         heldout,
@@ -950,7 +950,7 @@ def test_first_champion_needs_absolute_quality_and_verified_receipt(case) -> Non
         resolve_model(name, alias="champion", tracking_uri=uri, registry_uri=uri)
     assert controlled_champion_version(name, tracking_uri=uri, registry_uri=uri) is None
     candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         None,
         heldout,
@@ -999,7 +999,7 @@ def test_first_champion_rejects_missing_or_failed_quality_threshold(case) -> Non
     client.delete_registered_model_alias(name, "champion")
     candidate = resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri)
     for threshold in (None, 0.0):
-        report = compare_registered_local_models(
+        report = compare_registered_pipeline_models(
             candidate,
             None,
             heldout,
@@ -1035,7 +1035,7 @@ def test_first_champion_cannot_bypass_secondary_gate(case):
     client, uri, name, heldout, _, admission = case
     client.delete_registered_model_alias(name, "champion")
     candidate = resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri)
-    report = compare_registered_local_models(
+    report = compare_registered_pipeline_models(
         candidate,
         None,
         heldout,

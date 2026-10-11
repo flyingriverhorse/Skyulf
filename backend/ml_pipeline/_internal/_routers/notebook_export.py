@@ -556,7 +556,7 @@ async def export_pipeline_notebook(
         # Sanitise dataset_id before embedding it in the Content-Disposition
         # header — raw user input could inject header fields via `"` or CRLF.
         safe_id = re.sub(r"[^\w.\-]", "_", dataset_id)
-        filename = f"skyulf_pipeline_{safe_id}_{mode}.ipynb"
+        filename = f"kayra_pipeline_{safe_id}_{mode}.ipynb"
         return Response(
             content=body,
             media_type="application/x-ipynb+json",

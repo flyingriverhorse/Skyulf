@@ -1,0 +1,128 @@
+bundle:
+  name: skyulf_raw_serving_demo
+
+variables:
+  catalog:
+    default: workspace
+  schema_name:
+    description: A new isolated schema; raw_data intentionally refuses an existing schema.
+  endpoint_name:
+    description: A new endpoint name; no existing endpoint is changed.
+  wheel_path:
+    description: Absolute /Workspace or /Volumes path to the wheel from this checkout.
+  sql_function_ddl_path:
+    default: ""
+    description: Optional trusted SQL file compiled for this endpoint; empty uses the installed library.
+
+resources:
+  jobs:
+    raw_serving_demo:
+      name: skyulf_raw_serving_${var.schema_name}
+      max_concurrent_runs: 1
+      performance_target: STANDARD
+      environments:
+        - environment_key: python
+          spec:
+            client: "4"
+            dependencies:
+              - ${var.wheel_path}
+              - mlflow==3.16.1
+              - scikit-learn==1.8.0
+              - numpy==2.1.3
+              - pandas==2.2.3
+              - scipy==1.15.1
+              - polars==1.44.2
+              - cloudpickle==3.1.2
+              - PyYAML==6.0.2
+      tasks:
+        - task_key: raw_data
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: raw_data
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+        - task_key: train
+          depends_on: [{task_key: raw_data}]
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: train
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+              source_version: "{{tasks.raw_data.values.source_version}}"
+        - task_key: deploy
+          depends_on: [{task_key: train}]
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 1800
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: deploy
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+              endpoint_name: ${var.endpoint_name}
+              model_version: "{{tasks.train.values.model_version}}"
+        - task_key: predict_rest
+          depends_on: [{task_key: deploy}]
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: predict_rest
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+              endpoint_name: ${var.endpoint_name}
+              source_version: "{{tasks.raw_data.values.source_version}}"
+              model_version: "{{tasks.train.values.model_version}}"
+        - task_key: predict_sql
+          depends_on: [{task_key: predict_rest}]
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: predict_sql
+              sql_function_ddl_path: ${var.sql_function_ddl_path}
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+              endpoint_name: ${var.endpoint_name}
+              source_version: "{{tasks.raw_data.values.source_version}}"
+              model_version: "{{tasks.train.values.model_version}}"
+        - task_key: verify
+          depends_on: [{task_key: predict_sql}]
+          environment_key: python
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          notebook_task:
+            notebook_path: ./src/notebook.py
+            base_parameters:
+              stage: verify
+              config_path: ${workspace.file_path}/config.yml
+              namespace: ${var.catalog}.${var.schema_name}
+              endpoint_name: ${var.endpoint_name}
+              source_version: "{{tasks.raw_data.values.source_version}}"
+              model_version: "{{tasks.train.values.model_version}}"
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${var.schema_name}/${bundle.target}

@@ -234,13 +234,13 @@ def test_model_definitions_are_synced_with_generated_bundle(tmp_path):
     template = TEMPLATE_ROOT / "template/{{.project_name}}"
     bundle = (template / "databricks.yml.tmpl").read_text(encoding="utf-8")
     sync = yaml.safe_load(bundle.split("sync:\n", 1)[1].split("\nvariables:", 1)[0])
-    modeling = tmp_path / "src/modeling"
+    modeling = tmp_path / "config"
     modeling.mkdir(parents=True)
     definitions = set()
-    for name in ("model_set.py", "model_competition.py", "multi_model.py", "single_model.py"):
-        assert (template / "src/modeling" / f"{name}.tmpl").is_file()
+    for name in ("training.yml", "inference.yml"):
+        assert (template / "config" / f"{name}.tmpl").is_file()
         generated = modeling / name
-        generated.write_text("# Generated model definition\n", encoding="utf-8")
+        generated.write_text("version: 1\n", encoding="utf-8")
         definitions.add(generated)
     synced = {path for pattern in sync["include"] for path in tmp_path.glob(pattern)}
     assert definitions <= synced

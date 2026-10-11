@@ -8,9 +8,11 @@ from sklearn.impute import SimpleImputer
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import validate_state
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import SimpleImputerArtifact
+from .._fitted_validation import _scalar, fitted_columns, portable_config
 from .._helpers import (
     auto_detect_numeric_columns,
     decimal_columns_to_float,
@@ -21,6 +23,7 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import (
     _compute_polars_fill_values,
+    _imputation_config,
     _polars_missing_counts,
     _resolve_simple_columns,
 )
@@ -51,10 +54,40 @@ class SimpleImputerApplier(BaseApplier):
 
     The calculator artifact records per-column values for ``mean``, ``median``,
     ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.
-    Missing columns seen during fitting are restored with their stored value.
+    Missing columns seen during fitting are restored with their stored value,
+    preserving the row count even when no input columns remain.
+    Empty saved artifacts declare identity replay only when the recipe explicitly
+    selects no columns; automatic or missing selections remain unreviewed.
     Spark supports only ``mean`` and ``constant`` artifacts and applies them
     with native expressions. All-missing means leave existing columns untouched.
     """
+
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return (
+            _local_statistic_state(raw)
+            if raw.get("strategy") in ("median", "most_frequent")
+            else validate_state("SimpleImputer", raw)
+        )
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        if not state:
+            if not user_picked_no_columns(raw) or raw.get("_auto_columns"):
+                raise ValueError("An empty imputer artifact requires explicit empty columns.")
+            strategy = raw.get("strategy")
+            if strategy in ("median", "most_frequent", "mode"):
+                canonical = "median" if strategy == "median" else "most_frequent"
+                return _imputation_config(
+                    "SimpleImputer",
+                    fitted_columns(raw, {"columns": []}),
+                    {"strategy": canonical},
+                )
+        if state.get("strategy") in ("median", "most_frequent"):
+            return _imputation_config("SimpleImputer", fitted_columns(raw, state), state)
+        return portable_config("SimpleImputer", raw, state)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -96,7 +129,7 @@ class SimpleImputerApplier(BaseApplier):
 
         # Restore columns that were present at fit time but missing in input X.
         exprs.extend(
-            pl.lit(fill_values[col]).alias(col)
+            pl.repeat(pl.lit(fill_values[col]), pl.len()).alias(col)
             for col in cols
             if col not in X.columns and col in fill_values
         )
@@ -140,25 +173,38 @@ class SimpleImputerApplier(BaseApplier):
     )
     + tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             codec_version=1,
             config_match=(("strategy", strategy),),
         )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
         for strategy in ("mean", "constant")
     )
-    + (
+    + tuple(
         ExecutionCapability(
-            "pandas",
+            engine,
             "apply",
-            "python_batch",
+            execution_kind,
             "preserve",
             "row",
             config_match=(("strategy", "most_frequent"),),
-        ),
+        )
+        for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
+    )
+    + tuple(
+        ExecutionCapability(
+            engine,
+            "apply",
+            "local",
+            "preserve",
+            "row",
+            config_match=(("strategy", "median"),),
+        )
+        for engine in ("pandas", "polars")
     ),
 )
 @node_meta(
@@ -321,3 +367,16 @@ class SimpleImputerCalculator(BaseCalculator):
             "missing_counts": missing_counts,
             "total_missing": total_missing,
         }
+
+
+def _local_statistic_state(raw: dict) -> dict:
+    """Validate local medians and modes without expanding the portable strategy vocabulary."""
+    strategy = raw.get("strategy")
+    if strategy not in ("median", "most_frequent"):
+        raise ValueError("Expected a median or most-frequent imputer.")
+    state = validate_state("SimpleImputer", {**raw, "strategy": "mean"})
+    for value in state["fill_values"].values():
+        _scalar(value)
+        if strategy == "median" and type(value) not in (int, float, type(None)):
+            raise ValueError("Median fill values must be numeric or null.")
+    return {**state, "strategy": "median" if strategy == "median" else "most_frequent"}

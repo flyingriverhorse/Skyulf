@@ -20,22 +20,22 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
-from skyulf.inference.local_scoring import scoring_output_schema
-from skyulf.integrations.databricks import run_incremental_local_batch, run_local_batch
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+from skyulf.inference.pipeline_scoring import scoring_output_schema
+from skyulf.integrations.databricks import run_frame_batch, run_incremental_batch
 from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import LocalSourceSpec
-from skyulf.integrations.databricks.scoring.local_sdk import (
+from skyulf.integrations.databricks.scoring.batch.frame_batch import SourceSpec
+from skyulf.integrations.databricks.scoring.shared.prediction_output import (
+    provision_prediction_table,
+)
+from skyulf.integrations.databricks.scoring.workflow import (
     InputSource,
-    LocalWorkflowConfig,
     ModelSelection,
     OutputSink,
     PreflightResult,
-    PreparedLocalWorkflow,
-)
-from skyulf.integrations.databricks.scoring.shared.prediction_output import (
-    provision_prediction_table,
+    PreparedWorkflow,
+    WorkflowConfig,
 )
 from skyulf.integrations.databricks.shared._contracts import BatchSpec
 from skyulf.pipeline import SkyulfPipeline
@@ -107,9 +107,9 @@ def _saved_artifact(directory, engine, policy):
     native = pl.from_pandas(data) if engine == "polars" else data
     pipeline = SkyulfPipeline(workflow["pipeline"])
     pipeline.fit(SplitDataset(train=native[:16], test=native[16:]), target_column="target")
-    save_local_pipeline(pipeline, directory / "artifact")
+    save_pipeline(pipeline, directory / "artifact")
     source.write_text("raise RuntimeError('editable source must not execute')", encoding="utf-8")
-    return load_local_pipeline(directory / "artifact")
+    return load_pipeline(directory / "artifact")
 
 
 def _latest(spark, table):
@@ -149,7 +149,7 @@ def make_scoring_delta_case(delta_spark, tmp_path):
             f"{key} long, event_time timestamp, x double",
         ).write.format("delta").option("delta.enableChangeDataFeed", "true").saveAsTable(source)
         source_version = _latest(delta_spark, source)[0]
-        config = LocalWorkflowConfig(
+        config = WorkflowConfig(
             runtime="databricks",
             engine=engine,
             source=InputSource(
@@ -172,7 +172,7 @@ def make_scoring_delta_case(delta_spark, tmp_path):
             model_digest=artifact.manifest.pipeline_sha256,
             output_schema=scoring_output_schema(artifact),
         )
-        prepared = PreparedLocalWorkflow(config, artifact, preflight)
+        prepared = PreparedWorkflow(config, artifact, preflight)
         if period:
             _create_period_target(delta_spark, target, key, preflight)
         else:
@@ -218,7 +218,7 @@ def _create_period_target(spark, target, key, preflight):
 
 def _increment(case):
     """Use the public incremental writer with explicit sole-writer admission."""
-    return run_incremental_local_batch(
+    return run_incremental_batch(
         case.spark, case.prepared, record_key_columns=(case.key,), admission=case.admission
     )
 
@@ -252,7 +252,9 @@ def test_incremental_scoring_rules_publish_exclusions_retry_and_noop(
     make_scoring_delta_case, monkeypatch, engine, policy
 ):
     """Every input key is committed once, and failed writes never advance a source receipt."""
-    from skyulf.integrations.databricks.scoring.incremental import local_incremental
+    from skyulf.integrations.databricks.scoring.incremental import (
+        incremental_batch as local_incremental,
+    )
 
     case = make_scoring_delta_case(engine, policy=policy)
     first = _increment(case)
@@ -322,7 +324,7 @@ def test_incremental_scoring_rules_publish_exclusions_retry_and_noop(
 
 def _period_request(case):
     """Pin the exact source and current target version for January publication."""
-    source = LocalSourceSpec(
+    source = SourceSpec(
         table=case.source,
         version=case.source_version,
         period_start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -357,12 +359,12 @@ def test_period_scoring_rules_publish_all_input_outcomes_and_replay(
     """Period receipts preserve excluded membership and explicit scoring coverage on replay."""
     case = make_scoring_delta_case(engine, period=True)
     source, request = _period_request(case)
-    first = run_local_batch(case.spark, source, case.prepared, request, admission=case.admission)
+    first = run_frame_batch(case.spark, source, case.prepared, request, admission=case.admission)
     _assert_initial_rows(case)
     assert (first.input_count, first.output_count) == (3, 3)
     assert (first.manifest["predicted_count"], first.manifest["excluded_count"]) == (2, 1)
     committed = _latest(case.spark, case.target)
-    replay = run_local_batch(case.spark, source, case.prepared, request, admission=case.admission)
+    replay = run_frame_batch(case.spark, source, case.prepared, request, admission=case.admission)
     assert replay.replayed and replay.commit_version == first.commit_version
     assert _latest(case.spark, case.target) == committed
     assert replay.manifest == first.manifest
@@ -374,7 +376,7 @@ def test_legacy_period_record_key_named_scoring_status_is_not_policy_metadata(
     """A pre-policy business key must not be interpreted as scoring outcome values."""
     case = make_scoring_delta_case("pandas", period=True, policy=False, key="scoring_status")
     source, request = _period_request(case)
-    result = run_local_batch(case.spark, source, case.prepared, request, admission=case.admission)
+    result = run_frame_batch(case.spark, source, case.prepared, request, admission=case.admission)
     rows = case.spark.table(case.target).orderBy("scoring_status").collect()
     assert [row.scoring_status for row in rows] == [1, 2, 3]
     assert [row.prediction for row in rows] == pytest.approx([4, -2, 16])

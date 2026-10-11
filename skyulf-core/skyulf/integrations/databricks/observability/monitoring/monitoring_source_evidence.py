@@ -8,10 +8,10 @@ from .monitoring_config import json_digest
 def source_evidence(frame: Any, columns: tuple[str, ...], dataset_id: str) -> dict:
     """Fingerprint normalized original source values, including keys and weight metadata."""
     from ...data.training.retraining_data import (  # noqa: PLC0415 - avoid training import cycles
-        _row_counts,
+        row_identity_counts,
     )
 
-    counts = _row_counts(frame, list(columns))
+    counts = row_identity_counts(frame, list(columns))
     return {
         "format": 1,
         "dataset_id": dataset_id,

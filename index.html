@@ -318,7 +318,7 @@ footer h3{font:500 11px var(--mono);letter-spacing:.16em;text-transform:uppercas
 
 df = load_breast_cancer(as_frame=True).frame
 
-<span class="c"># The pipeline is a dict, so you can version it, diff it in</span>
+<span class="c"># The configuration is a dict, so you can version it, diff it in</span>
 <span class="c"># review, or build it in a loop.</span>
 pipeline = SkyulfPipeline({
     <span class="s">"preprocessing"</span>: [
@@ -336,7 +336,7 @@ results = pipeline.fit(df, target_column=<span class="s">"target"</span>)
 print(results[<span class="s">"modeling"</span>][<span class="s">"splits"</span>][<span class="s">"test"</span>].metrics)
 <span class="c"># {'roc_auc': 0.9954, 'f1': 0.9722, 'pr_auc': 0.9972, ...}</span>
 
-pipeline.save(<span class="s">"tumour.pkl"</span>)  <span class="c"># one hash for data + steps + model</span></code></pre>
+pipeline.save(<span class="s">"tumour.pkl"</span>)  <span class="c"># save fitted preprocessing and model</span></code></pre>
         <div class="row">
           <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener" class="btn btn-primary">pip install skyulf-core</a>
           <a href="./manual/index.html" class="btn btn-secondary">Library docs</a>
@@ -431,18 +431,7 @@ pipeline.save(<span class="s">"tumour.pkl"</span>)  <span class="c"># one hash f
     <div class="rule"></div>
   </section>
 
-  <section id="evidence" class="wrap section">
-    <h2 class="h2" style="max-width:22ch;margin-bottom:12px">Claims are cheap. Here is the evidence.</h2>
-    <p style="max-width:58ch;margin-bottom:48px">Every number here comes from the repository, and the counts are yours to re-run.</p>
-    <div class="grid-auto" style="--gap:16px">
-      <div class="card"><div class="card-head"><i class="ph ph-list-checks gold"></i><h3>Tested where it matters</h3></div><p>5,787 tests in total: 3,512 in the library, 1,427 in the backend and 848 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p></div>
-      <div class="card"><div class="card-head"><i class="ph ph-chart-line peri"></i><h3>Drift is measured four ways</h3></div><p>A shifted column is caught with the Kolmogorov-Smirnov test, Population Stability Index, Wasserstein distance and KL divergence, each with its own threshold, instead of one number that either fires or does not.</p></div>
-      <div class="card"><div class="card-head"><i class="ph ph-ruler rose"></i><h3>Say what your data must look like</h3></div><p>Available expectations <code>expect_columns_exist</code>, <code>expect_no_nulls</code>, <code>expect_value_range</code> and <code>expect_unique</code> stop the run with a clear <code>ExpectationError</code> before a bad column reaches a model.</p></div>
-      <div class="card"><div class="card-head"><i class="ph ph-squares-four gold"></i><h3>Start from a working pipeline</h3></div><p>Five templates drop a wired graph onto the canvas: Tabular Classification, Tabular Regression, Text Classification, Customer Segmentation and Ensemble Classification. You adjust instead of assemble.</p></div>
-    </div>
-  </section>
-
-  <section id="updates" class="wrap" style="padding-bottom:clamp(72px,9vw,120px)">
+  <section id="updates" class="wrap section">
     <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:28px">
       <div>
         <h2 style="font-weight:800;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin-bottom:8px">Always <span class="gold">shipping</span></h2>

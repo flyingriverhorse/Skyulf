@@ -8,9 +8,11 @@ Output is **always dense**.
 import logging
 from typing import Any
 
+import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer, TfidfVectorizer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TfidfVectorizerArtifact
@@ -19,6 +21,9 @@ from ._common import (
     _join_text_columns,
     _sklearn_vectorizer_apply_pandas,
     _sklearn_vectorizer_apply_polars,
+    _validate_local_vectorizer,
+    _validate_vectorizer_vocabulary,
+    _vectorizer_uses_callbacks,
     _warn_large_output,
     apply_text_dual_engine,
     resolve_fit_text_columns,
@@ -38,6 +43,26 @@ def _tfidf_apply_pandas(
     return _sklearn_vectorizer_apply_pandas(X, y, params)
 
 
+def _validate_saved_idf(raw: dict, vectorizer: TfidfVectorizer) -> None:
+    """Inspect the stored dense IDF vector and its native learned transformer."""
+    transformer = getattr(vectorizer, "_tfidf", None)
+    if type(transformer) is not TfidfTransformer:
+        raise ValueError("Fitted TF-IDF transformer is missing or has an unexpected type.")
+    if type(raw["idf"]) not in (list, tuple, np.ndarray):
+        raise ValueError("Fitted IDF values must be an ordered numeric sequence.")
+    weights = np.asarray(raw["idf"])
+    width = len(raw["output_columns"])
+    if weights.shape != (width,) or weights.dtype.kind not in "fiu":
+        raise ValueError("Fitted IDF values have the wrong shape or dtype.")
+    if not np.isfinite(weights).all() or not (weights > 0).all():
+        raise ValueError("Fitted IDF values must be finite and positive.")
+    saved_weights = getattr(transformer, "idf_", None)
+    if saved_weights is None or not np.array_equal(weights, saved_weights):
+        raise ValueError("Fitted IDF values disagree with the saved transformer.")
+    if getattr(transformer, "n_features_in_", None) != width:
+        raise ValueError("Fitted TF-IDF transformer has the wrong feature width.")
+
+
 class TfidfVectorizerApplier(BaseApplier):
     """Attach one TF-IDF-weighted column per vocabulary term to the frame.
 
@@ -48,6 +73,27 @@ class TfidfVectorizerApplier(BaseApplier):
     into sklearn, and it falls back to a full pandas round-trip when a text
     column is not String dtype.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect learned vocabulary and IDF weights without recomputing corpus statistics."""
+        vectorizer = _validate_local_vectorizer(
+            raw, "tfidf_vectorizer", TfidfVectorizer, {"vocabulary", "max_features", "idf"}
+        )
+        if vectorizer is not None:
+            _validate_vectorizer_vocabulary(raw, vectorizer)
+            _validate_saved_idf(raw, vectorizer)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe fixed document weighting while leaving arbitrary analyzers undeclared."""
+        if engine not in ("pandas", "polars"):
+            return None
+        TfidfVectorizerApplier.validate_inference_state(state)
+        if state and _vectorizer_uses_callbacks(state["vectorizer_object"]):
+            return None
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

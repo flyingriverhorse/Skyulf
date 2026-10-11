@@ -8,10 +8,12 @@ import pandas as pd
 import polars as pl
 from sklearn.preprocessing import PowerTransformer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import PowerTransformerArtifact
+from .._fitted_validation import local_state_fields
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -20,7 +22,7 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._power_common import build_pretrained_power_transformer
+from ._power_common import build_pretrained_power_transformer, validate_power_parameters
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +93,30 @@ def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> 
 
 class PowerTransformerApplier(BaseApplier):
     """Apply the fitted Box-Cox / Yeo-Johnson transform to the selected columns."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved lambdas and scaler without normalizing or relearning them."""
+        if local_state_fields(
+            raw,
+            "power_transformer",
+            {"type", "columns", "method", "standardize", "lambdas", "scaler_params"},
+            allow_empty=True,
+        ):
+            columns = raw["columns"]
+            if type(columns) is not list or any(not isinstance(col, str) for col in columns):
+                raise ValueError("Fitted power columns must be a list of strings.")
+            validate_power_parameters(raw, len(columns))
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Expose whole-request fallback when any value prevents a power transform."""
+        if engine not in ("pandas", "polars"):
+            return None
+        PowerTransformerApplier.validate_inference_state(state)
+        context = "global" if state.get("columns") else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

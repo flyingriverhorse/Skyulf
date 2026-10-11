@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from skyulf.inference.project_code import load_project_module
-from skyulf.integrations.databricks.projects._project_files import project_source
+from skyulf.integrations.databricks.projects.yaml_recipes import feature_project_source
 
 FEATURES = (
     Path(__file__).resolve().parents[3]
@@ -27,7 +27,7 @@ FEATURES = (
 )
 def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
     """A frequency-only branch must never silently inherit an imputer from another branch."""
-    module = load_project_module(project_source(FEATURES))
+    module = load_project_module(feature_project_source(FEATURES))
     steps = module.build_preprocessing(recipe=recipe)
     assert len(steps) == len(expected)
     assert all(
@@ -41,7 +41,7 @@ def test_shipped_preprocessing_recipes_select_exact_steps(recipe, expected):
 )
 def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count):
     """Filtering may be shared or omitted independently of the learned transformations."""
-    module = load_project_module(project_source(FEATURES))
+    module = load_project_module(feature_project_source(FEATURES))
     steps = module.build_pre_split_steps(recipe=recipe)
     assert len(steps) == count
     if steps:
@@ -51,8 +51,8 @@ def test_shipped_pre_split_recipes_are_independently_selectable(recipe, count):
 @pytest.mark.parametrize("factory", ["build_preprocessing", "build_pre_split_steps"])
 def test_shipped_recipes_reject_unknown_names(factory):
     """A misspelled recipe must fail instead of silently training without intended steps."""
-    module = load_project_module(project_source(FEATURES))
-    with pytest.raises(ValueError, match="Unknown .* recipe"):
+    module = load_project_module(feature_project_source(FEATURES))
+    with pytest.raises(ValueError, match="Unknown .*recipe"):
         getattr(module, factory)(recipe="typo")
 
 

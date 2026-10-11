@@ -14,6 +14,8 @@ Boundary with ``dispatcher.py``:
 
 import logging
 from collections.abc import Callable, Mapping
+from numbers import Integral
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -22,10 +24,123 @@ import polars as pl
 
 from ...engines.polars_engine import SkyulfPolarsWrapper
 from ...utils import pack_pipeline_output, unpack_pipeline_input
+from .._fitted_validation import local_boolean, local_state_fields
 from .._helpers import resolve_valid_columns
 from .._output_names import validate_generated_column_names
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_text_names(value: Any) -> None:
+    """Inspect saved text selections and feature names without normalizing their container."""
+    if type(value) not in (list, tuple) or any(not isinstance(name, str) for name in value):
+        raise ValueError("Fitted text columns must be a list or tuple of strings.")
+
+
+def _validate_text_stop_words(stop_words: Any) -> None:
+    """Inspect native stop-word containers, including a truth-testable NumPy singleton."""
+    if type(stop_words) is np.ndarray:
+        if stop_words.ndim != 1 or stop_words.size != 1:
+            raise ValueError("Fitted NumPy stop words must be a one-dimensional singleton.")
+        stop_words = stop_words.tolist()
+    if (
+        stop_words is not None
+        and not isinstance(stop_words, str)
+        and (
+            type(stop_words) not in (list, tuple, set, frozenset)
+            or any(not isinstance(word, str) for word in stop_words)
+        )
+    ):
+        raise ValueError("Fitted stop words must contain strings.")
+
+
+def _validate_text_settings(lowercase: Any, stop_words: Any, ngram_range: Any) -> None:
+    """Check reusable analyzer settings while retaining native option semantics."""
+    if lowercase is not None:
+        local_boolean(lowercase, "lowercase")
+    _validate_text_stop_words(stop_words)
+    if type(ngram_range) not in (list, tuple) or len(ngram_range) != 2:
+        raise ValueError("Fitted n-gram range must have two entries.")
+    if any(not isinstance(size, Integral) for size in ngram_range):
+        raise ValueError("Fitted n-gram entries must be integers.")
+
+
+def _validate_text_layout(raw: dict) -> None:
+    """Check saved output names against intrinsic source-name collisions."""
+    _validate_text_names(raw["columns"])
+    _validate_text_names(raw["output_columns"])
+    if raw["drop_original"] is not None:
+        local_boolean(raw["drop_original"], "drop_original")
+    validate_text_output_names(SimpleNamespace(columns=raw["columns"]), raw, raw["columns"])
+
+
+def _validate_local_vectorizer(raw: dict, kind: str, expected: type, fields: set[str]) -> Any:
+    """Inspect shared fitted text layout and native estimator without invoking it."""
+    fields = fields | {
+        "type",
+        "columns",
+        "output_columns",
+        "lowercase",
+        "stop_words",
+        "vectorizer_object",
+        "drop_original",
+    }
+    if not local_state_fields(raw, kind, fields, allow_empty=True):
+        return None
+    _validate_text_layout(raw)
+    vectorizer = raw["vectorizer_object"]
+    if type(vectorizer) is not expected:
+        raise ValueError("Fitted text vectorizer has an unexpected native type.")
+    _validate_text_settings(raw["lowercase"], raw["stop_words"], vectorizer.ngram_range)
+    if raw["lowercase"] != vectorizer.lowercase or raw["stop_words"] != vectorizer.stop_words:
+        raise ValueError("Fitted text settings disagree with the saved vectorizer.")
+    if np.dtype(vectorizer.dtype).kind not in "biuf":
+        raise ValueError("Fitted vectorizer output dtype must be numeric.")
+    return vectorizer
+
+
+def _validate_vectorizer_vocabulary(raw: dict, vectorizer: Any) -> None:
+    """Check learned contiguous token indices and their saved dense output width."""
+    vocabulary = raw["vocabulary"]
+    if type(vocabulary) is not dict or any(not isinstance(key, str) for key in vocabulary):
+        raise ValueError("Fitted vocabulary must map token strings to feature indices.")
+    indices: list[Any] = list(vocabulary.values())
+    if any(not isinstance(index, Integral) for index in indices):
+        raise ValueError("Fitted vocabulary indices must be integers.")
+    if sorted(indices) != list(range(len(vocabulary))):
+        raise ValueError("Fitted vocabulary indices must be unique and contiguous.")
+    if vocabulary != getattr(vectorizer, "vocabulary_", None):
+        raise ValueError("Fitted vocabulary disagrees with the saved vectorizer.")
+    if len(raw["output_columns"]) != len(vocabulary):
+        raise ValueError("Fitted vectorizer output width disagrees with the vocabulary.")
+    if raw["max_features"] != vectorizer.max_features:
+        raise ValueError("Fitted feature limit disagrees with the saved vectorizer.")
+
+
+def _vectorizer_uses_callbacks(vectorizer: Any) -> bool:
+    """Keep external document inputs and arbitrary text callbacks undeclared."""
+    overridden = {
+        "transform",
+        "build_analyzer",
+        "build_preprocessor",
+        "build_tokenizer",
+        "decode",
+        "_get_hasher",
+        "_word_ngrams",
+        "_char_ngrams",
+        "_char_wb_ngrams",
+        "get_stop_words",
+    }
+    if overridden.intersection(vars(vectorizer)):
+        return True
+    transformer = getattr(vectorizer, "_tfidf", None)
+    if transformer is not None and "transform" in vars(transformer):
+        return True
+    return vectorizer.input != "content" or any(
+        callable(getattr(vectorizer, name))
+        for name in ("analyzer", "preprocessor", "tokenizer", "strip_accents")
+    )
+
 
 # Signature: (X_pandas, y, params) -> (X_out_pandas, y_out)
 TextApplyFn = Callable[[pd.DataFrame, Any, dict[str, Any]], tuple[pd.DataFrame, Any]]
@@ -300,7 +415,7 @@ def _drop_and_concat_polars(
         node_name="Text vectorizer",
     )
     X_out = X.drop(valid_cols) if drop_original else X
-    return X_out.hstack(encoded_frame)
+    return X_out.hstack(encoded_frame) if X_out.width else encoded_frame
 
 
 def _sklearn_vectorizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:

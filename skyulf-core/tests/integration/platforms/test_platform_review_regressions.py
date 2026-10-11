@@ -18,12 +18,12 @@ import pytest
 import yaml
 
 from skyulf.inference._manifest import ColumnSpec
-from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
 from skyulf.inference.model_set import ComponentReference, save_model_set
 from skyulf.inference.model_set_scoring import score_model_set
 from skyulf.integrations.databricks.data.admission import SingleWriterAdmission
 from skyulf.integrations.databricks.model_sets import model_set_batch as batch
-from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
     build_monitoring_report,
 )
 from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
@@ -93,8 +93,8 @@ def component(tmp_path, kind="float"):
     pipeline = SkyulfPipeline({"preprocessing": steps, "modeling": {"type": "linear_regression"}})
     pipeline.fit(data, target_column="target")
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    loaded = load_local_pipeline(path)
+    save_pipeline(pipeline, path)
+    loaded = load_pipeline(path)
     reference = ComponentReference(
         name="workspace.test.component", version="1", digest=loaded.manifest.pipeline_sha256
     )
@@ -126,8 +126,8 @@ def test_d8_5_save_rejects_key_feature_overlap(tmp_path):
         pd.DataFrame({"x": list(range(12)), "target": np.arange(12.0)}), target_column="target"
     )
     path = tmp_path / "component"
-    save_local_pipeline(pipeline, path)
-    digest = load_local_pipeline(path).manifest.pipeline_sha256
+    save_pipeline(pipeline, path)
+    digest = load_pipeline(path).manifest.pipeline_sha256
     reference = ComponentReference(name="workspace.test.component", version="1", digest=digest)
     with pytest.raises(ValueError, match="[Kk]ey|[Ii]nput|overlap"):
         save_model_set(

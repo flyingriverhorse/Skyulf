@@ -1,24 +1,62 @@
 """Z-Score outlier-removal node."""
 
+from decimal import Decimal
+from numbers import Real
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import ZScoreArtifact
+from .._fitted_validation import local_scalar, local_state_fields
 from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _apply_pandas_mask, _filter_y_polars
+from ._common import _apply_pandas_mask, _filter_y_polars, validate_detector_warnings
+
+
+def _validate_zscore_statistics(stats: Any) -> None:
+    """Keep each learned mean and nonnegative population deviation bound to its column."""
+    if type(stats) is not dict:
+        raise ValueError("Fitted z-score statistics must be a dictionary.")
+    for values in stats.values():
+        if type(values) is not dict or set(values) != {"mean", "std"}:
+            raise ValueError("Fitted z-score entries must contain mean and std.")
+        if any(isinstance(value, bool) or not isinstance(value, Real) for value in values.values()):
+            raise ValueError("Fitted z-score statistics must be real numbers.")
+        if values["std"] < 0:
+            raise ValueError("Fitted z-score deviations must be nonnegative.")
 
 
 class ZScoreApplier(BaseApplier):
     """Drop rows whose |z| against the fitted mean/std exceeds ``threshold`` in any column."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved numeric statistics and native scalar threshold semantics."""
+        if local_state_fields(
+            raw, "zscore", {"type", "stats", "threshold", "warnings"}, allow_empty=True
+        ):
+            _validate_zscore_statistics(raw["stats"])
+            if not isinstance(raw["threshold"], (Real, Decimal)):
+                local_scalar(raw["threshold"], "ZScore threshold")
+            validate_detector_warnings(raw["warnings"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved row filtering without bypassing the prediction row-count guard."""
+        if engine not in ("pandas", "polars"):
+            return None
+        ZScoreApplier.validate_inference_state(state)
+        effect = "filter" if state.get("stats") else "preserve"
+        return ExecutionCapability(engine, "apply", "local", effect, "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

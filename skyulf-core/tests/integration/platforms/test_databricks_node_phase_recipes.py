@@ -8,19 +8,16 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.inference.local_evaluation import evaluate_local_holdout
-from skyulf.inference.local_pipeline import load_local_pipeline, predict_local_pipeline
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline
+from skyulf.inference.pipeline_evaluation import evaluate_holdout
 from skyulf.inference.project_code import load_project_module
 from skyulf.integrations.databricks.projects.project import load_project_workflow
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.training.tuning.local_cv import (
-    LocalCVSpec,
-    evaluate_training_cv,
-)
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec, evaluate_training_cv
 from skyulf.registry import NodeRegistry
 
 CASES = [
@@ -109,7 +106,7 @@ def test_python_recipe_preserves_raw_predictions_after_artifact_reload(
     heldout = raw.iloc[40:].copy()
     native_train = pl.from_pandas(train) if engine == "polars" else train
     path = tmp_path / "artifact"
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=native_train, test=native_train.head(0)),
         target_column="target",
@@ -118,10 +115,10 @@ def test_python_recipe_preserves_raw_predictions_after_artifact_reload(
         max_bytes=1_000_000,
     )
     query = heldout.drop(columns="target")
-    expected = predict_local_pipeline(query, artifact)
+    expected = predict_pipeline(query, artifact)
     source_path.write_text("raise RuntimeError('edited source must not be used')", encoding="utf-8")
-    restored = load_local_pipeline(path)
-    actual = predict_local_pipeline(pl.from_pandas(query), restored)
+    restored = load_pipeline(path)
+    actual = predict_pipeline(pl.from_pandas(query), restored)
     assert restored.manifest.fitted_engine == engine
     assert len(actual) == len(query) == 8
     np.testing.assert_allclose(actual["prediction"], expected["prediction"], atol=1e-10)
@@ -135,13 +132,13 @@ def test_python_recipe_preserves_raw_predictions_after_artifact_reload(
         assert len(state["snapshot"]) == 2
     if family == "temporal":
         with pytest.raises(ValueError, match="row order"):
-            predict_local_pipeline(query.iloc[::-1], restored)
-    evaluation = evaluate_local_holdout(restored, heldout, target_column="target")
+            predict_pipeline(query.iloc[::-1], restored)
+    evaluation = evaluate_holdout(restored, heldout, target_column="target")
     metric = "heldout_accuracy" if family == "resampling" else "heldout_rmse"
     assert np.isfinite(evaluation[metric])
     if family != "temporal":
         cv = evaluate_training_cv(
-            native_train, config, LocalCVSpec(enabled=True, folds=2), target_column="target"
+            native_train, config, CVSpec(enabled=True, folds=2), target_column="target"
         )
         assert cv is not None and cv["aggregated_metrics"]
 
@@ -169,7 +166,7 @@ def test_template_custom_eligibility_example_keeps_only_known_false_flags(engine
         encoding="utf-8"
     )
     module = load_project_module(source)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table="workspace.example.source",
         version=0,
         record_key_columns=("id",),

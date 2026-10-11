@@ -12,6 +12,7 @@ from sklearn.svm import SVC
 from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 from skyulf.modeling._tuning.fold_scoring import wrap_fold_scorer
 from skyulf.modeling._tuning.metrics import resolve_scorer
+from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter, MergedBranchFoldAdapter
 
 
 class FilterScaleEncode:
@@ -99,3 +100,43 @@ def test_custom_multiresponse_scorer_transforms_once_and_preserves_live_pipeline
     with pytest.raises(ValueError, match="changed row count"):
         estimator.predict(X)
     assert worker.transform_calls == 2
+
+
+@pytest.mark.parametrize("encode_evaluation", [False, True])
+def test_ambiguous_overlapping_target_space_fails_loudly(encode_evaluation):
+    """A single overlapping class cannot reveal whether a custom adapter encoded its target."""
+
+    class OverlappingEncoder:
+        """Expose the unresolved original-versus-encoded target contract."""
+
+        def fit_transform(self, X, y):
+            """Train in the encoded space zero/one from original labels one/two."""
+            return X, y - 1
+
+        def transform(self, X, y):
+            """Keep or encode labels while giving the scorer the same ambiguous values."""
+            return X, y - 1 if encode_evaluation else y
+
+    X = pd.DataFrame({"x": [-3.0, -2.0, 2.0, 3.0]})
+    y = pd.Series([1, 1, 2, 2])
+    step = FoldAwareModelStep(LogisticRegression(), OverlappingEncoder()).fit(X, y)
+    rows = slice(2, 4) if encode_evaluation else slice(0, 2)
+    scorer = wrap_fold_scorer(step, "accuracy")
+    with pytest.raises(ValueError, match="[Aa]mbiguous.*target"):
+        scorer(step, X.iloc[rows], y.iloc[rows])
+
+
+@pytest.mark.parametrize("merged", [False, True])
+def test_recorded_target_mapping_resolves_single_overlapping_class(merged):
+    """An explicit decoder must disambiguate held-out subsets for ordinary and merged branches."""
+    steps = [{"name": "labels", "transformer": "LabelEncoder", "params": {"columns": ["target"]}}]
+    adapter = (
+        MergedBranchFoldAdapter([steps, steps], "last_wins", "target")
+        if merged
+        else FeatureEngineerFoldAdapter(steps, "target")
+    )
+    X = pd.DataFrame({"x": [-3.0, -2.0, 2.0, 3.0]})
+    y = pd.Series([1, 1, 2, 2], name="target")
+    step = FoldAwareModelStep(LogisticRegression(), adapter).fit(X, y)
+    scorer = wrap_fold_scorer(step, "accuracy")
+    assert scorer(step, X.iloc[2:], y.iloc[2:]) == pytest.approx(1.0)

@@ -14,12 +14,12 @@ import pytest
 from test_databricks_lifecycle_tasks import _call, staged  # noqa: F401 - shared real-store fixture
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.scoring.batch.local_batch import fit_local_workflow
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     split_labeled_snapshot,
 )
-from skyulf.integrations.databricks.training.shared.local_training_evidence import (
+from skyulf.integrations.databricks.training.shared.training_evidence import (
     build_training_evidence,
     evidence_digest,
     validate_training_evidence,
@@ -32,7 +32,7 @@ from skyulf.integrations.databricks.training.shared.training_parameters import (
 def _spec(weighted=True):
     """Use captured source that must never execute during saved-artifact replay."""
     source = "raise RuntimeError('mutable weight hook executed')\n"
-    return LocalTrainingSpec(
+    return TrainingSpec(
         table="workspace.test.source",
         version=4,
         record_key_columns=("id",),
@@ -102,7 +102,7 @@ def test_saved_weight_summary_and_configured_class_weight_are_logged(tmp_path, c
         "training_weights": summary,
     }
     weights = train.pop("training_weight").to_numpy()
-    artifact = fit_local_workflow(
+    artifact = fit_workflow(
         config,
         SplitDataset(train=train, test=train.head(0), train_sample_weight=weights),
         target_column="target",
@@ -129,39 +129,25 @@ def test_saved_weight_summary_and_configured_class_weight_are_logged(tmp_path, c
 
 def test_template_has_no_separate_weight_hook():
     """New bundles keep the weight declaration beside the selected model settings."""
-    modeling = (
-        Path(__file__).resolve().parents[3]
-        / "templates/databricks/template"
-        / "{{.project_name}}/src/modeling"
-    )
-    assert not (modeling / "weights.py").exists()
-    assert "WEIGHT_COLUMN = " in (modeling / "single_model.py.tmpl").read_text()
-    assert "WEIGHT_COLUMN = " in (modeling / "model_competition.py.tmpl").read_text()
-    assert '"weight_column": ' in (modeling / "multi_model.py.tmpl").read_text()
+    template = Path(__file__).resolve().parents[3] / "templates/databricks"
+    assert not (template / "template/{{.project_name}}/src/modeling").exists()
+    assert "weight_column:" in (template / "library/training_settings.tmpl").read_text()
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
 def test_cli_generates_optional_weight_declaration_for_each_layout(tmp_path, layout):
-    """Default initialization must emit an explicit disabled setting in the model file."""
-    import runpy
-
+    """Default initialization omits inactive weights while retaining unweighted runtime behavior."""
     from test_databricks_bundle_generation import CLI, PROFILE, _generate_project
 
     if not CLI or not PROFILE:
         pytest.skip("Set SKYULF_BUNDLE_CLI_TEST_PROFILE to opt into installed CLI generation.")
     project = _generate_project(tmp_path, training_layout=layout)
-    filename = {
-        "single_model": "single_model.py",
-        "model_competition": "model_competition.py",
-        "multi_target": "multi_model.py",
-    }[layout]
-    settings = runpy.run_path(str(project / "src/modeling" / filename))
-    if layout == "multi_target":
-        assert all(
-            entry["workflow"]["weight_column"] is None for entry in settings["MODELS"].values()
-        )
-    else:
-        assert settings["WEIGHT_COLUMN"] is None
+    from skyulf.integrations.databricks.projects.yaml_config import read_training_config
+    from skyulf.integrations.databricks.projects.yaml_models import model_entries
+
+    document = read_training_config(project / "config")
+    assert document is not None
+    assert all(entry.get("weight_column") is None for entry in model_entries(document).values())
     assert not (project / "src/modeling/weights.py").exists()
 
 
@@ -173,18 +159,18 @@ def test_weighted_lifecycle_preserves_snapshot_and_cleans_monitoring(staged, mon
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )
-    from skyulf.integrations.databricks.training.fitting import local_retraining
+    from skyulf.integrations.databricks.training.fitting import candidate as candidate
 
     _, client, config, _, frame = staged
     explained_columns = []
-    explain = local_retraining.log_training_explanations
+    explain = candidate.log_training_explanations
 
     def record_explanation_inputs(run, artifact, training_frame):
         """Observe the real explanation boundary before its optional SHAP execution."""
         explained_columns.append(list(training_frame.columns))
         return explain(run, artifact, training_frame)
 
-    monkeypatch.setattr(local_retraining, "log_training_explanations", record_explanation_inputs)
+    monkeypatch.setattr(candidate, "log_training_explanations", record_explanation_inputs)
     config["pipeline"]["explainability"] = {
         "method": "shap",
         "max_samples": 4,

@@ -25,7 +25,7 @@ def test_numeric_drift_effect_parity(spark):
     """Distributed CDF integration and reference quantile bins retain Core effect values."""
     import polars as pl
 
-    from skyulf.integrations.databricks.observability.monitoring.local.monitoring_metrics import (
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics import (
         _drift_evidence,
     )
     from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_drift import (

@@ -90,7 +90,7 @@ def test_missing_label_tags_null_nan_and_heldout_values(
         pd.testing.assert_frame_equal(result[["x", "untouched"]], snapshot)
         if custom_labels is None and label_format in ("ordinal", "bin_index"):
             assert result["x_tagged"].dtype == object
-            assert isinstance(result["x_tagged"].iloc[2], float)
+            assert isinstance(result["x_tagged"].iloc[2], int)
     first_edge = expected[0] if include_lowest else "MISSING_TAG"
     assert list(result.columns) == ["x", "untouched", "x_tagged"]
     assert output_target is target

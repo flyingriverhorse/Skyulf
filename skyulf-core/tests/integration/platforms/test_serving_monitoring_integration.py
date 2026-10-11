@@ -7,7 +7,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from skyulf.integrations.databricks.observability.monitoring.local import monitoring_performance
+from skyulf.integrations.databricks.observability.monitoring import (
+    monitoring_performance as monitoring_performance,
+)
 from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
 
 
@@ -171,7 +173,7 @@ def test_serving_rejects_replaced_table_before_publishing_evidence(monkeypatch):
 
 def test_online_observation_routes_event_keys_and_operational_evidence(monkeypatch):
     """Scheduled online reports must use actual events for both metrics and delayed labels."""
-    from skyulf.integrations.databricks.observability.monitoring.local import monitoring
+    from skyulf.integrations.databricks.observability.monitoring import monitoring as monitoring
     from skyulf.integrations.databricks.observability.monitoring.spark import (
         spark_monitoring_metrics,
         spark_monitoring_reference,

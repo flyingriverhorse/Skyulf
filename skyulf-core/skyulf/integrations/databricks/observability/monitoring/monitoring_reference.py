@@ -2,19 +2,23 @@
 
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ....mlflow.registration.registry import load_registered_local_pipeline, resolve_model
+from ....mlflow.registration.registry import (
+    load_registered_pipeline,
+    resolve_model,
+)
 from ....mlflow.shared._client import make_registry_client, require_mlflow
 from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
-from ...training.fitting.local_retraining import read_training_snapshot, split_labeled_snapshot
-from ...training.shared.local_training_evidence import validate_training_evidence
+from ...training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
+from ...training.shared.training_evidence import validate_training_evidence
 from .monitoring_config import MonitorConfig
 
 
-def _document(client: Any, run_id: str, path: str) -> dict:
+def reference_document(client: Any, run_id: str, path: str) -> dict:
     """Read exact saved JSON artifacts through a disposable local directory."""
     with TemporaryDirectory(prefix="skyulf-monitor-reference-") as directory:
         downloaded = client.download_artifacts(run_id, path, directory)
@@ -49,7 +53,7 @@ def load_monitoring_reference(
         train = train.drop(columns=[spec.weight_column])
     policy = config.performance_policy
     if policy and policy.get("mode") != "off" and policy["baseline"]["kind"] == "training_holdout":
-        from .local.monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
+        from .monitoring_performance import measure_holdout_baseline  # noqa: PLC0415
 
         evidence["performance_baseline"] = measure_holdout_baseline(
             artifact, spec, holdout, config, evidence["model_version"], evidence["training_run_id"]
@@ -68,7 +72,7 @@ def load_monitoring_artifact(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    artifact = load_registered_local_pipeline(
+    artifact = load_registered_pipeline(
         resolved,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
@@ -78,8 +82,8 @@ def load_monitoring_artifact(
     model = client.get_model_version(resolved.name, resolved.version)
     if not model.run_id:
         raise ValueError("Monitoring requires a saved training run.")
-    saved = _document(client, model.run_id, "candidate_training_spec.json")
-    filters = _document(client, model.run_id, "training_filter_evidence.json")
+    saved = reference_document(client, model.run_id, "candidate_training_spec.json")
+    filters = reference_document(client, model.run_id, "training_filter_evidence.json")
     if saved.get("engine") != artifact.manifest.fitted_engine:
         raise ValueError("Monitoring reference engine differs from the saved artifact.")
     spec = phase_training_spec(saved, artifact.pipeline.config.get("project_python_source"))
@@ -93,8 +97,34 @@ def load_monitoring_artifact(
         "dataset_id": spec.dataset_id,
         "training_evidence_sha256": spec.training_evidence_sha256,
         "reference_population": "training_partition_excluding_holdout",
+        "model_metadata": _model_metadata(client, model, artifact),
     }
     return artifact, spec, filters, evidence | parent
+
+
+def _model_metadata(client: Any, model: Any, artifact: Any) -> dict:
+    """Capture only operator lineage fields, preserving optional metadata failures."""
+    created = getattr(model, "creation_timestamp", None)
+    aliases = getattr(model, "aliases", None)
+    metadata = {
+        "status": "recorded",
+        "reason": None,
+        "captured_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.fromtimestamp(created / 1000, UTC).isoformat() if created else None,
+        "aliases": sorted(aliases) if aliases is not None else None,
+        "algorithm": artifact.pipeline.config.get("modeling", {}).get("type"),
+        "project_source_sha256": artifact.manifest.project_source_sha256,
+        "training_experiment_id": None,
+        "training_source_commit": None,
+    }
+    try:
+        run = client.get_run(model.run_id)
+        metadata["training_experiment_id"] = str(run.info.experiment_id)
+        metadata["training_source_commit"] = run.data.tags.get("mlflow.source.git.commit")
+    except Exception as exc:  # noqa: BLE001 - optional link metadata cannot invalidate metrics
+        metadata["status"] = "unavailable"
+        metadata["reason"] = f"training_run_metadata:{type(exc).__name__}"
+    return metadata
 
 
 def _verify_model_set(

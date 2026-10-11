@@ -94,9 +94,9 @@ def test_late_labels_do_not_move_prediction_snapshot_past_window(monkeypatch):
     snapshot = Mock(return_value=4)
     monkeypatch.setattr(sources, "snapshot_at", snapshot)
     monkeypatch.setattr(sources, "table_identity", lambda *args: "table-id")
-    monkeypatch.setattr(sources, "_window_receipts", lambda *args: {})
+    monkeypatch.setattr(sources, "window_receipts", lambda *args: {})
     monkeypatch.setattr(sources, "read_snapshot", lambda *args: Mock())
-    monkeypatch.setattr(sources, "_model_predictions", lambda *args: Mock(columns=[]))
+    monkeypatch.setattr(sources, "model_predictions", lambda *args: Mock(columns=[]))
     monkeypatch.setattr(sources.importlib, "import_module", lambda name: Mock())
     monkeypatch.setattr(
         sources, "bounded_frame", lambda *args: pd.DataFrame(columns=["id", "run_id", "prediction"])

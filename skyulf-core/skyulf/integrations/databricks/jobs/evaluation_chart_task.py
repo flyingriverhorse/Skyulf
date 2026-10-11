@@ -103,7 +103,7 @@ def _generate_in_run(store: PhaseStore, tracking_uri: str, destination: str) -> 
 
 def _single_identity(store: PhaseStore) -> tuple[dict, dict | None]:
     """Bind parent evaluation outputs to the verified single fit or competition winner."""
-    from ..training.competition.local_competition import selected_request  # noqa: PLC0415
+    from ..training.competition.competition import selected_request  # noqa: PLC0415
     from .lifecycle.lifecycle_tasks import phase_training_spec  # noqa: PLC0415
 
     config, _ = selected_request(store)

@@ -140,7 +140,9 @@ def test_prediction_transform_checks_every_step_including_plugins(grow):
         },
     ]
     data = pd.DataFrame({"x": [1, 2, 3]})
-    assert len(engineer.transform(data)) == 3
+    expanding_step = "plugin" if grow else "inverse"
+    with pytest.raises(ValueError, match=f"{expanding_step}.*cannot add evaluation rows"):
+        engineer.transform(data)
     with pytest.raises(ValueError, match="plugin.*row count"):
         engineer.transform(data, preserve_rows=True)
 

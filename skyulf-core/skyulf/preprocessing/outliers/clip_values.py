@@ -8,9 +8,11 @@ import polars as pl
 
 from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
+from ...core.portable_state import _normalize
 from ...registry import NodeRegistry
 from ...utils import is_decimal_series
 from .._artifacts import ClipValuesArtifact
+from .._fitted_validation import _fields
 from .._helpers import auto_detect_numeric_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -86,6 +88,23 @@ class ClipValuesApplier(BaseApplier):
     unlike ManualBounds this step also runs on scoring rows.
     """
 
+    @staticmethod
+    def validate_fitted_state(raw: dict) -> dict:
+        """Inspect this node's supported saved state without fitting or applying data."""
+        return _clip_state(raw)
+
+    @staticmethod
+    def resolve_fitted_config(raw: dict, state: dict) -> dict:
+        """Bind inference configuration to this node's inspected fitted artifact."""
+        params = _normalize(raw)
+        params.pop("target_column", None)
+        params.pop("_auto_columns", None)
+        _fields(params, {"bounds"})
+        bounds = _bounds(params["bounds"])
+        if bounds != state["bounds"]:
+            raise ValueError("Configured bounds disagree with fitted clipping bounds.")
+        return {"bounds": bounds}
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Clip the configured columns on the active engine; ``y`` passes through."""
@@ -121,6 +140,7 @@ class ClipValuesApplier(BaseApplier):
     ClipValuesApplier,
     execution_capabilities=(
         ExecutionCapability("pandas", "apply", "python_batch", "preserve", "row"),
+        ExecutionCapability("polars", "apply", "local", "preserve", "row"),
     ),
 )
 @node_meta(
@@ -159,3 +179,26 @@ class ClipValuesCalculator(BaseCalculator):
         if bounds and X is not None:
             _check_columns(X.to_native() if hasattr(X, "to_native") else X, bounds)
         return {"type": "clip_values", "bounds": bounds}
+
+
+def _bounds(raw: Any) -> dict:
+    """Normalize only explicit finite clipping limits."""
+    if type(raw) is not dict or any(type(key) is not str for key in raw):
+        raise ValueError("Clip bounds must map column names to limits.")
+    result = {}
+    for column, bound in raw.items():
+        if type(bound) is not dict or set(bound) - {"lower", "upper"}:
+            raise ValueError("Unknown clipping option.")
+        result[column] = _clean_bound(column, bound)
+    return result
+
+
+def _clip_state(raw: dict) -> dict:
+    """Bind the fitted clipping artifact to its known fixed-bound schema."""
+    state = _normalize(raw)
+    _fields(state, {"type", "bounds"})
+    if state["type"] != "clip_values":
+        raise ValueError("Wrong clipping artifact type.")
+    if state["bounds"] != _bounds(state["bounds"]):
+        raise ValueError("Fitted clipping bounds must be normalized.")
+    return state

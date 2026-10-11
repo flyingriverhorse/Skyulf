@@ -1,13 +1,16 @@
 """Drop-missing-rows node (drop rows with NaNs, y-synced)."""
 
+from numbers import Number
 from typing import Any
 
 import numpy as np
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingRowsArtifact
+from .._fitted_validation import local_state_fields
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
@@ -122,6 +125,32 @@ class DropMissingRowsApplier(BaseApplier):
     names only nonexistent columns collapses to ``None``, which both engines
     read as "check every column" rather than as a no-op.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect the saved policy without filtering data or converting native values."""
+        local_state_fields(
+            raw, "drop_missing_rows", {"type", "subset", "how", "threshold", "missing_threshold"}
+        )
+        _validate_how(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe native filtering; ordinary prediction skips this training policy."""
+        if engine not in ("pandas", "polars"):
+            return None
+        DropMissingRowsApplier.validate_inference_state(state)
+        subset = state["subset"]
+        if subset is not None and not isinstance(subset, (str, list, tuple, dict, set, frozenset)):
+            return None
+        threshold = state["threshold"]
+        if threshold is None:
+            threshold = state["missing_threshold"]
+        if threshold is not None and not isinstance(threshold, (Number, np.bool_)):
+            # Array/Series thresholds can depend on request positions or indexes.
+            return None
+        return ExecutionCapability(engine, "apply", "local", "filter", "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

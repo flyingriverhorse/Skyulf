@@ -1,0 +1,9 @@
+version: 1
+inference_mode: local
+score_source_table: "{catalog}.{input_schema}.sm33_generated_source"
+prediction_table: "{catalog}.{output_schema}.sm33_generated_predictions{resource_suffix}"
+score_model_selection: pinned_version
+model_version: "1"
+model_change_mode: incremental_append
+auto_rebuild_on_cdf_expiry: false
+score_handoff: disabled

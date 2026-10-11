@@ -11,7 +11,7 @@ import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.integrations.databricks.training.fitting import local_retraining as retraining
+from skyulf.integrations.databricks.training.fitting import candidate as retraining
 
 
 def _spec(**changes):
@@ -25,7 +25,7 @@ def _spec(**changes):
         "max_rows": 100,
         "max_bytes": 100000,
     }
-    return retraining.LocalTrainingSpec(**{**values, **changes})
+    return retraining.TrainingSpec(**{**values, **changes})
 
 
 def _frame():
@@ -45,7 +45,7 @@ def test_drop_missing_labels_produces_fit_ready_partitions(tmp_path, engine):
     assert set(train.x).union(heldout.x) == set(range(2, 20))
     assert not train.target.isna().any() and not heldout.target.isna().any()
     native = pl.from_pandas(train) if engine == "polars" else train
-    artifact = retraining.fit_local_workflow(
+    artifact = retraining.fit_workflow(
         {"preprocessing": [], "modeling": {"type": "linear_regression"}},
         SplitDataset(train=native, test=native.head(0)),
         target_column="target",
@@ -54,7 +54,7 @@ def test_drop_missing_labels_produces_fit_ready_partitions(tmp_path, engine):
         max_bytes=100000,
     )
     native_holdout = pl.from_pandas(heldout) if engine == "polars" else heldout
-    metrics = retraining.evaluate_local_holdout(artifact, native_holdout, target_column="target")
+    metrics = retraining.evaluate_holdout(artifact, native_holdout, target_column="target")
     assert metrics["heldout_rmse"] == pytest.approx(0, abs=1e-8)
 
 
@@ -93,7 +93,7 @@ def test_default_policy_preserves_saved_identity_and_missing_target_error():
     )
     payload = retraining.training_spec_payload(spec, "pandas")
     payload.pop("drop_missing_labels", None)
-    restored = retraining.LocalTrainingSpec.from_payload(payload)
+    restored = retraining.TrainingSpec.from_payload(payload)
     assert restored.drop_missing_labels is False
     assert replace(spec, drop_missing_labels=True).dataset_id != spec.dataset_id
     with pytest.raises(ValueError, match="nonnull targets"):
@@ -120,7 +120,7 @@ def test_candidate_tags_survive_fit_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(retraining, "track_run", tracked)
     monkeypatch.setattr(retraining, "fit_candidate", fail_fit)
     with pytest.raises(RuntimeError, match="fit failed"):
-        retraining.train_local_candidate(
+        retraining.train_candidate(
             None,
             _spec(),
             {"preprocessing": [], "modeling": {"type": "linear_regression"}},
@@ -156,7 +156,7 @@ def test_spark_sampling_excludes_missing_targets_before_validation(delta_spark, 
         else {}
     )
     spec = _spec(drop_missing_labels=True, training_sample_rows=8, **settings)
-    sampled, evidence = retraining._sample_training_source(frame, spec)
+    sampled, evidence = retraining.sample_training_source(frame, spec)
     local = sampled.toPandas()
     local.attrs["training_selection"] = evidence
     if filter_times:

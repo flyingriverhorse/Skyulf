@@ -4,10 +4,12 @@ from typing import Any, cast
 
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns
 from .._artifacts import MissingIndicatorArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
@@ -70,6 +72,28 @@ class MissingIndicatorApplier(BaseApplier):
     skipped. A generated flag name matching an existing column raises
     ``ValueError``; input values are never overwritten by flags.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect learned flag selection without detecting missing values again."""
+        local_state_fields(raw, "missing_indicator", {"type", "columns", "flag_suffix"})
+        columns = _columns(raw["columns"])
+        if type(raw["flag_suffix"]) is not str or not raw["flag_suffix"]:
+            raise ValueError("Fitted missing-indicator suffix must be a nonempty string.")
+        validate_generated_column_names(
+            columns,
+            (f"{column}{raw['flag_suffix']}" for column in columns),
+            node_name="MissingIndicator",
+        )
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local saved apply context without granting worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        MissingIndicatorApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

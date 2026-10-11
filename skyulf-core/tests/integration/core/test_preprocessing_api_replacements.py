@@ -174,9 +174,9 @@ def test_replacement_pandas_object_lists_keep_native_duplicate_semantics():
     [([0, 1, 2], "Int64", 0), ([0, 1, 2], "Float64", 0), ([False, True], "boolean", True)],
 )
 def test_replacement_scalar_null_retains_pandas_nullable_dtype(source, dtype, key):
-    """Scalar null replacement must preserve nullable types during artifact replay."""
+    """Scalar null replay keeps exact integer nulls and existing floating/boolean semantics."""
     frame = pd.DataFrame({"value": pd.Series(source, dtype=dtype)})
-    expected = frame["value"].replace(key, None)
+    expected = frame["value"].replace(key, pd.NA if dtype == "Int64" else None)
     artifact = ValueReplacementCalculator().fit(
         frame, {"columns": ["value"], "to_replace": key, "value": None}
     )

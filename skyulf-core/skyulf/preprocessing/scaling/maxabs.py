@@ -6,11 +6,13 @@ import numpy as np
 import polars as pl
 from sklearn.preprocessing import MaxAbsScaler
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import MaxAbsScalerArtifact
+from .._fitted_validation import _columns, local_state_fields
 from .._helpers import (
     decimal_columns_to_float,
     promote_configured_columns_to_float64,
@@ -20,11 +22,35 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _select_subset_pandas, _select_subset_polars
+from ._common import (
+    _select_subset_pandas,
+    _select_subset_polars,
+    divide_polars_column,
+    validate_scaler_vector,
+)
 
 
 class MaxAbsScalerApplier(BaseApplier):
     """Divide the selected columns by their fitted maximum absolute value."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved local statistics without changing them or fitting data."""
+        if local_state_fields(
+            raw, "maxabs_scaler", {"type", "columns", "scale", "max_abs"}, allow_empty=True
+        ):
+            columns = _columns(raw["columns"])
+            validate_scaler_vector(raw["scale"], len(columns), nonnegative=True)
+            validate_scaler_vector(raw["max_abs"], len(columns), nonnegative=True)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe local saved apply context without granting worker execution."""
+        if engine not in ("pandas", "polars"):
+            return None
+        MaxAbsScalerApplier.validate_inference_state(state)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -44,7 +70,13 @@ class MaxAbsScalerApplier(BaseApplier):
         exprs = []
         for col_name in valid:
             s = scale[cols.index(col_name)]
-            exprs.append((pl.col(col_name) / (s if s != 0 else 1.0)).alias(col_name))
+            # NumPy literals carry dtype metadata that Series scalar arithmetic discards.
+            column = (
+                pl.col(col_name)
+                if isinstance(X, pl.LazyFrame) or isinstance(s, np.generic)
+                else X.get_column(col_name)
+            )
+            exprs.append(divide_polars_column(X, column, s).alias(col_name))
         return X.with_columns(exprs), _y
 
     @staticmethod

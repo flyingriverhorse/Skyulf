@@ -21,23 +21,23 @@ from .....inference.project_code import load_project_module, project_source_dige
 from ....mlflow.lifecycle.challenger import ChallengerLifecycle
 from ....mlflow.lifecycle.promotion import AliasChangeReceipt, ExclusiveAliasWriterAdmission
 from ....mlflow.lifecycle.validation import ModelComparisonReport
-from ....mlflow.registration.registry import load_run_local_pipeline
+from ....mlflow.registration.registry import load_run_pipeline
 from ...lifecycle import _lifecycle_data as data_stages
-from ...lifecycle import local_workflow as workflow
+from ...lifecycle import workflow as workflow
 from ...lifecycle._lifecycle_state import (
     PHASE_PREDECESSORS,
     LifecycleContext,
     LifecyclePhaseResult,
     PhaseStore,
 )
-from ...training.competition.local_competition import (
+from ...training.competition.competition import (
     prepare_competition,
     selected_request,
     validate_competition_budget,
 )
-from ...training.fitting import local_retraining as training
-from ...training.shared.local_training_evidence import evidence_digest, validate_training_evidence
-from ...training.tuning.local_cv import LocalCVSpec
+from ...training.fitting import candidate as training
+from ...training.shared.training_evidence import evidence_digest, validate_training_evidence
+from ...training.tuning.cv import CVSpec
 
 __all__ = ["LifecycleContext", "LifecyclePhaseResult", "run_lifecycle_phase"]
 
@@ -52,12 +52,12 @@ class _ReplayEvidence:
     """Keep verified fit metadata within one phase; never reuse it across phase calls."""
 
     artifact: Any
-    spec: training.LocalTrainingSpec
+    spec: training.TrainingSpec
     fitted: dict[str, Any]
     filter_evidence: dict[str, Any]
 
 
-def phase_training_spec(payload: dict[str, Any], source: str | None) -> training.LocalTrainingSpec:
+def phase_training_spec(payload: dict[str, Any], source: str | None) -> training.TrainingSpec:
     """Restore pinned source settings after loading the saved custom-step identities."""
     if source is not None:
         module = load_project_module(source)
@@ -67,7 +67,7 @@ def phase_training_spec(payload: dict[str, Any], source: str | None) -> training
             factory = getattr(module, name, None)
             if factory is not None:
                 factory()
-    return training.LocalTrainingSpec.from_payload(payload)
+    return training.TrainingSpec.from_payload(payload)
 
 
 def _prepare_training_request(
@@ -242,8 +242,11 @@ def _train(spark: Any, store: PhaseStore) -> dict[str, Any]:
         )
         if selection is not None:
             fitted.tags["competition_winner"] = selection["winner"]
-        model_uri = training.log_local_model(
-            path, run_id=store.run_id, tracking_uri=config["tracking_uri"]
+        model_uri = training.log_pipeline_model(
+            path,
+            run_id=store.run_id,
+            tracking_uri=config["tracking_uri"],
+            **training.feature_log_options(spark, fitted.spec),
         )
     output = {
         "model_uri": model_uri,
@@ -272,7 +275,7 @@ def _fit_single_candidate(spark: Any, store: PhaseStore, spec: Any, path: Path) 
         pipeline_config=store.request["effective_config"],
         artifact_path=path,
         engine=config["engine"],
-        cv=LocalCVSpec.from_workflow(config),
+        cv=CVSpec.from_workflow(config),
         risk_category=config.get("risk_category"),
         **_prepared_fit_options(store),
     )
@@ -342,7 +345,7 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
     config, effective_config = selected_request(store)
     if fitted["model_uri"] != f"runs:/{store.run_id}/model":
         raise ValueError("Fitted model source differs from lifecycle invocation.")
-    artifact = load_run_local_pipeline(
+    artifact = load_run_pipeline(
         fitted["model_uri"], digest=fitted["model_digest"], tracking_uri=config["tracking_uri"]
     )
     source = config["pipeline"].get("project_python_source")
@@ -550,11 +553,11 @@ def _compare(spark: Any, store: PhaseStore) -> dict[str, Any]:
     return asdict(result)
 
 
-def _candidate(payload: dict[str, Any]) -> training.LocalCandidateResult:
+def _candidate(payload: dict[str, Any]) -> training.CandidateResult:
     """Restore the SDK result type from verified JSON comparison evidence."""
     values = dict(payload)
     values["comparison"] = ModelComparisonReport(**payload["comparison"])
-    return training.LocalCandidateResult(**values)
+    return training.CandidateResult(**values)
 
 
 def _decide(spark: Any, store: PhaseStore) -> dict[str, Any]:

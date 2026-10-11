@@ -83,7 +83,7 @@ export function useToolbarState() {
     setIsExporting(true);
     try {
       const fn = kind === 'png' ? exportCanvasToPng : exportCanvasToSvg;
-      const result = await fn(`skyulf-canvas.${kind}`);
+      const result = await fn(`kayra-canvas.${kind}`);
       if (!result) {
         toast.error('Export failed', 'Canvas viewport not found');
       } else {

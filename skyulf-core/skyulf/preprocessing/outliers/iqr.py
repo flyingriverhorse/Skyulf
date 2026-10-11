@@ -5,19 +5,45 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import IQRArtifact
+from .._fitted_validation import local_state_fields
 from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _apply_pandas_mask, _filter_y_polars
+from ._common import (
+    _apply_pandas_mask,
+    _filter_y_polars,
+    validate_detector_warnings,
+    validate_fitted_bounds,
+)
 
 
 class IQRApplier(BaseApplier):
     """Drop rows outside the fitted per-column IQR bounds; null/NaN values are kept."""
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect learned quartile limits without recomputing request statistics."""
+        if local_state_fields(
+            raw, "iqr", {"type", "bounds", "multiplier", "warnings"}, allow_empty=True
+        ):
+            validate_fitted_bounds(raw["bounds"], partial=False)
+            validate_detector_warnings(raw["warnings"])
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Describe saved row filtering; prediction still rejects any removed rows."""
+        if engine not in ("pandas", "polars"):
+            return None
+        IQRApplier.validate_inference_state(state)
+        effect = "filter" if state.get("bounds") else "preserve"
+        return ExecutionCapability(engine, "apply", "local", effect, "row")
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

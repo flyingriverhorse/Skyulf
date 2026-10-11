@@ -4,17 +4,20 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime
 from functools import partial
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pandas as pd
 import polars as pl
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines import PolarsEngine
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import DummyEncoderArtifact
 from .._category_keys import uses_category_keys
+from .._fitted_validation import local_boolean, local_state_fields
 from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -184,6 +187,27 @@ def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     return pd.concat([X_out, dummies], axis=1), y
 
 
+def _validate_dummy_category_values(values: Any) -> None:
+    """Require the unique ordered string categories emitted by dummy fitting."""
+    if type(values) not in (list, tuple) or any(not isinstance(value, str) for value in values):
+        raise ValueError("Fitted dummy categories must be ordered strings.")
+    if len(set(values)) != len(values):
+        raise ValueError("Fitted dummy categories must be unique.")
+
+
+def _validate_dummy_categories(raw: dict) -> None:
+    """Inspect the fitted vocabulary and intrinsic indicator-name collisions."""
+    columns = raw["columns"]
+    if type(columns) not in (list, tuple) or any(not isinstance(col, str) for col in columns):
+        raise ValueError("Fitted dummy columns must be a list or tuple of strings.")
+    categories = raw["categories"]
+    if type(categories) is not dict or set(categories) != set(columns):
+        raise ValueError("Fitted dummy categories must match the selected columns.")
+    for values in categories.values():
+        _validate_dummy_category_values(values)
+    _validate_dummy_names(SimpleNamespace(columns=columns), columns, categories, raw["drop_first"])
+
+
 class DummyEncoderApplier(BaseApplier):
     """Replace each categorical column with one ``<col>_<category>`` indicator column.
 
@@ -202,6 +226,29 @@ class DummyEncoderApplier(BaseApplier):
     their original rendering; refit the encoder and downstream model to obtain
     the portable category contract.
     """
+
+    @staticmethod
+    def validate_inference_state(raw: dict) -> dict:
+        """Inspect saved categories without deriving a vocabulary from inference rows."""
+        fields = {"type", "columns", "categories", "drop_first"}
+        if isinstance(raw, dict) and "category_key_version" in raw:
+            fields.add("category_key_version")
+        if not local_state_fields(raw, "dummy_encoder", fields, allow_empty=True):
+            return raw
+        local_boolean(raw["drop_first"], "drop_first")
+        uses_category_keys(raw)
+        _validate_dummy_categories(raw)
+        return raw
+
+    @staticmethod
+    def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
+        """Keep legacy pandas batch rendering visible in the local context declaration."""
+        if engine not in ("pandas", "polars"):
+            return None
+        DummyEncoderApplier.validate_inference_state(state)
+        legacy = state.get("columns") and not uses_category_keys(state)
+        context = "global" if engine == "pandas" and legacy else "row"
+        return ExecutionCapability(engine, "apply", "local", "preserve", context)
 
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ

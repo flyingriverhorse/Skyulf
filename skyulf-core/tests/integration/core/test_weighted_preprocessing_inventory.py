@@ -117,7 +117,7 @@ def test_h3_weights_keep_real_geographic_rows(engine):
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_sentence_embedding_weight_transport_without_model_download(monkeypatch, engine):
-    """Real node encode/concat behavior preserves row weights around a deterministic encoder."""
+    """Real encode/concat preserves row weights with model inference and packaging mocked."""
     from skyulf.preprocessing.vectorization import sentence_embedder
 
     class Encoder:
@@ -132,6 +132,7 @@ def test_sentence_embedding_weight_transport_without_model_download(monkeypatch,
             return np.asarray([[len(value), len(value.split())] for value in text], dtype=float)
 
     monkeypatch.setattr(sentence_embedder, "_load_model", lambda name: Encoder())
+    monkeypatch.setattr(sentence_embedder, "_snapshot_model", lambda model: {})
     X, y = payload(engine)
     engineer = FeatureEngineer(
         [

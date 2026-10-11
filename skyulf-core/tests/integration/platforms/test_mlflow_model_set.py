@@ -150,7 +150,7 @@ def registered_sets(tmp_path, monkeypatch):
     """Publish two real fitted set versions in an isolated SQLite MLflow registry."""
     from skyulf.data.dataset import SplitDataset
     from skyulf.inference.bundle import ColumnSpec
-    from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
     from skyulf.inference.model_set import ComponentReference, save_model_set
     from skyulf.pipeline import SkyulfPipeline
 
@@ -187,8 +187,8 @@ def registered_sets(tmp_path, monkeypatch):
             native = pl.from_pandas(frame) if branch == "right" else frame
             pipeline.fit(SplitDataset(train=native, test=native.head(0)), target_column="target")
             path = tmp_path / f"{branch}-{number}"
-            save_local_pipeline(pipeline, path)
-            local = load_local_pipeline(path)
+            save_pipeline(pipeline, path)
+            local = load_pipeline(path)
             components[branch] = (
                 ComponentReference(
                     name=branch, version=str(number), digest=local.manifest.pipeline_sha256
@@ -269,12 +269,12 @@ def test_model_set_package_loads_in_fresh_process(registered_sets, tmp_path) -> 
 def test_explicit_set_activation_replacement_and_rollback(registered_sets) -> None:
     """One durable set champion switches and restores complete validated releases."""
     client, uri, versions, query, admission = registered_sets
-    from skyulf.integrations.mlflow.models.local_model import log_local_model
+    from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 
     artifact = load_registered_model_set(versions[0], tracking_uri=uri, registry_uri=uri)
     run_id = client.get_model_version("coherent", "1").run_id
     for branch in ("left", "right"):
-        logged = log_local_model(
+        logged = log_pipeline_model(
             artifact.directory / "components" / branch,
             run_id=run_id,
             artifact_path=branch,

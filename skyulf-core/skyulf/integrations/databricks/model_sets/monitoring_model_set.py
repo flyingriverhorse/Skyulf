@@ -14,9 +14,9 @@ from ..observability.monitoring.monitoring_registration import (
     monitoring_destination,
 )
 from ..observability.monitoring.monitoring_store import (
-    _validate_activation_order,
     enroll_monitor,
     ensure_monitoring_store,
+    validate_activation_order,
 )
 
 
@@ -88,7 +88,7 @@ def register_set_monitors(
         return None
     configs = validate_component_monitoring(workflow, values, settings, resolved, artifact)
     if activation_started_ms is not None:
-        _validate_activation_order(activation_started_ms)
+        validate_activation_order(activation_started_ms)
     with notebook_task("monitoring.ensure_store", None):
         ensure_monitoring_store(spark, *namespace.split("."))
     for config in configs:

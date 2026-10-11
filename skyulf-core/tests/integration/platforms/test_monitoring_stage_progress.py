@@ -63,7 +63,7 @@ def test_reference_progress_covers_each_population_and_holdout(monkeypatch, caps
     monkeypatch.setattr(reference, "read_training_snapshot", lambda *a: frame)
     monkeypatch.setattr(reference, "make_registry_client", Mock())
     monkeypatch.setattr(reference, "require_mlflow", Mock())
-    monkeypatch.setattr(reference, "_document", lambda *a: {})
+    monkeypatch.setattr(reference, "reference_document", lambda *a: {})
     monkeypatch.setattr(reference, "validate_source_evidence", Mock())
     monkeypatch.setattr(reference, "validate_training_evidence", Mock())
     monkeypatch.setattr(

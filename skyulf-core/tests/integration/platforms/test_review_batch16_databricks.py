@@ -8,10 +8,7 @@ import pytest
 from skyulf.data.dataset import SplitDataset
 from skyulf.integrations.databricks.training.thresholds.decision_thresholds import manual_thresholds
 from skyulf.integrations.databricks.training.thresholds.threshold_training import _calibration_data
-from skyulf.integrations.databricks.training.tuning.local_cv import (
-    LocalCVSpec,
-    validate_fold_membership,
-)
+from skyulf.integrations.databricks.training.tuning.cv import CVSpec, validate_fold_membership
 from skyulf.preprocessing._target_labels import encoded_label
 
 
@@ -23,7 +20,7 @@ def test_shuffle_admission_uses_actual_twenty_percent_folds(engine):
         frame = pl.from_pandas(frame)
     validate_fold_membership(
         frame,
-        LocalCVSpec(enabled=True, folds=10, method="shuffle_split"),
+        CVSpec(enabled=True, folds=10, method="shuffle_split"),
         "target",
         "regression",
         None,

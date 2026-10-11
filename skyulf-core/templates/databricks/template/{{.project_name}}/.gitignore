@@ -1,3 +1,5 @@
 .databricks/
 __pycache__/
 *.pyc
+.skyulf-yaml-backup/
+.skyulf-yaml-stage-*/

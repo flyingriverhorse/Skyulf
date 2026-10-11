@@ -10,7 +10,7 @@ from typing import Any
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
 from ...mlflow.runs.tracking import TrackingRun
-from ..training.shared.local_training_evidence import evidence_digest
+from ..training.shared.training_evidence import evidence_digest
 
 PHASE_PREDECESSORS = {
     "load_data": "prepare",

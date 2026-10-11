@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks.data.training.training_dates import TrainingDateSpec
-from skyulf.integrations.databricks.training.fitting.local_retraining import (
-    LocalTrainingSpec,
+from skyulf.integrations.databricks.training.fitting.candidate import (
+    TrainingSpec,
     read_training_snapshot,
     split_labeled_snapshot,
 )
@@ -20,7 +20,7 @@ from skyulf.integrations.databricks.training.fitting.local_retraining import (
 
 def _spec(table, **changes):
     """Use exact boundaries so timezone drift changes observable row membership."""
-    return LocalTrainingSpec(
+    return TrainingSpec(
         table=table,
         version=0,
         start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -54,7 +54,7 @@ def test_date_free_delta_snapshot_stays_pinned_and_bounded(delta_spark, source_t
         [("a" if i < 10 else "b", i % 10, float(i), float(2 * i)) for i in reversed(range(20))],
         "tenant string, id long, x double, target double",
     ).write.format("delta").saveAsTable(source_table)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("tenant", "id"),
@@ -91,7 +91,7 @@ def test_random_delta_result_filtering_without_event_date(delta_spark, source_ta
         ],
         "id long, x double, target double, available string",
     ).write.format("delta").saveAsTable(source_table)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("id",),
@@ -250,7 +250,7 @@ def test_seeded_sample_selects_before_local_transfer_and_replays(delta_spark, so
         "id", "cast(id as double) x", "cast(id * 2 as double) target"
     )
     source.repartition(3).write.format("delta").saveAsTable(source_table)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("id",),
@@ -289,7 +289,7 @@ def test_sampling_filters_availability_before_selecting_keys(delta_spark, source
     delta_spark.createDataFrame(
         rows, "id long, available timestamp, x double, target double"
     ).write.format("delta").saveAsTable(source_table)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("id",),
@@ -318,7 +318,7 @@ def test_sample_key_named_count_and_nan_target_validation(delta_spark, source_ta
     delta_spark.createDataFrame(rows, "count long, x double, target double").write.format(
         "delta"
     ).saveAsTable(source_table)
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("count",),
@@ -347,7 +347,7 @@ def test_explicit_target_filter_runs_after_bounded_sample(delta_spark, source_ta
         "transformer": "DropMissingRows",
         "params": {"subset": ["target"]},
     }
-    spec = LocalTrainingSpec(
+    spec = TrainingSpec(
         table=source_table,
         version=0,
         record_key_columns=("id",),

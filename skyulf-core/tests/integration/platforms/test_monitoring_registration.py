@@ -332,8 +332,8 @@ def test_score_notebook_registers_actual_result(monkeypatch):
     import json
 
     from skyulf.integrations.databricks.jobs.shared import job_runtime
-    from skyulf.integrations.databricks.lifecycle.local_workflow import BundleActionResult
-    from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+    from skyulf.integrations.databricks.lifecycle.workflow import BundleActionResult
+    from skyulf.integrations.databricks.scoring.incremental.incremental_batch import (
         IncrementalBatchResult,
     )
 

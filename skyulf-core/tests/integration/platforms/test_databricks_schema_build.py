@@ -27,6 +27,17 @@ def test_ensemble_expansion_has_unique_ordered_candidate_fields():
     orders = [field["order"] for field in properties.values()]
     assert "SLOT" not in rendered
     assert len(orders) == len(set(orders))
+    assert all(isinstance(order, int) for order in orders)
+    assert (
+        properties["source_table_name"]["order"]
+        < properties["score_source_table_name"]["order"]
+        < properties["prediction_table_name"]["order"]
+    )
+    assert (
+        properties["target_column"]["order"]
+        < properties["training_version"]["order"]
+        < properties["cv_enabled"]["order"]
+    )
     for slot in range(1, 9):
         name = f"competition_ensemble_{slot}_regression_base_count"
         assert name in properties
@@ -40,6 +51,18 @@ def test_ensemble_group_rejects_names_without_slot(tmp_path):
     (tmp_path / "competition_ensemble.json").write_text('{"shared": {"order": 0}}')
     with pytest.raises(ValueError, match="must start with competition_ensemble_SLOT_"):
         build(tmp_path)
+
+
+def test_ensemble_group_rejects_explicit_generated_position():
+    """A hand-written position must not silently override a generated model menu."""
+    expand = runpy.run_path(str(ROOT / "build_schema.py"))["_ensemble_questions"]
+    fields = json.loads((ROOT / "schema/competition_ensemble.json").read_text())
+    fields["competition_ensemble_SLOT_regression_base_2"] = {
+        **fields["competition_ensemble_SLOT_regression_base_1"],
+        "default": "lasso",
+    }
+    with pytest.raises(ValueError, match="Duplicate ensemble question.*regression_base_2"):
+        expand(fields)
 
 
 @pytest.mark.parametrize("duplicate", ["within_file", "across_files"])
@@ -66,6 +89,28 @@ def test_schema_properties_follow_prompt_order(tmp_path):
     result = json.loads(build(tmp_path))
     assert result["welcome_message"] == "Hello"
     assert list(result["properties"]) == ["first", "later"]
+
+
+def test_duplicate_prompt_orders_fail_with_both_field_names(tmp_path):
+    """Ambiguous wizard sequencing must fail during generation, before CLI use."""
+    build = runpy.run_path(str(ROOT / "build_schema.py"))["render_schema"]
+    (tmp_path / "metadata.json").write_text("{}")
+    (tmp_path / "prompts.json").write_text('{"source": {"order": 7}, "scoring": {"order": 7}}')
+    with pytest.raises(ValueError, match="Duplicate prompt order 7: source, scoring"):
+        build(tmp_path)
+
+
+def test_schema_rejects_prompt_order_precision_instead_of_truncating(tmp_path):
+    """A malformed insertion position must not silently change wizard sequencing."""
+    build = runpy.run_path(str(ROOT / "build_schema.py"))["render_schema"]
+    source = tmp_path / "schema"
+    shutil.copytree(ROOT / "schema", source)
+    path = source / "project.json"
+    fields = json.loads(path.read_text(encoding="utf-8"))
+    fields["training_version"]["order"] = 12.19
+    path.write_text(json.dumps(fields), encoding="utf-8")
+    with pytest.raises(ValueError, match="training_version.*one decimal place"):
+        build(source)
 
 
 def test_schema_keeps_each_prompt_on_one_line(tmp_path):

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from skyulf.integrations.databricks.data.admission import BatchConflictError
-from skyulf.integrations.databricks.scoring.incremental.local_incremental import (
+from skyulf.integrations.databricks.scoring.incremental.incremental_batch import (
     select_incremental_rows,
 )
 
