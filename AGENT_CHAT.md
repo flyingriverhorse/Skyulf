@@ -27,25 +27,20 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Latest handoff
 
-C218-COMMIT-DONE | 2026-10-10T21:10:08Z | Codex/root -> peers | RESULT | reply:C218-COMMIT-CLAIM
-Task218 DCO commit completed with title:
-feat(databricks): add guarded serving rollout and online feature lookup.
-See git log for final hash after this coordination-only amend. No push.
-All applicable pre-commit hooks passed (schema, whitespace, YAML/JSON, Ruff,
-format, full CI Ty and CCN10). Frontend hooks skipped: no frontend changes.
-Whole Ruff and strict MkDocs passed.539runtime/676test files still match the
-native final6 package; passed pytest groups were not repeated unchanged.
-Record: initiatives/spark_and_mlflow/218-rollout-online-features.md.
+C224-CLEAN-DONE | 2026-10-10T22:14:41Z | Codex/root -> peers | RESULT | reply:none
+Completed authorized permanent local cleanup after user explicitly approved
+the disclosed scope. Removed 765 generated pytest directory roots and 12
+superseded plans: 141795 files / 3005573871 content bytes. All 777 targets
+confirmed absent; no remaining failure. Retained 8199 prior files; only
+README intentionally changed. Other 8198 size/mtime checks, 232 document
+SHA256 checks, 509 baseline link targets and 30 new document links passed.
+README points to Task223 (S01 READY, 0/8) and OPEN_QUEUE_updated.md.
+Evidence and 12 plan-to-result mappings: 224-folder-cleanup.md. Removed the
+three temporary inventory/result JSON helpers after checks. No ACL changes.
+No source-code/cloud/public-doc changes; no runtime tests or MkDocs build.
+git diff --check passed; no commit/push, branch 093, HEAD 1e4802cd.
+Nine deleted plans and README are tracked; three deleted plans and Task224
+are ignored. Task223 previous handoff is recorded in its own document.
 
-User next requests streaming but asks what publication selection enables.
-Explained: include_online_publication only adds a sync job; it does not make
-the endpoint use Lakebase. Native model lookup packaging and published features
-are separate prerequisites. Scope is not settled between continuous feature
-sync (Delta->Lakebase) and continuous prediction (Delta->prediction table).
-User answered the scope question with clarification questions, not a selection.
-No streaming implementation/config/cloud changes have been made.
-
-C218-COMMIT-RELEASE | 2026-10-10T21:10:08Z | Codex/root -> peers | RELEASE | reply:C218-COMMIT-DONE
-All Task218 source/test/docs/task/queue claims released. No peer question or
-active claim. Preserve the separate streaming scope discussion; no agent has
-been started for it. This coordination-only update is included in the commit.
+C224-CLEAN-RELEASE | 2026-10-10T22:14:41Z | Codex/root -> peers | RELEASE | reply:C224-CLEAN-DONE
+Released all claimed paths. No open peer questions or active claims.
