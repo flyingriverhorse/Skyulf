@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mlflow-model-packaging-development" class="md-skip">
+        <a href="#mlflow-model-packaging" class="md-skip">
           Skip to content
         </a>
       
@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1612,10 +1640,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#library-layout-and-compatibility" class="md-nav__link">
+  <a href="#library-layout-and-upgrades" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Library layout and compatibility
+        Library layout and upgrades
       
     </span>
   </a>
@@ -1623,15 +1651,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fitted-local-pipelines-pandas-or-polars" class="md-nav__link">
+  <a href="#fitted-pipelines-pandas-or-polars" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fitted local pipelines (pandas or Polars)
+        Fitted pipelines (pandas or Polars)
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Fitted local pipelines (pandas or Polars)">
+    <nav class="md-nav" aria-label="Fitted pipelines (pandas or Polars)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1733,14 +1761,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1768,7 +1852,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2048,7 +2132,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3574,20 +3658,22 @@
   
 
 
-<h1 id="mlflow-model-packaging-development">MLflow model packaging (development)</h1>
-<h2 id="library-layout-and-compatibility">Library layout and compatibility</h2>
+<h1 id="mlflow-model-packaging">MLflow model packaging</h1>
+<h2 id="library-layout-and-upgrades">Library layout and upgrades</h2>
 <p>MLflow implementation lives under <code>skyulf.integrations.mlflow</code>: <code>models</code> owns
 pyfunc adapters, <code>spark</code> owns distributed prediction and worker environments,
 <code>lifecycle</code> owns validation and champion/challenger decisions, <code>registration</code>
 owns registry resolution, and <code>runs</code> owns tracking. Shared client, signature and
 nullable transport helpers live in <code>shared</code>.</p>
-<p>Use these grouped paths in new code. Released flat import paths remain available
-through lazy <code>_compat</code> aliases, including classes referenced in saved models.
-The root still exports <code>TrackingConfig</code>, <code>TrackingRun</code> and <code>track_run</code> without
-loading the optional MLflow dependency. Worker wheels and source certificates
-continue to cover the entire <code>skyulf</code> package.</p>
-<h2 id="fitted-local-pipelines-pandas-or-polars">Fitted local pipelines (pandas or Polars)</h2>
-<p>Use a <strong>local pipeline artifact</strong> when fitted preprocessing contains nodes that
+<p>Use these grouped paths directly. The former <code>local_model</code> and
+<code>local_feature_model</code> modules and their renamed APIs have been removed. Saved
+packages that reference removed paths may require rebuilding and logging with
+the current imports; see <a href="databricks_sdk.html#upgrading-integration-code">upgrading integration code</a>.
+The root exports <code>TrackingConfig</code>, <code>TrackingRun</code> and <code>track_run</code> without loading
+the optional MLflow dependency. Worker wheels and source certificates cover the
+entire <code>skyulf</code> package.</p>
+<h2 id="fitted-pipelines-pandas-or-polars">Fitted pipelines (pandas or Polars)</h2>
+<p>Use a <strong>fitted pipeline artifact</strong> when fitted preprocessing contains nodes that
 the portable Spark bundle does not yet support, such as categorical encoding or
 binning. This path saves the whole fitted pipeline, its recorded training engine,
 raw and model-feature column order and dtypes, dependency versions, and a payload
@@ -3596,32 +3682,32 @@ Spark-capable <code>InferenceBundle</code> described below.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.local_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">load_local_pipeline</span><span class="p">,</span>
-    <span class="n">predict_local_pipeline</span><span class="p">,</span>
-    <span class="n">save_local_pipeline</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.fitted_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">load_pipeline</span><span class="p">,</span>
+    <span class="n">predict_pipeline</span><span class="p">,</span>
+    <span class="n">save_pipeline</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_local_model</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.pipeline_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_pipeline_model</span>
 
 <span class="c1"># fitted_pipeline was already trained on pandas or Polars data.</span>
-<span class="n">save_local_pipeline</span><span class="p">(</span><span class="n">fitted_pipeline</span><span class="p">,</span> <span class="s2">"artifacts/local-pipeline"</span><span class="p">)</span>
+<span class="n">save_pipeline</span><span class="p">(</span><span class="n">fitted_pipeline</span><span class="p">,</span> <span class="s2">"artifacts/fitted-pipeline"</span><span class="p">)</span>
 <span class="n">config</span> <span class="o">=</span> <span class="n">TrackingConfig</span><span class="p">(</span>
     <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"sqlite:///mlflow.db"</span><span class="p">,</span>
     <span class="n">experiment_name</span><span class="o">=</span><span class="s2">"customer-risk"</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">with</span> <span class="n">track_run</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">run_name</span><span class="o">=</span><span class="s2">"fit-2026-09"</span><span class="p">)</span> <span class="k">as</span> <span class="n">run</span><span class="p">:</span>
-    <span class="n">model_uri</span> <span class="o">=</span> <span class="n">log_local_model</span><span class="p">(</span>
-        <span class="s2">"artifacts/local-pipeline"</span><span class="p">,</span>
+    <span class="n">model_uri</span> <span class="o">=</span> <span class="n">log_pipeline_model</span><span class="p">(</span>
+        <span class="s2">"artifacts/fitted-pipeline"</span><span class="p">,</span>
         <span class="n">run_id</span><span class="o">=</span><span class="n">run</span><span class="o">.</span><span class="n">run_id</span><span class="p">,</span>
         <span class="n">artifact_path</span><span class="o">=</span><span class="s2">"model"</span><span class="p">,</span>
         <span class="n">tracking_uri</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">tracking_uri</span><span class="p">,</span>
     <span class="p">)</span>
 
 <span class="n">request_frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"age"</span><span class="p">:</span> <span class="p">[</span><span class="mf">42.0</span><span class="p">],</span> <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="mf">72000.0</span><span class="p">]})</span>
-<span class="n">local</span> <span class="o">=</span> <span class="n">load_local_pipeline</span><span class="p">(</span><span class="s2">"artifacts/local-pipeline"</span><span class="p">)</span>
-<span class="n">local_predictions</span> <span class="o">=</span> <span class="n">predict_local_pipeline</span><span class="p">(</span><span class="n">request_frame</span><span class="p">,</span> <span class="n">local</span><span class="p">)</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">load_pipeline</span><span class="p">(</span><span class="s2">"artifacts/fitted-pipeline"</span><span class="p">)</span>
+<span class="n">direct_predictions</span> <span class="o">=</span> <span class="n">predict_pipeline</span><span class="p">(</span><span class="n">request_frame</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
 <span class="n">mlflow</span><span class="o">.</span><span class="n">set_tracking_uri</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">tracking_uri</span><span class="p">)</span>
 <span class="n">pyfunc_predictions</span> <span class="o">=</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">pyfunc</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_uri</span><span class="p">)</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">request_frame</span><span class="p">)</span>
 </code></pre></div>
@@ -3645,7 +3731,7 @@ preprocessing handles them; the adapter does not fill them or retrain an imputer
 integer or Boolean values pass their primitive signature. Floating-point
 columns keep numeric signatures and do not need this string transport.</p>
 <p>Use the public helper with a loaded model:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.local_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_pyfunc_input</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.pipeline_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_pyfunc_input</span>
 
 <span class="n">loaded</span> <span class="o">=</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">pyfunc</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_uri</span><span class="p">)</span>
 <span class="c1"># raw_frame contains the original, typed values expected by this artifact.</span>
@@ -3657,7 +3743,7 @@ columns keep numeric signatures and do not need this string transport.</p>
 the fitted cleaning steps. A pipeline with no suitable missing-value handler
 can still fail in its model. The helper preserves input order and index and
 does not mutate the caller's frame. It is needed only at the MLflow boundary;
-direct <code>predict_local_pipeline</code> calls continue to take native values.
+direct <code>predict_pipeline</code> calls continue to take native values.
 Call the helper once: it accepts native values and deliberately rejects
 already encoded strings. REST/JSON clients can send the declared strings and
 nulls directly; they do not call this Python helper.</p>
@@ -3685,34 +3771,13 @@ prediction-output limitations. See
 <a href="https://mlflow.org/docs/latest/model/signatures/">MLflow signature validation</a>.</p>
 <p>For classifiers, the output is <code>prediction</code> followed by
 <code>probability_0</code>, <code>probability_1</code>, and so on in the saved model class order. Pass
-<code>use_tuned_thresholds=True</code> to <code>save_local_pipeline</code> only when the fitted
+<code>use_tuned_thresholds=True</code> to <code>save_pipeline</code> only when the fitted
 pipeline has stored tuned thresholds and those decisions are intended for this
 artifact; otherwise predictions use the estimator's default decision rule.
-The current parity evidence is deliberately narrow:</p>
-<table>
-<thead>
-<tr>
-<th>Model family</th>
-<th>Fitted engines</th>
-<th>Verified preprocessing and outputs</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>scikit-learn linear regression</td>
-<td>pandas, Polars</td>
-<td>One-hot encoding; custom binning followed by one-hot encoding; <code>prediction</code></td>
-</tr>
-<tr>
-<td>scikit-learn logistic regression</td>
-<td>pandas, Polars</td>
-<td>Class order, probabilities and explicit tuned decisions</td>
-</tr>
-</tbody>
-</table>
-<p>Other model families, input dtypes, and context-dependent nodes need their own
-parity checks before production use. The manifest records the concrete model
-class so a later preflight can compare it with this evidence.</p>
+Validate replay for the actual recipe, input dtypes and estimator you package.
+Use <a href="preprocessing_context.html">preprocessing diagnostics</a> to inspect saved-state
+and request-context behavior; compare direct and pyfunc predictions with the
+same typed features. Diagnostic success does not grant worker eligibility.</p>
 <p>This package retains its <code>whole_frame_local</code> scope. It supports bounded local
 batch inference, including inside a Databricks Python task with the recorded
 dependencies installed. It does <strong>not</strong> certify independent HTTP row requests,
@@ -3809,11 +3874,12 @@ Choose a fresh artifact path for each model; uploading the same run/path is
 not an atomic publish operation and may overwrite files. Logging failures
 propagate to the caller even when tracking was configured with <code>warn</code>.
 Producer project files and the temporary source bundle path are excluded.</p>
-<p>This stage provides local MLflow pyfunc packaging. The optional registry adapter
-can now publish and resolve concrete local registry versions; live Unity Catalog,
-Databricks job delivery, Delta batch sinks, and Spark UDF/endpoint adapters
-remain later initiative tasks. Until those platform gates are complete,
-<code>load_model</code> plus <code>predict</code> is the supported pyfunc packaging contract.</p>
+<p>Use the <a href="mlflow_registry.html">registry guide</a> to register a concrete run artifact
+and manage candidate/champion versions. The <a href="databricks_sdk.html">Databricks Python SDK</a>
+adds pinned UC source reads and bounded Delta publication; the
+<a href="databricks_bundle.html">Bundle guide</a> describes distributed scoring and deployment
+settings. Those integrations keep their own schema, context and admission checks;
+logging a model alone does not deploy it or create a prediction table.</p>
 
 
 

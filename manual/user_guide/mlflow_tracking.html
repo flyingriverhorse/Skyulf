@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/mlflow_tracking.html">
       
       
-        <link rel="prev" href="inference_flow.html">
+        <link rel="prev" href="preprocessing_context.html">
       
       
         <link rel="next" href="mlflow_models.html">
@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1533,6 +1561,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="mlflow_tracking.html" class="md-nav__link md-nav__link--active">
         
   
@@ -1549,6 +1595,47 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#training-datasets-in-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training datasets in Inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training-preprocessing-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training preprocessing diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1646,14 +1733,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1681,7 +1824,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -1961,7 +2104,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3491,7 +3634,7 @@
 <p>Skyulf Core keeps experiment tracking separate from training and inference. The
 base installation does not import or require MLflow. Install the optional
 extra only for jobs that should create tracking runs:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core<span class="o">[</span>mlflow<span class="o">]</span>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"skyulf-core[mlflow]"</span>
 <span class="c1"># or, from this repository:</span>
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements-mlflow.txt
 </code></pre></div>
@@ -3532,8 +3675,73 @@ does not write backend job metadata itself. A successful context terminates its
 own run as <code>FINISHED</code>; an exception in the training body terminates it as
 <code>FAILED</code>.</p>
 <p>This adapter creates tracking metadata. See <a href="mlflow_models.html">MLflow models</a>
-to package a fitted inference bundle in the same run. Registry/Unity Catalog,
-Delta batch publication and Databricks deployment remain later stages.</p>
+to package a fitted pipeline or portable inference bundle in the same run, and
+<a href="mlflow_registry.html">MLflow registry</a> to register and resolve model versions.
+<a href="databricks_batch.html">Databricks publication</a> has a separate data-write contract.</p>
+<h2 id="training-datasets-in-inputs">Training datasets in Inputs</h2>
+<p>Databricks candidate training records two native MLflow dataset inputs on the
+run that produces the model: <code>training</code> and <code>holdout</code>. This happens automatically
+for <code>train_candidate</code> and generated Bundle training jobs, with either pandas or
+Polars. Calling <code>SkyulfPipeline.fit</code> alone does not create a tracking run.</p>
+<p>Open the registered model version, follow its source run, then open <strong>Inputs</strong>.
+For a model competition, each fitted candidate has its own inputs and the winning
+model's parent run records the selected candidate's inputs. For multiple targets,
+inspect the individual model's run; the orchestration parent does not fit a model.</p>
+<table>
+<thead>
+<tr>
+<th>Evidence</th>
+<th>Where to inspect it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Actual fitted and held-out row counts, schema and digest</td>
+<td>The <code>training</code> and <code>holdout</code> dataset entries. Counts describe the bounded splits after source filtering and sampling, rather than the entire Delta table.</td>
+</tr>
+<tr>
+<td>Original Delta table and pinned version, including version <code>0</code></td>
+<td>Each dataset's source metadata. Native Unity Catalog identity is included when captured inside Databricks.</td>
+</tr>
+<tr>
+<td>Model feature names, target and optional weight column</td>
+<td>Input tags <code>skyulf.feature_columns</code>, <code>skyulf.target_column</code> and <code>skyulf.weight_column</code>. A target or weight column is not an input feature merely because it appears in a dataset schema.</td>
+</tr>
+<tr>
+<td>Split, sampling, source identity and feature lookup evidence</td>
+<td><strong>Artifacts &gt; dataset_inputs.json</strong>. Each input's source metadata references this artifact and its SHA-256 digest.</td>
+</tr>
+</tbody>
+</table>
+<p>The dataset represents the frame passed to fitting or final evaluation, before
+the pipeline's fitted preprocessing transforms it. Sample weights are supplied
+separately to fitting; their column role and existing weight evidence remain in
+the provenance. Cross-validation folds do not create a fictitious validation
+split in this view.</p>
+<p>Inputs are metadata, not an additional upload of every data row or a backup of
+the source table. The native Delta source identifies the originating snapshot;
+loading that source alone does not reconstruct filtering, sampling or split
+membership. Keep the referenced Delta versions and the run's existing artifacts
+for reproducibility. Later table updates do not rewrite previously logged inputs.</p>
+<p>For custom tracked code, <code>run.log_inputs(dataset_inputs)</code> accepts native
+<code>mlflow.entities.DatasetInput</code> records and writes to that handle's explicit run
+ID. It follows the same disabled-tracking and failure-policy behavior as the
+other logging methods. See the native
+<a href="https://www.mlflow.org/docs/latest/api_reference/python_api/mlflow.client.html#mlflow.client.MlflowClient.log_inputs">MLflow client API</a>
+for the dataset input format.</p>
+<h2 id="training-preprocessing-diagnostics">Training preprocessing diagnostics</h2>
+<p>Candidate training can log a saved-state diagnostic by setting
+<code>TrainingSpec(..., preprocessing_probe=True)</code>, or <code>defaults.preprocessing_probe:
+true</code> in a generated Bundle's <code>config/training.yml</code>. It defaults to off. The
+training run's <strong>Artifacts</strong> tab contains <code>preprocessing_probe.json</code>; competition
+and multi-target layouts record it on the run that actually fitted each pipeline.
+The training report displays it under <strong>Preprocessing diagnostics</strong>.</p>
+<p>The check uses the saved/reloaded artifact and at most the first 256 holdout rows,
+with an 8 MiB input/output limit. It neither refits nor controls promotion.
+See <a href="preprocessing_context.html">preprocessing diagnostics and context</a> for the
+runnable example and interpretation of <code>passed</code>, <code>failed</code>, <code>requires_context</code>,
+<code>not_run</code> and unsupported empty input. MLflow artifact-write failures retain the
+training workflow's failure policy.</p>
 
 
 

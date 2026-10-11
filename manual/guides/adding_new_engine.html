@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adding-a-new-compute-engine-dask-spark-etc" class="md-skip">
+        <a href="#adding-a-compute-engine" class="md-skip">
           Skip to content
         </a>
       
@@ -1037,10 +1037,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#architecture-overview" class="md-nav__link">
+  <a href="#register-the-adapter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Architecture Overview
+        Register the adapter
       
     </span>
   </a>
@@ -1048,71 +1048,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#steps-to-add-a-new-engine" class="md-nav__link">
+  <a href="#implement-supported-operations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Steps to Add a New Engine
+        Implement supported operations
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Steps to Add a New Engine">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-implement-the-engine-class" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Implement the Engine Class
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-register-the-engine" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Register the Engine
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-update-nodes-optional-but-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Update Nodes (Optional but Recommended)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-update-data-ingestion" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Update Data Ingestion
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
+  <a href="#verify-and-document-the-boundary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Summary
+        Verify and document the boundary
       
     </span>
   </a>
@@ -1633,7 +1583,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1766,14 +1744,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../user_guide/databricks_local_sdk.html" class="md-nav__link">
+      <a href="../user_guide/databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1801,7 +1835,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2081,7 +2115,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3607,79 +3641,52 @@
   
 
 
-<h1 id="adding-a-new-compute-engine-dask-spark-etc">Adding a New Compute Engine (Dask, Spark, etc.)</h1>
-<p>Skyulf is designed to be engine-agnostic. While it currently supports <strong>Pandas</strong> and <strong>Polars</strong>, the architecture allows for adding distributed computing engines like <strong>Dask</strong> or <strong>Spark</strong> (via PySpark) without rewriting the entire codebase.</p>
-<h2 id="architecture-overview">Architecture Overview</h2>
-<p>The core abstraction is the <code>EngineRegistry</code> and the <code>BaseEngine</code> interface.</p>
-<ol>
-<li><strong>Engine Registry:</strong> <code>skyulf.engines.registry.EngineRegistry</code> manages available engines.</li>
-<li><strong>Base Engine:</strong> <code>skyulf.engines.base.BaseEngine</code> defines the contract that all engines must fulfill.</li>
-<li><strong>Nodes:</strong> <code>Calculator</code> and <code>Applier</code> classes use the engine to perform operations.</li>
-</ol>
-<h2 id="steps-to-add-a-new-engine">Steps to Add a New Engine</h2>
-<h3 id="1-implement-the-engine-class">1. Implement the Engine Class</h3>
-<p>Create a new file in <code>skyulf-core/skyulf/engines/</code> (e.g., <code>dask_engine.py</code>).</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Union</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">dask.dataframe</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dd</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.engines.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEngine</span>
-
-<span class="k">class</span><span class="w"> </span><span class="nc">DaskEngine</span><span class="p">(</span><span class="n">BaseEngine</span><span class="p">):</span>
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">"dask"</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">is_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">is_series</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_columns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-        <span class="c1"># Dask shape is lazy, might need compute() or delayed</span>
-        <span class="k">return</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
-
-    <span class="c1"># ... implement other required methods</span>
-</code></pre></div>
-<h3 id="2-register-the-engine">2. Register the Engine</h3>
-<p>In <code>skyulf-core/skyulf/engines/__init__.py</code> or <code>registry.py</code>, register your new engine.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">.dask_engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">DaskEngine</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span>
-
-<span class="n">EngineRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">DaskEngine</span><span class="p">())</span>
-</code></pre></div>
-<h3 id="3-update-nodes-optional-but-recommended">3. Update Nodes (Optional but Recommended)</h3>
-<p>Most existing nodes use <code>SklearnBridge</code> or generic Python logic.
-*   <strong>SklearnBridge:</strong> If you implement <code>to_numpy()</code> or <code>to_pandas()</code> in your engine (or if the dataframe supports it), many nodes will work out-of-the-box by converting data to local memory (Pandas/Numpy).
-*   <strong>Native Implementation:</strong> For true distributed performance, you should update critical nodes (like <code>Scaling</code>, <code>Join</code>, <code>Aggregation</code>) to use native Dask/Spark API.</p>
-<p>Example of a node supporting multiple engines:</p>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StandardScalerCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">):</span>
-        <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"dask"</span><span class="p">:</span>
-            <span class="c1"># Use Dask native logic</span>
-            <span class="n">mean</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-            <span class="n">std</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-            <span class="k">return</span> <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="n">mean</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">:</span> <span class="n">std</span><span class="p">}</span>
-
-        <span class="k">elif</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"polars"</span><span class="p">:</span>
-            <span class="c1"># Use Polars logic</span>
-            <span class="o">...</span>
-
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Fallback to Pandas/Sklearn</span>
-            <span class="o">...</span>
-</code></pre></div>
-<h3 id="4-update-data-ingestion">4. Update Data Ingestion</h3>
-<p>Ensure <code>DataService</code> or your ingestion layer can load data into the new format (e.g., <code>dd.read_csv</code>).</p>
-<h2 id="summary">Summary</h2>
-<p>You do <strong>not</strong> need to rewrite everything.
-1.  <strong>Infrastructure:</strong> Add the Engine implementation (One-time setup).
-2.  <strong>Compatibility:</strong> Existing nodes will work via fallback (conversion to Pandas), assuming the data fits in memory.
-3.  <strong>Optimization:</strong> Gradually optimize specific nodes to use the new engine's native capabilities for large-scale data.</p>
+<h1 id="adding-a-compute-engine">Adding a compute engine</h1>
+<p>Skyulf has pandas and Polars frame engines and an explicit distributed Spark
+path. Adding an engine requires an input adapter and node implementations for
+the operations it will support. Registering an engine does not make existing
+preprocessing or sklearn estimators run on it automatically.</p>
+<p>Start with <a href="engine_mechanics.html">engine mechanics</a>,
+<a href="engine_data_paths.html">engine data paths</a> and the existing
+<a href="../user_guide/spark.html">Spark execution contract</a>. Use the Spark implementation
+as the reference for a distributed engine; it preserves distributed input and
+rejects implicit materialization into pandas/NumPy.</p>
+<h2 id="register-the-adapter">Register the adapter</h2>
+<p><code>BaseEngine</code> and <code>EngineRegistry</code> live in <code>skyulf.engines.registry</code>.
+<code>EngineRegistry.register(name, engine_cls)</code> registers an engine class.
+Implement its actual class-method contract: <code>ensure_available</code>, <code>is_compatible</code>,
+<code>wrap</code>, <code>from_pandas</code>, <code>to_numpy</code> and <code>create_dataframe</code>. A method that cannot
+safely support a distributed operation should reject it explicitly.</p>
+<p>Use <code>SkyulfDataFrame</code> for bounded frame wrappers and <code>DistributedDataFrame</code> for
+distributed wrappers, both from <code>skyulf.engines.protocol</code>. The distributed
+contract exposes columns, schema, projection and <code>to_native</code>; it does not promise
+an eager row count or conversion to a driver array. The caller owns the runtime
+session and explicit data actions.</p>
+<h2 id="implement-supported-operations">Implement supported operations</h2>
+<p>Nodes use Calculator/Applier pairs: fit returns learned state, and apply reuses
+that state. Add the new engine's implementation to the node's existing
+engine-keyed dispatcher. Do not introduce an unconditional pandas fallback for
+an unknown or unsupported engine.</p>
+<p>For distributed preprocessing, specify separate fit/apply capabilities, row and
+key preservation, context requirements, and bounded learned-state transport.
+A transformation requiring complete groups or ordered history needs an execution
+path that supplies that context. Independent worker batches cannot establish it
+by themselves. See <a href="../user_guide/preprocessing_context.html">preprocessing context</a>.</p>
+<p><code>SklearnBridge</code> converts supported bounded frame data for sklearn. It rejects
+Spark data rather than collecting the full table into driver memory. Distributed
+model prediction is a separate adapter with explicit worker dependency, input
+schema and memory contracts; adding a preprocessing engine does not add model
+training or prediction support automatically.</p>
+<h2 id="verify-and-document-the-boundary">Verify and document the boundary</h2>
+<p>Use focused checks for engine detection, schema/projection, fit/save/apply parity,
+keys, nulls, empty requests and unsupported operations. For a distributed engine,
+include multiple partitions and assert that the adapter does not collect the
+whole input. Validate the actual runtime and dependencies used in deployment.</p>
+<p>Update optional dependency declarations and the public support guide for the
+specific implemented nodes. Keep unsupported requests explicit while adding
+further native implementations incrementally. Backend ingestion or frontend
+engine controls require their own changes only when those consumers need to
+expose the new engine.</p>
 
 
 

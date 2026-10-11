@@ -1500,7 +1500,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1633,14 +1661,70 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../user_guide/databricks_local_sdk.html" class="md-nav__link">
+      <a href="../../../user_guide/databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1668,7 +1752,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -1948,7 +2032,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3196,6 +3280,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.CorrelationThresholdApplier.inference_capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inference_capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.CorrelationThresholdApplier.validate_inference_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_inference_state
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3246,6 +3352,28 @@
     <span class="md-ellipsis">
       
         apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.FeatureSelectionApplier.inference_capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inference_capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.FeatureSelectionApplier.validate_inference_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_inference_state
       
     </span>
   </a>
@@ -3308,6 +3436,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.ModelBasedSelectionApplier.inference_capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inference_capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.ModelBasedSelectionApplier.validate_inference_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_inference_state
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3364,6 +3514,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.UnivariateSelectionApplier.inference_capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inference_capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.UnivariateSelectionApplier.validate_inference_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_inference_state
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3414,6 +3586,28 @@
     <span class="md-ellipsis">
       
         apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.VarianceThresholdApplier.inference_capability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        inference_capability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.feature_selection.VarianceThresholdApplier.validate_inference_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate_inference_state
       
     </span>
   </a>
@@ -3891,10 +4085,7 @@ their public classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
@@ -3903,8 +4094,55 @@ their public classes.</p>
 <span class="normal">156</span>
 <span class="normal">157</span>
 <span class="normal">158</span>
-<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CorrelationThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CorrelationThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Remove the columns a fitted correlation threshold marked redundant."""</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Inspect saved drop decisions without evaluating fit-only metadata.</span>
+
+<span class="sd">        Fewer than two fitted candidates produce an empty no-op artifact.</span>
+<span class="sd">        Threshold and method are unused at apply, including callable methods.</span>
+<span class="sd">        """</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"columns_to_drop"</span><span class="p">,</span> <span class="s2">"threshold"</span><span class="p">,</span> <span class="s2">"method"</span><span class="p">,</span> <span class="s2">"drop_columns"</span><span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"correlation_threshold"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">raw</span>
+        <span class="n">_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"columns_to_drop"</span><span class="p">])</span>
+        <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">raw</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+        <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">CorrelationThresholdApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -3950,16 +4188,16 @@ matrix; <code>drop_columns=False</code> leaves the frame untouched.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Drop the artifact's precomputed ``columns_to_drop`` from ``X``.</span>
 
@@ -3969,6 +4207,98 @@ matrix; <code>drop_columns=False</code> leaves the frame untouched.</p>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_corr_drop_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_corr_drop_pandas</span><span class="p">}</span>
     <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.CorrelationThresholdApplier.inference_capability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Describe existing local saved apply without admitting partition workers.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">CorrelationThresholdApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.CorrelationThresholdApplier.validate_inference_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Inspect saved drop decisions without evaluating fit-only metadata.</p>
+<p>Fewer than two fitted candidates produce an empty no-op artifact.
+Threshold and method are unused at apply, including callable methods.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Inspect saved drop decisions without evaluating fit-only metadata.</span>
+
+<span class="sd">    Fewer than two fitted candidates produce an empty no-op artifact.</span>
+<span class="sd">    Threshold and method are unused at apply, including callable methods.</span>
+<span class="sd">    """</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"columns_to_drop"</span><span class="p">,</span> <span class="s2">"threshold"</span><span class="p">,</span> <span class="s2">"method"</span><span class="p">,</span> <span class="s2">"drop_columns"</span><span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"correlation_threshold"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">raw</span>
+    <span class="n">_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"columns_to_drop"</span><span class="p">])</span>
+    <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">raw</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4011,32 +4341,7 @@ matrix; <code>drop_columns=False</code> leaves the frame untouched.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
@@ -4062,7 +4367,32 @@ matrix; <code>drop_columns=False</code> leaves the frame untouched.</p>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CorrelationThreshold"</span><span class="p">,</span> <span class="n">CorrelationThresholdApplier</span><span class="p">)</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CorrelationThreshold"</span><span class="p">,</span> <span class="n">CorrelationThresholdApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"CorrelationThreshold"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Correlation Threshold"</span><span class="p">,</span>
@@ -4150,32 +4480,7 @@ artifact — a no-op passthrough — when fewer than two columns resolve.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/correlation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
@@ -4189,7 +4494,32 @@ artifact — a no-op passthrough — when fewer than two columns resolve.</p>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CorrelationThresholdArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Return columns whose correlation with an earlier one exceeds the threshold.</span>
 
@@ -4271,15 +4601,7 @@ artifact — a no-op passthrough — when fewer than two columns resolve.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
@@ -4302,8 +4624,64 @@ artifact — a no-op passthrough — when fewer than two columns resolve.</p>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
-<span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Route a fitted selection artifact to the applier that produced it."""</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Delegate inspection to the same saved discriminator used by local apply."""</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">dict</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Local fitted selection state must be a dictionary."</span><span class="p">)</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selection type must be a string."</span><span class="p">)</span>
+        <span class="n">owner</span> <span class="o">=</span> <span class="n">_FS_APPLIERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">kind</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">owner</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">raw</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Reuse the selected owner's context; unmatched saved types remain passthroughs."""</span>
+        <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">FeatureSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="n">owner</span> <span class="o">=</span> <span class="n">_FS_APPLIERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">owner</span><span class="o">.</span><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="n">engine</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -4369,35 +4747,35 @@ never drop data on its own.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
@@ -4426,6 +4804,100 @@ never drop data on its own.</p>
         <span class="k">return</span> <span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>  <span class="c1"># pylint: disable=no-value-for-parameter</span>
     <span class="c1"># Identity passthrough when no concrete applier matches.</span>
     <span class="k">return</span> <span class="n">df</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.FeatureSelectionApplier.inference_capability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Reuse the selected owner's context; unmatched saved types remain passthroughs.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Reuse the selected owner's context; unmatched saved types remain passthroughs."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">FeatureSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="n">owner</span> <span class="o">=</span> <span class="n">_FS_APPLIERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">owner</span><span class="o">.</span><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="n">engine</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.FeatureSelectionApplier.validate_inference_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Delegate inspection to the same saved discriminator used by local apply.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Delegate inspection to the same saved discriminator used by local apply."""</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Local fitted selection state must be a dictionary."</span><span class="p">)</span>
+    <span class="n">kind</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selection type must be a string."</span><span class="p">)</span>
+    <span class="n">owner</span> <span class="o">=</span> <span class="n">_FS_APPLIERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">kind</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">owner</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">raw</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4468,37 +4940,37 @@ never drop data on its own.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"feature_selection"</span><span class="p">,</span> <span class="n">FeatureSelectionApplier</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"feature_selection"</span><span class="p">,</span> <span class="n">FeatureSelectionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"feature_selection"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Feature Selection (Wrapper)"</span><span class="p">,</span>
@@ -4566,25 +5038,25 @@ than raising, which degrades the node to a passthrough.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/facade.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
@@ -4645,11 +5117,7 @@ than raising, which degrades the node to a passthrough.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
 <span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
@@ -4658,8 +5126,66 @@ than raising, which degrades the node to a passthrough.</p>
 <span class="normal">39</span>
 <span class="normal">40</span>
 <span class="normal">41</span>
-<span class="normal">42</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ModelBasedSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ModelBasedSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Remove the columns an estimator's importances rejected."""</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Inspect saved membership while leaving unused fit reports unchanged."""</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">,</span>
+            <span class="s2">"selected_columns"</span><span class="p">,</span>
+            <span class="s2">"candidate_columns"</span><span class="p">,</span>
+            <span class="s2">"method"</span><span class="p">,</span>
+            <span class="s2">"drop_columns"</span><span class="p">,</span>
+            <span class="s2">"feature_importances"</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"model_based_selection"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+            <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">raw</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Describe saved column selection without rerunning the training estimator."""</span>
+        <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">ModelBasedSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -4707,17 +5233,17 @@ transform.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Drop ``candidate_columns - selected_columns`` from ``X``.</span>
 
@@ -4728,6 +5254,106 @@ transform.</p>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_drop_selected_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_drop_selected_pandas</span><span class="p">}</span>
     <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.ModelBasedSelectionApplier.inference_capability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Describe saved column selection without rerunning the training estimator.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Describe saved column selection without rerunning the training estimator."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">ModelBasedSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.ModelBasedSelectionApplier.validate_inference_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Inspect saved membership while leaving unused fit reports unchanged.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Inspect saved membership while leaving unused fit reports unchanged."""</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">,</span>
+        <span class="s2">"selected_columns"</span><span class="p">,</span>
+        <span class="s2">"candidate_columns"</span><span class="p">,</span>
+        <span class="s2">"method"</span><span class="p">,</span>
+        <span class="s2">"drop_columns"</span><span class="p">,</span>
+        <span class="s2">"feature_importances"</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"model_based_selection"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+        <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">raw</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4770,38 +5396,7 @@ transform.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
-<span class="normal"> 50</span>
-<span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 76</span>
 <span class="normal"> 77</span>
 <span class="normal"> 78</span>
 <span class="normal"> 79</span>
@@ -4842,7 +5437,38 @@ transform.</p>
 <span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
-<span class="normal">117</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"ModelBasedSelection"</span><span class="p">,</span> <span class="n">ModelBasedSelectionApplier</span><span class="p">)</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"ModelBasedSelection"</span><span class="p">,</span> <span class="n">ModelBasedSelectionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"ModelBasedSelection"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Model-Based Selection"</span><span class="p">,</span>
@@ -4952,38 +5578,7 @@ without the log line the other branches emit.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/model_based.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
@@ -5012,7 +5607,38 @@ without the log line the other branches emit.</p>
 <span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
-<span class="normal">117</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ModelBasedSelectionArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Return the features the fitted estimator's support keeps.</span>
 
@@ -5115,11 +5741,7 @@ without the log line the other branches emit.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
@@ -5127,8 +5749,74 @@ without the log line the other branches emit.</p>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnivariateSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnivariateSelectionApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Remove the columns a univariate statistical test rejected."""</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Inspect saved selection membership while preserving both fitted schemas.</span>
+
+<span class="sd">        A no-target fit uses ``scores``/``pvalues`` reporting fields; a scored</span>
+<span class="sd">        fit uses ``feature_scores``/``p_values``. Reports and the fitted method</span>
+<span class="sd">        are unused by apply and remain untouched, including nonfinite scores.</span>
+<span class="sd">        """</span>
+        <span class="n">reports</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">{</span><span class="s2">"scores"</span><span class="p">,</span> <span class="s2">"pvalues"</span><span class="p">}</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span> <span class="ow">and</span> <span class="s2">"scores"</span> <span class="ow">in</span> <span class="n">raw</span>
+            <span class="k">else</span> <span class="p">{</span><span class="s2">"feature_scores"</span><span class="p">,</span> <span class="s2">"p_values"</span><span class="p">}</span>
+        <span class="p">)</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"selected_columns"</span><span class="p">,</span> <span class="s2">"candidate_columns"</span><span class="p">,</span> <span class="s2">"method"</span><span class="p">,</span> <span class="s2">"drop_columns"</span><span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"univariate_selection"</span><span class="p">,</span> <span class="n">fields</span> <span class="o">|</span> <span class="n">reports</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">raw</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+        <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">raw</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+        <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">UnivariateSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -5174,16 +5862,16 @@ without the log line the other branches emit.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Drop ``candidate_columns - selected_columns`` from ``X``.</span>
 
@@ -5193,6 +5881,117 @@ without the log line the other branches emit.</p>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_drop_selected_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_drop_selected_pandas</span><span class="p">}</span>
     <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.UnivariateSelectionApplier.inference_capability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Describe existing local saved apply without admitting partition workers.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">UnivariateSelectionApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.UnivariateSelectionApplier.validate_inference_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Inspect saved selection membership while preserving both fitted schemas.</p>
+<p>A no-target fit uses <code>scores</code>/<code>pvalues</code> reporting fields; a scored
+fit uses <code>feature_scores</code>/<code>p_values</code>. Reports and the fitted method
+are unused by apply and remain untouched, including nonfinite scores.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Inspect saved selection membership while preserving both fitted schemas.</span>
+
+<span class="sd">    A no-target fit uses ``scores``/``pvalues`` reporting fields; a scored</span>
+<span class="sd">    fit uses ``feature_scores``/``p_values``. Reports and the fitted method</span>
+<span class="sd">    are unused by apply and remain untouched, including nonfinite scores.</span>
+<span class="sd">    """</span>
+    <span class="n">reports</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">{</span><span class="s2">"scores"</span><span class="p">,</span> <span class="s2">"pvalues"</span><span class="p">}</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span> <span class="ow">and</span> <span class="s2">"scores"</span> <span class="ow">in</span> <span class="n">raw</span>
+        <span class="k">else</span> <span class="p">{</span><span class="s2">"feature_scores"</span><span class="p">,</span> <span class="s2">"p_values"</span><span class="p">}</span>
+    <span class="p">)</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"selected_columns"</span><span class="p">,</span> <span class="s2">"candidate_columns"</span><span class="p">,</span> <span class="s2">"method"</span><span class="p">,</span> <span class="s2">"drop_columns"</span><span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"univariate_selection"</span><span class="p">,</span> <span class="n">fields</span> <span class="o">|</span> <span class="n">reports</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">raw</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+    <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">raw</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5235,42 +6034,7 @@ without the log line the other branches emit.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
 <span class="normal"> 92</span>
 <span class="normal"> 93</span>
 <span class="normal"> 94</span>
@@ -5306,7 +6070,42 @@ without the log line the other branches emit.</p>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"UnivariateSelection"</span><span class="p">,</span> <span class="n">UnivariateSelectionApplier</span><span class="p">)</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"UnivariateSelection"</span><span class="p">,</span> <span class="n">UnivariateSelectionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"UnivariateSelection"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Univariate Selection"</span><span class="p">,</span>
@@ -5415,42 +6214,7 @@ negative — because both shift the resulting scores.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/univariate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
-<span class="normal"> 78</span>
-<span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
@@ -5474,7 +6238,42 @@ negative — because both shift the resulting scores.</p>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">UnivariateSelectionArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Return the features the score function's support keeps.</span>
 
@@ -5576,20 +6375,84 @@ negative — because both shift the resulting scores.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VarianceThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VarianceThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Remove the columns a fitted variance threshold rejected."""</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Inspect saved selection membership without recomputing variances.</span>
+
+<span class="sd">        Empty fitted artifacts and selections are valid. The fit-only threshold</span>
+<span class="sd">        and variances remain untouched, including undefined all-missing variance.</span>
+<span class="sd">        """</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">,</span>
+            <span class="s2">"selected_columns"</span><span class="p">,</span>
+            <span class="s2">"candidate_columns"</span><span class="p">,</span>
+            <span class="s2">"threshold"</span><span class="p">,</span>
+            <span class="s2">"drop_columns"</span><span class="p">,</span>
+            <span class="s2">"variances"</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"variance_threshold"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">raw</span>
+        <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+        <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+        <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">raw</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+        <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">VarianceThresholdApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -5635,16 +6498,16 @@ passes through untouched.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Drop ``candidate_columns - selected_columns`` from ``X``.</span>
 
@@ -5654,6 +6517,118 @@ passes through untouched.</p>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_drop_selected_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_drop_selected_pandas</span><span class="p">}</span>
     <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.VarianceThresholdApplier.inference_capability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Describe existing local saved apply without admitting partition workers.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExecutionCapability</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Describe existing local saved apply without admitting partition workers."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">}:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">VarianceThresholdApplier</span><span class="o">.</span><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.feature_selection.VarianceThresholdApplier.validate_inference_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Inspect saved selection membership without recomputing variances.</p>
+<p>Empty fitted artifacts and selections are valid. The fit-only threshold
+and variances remain untouched, including undefined all-missing variance.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_inference_state</span><span class="p">(</span><span class="n">raw</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Inspect saved selection membership without recomputing variances.</span>
+
+<span class="sd">    Empty fitted artifacts and selections are valid. The fit-only threshold</span>
+<span class="sd">    and variances remain untouched, including undefined all-missing variance.</span>
+<span class="sd">    """</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">,</span>
+        <span class="s2">"selected_columns"</span><span class="p">,</span>
+        <span class="s2">"candidate_columns"</span><span class="p">,</span>
+        <span class="s2">"threshold"</span><span class="p">,</span>
+        <span class="s2">"drop_columns"</span><span class="p">,</span>
+        <span class="s2">"variances"</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">local_state_fields</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="s2">"variance_threshold"</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">allow_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">raw</span>
+    <span class="n">selected</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"selected_columns"</span><span class="p">])</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="n">_local_selection_columns</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"candidate_columns"</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">candidates</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Fitted selected columns must belong to candidate columns."</span><span class="p">)</span>
+    <span class="n">_local_selection_drop_flag</span><span class="p">(</span><span class="n">raw</span><span class="p">[</span><span class="s2">"drop_columns"</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">raw</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5696,70 +6671,70 @@ passes through untouched.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span> <span class="n">VarianceThresholdApplier</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span> <span class="n">VarianceThresholdApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Variance Threshold"</span><span class="p">,</span>
@@ -5860,58 +6835,58 @@ apply can remove all candidates while preserving other columns.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">VarianceThresholdArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Record which numeric columns clear ``config["threshold"]`` variance.</span>
 

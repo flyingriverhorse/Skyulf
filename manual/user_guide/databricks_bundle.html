@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_bundle.html">
       
       
-        <link rel="prev" href="databricks_local_sdk.html">
+        <link rel="prev" href="databricks_online_features.html">
       
       
         <link rel="next" href="databricks_bundle_walkthrough.html">
@@ -25,7 +25,7 @@
     
     
       
-        <title>Databricks Local Bundle (Development) - Skyulf</title>
+        <title>Databricks Bundle - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#databricks-bundle-local-training-and-selectable-inference" class="md-skip">
+        <a href="#databricks-bundle-training-and-selectable-inference" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Databricks Local Bundle (Development)
+              Databricks Bundle
             
           </span>
         </div>
@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1636,14 +1664,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1680,7 +1764,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -1698,7 +1782,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -1728,6 +1812,17 @@
     <span class="md-ellipsis">
       
         Distributed inference settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring-investigation-and-training-lineage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring investigation and training lineage
       
     </span>
   </a>
@@ -1770,6 +1865,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preprocessing-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preprocessing diagnostics
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2319,7 +2425,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3845,15 +3951,16 @@
   
 
 
-<h1 id="databricks-bundle-local-training-and-selectable-inference">Databricks Bundle: local training and selectable inference</h1>
+<h1 id="databricks-bundle-training-and-selectable-inference">Databricks Bundle: training and selectable inference</h1>
 <p>For job-screen instructions and lifecycle diagrams, use the
 <a href="databricks_bundle_walkthrough.html">operator walkthrough</a>.</p>
 <p>For optional weight columns, class weights, SMOTE settings and supported models,
 see <a href="weighted_training.html">Weighted Training &amp; Support</a>.</p>
 <p>The custom Skyulf template generates one editable Bundle with <code>dev</code>, <code>test</code>,
-<code>syst</code> and <code>prod</code> targets. Training stays local. New projects independently choose
+<code>syst</code> and <code>prod</code> targets. Training runs in one bounded Python process on job
+compute. New projects independently choose
 <code>inference_mode=local</code> or <code>spark</code> based on the expected rows and bytes per scoring
-run and available memory. Local mode trains and scores with pandas or Polars.
+run and available memory. The <code>local</code> inference mode scores a whole frame with pandas or Polars; it can run on Databricks compute.
 Spark mode trains with pandas and scores through <code>mlflow.pyfunc.spark_udf</code> on
 workers, retaining keyed predictions in Spark through Delta publication.
 Older configurations default to local inference; explicit Spark with Polars is
@@ -3874,13 +3981,16 @@ and serverless does not allow changing <code>spark.sql.execution.arrow.maxRecord
 Each worker needs memory for the model, incoming Arrow frame and prediction slices.
 There is no universal row threshold for choosing Spark. A failed distributed
 run does not fall back to collecting the population locally.</p>
-<p>Initial support covers SimpleImputer mean/constant and StandardScaler with
-LinearRegression or LogisticRegression, including reviewed built-in tuning
-wrappers. Single and competition layouts score the pinned model or winner.
-Model sets validate every component and support independent outputs without
-custom composition. Unsupported steps, models, callbacks, temporal history and
-tuning feature exclusions fail before predictions are published. The model menus
-also serve local projects; Bundle validation does not certify a fitted artifact.</p>
+<p>Admission depends on the exact fitted recipe and model. Supported model families
+include the admitted linear/logistic, DecisionTree, RandomForest and ExtraTrees
+estimators; supported preprocessing includes reviewed SimpleImputer,
+StandardScaler and MinMaxScaler configurations. This is not blanket support for
+all options of those classes. Single and competition layouts score the pinned
+model or winner. Model sets validate every component and support independent
+outputs and admitted declarative weighted composition. Unsupported callbacks,
+temporal carry history and other unadmitted fitted states fail before publication.
+The model menus also serve whole-frame projects; selecting an item in setup does
+not certify the resulting fitted artifact.</p>
 <p>For serverless, the template selects MLflow <code>env_manager=local</code>: Spark workers use
 the declared Bundle task environment containing the exact wheel and dependencies.
 This setting concerns worker environment reuse, not driver-side scoring.
@@ -3893,13 +4003,12 @@ virtualenv archives containing absolute interpreter symlinks. No automatic
 environment or scoring fallback occurs.</p>
 <p>For measured capacity and a repeatable benchmark, see
 <a href="spark.html#measuring-inference-capacity">Measuring inference capacity</a>.
-SM-58 compares native FE, worker Python preprocessing and this Bundle's pyfunc
-route with 1–5 million rows. These timings include a correctness aggregate and
+The benchmark compares native preprocessing, worker Python preprocessing and
+this Bundle's pyfunc route. These timings include a correctness aggregate and
 exclude Delta publication; they are not complete score-job latency estimates.
 The benchmark stores reports in its own schema/volume and leaves project jobs,
-monitoring tables and the shared dashboard unchanged. The initial validation
-workspace supports only serverless, so classic executor RSS and <code>virtualenv</code>
-packaging still require a classic-enabled workspace.</p>
+monitoring tables and the shared dashboard unchanged. Measure classic executor RSS and validate <code>virtualenv</code> packaging on the actual
+classic compute used by your project.</p>
 <p>Certified MLflow packages carry a safety certificate, source hash and exact-source
 Skyulf wheel. Existing whole-frame
 packages need a newly logged certified version; a pickle alone grants no Spark
@@ -3911,6 +4020,115 @@ insert-only CDF windows, no-op replay, model-change policies and optional
 <code>recover_predictions</code> use the same guarded Delta publication lifecycle. All model
 set outputs commit together. Successful scoring retains the monitoring child-job
 and native dashboard-refresh handoff.</p>
+<h3 id="monitoring-investigation-and-training-lineage">Monitoring investigation and training lineage</h3>
+<p>In the shared dashboard, open <strong>Overview → Issues to investigate</strong> for the latest
+recorded health, quality, drift and active performance-policy issues. The native table
+paginates the complete list; the counter includes all filtered issues. Filter by registered
+model, version and monitoring context before following <strong>Evidence run</strong> to the
+monitoring run or <strong>Model version</strong> to its concrete registry entry. Missing,
+never-observed, failed, stale and insufficient-label evidence stays distinct.
+Disabled monitoring and disabled policies create no new failures.</p>
+<p>Use the <strong>shared filters</strong> on the left: <strong>Model</strong>, <strong>Monitored version</strong> and
+<strong>Context</strong>. Model names include catalog and schema, so there are no separate
+catalog/schema controls. Context includes environment, project and a short monitor
+ID. The selection persists between pages; there are no competing model controls
+inside the pages. Date, feature, metric, target and job controls refine only the
+page where they appear.</p>
+<p><strong>All models</strong>, <strong>All versions</strong> and <strong>All contexts</strong> are the initial selections.
+Drift and Model performance include every matching model/version/context, with
+the latest result selected independently for each identity. Disabled policies and
+identities without measurements remain visible. Choose Model, Version and Context
+to narrow the portfolio. Online serving lists matching endpoint contexts separately.
+Incompatible explicit selections stay empty; clear Version and Context when
+switching models. An explicitly selected model
+never falls back to another model.</p>
+<p>The Drift and Performance charts show up to two columns and two rows of panels
+at once; scroll inside a chart to see the remaining identities. Fewer panels use
+the available width. The dashboard card itself keeps a fixed, compact height.
+Selecting one model can still leave several panels when that model has multiple
+versions or monitoring contexts. Select <strong>Monitored version</strong> and <strong>Context</strong> to
+narrow it further.</p>
+<table>
+<thead>
+<tr>
+<th>Page</th>
+<th>Scope</th>
+<th>What to use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Overview</td>
+<td>All models with the initial All selections; otherwise all matching registrations.</td>
+<td>Four summary counts, prioritized issues, current status distributions and daily trends.</td>
+</tr>
+<tr>
+<td>Training and lineage</td>
+<td>All matching model/version/context identities.</td>
+<td>Compare concrete versions, owning training runs and recorded provenance.</td>
+</tr>
+<tr>
+<td>Drift and data quality</td>
+<td>Every matching model/version/context, with its own latest observation.</td>
+<td>Separate feature PSI comparisons and drift histories, with detailed quality measurements.</td>
+</tr>
+<tr>
+<td>Model performance</td>
+<td>Every matching model/version/context, including disabled and unmeasured policies.</td>
+<td>Per-identity prediction/label coverage, metric history, policy comparisons and classification evidence.</td>
+</tr>
+<tr>
+<td>Online serving</td>
+<td>All matching serving enrollments, separated by model/version/context; choose Model to narrow them.</td>
+<td>Distinguish monitored and served versions; inspect captured counts and latency per observation in tables and three window charts.</td>
+</tr>
+<tr>
+<td>Execution and compute</td>
+<td>The explicitly selected workspace and job, independently of model filters.</td>
+<td>Job runs, estimated attributed cost and available compute telemetry.</td>
+</tr>
+</tbody>
+</table>
+<p>Drift and Performance time charts and date filters use <strong>Data window end (UTC)</strong>.
+For data from 09:00 to 10:00, the point appears at 10:00 even if checks ran later.
+<strong>Calculated at</strong> records that later execution time separately. Drift counts use
+whole-number bar labels; the tooltip includes the full window and calculation time.</p>
+<p><strong>Latest policy result for every model</strong> lists each identity's own metric, baseline,
+current score, allowed limit, improvement direction and result. Accuracy, F1 and
+RMSE policies can appear together. A latest-metric table shows observed values
+by identity and target. The two time charts use separate model/metric panels
+with independent scales, so scores with different units are not mixed. Each policy
+panel compares <strong>Current</strong>, <strong>Baseline</strong> and <strong>Tolerance boundary</strong>.
+Each saved performance value is a point; missing values have no point and are
+not joined by a line. Changing
+<strong>Chart metric</strong> affects the observed-metric table and time chart, leaving each policy's
+configured metric intact. An accuracy baseline of 0.96 and absolute tolerance of
+0.10 give a lower limit of 0.86; an error metric has an upper limit. Missing scores
+remain unavailable, and a newer missing result never revives an older success.</p>
+<p><strong>Latest prediction coverage by model</strong> replaces the three shared counters with
+one row per identity: predictions, matched outcomes and label coverage for its
+latest full observation. Confusion-matrix rows are also grouped by model/version/context.
+Counts, scores and windows from different identities are never combined. The three
+Serving history charts remain above their detailed tables.</p>
+<p>On <strong>Execution and compute</strong>, copy Workspace and Job ID from <strong>Recent accessible
+jobs</strong> into the two input controls. The list includes one-off runs from the last
+30 days, independently of model enrollment. Inputs also accept IDs not yet listed;
+telemetry and billing may arrive later. Neither input silently selects a job.</p>
+<p>Lineage tables retain unresolved NULL versions explicitly.</p>
+<p>Inspect creation time, the owning training run, recorded algorithm, artifact
+digest and available source evidence. <strong>Training run</strong> opens that exact run's
+native Inputs and artifacts. Historical versions remain concrete.
+<strong>Aliases at capture</strong> has a capture
+timestamp and describes a metadata snapshot, not historical deployment identity.</p>
+<p>New monitoring observations capture bounded lineage metadata in the existing
+report; dashboard refresh only rereads saved evidence. Retrying an observation
+preserves its first snapshot and prepared Spark references. Older reports show
+<code>not_recorded</code>; metadata permission failures show <code>unavailable</code>. Missing links,
+creation time or code evidence are not inferred. Store owners can explicitly run
+<code>initialize_monitoring_store</code> to refresh owned view definitions; ordinary runs
+create missing compatible views. Read-only viewers keep their own permissions.</p>
+<p>The generated project's <code>src/monitoring/README.md</code> explains the shared store,
+dashboard refresh setup and independent optional retraining policies.</p>
 <p>Initialize a project from a Skyulf checkout:</p>
 <div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">init</span> <span class="n">skyulf-core</span><span class="p">/</span><span class="n">templates</span><span class="p">/</span><span class="n">databricks</span> <span class="p">-</span><span class="n">-output-dir</span> <span class="p">./</span><span class="n">generated</span>
 </code></pre></div>
@@ -3920,46 +4138,53 @@ composite keys), source columns, split strategy, applicable date parsing,
 scoring/promotion policies and job settings. Serverless is the default. Reviewable
 noninteractive examples are in <code>skyulf-core/templates/databricks/examples/</code>. The generated
 project has its own <code>databricks.yml</code>; Skyulf's root has no Bundle config.</p>
-<p>Choose the training layout, then edit its generated model file:</p>
+<p>New projects use YAML as the authoritative configuration. Edit shared settings
+under <code>defaults</code> and named model settings under <code>models</code> in <code>config/training.yml</code>:</p>
 <table>
 <thead>
 <tr>
 <th>Layout</th>
-<th>Model settings</th>
+<th>Training configuration</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>single_model</code></td>
-<td><code>src/modeling/single_model.py</code>: <code>MODELING</code> owns model parameters and tuning/search space</td>
+<td>One model entry, normally <code>models.main</code></td>
 </tr>
 <tr>
 <td><code>model_competition</code></td>
-<td><code>src/modeling/model_competition.py</code>: <code>MODELS</code> compares candidates for one shared target</td>
+<td>One entry per candidate, sharing target/split/quality defaults</td>
 </tr>
 <tr>
 <td><code>multi_target</code></td>
-<td><code>src/modeling/multi_model.py</code>: <code>MODELS</code> defines independent targets, models, training/CV, preprocessing and quality limits</td>
+<td>One entry per independent target, with its own inputs, model and policy</td>
 </tr>
 </tbody>
 </table>
-<p>For multiple targets, <code>src/modeling/model_set.py</code> separately defines the coherent
-release: registered set name, promotion policy and scoring table/view destinations.
-For example, define revenue and cost models in <code>multi_model.py</code>, then configure
-<code>model_set.py</code> to approve them together and publish their predictions under one
-set version. Define the profit calculation (<code>revenue - cost</code>) in
-<code>src/features/scoring.py</code>.</p>
-<p>The model files contain plain editable Python dictionaries. Library helpers run
-at initialization to populate settings from your choices; afterward edit the
-generated values directly using Python <code>True</code>, <code>False</code> and <code>None</code>. Keep
-<code>config/workflow.json</code> for shared data, validation/CV, size limits and lifecycle
-settings. For <code>single_model</code>, its <code>pipeline.modeling</code> stays empty; the loader
-supplies the selected model definition. Other layouts retain an internal task
-placeholder there and load the actual model definitions from their Python file.</p>
-<p>Legacy compatibility: existing projects can retain inline <code>pipeline.modeling</code>
-in <code>workflow.json</code>, <code>src/modeling/candidates.py</code> or <code>src/modeling/branches.py</code>.
-When migrating, remove the old definition: both old and new filenames, or a
-single-model file alongside a nonempty inline model, fail validation.</p>
+<p>For multiple targets, <code>config/inference.yml</code> has a <code>model_set</code> mapping for the
+registered set, activation policy and scoring destinations. Put business output
+functions in <code>src/features/scoring.py</code>. For example, revenue and cost model
+entries can activate together and expose a saved profit rule.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_layout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">single_model</span>
+<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas</span>
+<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">main</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linear_regression</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</code></pre></div>
+<p>This is a configuration excerpt; keep the generated source, keys, target, limits
+and quality settings. Model entries inherit complete values from defaults;
+nested mappings replace rather than deep-merge. Use YAML <code>true</code>, <code>false</code>, <code>null</code>.
+Do not add competing Python model files or <code>workflow.json</code> beside these files.
+Existing projects using older Python/JSON configuration remain readable, but
+must retain one authoritative owner. The fragments below describe workflow and
+pipeline settings; place shared training values in YAML <code>defaults</code>, model/tuning
+values in the named <code>models</code> entry, and scoring values in <code>config/inference.yml</code>.</p>
 <p>Regression starts with Core <code>linear_regression</code> and <code>heldout_rmse</code>;
 classification starts with <code>logistic_regression</code> and <code>heldout_accuracy</code>.
 The pipeline remains editable: add registered Core preprocessing nodes and
@@ -3982,7 +4207,7 @@ questions appear only when you enable that separate filter. Schedule and
 policy-cluster details likewise appear only when selected.</p>
 <p>Advanced settings use defaults without additional questions. Set them with
 <code>--config-file</code> using an existing example, or edit the generated
-<code>config/workflow.json</code> before running preview:</p>
+<code>config/training.yml</code> defaults or <code>config/inference.yml</code> before running preview:</p>
 <table>
 <thead>
 <tr>
@@ -4124,7 +4349,7 @@ schema, with any target resource suffix. Blank uses <code>&lt;project_name&gt;_p
 overrides it with a second monthly timer. Manual and scheduled runs use the same
 <code>train</code> action with identical snapshot/window selection rules.
 <code>monthly_lookback_months</code> separately controls how many complete
-months of data a rolling window reads. Independent score scheduling is SM-34.</p>
+months of data a rolling window reads. Scoring has its own independent job schedule.</p>
 <table>
 <thead>
 <tr>
@@ -4155,79 +4380,65 @@ months of data a rolling window reads. Independent score scheduling is SM-34.</p
 </tr>
 </tbody>
 </table>
-<p>Preprocessing is edited in <strong><code>src/features/preprocessing.py</code></strong>.
-<code>build_preprocessing()</code> returns normal Core steps in
-execution order. Keep the JSON <code>pipeline.preprocessing</code> list empty.
-Use <strong><code>src/features/pre_split.py</code></strong> for <code>build_pre_split_steps()</code> and keep the
-JSON <code>pre_split_steps</code> list empty. The package exports both builders separately.</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_preprocessing</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">"""Fit numeric cleanup and scaling with the selected Core engine."""</span>
-    <span class="k">return</span> <span class="p">[</span>
-        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"impute"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span>
-         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}},</span>
-        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"scale"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"StandardScaler"</span><span class="p">,</span>
-         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">]}},</span>
-    <span class="p">]</span>
+<p>Edit the ordered recipe in <code>config/preprocessing.yml</code>. Put fixed eligibility
+rules in <code>config/pre_split.yml</code>. Custom Python factories stay in the corresponding
+<code>src/features/</code> modules. For example:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">recipes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">impute</span>
+<span class="w">      </span><span class="nt">transformer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimpleImputer</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">],</span><span class="nt"> strategy</span><span class="p">:</span><span class="w"> </span><span class="nv">mean</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scale</span>
+<span class="w">      </span><span class="nt">transformer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StandardScaler</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">income</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">age</span><span class="p p-Indicator">]}</span>
 </code></pre></div>
+<p>Select <code>preprocessing_recipe: default</code> in the model's training configuration.</p>
 <h3 id="custom-preprocessing-recipes">Custom preprocessing recipes</h3>
 <p>Select per-step columns when mixing numeric and categorical features. Generated
-projects contain small, domain-independent custom examples written as plain
-pandas functions:</p>
+projects contain custom Python examples in <code>src/features/</code>. The YAML files own
+the ordered recipe lists; Python owns only the selected functions/factories:</p>
 <table>
 <thead>
 <tr>
-<th>Custom module</th>
-<th>Examples</th>
-<th>Configuration location</th>
+<th>File</th>
+<th>Owns</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>src/features/custom/pre_split_custom.py</code></td>
-<td><code>minimum_completeness</code>, <code>value_range</code>, <code>allowed_values</code> row filters</td>
+<td><code>config/pre_split.yml</code></td>
+<td>Fixed eligibility recipes</td>
+</tr>
+<tr>
+<td><code>config/preprocessing.yml</code></td>
+<td>Learned preprocessing recipes</td>
+</tr>
+<tr>
 <td><code>src/features/pre_split.py</code></td>
+<td>Custom filter factories</td>
 </tr>
 <tr>
-<td><code>src/features/custom/preprocessing_custom.py</code></td>
-<td><code>log_feature</code> (new column), <code>frequency_encoding</code> and <code>rare_categories</code> (learned per fold)</td>
 <td><code>src/features/preprocessing.py</code></td>
+<td>Custom transformation factories</td>
 </tr>
 <tr>
-<td><code>src/features/custom/advanced_class_step.py</code></td>
-<td>The same <code>rare_categories</code> written as a Calculator/Applier pair, to compare</td>
-<td>—</td>
+<td><code>src/features/custom/</code></td>
+<td>Optional callback implementations and advanced examples</td>
 </tr>
 </tbody>
 </table>
-<p>Each example is a pair of functions plus a factory that wraps them with one
-helper from <code>skyulf.preprocessing</code>. Each factory returns a normal Core step
-dictionary. Both recipe files also have an <code>example_all</code> recipe that runs them
-together. Each custom file ends with an inactive Example 4 that reads a small
-data file (asset); <code>src/features/assets.json</code> explains the three steps to enable it. The parent recipe files show
-these calls directly beside the built-in steps in the returned list. Uncomment
-the matching import and step, then adapt the columns:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># src/features/pre_split.py</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.custom.pre_split_custom</span><span class="w"> </span><span class="kn">import</span> <span class="n">minimum_completeness</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">build_pre_split_steps</span><span class="p">():</span>
-    <span class="k">return</span> <span class="p">[</span>
-        <span class="n">minimum_completeness</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"field_a"</span><span class="p">,</span> <span class="s2">"field_b"</span><span class="p">,</span> <span class="s2">"field_c"</span><span class="p">],</span> <span class="n">min_present</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
-    <span class="p">]</span>
+<p>For example, select the shipped frequency encoder in <code>config/preprocessing.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">recipes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">custom</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">preprocessing.frequency_encoding</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">category</span><span class="p p-Indicator">]}</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># src/features/preprocessing.py</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.custom.preprocessing_custom</span><span class="w"> </span><span class="kn">import</span> <span class="n">frequency_encoding</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">build_preprocessing</span><span class="p">():</span>
-    <span class="k">return</span> <span class="p">[</span>
-        <span class="n">frequency_encoding</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"category"</span><span class="p">]),</span>
-    <span class="p">]</span>
-</code></pre></div>
-<p>The list order is the execution order. Add Core operations to the same list.
-The template starts with commented steps because source column names vary across
-projects. There are no separate column-selection variables or enable switches.
-Keep both JSON recipe lists empty.</p>
+<p>Select <code>preprocessing_recipe: default</code> for the model. To add a built-in node, add
+its <code>name</code>, <code>transformer</code> and <code>params</code> entry to that same ordered list. Customize
+the Python factory when the calculation itself must change. The generated
+<code>PREPROCESSING.md</code> explains factory names, assets and advanced class examples.</p>
 <p>Completeness treats null/NaN as missing; blank strings and infinity count as
 values. With three selected fields and <code>min_present=2</code>, rows with two or three
 observed values survive without any value or order changes. Required filter
@@ -4242,9 +4453,6 @@ map to zero. Cast numeric category identifiers to strings upstream if needed.
 Select these columns in workflow <code>input_columns</code>, excluding target/record keys.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>src/tools/preview.py<span class="w"> </span>--action<span class="w"> </span>train
 </code></pre></div>
-<p>The tests configure these actual parent builders, then run filtering, training,
-CV and fresh-process model reload on pandas and Polars. No separate demonstration
-files need to be copied into a project.</p>
 <h4 id="writing-your-own-step">Writing your own step</h4>
 <p>Write top-level pandas functions and wrap them with one of three helpers:</p>
 <table>
@@ -4332,6 +4540,26 @@ dependencies explicitly in both training and scoring environments. Keep jobs and
 modeling hooks outside the feature package. Only load trusted code/models, as
 with existing pickle artifacts. Scoring exclusions, historical feature context
 and post-prediction business rules remain separate work.</p>
+<h3 id="preprocessing-diagnostics">Preprocessing diagnostics</h3>
+<p>Enable this optional saved-model check in <code>config/training.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>The default is <code>false</code>. Single-model, competition and multi-target fits inspect
+their saved and reloaded preprocessing on at most the first 256 holdout rows,
+with an 8 MiB input/output limit. Each fitting run logs
+<code>preprocessing_probe.json</code>; open that run's MLflow <strong>Artifacts</strong> tab or the
+<strong>Preprocessing diagnostics</strong> section of the training report.</p>
+<p><code>passed</code> means the required sample comparisons matched. <code>failed</code> identifies a
+saved-state, schema, mutation or apply problem to inspect. <code>requires_context</code>
+means independent row/chunk comparisons do not represent the step's group,
+window or global requirements; subsequent steps can be <code>not_run</code>. An empty-input
+check can be <code>not_supported</code> while other checks pass. These are diagnostics,
+not model-quality or promotion gates. No refit occurs.</p>
+<p>See <a href="preprocessing_context.html">preprocessing diagnostics and context</a> for the
+runnable example, full status reference and explicit continuation API. The direct
+SDK option is <code>TrainingSpec(..., preprocessing_probe=True)</code>; the standalone
+<code>probe_fitted_preprocessing</code> function returns the report without MLflow logging.</p>
 <h3 id="source-layout-and-existing-projects">Source layout and existing projects</h3>
 <table>
 <thead>
@@ -4350,8 +4578,8 @@ and post-prediction business rules remain separate work.</p>
 <td>Saved pre-split and preprocessing recipes, custom pairs/helpers</td>
 </tr>
 <tr>
-<td><code>src/modeling/</code></td>
-<td>Generated single-model, competition and multi-model settings plus model-set policies</td>
+<td><code>config/</code></td>
+<td>Authoritative training, inference, pre-split and preprocessing YAML</td>
 </tr>
 <tr>
 <td><code>src/tools/</code></td>
@@ -4359,16 +4587,12 @@ and post-prediction business rules remain separate work.</p>
 </tr>
 </tbody>
 </table>
-<p>Existing single-file projects and their saved models remain supported. To migrate,
-move your builders into the two feature recipe files, move custom pairs into
-<code>features/custom/</code>, and add relative imports. Pass the <code>src/features</code> directory
-to <code>load_project_workflow</code>; update <code>initialize_run.py</code> to use
-<code>preprocessing_path="../src/features"</code> (relative to the configuration directory).
-If retaining legacy tuning/ensemble hooks, move them into <code>src/modeling/</code>. New
-projects keep those settings in each model definition. Update YAML notebook paths to
-<code>../src/jobs/&lt;name&gt;.py</code> and sync the new directories. Run the new preview command
-before deploying. Keep only one active copy of each builder. Newly trained models
-capture the new package; older model versions retain their original snapshot.</p>
+<p>Existing projects and saved models remain readable through their original
+configuration and artifact paths. To adopt the current generated layout,
+initialize a separate project, transfer the relevant values into YAML, and copy
+custom functions into <code>src/features/</code>. Review source/split/model/scoring settings
+with preview before deploying. Do not keep duplicate recipe or model owners.
+Older model versions retain their original saved source snapshot.</p>
 <p>From the generated project, with the matching Core wheel installed locally:</p>
 <div class="highlight"><pre><span></span><code><span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span>
 <span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">preview</span><span class="p">.</span><span class="n">py</span> <span class="p">-</span><span class="n">-list-models</span>
@@ -4452,7 +4676,7 @@ field-alias adapter or automatic conversion of earlier training evidence.</p>
 nonnull target. <code>training_version</code> pins the source Delta snapshot; it is unrelated
 to dates. Leave it null to resolve latest once at run start, or set a nonnegative
 integer to pin that version. This example shows the training-related
-part of the generated <code>config/workflow.json</code>:</p>
+part of the generated <code>config/training.yml</code> defaults:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"split_strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"random"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"training_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span>
@@ -4574,18 +4798,12 @@ Basic/Advanced mode flag. The generated model definition uses Core's
 </table>
 <p>Search spaces come from Core's model/strategy catalog or ensemble builder. Bundle
 initialization writes editable finite lists into each model's <code>search_space</code>.
-For a single model, edit <code>MODELING</code> in <code>src/modeling/single_model.py</code>; for competition,
-edit the candidate's <code>modeling</code> in <code>MODELS</code> in <code>src/modeling/model_competition.py</code>;
-for multiple targets, edit the branch's <code>workflow.pipeline.modeling</code> in <code>MODELS</code>
-in <code>src/modeling/multi_model.py</code>. Each definition owns its model params, strategy,
-trial budget and search space. The generated lists are editable snapshots of
-initialization defaults. Set <code>search_space</code> to <code>{}</code> to use the installed Core's
-current automatic defaults. Changing the definition affects future training;
-scoring uses the saved fitted model and captured recipe.</p>
-<p>Legacy <code>src/modeling/tuning.py::build_search_space(model_type, strategy, params)</code>
-hooks remain supported: <code>None</code> preserves the configured space, while returned finite
-lists override it. New projects do not generate this hook.
-Fixed scalar model parameters remain fixed during search. Ensemble structural
+In <code>config/training.yml</code>, edit the named model's <code>model.params</code> and sibling
+<code>tuning</code> mapping. Its strategy, trial budget and search space control future
+training; scoring uses the saved fitted model. Generated search lists are editable
+initial defaults. An empty <code>search_space</code> selects the installed Core's automatic
+defaults. Older custom tuning hooks remain readable by their existing loader.</p>
+<p>Fixed scalar model parameters remain fixed during search. Ensemble structural
 settings stay on the base model. Estimator-specific value compatibility is checked
 when Core fits the model; offline preview validates structure and budgets.</p>
 <p>Training is sequential (<code>n_jobs=1</code>). Grid admission fails if the full space exceeds
@@ -4594,12 +4812,10 @@ integration. Its timeout is a soft search deadline and cannot interrupt an activ
 model fit. Nested binary search can select a decision threshold from training-only
 inner out-of-fold predictions with <code>"tune_threshold": True</code> in the model definition.</p>
 <h3 id="optional-classification-decision-thresholds">Optional classification decision thresholds</h3>
-<p>New projects keep decision thresholds <strong>off</strong>. Edit <code>DECISION_THRESHOLD</code> in
-<code>src/modeling/single_model.py</code>. In a competition, edit each candidate's
-<code>decision_threshold</code> in <code>MODELS</code>; for independent targets, edit each branch's
-<code>workflow.pipeline.decision_threshold</code> in <code>src/modeling/multi_model.py</code>.
-These are model settings; the Bundle initialization wizard does not ask for them.
-SDK configurations use <code>pipeline.decision_threshold</code> directly.</p>
+<p>New projects keep decision thresholds <strong>off</strong>. Configure <code>decision_threshold</code>
+on a named model entry in <code>config/training.yml</code>. These Python mappings illustrate
+the corresponding Core pipeline value; use the equivalent YAML mapping in a
+Bundle model entry:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Native classifier decisions; no calibration partition is reserved.</span>
 <span class="n">DECISION_THRESHOLD</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"off"</span><span class="p">}</span>
 
@@ -4753,11 +4969,11 @@ Choosing ordinary or nested temporal CV fixes the generated final split to
 clock/window questions. With the default window mode, this produces a rolling
 calendar holdout. Explicit fixed-window settings still retain their date pins.
 Group and non-temporal CV preserve the chosen final split. These initializer
-rules do not rewrite an existing <code>config/workflow.json</code>.</p>
+rules do not rewrite defaults in an existing <code>config/training.yml</code>.</p>
 <p>Initializer examples: <code>templates/databricks/examples/nested-temporal-init.example.json</code>
 and <code>templates/databricks/examples/nested-group-threshold-init.example.json</code>.
-These settings keep the existing two jobs and graph contract 3. Local tests do
-not establish cloud acceptance; record actual Databricks run evidence separately.</p>
+These settings use the same train/score jobs. Review the resolved split and
+search budgets before deployment.</p>
 <p>MLflow stores <code>cross_validation.json</code> with fold results, aggregate metrics,
 source/split dataset identity and engine. Ordinary CV includes fold-refit counts
 and metrics such as <code>cv_rmse_mean</code> and <code>cv_rmse_std</code>. Nested search reports its
@@ -4773,22 +4989,16 @@ and higher is better. <code>train_and_tune</code> displays a compact search summ
 already fitted preprocessing, without fitting again. <code>explanations.json</code> records
 results or an explicit unavailable reason. Limits are 200 samples, 50 transformed
 features and 50 displayed samples; explanations are disabled when this field is absent.</p>
-<p>To enable SHAP in a generated project, add this entry inside the existing
-<code>pipeline</code> object in <code>config/workflow.json</code> (alongside the empty <code>modeling</code> and
-<code>preprocessing</code> entries):</p>
-<div class="highlight"><pre><span></span><code><span class="nt">"explainability"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shap"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"max_samples"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"max_features"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"max_display_samples"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
-<span class="p">}</span>
+<p>To enable SHAP in a generated project, add shared defaults or a named-model override
+in <code>config/training.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">explainability</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shap</span>
+<span class="w">    </span><span class="nt">max_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">    </span><span class="nt">max_features</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">    </span><span class="nt">max_display_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 </code></pre></div>
-<p>The training runtime also needs the optional <code>shap&gt;=0.46.0,&lt;1.0.0</code> dependency
-declared by Core's <code>explainability</code> extra. The generated wheel/MLflow dependency
-list does not install this extra automatically. For serverless training, add SHAP
-to the training environment's <code>dependencies</code> in <code>resources/train.job.yml</code>;
-for classic compute, include it in the training task's PyPI libraries.</p>
-<p>Run the normal training job; do not execute <code>local_explanations.py</code> directly.
+<p>Run the normal training job; do not execute <code>explanations.py</code> directly.
 <code>train_and_tune</code> reports the explanation status, sample count and artifact name.
 Open that training run in MLflow and read <strong>Artifacts &gt; explanations.json</strong> for
 global feature importance and the bounded per-row explanations. The Bundle
@@ -4924,9 +5134,9 @@ invocation resolves latest once when <code>training_version</code> is null or mi
 an explicit version is honored regardless of trigger. Only <code>rolling_calendar</code>
 derives new observation boundaries, including for manual runs. Fixed
 windows stay fixed even if a job runs again a month later.</p>
-<p>This is a pre-production contract change: recreate candidates produced before
-SM-33D. Added sampling fields participate in the saved dataset identity even when
-sampling is disabled; earlier evidence is not silently upgraded for approval.</p>
+<p>Sampling fields participate in the saved dataset identity even when sampling
+is disabled. Candidates without this evidence must be recreated before approval;
+earlier evidence is not silently upgraded.</p>
 <p>For example, <code>window_timezone: "Europe/Vilnius"</code> uses Vilnius month boundaries,
 including the correct seasonal UTC offsets. Four months includes the temporal
 holdout month: three months for fit, the last completed month for final test.
@@ -4953,7 +5163,7 @@ calendar implicitly. When availability filtering is enabled, an explicit
 selects the source column; <code>event_time_parsing</code> explains its values. The
 <code>start</code>, <code>holdout_start</code> and <code>cutoff</code> boundaries are timezone-aware instants.
 They do not need to use the same UTC offset as source values.</p>
-<p>Edit these settings in the generated <code>config/workflow.json</code>:</p>
+<p>Edit these settings in the generated <code>config/training.yml</code> defaults:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"split_strategy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"temporal"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"training_window_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fixed_window"</span><span class="p">,</span>
@@ -5040,7 +5250,7 @@ record zone identifiers, not a copy of the IANA timezone database.</p>
 identity. Approval replays those saved rules. The job's cron timezone only
 controls when it runs; it does not define the source timestamps' timezone.
 For Python APIs, use <code>TrainingDateSpec</code> in the
-<a href="databricks_local_sdk.html#train-a-candidate-when-labels-are-ready">local training guide</a>.
+<a href="databricks_sdk.html#train-a-candidate-when-labels-are-ready">Python SDK training guide</a>.
 The supported format vocabulary is a subset of Python's
 <a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes">strptime directives</a>;
 source timezone rules use <a href="https://docs.python.org/3/library/zoneinfo.html">IANA zoneinfo</a>.</p>
@@ -5057,7 +5267,7 @@ compatibility, metric/threshold domains and action-specific snapshot inputs.
 Actual source schema, keys and artifact compatibility are checked by the
 existing data-read and scoring services against the real data.</p>
 <p>The same check can run locally, without Spark or registry access:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_target_config</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_target_config</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.projects.workflow_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">validate_workflow_config</span>
 
 <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_target_config</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="p">{</span>
@@ -5099,7 +5309,7 @@ the generic default remains <code>CostCenter</code>. This tag applies to policy-
 compute. Selecting it does not assign a model risk category.</p>
 <p>Advanced configuration accepts an optional <code>risk_category</code>, such as <code>Low</code>,
 <code>Medium</code>, or <code>High</code>. Leave it blank to omit the tag. The value remains editable
-in <code>config/workflow.json</code> and is recorded on future training runs and model
+in <code>config/training.yml</code> defaults and is recorded on future training runs and model
 versions; it does not change promotion gates or relabel existing versions.</p>
 <h2 id="where-the-workflow-lives">Where the workflow lives</h2>
 <p>The generated notebooks have fixed lifecycle steps or the score role.
@@ -5116,6 +5326,13 @@ closes training even on failure and publishes only a verified successful result.
 Parquet artifacts under <code>lifecycle/data/</code>, with digests and membership metadata
 checked before reuse. The experiment therefore stores training rows as well as
 model evidence; its access and retention policies apply to those rows.
+The model-producing run's <strong>Inputs</strong> tab separately lists native MLflow
+<code>training</code> and <code>holdout</code> datasets, including their actual split profiles and
+pinned source version. <strong>Artifacts &gt; dataset_inputs.json</strong> preserves the split,
+sampling and optional feature lookup provenance. These metadata entries reuse
+the already materialized frames; they do not trigger another source read or fit.
+See <a href="mlflow_tracking.html#training-datasets-in-inputs">training datasets in Inputs</a>
+for competition and multi-target run ownership and the limits of source replay.
 Computation and lifecycle changes reuse existing Core services; no additional
 control tables or jobs are introduced. See the
 <a href="databricks_bundle_walkthrough.html#the-two-jobs-and-their-tasks">task graph and operator walkthrough</a>.
@@ -5125,15 +5342,16 @@ Imports do not create a Spark session or cloud resource.</p>
 Existing graph-2 bundles retain their legacy runtime path; changing only a
 contract marker does not migrate a bundle.
 The workflow configuration schema remains version 1.</p>
-<p>Notebook entrypoints are explicit: generated <code>src/score.py</code> calls
+<p>Notebook entrypoints are explicit: generated <code>src/jobs/score.py</code> calls
 <code>job_runtime.run_score_notebook</code>; lifecycle notebooks call
 <code>job_runtime.run_lifecycle_notebook</code> with a fixed phase. Deploy new entrypoints
 with the matching wheel. Existing direct <code>run_notebook(task_role=...)</code> callers
 remain supported: score delegates to the score entrypoint, while lifecycle keeps
 its sequential behavior and does not acquire durable phase/retry semantics.
-<code>run_bundle_action</code>, <code>run_action</code> and <code>train_local_candidate</code> retain their APIs.</p>
-<p>Edit preprocessing in <code>src/features/preprocessing.py</code>, model settings in the
-selected <code>src/modeling/</code> file, and shared workflow settings in <code>config/workflow.json</code>.
+<code>run_bundle_action</code>, <code>run_action</code> and <code>train_candidate</code> retain their APIs.</p>
+<p>Edit recipe lists in <code>config/preprocessing.yml</code>, custom calculations in
+<code>src/features/preprocessing.py</code>, model settings in <code>config/training.yml</code>, and
+scoring/publication settings in <code>config/inference.yml</code>.
 These remain project choices; common workflow fixes ship in the Skyulf wheel
 instead of requiring edits to every generated notebook.</p>
 <h3 id="independent-scoring-and-promotion-policies">Independent scoring and promotion policies</h3>
@@ -5233,11 +5451,8 @@ lifecycle parameters and cannot dispatch alias actions; this is input isolation,
 registry write permissions. A failed/uncertain alias action never publishes a
 successful score request. If the alias change succeeded but score failed, retry
 score directly; no retraining is needed.</p>
-<p>Local tests and strict generated-project validation cover this wiring. The
-personal serverless SM-32 rehearsal verified manual approval, rejection,
-rollback/retry, automatic promotion, score handoff and pinned selection.
-The score entrypoint filters inherited parent-job evidence before dispatching
-score. Company targets and production identities remain separate acceptance work.</p>
+<p>The score entrypoint filters inherited parent-job evidence before dispatching
+score. Validate permissions and compute dependencies in each deployment target.</p>
 <h3 id="approve-an-existing-candidate-without-training">Approve an existing candidate without training</h3>
 <p>Use an explicit manual policy and the comparison returned by the earlier
 training job. Review that saved result before passing its version and digest:</p>
@@ -5245,7 +5460,7 @@ training job. Review that saved result before passing its version and digest:</p
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">asdict</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.local_workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_action</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.lifecycle.workflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_action</span>
 
 <span class="c1"># candidate is the result of an earlier training job; no training runs here.</span>
 <span class="n">comparison</span> <span class="o">=</span> <span class="n">asdict</span><span class="p">(</span><span class="n">candidate</span><span class="o">.</span><span class="n">comparison</span><span class="p">)</span>
@@ -5360,11 +5575,10 @@ version and its earlier event records remain available.</p>
 <p>This alias is neither a complete history nor a scoring fallback. It creates
 no table or job. History changes share the lifecycle's pending-event checks
 and writer ownership; manual alias/receipt disagreement stops further actions,
-including retries. Partial writes require reconciliation before proceeding.
-This history extension passed local and personal-serverless Bundle verification,
-including replacement, explicit rejection and rollback while retaining a contender.</p>
+including retries. Partial writes require reconciliation before proceeding.</p>
 <h2 id="what-is-created">What is created</h2>
-<p><code>bundle deploy</code> creates only two jobs and uploads their code:</p>
+<p><code>bundle deploy</code> creates the core train/score jobs and uploads their code; optional
+feature, monitoring and dashboard resources depend on configuration:</p>
 <table>
 <thead>
 <tr>
@@ -5397,7 +5611,7 @@ Initialization alone does not deploy or start any job.
 <code>promotion_policy=automatic</code> uses the same train job to compare candidate and
 champion on the same pinned holdout, independently of the score selector. The
 selected <code>metric</code>, <code>min_improvement</code>, and absolute <code>quality_threshold</code> stay
-editable in <code>config/workflow.json</code>. A first champion requires a numeric
+editable in <code>config/training.yml</code> defaults. A first champion requires a numeric
 absolute threshold because no prior version exists for comparison. Later
 versions must pass that threshold and improve on champion by the chosen
 minimum. A passing candidate is staged and promoted through checked registry
@@ -5406,7 +5620,7 @@ calls the existing score job only after a champion transition when handoff is
 enabled. No third job or control table is added.</p>
 <h3 id="additional-quality-gates">Additional quality gates</h3>
 <p>Keep one selection <code>metric</code>. Optionally add <code>quality_gates</code> directly to
-<code>config/workflow.json</code>; no extra initializer question is needed. For example,
+<code>config/training.yml</code> defaults; no extra initializer question is needed. For example,
 merge these regression policy fields into your existing configuration:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"metric"</span><span class="p">:</span><span class="w"> </span><span class="s2">"heldout_rmse"</span><span class="p">,</span>
@@ -5450,7 +5664,7 @@ supplies the explicit <code>on_registered</code> lifecycle callback.</p>
 <p>Training runs and model versions share readable metadata: <code>train_data_version</code>,
 <code>test_data_version</code>, <code>train_data_destination</code>, <code>test_data_destination</code>,
 <code>model_type</code>, <code>candidate_date_tag</code>, and <code>engine</code>. Optional <code>risk_category</code> is
-editable in workflow.json. Since fit and evaluation split one Delta snapshot,
+editable in <code>config/training.yml</code> defaults. Since fit and evaluation split one Delta snapshot,
 their table names and versions match; <code>train_start</code>, <code>test_start</code>, and
 <code>data_end</code> explain the split. The exact dataset identity is saved in
 <code>training_data.json</code>. Run tags use <code>task=training</code>.</p>
@@ -5473,9 +5687,9 @@ and reasons remain. Long result lists are abbreviated with a notice. The full
 JSON notebook result and task values remain unchanged for automation. SHAP and
 monitoring retain their existing richer reports; the chart task lists artifact
 locations. The notebook exit stays in a separate final cell.</p>
-<p>New projects generate only the selected modeling files: <code>single_model.py</code>,
-<code>model_competition.py</code>, or <code>multi_model.py</code> plus <code>model_set.py</code>. Job notebooks are
-also limited to the selected graph, including optional SHAP/charts/recovery.
+<p>New projects generate the selected model entries in <code>config/training.yml</code> and
+optional set settings in <code>config/inference.yml</code>. Job notebooks are limited to
+the selected graph, including optional SHAP/charts/recovery.
 This affects new generation; it does not delete files from existing projects.
 Reinitialize a separate project when changing layout or enabling a feature whose
 notebook was omitted, then review and merge the required resources and files.
@@ -5486,16 +5700,18 @@ Do not only toggle a resource flag and reference a missing notebook.</p>
 subpackages: <code>jobs/{training,monitoring,lifecycle,shared}</code>,
 <code>training/{fitting,competition,tuning,thresholds,weights,shared}</code> and
 <code>scoring/{batch,incremental,shared}</code>. Monitoring lives in
-<code>observability/monitoring</code>, with <code>local</code>, <code>spark</code> and <code>performance</code> subpackages;
+<code>observability/monitoring</code>, with <code>spark</code>, <code>performance</code> and <code>serving</code> subpackages;
 charts and reports have their own folders. For example, notebook adapters import
 <code>skyulf.integrations.databricks.jobs.shared.job_runtime</code>.
-Use these paths for new code. <code>_compat</code> preserves old module imports
-and serialized class references; it contains aliases, not a second runtime.
+Use these paths directly. The old <code>local_*</code> integration modules and renamed
+APIs have been removed; update existing imports and model packages as described
+in <a href="databricks_sdk.html#upgrading-integration-code">upgrading integration code</a>.
 The generated project's <code>src/jobs</code> directory remains unchanged.</p>
 <p>The related MLflow library follows the same organization:
 <code>skyulf.integrations.mlflow.{models,spark,lifecycle,registration,runs,shared}</code>.
-Its <code>_compat</code> aliases preserve existing model class and notebook import paths.
-Package import still leaves MLflow optional; pyfunc adapters load it when selected.
+Use <code>models.pipeline_model</code> and <code>models.feature_model</code> for fitted-pipeline
+adapters. Package import leaves MLflow optional; pyfunc adapters load it when
+selected.
 Worker source snapshots and certificates continue to cover the entire Skyulf
 package after the files move.</p>
 <p>With <code>score_model_selection=champion</code>, score resolves the alias once to a
@@ -5584,21 +5800,27 @@ can find a customer's predictions:</p>
 <span class="k">WHERE</span><span class="w"> </span><span class="n">customer_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'C123'</span><span class="p">;</span>
 </code></pre></div>
 <h2 id="first-run">First run</h2>
-<p>Set <code>deployment/artifact.json</code> to the Core source directory or release wheel and
-the expected Core version. The Bundle artifact build prepares the wheel, checks
-its identity and records its SHA-256 in <code>dist/skyulf/build.json</code>.
-The wheel filename includes its content digest as a build tag: changed bytes get
-a distinct deployment/cache identity while the release version stays compatible
-with existing saved model requirements. The receipt matches the uploaded bytes.
-Edit <code>config/workflow.json</code> for real source columns, split policy and size
-limits, the selected <code>src/modeling/</code> file for model settings, and
-<code>src/features/preprocessing.py</code> for feature engineering.
-The JSON values are an example, not a dataset.
+<p>Core is installed from the package index through
+<code>skyulf-core[mlflow]==0.9.2</code> in <code>deployment/requirements.txt</code>. Change that one
+version to a published release and redeploy to upgrade Core. Serverless and
+policy-cluster jobs share this pin, including monitoring and optional online jobs.
+Ensure the job environment can reach the package index.
+Use a Core release containing the same template revision. A template from an
+unreleased source checkout needs a corresponding package release before this
+requirements-only setup can run. Older packages can lack the YAML configuration
+support used by smoke, preview, training and scoring, even with online jobs disabled.
+Successful package installation does not establish runtime compatibility. For local smoke/preview,
+run <code>uv pip install -r deployment/train-requirements.txt</code> from the generated project.
+Saved models enforce their producer's runtime versions; validate compatibility
+or retrain before upgrading production.
+Edit <code>config/training.yml</code> for real source columns, split policy, budgets and
+model settings. Configure recipe lists in <code>config/preprocessing.yml</code> and custom
+calculations in <code>src/features/preprocessing.py</code>. Review scoring settings in
+<code>config/inference.yml</code>. Generated names are placeholders for your own data.
 Enable Change Data Feed on the scoring source before later inserts arrive.</p>
-<div class="highlight"><pre><span></span><code><span class="n">uv</span> <span class="n">run</span> <span class="p">-</span><span class="n">-no-project</span> <span class="n">python</span> <span class="n">src</span><span class="p">/</span><span class="n">tools</span><span class="p">/</span><span class="n">build_wheel</span><span class="p">.</span><span class="n">py</span>
-<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
-<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
-<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">train</span> <span class="n">-t</span> <span class="n">test_development</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<div class="highlight"><pre><span></span><code><span class="n">databricks</span> <span class="n">bundle</span> <span class="n">validate</span> <span class="p">-</span><span class="n">-strict</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">deploy</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
+<span class="n">databricks</span> <span class="n">bundle</span> <span class="n">run</span> <span class="n">train</span> <span class="n">-t</span> <span class="n">dev</span> <span class="p">-</span><span class="n">-profile</span> <span class="p">&lt;</span><span class="n">profile</span><span class="p">&gt;</span>
 </code></pre></div>
 <p>Use <code>test</code> instead if personal development targets were not generated.
 <code>deployment/requirements.txt</code> supplies the shared train/score runtime, including
@@ -5656,14 +5878,10 @@ concrete version for comparison if present. Manual approval leaves champion
 unchanged; automatic promotion applies its metric gates. Score handoff follows
 only a successful champion transition when enabled. The source version is
 pinned at run start; it is not a historical snapshot as of the observation cutoff.</p>
-<p>The older SM-20a personal serverless rehearsal passed, but its jobs and test
-schemas were removed at the user's request. The subsequent clean generic
-<code>dev</code> rehearsal trained a Polars model from 600 real taxi rows, wrote 600
-initial and 50 later predictions to one table, and replayed without another
-commit. The later two-job design passed a separate personal serverless
-rehearsal: 650 existing source rows, one later insert, and a no-op replay
-left one prediction table with 651 rows. The <code>test</code>, <code>syst</code> and <code>prod</code>
-placeholders have not been deployed in a company workspace.</p>
+<p>Use a dedicated development target for the first deployment. Check the training
+run, concrete registered version, score-job result and committed Delta receipt
+before enabling schedules in another target. A successful development run does
+not establish the permissions or resource limits of <code>test</code>, <code>syst</code> or <code>prod</code>.</p>
 <h3 id="explicit-retry-policy">Explicit retry policy</h3>
 <p>Generated notebook tasks set <code>max_retries: 0</code>; serverless tasks additionally set
 <code>disable_auto_optimization: true</code> because serverless auto-optimization can add

@@ -1528,6 +1528,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#fitted-pipeline-or-portable-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fitted pipeline or portable bundle?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#raw-data-and-prepared-features" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1605,7 +1616,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1738,14 +1777,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1773,7 +1868,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2053,7 +2148,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3580,12 +3675,22 @@
 
 
 <h1 id="standalone-inference-bundles">Standalone inference bundles</h1>
-<p>The 0.9.0 development API packages a fitted feature pipeline and a Python
+<p>The bundle API packages a fitted feature pipeline and a Python
 estimator with an explicit inference contract. It supports local pandas/Polars
 prediction and native Spark FE followed by Python model inference on Spark workers.
 Importing <code>skyulf.inference</code> requires neither PySpark nor MLflow.</p>
 <p>Start with <a href="inference_flow.html">How inference works</a> for training and inference
 diagrams and a worked example of reusing the same fitted FE and model.</p>
+<h2 id="fitted-pipeline-or-portable-bundle">Fitted pipeline or portable bundle?</h2>
+<p>Use <code>FittedPipelineArtifact</code> from <code>skyulf.inference.fitted_pipeline</code> to save and
+restore the complete pandas/Polars pipeline with its recorded engine and schemas.
+<code>save_pipeline</code>, <code>load_pipeline</code> and <code>predict_pipeline</code> use that format. It carries
+the persisted <code>kind="local_pipeline"</code> and <code>execution_scope="whole_frame_local"</code>
+values for compatibility; those strings do not restrict it to a workstation.</p>
+<p>Use <code>InferenceBundle</code> for the explicitly portable preprocessing state and
+<code>predict_local</code>/<code>predict_spark</code> API described here. These two artifact formats are
+not interchangeable. <a href="preprocessing_context.html">Preprocessing context</a> explains
+when a complete frame, groups or carried history are required.</p>
 <h2 id="raw-data-and-prepared-features">Raw data and prepared features</h2>
 <p>Choose the input stage when building a bundle:</p>
 <table>
@@ -3736,7 +3841,7 @@ classification bundle and a Spark DataFrame. The fitted FE runs as native Spark 
 Only the prepared feature columns and row keys reach the Python workers;
 the estimator receives the features in the saved training order. Pandas/NumPy
 batches exist inside those workers, without collecting the dataset to the driver.
-Local training describes where the fit runs; it does not waive the matching
+Training fits the model in one Python process; it does not waive the matching
 runtime requirements above. Train/package and consume in compatible environments,
 even when switching from pandas or Polars inputs to Spark inputs.</p>
 <p>This example continues the local training example above. <code>spark</code> is an existing,
@@ -3814,9 +3919,9 @@ classification. Prepared-feature bundles and streaming remain unsupported.
 Classification output includes <code>prediction</code> plus <code>probability_*</code> columns in the
 manifest class order. Saved tuning or pipeline thresholds are applied in the
 same precedence order as local inference. The Python FE worker mode is
-available for the portable row-independent path. Databricks,
-Spark Connect and worker-wheel isolation still require their later validation
-gates; local PySpark tests do not establish those deployment guarantees.</p>
+available for the portable row-independent path. Each process needs the recorded
+runtime dependencies; validate packaging and worker environments on the actual
+Databricks or Spark Connect compute before running a production workload.</p>
 <h2 id="current-support-and-legacy-adapters">Current support and legacy adapters</h2>
 <p>The first version accepts a successfully fitted standalone <code>SkyulfPipeline</code>
 with recorded schemas, primitive numeric/boolean features, supported sklearn
@@ -3846,7 +3951,7 @@ consumers; it does not relearn or replace those fitted transformations.</p>
 <tr>
 <td>Backend job artifact, normally <code>.joblib</code></td>
 <td>Model, fitted FeatureEngineer, target/drop metadata, model feature order/dtypes and training engine; <code>DeploymentService</code></td>
-<td>Explicit adapter planned for SM-18; do not pass the dictionary to <code>build_bundle</code></td>
+<td>Not a bundle input; use its existing backend loader</td>
 </tr>
 <tr>
 <td>Estimator-only pickle</td>
@@ -3864,7 +3969,8 @@ pipeline saved after schema capture can be loaded through that API and passed
 to <code>build_bundle</code>. Historical standalone artifacts without captured schemas
 must be fitted successfully again; the bundle does not invent missing column
 names or types. Backend artifact dictionaries are rejected. Their explicit
-adapter and threshold/label compatibility checks belong to SM-18.</p>
+adapter would need to preserve threshold and target-label behavior; no implicit
+conversion is performed.</p>
 <p>Changing the inference engine does not make every fitted Python transformer a
 native Spark operation. For example, a future binning adapter must use the saved
 training bin boundaries; it must not discover new boundaries from each inference
@@ -3879,10 +3985,10 @@ does not include external feature engineering; log a fitted pipeline or provide
 a model wrapper that runs it. MLflow's
 <a href="https://mlflow.org/docs/latest/api_reference/python_api/mlflow.pyfunc.html#mlflow.pyfunc.spark_udf">Spark UDF</a>
 executes Python model inference through pandas batches; it does not compile
-arbitrary Python transformations into native Spark expressions. Skyulf's MLflow
-adapter will expose the selected bundle contract in a later stage.</p>
-<p>MLflow/Unity Catalog, Databricks runtime validation, endpoints and template
-generation remain later stages of the <a href="spark.html">Spark work</a>.</p>
+arbitrary Python transformations into native Spark expressions. Skyulf's <a href="mlflow_models.html">MLflow adapter</a> packages the selected artifact
+contract. The certified fitted-pipeline pyfunc route has separate admission
+checks from this portable bundle format. See the <a href="databricks_bundle.html">Databricks Bundle guide</a>
+for generated jobs, source snapshots and publication.</p>
 
 
 

@@ -1,0 +1,4803 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/databricks_sdk.html">
+      
+      
+        <link rel="prev" href="databricks_batch.html">
+      
+      
+        <link rel="next" href="databricks_serving_rollout.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Databricks Python SDK - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#databricks-python-sdk-training-and-bounded-scoring" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Databricks Python SDK
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="databricks_sdk.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading-integration-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading integration code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#train-a-candidate-when-labels-are-ready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train a candidate when labels are ready
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-and-score-a-small-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fit and score a small batch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preflight-and-custom-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preflight and custom pipelines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluate-the-held-out-split-in-the-model-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluate the held-out split in the model run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preprocessing-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preprocessing diagnostics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-and-score-a-pinned-uc-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fit and score a pinned UC source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publish-one-scored-month-to-a-uc-delta-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publish one scored month to a UC Delta table
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#score-newly-inserted-rows-automatically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Score newly inserted rows automatically
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lag-and-rolling-history-across-batches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lag and rolling history across batches
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#saved-scoring-policies-and-project-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved scoring policies and project assets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Saved scoring policies and project assets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deliver-lookup-files-and-external-python-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deliver lookup files and external Python dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#train-independent-target-models-in-one-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train independent target models in one job
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Train independent target models in one job">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#activate-and-score-a-coherent-model-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Activate and score a coherent model set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-output-storage-and-consumer-views" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose output storage and consumer views
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-component-quality-gates-and-automatic-set-activation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-component quality gates and automatic set activation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#select-preprocessing-and-pre-split-recipes-independently" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Select preprocessing and pre-split recipes independently
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verify Sampling and Weights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="databricks-python-sdk-training-and-bounded-scoring">Databricks Python SDK: training and bounded scoring</h1>
+<p>Use the SDK to train, save, evaluate and score fitted pandas/Polars pipelines
+from Python, including inside a Databricks driver or serverless job. A generated
+Bundle is optional. Training and whole-frame scoring run in one Python process;
+Spark can read the pinned Delta source and publish the resulting predictions.</p>
+<p>Three independent choices determine the workflow:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>What it selects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>runtime="standalone"</code> or <code>"databricks"</code></td>
+<td>General Python integration or Databricks integration. Both can run on a workstation or cloud compute; UC Delta publication requires <code>databricks</code>. This does not select the DataFrame engine or distributed execution.</td>
+</tr>
+<tr>
+<td><code>engine="pandas"</code> or <code>"polars"</code></td>
+<td>The DataFrame engine for training and whole-frame scoring. It must match the saved pipeline.</td>
+</tr>
+<tr>
+<td>Bundle <code>inference_mode="local"</code> or <code>"spark"</code></td>
+<td>Bounded whole-frame scoring or distributed worker scoring. Spark scoring has separate fitted-recipe admission checks.</td>
+</tr>
+</tbody>
+</table>
+<p>Start with <a href="#fit-and-score-a-small-batch">fit and score a small batch</a> for a
+self-contained example. Reading UC tables additionally needs an authenticated
+Spark session; MLflow registration needs tracking/registry access. Set explicit
+row and byte limits before reading a source into Python memory.</p>
+<p>For REST serving, see <a href="databricks_online_features.html">online feature lookup</a> to
+package native entity-key lookups with saved completeness and freshness checks.
+See <a href="databricks_serving_rollout.html">gradual serving rollout</a> to increase a
+challenger's traffic by 10 percentage points per passing 24-hour stage and
+automatically promote it after its final 100% stage passes. The optional Bundle
+scheduled jobs start paused and disabled; neither workflow requires a batch prediction sink.</p>
+<p>For generated online setup, select <code>include_online_serving: "true"</code> independently
+of <code>include_online_publication</code> and <code>include_daily_rollout</code>. Configure
+<code>feature_lookup</code> and <code>online_features</code> in <code>config/training.yml</code>, train and register,
+then configure <code>online_serving</code> in <code>config/serving.yml</code> with the concrete version
+and existing publication bindings. Deploy and run <code>online_serving_setup</code> explicitly.
+Its returned request example follows the inspected native signature, including
+required source fields beyond entity keys. The
+<a href="databricks_online_features.html#generate-train-and-set-up-an-online-bundle">complete init, config, deploy and request example</a>
+also covers externally managed publication. Python callers can invoke
+<code>skyulf.integrations.databricks.jobs.serving_job.run_online_serving_setup</code>
+with the same section, Spark session and authenticated workspace client; the
+helper composes the existing native model and pinned endpoint APIs.</p>
+<h2 id="upgrading-integration-code">Upgrading integration code</h2>
+<p>Use the purpose-based module, class and function names shown in this guide.
+The previous fitted-pipeline and integration names containing <code>local</code> have been
+removed, including their forwarding modules. Update those imports and call sites.</p>
+<p>Replace <code>runtime="local"</code> with <code>runtime="standalone"</code>; the old runtime value is
+rejected during configuration validation. Continue to choose <code>engine="pandas"</code>
+or <code>"polars"</code> separately. Use <code>runtime="databricks"</code> for UC Delta publication.</p>
+<p>Saved pickle or MLflow packages that reference removed module or class names may
+fail to load with this version. Rebuild and log those model packages using the
+updated imports before upgrading their consumers.</p>
+<p>Persisted values such as <code>kind="local_pipeline"</code>, <code>mode="local_pipeline"</code> and
+<code>execution_scope="whole_frame_local"</code> remain unchanged. Keep these artifact-format
+values; Python naming does not change execution admission, payload
+checks or resource budgets. Portable bundles continue to use <code>predict_local</code>.</p>
+<h2 id="train-a-candidate-when-labels-are-ready">Train a candidate when labels are ready</h2>
+<p><code>train_candidate</code> reads a <strong>specific Delta table version</strong>, filters a
+bounded event window in Spark when temporal splitting is selected. Random
+splitting uses Core <code>DataSplitter</code> on stable record-key order and needs no dates.
+Optional availability filtering excludes unknown results and those after the
+independent <code>result_cutoff</code> from both fit and holdout.
+For temporal splitting, the feature/model pipeline fits only on events before
+<code>holdout_start</code>; later eligible events are reserved for evaluation. The fit engine can be pandas or
+Polars. The run logs the Skyulf config, source and code identities, fitted model,
+held-out metrics and <code>candidate_comparison.json</code>. It registers a new concrete
+model version but never assigns <code>@challenger</code> or <code>@champion</code>.</p>
+<p>The model-producing run also exposes native MLflow <strong>Inputs</strong> for the actual
+<code>training</code> and <code>holdout</code> frames. These preserve the pinned source version and
+bounded split profiles; <code>dataset_inputs.json</code> links the source, sampling, split
+and optional feature lookup evidence. See
+<a href="mlflow_tracking.html#training-datasets-in-inputs">training datasets in Inputs</a>
+for the fields and the distinction between lineage metadata and saved data rows.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingSpec</span><span class="p">,</span> <span class="n">train_candidate</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">TrainingSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.labeled_events"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">split_strategy</span><span class="o">=</span><span class="s2">"temporal"</span><span class="p">,</span> <span class="n">filter_unavailable_results</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">result_cutoff</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">holdout_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">event_column</span><span class="o">=</span><span class="s2">"event_time"</span><span class="p">,</span> <span class="n">result_available_at_column</span><span class="o">=</span><span class="s2">"label_available_at"</span><span class="p">,</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"event_id"</span><span class="p">,),</span> <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"feature_a"</span><span class="p">,</span> <span class="s2">"feature_b"</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">train_candidate</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">pipeline_config</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span>
+    <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="n">experiment_name</span><span class="o">=</span><span class="s2">"/Shared/customer-model"</span><span class="p">,</span> <span class="n">run_name</span><span class="o">=</span><span class="s2">"candidate-2026-03"</span><span class="p">,</span>
+    <span class="n">artifact_path</span><span class="o">=</span><span class="s2">"artifacts/customer-model"</span><span class="p">,</span> <span class="n">metric</span><span class="o">=</span><span class="s2">"heldout_rmse"</span><span class="p">,</span>
+    <span class="n">min_improvement</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">champion_version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>  <span class="c1"># Pin this concrete version before the job starts.</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">comparison</span><span class="o">.</span><span class="n">eligible</span><span class="p">)</span>
+</code></pre></div>
+<p>The example uses native Spark timestamp instants; their stored instants are
+retained independently of the Spark session timezone. A
+missing or later label is not a training label, even if its target value is
+already present in the pinned table. The source must have unique nonnull row
+keys and distinct feature, target and timestamp columns. A nonempty training
+set and holdout of at least two rows each are required. The row and byte limits
+bound decoded rows and the local frame, not Spark's wire transfer size. The
+caller supplies a concrete <code>champion_version</code>; omit it for the first candidate.
+Review the comparison report, then use the separate guarded staging/promotion
+operations if a human approves a change. If fit, packaging, registration or
+comparison fails, no alias moves; a registered but unapproved candidate may
+remain for inspection. A scheduling policy is separate from this service.</p>
+<p>For string, local-clock or date-only source columns, supply independent rules:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrainingDateSpec</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
+    <span class="n">spec</span><span class="p">,</span>
+    <span class="n">event_time_parsing</span><span class="o">=</span><span class="n">TrainingDateSpec</span><span class="p">(</span>
+        <span class="nb">format</span><span class="o">=</span><span class="s2">"</span><span class="si">%d</span><span class="s2">/%m/%Y %H:%M:%S"</span><span class="p">,</span> <span class="n">timezone</span><span class="o">=</span><span class="s2">"Europe/Copenhagen"</span>
+    <span class="p">),</span>
+    <span class="n">result_time_parsing</span><span class="o">=</span><span class="n">TrainingDateSpec</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s2">"%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%M:%S%z"</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Leave the format unset for native timestamp columns. Naive local timestamps
+need an explicit source timezone; dates additionally require
+<code>date_only="midnight"</code>. The default rejects date-only inputs. Ambiguous and
+nonexistent local times are rejected, and strings are never guessed.
+See the <a href="databricks_bundle.html#source-date-formats-and-timezones">source-date contract</a>
+for examples, boundaries, supported directives and distributed validation cost.
+<code>candidate_training_spec.json</code> retains both parsing rules for approval replay.</p>
+<p>For a table without dates, create the same specification with no time fields:</p>
+<div class="highlight"><pre><span></span><code><span class="n">spec</span> <span class="o">=</span> <span class="n">TrainingSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.labeled_customers"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"customer_id"</span><span class="p">,),</span> <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"income"</span><span class="p">,</span> <span class="s2">"age"</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+    <span class="n">split_strategy</span><span class="o">=</span><span class="s2">"random"</span><span class="p">,</span> <span class="n">test_size</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">stratify</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Pass this spec to the same <code>train_candidate</code> call above with either fit
+engine. All targets must be known. Enable <code>filter_unavailable_results</code> and set
+<code>result_available_at_column</code> plus <code>result_cutoff</code> if outcomes arrive later;
+random splitting still needs no observation timestamp. The returned candidate
+and saved spec record holdout membership evidence for approval replay.
+See the <a href="databricks_bundle.html#choose-the-evaluation-split-and-result-availability">split/availability matrix</a>
+for the four supported combinations.</p>
+<h2 id="fit-and-score-a-small-batch">Fit and score a small batch</h2>
+<p>Candidate training also accepts <code>cv=CVSpec(enabled=True, folds=3)</code> from
+<code>skyulf.integrations.databricks.training.tuning.cv</code>. It reuses Core CV on training rows,
+refits preprocessing per fold and logs a separate report to the candidate's
+MLflow run. Use <code>method="stratified_k_fold"</code> for classification; time-series CV
+requires an explicit event window and <code>shuffle=False</code>. The saved final pipeline
+and its protected holdout are independent of the fold fits.</p>
+<p><code>TrainingSpec(training_sample_rows=10_000, training_sample_seed=42, ...)</code>
+opts into seeded Spark-side selection before local transfer. The limit includes
+training and final holdout rows and cannot exceed <code>max_rows</code>. Sample membership
+is pinned for approval replay. Leaving it null preserves overflow-fail behavior.
+See <a href="databricks_bundle.html#optional-basic-model-cross-validation">Bundle CV, sampling and selection</a>
+for full contracts and the Bundle's <code>train</code> calendar settings. The Bundle uses
+the same action for manual and scheduled runs: null source version resolves
+latest once, explicit version pins the snapshot, and rolling windows derive at
+invocation. The direct <code>train_candidate</code> API still takes a concrete
+<code>TrainingSpec</code> with its source version and any active date boundaries.</p>
+<p>Install the same <code>skyulf-core</code>, pandas, Polars and scikit-learn versions in the
+training and scoring environments. The fitted artifact records those versions,
+the fit engine and the raw/feature schemas. It contains trusted Python pickle;
+only load packages from your own controlled producer.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.fitted_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">WorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span>
+    <span class="n">prepare_workflow</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+
+<span class="n">train</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">],</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">5</span><span class="p">],</span> <span class="n">test</span><span class="o">=</span><span class="n">train</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">5</span><span class="p">:]),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">save_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="s2">"artifacts/customer-model"</span><span class="p">)</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">WorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"standalone"</span><span class="p">,</span>  <span class="c1"># general Python integration, on any compute</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"pandas"</span><span class="p">,</span>       <span class="c1"># must match the recorded fit engine</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"caller_frame"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"artifacts/customer-model"</span><span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"return_frame"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">query</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"x"</span><span class="p">:</span> <span class="p">[</span><span class="mf">7.0</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">]})</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">prepared</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">feature_order</span> <span class="o">==</span> <span class="p">(</span><span class="s2">"x"</span><span class="p">,)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
+</code></pre></div>
+<p>The example uses a path within one process. A Databricks job's temporary path
+is not a cross-job model store. For separate training and scoring jobs, log the
+artifact with <code>log_pipeline_model</code>, register that run model explicitly, then select
+the registered version in scoring. An alias is read once and converted to a
+concrete <code>models:/name/version</code> reference; later alias changes cannot alter the
+already prepared predictor.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModelSelection</span>
+
+<span class="n">selection</span> <span class="o">=</span> <span class="n">ModelSelection</span><span class="p">(</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span>
+    <span class="n">alias</span><span class="o">=</span><span class="s2">"champion"</span><span class="p">,</span>  <span class="c1"># or version="7"; never both</span>
+    <span class="n">tracking_uri</span><span class="o">=</span><span class="n">tracking_uri</span><span class="p">,</span>
+    <span class="n">registry_uri</span><span class="o">=</span><span class="n">registry_uri</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">"model"</span><span class="p">:</span> <span class="n">selection</span><span class="p">})</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>  <span class="c1"># read-only registry resolution and load</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span> <span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_digest</span><span class="p">)</span>
+</code></pre></div>
+<p>Obtain <code>tracking_uri</code> and <code>registry_uri</code> from your job's non-secret settings;
+authenticate through the runtime's credential provider. Do not put tokens or
+passwords into config or store URIs. Registering or changing an alias is a
+separate, explicit operation. Preparing or scoring a workflow never promotes a model; lifecycle actions are explicit.</p>
+<h2 id="preflight-and-custom-pipelines">Preflight and custom pipelines</h2>
+<p><code>WorkflowConfig</code> is frozen, serializable and has no implicit source
+snapshot, period or promotion decision. <code>preflight(config, artifact=...)</code>
+performs offline checks without a registry call, package load or job submission.
+It returns issues with a code, category and suggested fix. For a registry
+selection, offline preflight reports <code>model_unresolved</code>; call
+<code>prepare_workflow</code> when read-only registry access is allowed. That step
+loads the pinned package and performs full preflight before returning a
+predictor. <code>local_issues</code>, <code>remote_issues</code> and <code>remote_checked</code> keep the two
+stages visible. It may deserialize trusted pickle, but creates no cloud resource.
+If representative rows are available before submitting a job, pass
+<code>probe_frame=sample</code> to <code>preflight</code> or <code>prepare_workflow</code>. The probe
+runs the actual fitted FE and model and reports a <code>prediction_probe_failed</code>
+issue for an incompatible sample. A passing sample is evidence for that sample,
+not a guarantee about every later batch.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.fitted_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">preflight</span>
+
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">load_pipeline</span><span class="p">(</span><span class="s2">"artifacts/customer-model"</span><span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">preflight</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span>
+    <span class="s2">"model"</span><span class="p">:</span> <span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"artifacts/customer-model"</span><span class="p">)</span>
+<span class="p">}),</span> <span class="n">artifact</span><span class="o">=</span><span class="n">artifact</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">issue</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">issues</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">issue</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">issue</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">issue</span><span class="o">.</span><span class="n">fix</span><span class="p">)</span>
+</code></pre></div>
+<p>For custom feature engineering, edit the normal <code>SkyulfPipeline</code> preprocessing
+configuration, fit it on training data, save it, and compare predictions before
+and after loading. The SDK has <strong>no separate node or model allowlist</strong>: it
+restores the fitted <code>SkyulfPipeline</code> and calls its existing prediction path.
+Integration examples cover imputation, scaling, encoding, binning, linear and
+logistic regression, and a MinMaxScaler/random-forest combination on both DataFrame
+engines. Other library combinations remain governed by their own fitted
+inference behavior and should receive replay tests before production use.
+Saving a pipeline does not itself admit it to independent worker batches or
+single-row requests. Inspected pandas artifacts can use the separately certified
+<a href="databricks_bundle.html#distributed-inference-settings">Spark pyfunc route</a> when
+their exact fitted recipe and model are supported. A portable <code>InferenceBundle</code>
+uses a different state format and its own <code>predict_local</code>/<code>predict_spark</code> paths;
+selecting the wrong package kind fails preflight. See
+<a href="preprocessing_context.html">preprocessing context</a> for groups and history.</p>
+<p>For example, an advanced pipeline may fit explicit binning followed by encoding
+before it is packaged; its saved edges and category positions are then replayed
+by the fitted artifact:</p>
+<div class="highlight"><pre><span></span><code><span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"bands"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"x"</span><span class="p">],</span> <span class="s2">"bins"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">4.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">],</span>
+            <span class="s2">"output_suffix"</span><span class="p">:</span> <span class="s2">"_band"</span><span class="p">,</span>
+        <span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode_bands"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"x_band"</span><span class="p">],</span> <span class="s2">"drop_original"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">,</span>
+        <span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="c1"># Fit with SplitDataset, then save_pipeline as in the first example.</span>
+</code></pre></div>
+<p><code>InputSource</code> defaults to 100,000 rows and 128 MiB. Set tighter limits for each
+job. <code>PreparedWorkflow.predict</code> checks both before running FE and the model.
+It preserves the caller's input column order and rejects schema mismatches; it
+does not silently collect a Spark DataFrame. On Databricks, supply either a
+bounded caller-owned frame or the explicit pinned UC source adapter below.</p>
+<h2 id="evaluate-the-held-out-split-in-the-model-run">Evaluate the held-out split in the model run</h2>
+<p>Keep labeled test rows outside the fit split. After fitting and loading the
+artifact, <code>evaluate_holdout</code> calls the saved pipeline's normal prediction
+path on those raw test features. It returns <code>heldout_mae</code>, <code>heldout_rmse</code> and
+<code>heldout_r2</code> for regression; classification returns <code>heldout_accuracy</code> and
+<code>heldout_f1_weighted</code>, plus <code>heldout_f1</code> for binary models (the model's second
+class is positive). A negative R2 is a valid poor-generalization result, not a
+logging failure. The caller chooses the split and logs metrics to the same
+MLflow run ID that contains the model artifact:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">mlflow</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_holdout</span><span class="p">,</span> <span class="n">fit_workflow</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.models.pipeline_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_pipeline_model</span>
+
+<span class="c1"># `frame` is a bounded, labeled pandas or Polars frame with 1,000 rows.</span>
+<span class="n">training</span><span class="p">,</span> <span class="n">heldout</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[:</span><span class="mi">800</span><span class="p">],</span> <span class="n">frame</span><span class="p">[</span><span class="mi">800</span><span class="p">:]</span>
+<span class="n">artifact_path</span> <span class="o">=</span> <span class="s2">"artifacts/customer-model"</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">fit_workflow</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">"preprocessing"</span><span class="p">:</span> <span class="n">preprocessing</span><span class="p">,</span> <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="n">model_type</span><span class="p">}},</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">training</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">heldout</span><span class="p">),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+    <span class="n">artifact_path</span><span class="o">=</span><span class="n">artifact_path</span><span class="p">,</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+    <span class="n">max_bytes</span><span class="o">=</span><span class="mi">4_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">evaluate_holdout</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">heldout</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">start_run</span><span class="p">(</span><span class="n">run_name</span><span class="o">=</span><span class="s2">"customer-model"</span><span class="p">)</span> <span class="k">as</span> <span class="n">run</span><span class="p">:</span>
+    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_param</span><span class="p">(</span><span class="s2">"heldout_rows"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">heldout</span><span class="p">))</span>
+    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+    <span class="n">model_uri</span> <span class="o">=</span> <span class="n">log_pipeline_model</span><span class="p">(</span>
+        <span class="n">artifact_path</span><span class="p">,</span> <span class="n">run_id</span><span class="o">=</span><span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">,</span>
+        <span class="n">artifact_path</span><span class="o">=</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div>
+<p>The held-out labels are used only for evaluation. Monthly scoring reads raw
+features without labels and applies the already fitted FE and model.</p>
+<h2 id="preprocessing-diagnostics">Preprocessing diagnostics</h2>
+<p>Set <code>TrainingSpec(..., preprocessing_probe=True)</code> to inspect the saved and
+reloaded preprocessing on at most the first 256 holdout rows. The option defaults
+to <code>False</code>. The 8 MiB input/output budget keeps the sample bounded; the report
+is saved as <code>preprocessing_probe.json</code> on the candidate's MLflow training run.</p>
+<p>This checks saved state, schema, repeated application, chunk/order consistency
+and mutation where the step's context allows those comparisons. It does not
+refit or measure model quality and does not change promotion policy. A step
+requiring groups or history reports <code>requires_context</code>, with later steps
+<code>not_run</code>; that is a request for the right execution context, not proof of a
+broken pipeline. See <a href="preprocessing_context.html">the runnable example and report guide</a>
+for all statuses and direct <code>probe_fitted_preprocessing(artifact, sample)</code> use.
+The preflight prediction sample described above is a separate check that also
+calls the model.</p>
+<h2 id="fit-and-score-a-pinned-uc-source">Fit and score a pinned UC source</h2>
+<p><code>fit_workflow</code> requires an explicit <code>SplitDataset</code>; it bounds the total
+rows and in-memory bytes before fitting and saves the same trusted artifact as
+<code>save_pipeline</code>. Tracking and registration remain opt-in calls through
+<code>track_run</code>, <code>log_pipeline_model</code> and <code>register_model</code>. They do not move an alias.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">SourceSpec</span><span class="p">,</span> <span class="n">WorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span>
+    <span class="n">OutputSink</span><span class="p">,</span> <span class="n">prepare_workflow</span><span class="p">,</span> <span class="n">score_source</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">table</span> <span class="o">=</span> <span class="s2">"catalog.schema.new_entities"</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">WorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>  <span class="c1"># must match the registered artifact's fit engine</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+                       <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+                         <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+                         <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"return_frame"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>  <span class="c1"># resolves a concrete model version</span>
+<span class="n">period</span> <span class="o">=</span> <span class="n">SourceSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">,),</span>
+    <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"amount"</span><span class="p">,</span> <span class="s2">"city"</span><span class="p">),</span>  <span class="c1"># exact saved raw input order</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">score_source</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">prepared</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">predictions</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span>
+</code></pre></div>
+<p>The reader applies the pinned Delta version, half-open UTC period filter,
+column projection, deterministic row-key order and <code>max_rows + 1</code> limit before
+iterating on the driver. It stops when decoded serialized rows or the resulting
+local frame exceed <code>max_bytes</code>, and rejects duplicate row keys. This byte guard
+measures decoded payload and local memory, not Spark's private wire framing;
+very wide individual rows should therefore be excluded or handled by a
+separately proven paged transport. The selected source and its limits must match
+the prepared workflow. The result keeps row keys outside the model input and
+records the source version, period, model digest and concrete model version.
+No prediction table is created here. Whole-frame FE retains local pandas or
+Polars behavior even though Spark performs the bounded UC read.</p>
+<h2 id="publish-one-scored-month-to-a-uc-delta-table">Publish one scored month to a UC Delta table</h2>
+<p><code>run_frame_batch</code> keeps feature engineering and model prediction in the saved
+pandas or Polars engine. Spark reads the pinned UC source and converts only the
+bounded final prediction rows to a DataFrame with the target's explicit schema.
+The guarded Delta writer then replaces exactly the requested half-open period.
+A second month therefore leaves the first month's predictions and run metadata
+unchanged; a backfill must explicitly name the earlier period.</p>
+<p>Provision the source, prediction target and admission control table before the
+job. The source and target must be different Delta tables. The target must have
+the row-key columns with the same Spark types as the source (<code>long</code> or
+<code>string</code>), a <code>timestamp</code> period column, the saved model's output columns at
+their declared types, and three string columns:
+<code>run_id</code>, <code>model_name</code> and <code>model_version</code>.
+Here <code>run_id</code> identifies the prediction publication, not the MLflow training run;
+the incremental writer derives it from the source/model snapshot. Existing test
+targets with <code>__skyulf_*</code> columns retain their historical schema; create a
+new target with these names for the updated writer.</p>
+<p>The control table has exactly one row, <code>target_id STRING</code> equal to the target
+Delta table ID and nullable <code>owner STRING</code> initially null. Every publisher
+of this target must use that same control table. The job identity needs read
+access to the source/model and write access to the target/control tables.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">version</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BatchSpec</span><span class="p">,</span> <span class="n">InputSource</span><span class="p">,</span> <span class="n">SourceSpec</span><span class="p">,</span> <span class="n">WorkflowConfig</span><span class="p">,</span>
+    <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span> <span class="n">prepare_workflow</span><span class="p">,</span> <span class="n">run_frame_batch</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+
+<span class="n">source_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.scoring_source"</span>
+<span class="n">target_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.predictions"</span>
+<span class="n">control_table</span> <span class="o">=</span> <span class="s2">"catalog.schema.prediction_admission"</span>
+<span class="n">source_version</span> <span class="o">=</span> <span class="mi">12</span>
+<span class="n">source</span> <span class="o">=</span> <span class="n">SourceSpec</span><span class="p">(</span>
+    <span class="n">table</span><span class="o">=</span><span class="n">source_table</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2026</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">UTC</span><span class="p">),</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"entity_id"</span><span class="p">,),</span>
+    <span class="n">input_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"amount"</span><span class="p">,</span> <span class="s2">"city"</span><span class="p">),</span>
+    <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
+    <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">WorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">source_table</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+        <span class="n">max_rows</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">max_rows</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">max_bytes</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+        <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_delta"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">target_table</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">spec</span> <span class="o">=</span> <span class="n">BatchSpec</span><span class="p">(</span>
+    <span class="n">period_start</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">period_start</span><span class="p">,</span>
+    <span class="n">period_end</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">period_end</span><span class="p">,</span>
+    <span class="n">as_of</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+    <span class="n">record_key_columns</span><span class="o">=</span><span class="n">source</span><span class="o">.</span><span class="n">record_key_columns</span><span class="p">,</span>
+    <span class="n">output_table</span><span class="o">=</span><span class="n">target_table</span><span class="p">,</span>
+    <span class="n">model_name</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+    <span class="n">model_version</span><span class="o">=</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_version</span><span class="p">,</span>
+    <span class="n">model_digest</span><span class="o">=</span><span class="n">prepared</span><span class="o">.</span><span class="n">preflight</span><span class="o">.</span><span class="n">model_digest</span><span class="p">,</span>
+    <span class="n">source_version</span><span class="o">=</span><span class="n">source_version</span><span class="p">,</span>
+    <span class="n">code_version</span><span class="o">=</span><span class="n">version</span><span class="p">(</span><span class="s2">"skyulf-core"</span><span class="p">),</span>
+    <span class="n">run_id</span><span class="o">=</span><span class="s2">"january-2026-v1"</span><span class="p">,</span>
+    <span class="n">expected_target_version</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># read and pin before submission</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run_frame_batch</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">prepared</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span>
+    <span class="n">admission</span><span class="o">=</span><span class="n">DeltaTableAdmission</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="n">control_table</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">commit_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">replayed</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">manifest</span><span class="p">)</span>
+</code></pre></div>
+<p>Use a new logical run ID and the current target version for the next month's
+job. Retry an uncertain job with the <em>identical</em> spec, including its original
+run ID and expected target version; a successful replay returns the existing
+receipt. A new run with a stale expected version fails instead of overwriting
+newer results. An empty period fails unless <code>allow_empty=True</code> is explicit.
+The source snapshot must have been committed by <code>as_of</code>. The reader and
+result both enforce the configured local row and memory budgets; this does not
+measure Spark's private wire bytes. The control-row admission protocol protects
+participating writers only; do not let other jobs bypass it or manually clear
+an owner while a writer may still be active.</p>
+<h2 id="score-newly-inserted-rows-automatically">Score newly inserted rows automatically</h2>
+<p><code>run_incremental_batch</code> selects records by <strong>Delta source commits</strong>, not
+by calendar date. On the first run it scores the existing bounded snapshot. On
+later runs it reads only inserts after the source version recorded in the last
+prediction-table commit. It appends predictions without replacing an older
+period. A source <code>event_time</code> column is optional; if you want to carry it into
+the target, set <code>period_column="event_time"</code> in the stable job configuration.
+It never filters rows by that column, including late arrivals.</p>
+<p>Provision a distinct, initially empty Delta prediction table with the
+globally unique key, saved model output columns and
+<code>run_id</code>, <code>model_name</code>, <code>model_version</code> string
+columns. If carrying an event timestamp, add a matching Spark <code>timestamp</code>
+column to both tables. Enable Delta Change Data Feed on the source <strong>before</strong>
+any changes that the job must consume. Provision the same shared admission
+control table used by the explicit-period writer; all target writers must use
+that admission authority. The job identity needs source, model, target and
+control-table permissions.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">InputSource</span><span class="p">,</span> <span class="n">WorkflowConfig</span><span class="p">,</span> <span class="n">ModelSelection</span><span class="p">,</span> <span class="n">OutputSink</span><span class="p">,</span>
+    <span class="n">prepare_workflow</span><span class="p">,</span> <span class="n">run_incremental_batch</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">WorkflowConfig</span><span class="p">(</span>
+    <span class="n">runtime</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span>
+    <span class="n">engine</span><span class="o">=</span><span class="s2">"polars"</span><span class="p">,</span>
+    <span class="n">source</span><span class="o">=</span><span class="n">InputSource</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"uc_table"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.new_records"</span><span class="p">,</span>
+        <span class="n">read_mode</span><span class="o">=</span><span class="s2">"incremental"</span><span class="p">,</span> <span class="n">max_rows</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">32_000_000</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">model</span><span class="o">=</span><span class="n">ModelSelection</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">"local_pipeline"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"catalog.schema.customer_model"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"7"</span><span class="p">,</span>
+        <span class="n">tracking_uri</span><span class="o">=</span><span class="s2">"databricks"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="n">sink</span><span class="o">=</span><span class="n">OutputSink</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">"uc_delta"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="s2">"catalog.schema.predictions"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">prepared</span> <span class="o">=</span> <span class="n">prepare_workflow</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run_incremental_batch</span><span class="p">(</span>
+    <span class="n">spark</span><span class="p">,</span> <span class="n">prepared</span><span class="p">,</span> <span class="n">record_key_columns</span><span class="o">=</span><span class="p">(</span><span class="s2">"event_id"</span><span class="p">,),</span>
+    <span class="n">admission</span><span class="o">=</span><span class="n">DeltaTableAdmission</span><span class="p">(</span><span class="n">spark</span><span class="p">,</span> <span class="s2">"catalog.schema.prediction_admission"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">input_count</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">commit_version</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">noop</span><span class="p">)</span>
+</code></pre></div>
+<p>Keep this configuration for scheduled runs; do not supply a period or source
+version on each invocation. A repeat run with no new source inserts makes no
+target write. If an append succeeds but its acknowledgement is lost, the next
+run reads its committed receipt and continues after that source version.
+Source updates and deletes, duplicate keys, a missing or expired change feed,
+and an unrecognized target commit fail without advancing the watermark.
+Key uniqueness must hold across all runs, not only within one batch. Oversized
+increments fail under the same local row/decoded-memory limits; increase the
+budget deliberately or handle such a source with a separate distributed path.
+The target receipt is in the same Delta commit as the predictions. This
+protects participating writers only; changes outside the admission protocol
+must be handled explicitly.</p>
+<h2 id="lag-and-rolling-history-across-batches">Lag and rolling history across batches</h2>
+<p><code>LagFeatures</code> and <code>RollingAggregate</code> default to <code>history_mode="batch"</code>: only
+the supplied frame participates. Set <code>history_mode="carry"</code> in a preprocessing
+step to save a bounded training tail per entity. Put this step <strong>after splitting</strong>.
+For example:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"recent_value"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"RollingAggregate"</span><span class="p">,</span>
+ <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"value"</span><span class="p">],</span> <span class="s2">"window"</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+            <span class="s2">"sort_by"</span><span class="p">:</span> <span class="s2">"observation_time"</span><span class="p">,</span> <span class="s2">"group_by"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"entity"</span><span class="p">],</span>
+            <span class="s2">"history_mode"</span><span class="p">:</span> <span class="s2">"carry"</span><span class="p">,</span>
+            <span class="s2">"history_max_rows"</span><span class="p">:</span> <span class="mi">1000</span><span class="p">,</span> <span class="s2">"history_max_bytes"</span><span class="p">:</span> <span class="mi">48000</span><span class="p">}}</span>
+</code></pre></div>
+<p>Declare the observed value, clock and entity in <code>input_columns</code>. For the
+Databricks source contract, this clock must be distinct from the job's
+<code>event_column</code> and record keys. Drop or encode non-model columns after the
+temporal step. Inputs must be available at prediction time; target-history
+forecasting is not supported.
+The clock must be numeric or a typed datetime; parse JSON/string timestamps in
+an earlier preprocessing step before using them as temporal ordering keys.</p>
+<ul>
+<li>The artifact seed stays fixed. Lag 3 retains three prior rows per entity;
+  rolling window 5 retains four. Window 1 retains one ordering marker.</li>
+<li>Training never reads its own saved tail. Temporal holdout and each CV fold
+  use only their own training history. Carry mode requires Time Series CV
+  (or nested Time Series); skipped gap rows do not enter history.</li>
+<li>Missing or tied entity/time keys and observations at or before the saved
+  entity time are rejected. New entities start with empty history. Returned
+  rows keep request order. <code>drop_na</code> is disallowed; use an imputer instead.</li>
+<li>Each chained temporal step stores its own input context. Context rows do
+  not enter subsequent imputer/scaler/model fitting or returned predictions.</li>
+<li>Limits apply across all entities per step: by default 10,000 rows and 1 MiB.
+  Exceeding a limit fails explicitly; inactive entities are not silently evicted.</li>
+</ul>
+<p><strong>Incremental Databricks scoring:</strong> the initial complete source snapshot
+reconstructs history from that snapshot, without prepending the training seed.
+Later increments read <code>temporal_history</code> from the last prediction receipt.
+The new context, source watermark and predictions share one Delta commit.
+A failed write leaves the prior committed context; a retry reads the actual
+receipt, and a no-op makes no write. Receipts have a 64 KiB history budget.
+A changed model or a prior receipt without history requires a fresh target;
+contexts are never silently mixed across models. This is bounded local batch
+execution, not Spark worker or streaming state.</p>
+<p><strong>Period scoring:</strong> <code>run_frame_batch(..., history_state=...)</code> accepts an explicit
+earlier context. A successful result's manifest contains the next context.
+Period replacement does not automatically choose another period's history.
+Retry identity includes the supplied context, so conflicting retries fail.</p>
+<p><strong>Core continuation:</strong> use <code>score_pipeline_with_history</code> to receive a
+<code>PipelinePrediction</code> with <code>frame</code> and detached <code>history</code>. Pass that history to
+the next call. The <a href="preprocessing_context.html#runnable-history-continuation">complete history example</a>
+shows model reload, JSON transport and equivalence with one complete request.
+Persist predictions and history atomically, and serialize writers or compare
+and swap the prior state. Ordinary prediction reuses the immutable training
+seed; it does not remember earlier calls.</p>
+<p>The backend <code>/deployment/predict</code> accepts <code>continue_history=true</code> for the first
+request and <code>history_state</code> thereafter; its response returns the next state.
+The caller owns durable storage and request serialization. An HTTP error returns
+no next state. Custom group/window callbacks still need complete caller-supplied
+context; built-in carry mode does not create history for arbitrary callbacks.</p>
+<h2 id="saved-scoring-policies-and-project-assets">Saved scoring policies and project assets</h2>
+<p>Generated projects separate <code>src/features/pre_split.py</code>, <code>preprocessing.py</code>
+and <code>scoring.py</code>. Preprocessing fits transformations inside each training fold.
+Scoring has a three-way mode and an independent target-filter switch:</p>
+<div class="highlight"><pre><span></span><code><span class="n">SCORING_MODE</span> <span class="o">=</span> <span class="s2">"pre_split"</span>           <span class="c1"># "pre_split", "custom", or "combined"</span>
+<span class="n">SKIP_TARGET_PRE_SPLIT_STEPS</span> <span class="o">=</span> <span class="kc">False</span> <span class="c1"># fail if reuse requires the actual target</span>
+</code></pre></div>
+<p>In <code>pre_split</code> or <code>combined</code>, set the second switch to <code>True</code> to skip target-reading filters while keeping
+other pre-split steps. This never changes the predicted target. For example,
+"price is present" is a training-label check; "floor_area is present" can also
+be useful when predicting an unknown price. A mixed target/feature filter is
+skipped whole, because deleting one field would change its meaning. Fixed edits
+are projected onto feature columns. Preview records skipped names and reused steps.</p>
+<p>Reused rules use existing Core implementations and survivor guards on a copy.
+Accepted original rows go to the model, so its saved normalization runs once.
+Filter dependencies must exist in scoring <code>input_columns</code>; include a field there
+and remove it from model features in preprocessing if necessary. Deduplication
+checks the current batch only. Empty recipes in pre_split mode preserve ordinary output.
+These choices are saved per model version; changing a local switch does not
+change the behavior of an already registered model.</p>
+<p>Use <code>SCORING_MODE="custom"</code> for custom rules alone, or <code>"combined"</code> to run
+pre-split first and custom eligibility only on its survivors. First pre-split
+exclusion reasons are retained. Custom callbacks receive original accepted inputs;
+fixed model transformations still run once. All-excluded batches skip custom
+callbacks and the model; combined mode with no pre-split steps still uses custom
+rules. Both modes expose the same separate custom sections:</p>
+<ul>
+<li><code>eligibility</code>: checks <strong>before prediction</strong>. A null reason accepts a row;
+  a text reason excludes it. The template shows both required-field and finite
+  inclusive numeric-range checks, using <code>feature_value</code> as an editable example.</li>
+<li><code>outputs</code>: rules <strong>after prediction</strong>. Add fields such as a prediction band.
+  They do not change model predictions or select training data.</li>
+</ul>
+<p><code>build_eligibility_rules()</code> and <code>build_output_rules()</code> configure the callable
+paths and parameters; <code>custom/scoring_custom.py</code> implements the functions under
+BEFORE/AFTER headings. Both lists start empty; the sample dictionaries in
+<code>scoring.py</code> are commented out. Uncomment and adapt a desired example explicitly.
+Selecting custom or combined mode alone does not activate sample rules.
+The complete dictionary form
+below is also supported (returning <code>None</code> explicitly disables all scoring rules):</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># src/features/scoring.py</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">build_scoring</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"eligibility"</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"observed_fields"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
+            <span class="s2">"function"</span><span class="p">:</span> <span class="s2">"custom.scoring_custom.require_observed_values"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"feature_value"</span><span class="p">]},</span>
+        <span class="p">}],</span>
+        <span class="s2">"outputs"</span><span class="p">:</span> <span class="p">[{</span>
+            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"risk_band"</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">:</span> <span class="s2">"1"</span><span class="p">,</span>
+            <span class="s2">"function"</span><span class="p">:</span> <span class="s2">"custom.scoring_custom.prediction_band"</span><span class="p">,</span>
+            <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="s2">"prediction"</span><span class="p">,</span> <span class="s2">"thresholds"</span><span class="p">:</span> <span class="p">[</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">50.0</span><span class="p">],</span>
+                       <span class="s2">"labels"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"low"</span><span class="p">,</span> <span class="s2">"medium"</span><span class="p">,</span> <span class="s2">"high"</span><span class="p">],</span> <span class="s2">"output"</span><span class="p">:</span> <span class="s2">"band"</span><span class="p">},</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"band"</span><span class="p">,</span> <span class="s2">"dtype"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">}],</span>
+        <span class="p">}],</span>
+    <span class="p">}</span>
+</code></pre></div>
+<p>For classification, the band rule can use <code>probability_0</code>, <code>probability_1</code>, etc.;
+class order comes from the saved artifact manifest. Callbacks are ordinary trusted
+project functions saved with the model. Eligibility receives <code>(frame, params)</code>
+and returns a Series of nullable reason strings: null means eligible. The first
+non-null reason wins in configured order. Output callbacks receive
+<code>(frame, predictions, params)</code> and return exactly their declared columns, types,
+rows and index. Supported output types: <code>float64</code>, <code>int64</code>, <code>string</code>, <code>bool</code>.
+Callbacks receive defensive pandas frames with a RangeIndex for both engines;
+Core preprocessing and model prediction retain the recorded engine. Rules cannot
+overwrite raw inputs, estimates, keys or publication metadata. Keep callbacks
+deterministic; use saved assets instead of mutable files, clocks or network data.</p>
+<p>Every source key has an output row. With a scoring policy enabled, that row has
+<code>scoring_status</code> (<code>predicted</code>/<code>excluded</code>) and nullable <code>exclusion_reason</code>.
+Excluded rows have null predictions and business outputs. Receipts include
+<code>predicted_count</code> and <code>excluded_count</code>; <code>output_count</code> counts all outcome rows.
+An all-excluded increment is a successful atomic publication that advances the
+source watermark. Failed callbacks/writes advance nothing. Replays cannot publish
+duplicate keys. Existing targets require the exact output schema, so introduce a
+new scoring schema using a fresh target. Training, CV and holdout comparison still
+use the raw predictor and their independently defined population.</p>
+<p>Eligibility precedes lag/rolling processing. Excluded observations never enter
+continuation history. All-excluded batches retain the previous history unchanged.
+The saved input schema still applies to excluded rows; normalize input types before
+scoring rather than relying on eligibility to reinterpret an incompatible schema.</p>
+<h3 id="deliver-lookup-files-and-external-python-dependencies">Deliver lookup files and external Python dependencies</h3>
+<p><code>src/features/assets.json</code> includes detailed <code>_help</code> instructions and a <code>files</code>
+list, initially empty. Create your data file and add its feature-root-relative
+path, for example <code>"files": ["assets/bands.json"]</code>. The original plain-list format
+<code>["assets/bands.json"]</code> also works. Help text is never embedded as model data.
+Assets can support pre-split, preprocessing or scoring; they do not automatically
+add a pipeline step. Inside saved code, read a declared file as bytes:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.project_package</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_project_asset</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">read_project_asset</span><span class="p">(</span><span class="n">__package__</span><span class="p">,</span> <span class="s2">"assets/bands.json"</span><span class="p">)</span>
+</code></pre></div>
+<p>Code, encoded file contents and pins share the bounded 64 KiB source snapshot.
+Paths must remain inside the feature package and asset symlinks are rejected.
+Undeclared assets, large external model downloads and files outside the package
+are not embedded. Replacing a local lookup file cannot change an existing model.</p>
+<p>Declare exact <code>distribution==version</code> pins in <code>src/features/requirements.txt</code>.
+Training/load verifies installed versions before executing package code or
+unpickling the model. The artifact manifest records the pins; MLflow includes them
+in its saved environment. Provision the same dependencies in the training and
+scoring job environments; prediction never installs packages. Ranges, URLs,
+recursive requirement files, options, extras and environment markers are rejected.</p>
+<h2 id="train-independent-target-models-in-one-job">Train independent target models in one job</h2>
+<p>Choose <code>training_layout=multi_target</code> when generating a project to use the existing
+<code>train</code> job for several named training branches. Configure branches in
+the named <code>models</code> mapping in <code>config/training.yml</code>. The default <code>single_model</code>
+layout retains its ordinary training graph. Shared source, keys and budgets
+belong under <code>defaults</code>; each model can override its target, inputs, estimator,
+search/CV, split and quality settings.</p>
+<p>A branch has its own target, input columns, preprocessing package, estimator,
+tuning/CV settings, quality metric and registered model name. For example, a
+customer dataset can train a purchase classifier, a spending regressor and a
+visit-count ensemble. Each model remains useful independently. Different targets
+have different metrics; their scores are not ranked against each other.</p>
+<p>The coordinator resolves one Delta table version before training starts. Branches
+read that same immutable snapshot sequentially within their individual row/byte
+budgets. Missing labels are excluded separately per target before sampling and
+splitting. A missing spending label cannot remove an otherwise labeled purchase
+example. All target columns are forbidden as model inputs to prevent cross-target
+leakage. The existing training service fits learned preprocessing inside training
+folds and keeps the final holdout separate.</p>
+<p>MLflow records a parent run and a linked run for each trained branch. The parent
+saves the exact branch plan and progress; child runs retain their fitted pipeline,
+CV/tuning evidence, holdout metrics, dependency pins and immutable model version.
+With a model set enabled, every candidate is compared with its corresponding
+component in the one champion set pinned before training. Independent component
+aliases cannot change that baseline. Train-only branches retain their own pinned champions.</p>
+<p>All branches are required. If one fails, execution stops and the parent is failed;
+earlier immutable candidate versions remain available for inspection. A complete
+result is written only after all branches succeed. Replaying a saved plan keeps
+the source version and split/sample settings; it is a new attempt and can create
+new model versions. It is not an exactly-once registration retry.</p>
+<p>Individual branches require <code>promotion_policy=manual_approval</code> and
+<code>score_handoff=disabled</code>; activation is controlled by the complete set's separate
+<code>promotion_policy</code>. Newly generated projects enable
+the <code>model_set</code> mapping in <code>config/inference.yml</code>. It declares the set's
+registered name, prediction table, publication settings and shared rule path.
+Older Python-configured projects remain readable through their original loader.
+The project still has two jobs. Training registers the complete set candidate;
+training nominates the complete set as <code>challenger</code>. Automatic set activation can
+move the set champion, while component aliases stay unchanged. A later candidate
+moves the displaced contender to <code>previous_challenger</code>. The multi-target score job uses
+<code>score_models.py</code> to select one complete saved set.</p>
+<h3 id="activate-and-score-a-coherent-model-set">Activate and score a coherent model set</h3>
+<p>The set copies each component's exact fitted artifact and records its concrete
+model name, version and digest. It also captures <code>src/features/</code>, the combined rule
+configuration and typed record keys. Scoring and approval load these saved assets;
+editing project files cannot change an existing set. Packaging changed rules
+creates a new set candidate and preserves earlier registered packages.</p>
+<p>Each newly registered Bundle set version exposes <code>model_set_model_count</code> and
+<code>model_set_&lt;branch&gt;_name</code>, <code>model_set_&lt;branch&gt;_version</code>, <code>model_set_&lt;branch&gt;_type</code>
+tags for quick inspection. The type identifies the selected estimator or ensemble,
+including when tuning was used. Long qualified names continue in <code>_name_2</code>,
+<code>_name_3</code>, etc. These tags are display metadata; the saved manifest remains the
+execution authority. Existing registered versions are not automatically backfilled.</p>
+<p>In <code>features/scoring.py</code>, <code>build_model_rules()</code> configures each model's eligibility
+and output rules, while <code>build_combined_rules()</code> configures calculations across
+model results. Both stages execute during multi-model scoring. The latter's
+default empty list adds no combined business rules. Each
+component retains its namespaced predictions and exclusion outcomes. Optional
+rules declare a named function, rule version, parameters, output column types and
+<code>required_components</code>. Functions receive <code>(inputs, predictions, params)</code> and
+return a pandas DataFrame containing exactly their declared output columns. A
+profit rule can require revenue and cost without depending on an unrelated churn
+component. Excluded required predictions make that rule ineligible; missing
+predictions are never substituted with zero.</p>
+<p><code>inputs</code> contains only the set's declared keys and component input columns.
+Declare rule Python dependencies as exact pins in
+<code>src/features/requirements.txt</code>; the saved set includes them in its MLflow
+requirements and rejects pins that conflict with a component.
+Legacy projects using <code>composition_config</code> and <code>src/composition/</code> remain readable;
+existing saved artifacts keep their original source without migration.</p>
+<h3 id="choose-output-storage-and-consumer-views">Choose output storage and consumer views</h3>
+<p>Multi-target initialization asks <code>model_set_name</code>, <code>model_set_output_mode</code> and a custom physical
+table name. Edit <code>model_set.publication</code> in <code>config/inference.yml</code>. Modes are:</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Stored values</th>
+<th>Consumer access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>all</code></td>
+<td>Every model output and combined rule result</td>
+<td>One prediction table</td>
+</tr>
+<tr>
+<td><code>combined_only</code></td>
+<td>Combined results, keys, rule outcomes and set provenance</td>
+<td>One prediction table</td>
+</tr>
+<tr>
+<td><code>separate_views</code></td>
+<td>All results, written once</td>
+<td>Selected model views and a combined-result view</td>
+</tr>
+</tbody>
+</table>
+<p>Leaving names blank uses <code>&lt;project_name&gt;_set</code> for the registered model set,
+<code>&lt;project_name&gt;_set_scores</code> for the physical result table,
+<code>&lt;project_name&gt;_predictions_&lt;branch&gt;</code> for model views, and
+<code>&lt;project_name&gt;_business_results</code> for the combined view. Custom names replace
+these defaults. Registry names use the metadata schema; tables/views use the
+output schema. The deployment suffix is added to both.</p>
+<p><code>combined_only</code> still computes all models and their scoring policies. It requires
+saved combined rules; an empty rule list fails explicitly. Changing this storage
+schema requires a new compatible table. Model output values are not stored in
+this mode, even though needed for the combined calculations.</p>
+<p>Only <code>separate_views</code> asks for <code>model_view_prefix</code> and <code>combined_view_name</code>.
+Blank names use project defaults. Explicit names gain the active target catalog,
+output schema and resource suffix. Fine-tune names and selection under <code>model_set.publication</code>; this dictionary shows the resolved setting:</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"publication"</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"separate_views"</span><span class="p">,</span>
+    <span class="s2">"model_views"</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">"revenue"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.revenue_predictions</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="s2">"cost"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.cost_predictions</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="s2">"combined_view"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{catalog}</span><span class="s2">.</span><span class="si">{output_schema}</span><span class="s2">.profit_results</span><span class="si">{resource_suffix}</span><span class="s2">"</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><code>model_views=None</code> selects every saved branch using <code>model_view_template</code>;
+an explicit mapping selects only listed branches; <code>{}</code> selects none.
+Combined views exist only if the saved set has combined rules. Every view keeps
+record keys, relevant output/status fields and set provenance. Branch output
+names retain their prefix. These are views of one Delta table, not independently
+written prediction copies. Setup verifies or creates all views before the data
+write. A setup failure can leave views of empty/previous data, but no new subset
+of predictions is published. Unrelated objects are never overwritten. Existing
+view definitions must match their recorded projection; use new names to change
+the source or columns. Removing configuration does not delete catalog objects.</p>
+<h3 id="per-component-quality-gates-and-automatic-set-activation">Per-component quality gates and automatic set activation</h3>
+<p>Bundle initialization asks <code>model_set_promotion_policy</code> for multi-target projects.
+The default is <code>manual_approval</code>; <code>automatic</code> validates and activates a passing
+complete set after training. Set <code>model_set.promotion_policy</code> in
+<code>config/inference.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">model_set</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">promotion_policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">automatic</span>
+</code></pre></div>
+<p>In each named <code>models</code> entry in <code>config/training.yml</code>, define its task-appropriate
+metric and limits. This resolved mapping illustrates a revenue regressor's policy:</p>
+<div class="highlight"><pre><span></span><code><span class="s2">"metric"</span><span class="p">:</span> <span class="s2">"heldout_rmse"</span><span class="p">,</span>
+<span class="s2">"quality_threshold"</span><span class="p">:</span> <span class="mf">10.0</span><span class="p">,</span>       <span class="c1"># RMSE must be &lt;= 10.</span>
+<span class="s2">"quality_gates"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"heldout_r2"</span><span class="p">:</span> <span class="mf">0.8</span><span class="p">},</span>  <span class="c1"># R2 must also be &gt;= 0.8.</span>
+<span class="s2">"min_improvement"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>          <span class="c1"># Replacements must strictly improve RMSE.</span>
+</code></pre></div>
+<p>A classifier can instead use <code>metric="heldout_f1"</code> and <code>quality_threshold=0.8</code>.
+Ensembles use the same task-specific policy. These are illustrative limits, not
+recommended thresholds for every dataset. Every branch must have a primary
+<code>quality_threshold</code> for activation; automatic mode checks its presence before training.</p>
+<p>The first set must pass all absolute gates. A replacement must additionally
+improve <strong>every</strong> component over its counterpart in the pinned champion set by
+<code>min_improvement</code>; ties fail even when that value is zero. All models are
+evaluated on their saved heldout rows, separately for each target. Policies,
+comparison digests and the expected set champion are frozen into the package.
+Changing project files cannot relax an existing candidate's gates. Changed
+policies require training a new candidate. Set replacements require the same
+branch names and registered component names; use a new set for a changed layout.</p>
+<p>An automatic quality failure leaves the candidate available and the champion
+unchanged. The notebook result and <code>model_set_quality/.../decision.json</code> identify
+every failed component and its metrics. Execution, missing evidence and stale
+champion errors fail the job. Successful approval also requires each saved model
+and business rule to execute on representative scoring input. Scoring remains a
+separate job after activation.</p>
+<p>Manual approval enforces the same gates. After reviewing evidence, run the training job with
+<code>lifecycle_action=approve</code>, the set's <code>candidate_version</code>, and
+<code>expected_champion_version</code> (<code>none</code> for first activation). Approval runs every
+saved component and rule against one bounded scoring-source snapshot and requires
+each to produce at least one result, then rechecks saved holdout quality under the
+same alias admission. Save the returned promotion receipt. To restore its complete prior set,
+use <code>lifecycle_action=rollback</code>, <code>promotion_receipt_json</code> and the expected current
+champion version. Approval clears the promoted set's <code>challenger</code> alias and saves
+the former champion as <code>previous_champion</code>. <code>previous_challenger</code> records displaced
+candidates, not the former champion.</p>
+<p>To explicitly reject the current candidate, run the same training job with
+<code>lifecycle_action=reject</code>, <code>candidate_version</code>, <code>expected_champion_version</code>, and a
+nonempty <code>rejection_reason</code> (at most 256 UTF-8 bytes). Rejection uses the frozen set
+identity and controlled nomination receipt; it does not run training, scoring, or
+require passing quality gates. The rejected version remains <code>challenger</code> for
+inspection until a newer candidate replaces it. Its <code>approval_status=rejected</code>
+and <code>approval_reason</code> tags block later approval. An identical repeat returns the
+original rejection receipt; changed candidates, champions or reasons fail.</p>
+<p>Rollback restores the whole previous set while preserving an unrelated current
+challenger and its history. A stale or manually changed alias blocks the operation.</p>
+<p>Previously saved sets remain scoreable. Sets without saved quality evidence must
+be retrained and packaged before approval through this updated Bundle flow.
+The low-level SDK retains explicit functional-only approval for legacy packages;
+new quality-bound packages require controlled nomination and the quality validator.
+Rollback verifies the
+recorded successful evidence and restores the complete prior set.</p>
+<p>Run the score job after approval. It resolves the set champion once, or uses an
+explicit <code>score_model_version</code>, and joins component outcomes by unique non-null
+integer, string or boolean keys. One final Delta publication contains the complete
+selected result and set provenance. A component or rule exception fails the job
+before a new data commit; previous successful output remains intact.
+Repeated committed source versions are no-ops; model changes follow the configured
+append or full rebuild policy. Both jobs use <code>max_concurrent_runs=1</code> and require
+exclusive ownership of set alias changes and prediction-table writes.</p>
+<p>Append mode preserves older rows and their original set identities. Full rebuild
+atomically replaces the compatible output table when the selected set changes,
+even without new input. A transition involving temporal carry history requires
+full rebuild so lag/rolling state is reconstructed from the complete snapshot.
+Schema changes require a separate compatible output table. Source updates and
+deletes cannot be consumed as incremental inserts.</p>
+<p>For example, inserting a new <code>id=102</code> after scoring <code>id=101</code> appends a new
+prediction. Updating a feature or deleting the already-scored <code>id=101</code> instead
+fails the next incremental batch: there is no update/delete reconciliation of
+previous predictions under the default <code>source_change_policy="reject"</code>.
+For model-set scoring, select <code>rebuild_on_change</code> in Bundle setup or the
+<code>model_set</code> mapping in <code>config/inference.yml</code> to reuse the complete snapshot rebuild when
+updates/deletes are observed, even without a model-set change. The selected set
+rescores ALL current rows, recomputes model/combined rules and resets temporal
+history. Deleted records disappear. This can replace earlier predictions from
+older sets; new inserts alone still append. No model training is involved.</p>
+<p><code>model_change_mode</code> independently controls what happens when the model selection
+changes. Source-triggered rebuilding respects the full snapshot row/byte limits
+and commits results/history once after successful computation. Empty snapshots
+clear the table and history. A failed calculation, exceeded budget, missing CDF
+history or permission error preserves prior output. Only recognized readable
+source changes trigger recovery. Receipts record <code>source_change_policy</code>,
+<code>source_rebuilt</code> (source-triggered rebuild) and <code>write_mode</code>.
+This setting applies to the model-set adapter; the standalone single-model
+incremental scorer still rejects source updates/deletes.</p>
+<h3 id="select-preprocessing-and-pre-split-recipes-independently">Select preprocessing and pre-split recipes independently</h3>
+<p>Declare named lists under <code>recipes</code> in <code>config/preprocessing.yml</code> and
+<code>config/pre_split.yml</code>. Keep custom function factories in the corresponding
+<code>src/features/preprocessing.py</code> and <code>src/features/pre_split.py</code> modules.
+Select the recipe names independently for each model in <code>config/training.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">revenue</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">preprocessing_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">revenue_features</span>
+<span class="w">    </span><span class="nt">pre_split_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">complete_inputs</span>
+</code></pre></div>
+<p>Different models can share one recipe declaration while learning separate fitted
+state in each training fold. Missing names and duplicate configuration owners
+fail before reading data. The saved model captures the selected declarations and
+custom source, so editing today's files cannot alter an existing candidate.
+Older projects with Python recipe builders remain readable through their
+original loader; do not define the same recipe in both Python and YAML.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

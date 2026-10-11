@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1636,14 +1664,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1671,7 +1755,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -1951,7 +2035,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -2305,10 +2389,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#validation-record-for-this-audit" class="md-nav__link">
+  <a href="#validate-prediction-context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Validation record for this audit
+        Validate prediction context
       
     </span>
   </a>
@@ -4199,54 +4283,20 @@ reason so the user can correct the pipeline after a toast disappears.</p>
 training state, changing held-out labels must not change features, and replay
 must preserve the fitted schema and unknown-value policy. Registry flags alone
 are insufficient evidence for these properties.</p>
-<h2 id="validation-record-for-this-audit">Validation record for this audit</h2>
-<p>Follow-up on 2026-09-26: the temporal review rejects missing declared sort columns,
-invalid direct lag shifts, and rolling the known current target. Backend admission
-reuses the Core target rule. Relevant suites passed 1,981 Core and 1,731 backend
-tests; Ruff, ty and strict MkDocs passed. The new temporal regression tests also
-pin grouped causal prefixes and the absence of an automatic history buffer.
-See <a href="preprocessing_placement.html#target-encoders-lags-and-rolling-windows">temporal placement and history</a>
-for the remaining prediction-time availability and batch-boundary responsibilities.</p>
-<p>The final consolidated runs completed on 2026-09-08:</p>
-<table>
-<thead>
-<tr>
-<th>Layer</th>
-<th style="text-align: right;">Passing tests</th>
-<th>Scope</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Core</td>
-<td style="text-align: right;">3,476</td>
-<td>Entire unit directory plus leakage JSON contracts, preprocessing integration, native tuning/CV refit, raw text target context, and repeated row boundaries</td>
-</tr>
-<tr>
-<td>Backend</td>
-<td style="text-align: right;">1,608</td>
-<td>Admission and operation JSON contracts, real graph execution, fold refit/stress, gate units, and preprocessing/pipeline units</td>
-</tr>
-<tr>
-<td>Frontend</td>
-<td style="text-align: right;">193</td>
-<td>Leakage preflight, operation modes, selected training context, and error-detail regressions</td>
-</tr>
-</tbody>
-</table>
-<p>These are 5,277 passing test cases across the consolidated suites, not a claim
-that every possible input or graph has been exhausted. The 69 skipped core cases
-are opt-in or disabled performance/benchmark cases, not failed leakage cases.
-Dependency, alias, dataframe-conversion, and build-chunk warnings remain.</p>
-<p>Changed-source Ruff and ty checks passed. Frontend lint and the production build
-passed. Example 09's script ran successfully; its notebook ran all 12 code cells
-in a real Jupyter kernel with all assertions passing. Six SVG diagrams, three
-embedded notebook SVG attachments, and the executed notebook schema were also
-validated. Mermaid sources accompany the SVGs; mkdocs was deliberately not run.</p>
-<p>Backend submission tests replace external dispatch/storage services rather than
-launch a production Celery/DB deployment. Pretrained embedding behavior uses a
-model double. Legacy numeric HashEncoder artifacts preserve historical buckets;
-refit to adopt the new versioned, batch-invariant numeric normalization.</p>
+<h2 id="validate-prediction-context">Validate prediction context</h2>
+<p>Temporal features require declared sort columns and valid lag/window settings.
+Do not roll a target that is unavailable at prediction time. A causal training
+split does not itself provide missing prediction history: supply the intended
+batch context, or use configured built-in carry history with explicit continuation.</p>
+<p>See <a href="preprocessing_placement.html#target-encoders-lags-and-rolling-windows">temporal placement and history</a>
+for availability rules and <a href="preprocessing_context.html">preprocessing diagnostics and context</a>
+for saved-state checks and a runnable history example. Diagnostic sample parity
+is separate from leakage prevention and worker/endpoint admission.</p>
+<p>When extending preprocessing, use the regression strategy above on the actual
+engine, data types and source/serving boundaries. Verify fit/save/load/apply with
+representative nulls, unknown values and request boundaries. Legacy numeric
+HashEncoder artifacts preserve their original buckets; refit the whole pipeline
+to adopt the versioned batch-invariant numeric normalization.</p>
 
 
 

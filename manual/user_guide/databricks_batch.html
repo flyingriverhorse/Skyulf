@@ -14,7 +14,7 @@
         <link rel="prev" href="mlflow_registry.html">
       
       
-        <link rel="next" href="databricks_local_sdk.html">
+        <link rel="next" href="databricks_sdk.html">
       
       
         
@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1729,10 +1757,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#local-verification" class="md-nav__link">
+  <a href="#validate-a-new-destination" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Local verification
+        Validate a new destination
       
     </span>
   </a>
@@ -1755,14 +1783,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1790,7 +1874,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2070,7 +2154,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3601,22 +3685,16 @@
 and atomically replaces the requested period in a precreated Delta table.
 It reuses both <a href="inference_flow.html">Spark inference modes</a>, without refitting
 feature engineering or the model. Scheduling remains the caller's responsibility.</p>
-<p>Validation covers <strong>local Spark 4.0.3 with Delta Lake 4.0.0 on Linux</strong> and a live
-Databricks serverless Spark Connect 4.2.0 regression probe using Unity Catalog
-tables. The live probe verified monthly replacement, replay, empty protection,
-prior-period preservation and worker wheel contents. Separate live jobs verified
-exclusive admission and a restricted principal's target-write denial, with
-unchanged data/version and released ownership afterward. This is a bounded
-regression workflow, not certification of every runtime or production workload.
-Tracking and registry remain optional and independent of the engine.
-For small-data pandas/Polars scoring on Databricks job compute, see the
-<a href="databricks_local_sdk.html">local-engine SDK</a>. Its UC source and Delta target
-adapters are still separate follow-up tasks.</p>
-<p>This runner currently requires Spark. Delta itself can also be written from
-pandas/Polars through <a href="https://delta-io.github.io/delta-rs/usage/writing/">Arrow and delta-rs</a>; a local-engine Skyulf Delta sink
-with the same period/retry guarantees is planned separately as SM-15L. Choosing
-Delta as the output format should not force the inference engine to be Spark.
-Unity Catalog access and supported Delta features need validation for each writer.</p>
+<p>Choose the execution path based on the artifact and input size. <code>run_batch</code>
+keeps inference distributed through the portable Spark bundle. For bounded
+pandas/Polars scoring, use <a href="databricks_sdk.html#publish-one-scored-month-to-a-uc-delta-table"><code>run_frame_batch</code></a>:
+Spark reads the pinned source, Python scores the selected frame, and the guarded
+writer publishes it to UC Delta. <code>runtime="databricks"</code> is required for this
+UC sink; it does not change the pipeline's pandas/Polars engine.</p>
+<p>Tracking and registration are separate optional operations. Configure a caller-owned
+Spark session, compatible driver/worker dependencies and source/target permissions
+for the chosen environment. Do not infer a recipe's Spark support from its ability
+to run in a bounded Python frame.</p>
 <p>The runner caches predictions when the runtime supports <code>persist()</code>. If
 Databricks serverless rejects that operation with its specific structured
 restriction, validation and publication use the distributed frame without a
@@ -3704,10 +3782,9 @@ OS releases ownership when the process exits. This implementation is rejected
 on distributed Spark masters, including <code>local-cluster</code>.</p>
 <h3 id="shared-delta-admission">Shared Delta admission</h3>
 <p><code>DeltaTableAdmission</code> coordinates participating publishers through one shared
-Delta control table. Real local Delta tests cover independent Spark sessions and
-simultaneous claims. A live serverless test also rejected a second job while the
-first held ownership, then allowed the first job to commit. Operators must
-provision the authority once, before starting publishers:</p>
+Delta control table. A second participating publisher cannot acquire ownership
+while the first holds the target. Provision the authority once, before starting
+publishers:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.databricks.data.delta_io.delta_admission</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeltaTableAdmission</span>
 
 <span class="n">target_id</span> <span class="o">=</span> <span class="n">spark</span><span class="o">.</span><span class="n">sql</span><span class="p">(</span>
@@ -3755,8 +3832,8 @@ table before identity reads. When serverless rejects <code>REFRESH TABLE</code> 
 specific unsupported-operation condition, the provider proceeds with fresh
 Delta identity/ownership reads; user-managed cache APIs are unavailable there.
 Conditional updates and unique-token verification still control ownership.
-Other errors propagate. The platform gate records tested environments rather
-than assuming all compute types support the same APIs.</p>
+Other errors propagate. Validate these operations on the selected compute and
+with the job's actual permissions.</p>
 <h2 id="time-and-reproducibility">Time and reproducibility</h2>
 <p>The period is half-open: the start is included and the end is excluded. Aware
 datetimes are converted to UTC instants independently of the Spark session's
@@ -3808,31 +3885,16 @@ installed Skyulf version, run ID and input/output counts. Only the three
 evolution, streaming and endpoint deployment remain unsupported here. The sink
 helper is lower-level: direct callers must supply output and a manifest with
 the same provenance guarantees as <code>run_batch</code>.</p>
-<h2 id="local-verification">Local verification</h2>
-<p>The test fixture <code>skyulf-core/tests/fixtures/databricks_delta_smoke.py</code> accepts an
-existing Spark session, a pinned raw <code>y=2*x</code> regression bundle and an existing
-test namespace. Its <code>run_smoke(...)</code> creates and prints three unique Delta table
-names, verifies monthly publication/replay and explicit empty replacement, and
-retains the tables for inspection. Use only a test namespace where you are
-authorized to create and modify tables. The returned report includes table IDs,
-versions and receipts and deliberately keeps <code>platform_gate_complete=False</code>.
-Unexpected runtime failures propagate; the probe does not change runtime settings
-or replace admission with a no-op provider.</p>
-<p>Use Linux (or WSL) with Python 3.12 and Java 17. Windows Spark inference alone
-does not establish that Hadoop's filesystem support can write Delta locally.
-Keep this test environment separate from Databricks Runtime's bundled packages.</p>
-<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>venv<span class="w"> </span>.venv-delta
-uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>.venv-delta/bin/python<span class="w"> </span>-r<span class="w"> </span>requirements-delta.txt
-<span class="nv">SKYULF_REQUIRE_DELTA</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>.venv-delta/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integration/platforms/test_batch_contract.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integration/platforms/test_batch_admission.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>skyulf-core/tests/integration/platforms/test_delta_publish.py<span class="w"> </span>-q<span class="w"> </span>-o<span class="w"> </span><span class="nv">addopts</span><span class="o">=</span>
-</code></pre></div>
-<p>The fixture configures the Delta extension/catalog and creates only temporary
-test tables. Its first launch downloads the matching Maven jars. For an offline
-run, <code>SKYULF_DELTA_JARS</code> may point to a prepared directory containing compatible
-Delta and transitive dependency jars. Required lanes fail when Delta is missing;
-the base environment skips optional Delta tests.</p>
+<h2 id="validate-a-new-destination">Validate a new destination</h2>
+<p>Use an isolated development destination with the same schema and access policy as
+the planned target. Publish one small pinned period, repeat the identical request,
+and verify that the receipt identifies the original commit. Then publish a second
+period and confirm that earlier keys and predictions remain unchanged. Exercise
+empty-period behavior explicitly before enabling replacement of production data.</p>
+<p>Check source/target versions, model identity, keyed output values and admission
+release after a failure. Local filesystem behavior does not establish UC permissions
+or a distributed driver's ownership guarantees. Use shared Delta admission for
+jobs that do not share a single host.</p>
 <p>Relevant upstream behavior: <a href="https://docs.delta.io/delta-batch/">Delta selective overwrite and idempotent writes</a>
 and <a href="https://docs.delta.io/concurrency-control/">Delta concurrency control</a>.</p>
 

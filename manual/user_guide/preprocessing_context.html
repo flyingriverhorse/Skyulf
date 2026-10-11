@@ -1,0 +1,4399 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/preprocessing_context.html">
+      
+      
+        <link rel="prev" href="inference_flow.html">
+      
+      
+        <link rel="next" href="mlflow_tracking.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Preprocessing Diagnostics and Context - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#preprocessing-diagnostics-and-context" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Preprocessing Diagnostics and Context
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spark.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spark (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_bundles.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Bundles (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="inference_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="preprocessing_context.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-context-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What does context mean?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What does context mean?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-is-a-fitted-groupimputer-a-row-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why is a fitted GroupImputer a row operation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#window-and-global-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Window and global examples
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#predictions-with-continued-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Predictions with continued history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-do-i-declare-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where do I declare context?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-report-probe_fitted_preprocessingartifact-sample-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What does report = probe_fitted_preprocessing(artifact, sample) do?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What does report = probe_fitted_preprocessing(artifact, sample) do?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#complete-runnable-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete runnable example
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-to-read-the-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How to read the report
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How to read the report">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-training-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional training report
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#status-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#practical-built-in-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practical built-in boundaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runnable-history-continuation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runnable history continuation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_tracking.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Tracking (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Models (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mlflow_registry.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLflow Registry (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_batch.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Batch (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_sdk.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_bundle_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Databricks Bundle Operator Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="weighted_training.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weighted Training & Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_weight_acceptance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verify Sampling and Weights
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="preprocessing-diagnostics-and-context">Preprocessing diagnostics and context</h1>
+<p>Use preprocessing diagnostics to check whether a saved transformation behaves
+consistently when the same sample is repeated, reordered, or split into batches.
+Install <code>skyulf-core</code> with the dependencies used to fit the model. The
+<a href="#complete-runnable-example">complete runnable example</a> trains a tiny model only
+to make a saved artifact available; diagnosing your own artifact does not retrain it.
+The existing step still owns its calculation. Training calls <code>fit</code>; inference
+calls <code>apply</code> with the information saved during training.</p>
+<h2 id="what-does-context-mean">What does context mean?</h2>
+<p>Context describes <strong>the other input rows needed during inference</strong>. It does not
+describe how much data training needed, choose an engine, or change the formula.</p>
+<table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Information required at inference</th>
+<th>Example</th>
+<th>Current probe behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>row</code></td>
+<td>This row and saved training state</td>
+<td>Saved mean, scaler, category mapping</td>
+<td>Compare full, repeated, chunked and reversed requests</td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>All relevant rows in the same group</td>
+<td>Subtract this request's customer-group mean</td>
+<td>Report <code>requires_context</code>; do not run independent chunks</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td>Neighboring or earlier rows, usually in a defined order</td>
+<td>Lag or rolling mean</td>
+<td>Report <code>requires_context</code>; do not invent history</td>
+</tr>
+<tr>
+<td><code>global</code></td>
+<td>The complete intended input population</td>
+<td>Choose duplicates across the whole request</td>
+<td>Report <code>requires_context</code> if the step is active</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td>Not yet declared for this implementation/configuration</td>
+<td>An undeclared custom callback</td>
+<td>Try sample comparisons; retain <code>unknown</code> even when they pass</td>
+</tr>
+</tbody>
+</table>
+<p>These declarations currently guide an explicit diagnostic. They do not create a
+Spark grouping/shuffle, sort the data, fetch older records or configure serving.
+Training can opt into the diagnostic below. Prediction does not run it.</p>
+<h3 id="why-is-a-fitted-groupimputer-a-row-operation">Why is a fitted GroupImputer a row operation?</h3>
+<p>Suppose training learned these income replacement values:</p>
+<table>
+<thead>
+<tr>
+<th>Segment</th>
+<th style="text-align: right;">Saved mean income</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td style="text-align: right;">200</td>
+</tr>
+<tr>
+<td>B</td>
+<td style="text-align: right;">1200</td>
+</tr>
+</tbody>
+</table>
+<p>For a new row <code>{segment: A, income: null}</code>, <code>GroupImputer.apply</code> looks up the
+saved A value, 200. That remains 200 whether the request contains one row or a
+thousand rows. The training-time aggregation is already finished. Its inference
+context is therefore <code>row</code>, even though the step's name contains "Group".
+Unseen groups use the fitted fallback according to the node's saved policy.</p>
+<p>Compare that with a custom function computing
+<code>df.groupby("customer_id")["amount"].transform("mean")</code> on the incoming request.
+For one customer with amounts 10 and 30, the complete group gives 20 for both
+rows. Separating those rows into singleton requests gives 10 and 30. This is
+<code>group</code> context: the request must contain the intended complete groups. Saving
+the function in a model does not save future customer transactions.</p>
+<h3 id="window-and-global-examples">Window and global examples</h3>
+<p>A rolling mean over 10, 20, 30 with a two-row window is 10, 15, 25 when the first
+window accepts one row. Independently processing chunks <code>[10, 20]</code> and <code>[30]</code>
+loses the previous value for the last chunk. Declaring <code>window</code> makes this
+requirement visible. Carry-history mode additionally needs an explicit
+continuation session; restarting each request from training history is not
+equivalent to a continuous stream. The current probe does not run that session.</p>
+<h3 id="predictions-with-continued-history">Predictions with continued history</h3>
+<p>Use the existing carry-history modes of <code>LagFeatures</code> and <code>RollingAggregate</code>
+through <code>score_pipeline_with_history</code>. Supply the actual request frame in
+the saved engine/schema. Each step retains its own transformed tail; subsequent
+requests receive the returned JSON-compatible state:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.pipeline_scoring</span><span class="w"> </span><span class="kn">import</span> <span class="n">score_pipeline_with_history</span>
+
+<span class="n">first</span> <span class="o">=</span> <span class="n">score_pipeline_with_history</span><span class="p">(</span><span class="n">first_batch</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+<span class="n">second</span> <span class="o">=</span> <span class="n">score_pipeline_with_history</span><span class="p">(</span>
+    <span class="n">next_batch</span><span class="p">,</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">history_state</span><span class="o">=</span><span class="n">first</span><span class="o">.</span><span class="n">history</span>
+<span class="p">)</span>
+<span class="n">predictions</span> <span class="o">=</span> <span class="n">second</span><span class="o">.</span><span class="n">frame</span>
+<span class="n">next_history</span> <span class="o">=</span> <span class="n">second</span><span class="o">.</span><span class="n">history</span>
+</code></pre></div>
+<p>The first call starts from the saved training seed. For a complete initial
+history replay, use <code>bootstrap_history=True</code> on that first call to exclude the
+seed; do not combine it with <code>history_state</code>. Calls neither fetch older rows nor
+change the artifact. Saved state belongs to its model digest and engine. Existing
+ordering, tie-breaker, per-group limits and late/repeated-row checks still apply.
+Empty requests preserve validated history and return nullable prediction columns.
+Models without carry steps return <code>history=None</code> and reject supplied history.</p>
+<p>Persist predictions and returned history atomically. Serialize calls sharing a
+history stream or use compare-and-swap in your storage so two writers cannot
+overwrite each other's progress. Reusing an old detached state can replay an old
+request; this API cannot detect storage races. Databricks incremental scoring
+already owns its durable history/receipt path and uses the same session factory.</p>
+<p>For custom <code>group</code>, <code>window</code> or <code>global</code> callbacks, pass the complete intended
+request, including required context rows, through whole-frame scoring. The wrapper
+preserves that request as one frame; it cannot infer group completeness, build
+custom history, or admit independent Spark partitions. Built-in carry history
+does not provide state for arbitrary custom callbacks.</p>
+<p>Deduplication needs all rows in the intended deduplication population; duplicates
+in different partitions cannot be discovered independently. Its declared context
+is <code>global</code>. However, ordinary row-preserving prediction skips the built-in
+<code>Deduplicate</code> step. The probe follows that same rule and reports
+<code>action: skip_preserve_rows</code>, <code>status: skipped</code>; it does not remove predictions.</p>
+<h2 id="where-do-i-declare-context">Where do I declare context?</h2>
+<p>Built-in declarations belong to the existing Skyulf preprocessing implementation.
+You do not add a context setting to every built-in YAML entry. Some built-in
+configurations/engines are not reviewed yet and will report <code>unknown</code>.</p>
+<p>For a custom function, declare its actual behavior in the existing factory in
+<code>src/features/preprocessing.py</code>. For example, replace the shipped <code>log_feature</code>
+factory with this version; keep its existing <code>log1p_value</code> calculation:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">log_feature</span><span class="p">(</span><span class="n">column</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Add a per-row logarithm with no request-time population statistics."""</span>
+    <span class="k">return</span> <span class="n">column_step</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"log_</span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="n">log1p_value</span><span class="p">,</span>
+        <span class="n">output</span><span class="o">=</span><span class="sa">f</span><span class="s2">"log_</span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"column"</span><span class="p">:</span> <span class="n">column</span><span class="p">},</span>
+        <span class="n">inference_context</span><span class="o">=</span><span class="s2">"row"</span><span class="p">,</span>
+    <span class="p">)</span>
+</code></pre></div>
+<p>In a generated Bundle, select it normally in <code>config/preprocessing.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">recipes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">custom</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">preprocessing.log_feature</span>
+<span class="w">      </span><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="nv">income</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>The YAML selects the factory; the returned step contains the context. It is not
+a second YAML definition of the calculation. For <code>fitted_step</code>, use the same
+keyword when <code>apply(df, state)</code> only reads saved state. Do not label a callback
+<code>row</code> if it recalculates statistics from <code>df</code> during prediction.</p>
+<p><code>filter_step</code> also accepts this diagnostic keyword. Its pre-split contract still
+requires fixed, row-local eligibility rules; <code>group</code>/<code>window</code>/<code>global</code> declarations
+do not make context-dependent pre-split filters valid. The preprocessing probe
+does not inspect the separate project scoring/pre-split eligibility policy.</p>
+<p>For an advanced custom class, add an optional static method to its existing
+Applier class, alongside its existing <code>apply</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.core.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutionCapability</span>
+
+<span class="c1"># Inside your existing Applier class:</span>
+<span class="nd">@staticmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inference_capability</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">engine</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Describe only engines and modes supported by this saved implementation."""</span>
+    <span class="k">if</span> <span class="n">engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="s2">"polars"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">ExecutionCapability</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="s2">"apply"</span><span class="p">,</span> <span class="s2">"local"</span><span class="p">,</span> <span class="s2">"preserve"</span><span class="p">,</span> <span class="s2">"row"</span><span class="p">)</span>
+</code></pre></div>
+<p>Use that example only if the class actually supports both engines and preserves
+rows. Otherwise narrow it. Omitting a declaration keeps context <code>unknown</code>.
+Editing the factory/class affects newly trained artifacts; an existing model
+continues using its captured source. A declaration is a claim to test, not a
+Spark/REST admission certificate.</p>
+<h2 id="what-does-report-probe_fitted_preprocessingartifact-sample-do">What does <code>report = probe_fitted_preprocessing(artifact, sample)</code> do?</h2>
+<p>It means: <strong>take this already fitted pipeline, try its saved preprocessing on
+these example inputs in several ways, and return what happened</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>What you provide or receive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>artifact</code></td>
+<td>A <code>FittedPipelineArtifact</code>: the loaded pipeline plus its manifest and saved fitted state. It is not a model-name string, endpoint or unfitted estimator.</td>
+</tr>
+<tr>
+<td><code>sample</code></td>
+<td>A small pandas or Polars DataFrame matching the saved model input columns, order and dtypes. It normally excludes the target and unrelated record keys.</td>
+</tr>
+<tr>
+<td><code>report</code></td>
+<td>A Python dictionary containing step names, context, hashes, checks, statuses and failure reasons. It is not predictions or a trained model.</td>
+</tr>
+</tbody>
+</table>
+<p>The artifact is loaded with <code>load_pipeline(path)</code> from an existing fitted
+pipeline artifact directory, such as one created by <code>save_pipeline</code> or
+<code>fit_workflow</code>. The loader verifies saved payload/package checks. Do not
+pass <code>models:/...</code>, an endpoint name, or the result of a generic pyfunc loader
+directly to this API; those are different objects.</p>
+<p>If you already have the artifact, use a matching sample directly. If the model
+was trained on merged features, sample those features. The probe does not turn a
+raw source table into merged features or rerun upstream joins.</p>
+<h3 id="complete-runnable-example">Complete runnable example</h3>
+<p>This standalone example creates a tiny fitted artifact so the origin of every
+variable is clear. In a real project, replace the training section with loading
+your existing artifact; you do not retrain to run the probe.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.fitted_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_pipeline</span><span class="p">,</span> <span class="n">save_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.preprocessing_probe</span><span class="w"> </span><span class="kn">import</span> <span class="n">probe_fitted_preprocessing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+
+<span class="n">training</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"segment"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">],</span>
+    <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="mf">100.0</span><span class="p">,</span> <span class="mf">300.0</span><span class="p">,</span> <span class="mf">1000.0</span><span class="p">,</span> <span class="mf">1400.0</span><span class="p">,</span> <span class="mf">200.0</span><span class="p">,</span> <span class="mf">1200.0</span><span class="p">],</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="mf">14.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fill_income"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"GroupImputer"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"income"</span><span class="p">],</span> <span class="s2">"group_by"</span><span class="p">:</span> <span class="s2">"segment"</span><span class="p">,</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"encode_segment"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
+         <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"segment"</span><span class="p">],</span> <span class="s2">"handle_unknown"</span><span class="p">:</span> <span class="s2">"ignore"</span><span class="p">,</span> <span class="s2">"max_categories"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">training</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">training</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">0</span><span class="p">]),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Training is finished. Save once; all following checks use this fitted state.</span>
+<span class="n">artifact_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"artifacts/context_demo"</span><span class="p">)</span>
+<span class="n">save_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">artifact_path</span><span class="p">)</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">load_pipeline</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
+
+<span class="c1"># These are model inputs, including missing income and a previously unseen segment.</span>
+<span class="n">sample</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"segment"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"NEW"</span><span class="p">],</span>
+    <span class="s2">"income"</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="mf">1600.0</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">probe_fitted_preprocessing</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">sample</span><span class="p">,</span> <span class="n">chunk_sizes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="p">[</span><span class="s2">"status"</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">report</span><span class="p">[</span><span class="s2">"steps"</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">step</span><span class="p">[</span><span class="s2">"name"</span><span class="p">],</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"context"</span><span class="p">),</span> <span class="n">step</span><span class="p">[</span><span class="s2">"status"</span><span class="p">])</span>
+
+<span class="c1"># Optional: persist diagnostic evidence locally. No prediction table is written.</span>
+<span class="n">Path</span><span class="p">(</span><span class="s2">"preprocessing_report.json"</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Expected summary:</p>
+<div class="highlight"><pre><span></span><code>passed
+fill_income row passed
+encode_segment row passed
+</code></pre></div>
+<p>The sample contains three rows. <code>chunks:1</code> makes three separate one-row apply
+calls, and <code>chunks:2</code> makes one two-row call and one one-row call. Each result is
+compared with the corresponding rows from the full-sample result. The learned
+segment means and categories remain the ones from <code>training</code>.</p>
+<h2 id="how-to-read-the-report">How to read the report</h2>
+<h3 id="optional-training-report">Optional training report</h3>
+<p>In generated <code>config/training.yml</code>, enable the diagnostic explicitly:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">preprocessing_probe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>The default is <code>false</code>. Single-model, competition and multi-target training use the
+same saved-model check. Each fit checks its saved and reloaded artifact using at most the first 256 holdout input rows and
+uses the probe's 8 MiB frame limit; it does not log the sample values or refit.
+The run records <code>preprocessing_probe.json</code>, displayed under <strong>Preprocessing
+diagnostics</strong> in the training report. The SDK equivalent is
+<code>TrainingSpec(..., preprocessing_probe=True)</code>, passed to <code>train_candidate</code>.
+To enable it on an existing specification:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace</span>
+
+<span class="n">spec</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">preprocessing_probe</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Open the MLflow training run's <strong>Artifacts</strong> tab and select
+<code>preprocessing_probe.json</code>. In competition and multi-target layouts, inspect
+the individual candidate/branch run that fitted the pipeline.</p>
+<p><code>failed</code>, <code>requires_context</code> and empty-holdout <code>not_run</code> remain diagnostic
+outcomes. They do not block promotion or change the data identity, split, model,
+thresholds or aliases. An MLflow write error follows the existing training
+failure path. Custom callbacks remain trusted code with possible external side
+effects; the row/byte limits are not a sandbox or execution timeout.</p>
+<h3 id="status-fields">Status fields</h3>
+<table>
+<thead>
+<tr>
+<th>Field or status</th>
+<th>Meaning and next action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Top-level <code>status: passed</code></td>
+<td>All required sample checks and the final feature schema matched. Inspect context and empty-input support too.</td>
+</tr>
+<tr>
+<td><code>checks</code></td>
+<td><code>full</code>, <code>repeat</code>, <code>chunks:N</code>, <code>reverse</code> and <code>empty</code> name the attempted strategy.</td>
+</tr>
+<tr>
+<td><code>failed</code> + <code>output_mismatch</code></td>
+<td>Inspect the named step for batch statistics, order, dtype changes or numerical rounding.</td>
+</tr>
+<tr>
+<td><code>state_mutation</code> / <code>input_mutation</code></td>
+<td>The step changed its saved state or received input during apply. Keep learned state read-only and return transformed data separately.</td>
+</tr>
+<tr>
+<td><code>apply_error</code> + <code>error_type</code></td>
+<td>The existing apply raised. Reproduce the named step locally with trusted data; sample-bearing exception messages are omitted from the report.</td>
+</tr>
+<tr>
+<td><code>invalid_step_contract</code></td>
+<td>Saved identity/configuration/validation could not be inspected. Check the artifact and the optional validator; do not infer numerical parity.</td>
+</tr>
+<tr>
+<td><code>requires_context</code></td>
+<td>Supply a separately designed group/history execution path; changing the label to <code>row</code> does not resolve the dependency.</td>
+</tr>
+<tr>
+<td><code>skipped</code></td>
+<td>The normal prediction chain skips this fitted training step. No apply test ran for it.</td>
+</tr>
+<tr>
+<td><code>not_run</code></td>
+<td>An earlier step failed or required context, so no result is claimed for this step.</td>
+</tr>
+<tr>
+<td><code>empty</code> check: <code>not_supported</code></td>
+<td>Empty input raised. Other checks can pass; this does not promise support for empty requests.</td>
+</tr>
+<tr>
+<td><code>state_validation: node_owned</code></td>
+<td>The preprocessing owner inspected its saved state. This can be a pandas/Polars diagnostic contract; it does not mean worker admission.</td>
+</tr>
+<tr>
+<td><code>state_validation: unavailable</code></td>
+<td>No applicable node-owned validator exists for this fitted state. Empirical checks may still pass.</td>
+</tr>
+<tr>
+<td><code>admission: diagnostic_only</code></td>
+<td>The report grants no distributed or endpoint eligibility.</td>
+</tr>
+</tbody>
+</table>
+<p>Validation of the initial artifact, sample schema and limits can raise an
+exception <strong>before</strong> a report exists. For example, wrong columns or more than
+<code>max_rows</code> are caller errors. Step execution failures normally appear in the
+report. The default limits are 256 rows and 8 MiB per frame; the probe rejects
+oversized samples instead of silently truncating them. These limits do not cap
+the project's full Spark scoring population.</p>
+<p>Choose a nonempty sample with realistic values, nulls, unseen categories and
+varied group keys. Only bounded pandas/Polars frames with immutable scalar cells
+are supported; nested mutable cells are rejected. Comparisons are exact. A
+floating-point difference near machine precision may need investigation but
+does not by itself demonstrate refitting. No tolerance setting is currently
+exposed. Passing finite samples cannot establish behavior for every future row.</p>
+<p>A <code>row</code> declaration describes the data the operation needs. It does not promise
+that every engine/configuration passes exact chunk comparisons. For example,
+pandas can choose different output dtypes for integer casts, clipped integer
+values or numeric replacements across chunks. The report must retain that
+failure even though neither operation needs other rows to calculate its values.</p>
+<h3 id="practical-built-in-boundaries">Practical built-in boundaries</h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Meaning for saved inference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Casting</code></td>
+<td>Saved categorical vocabularies can be reused per row. Legacy pandas category inference and coercive fallback conversions can depend on the complete request; the diagnostic reports that context.</td>
+</tr>
+<tr>
+<td><code>GeneralBinning</code>, <code>KBinsDiscretizer</code>, <code>Winsorize</code></td>
+<td>Apply reuses training bins/limits. Integer pandas clipping may still fail exact chunk dtype comparisons; use representative model-input dtypes.</td>
+</tr>
+<tr>
+<td><code>ManualBounds</code></td>
+<td>This is a row-local filter, not an automatically skipped step. In-bound prediction succeeds; a request that would lose rows is rejected to preserve prediction alignment.</td>
+</tr>
+<tr>
+<td><code>DropMissingRows</code></td>
+<td>Native apply filters rows, but ordinary prediction skips it. Use an imputer for missing scoring values; skipping does not guarantee the model accepts nulls.</td>
+</tr>
+<tr>
+<td><code>Oversampling</code>, <code>Undersampling</code></td>
+<td>These balance training classes using global context and are skipped during prediction. Mixed effects, replacement sampling and arbitrary callbacks can remain <code>unknown</code>.</td>
+</tr>
+<tr>
+<td><code>DatasetProfile</code>, <code>DataSnapshot</code></td>
+<td>Fit saves training reports; apply passes prediction data through unchanged. The report or snapshot is not recomputed per request.</td>
+</tr>
+<tr>
+<td><code>TrainTestSplitter</code>, <code>Split</code>, <code>feature_target_split</code></td>
+<td>These are training structure helpers, absent from saved <code>fitted_steps</code> and from the probe report. No prediction-time splitting occurs. The train/test splitter deliberately has no feature-frame context declaration.</td>
+</tr>
+<tr>
+<td><code>DateFeatures</code></td>
+<td>New UTC-aware fitted settings can be inspected per row. Legacy non-UTC settings can stay <code>unknown</code>; existing generated-name collisions are not renamed by the probe.</td>
+</tr>
+<tr>
+<td><code>PolynomialFeatures</code></td>
+<td>Apply reconstructs combinatorial terms from saved configuration and feature shape. Its internal sklearn <code>fit</code> does not learn means or categories. Empty/null inputs retain their existing errors.</td>
+</tr>
+<tr>
+<td><code>TextCleaning</code>, <code>InvalidValueReplacement</code></td>
+<td>Fixed operations reuse saved settings. Null-only chunks, regex support and dtype changes are engine-specific, so include those cases in your sample.</td>
+</tr>
+<tr>
+<td><code>DummyEncoder</code>, <code>LabelEncoder</code>, <code>OrdinalEncoder</code>, <code>WOEEncoder</code>, <code>HashEncoder</code></td>
+<td>Current category keys reuse deterministic saved settings. Legacy pandas datetime rendering may depend on the batch; refit the whole pipeline to update that contract. HashEncoder empty output can still fail strict schema comparisons.</td>
+</tr>
+<tr>
+<td><code>TargetEncoder</code>, <code>WOEEncoder</code></td>
+<td>Prediction reuses the saved full-data mapping. TargetEncoder's out-of-fold training values deliberately differ from its inference values; WOE requires a binary training target.</td>
+</tr>
+<tr>
+<td><code>KNNImputer</code>, <code>IterativeImputer</code></td>
+<td>Neighbors and prediction estimators come from training. IterativeImputer with active rounds needs request context because a completely null request takes a different initial-fill path. Custom/stochastic modes can stay <code>unknown</code>.</td>
+</tr>
+<tr>
+<td><code>PowerTransformer</code>, power rules in <code>GeneralTransformation</code></td>
+<td>Lambdas and scaler values are saved. Existing error handling returns a complete column/frame unchanged after one invalid value, so active power transforms report <code>global</code>.</td>
+</tr>
+<tr>
+<td><code>FeatureGeneration</code>, <code>FeatureMath</code>, <code>FeatureGenerationNode</code></td>
+<td>Fitted group aggregates are saved lookups, so inference does not need other group rows. Pandas similarity rendering can depend on neighboring datetimes and reports <code>global</code>; legacy unpinned similarity stays <code>unknown</code>.</td>
+</tr>
+<tr>
+<td><code>ModelBasedSelection</code>, <code>feature_selection</code></td>
+<td>Prediction uses saved selected columns. The facade delegates inspection to its fitted concrete selector; it does not select features again.</td>
+</tr>
+<tr>
+<td><code>IQR</code>, <code>ZScore</code>, <code>EllipticEnvelope</code></td>
+<td>Saved limits or detector models filter rows. Normal model prediction rejects a request that would lose rows; these steps are not automatically skipped.</td>
+</tr>
+<tr>
+<td><code>count_vectorizer</code>, <code>tfidf_vectorizer</code>, <code>hashing_vectorizer</code>, <code>tokenizer</code></td>
+<td>Reuse learned vocabulary/IDF or saved analyzer settings. Outputs are dense. Custom callbacks, native estimator cache mutations and empty-output dtypes need their own diagnostic evidence.</td>
+</tr>
+<tr>
+<td><code>H3Index</code></td>
+<td>Saved coordinate names and resolution drive the existing H3 calculation. Install and pin the optional <code>h3</code> dependency in the scoring environment; the built-in artifact does not automatically capture that package pin. Pandas empty-output dtype differences remain visible.</td>
+</tr>
+</tbody>
+</table>
+<p><code>global</code> can therefore describe error handling as well as population statistics.
+For Box-Cox, the valid row in <code>[2, -1]</code> can remain untransformed when the negative
+neighbor makes the whole request fail, whereas <code>[2]</code> alone is transformed. The
+probe reports <code>requires_context</code>; it does not silently replace this behavior or
+claim singleton requests are equivalent. Correct invalid inputs and preserve
+request boundaries when using these modes.</p>
+<p>These pandas/Polars declarations do not make additional steps eligible for Spark workers
+or serving endpoints. Saved-state validation also does not certify every value
+for artifact serialization: for example, native Decimal settings may be accepted
+by an applier but remain unsupported by sealed-model hashing.</p>
+<p>The same boundary applies to temporal scalar values saved in snapshots: the
+semantic hash rejects unsupported dates, times, durations and periods rather
+than silently treating different values as equal. Native passthrough apply and
+binary-payload checks are separate from diagnostic state hashing. NumPy temporal
+arrays retain their supported array encoding; no new scalar codec is implied.</p>
+<p>A skipped fitted step has no apply checks and reports
+<code>state_validation: unavailable</code>. An unrecorded split marker has no report entry
+at all. Neither result is a successful test of running that training operation
+on individual prediction rows.</p>
+<p>Built-in owners can inspect saved pandas/Polars state through <code>validate_inference_state</code>.
+The probe calls that hook on a detached artifact before the existing <code>apply</code>;
+malformed state produces <code>invalid_step_contract</code>. Learned arrays, fixed bin
+edges and selected columns are checked, not learned again. This hook is separate
+from the stricter fitted-state/configuration contracts used for Spark workers.
+Your custom preprocessing still runs through its existing saved apply function;
+there is no second implementation of its transformation to maintain.</p>
+<p>Run this after training/loading and when changing custom preprocessing or its
+dependencies, or enable the optional training report above. It is not a separate
+Bundle task, production monitor, accuracy
+evaluation, drift check or performance-loss policy. It does not call the model's
+prediction method. It tests detached preprocessing state; module globals and
+external services accessed by trusted custom code are not isolated.</p>
+<p>See <a href="preprocessing_placement.html">preprocessing placement</a>, the
+<a href="databricks_sdk.html">Databricks Python SDK</a>, and
+<a href="databricks_bundle.html#distributed-inference-settings">Bundle distributed inference</a>
+for their separate execution requirements.</p>
+<h2 id="runnable-history-continuation">Runnable history continuation</h2>
+<p>This example fits a lag feature on ordered observations, reloads the artifact,
+and scores two new requests. <code>history_mode="carry"</code> saves the training tail;
+passing the returned history advances that tail without changing the artifact.
+The example uses one stream. For multiple entities, set <code>group_by</code> and supply
+ordered observations for each entity.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.fitted_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_pipeline</span><span class="p">,</span> <span class="n">save_pipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.pipeline_scoring</span><span class="w"> </span><span class="kn">import</span> <span class="n">score_pipeline_with_history</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.preprocessing_probe</span><span class="w"> </span><span class="kn">import</span> <span class="n">probe_fitted_preprocessing</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">SkyulfPipeline</span>
+
+<span class="n">observations</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"time"</span><span class="p">:</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span>
+    <span class="s2">"value"</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">11.0</span><span class="p">),</span>
+    <span class="s2">"target"</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">11.0</span><span class="p">)</span> <span class="o">*</span> <span class="mi">3</span><span class="p">,</span>
+<span class="p">})</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">SkyulfPipeline</span><span class="p">({</span>
+    <span class="s2">"preprocessing"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"lag"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"LagFeatures"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"value"</span><span class="p">],</span> <span class="s2">"lags"</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">"sort_by"</span><span class="p">:</span> <span class="s2">"time"</span><span class="p">,</span>
+            <span class="s2">"history_mode"</span><span class="p">:</span> <span class="s2">"carry"</span><span class="p">,</span>
+        <span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fill"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"value_lag_1"</span><span class="p">],</span> <span class="s2">"strategy"</span><span class="p">:</span> <span class="s2">"mean"</span><span class="p">,</span>
+        <span class="p">}},</span>
+        <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"drop_clock"</span><span class="p">,</span> <span class="s2">"transformer"</span><span class="p">:</span> <span class="s2">"DropMissingColumns"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"time"</span><span class="p">],</span> <span class="s2">"missing_threshold"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">}},</span>
+    <span class="p">],</span>
+    <span class="s2">"modeling"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"linear_regression"</span><span class="p">},</span>
+<span class="p">})</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">observations</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">8</span><span class="p">],</span> <span class="n">test</span><span class="o">=</span><span class="n">observations</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">8</span><span class="p">:]),</span>
+    <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">artifact_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"artifacts/history_demo"</span><span class="p">)</span>
+<span class="n">save_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">artifact_path</span><span class="p">)</span>
+<span class="n">artifact</span> <span class="o">=</span> <span class="n">load_pipeline</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">)</span>
+<span class="n">requests</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"time"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">11</span><span class="p">],</span> <span class="s2">"value"</span><span class="p">:</span> <span class="p">[</span><span class="mf">11.0</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">]})</span>
+
+<span class="n">first</span> <span class="o">=</span> <span class="n">score_pipeline_with_history</span><span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:</span><span class="mi">1</span><span class="p">],</span> <span class="n">artifact</span><span class="p">)</span>
+<span class="c1"># JSON round-trip represents transporting the proposed state to another call.</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">first</span><span class="o">.</span><span class="n">history</span><span class="p">))</span>
+<span class="n">second</span> <span class="o">=</span> <span class="n">score_pipeline_with_history</span><span class="p">(</span>
+    <span class="n">requests</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">load_pipeline</span><span class="p">(</span><span class="n">artifact_path</span><span class="p">),</span> <span class="n">history_state</span><span class="o">=</span><span class="n">state</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">expected</span> <span class="o">=</span> <span class="n">score_pipeline_with_history</span><span class="p">(</span><span class="n">requests</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">testing</span><span class="o">.</span><span class="n">assert_allclose</span><span class="p">(</span>
+    <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">first</span><span class="o">.</span><span class="n">frame</span><span class="p">,</span> <span class="n">second</span><span class="o">.</span><span class="n">frame</span><span class="p">])[</span><span class="s2">"prediction"</span><span class="p">],</span>
+    <span class="n">expected</span><span class="o">.</span><span class="n">frame</span><span class="p">[</span><span class="s2">"prediction"</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="k">assert</span> <span class="n">second</span><span class="o">.</span><span class="n">history</span> <span class="o">==</span> <span class="n">expected</span><span class="o">.</span><span class="n">history</span>
+
+<span class="c1"># Independent row/chunk comparisons cannot stand in for this history session.</span>
+<span class="n">context_report</span> <span class="o">=</span> <span class="n">probe_fitted_preprocessing</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">requests</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">context_report</span><span class="p">[</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"requires_context"</span>
+<span class="k">assert</span> <span class="n">context_report</span><span class="p">[</span><span class="s2">"steps"</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="s2">"status"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"not_run"</span>
+</code></pre></div>
+<p>After each successful request, commit its predictions and proposed history in
+one transaction. A later request must read that committed history. If either
+write fails, retain the previous state and retry the same request from it.
+Serialize requests for a stream or use compare-and-swap to reject a stale writer;
+the function cannot detect another process publishing competing state.</p>
+<p>Use <code>bootstrap_history=True</code> only when the first request is a complete initial
+observation snapshot and should replace the training seed. It cannot accompany
+<code>history_state</code>. Preserve the configured ordering, unique entity/time keys and
+history limits; late or repeated rows are rejected. Complete-group custom
+callbacks still require complete groups in each frame, and custom windows still
+require their own caller-supplied history. This built-in continuation does not
+make those arbitrary callbacks stateful.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#skyulf" class="md-skip">
+        <a href="#skyulf-kayra-and-skyulf-core" class="md-skip">
           Skip to content
         </a>
       
@@ -470,10 +470,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-skyulf" class="md-nav__link">
+  <a href="#why-kayra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Why Skyulf?
+        Why Kayra?
       
     </span>
   </a>
@@ -504,10 +504,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#full-platform-backend-frontend" class="md-nav__link">
+  <a href="#kayra-backend-frontend" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Full platform (backend + frontend)
+        Kayra (backend + frontend)
       
     </span>
   </a>
@@ -1667,7 +1667,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1800,14 +1828,70 @@
   
   
     <li class="md-nav__item">
-      <a href="user_guide/databricks_local_sdk.html" class="md-nav__link">
+      <a href="user_guide/databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user_guide/databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1835,7 +1919,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2115,7 +2199,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3641,13 +3725,13 @@
   
 
 
-<h1 id="skyulf">Skyulf</h1>
+<h1 id="skyulf-kayra-and-skyulf-core">Skyulf: Kayra and skyulf-core</h1>
 <blockquote>
 <p><strong>The Visual MLOps Builder</strong> — Drag-and-drop machine learning without writing code.</p>
 </blockquote>
-<p>Skyulf is a self-hosted, privacy-first MLOps platform. Bring your data, clean it visually, engineer features with a node-based canvas, train models, and deploy — all in one place.</p>
+<p>Kayra is the self-hosted visual MLOps application by Skyulf. Its backend and frontend use <code>skyulf-core</code>, Skyulf’s standalone Python library. Bring your data, clean it visually, engineer features with a node-based canvas, train models, and deploy — all in one place.</p>
 <hr />
-<h2 id="why-skyulf">Why Skyulf?</h2>
+<h2 id="why-kayra">Why Kayra?</h2>
 <table>
 <thead>
 <tr>
@@ -3691,7 +3775,7 @@
 <h3 id="skyulf-core-standalone-python-library">skyulf-core (standalone Python library)</h3>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>skyulf-core
 </code></pre></div>
-<h3 id="full-platform-backend-frontend">Full platform (backend + frontend)</h3>
+<h3 id="kayra-backend-frontend">Kayra (backend + frontend)</h3>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/flyingriverhorse/Skyulf.git
 <span class="nb">cd</span><span class="w"> </span>Skyulf
 python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
@@ -3702,7 +3786,7 @@ python<span class="w"> </span>run_skyulf.py
 <p>Open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a> to access the dashboard.</p>
 <hr />
 <h2 id="architecture">Architecture</h2>
-<p>Skyulf is built on three components with strict boundaries:</p>
+<p>Kayra is built on three components with strict boundaries:</p>
 <ul>
 <li><strong>Frontend</strong>: React + TypeScript + React Flow (visual ML canvas)</li>
 <li><strong>Backend</strong>: FastAPI + Celery + Redis (API, jobs, persistence)</li>

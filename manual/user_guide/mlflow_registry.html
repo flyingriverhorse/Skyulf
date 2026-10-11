@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#mlflow-model-registry-development" class="md-skip">
+        <a href="#mlflow-model-registry" class="md-skip">
           Skip to content
         </a>
       
@@ -1503,7 +1503,35 @@
   <span class="md-ellipsis">
     
   
-    Inference Flow (Development)
+    Inference Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_context.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Diagnostics and Context
   
 
     
@@ -1651,10 +1679,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compare-a-local-challenger-before-promotion" class="md-nav__link">
+  <a href="#compare-a-candidate-before-promotion" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compare a local challenger before promotion
+        Compare a candidate before promotion
       
     </span>
   </a>
@@ -1716,14 +1744,70 @@
   
   
     <li class="md-nav__item">
-      <a href="databricks_local_sdk.html" class="md-nav__link">
+      <a href="databricks_sdk.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Databricks Local SDK (Development)
+    Databricks Python SDK
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_serving_rollout.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gradual Serving Rollout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="databricks_online_features.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Online Feature Lookup
   
 
     
@@ -1751,7 +1835,7 @@
   <span class="md-ellipsis">
     
   
-    Databricks Local Bundle (Development)
+    Databricks Bundle
   
 
     
@@ -2031,7 +2115,7 @@
   <span class="md-ellipsis">
     
   
-    Sampling Weight Acceptance
+    Verify Sampling and Weights
   
 
     
@@ -3557,7 +3641,7 @@
   
 
 
-<h1 id="mlflow-model-registry-development">MLflow model registry (development)</h1>
+<h1 id="mlflow-model-registry">MLflow model registry</h1>
 <p>Skyulf keeps model publication and model selection as explicit operations. The
 registry adapter is optional: importing the core package does not import MLflow,
 open a client, or contact a registry.</p>
@@ -3607,22 +3691,18 @@ exception types so a runner can choose the right remediation. The <code>signatur
 and <code>digest</code> fields are read from the packaged MLflow model metadata; they are
 validation data, not a second feature-engineering implementation.</p>
 <p>For Unity Catalog, pass a three-part model name (<code>catalog.schema.model</code>) and a
-<code>databricks-uc</code> registry URI. Tracking and registry URIs remain separate. The
-local tests cover configuration validation and separate stores. A live
-Databricks serverless Spark Connect 4.2.0 test registered and loaded a
-Polars-trained regression bundle, then verified both Spark inference modes.
-A separate restricted service principal loaded an allowed model and received
-<code>RegistryAccessError</code> for a model without <code>EXECUTE</code> permission. This evidence
-does not establish compatibility with every compute type or registry backend.</p>
+<code>databricks-uc</code> registry URI. Tracking and registry URIs remain separate. Grant the job identity the model
+permissions required by its operation, including <code>EXECUTE</code> for loading a UC model.
+Validate the recorded dependencies and artifact contract on the selected compute.</p>
 <p>Load the selected artifact with <code>load_registered_bundle</code>. It uses the pinned
 name/version and the package's declared bundle path, rejects paths outside the
 downloaded package, and checks the package/bundle digest against <code>resolved.digest</code>.
 The same bundle can then be passed to <code>predict_local</code> or either Spark inference
 mode, subject to their existing schema and FE capabilities.</p>
-<p>For fitted pandas/Polars packages created with <code>log_local_model</code>, use
-<code>load_registered_local_pipeline(resolved, ...)</code> instead. It verifies the
+<p>For fitted pandas/Polars packages created with <code>log_pipeline_model</code>, use
+<code>load_registered_pipeline(resolved, ...)</code> instead. It verifies the
 declared local artifact path, scope, engine and payload digest against the
-pinned registry version. That package supports whole-frame local inference;
+pinned registry version. That package supports whole-frame pandas/Polars inference;
 it does not become a Spark bundle merely because it is registered.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_registered_bundle</span>
 
@@ -3634,7 +3714,7 @@ it does not become a Spark bundle merely because it is registered.</p>
 <span class="k">assert</span> <span class="n">bundle</span><span class="o">.</span><span class="n">semantic_digest</span> <span class="o">==</span> <span class="n">resolved</span><span class="o">.</span><span class="n">digest</span>
 </code></pre></div>
 <h2 id="how-the-adapters-use-skyulf-core">How the adapters use Skyulf Core</h2>
-<p>The Databricks local workflow calls Skyulf Core's existing pipeline fit and
+<p>The Databricks Python workflow calls Skyulf Core's existing pipeline fit and
 prediction methods. Its UC reader and Delta writer handle transport and
 publication; they do not reimplement feature engineering or model behavior.
 The MLflow adapter packages that same saved pipeline, resolves a registry
@@ -3644,17 +3724,17 @@ predictions and class-ordered probabilities to Core's model metric calculators.
 There is no separate Databricks or MLflow training algorithm.</p>
 <p>For example, a training job can log every available held-out metric to
 its own MLflow run without implementing a second evaluator:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.local_evaluation</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_local_holdout</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.inference.pipeline_evaluation</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_holdout</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.runs.tracking</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrackingConfig</span><span class="p">,</span> <span class="n">track_run</span>
 
-<span class="n">metrics</span> <span class="o">=</span> <span class="n">evaluate_local_holdout</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">heldout</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
+<span class="n">metrics</span> <span class="o">=</span> <span class="n">evaluate_holdout</span><span class="p">(</span><span class="n">artifact</span><span class="p">,</span> <span class="n">heldout</span><span class="p">,</span> <span class="n">target_column</span><span class="o">=</span><span class="s2">"target"</span><span class="p">)</span>
 <span class="k">with</span> <span class="n">track_run</span><span class="p">(</span>
     <span class="n">TrackingConfig</span><span class="p">(</span><span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">experiment_name</span><span class="o">=</span><span class="s2">"customer-risk"</span><span class="p">),</span>
     <span class="n">run_name</span><span class="o">=</span><span class="s2">"candidate-training"</span><span class="p">,</span>
 <span class="p">)</span> <span class="k">as</span> <span class="n">run</span><span class="p">:</span>
     <span class="n">run</span><span class="o">.</span><span class="n">log_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="compare-a-local-challenger-before-promotion">Compare a local challenger before promotion</h2>
+<h2 id="compare-a-candidate-before-promotion">Compare a candidate before promotion</h2>
 <p>For a fitted pandas/Polars pipeline, resolve both registered versions to
 concrete identities and evaluate them on the <strong>same held-out labeled rows</strong>.
 Pin the source snapshot and split in the caller; <code>dataset_id</code> records that
@@ -3663,7 +3743,7 @@ The report also records the running Skyulf Core version and both model digests.
 The comparison uses the saved FE, model, class order and tuned thresholds.
 It accepts a row/memory budget and rejects incompatible tasks or class labels.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.registration.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_model</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.lifecycle.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_registered_local_models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">skyulf.integrations.mlflow.lifecycle.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">compare_registered_pipeline_models</span>
 
 <span class="n">candidate</span> <span class="o">=</span> <span class="n">resolve_model</span><span class="p">(</span>
     <span class="s2">"catalog.schema.customer_risk"</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">"2"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span>
@@ -3671,7 +3751,7 @@ It accepts a row/memory budget and rejects incompatible tasks or class labels.</
 <span class="n">champion</span> <span class="o">=</span> <span class="n">resolve_model</span><span class="p">(</span>
     <span class="s2">"catalog.schema.customer_risk"</span><span class="p">,</span> <span class="n">alias</span><span class="o">=</span><span class="s2">"champion"</span><span class="p">,</span> <span class="n">registry_uri</span><span class="o">=</span><span class="s2">"databricks-uc"</span>
 <span class="p">)</span>
-<span class="n">report</span> <span class="o">=</span> <span class="n">compare_registered_local_models</span><span class="p">(</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">compare_registered_pipeline_models</span><span class="p">(</span>
     <span class="n">candidate</span><span class="p">,</span>
     <span class="n">champion</span><span class="p">,</span>
     <span class="n">heldout</span><span class="p">,</span>  <span class="c1"># bounded pandas or Polars frame with raw inputs and true labels</span>
@@ -3714,7 +3794,7 @@ not move <code>@champion</code>. A replacement challenger requires an explicit
 candidate. Merely registering or comparing a model never assigns an alias.</p>
 <p>An orchestrator can explicitly create <code>ChallengerLifecycle</code> from
 <code>skyulf.integrations.mlflow.lifecycle.challenger</code> and pass its <code>registered</code> method as
-<code>train_local_candidate(..., on_registered=...)</code>. This nominates a registered
+<code>train_candidate(..., on_registered=...)</code>. This nominates a registered
 contender before comparison, with <code>validation_status=pending</code>. After evaluation,
 <code>stage_challenger</code> records <code>passed</code> or <code>rejected</code>; <code>lifecycle.failed()</code> records
 <code>error</code> for a still-pending comparison without overwriting a completed result.
@@ -3850,17 +3930,9 @@ expire; clear it only after proving the original job cannot publish.</p>
 digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later
 alias move does not redirect the pinned reference.</p>
-<p>The <code>skyulf-core/tests/fixtures/databricks_batch_smoke.py</code> fixture logs a uniquely
-named test model, loads
-its concrete registry version, and compares known gold predictions through both
-Spark inference modes. It accepts pandas or Polars training and emits a partial
-validation report. Local SQLite/Spark evidence does not certify live Unity Catalog,
-wheel deployment, distributed admission, Delta publication or platform scale.</p>
 <p>Registry resolution/loading does not predict, mutate aliases, start Spark or
-write a table. HTTP/SQL endpoints remain later initiative tasks. The
-<a href="databricks_bundle.html">local-engine Bundle</a> integrates the existing services;
-the monthly Spark/Delta runner has its own
-<a href="databricks_batch.html">batch contract</a>.</p>
+write a table. Use the <a href="databricks_bundle.html">Databricks Bundle</a> for generated jobs
+and the <a href="databricks_batch.html">batch publication guide</a> for the Delta sink contract.</p>
 
 
 
