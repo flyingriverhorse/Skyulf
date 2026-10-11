@@ -496,7 +496,7 @@ class StatefulEstimator:
         X_train, y_train = self._extract_xy(dataset.train, target_column)
 
         validation_data = None
-        if dataset.validation is not None:
+        if self._is_non_empty_split(dataset.validation):
             X_val, y_val = self._extract_xy(dataset.validation, target_column)
             validation_data = (X_val, y_val)
 

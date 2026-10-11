@@ -304,6 +304,7 @@ def _component_outcomes(result: pd.DataFrame, component: Any) -> pd.DataFrame:
 
 def _score_component(
     raw: pd.DataFrame,
+    frame: pd.DataFrame | pl.DataFrame,
     artifact: ModelSetArtifact,
     component: Any,
     state: Any,
@@ -313,11 +314,14 @@ def _score_component(
 ) -> tuple[pd.DataFrame, Any]:
     """Release one loaded component before advancing to the next model in the set."""
     local = load_pipeline(artifact.directory / "components" / component.branch)
-    selected = raw[[column.name for column in component.input_schema]].copy(deep=True)
+    columns = [column.name for column in component.input_schema]
+    selected = (
+        frame.select(columns) if isinstance(frame, pl.DataFrame) else raw[columns].copy(deep=True)
+    )
     _bounded(selected, max_rows, max_bytes)
     with pipeline_history_session(local, state, bootstrap=bootstrap) as session:
         result = _predict_component(selected, local, component)
-        _check_rows(result, selected, pd.DataFrame)
+        _check_rows(result, raw, pd.DataFrame)
         result = _component_outcomes(result, component)
     result = result.rename(columns=lambda name: f"{component.branch}__{name}")
     keyed = pd.concat([raw[list(artifact.manifest.record_key_columns)], result], axis=1)
@@ -325,9 +329,11 @@ def _score_component(
     return keyed, session.state if session is not None else None
 
 
-def _predict_component(selected: pd.DataFrame, local: Any, component: Any) -> pd.DataFrame:
+def _predict_component(
+    selected: pd.DataFrame | pl.DataFrame, local: Any, component: Any
+) -> pd.DataFrame:
     """Validate empty inputs and preserve history without invoking an estimator."""
-    if not selected.empty:
+    if len(selected):
         return score_pipeline(selected, local)
     validate_pipeline_input(selected, local)
     _preserve_history(local)
@@ -389,6 +395,7 @@ def score_model_set(
     for component in artifact.manifest.components:
         keyed, state = _score_component(
             raw,
+            frame,
             artifact,
             component,
             previous.get(component.branch),

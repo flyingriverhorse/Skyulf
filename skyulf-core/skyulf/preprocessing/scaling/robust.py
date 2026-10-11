@@ -114,6 +114,9 @@ class RobustScalerApplier(BaseApplier):
         if not valid:
             return X, _y
 
+        if not (params.get("with_centering", True) or params.get("with_scaling", True)):
+            return X, _y
+
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid]
         subset = decimal_columns_to_float(X_out[valid], valid)

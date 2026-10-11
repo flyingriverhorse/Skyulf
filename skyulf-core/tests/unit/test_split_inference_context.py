@@ -147,15 +147,17 @@ def test_feature_target_split_dataset_preserves_existing_pairs_weights_and_cover
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_target_only_frame_retains_native_zero_feature_limitation(engine):
-    """Polars zero-width features lose height even though the extracted target retains rows."""
+def test_target_only_frame_keeps_native_zero_feature_shape(engine):
+    """Native extraction keeps the engine version's zero-column shape and all target rows."""
     frame = pd.DataFrame({"target": [0, 1]})
     if engine == "polars":
         frame = pl.from_pandas(frame)
     config = {"target_column": "target"}
     state = NodeRegistry.get_calculator("feature_target_split")().fit(frame, config)
     features, target = NodeRegistry.get_applier("feature_target_split")().apply(frame, state)
-    assert features.shape == ((0, 0) if engine == "polars" else (2, 0))
+    # Polars 2.0 preserves height after dropping the last column; 1.x loses it.
+    expected_rows = 0 if engine == "polars" and pl.__version__.startswith("1.") else 2
+    assert features.shape == (expected_rows, 0)
     assert target.to_list() == [0, 1]
     # Context describes native extraction, not successful model input shape for every frame.
     capability = get_inference_capability("feature_target_split", config, state, engine=engine)

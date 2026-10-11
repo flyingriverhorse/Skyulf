@@ -64,6 +64,8 @@ def original_target_labels(fitted_steps: list[dict[str, Any]], labels: Any) -> n
 
 def encoded_label(pipeline: Any, label: Any, classes: Any) -> Any:
     """Resolve a user-facing original label on the actual fitted probability axis."""
+    if isinstance(label, np.generic):
+        label = label.item()
     raw = original_labels(pipeline, classes).tolist()
     for position, candidate in enumerate(raw):
         if type(candidate) is type(label) and candidate == label:

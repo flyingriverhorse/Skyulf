@@ -264,7 +264,7 @@ def test_analyze_timeseries_outer_exception_returns_none(monkeypatch) -> None:
     def _boom(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(analyzer.lazy_df, "sort", _boom)
+    monkeypatch.setattr(analyzer, "_build_raw_trend", _boom)
     result = analyzer._analyze_timeseries(["value"], date_col="date")
     assert result is None
 

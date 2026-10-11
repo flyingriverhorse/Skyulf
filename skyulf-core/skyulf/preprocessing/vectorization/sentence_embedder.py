@@ -99,6 +99,7 @@ def _construct_model(model_name: str | bytes) -> Any:
         raise ImportError(_INSTALL_HINT) from exc
 
     if isinstance(model_name, bytes):
+        # ty: ignore[unresolved-import]
         import torch  # noqa: PLC0415 - optional nlp extra
 
         # Like pipeline.pkl, this is executable state from a trusted producer.
@@ -112,7 +113,10 @@ def _construct_model(model_name: str | bytes) -> Any:
 
 def _snapshot_model(model: Any) -> dict[str, Any]:
     """Capture native weights, tokenizer and config without filesystem or Hub references."""
+    # ty: ignore[unresolved-import]
     import torch  # noqa: PLC0415 - optional nlp extra
+
+    # ty: ignore[unresolved-import]
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415 - optional nlp extra
 
     if type(model) is not SentenceTransformer or model.get_backend() != "torch":

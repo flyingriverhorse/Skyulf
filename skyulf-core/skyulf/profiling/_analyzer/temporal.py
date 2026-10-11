@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 from statsmodels.tsa import stattools
 
+from ..correlations import _nan_to_null
 from ..schemas import SeasonalityStats, TimeSeriesAnalysis, TimeSeriesPoint
 from ._utils import STATSMODELS_AVAILABLE, _AnalyzerState, _collect
 
@@ -26,7 +27,11 @@ class TemporalMixin(_AnalyzerState):
         Avoids constant metadata fields like "ingested_at".
         """
         if date_col:
-            return date_col if date_col in self.columns else None  # type: ignore[attr-defined]
+            return (
+                date_col
+                if date_col in self.columns and self.df.schema[date_col] in (pl.Date, pl.Datetime)
+                else None
+            )
 
         date_cols = [
             col
@@ -133,7 +138,8 @@ class TemporalMixin(_AnalyzerState):
         agg_expr = pl.len().alias("count")
         if cols_to_track:
             target_metric = cols_to_track[0]
-            agg_expr = pl.col(target_metric).mean().alias("count")
+            values = pl.col(target_metric).cast(pl.Float64)
+            agg_expr = values.filter(values.is_finite()).mean().alias("count")
 
         dow_df = _collect(
             self.lazy_df.filter(pl.col(date_col).is_not_null())  # type: ignore[attr-defined]
@@ -178,7 +184,7 @@ class TemporalMixin(_AnalyzerState):
         """Mean-fill gaps only when enough finite, varying observations support a test."""
         # .copy() avoids "assignment destination is read-only" — polars
         # returns a zero-copy read-only view when the column has no nulls.
-        series = trend_df[target_metric].to_numpy().copy()
+        series = trend_df[target_metric].cast(pl.Float64).to_numpy().copy()
         finite = np.isfinite(series)
         if np.count_nonzero(finite) < min_observations:
             return None
@@ -255,7 +261,9 @@ class TemporalMixin(_AnalyzerState):
             if not date_col:
                 return None
 
-            ts_df = self.lazy_df.sort(date_col).filter(pl.col(date_col).is_not_null())
+            ts_df = (
+                _nan_to_null(self.df).lazy().sort(date_col).filter(pl.col(date_col).is_not_null())
+            )
 
             min_date = cast(Any, self.df[date_col].min())  # type: ignore[attr-defined]
             max_date = cast(Any, self.df[date_col].max())  # type: ignore[attr-defined]

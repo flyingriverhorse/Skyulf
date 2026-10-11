@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
@@ -90,6 +90,8 @@ describe('ErrorState', () => {
 });
 
 describe('LoadingState', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it('announces loading as a polite status', () => {
     render(<LoadingState />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading...');
@@ -100,11 +102,15 @@ describe('LoadingState', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Crunching numbers');
   });
 
-  it('hides the decorative loading logo from assistive technology', () => {
-    // The surrounding status text provides the accessible loading announcement.
+  it.each([false, true])('hides the decorative loading logo with reduced motion %s', reducedMotion => {
+    // Both the animated scene and static fallback defer announcements to the status text.
+    vi.spyOn(window, 'matchMedia').mockReturnValue(
+      Object.assign(new EventTarget(), { matches: reducedMotion }) as MediaQueryList,
+    );
     const { container } = render(<LoadingState />);
-    const logo = container.querySelector('video, img');
+    const logo = container.querySelector(reducedMotion ? 'img' : 'svg');
     expect(logo).not.toBeNull();
     expect(logo).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('img')).toBeNull();
   });
 });

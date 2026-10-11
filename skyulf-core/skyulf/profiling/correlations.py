@@ -73,16 +73,8 @@ def _nan_to_null(subset: pl.DataFrame) -> pl.DataFrame:
 
 
 def _filter_constant_columns(subset: pl.DataFrame, numeric_cols: list[str]) -> list[str]:
-    """Return the subset of columns with non-null, non-zero standard deviation."""
-    # Handle constant columns to avoid RuntimeWarning: invalid value encountered in divide
-    # Filter out columns with 0 std dev
-    valid_cols = []
-    for col in numeric_cols:
-        std_val = subset[col].std()
-        # Check for None (all nulls or single value) and 0 variance
-        if std_val is not None and cast(float, std_val) > 1e-9:
-            valid_cols.append(col)
-    return valid_cols
+    """Keep distinct observations without a variance cutoff that depends on units."""
+    return [col for col in numeric_cols if subset[col].min() != subset[col].max()]
 
 
 def _clean_cell(value: object) -> float:
@@ -112,12 +104,17 @@ def _pairwise_correlation_matrix(subset: pl.DataFrame, cols: list[str]) -> list[
 
     exprs = []
     for i, j in pairs:
-        exprs.append(pl.corr(cols[i], cols[j]).alias(f"r__{i}_{j}"))
+        observed = pl.col(cols[i]).is_not_null() & pl.col(cols[j]).is_not_null()
+        left = pl.col(cols[i]).cast(pl.Float64).filter(observed)
+        right = pl.col(cols[j]).cast(pl.Float64).filter(observed)
+        # Center within this pair so unshared outliers cannot erase its variation.
+        # Scale the centered values to avoid underflow/overflow in Pearson products.
+        left = left - left.mean()
+        right = right - right.mean()
         exprs.append(
-            (pl.col(cols[i]).is_not_null() & pl.col(cols[j]).is_not_null())
-            .sum()
-            .alias(f"n__{i}_{j}")
+            pl.corr(left / left.abs().max(), right / right.abs().max()).alias(f"r__{i}_{j}")
         )
+        exprs.append(observed.sum().alias(f"n__{i}_{j}"))
     row = subset.select(exprs).row(0, named=True)
 
     degenerate: list[str] = []
@@ -178,7 +175,6 @@ def calculate_correlations(
         if len(valid_cols) < 2:
             return None
 
-        # Re-select only valid columns
         subset = subset.select(valid_cols)
 
         matrix = _pairwise_correlation_matrix(subset, valid_cols)

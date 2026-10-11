@@ -18,6 +18,7 @@ from sklearn.preprocessing import StandardScaler
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.core.schema import SkyulfSchema
 from skyulf.engines.registry import EngineRegistry
 from skyulf.preprocessing.scaling.maxabs import (
     MaxAbsScalerApplier,
@@ -508,6 +509,40 @@ def test_robust_scaler_with_scaling_false() -> None:
     median = np.median(arr)
     expected = arr - median
     np.testing.assert_allclose(out["a"].to_numpy(), expected, rtol=1e-9, atol=1e-9)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_robust_scaler_disabled_preserves_dtypes_index_and_input(engine) -> None:
+    """Disabling both operations is an identity even for nullable and narrow numeric types."""
+    source = pd.DataFrame(
+        {
+            "integer": [1, 3, 5],
+            "nullable": pd.Series([2, None, 6], dtype="Int64"),
+            "narrow": pd.Series([1.5, 2.5, 4.5], dtype="float32"),
+            "keep": ["b", "a", "c"],
+        }
+    )
+    source.index = pd.Index([8, 2, 8], name="row")
+    original = source.copy(deep=True)
+    native = pl.from_pandas(source) if engine == "polars" else source
+    target = pd.Series([10, 20, 30], index=source.index, name="target")
+    config = {
+        "columns": ["integer", "nullable", "narrow"],
+        "with_centering": False,
+        "with_scaling": False,
+    }
+    calculator = RobustScalerCalculator()
+    params = calculator.fit(native, config)
+    actual, actual_target = RobustScalerApplier().apply((native, target), params)
+    assert SkyulfSchema.from_dataframe(actual) == calculator.infer_output_schema(
+        SkyulfSchema.from_dataframe(native), config
+    )
+    if engine == "polars":
+        assert actual.equals(native)
+    else:
+        pd.testing.assert_frame_equal(actual, original)
+    pd.testing.assert_frame_equal(source, original)
+    pd.testing.assert_series_equal(actual_target, target)
 
 
 def test_robust_scaler_constant_column_scale_guarded_to_one() -> None:

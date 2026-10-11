@@ -384,15 +384,14 @@ def test_indicator_rejects_suffix_outside_the_saved_string_contract(suffix):
 
 
 @pytest.mark.parametrize("engine", ENGINES)
-def test_robust_disabled_flags_retain_existing_engine_dtype(engine, monkeypatch):
-    """Local inspection must preserve the established no-arithmetic dtype behavior."""
+def test_robust_disabled_flags_preserve_input_dtype(engine, monkeypatch):
+    """Saved apply must preserve input dtypes when both operations are disabled."""
     request = _frame(engine, {"x": [1, 2, 3, 4]}, index=[8, 2, 8, -1])
     state = NodeRegistry.get_calculator("RobustScaler")().fit(
         request, {"columns": ["x"], "with_centering": False, "with_scaling": False}
     )
     _poison_fit(monkeypatch, "RobustScaler")
-    expected = request.astype("float64") if engine == "pandas" else request
-    _assert_saved_apply("RobustScaler", state, request, expected, engine)
+    _assert_saved_apply("RobustScaler", state, request, request, engine)
     assert state["center"] is None and state["scale"] is None
 
 

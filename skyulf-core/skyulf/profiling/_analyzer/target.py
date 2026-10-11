@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 from scipy import stats as scipy_stats
 
-from ..correlations import MIN_PAIRWISE_OVERLAP
+from ..correlations import MIN_PAIRWISE_OVERLAP, _nan_to_null
 from ..schemas import BoxPlotStats, CategoryBoxPlot, TargetInteraction
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState, _collect
 
@@ -77,7 +77,9 @@ class TargetMixin(_AnalyzerState):
         for this feature. Return None when no pairs remain, or zero when
         the observed feature is constant; the source frame is unchanged.
         """
-        pairs = self.df.select([target_col, col]).drop_nulls()  # type: ignore[attr-defined]
+        pairs = _nan_to_null(
+            self.df.select([pl.col(target_col), pl.col(col).cast(pl.Float64)])
+        ).drop_nulls()
         global_mean = pairs[col].mean()
         if global_mean is None:
             return None
@@ -172,22 +174,17 @@ class TargetMixin(_AnalyzerState):
 
     def _compute_boxplot_stats(self, group_col: str, value_col: str) -> pl.DataFrame:
         """Compute box-plot stats with a fixed group key, isolating user column names."""
-        return _collect(
-            self.lazy_df.group_by(pl.col(group_col).alias("group")).agg(  # type: ignore[attr-defined]
-                [
-                    pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
-                    pl.col(value_col)
-                    .cast(pl.Float64, strict=False)
-                    .quantile(0.25, interpolation="linear")
-                    .alias("q1"),
-                    pl.col(value_col).cast(pl.Float64, strict=False).median().alias("median"),
-                    pl.col(value_col)
-                    .cast(pl.Float64, strict=False)
-                    .quantile(0.75, interpolation="linear")
-                    .alias("q3"),
-                    pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
-                ]
-            )
+        pairs = _nan_to_null(
+            self.df.select([pl.col(group_col), pl.col(value_col).cast(pl.Float64, strict=False)])
+        )
+        return pairs.group_by(pl.col(group_col).alias("group")).agg(
+            [
+                pl.col(value_col).min().alias("min"),
+                pl.col(value_col).quantile(0.25, interpolation="linear").alias("q1"),
+                pl.col(value_col).median().alias("median"),
+                pl.col(value_col).quantile(0.75, interpolation="linear").alias("q3"),
+                pl.col(value_col).max().alias("max"),
+            ]
         )
 
     def _build_category_plots(
@@ -240,13 +237,8 @@ class TargetMixin(_AnalyzerState):
         value = pl.col(value_col)
         if self.df.schema[value_col].is_decimal():
             value = value.cast(pl.Float64)
-        anova_data = _collect(
-            self.lazy_df.select(  # type: ignore[attr-defined]
-                [pl.col(group_col), value]
-            )
-            .group_by(group_col)
-            .agg(pl.col(value_col))
-        )
+        pairs = _nan_to_null(self.df.select([pl.col(group_col), value]))
+        anova_data = pairs.group_by(group_col).agg(pl.col(value_col))
 
         groups_data = []
         for row in anova_data.iter_rows(named=True):
