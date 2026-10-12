@@ -809,13 +809,17 @@ def test_promote_and_rollback_persist_receipts(case, receipt_format) -> None:
     }
 
 
-def test_rollback_restores_prior_previous_champion_pointer(case) -> None:
+@pytest.mark.parametrize("previous_version", ["2", "3"])
+def test_rollback_restores_prior_previous_champion_pointer(case, previous_version) -> None:
     """Rollback restores the preceding rollback pointer rather than leaving a stale one."""
     client, uri, name, _, _, admission = case
-    client.set_registered_model_alias(name, "previous_champion", "2")
+    if previous_version == "3":
+        source = client.get_model_version(name, "1")
+        client.create_model_version(name, source.source, run_id=source.run_id)
+    client.set_registered_model_alias(name, "previous_champion", previous_version)
     _stage(case)
     receipt = _promote(case)
-    assert receipt.previous_champion_version == "2"
+    assert receipt.previous_champion_version == previous_version
     assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "1"
 
     rollback_promotion(
@@ -825,7 +829,62 @@ def test_rollback_restores_prior_previous_champion_pointer(case) -> None:
         tracking_uri=uri,
         registry_uri=uri,
     )
-    assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "2"
+    assert (
+        str(client.get_model_version_by_alias(name, "previous_champion").version)
+        == previous_version
+    )
+
+
+@pytest.mark.parametrize("unavailable", ["deleted", "denied"])
+def test_rollback_unavailable_previous_target_leaves_registry_unchanged(
+    case, monkeypatch, unavailable
+) -> None:
+    """An unavailable second rollback target must fail before any alias or receipt is written."""
+    client, uri, name, _, _, admission = case
+    source = client.get_model_version(name, "1")
+    previous = client.create_model_version(name, source.source, run_id=source.run_id)
+    client.set_registered_model_alias(name, "previous_champion", previous.version)
+    _stage(case)
+    receipt = _promote(case)
+    assert receipt.previous_champion_version == str(previous.version)
+    if unavailable == "deleted":
+        client.delete_model_version(name, previous.version)
+        expected_error = RegistryModelNotFoundError
+    else:
+        original = mlflow.MlflowClient.get_model_version
+
+        def deny_previous(self, model_name, version, *args, **kwargs):
+            """Inject a registry permission refusal only for the second destination."""
+            if model_name == name and str(version) == str(previous.version):
+                error = mlflow.exceptions.MlflowException("denied")
+                error.error_code = "PERMISSION_DENIED"
+                raise error
+            return original(self, model_name, version, *args, **kwargs)
+
+        monkeypatch.setattr(mlflow.MlflowClient, "get_model_version", deny_previous)
+        expected_error = RegistryAccessError
+    model_before = client.get_registered_model(name)
+    tags_before = {version: client.get_model_version(name, version).tags for version in ("1", "2")}
+
+    with pytest.raises(expected_error):
+        rollback_promotion(
+            receipt,
+            expected_current_version="2",
+            admission=admission,
+            tracking_uri=uri,
+            registry_uri=uri,
+        )
+
+    model_after = client.get_registered_model(name)
+    assert model_after.aliases == model_before.aliases
+    assert {alias: str(version) for alias, version in model_after.aliases.items()} == {
+        "champion": "2",
+        "previous_champion": "1",
+    }
+    assert model_after.tags == model_before.tags
+    assert {
+        version: client.get_model_version(name, version).tags for version in ("1", "2")
+    } == tags_before
 
 
 def test_rollback_rejects_changed_previous_pointer(case) -> None:

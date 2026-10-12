@@ -884,13 +884,20 @@ def rollback_promotion(
         if active_marker(client, receipt.model_name, current) != receipt.event_id:
             raise AliasConflictError("A newer promotion superseded this rollback receipt.")
         _verify_rollback_roles(client, receipt, current, legacy)
-        # The previous version must still exist before changing the alias.
+        # Both rollback destinations must be readable before preparing any writes.
         resolve_model(
             receipt.model_name,
             version=receipt.prior_version,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
         )
+        if receipt.previous_champion_version is not None:
+            resolve_model(
+                receipt.model_name,
+                version=receipt.previous_champion_version,
+                tracking_uri=tracking_uri,
+                registry_uri=registry_uri,
+            )
         reversal = AliasChangeReceipt(
             event_id=uuid4().hex,
             kind="rollback",
