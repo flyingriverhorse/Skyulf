@@ -310,6 +310,8 @@ def test_registered_preprocessor_saved_state_roundtrip(
     config.update(deepcopy(_RECIPES[node]))
     if node == "sentence_embedder":
         config["model_name"] = request.getfixturevalue("native_encoder")
+    if node == "H3Index":
+        pytest.importorskip("h3")
     frame, target = _data(node, engine)
     payload = frame if node == "feature_target_split" else (frame, target)
     calculator = NodeRegistry.get_calculator(node)
