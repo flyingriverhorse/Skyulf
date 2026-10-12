@@ -2,6 +2,7 @@
 
 import importlib
 import math
+from decimal import Decimal
 from typing import Any
 
 import numpy as np
@@ -103,28 +104,60 @@ def _cdf_statistics(reference: Any, current: Any, n: int, m: int) -> tuple[float
     return float(row["ks"]) / (n * m), float(row["transport"] or 0) / (n * m)
 
 
-def _histogram(frame: Any, edges: list[float], size: int) -> np.ndarray:
-    """Reduce clipped reference-quantile bins to at most ten counts."""
+def _histogram(frame: Any, boundaries: list[float | Decimal], size: int) -> np.ndarray:
+    """Reduce midpoint or quantile bins to at most ten counts, including tails."""
     f = spark_functions()
     value = spark_column("value")
+    floating = frame.schema["value"].dataType.typeName() in {"float", "double"}
     bucket = f.lit(0)
-    for edge in edges[1:-1]:
+    for edge in boundaries:
+        if floating and isinstance(edge, Decimal):
+            # Spark compares float/Decimal as double. Round the exact midpoint
+            # upward so a representable value below it stays in the lower bin.
+            rounded = float(edge)
+            edge = math.nextafter(rounded, math.inf) if Decimal(rounded) < edge else rounded
         bucket = bucket + (value >= f.lit(edge)).cast("int")
     rows = frame.select(bucket.alias("bucket")).groupBy("bucket").count().limit(11).collect()
-    counts = np.zeros(len(edges) - 1)
+    counts = np.zeros(len(boundaries) + 1)
     for row in rows:
         counts[row["bucket"]] = row["count"] / size
     return np.where(counts == 0, 0.0001, counts)
 
 
+def _histogram_boundaries(reference: Any) -> list[float | Decimal]:
+    """Match Core's discrete midpoints before falling back to continuous quantiles."""
+    levels = sorted(
+        row["value"] for row in reference.select("value").distinct().limit(11).collect()
+    )
+    if len(levels) > 10:
+        f = spark_functions()
+        percentiles = f.percentile("value", [index / 10 for index in range(11)])
+        return sorted(set(reference.agg(percentiles.alias("edges")).first()["edges"]))[1:-1]
+    dtype = reference.schema["value"].dataType.typeName()
+    if dtype in {"long", "integer", "short", "byte"}:
+        # Parsing (left + right) * 5 at scale 1 gives the exact midpoint without
+        # integer overflow or rounding by the caller's Decimal precision.
+        return [
+            Decimal(f"{(left + right) * 5}e-1")
+            for left, right in zip(levels, levels[1:], strict=False)
+        ]
+    values = np.asarray(levels, dtype=np.float32 if dtype == "float" else np.float64)
+    return np.maximum(values[:-1] / 2 + values[1:] / 2, np.nextafter(values[:-1], np.inf)).tolist()
+
+
 def _histogram_metrics(reference: Any, current: Any, n: int, m: int) -> tuple[float, float]:
-    """Use exact continuous quantiles, matching NumPy percentile interpolation."""
-    f = spark_functions()
-    percentiles = f.percentile("value", [index / 10 for index in range(11)])
-    edges = sorted(set(reference.agg(percentiles.alias("edges")).first()["edges"]))
-    if len(edges) < 2:
+    """Preserve Core's numeric binning and smoothing for both PSI and KL."""
+    # Core converts Decimal columns to float64 before numeric drift calculations.
+    reference, current = (
+        frame.select(spark_column("value").cast("double").alias("value"))
+        if frame.schema["value"].dataType.typeName() == "decimal"
+        else frame
+        for frame in (reference, current)
+    )
+    boundaries = _histogram_boundaries(reference)
+    if not boundaries:
         return 0.0, 0.0
-    expected, actual = _histogram(reference, edges, n), _histogram(current, edges, m)
+    expected, actual = _histogram(reference, boundaries, n), _histogram(current, boundaries, m)
     return float(np.sum((actual - expected) * np.log(actual / expected))), float(
         entropy(actual, expected)
     )
