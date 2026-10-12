@@ -353,6 +353,89 @@ The lock protects only participating jobs. A principal with direct registry
 write permission can bypass it. A crashed Delta admission owner does not
 expire; clear it only after proving the original job cannot publish.
 
+### Recover an interrupted alias operation
+
+An `AliasOutcomeUnknownError` means a registry call may have succeeded before
+its response was lost. Do not rerun training or delete `pending_alias_event`
+to bypass it. First stop all jobs and manual actions that can write this
+model's aliases. Confirm the original run has terminated and cannot retry.
+
+New lifecycle operations save their full recovery intent before publishing
+the pending marker. Use the pending event ID and its destination model
+version from the failed operation's logs and `promotion_<event_id>` tag:
+
+```python
+from skyulf.integrations.mlflow.lifecycle.promotion import (
+    reconcile_alias_change,
+)
+
+outcome = reconcile_alias_change(
+    "catalog.schema.customer_risk",
+    version="7",                     # destination of the interrupted operation
+    event_id="event_id_from_pending_alias_event",
+    admission=admission,              # the same authority used by all writers
+    tracking_uri="databricks",
+    registry_uri="databricks-uc",
+)
+print(outcome)  # "committed" or "aborted"
+```
+
+The function acquires shared admission and reads all four roles: `champion`,
+`challenger`, `previous_champion` and `previous_challenger`. It never sets or
+deletes an alias.
+
+| Observed state | Result |
+| --- | --- |
+| All changed roles match their saved targets; metadata is unchanged or partly completed as planned | Complete and verify the metadata, then clear this operation's pending marker. Return `committed`. |
+| All roles and operation-owned metadata still match their saved starting values | Mark the event `aborted`, verify it, then clear its pending marker. No model is promoted. Retry the original business operation with fresh checks if still wanted. |
+| Some roles changed, a guarded role changed unexpectedly, or metadata contradicts the plan | Raise `AliasConflictError` with observed roles and expected before/after values. Keep the pending marker. |
+| The same repair already completed and its terminal state is still current | Return the same outcome without writing tags or changing the event timestamp. |
+
+Rejection, evaluation-error recording and same-version restaging may change
+only metadata. Unchanged aliases alone cannot prove these operations finished.
+They abort if their metadata is untouched; an already committed event can
+finish its remaining markers. Partly applied metadata without a committed
+event requires manual inspection.
+
+Recovery storage uses `alias_intent` and numbered `alias_intent_0000` slots on
+the destination version. A manifest verifies the complete snapshot's digest;
+each ASCII chunk is at most 256 bytes. The next operation on that version
+reuses these slots only after the pending guard is clear. Compact event tags
+remain available, but a superseded recovery snapshot cannot repair an older
+event. The writer reserves room for intent, final status and event tags before
+preparation and rejects operations exceeding the 50-tag model or model-version
+budget. This follows the [Unity Catalog tag limits](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/migrate-to-uc#tags).
+Existing receipts can eventually exhaust that budget; archive reviewed audit
+evidence before deliberately retiring obsolete tags. Never remove current
+control receipts or pending recovery evidence to make room.
+
+For a partial or historical operation without complete recovery intent:
+
+1. Keep writers stopped. Export the registered-model tags, the destination
+   version's tags, all four alias assignments and the original operation's
+   inputs/logs. A comparison hash does not reconstruct a rejection reason or
+   missing quality-gate metadata.
+2. If Delta admission has a crashed owner, confirm that exact owner belongs
+   to the terminated run. Under exclusive operator control, release only its
+   row, using both `target_id = alias_resource_id(model_name)` and the observed
+   owner in the update condition. Read the row back. Do not clear another
+   owner's claim or introduce a time-based expiry.
+3. Compare every role and marker with the saved intent. Decide explicitly
+   whether to complete the intended operation or restore the starting state.
+   Make any necessary alias corrections under the same admission. Do not
+   invoke reconciliation while holding a second, non-reentrant claim.
+4. For a complete saved intent, release the manual claim with writers still
+   stopped and call `reconcile_alias_change`. It verifies the whole resulting
+   state. A failed call leaves recovery unresolved; do not bypass its guard.
+5. For an older event without a snapshot, automatic recovery is unavailable.
+   Restore aliases **and** status/history/active markers from verified original
+   evidence. Verify a consistent terminal event and control markers before
+   clearing only the matching pending event. If the evidence cannot establish
+   those values, keep the model blocked and recover from an audited registry
+   snapshot with the platform owner.
+6. Read the controlled champion again, then resume the appropriate failed
+   job. Alias repair does not roll back predictions, serving traffic or tables.
+
 Only load trusted registry artifacts: bundle loading deserializes pickle, and
 digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later

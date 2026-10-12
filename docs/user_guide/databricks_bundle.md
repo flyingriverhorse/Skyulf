@@ -1592,6 +1592,12 @@ Skyulf marks an alias transition as pending before writing it; automatic
 training and scoring stop until that pending event is reconciled. An existing
 champion alias set outside this controlled lifecycle also needs reconciliation
 before controlled champion scoring or promotion can use it.
+For a failed controlled operation, use the
+[alias recovery procedure](mlflow_registry.md#recover-an-interrupted-alias-operation)
+with the original destination version, pending event ID and shared admission.
+It completes fully applied changes or aborts untouched changes; mixed roles
+remain blocked for operator inspection. It does not change serving traffic or
+prediction tables, and it cannot adopt an uncontrolled alias automatically.
 
 For example, a regression project can select its gate in the generated config:
 
