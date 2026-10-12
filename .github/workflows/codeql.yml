@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 2
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.4
+        uses: github/codeql-action/init@v4.38.2
         with:
           languages: ${{ matrix.language }}
           build-mode: none
@@ -45,4 +45,4 @@ jobs:
       # Python doesn't require an explicit build step for CodeQL; the JS/TS
       # analysis is source-only too (no bundler build needed for CodeQL).
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.4
+        uses: github/codeql-action/analyze@v4.38.2
