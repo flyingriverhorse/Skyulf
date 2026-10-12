@@ -93,8 +93,11 @@ starting those jobs. This also prepares `retraining_requests`, so the first
 automatic training request can use the existing table. Grant the runtime identity
 the required catalog/schema access and table read/write privileges. Reusing a
 compatible store requires no schema, table or view creation SQL. For older stores,
-rerun owner initialization to add the missing request table and upgrade its
-isolation if necessary; normal runs refuse incompatible schemas or weak isolation.
+rerun owner initialization before upgrading producers without creation privileges
+to add the missing request table and upgrade its isolation if necessary. Otherwise
+their first enrollment or monitoring run needs to create that missing table,
+even if no automatic training request is made. Normal runs refuse incompatible
+schemas or weak isolation.
 
 ## Configure the one shared dashboard
 
