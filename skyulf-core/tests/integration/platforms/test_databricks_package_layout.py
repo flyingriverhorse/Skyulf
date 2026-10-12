@@ -37,17 +37,18 @@ GROUPS = {
         ("scoring.batch.batch", "batch"),
     ],
 )
-def test_responsibility_subpackages_preserve_legacy_identity(canonical, legacy):
-    """Deeper package boundaries must not fork objects used by deployed clients."""
-    assert importlib.import_module(f"{PACKAGE}.{canonical}") is importlib.import_module(
-        f"{PACKAGE}.{legacy}"
-    )
+def test_responsibility_subpackages_replace_flat_imports(canonical, legacy):
+    """The direct implementation remains importable after its flat alias is retired."""
+    assert importlib.import_module(f"{PACKAGE}.{canonical}").__name__ == f"{PACKAGE}.{canonical}"
+    assert importlib.util.find_spec(f"{PACKAGE}.{legacy}") is None
 
 
 def test_runtime_root_contains_only_package_entrypoint():
     """Operators can find runtime responsibilities without scanning flat modules."""
     assert {path.name for path in PACKAGE_ROOT.glob("*.py")} == {"__init__.py"}
     assert {path.name for path in PACKAGE_ROOT.iterdir() if path.is_dir()} >= GROUPS
+    assert not list((PACKAGE_ROOT / "_compat").glob("*.py"))
+    assert all(Path(path).name != "_compat" for path in importlib.import_module(PACKAGE).__path__)
 
 
 @pytest.mark.parametrize("promotion_first", [True, False])
@@ -75,24 +76,101 @@ def test_canonical_import_order_preserves_pickled_class_identity(promotion_first
     assert result.returncode == 0, result.stderr
 
 
-def test_all_legacy_modules_resolve_to_canonical_modules():
-    """Compatibility imports must share module globals used by monkeypatch callers."""
-    aliases = list((PACKAGE_ROOT / "_compat").glob("*.py"))
-    assert aliases
-    for alias in aliases:
-        if alias.stem == "__init__":
-            continue
-        legacy = importlib.import_module(f"{PACKAGE}.{alias.stem}")
-        assert legacy.__name__.removeprefix(PACKAGE + ".").split(".")[0] in GROUPS
-        canonical = importlib.import_module(legacy.__name__)
-        assert legacy is canonical
+@pytest.mark.parametrize(
+    "retired",
+    [
+        "_batch_manifest",
+        "_contracts",
+        "_lifecycle_data",
+        "_lifecycle_state",
+        "_project_files",
+        "_project_recipes",
+        "admission",
+        "batch",
+        "branch_notebook",
+        "branch_tasks",
+        "cdf_recovery",
+        "competition_evaluation",
+        "competition_project",
+        "competition_training",
+        "decision_thresholds",
+        "delta",
+        "delta_admission",
+        "evaluation_chart_data",
+        "evaluation_chart_report",
+        "evaluation_chart_runs",
+        "evaluation_chart_task",
+        "evaluation_charts",
+        "explanation_report",
+        "job_output",
+        "job_runtime",
+        "lifecycle_tasks",
+        "model_set_batch",
+        "model_set_output",
+        "model_set_project",
+        "model_set_quality",
+        "model_set_release",
+        "model_set_stages",
+        "monitoring_config",
+        "monitoring_model_set",
+        "monitoring_output",
+        "monitoring_reference",
+        "monitoring_registration",
+        "monitoring_source_evidence",
+        "monitoring_sources",
+        "monitoring_store",
+        "monitoring_tasks",
+        "notebook_diagnostics",
+        "performance_actions",
+        "performance_policy",
+        "performance_retraining",
+        "prediction_output",
+        "project",
+        "project_checks",
+        "retraining_data",
+        "retraining_requests",
+        "retraining_task",
+        "scoring_pre_split",
+        "scoring_recovery",
+        "spark_monitoring_drift",
+        "spark_monitoring_job",
+        "spark_monitoring_metrics",
+        "spark_monitoring_probability",
+        "spark_monitoring_quality",
+        "spark_monitoring_reference",
+        "spark_monitoring_sources",
+        "spark_monitoring_windows",
+        "spark_retraining_data",
+        "spark_scoring",
+        "threshold_cv",
+        "threshold_training",
+        "training_dates",
+        "training_node_notebook",
+        "training_node_output",
+        "training_nodes",
+        "training_parameters",
+        "weight_config",
+        "workflow_config",
+    ],
+)
+def test_retired_flat_modules_do_not_resolve(retired):
+    """Removed notebook import paths must fail instead of silently routing to another module."""
+    name = f"{PACKAGE}.{retired}"
+    assert importlib.util.find_spec(name) is None
+    with pytest.raises(ModuleNotFoundError) as error:
+        importlib.import_module(name)
+    assert error.value.name == name
 
 
-def test_retired_training_pickle_path_is_not_redirected():
+@pytest.mark.parametrize(
+    "module, name",
+    [("local_retraining", "LocalTrainingSpec"), ("monitoring_config", "MonitorConfig")],
+)
+def test_retired_training_pickle_path_is_not_redirected(module, name):
     """Old saved class paths fail clearly rather than silently reviving removed modules."""
     with pytest.raises(ModuleNotFoundError) as error:
-        pickle.loads(b"cskyulf.integrations.databricks.local_retraining\nLocalTrainingSpec\n.")
-    assert error.value.name == f"{PACKAGE}.local_retraining"
+        pickle.loads(f"c{PACKAGE}.{module}\n{name}\n.".encode())
+    assert error.value.name == f"{PACKAGE}.{module}"
 
 
 @pytest.mark.parametrize(

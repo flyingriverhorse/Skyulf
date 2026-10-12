@@ -18,7 +18,6 @@ Find implementation modules by responsibility:
 | `scoring/incremental/` | History, incremental prediction and recovery |
 | `scoring/shared/` | Prediction output contracts and pre-split scoring transforms |
 | `observability/monitoring/` | Monitoring configuration, registration, sources and storage |
-| `observability/monitoring/local/` | Bounded local monitoring and metrics |
 | `observability/monitoring/spark/` | Distributed drift, quality, metrics and windows |
 | `observability/monitoring/performance/` | Performance policy, actions and retraining evidence |
 | `observability/charts/` | Evaluation chart data, runs and rendering |
@@ -32,15 +31,25 @@ Find implementation modules by responsibility:
 
 New code imports modules from these packages, for example
 `skyulf.integrations.databricks.jobs.shared.job_runtime` or
-`skyulf.integrations.databricks.training.fitting.local_retraining`.
+`skyulf.integrations.databricks.training.fitting.candidate`.
 The public objects exported by `skyulf.integrations.databricks` remain available.
 
-`_compat/` preserves previous flat module paths used by deployed notebooks and
-serialized model artifacts. The root package adds that directory to `__path__`;
-each compatibility module aliases the canonical module in `sys.modules`. Both
-paths therefore share the same classes and module globals, including monkeypatches.
-Aliases load on demand; importing the root does not load every runtime module.
-Keep implementation changes in the responsibility packages, not in `_compat/`.
+Previous flat module paths and the `_compat` package have been removed. Update
+deployed notebooks and dynamic import or monkeypatch paths to the owning package:
+
+| Previous import | Current import |
+| --- | --- |
+| `skyulf.integrations.databricks.job_runtime` | `skyulf.integrations.databricks.jobs.shared.job_runtime` |
+| `skyulf.integrations.databricks.batch` | `skyulf.integrations.databricks.scoring.batch.batch` |
+| `skyulf.integrations.databricks.monitoring_config` | `skyulf.integrations.databricks.observability.monitoring.monitoring_config` |
+| `skyulf.integrations.databricks.training_dates` | `skyulf.integrations.databricks.data.training.training_dates` |
+
+Artifacts that serialize a removed module path can raise `ModuleNotFoundError`
+when loaded. Load those artifacts in their original environment and create a
+replacement using the current code before upgrading their jobs. A fitted
+pipeline's exact runtime-version check remains in force; it does not protect all
+outer MLflow model pickles from removed import paths. Current model artifacts
+serialize the owning modules directly. Importing the root remains lazy.
 
 Put a helper beside its owning domain. Use that domain's `shared/` package when
 multiple components in the domain reuse it; use the top-level `shared/` only for

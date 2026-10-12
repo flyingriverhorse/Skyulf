@@ -1,10 +1,6 @@
 """Optional Databricks batch and Delta integrations."""
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-# Keep old module imports available without loading every runtime component.
-__path__ = [*__path__, str(Path(__file__).with_name("_compat"))]
 
 from .data.training.training_dates import TrainingDateSpec
 from .scoring.batch.batch import BatchResult, BatchSpec, run_batch
@@ -62,7 +58,7 @@ _BRANCH_EXPORTS = {
 
 
 def __getattr__(name: str) -> Any:
-    """Load training orchestration only after low-level alias imports have finished."""
+    """Load branch orchestration lazily to avoid promotion/admission import cycles."""
     if name not in _BRANCH_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     from .training import branches  # noqa: PLC0415 - avoid promotion/admission import cycle
