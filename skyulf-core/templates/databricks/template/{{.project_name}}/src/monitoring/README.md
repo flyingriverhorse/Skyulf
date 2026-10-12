@@ -66,6 +66,7 @@ for deliberately refreshing view definitions.
 | `current_health` (view) | Create if absent | Reuse; read inventory and latest applicable observation. |
 | `metric_history` (view) | Create if absent | Reuse; expand stored report metrics for dashboard queries. |
 | `performance_actions` (Delta) | Create if absent | Append request and skip receipts without rewriting observations. |
+| `retraining_requests` (Delta) | Create if absent with Serializable isolation | Retain request identities, submission receipts and a shared cooldown gate per training job. |
 | `performance_history` (view) | Create if absent | Reuse; join performance evidence with the latest applicable action. |
 | `monitoring_issues` (view) | Create if absent | Reuse; read current health and recorded quality, drift and active-policy issues. |
 | `model_version_details` (view) | Create if absent | Reuse; read concrete version lineage and bounded metadata snapshots from existing reports. |
@@ -80,11 +81,20 @@ metric metadata. They are prepared once for that identity and reused; a new
 model/training identity can require new reference tables. Ordinary monitoring
 observations append to the shared results table, not to new per-run tables.
 Existing foreign objects or incompatible table schemas are rejected.
-Store initialization sets inventory isolation to Serializable. Producer
+Store initialization sets inventory and retraining-request isolation to Serializable. Producer
 registrations retry optimistic Delta conflicts at most three times; exhausted
 conflicts and other errors remain visible. Each project monitoring job serializes
 its own observations; independent projects share the same store. An inventory read
 never writes its older snapshot back over another repository's configuration update.
+
+For jobs without schema/table creation privileges, have the store owner run
+`initialize_monitoring_store(spark, monitoring_catalog, monitoring_schema)` before
+starting those jobs. This also prepares `retraining_requests`, so the first
+automatic training request can use the existing table. Grant the runtime identity
+the required catalog/schema access and table read/write privileges. Reusing a
+compatible store requires no schema, table or view creation SQL. For older stores,
+rerun owner initialization to add the missing request table and upgrade its
+isolation if necessary; normal runs refuse incompatible schemas or weak isolation.
 
 ## Configure the one shared dashboard
 

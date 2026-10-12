@@ -124,10 +124,16 @@ def ensure_owned_object(spark: Any, name: str) -> bool:
 
 def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     """Provision only the explicit central namespace, preserving foreign objects."""
+    from ...lifecycle.retraining_requests import REQUEST_SCHEMA  # noqa: PLC0415
+
     namespace = store_namespace(catalog, schema)
+    tables = {
+        "model_inventory": INVENTORY_SCHEMA,
+        "monitoring_results": RESULT_SCHEMA,
+        "retraining_requests": REQUEST_SCHEMA,
+    }
     names = (
-        "model_inventory",
-        "monitoring_results",
+        *tables,
         "current_health",
         "metric_history",
         "performance_actions",
@@ -137,24 +143,29 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     )
     for name in names:
         ensure_owned_object(spark, f"{namespace}.{name}")
-    for name, ddl in (("model_inventory", INVENTORY_SCHEMA), ("monitoring_results", RESULT_SCHEMA)):
+    for name, ddl in tables.items():
         full_name = f"{namespace}.{name}"
         if spark.catalog.tableExists(full_name):
             expected = spark.createDataFrame([], schema=ddl).schema.simpleString()
             if spark.table(full_name).schema.simpleString() != expected:
                 raise ValueError(f"Monitoring table schema differs: {full_name}.")
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {table_name(namespace)}")
-    for name, ddl in (("model_inventory", INVENTORY_SCHEMA), ("monitoring_results", RESULT_SCHEMA)):
-        isolation = ", 'delta.isolationLevel' = 'Serializable'" if name == "model_inventory" else ""
+    for name, ddl in tables.items():
+        isolation = (
+            ", 'delta.isolationLevel' = 'Serializable'"
+            if name in {"model_inventory", "retraining_requests"}
+            else ""
+        )
         spark.sql(
             f"CREATE TABLE IF NOT EXISTS {table_name(namespace + '.' + name)} ({ddl}) "
             f"USING DELTA TBLPROPERTIES ('{PROPERTY}' = '{OWNER}'{isolation})"
         )
-    inventory = table_name(f"{namespace}.model_inventory")
-    if _inventory_isolation(spark, inventory) != "Serializable":
-        spark.sql(
-            f"ALTER TABLE {inventory} SET TBLPROPERTIES ('delta.isolationLevel' = 'Serializable')"
-        )
+    for name in ("model_inventory", "retraining_requests"):
+        target = table_name(f"{namespace}.{name}")
+        if _inventory_isolation(spark, target) != "Serializable":
+            spark.sql(
+                f"ALTER TABLE {target} SET TBLPROPERTIES ('delta.isolationLevel' = 'Serializable')"
+            )
     from .performance.performance_actions import initialize_performance_actions  # noqa: PLC0415
 
     initialize_performance_actions(spark, namespace)
@@ -170,9 +181,10 @@ def ensure_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     """Create missing shared objects; reuse compatible stores without replacement DDL.
 
     First use requires schema/table/view creation privileges. Existing tables
-    must already have the current schema and Serializable inventory isolation;
+    must have current schemas and Serializable inventory/request isolation;
     explicit owner-run initialization remains responsible for upgrades.
     """
+    from ...lifecycle.retraining_requests import REQUEST_SCHEMA  # noqa: PLC0415
     from .performance.performance_actions import ACTION_SCHEMA  # noqa: PLC0415
 
     namespace = store_namespace(catalog, schema)
@@ -180,6 +192,7 @@ def ensure_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
         "model_inventory": INVENTORY_SCHEMA,
         "monitoring_results": RESULT_SCHEMA,
         "performance_actions": ACTION_SCHEMA,
+        "retraining_requests": REQUEST_SCHEMA,
     }
     views = monitoring_views(namespace)
     missing = [
@@ -206,11 +219,13 @@ def _compatible_store_object(spark: Any, namespace: str, name: str, ddl: str | N
         if spark.table(full_name).schema.simpleString() != expected:
             raise ValueError(f"Monitoring table schema differs: {full_name}.")
     if (
-        name == "model_inventory"
+        name in {"model_inventory", "retraining_requests"}
         and _inventory_isolation(spark, table_name(full_name)) != "Serializable"
     ):
         raise ValueError(
             "Initialize the central inventory with Serializable isolation before registration."
+            if name == "model_inventory"
+            else "Retraining requests require Serializable Delta isolation."
         )
     return True
 
@@ -222,7 +237,7 @@ def _create_store_object(
     target = table_name(f"{namespace}.{name}")
     properties = f"'{PROPERTY}' = '{OWNER}'"
     if ddl is not None:
-        if name == "model_inventory":
+        if name in {"model_inventory", "retraining_requests"}:
             properties += ", 'delta.isolationLevel' = 'Serializable'"
         statement = f"CREATE TABLE IF NOT EXISTS {target} ({ddl}) USING DELTA"
         statement += f" TBLPROPERTIES ({properties})"

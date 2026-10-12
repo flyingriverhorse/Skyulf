@@ -8,6 +8,7 @@ import pytest
 from test_monitoring_model_set import component
 from test_monitoring_registration import settings, workflow
 
+from skyulf.integrations.databricks.lifecycle.retraining_requests import REQUEST_SCHEMA
 from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
 from skyulf.integrations.databricks.observability.monitoring.performance.performance_actions import (
     ACTION_SCHEMA,
@@ -83,6 +84,7 @@ def existing_store():
         "model_inventory": store.INVENTORY_SCHEMA,
         "monitoring_results": store.RESULT_SCHEMA,
         "performance_actions": ACTION_SCHEMA,
+        "retraining_requests": REQUEST_SCHEMA,
         **dict.fromkeys(store.monitoring_views("ops.monitoring"), "view"),
     }
     spark.objects = {
@@ -98,13 +100,32 @@ def mutations(spark):
 
 
 def test_fresh_store_is_created_once_and_second_producer_needs_no_ddl():
-    """Two model projects must share eight objects without replacing each other's views."""
+    """Two model projects must share nine objects without replacing each other's views."""
     spark = StoreSpark()
     assert ensure(spark) == "ops.monitoring"
-    assert len(spark.objects) == 8
+    assert len(spark.objects) == 9
     assert not any("REPLACE" in sql or "ALTER" in sql for sql in mutations(spark))
     spark.statements.clear()
     assert ensure(spark) == "ops.monitoring"
+    assert mutations(spark) == []
+
+
+def test_bootstrap_prepares_retraining_requests_before_runtime_use():
+    """The first automatic request must reuse owner-provisioned storage without CREATE access."""
+    from skyulf.integrations.databricks.lifecycle.retraining_requests import (
+        REQUEST_SCHEMA,
+        _RequestStore,
+    )
+
+    spark = StoreSpark()
+    ensure(spark)
+    name = "ops.monitoring.retraining_requests"
+    assert name in spark.objects
+    assert spark.objects[name]["schema"] == REQUEST_SCHEMA
+    assert spark.objects[name]["isolation"] == "Serializable"
+    spark.statements.clear()
+    requests = _RequestStore(spark, "ops.monitoring")
+    assert requests.name == name
     assert mutations(spark) == []
 
 
@@ -116,6 +137,38 @@ def test_partial_store_creates_only_missing_objects():
     ddl = mutations(spark)
     assert len([sql for sql in ddl if sql.startswith("CREATE VIEW")]) == 1
     assert all("REPLACE" not in sql and "CREATE TABLE" not in sql for sql in ddl)
+
+
+@pytest.mark.parametrize("operation", ["ensure_monitoring_store", "initialize_monitoring_store"])
+@pytest.mark.parametrize("defect", ["owner", "schema"])
+def test_retraining_table_preflight_refuses_incompatible_storage(operation, defect):
+    """An unrelated or incompatible request table must block setup before sibling DDL."""
+    spark = existing_store()
+    spark.objects["ops.monitoring.retraining_requests"][defect] = "incompatible"
+    with pytest.raises(ValueError, match="ownership|schema differs"):
+        getattr(store, operation)(spark, "ops", "monitoring")
+    assert mutations(spark) == []
+
+
+def test_existing_retraining_table_requires_serializable_isolation():
+    """Runtime bootstrap must refuse a weak gate instead of changing owner-managed storage."""
+    spark = existing_store()
+    spark.objects["ops.monitoring.retraining_requests"]["isolation"] = "WriteSerializable"
+    with pytest.raises(ValueError, match="Retraining requests require Serializable"):
+        ensure(spark)
+    assert mutations(spark) == []
+
+
+def test_old_store_adds_only_retraining_requests():
+    """An owner can add the request gate without replacing any existing monitoring data."""
+    spark = existing_store()
+    del spark.objects["ops.monitoring.retraining_requests"]
+    ensure(spark)
+    ddl = mutations(spark)
+    tables = [sql for sql in ddl if sql.startswith("CREATE TABLE")]
+    assert len(tables) == 1 and "retraining_requests" in tables[0]
+    assert "'delta.isolationLevel' = 'Serializable'" in tables[0]
+    assert not any("CREATE VIEW" in sql or "ALTER" in sql or "REPLACE" in sql for sql in ddl)
 
 
 def test_old_store_adds_only_investigation_views():
@@ -170,7 +223,7 @@ def test_scoring_producer_bootstraps_before_first_inventory_merge(layout):
     result = register_scoring_monitor(spark, workflow(training_layout=layout), settings(), payload)
     assert result is not None
     assert result["inventory_table"] == "ops.monitoring.model_inventory"
-    assert len(spark.objects) == 8
+    assert len(spark.objects) == 9
     assert mutations(spark)[-1].startswith("MERGE")
 
 
@@ -217,7 +270,7 @@ def test_activation_bootstraps_before_first_inventory_merge():
     )
     assert result is not None
     assert result["inventory_table"] == "ops.monitoring.model_inventory"
-    assert len(spark.objects) == 8
+    assert len(spark.objects) == 9
 
 
 @pytest.mark.parametrize("invalid", ["activation", "version", "settings", "receipt"])
@@ -284,7 +337,7 @@ def test_fresh_scheduled_project_creates_empty_store_without_models():
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
     assert run_project_monitoring_notebook(spark, dbutils) == {"status": "no_active_models"}
-    assert len(spark.objects) == 8
+    assert len(spark.objects) == 9
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,10 @@
 """Shared monitoring persistence binds snapshots and preserves unobserved models."""
 
+import os
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 
@@ -197,3 +200,74 @@ def test_inventory_read_is_bounded_and_rejects_tampered_config(monkeypatch):
     collect.return_value = [row | {"enabled": False}]
     with pytest.raises(ValueError, match="integrity"):
         store.load_enrolled_models(spark, "ops.monitoring")
+
+
+@pytest.fixture
+def native_store_namespace(delta_spark):
+    """Isolate real store initialization and clean only this test's owned objects."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+    from skyulf.integrations.databricks.shared._contracts import table_name
+
+    catalog = os.environ.get("SKYULF_TEST_CATALOG", "spark_catalog")
+    schema = f"skyulf_store_test_{uuid4().hex}"
+    namespace = store.store_namespace(catalog, schema)
+    assert not delta_spark.catalog.databaseExists(namespace)
+    try:
+        yield catalog, schema
+    finally:
+        if delta_spark.catalog.databaseExists(namespace):
+            allowed = {
+                "model_inventory",
+                "monitoring_results",
+                "performance_actions",
+                "retraining_requests",
+                *store.monitoring_views(namespace),
+            }
+            for item in delta_spark.catalog.listTables(namespace):
+                if not item.isTemporary:
+                    assert item.name in allowed
+                    assert store.ensure_owned_object(delta_spark, f"{namespace}.{item.name}")
+            delta_spark.sql(f"DROP SCHEMA {table_name(namespace)} CASCADE").collect()
+            assert not delta_spark.catalog.databaseExists(namespace)
+
+
+@pytest.mark.parametrize("operation", ["ensure_monitoring_store", "initialize_monitoring_store"])
+def test_native_preprovisioned_store_accepts_requests_without_ddl(
+    delta_spark, native_store_namespace, operation
+):
+    """Both setup paths must prepare real Delta requests that runtime can use without DDL."""
+    from skyulf.integrations.databricks.lifecycle.retraining_requests import _RequestStore
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    catalog, schema = native_store_namespace
+    namespace = getattr(store, operation)(delta_spark, catalog, schema)
+    statements = []
+
+    def runtime_sql(statement):
+        """Reject setup SQL while executing metadata reads and writes on real Delta."""
+        statements.append(statement)
+        assert not statement.lstrip().upper().startswith(("CREATE", "ALTER", "DROP"))
+        return delta_spark.sql(statement)
+
+    runtime = SimpleNamespace(
+        sql=runtime_sql,
+        catalog=delta_spark.catalog,
+        table=delta_spark.table,
+        createDataFrame=delta_spark.createDataFrame,
+    )
+    assert store.ensure_monitoring_store(runtime, catalog, schema) == namespace
+    requests = _RequestStore(runtime, namespace)
+    row = {
+        "row_id": "request:17:" + "a" * 64,
+        "job_id": 17,
+        "request_id": "a" * 64,
+        "status": "intent",
+        "evidence_json": '{"model_version":"2"}',
+        "created_at_ms": 1000,
+        "submitted_at_ms": None,
+        "run_id": None,
+    }
+    requests.record(row)
+    requests.record(row | {"evidence_json": '{"later":true}'})
+    assert requests.read(row["row_id"]) == row
+    assert sum(statement.startswith("MERGE") for statement in statements) == 2
