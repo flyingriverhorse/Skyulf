@@ -523,15 +523,6 @@ checksum. Unknown versions, malformed fields, configuration/state disagreement a
 checksum mismatches are rejected. The checksum covers step order and configuration;
 it detects corruption but does not authenticate a producer.
 
-The runnable repository example also exercises Spark fit and application-owned
-file persistence. From the repository root, with Java configured as above:
-
-```powershell
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_feature_engineering.py --state-path features.json
-```
-
-`skyulf-core/examples/spark_feature_engineering.py` owns and closes its local Spark
-session. Its `run_example(spark, state_path)` function accepts an existing session.
 Use representative nulls, dtypes and partitions when checking your own recipe;
 verify prediction output by record key rather than relying on Spark row order.
 

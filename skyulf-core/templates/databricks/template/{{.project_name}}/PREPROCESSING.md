@@ -211,12 +211,10 @@ actual groups/history and are reported separately.
 The probe is explicitly invoked. It does not run automatically in training,
 scoring or serving, and it does not grant Spark/REST eligibility.
 
-## Why does the standalone serving demo have a different YAML shape?
+## Can I define pipeline steps directly in training.yml?
 
-The repository's `examples/databricks_raw_serving/config.yml` is a small Core API
-demo. Its Python code passes `pipeline.preprocessing` and `pipeline.modeling`
-directly to `fit_workflow`. The Bundle loader deliberately rejects those
-nonempty inline definitions in `training.yml`: steps come from
+No. The Bundle loader rejects nonempty `pipeline.preprocessing` and
+`pipeline.modeling` definitions in `training.yml`: steps come from
 `config/preprocessing.yml`, and the model comes from `models.<name>.model`.
 Use the placement above for this generated project.
 Do not define the same step in both YAML and Python.
@@ -234,8 +232,5 @@ The configured `prediction_table` is a destination for the separate score job;
 its presence alone does not create or populate the table. Training may still
 write its own dataset snapshots and lifecycle evidence.
 
-The demo's `write_batch_predictions` switch and `training_batch_predictions`
-output are demo-only. `status: skipped` means the optional training-time write
-was not requested. It says nothing about the demo's separate REST/SQL tasks,
-which explicitly create their own prediction tables. Endpoint callers can
-consume predictions without writing any table; see [SERVING.md](SERVING.md).
+Endpoint callers can consume predictions without writing any table;
+see [SERVING.md](SERVING.md).

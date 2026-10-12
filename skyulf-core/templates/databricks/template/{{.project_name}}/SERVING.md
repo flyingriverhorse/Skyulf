@@ -233,14 +233,6 @@ configuration does not itself create a table. REST calls and SQL functions
 return results. A separate caller decides whether to publish them with a
 DataFrame write or `CREATE TABLE ... AS SELECT`.
 
-The repository example `skyulf-core/examples/databricks_raw_serving/` demonstrates
-one synthetic customer classifier with imputation, interaction features, scaling
-and category encoding. Its optional training-time batch write is disabled by
-default. Separate tasks call the same concrete model through REST and a typed
-SQL function, write two prediction tables and compare keys and probabilities.
-Read its README for file responsibilities, commands and the small-data limits
-of the example REST caller.
-
 ## Generate, train and set up an online Bundle
 
 From a Skyulf checkout, save these selections as `online-init.json`, completing

@@ -73,10 +73,9 @@ np.testing.assert_allclose(predict_local(prepared, features_bundle)["prediction"
                            output["prediction"], atol=1e-12)
 ```
 
-The repository also includes `skyulf-core/examples/inference_bundle.py`. Run
-it from the root with `.venv/Scripts/python.exe skyulf-core/examples/inference_bundle.py`.
-Add `--bundle-dir path/to/new-model` to retain the artifact. An existing
-destination is rejected, so an earlier package cannot be overwritten accidentally.
+To retain the artifact, replace the temporary directory above with a new
+destination directory. `save_bundle` rejects an existing destination, so an
+earlier package cannot be overwritten accidentally.
 
 ## Input and output contracts
 
@@ -187,19 +186,6 @@ rows = predictions.orderBy("id").collect()
 assert [row.id for row in rows] == [101, 102]
 np.testing.assert_allclose([row.prediction for row in rows], [40.0, 20.0], atol=1e-12)
 ```
-
-The runnable `skyulf-core/examples/spark_batch_inference.py` example trains a
-small pandas classification model, builds a bundle, and runs the same keyed
-batch through either mode:
-
-```text
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode native_features
-.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode python_pipeline
-```
-
-Both modes return `prediction`, `probability_0` and `probability_1` in the
-declared class order. A production job can replace the final `show()` action
-with a Delta-table write or another caller-owned sink.
 
 Production consumers receive a Spark DataFrame and can select their own action
 or output sink. Output rows have no guaranteed physical order; match them by

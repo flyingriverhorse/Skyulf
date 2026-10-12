@@ -690,9 +690,9 @@ metric tables directly.
   replay/failure recovery, baseline/version changes, metric parity and measured
   memory/runtime. Training/scoring engine capacity is a separate workstream.
 
-The current usable policy example and field explanations are in the
-[monitoring guide](../../skyulf-core/examples/databricks_monitoring/README.md#enable-each-independent-model-repository)
-and the generated producer README. The guide documents exact/bounded statistical
+The generated
+[monitoring guide](../../skyulf-core/templates/databricks/template/{{.project_name}}/src/monitoring/README.md#enable-each-independent-model-repository)
+contains the current policy example and field explanations. It documents exact/bounded statistical
 methods, unsupported types/recipes, explicit reference preparation for legacy
 models, a paused-by-default independent schedule and the late-label revisit horizon.
 
