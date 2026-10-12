@@ -186,6 +186,27 @@ def test_polars_engine_to_numpy_from_dataframe(pl_df):
     np.testing.assert_array_equal(result, pl_df.to_numpy())
 
 
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize(
+    "signed",
+    [
+        pl.Series([1, -2], dtype=pl.Int64),
+        pl.Series([1, -2], dtype=pl.Int8),
+        pl.Series([1, None], dtype=pl.Int64),
+    ],
+)
+@pytest.mark.parametrize("with_flag", [False, True])
+def test_polars_engine_to_numpy_keeps_float64_for_signed_and_uint64_mix(signed, with_flag, wrapped):
+    """A model matrix mixing UInt64 with signed integers must convert on Polars 1 and 2 alike."""
+    columns = {"signed": signed, "unsigned": pl.Series([2**64 - 1, 1], dtype=pl.UInt64)}
+    if with_flag:
+        columns["flag"] = pl.Series([True, False])
+    frame = pl.DataFrame(columns)
+    result = PolarsEngine.to_numpy(SkyulfPolarsWrapper(frame) if wrapped else frame)
+    assert result.dtype == np.float64
+    np.testing.assert_array_equal(result, frame.cast(pl.Float64).to_numpy())
+
+
 def test_polars_engine_to_numpy_from_plain_list():
     """to_numpy should fall back to np.array for objects without to_numpy."""
     result = PolarsEngine.to_numpy([1, 2, 3])

@@ -35,6 +35,15 @@ POLARS_NUMERIC_BOOL_DTYPES: frozenset = frozenset(
 POLARS_NUMERIC_DTYPES: frozenset = POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,))
 
 
+def _unifies_as_int128(dtypes: list[Any]) -> bool:
+    """Recognize the UInt64-with-signed mix that Polars 2 widens to Int128, not Float64."""
+    return (
+        pl.UInt64 in dtypes
+        and any(dtype.is_signed_integer() for dtype in dtypes)
+        and all(dtype.is_integer() or dtype == pl.Boolean for dtype in dtypes)
+    )
+
+
 def _retain_projection_height(df: pl.DataFrame, height: int) -> pl.DataFrame:
     """Restore source rows when Polars drops height during an empty projection."""
     if df.width == 0:
@@ -189,6 +198,10 @@ class PolarsEngine(BaseEngine):
             # Preserve pandas' float64 dtype for zero-column feature matrices.
             if getattr(df, "width", None) == 0:
                 return np.empty((df.height, 0), dtype=np.float64)
+            dtypes = getattr(df, "dtypes", None)
+            if isinstance(dtypes, list) and _unifies_as_int128(dtypes):
+                # Polars 2 has no NumPy conversion for Int128; earlier versions returned float64.
+                return df.cast(pl.Float64).to_numpy()
             return df.to_numpy()
         return np.array(df)
 
