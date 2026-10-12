@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -102,6 +103,64 @@ def test_version_isolation_and_failed_http_counts(spark):
     assert [r.databricks_request_id for r in predictions.collect()] == ["ok"]
     assert summary["request_count"] == 2
     assert summary["error_count"] == 1
+
+
+def test_operational_summary_keeps_status_classes_and_latency_bucket_boundaries(spark):
+    """Every captured error and every timed response must belong to exactly one bucket."""
+    durations = [0, 5, 10, 25, 50, 100, 250, 500, 1000, None]
+    statuses = [200, 201, 400, 404, 500, 503, 302, 150, 650, 200]
+    rows = [(status, duration, NOW) for status, duration in zip(statuses, durations, strict=True)]
+    payloads = spark.createDataFrame(
+        rows, "status_code int, execution_duration_ms long, request_time timestamp"
+    )
+    summary, observed = serving_payloads._summary(payloads, spark.range(7))
+    assert summary["request_count"] == 10 and summary["success_count"] == 3
+    assert summary["status_4xx_count"] == summary["status_5xx_count"] == 2
+    assert summary["status_other_count"] == 3
+    classes = []
+    for key in ("status_4xx_count", "status_5xx_count", "status_other_count"):
+        count = summary[key]
+        assert isinstance(count, int)
+        classes.append(count)
+    assert sum(classes) == summary["error_count"]
+    assert summary["latency_sample_count"] == 9
+    assert summary["latency_bucket_edges_ms"] == [5, 10, 25, 50, 100, 250, 500, 1000]
+    assert summary["latency_bucket_counts"] == [1] * 9
+    assert summary["latency_p50_ms"] == 50
+    assert summary["latency_p95_ms"] == summary["latency_p99_ms"] == 1000
+    assert summary["latency_mean_ms"] == pytest.approx(1940 / 9)
+    assert summary["latency_max_ms"] == 1000
+    assert summary["prediction_row_count"] == 7 and observed == NOW
+
+
+@pytest.mark.parametrize("durations", [[], [None, None], [12]])
+def test_operational_summary_empty_null_and_single_latency(spark, durations):
+    """Unmeasured percentiles remain null and a single timed response has one occupied bucket."""
+    rows = [(200, duration, NOW) for duration in durations]
+    payloads = spark.createDataFrame(
+        rows, "status_code int, execution_duration_ms long, request_time timestamp"
+    )
+    summary, observed = serving_payloads._summary(payloads, spark.range(0))
+    expected = 12.0 if durations == [12] else None
+    assert (
+        summary["latency_p50_ms"]
+        == summary["latency_p95_ms"]
+        == summary["latency_p99_ms"]
+        == expected
+    )
+    assert summary["latency_sample_count"] == (1 if expected else 0)
+    buckets = summary["latency_bucket_counts"]
+    assert isinstance(buckets, list)
+    assert sum(buckets) == summary["latency_sample_count"]
+    assert buckets[2] == (1 if expected else 0)
+    assert (
+        summary["error_count"]
+        == summary["status_4xx_count"]
+        == summary["status_5xx_count"]
+        == summary["status_other_count"]
+        == 0
+    )
+    assert observed == (NOW if durations else None)
 
 
 @pytest.mark.parametrize(
@@ -322,3 +381,62 @@ def test_scalar_envelope_validator_preserves_json_primitives(value):
     """Strict shape checking must retain nulls, exact large integers and ordinary strings."""
     raw = json.dumps({"dataframe_records": [{"x": value}]})
     assert serving_payloads._scalar_envelope(raw, "dataframe_records")
+
+
+def test_latency_distribution_query_keeps_only_valid_scoped_samples(spark):
+    """Old or malformed arrays cannot become fake heatmap cells or cross model scope."""
+    dashboard = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "templates/databricks/template/{{.project_name}}/src/monitoring/monitoring.lvdash.json"
+        ).read_text(encoding="utf-8")
+    )
+    sql = "".join(
+        next(d for d in dashboard["datasets"] if d["name"] == "serving_latency_distribution")[
+            "queryLines"
+        ]
+    )
+    valid = {
+        "request_count": 3,
+        "error_count": 1,
+        "latency_sample_count": 2,
+        "latency_bucket_edges_ms": [5, 10, 25, 50, 100, 250, 500, 1000],
+        "latency_bucket_counts": [1, 0, 1, 0, 0, 0, 0, 0, 0],
+    }
+    cases = [
+        ("valid", "healthy", valid),
+        ("failed", "failed", valid),
+        ("legacy", "healthy", {"request_count": 3}),
+        ("null", "healthy", valid | {"latency_bucket_counts": [None] * 9}),
+        ("negative", "healthy", valid | {"latency_bucket_counts": [-1, 0, 3, 0, 0, 0, 0, 0, 0]}),
+        ("bad_sum", "healthy", valid | {"latency_sample_count": 3}),
+        ("short", "healthy", valid | {"latency_bucket_counts": [2]}),
+        (
+            "bad_edges",
+            "healthy",
+            valid | {"latency_bucket_edges_ms": [6, 10, 25, 50, 100, 250, 500, 1000]},
+        ),
+        ("zero", "healthy", valid | {"latency_sample_count": 0, "latency_bucket_counts": [0] * 9}),
+        ("too_many", "healthy", valid | {"request_count": 1}),
+    ]
+    reports = ",".join(
+        f"('m','1','{name}',TIMESTAMP '2026-10-12 12:00:00',TIMESTAMP '2026-10-12 13:00:00',TIMESTAMP '2026-10-12 14:00:00','{status}','{json.dumps({'serving': summary})}','config')"
+        for name, status, summary in cases
+    )
+    source = (
+        "WITH model_inventory(monitor_id, model_name, enabled, updated_at, config_digest, environment, project, config_json) AS ("
+        "SELECT * FROM VALUES ('m','model',true,1,'config','demo','serving','{\"model_version\":\"1\",\"serving_endpoint\":\"endpoint\"}')), "
+        "monitoring_results(monitor_id, model_version, report_id, window_start, window_end, measured_at, status, report_json, config_digest) AS ("
+        f"SELECT * FROM VALUES {reports}), " + sql.removeprefix("WITH ")
+    )
+    params = {"serving_model": "", "serving_version": "", "serving_monitor": ""}
+    rows = spark.sql(source, args=params).collect()
+    assert len(rows) == 9 and {r.report_id for r in rows} == {"valid"}
+    assert sum(r.latency_fraction for r in rows) == 1.0
+    assert [r.bucket_count for r in rows] == valid["latency_bucket_counts"]
+    for field, value in (
+        ("serving_model", "other"),
+        ("serving_version", "2"),
+        ("serving_monitor", "other context"),
+    ):
+        assert spark.sql(source, args=params | {field: value}).count() == 0

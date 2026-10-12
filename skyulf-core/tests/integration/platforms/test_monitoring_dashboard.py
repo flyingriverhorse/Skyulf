@@ -214,6 +214,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                         if isinstance(value, dict) and "fieldName" in value
                     ]
                     refs += encodings.get("extra", [])
+                    refs += encodings.get("y", {}).get("fields", [])
                 if "facet" in spec:
                     refs = [*refs, spec["facet"]]
                 assert all(ref["fieldName"] in selected for ref in refs)
@@ -221,7 +222,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                     1
                     if widget_type == "custom-vega-viz"
                     else 3
-                    if widget_type in {"line", "bar", "scatter", "pivot"}
+                    if widget_type in {"line", "bar", "scatter", "pivot", "heatmap"}
                     else 2
                 )
     assert filters <= seen_filters
@@ -277,7 +278,7 @@ def test_history_keeps_metric_identity_and_units_separate() -> None:
     performance_charts = {
         w["name"]: w["spec"]
         for w in _widgets(performance_page)
-        if w.get("spec", {}).get("widgetType") == "scatter"
+        if w["name"] in {"performance_trend", "performance_policy_trend"}
     }
     assert set(performance_charts) == {
         "performance_trend",
@@ -309,7 +310,7 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
             assert control["spec"]["widgetType"] == "filter-single-select"
             assert any(q["query"]["datasetName"] == dataset for q in control["queries"])
     psi = datasets["drift_psi_chart"]
-    assert "metric_name = 'psi'" in psi
+    assert "metric_name IN ('psi', 'psi_categorical')" in psi
     assert "threshold AS plot_value" in psi
     assert "report_rank = 1" in psi and "feature_rank <= 10" in psi
     assert "PARTITION BY monitor_id, model_name, model_version" in psi
@@ -755,12 +756,15 @@ def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> 
             ],
         )
         connection.execute("ALTER TABLE performance_history ADD COLUMN direction TEXT")
+        connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance REAL")
+        connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance_mode TEXT")
         row = connection.execute(query).fetchone()
         assert row["report_id"] == "latest" and row["current_value"] is None
         assert row["policy_status"] == "Insufficient evidence"
         connection.execute(
-            "INSERT INTO performance_history VALUES "
-            "('m','model','1','disabled',3,3,NULL,'disabled','policy_off','none',NULL,NULL,NULL,NULL)"
+            "INSERT INTO performance_history (monitor_id,model_name,model_version,report_id,"
+            "window_end,measured_at,status,reason,action) VALUES "
+            "('m','model','1','disabled',3,3,'disabled','policy_off','none')"
         )
         assert connection.execute(query).fetchone()["policy_status"] == "Policy disabled"
     for name in ("performance_policy_snapshot", "performance_policy_series"):
@@ -779,7 +783,7 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     dashboard = _dashboard()
     dataset = next(d for d in dashboard["datasets"] if d["name"] == "performance_policy")
     sql = "".join(dataset["queryLines"])
-    labels = sql.split("source.*,", 1)[1].split("FROM (SELECT", 1)[0]
+    labels = sql[sql.index("CASE WHEN source.status IN ('disabled'") :].split("FROM (SELECT", 1)[0]
     with sqlite3.connect(":memory:") as connection:
         cases = [
             ("healthy", "none", "Within tolerance", "No training requested"),

@@ -20,6 +20,74 @@ def _sql(name):
     return "".join(next(item for item in _data()["datasets"] if item["name"] == name)["queryLines"])
 
 
+def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentiles():
+    """New charts must not invent status classes or turn absent timings into zero latency."""
+
+    def scalar(raw, path):
+        """Match Spark JSON scalar access while keeping array payloads serialized."""
+        value = json.loads(raw or "{}")
+        for part in path[2:].split("."):
+            value = value.get(part) if isinstance(value, dict) else None
+        return json.dumps(value) if isinstance(value, (dict, list)) else value
+
+    complete = {
+        "request_count": 10,
+        "error_count": 4,
+        "status_4xx_count": 2,
+        "status_5xx_count": 1,
+        "status_other_count": 1,
+        "latency_sample_count": 9,
+        "latency_mean_ms": 15,
+        "latency_p50_ms": 12,
+        "latency_p95_ms": 20,
+        "latency_p99_ms": 30,
+    }
+    cases = [
+        ("new", "healthy", complete),
+        ("legacy", "healthy", {"request_count": 10, "error_count": 3, "latency_mean_ms": 5}),
+        ("partial", "healthy", {"request_count": 10, "error_count": 3, "status_4xx_count": 2}),
+        ("inconsistent", "healthy", complete | {"status_other_count": 9}),
+        ("negative", "healthy", complete | {"status_4xx_count": -1, "status_other_count": 4}),
+        ("failed", "failed", complete),
+        ("zero", "healthy", {"request_count": 0, "error_count": 0}),
+    ]
+    with sqlite3.connect(":memory:") as connection:
+        connection.row_factory = sqlite3.Row
+        connection.create_function("get_json_object", 2, scalar)
+        connection.create_function("concat", -1, lambda *parts: "".join(str(p) for p in parts))
+        connection.create_function("date_format", 2, lambda value, pattern: str(value))
+        connection.execute(
+            "CREATE TABLE model_inventory (monitor_id, model_name, enabled, updated_at, config_digest, environment, project, config_json)"
+        )
+        connection.execute(
+            "INSERT INTO model_inventory VALUES ('m','model',1,1,'config','demo','serving',?)",
+            (json.dumps({"model_version": "1", "serving_endpoint": "endpoint"}),),
+        )
+        connection.execute(
+            "CREATE TABLE monitoring_results (monitor_id, model_version, report_id, window_start, window_end, measured_at, status, report_json, config_digest)"
+        )
+        for name, status, summary in cases:
+            connection.execute(
+                "INSERT INTO monitoring_results VALUES ('m','1',?,0,1,2,?,?, 'config')",
+                (name, status, json.dumps({"serving": summary})),
+            )
+        params = {"serving_model": "", "serving_version": "", "serving_monitor": ""}
+        rows = {r["report_id"]: r for r in connection.execute(_sql("serving_windows"), params)}
+        assert [rows["new"][key] for key in ("plot_4xx", "plot_5xx", "plot_other")] == [2, 1, 1]
+        assert rows["new"]["latency_p50_ms"] == 12 and rows["new"]["latency_sample_count"] == 9
+        for name in ("legacy", "partial"):
+            assert rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is None
+            assert rows[name]["plot_other"] == 3
+            assert rows[name]["latency_p95_ms"] is rows[name]["latency_sample_count"] is None
+        for name in ("inconsistent", "negative"):
+            assert rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is None
+            assert rows[name]["plot_other"] == 4
+        for name in ("failed", "zero"):
+            assert (
+                rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is rows[name]["plot_other"] is None
+            )
+
+
 def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
     """Another model's newer windows cannot hide the selected model or leak into its results."""
     with sqlite3.connect(":memory:") as connection:
@@ -28,6 +96,7 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
             "get_json_object", 2, lambda raw, path: json.loads(raw or "{}").get(path[2:])
         )
         connection.create_function("concat", -1, lambda *args: "".join(str(v) for v in args))
+        connection.create_function("date_format", 2, lambda value, pattern: str(value))
         connection.execute(
             "CREATE TABLE model_inventory (monitor_id TEXT, model_name TEXT, enabled INTEGER, "
             "config_json TEXT, updated_at INTEGER, config_digest TEXT, environment TEXT, project TEXT)"
@@ -108,7 +177,9 @@ def test_serving_page_shows_bounded_aggregate_context_and_async_empty_state():
         sql = _sql(name)
         assert "FROM model_inventory" in sql and "monitoring_results" in sql
         assert "get_json_object" in sql
-        assert "request" not in sql.lower().replace("request_count", "")
+        assert "request" not in sql.lower().replace("request_count", "").replace(
+            "rows_per_request", ""
+        )
         assert "response" not in sql.lower()
 
 
@@ -126,6 +197,7 @@ def test_latest_serving_status_does_not_reuse_old_success_after_failure():
 
         connection.create_function("get_json_object", 2, json_value)
         connection.create_function("concat", -1, lambda *args: "".join(str(v) for v in args))
+        connection.create_function("date_format", 2, lambda value, pattern: str(value))
         connection.execute(
             "CREATE TABLE model_inventory (monitor_id TEXT, model_name TEXT, enabled INTEGER, config_json TEXT, updated_at INTEGER, config_digest TEXT)"
         )
@@ -214,3 +286,31 @@ def test_latest_serving_status_does_not_reuse_old_success_after_failure():
             ("online", "new"),
             ("other", "other-report"),
         }
+
+
+def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
+    """Serving charts must preserve selection scope and distinguish operational categories."""
+    dashboard = _data()
+    widgets = {i["widget"]["name"]: i["widget"] for p in dashboard["pages"] for i in p["layout"]}
+    for name in ("filter_model", "filter_version", "filter_context", "filter_serving_window"):
+        assert "serving_latency_distribution" in {
+            q["query"]["datasetName"] for q in widgets[name]["queries"]
+        }
+    errors = widgets["serving_error_trend"]["spec"]
+    assert errors["widgetType"] == "bar" and "mark" not in errors
+    assert errors["encodings"]["x"]["fieldName"] == "observation_label"
+    colors = {m["value"]: m["color"] for m in errors["encodings"]["color"]["scale"]["mappings"]}
+    assert colors == {"4xx": "#9085E9", "5xx": "#E5484D", "Other / class not recorded": "#7C8CA0"}
+    latency = widgets["serving_latency_trend"]["spec"]["encodings"]
+    assert [f["fieldName"] for f in latency["y"]["fields"]] == [
+        "latency_mean_ms",
+        "latency_p95_ms",
+        "latency_p99_ms",
+    ]
+    assert {"latency_p50_ms", "latency_max_ms", "latency_sample_count"} <= {
+        f["fieldName"] for f in latency["extra"]
+    }
+    matrix = widgets["serving_latency_distribution"]["spec"]
+    assert matrix["widgetType"] == "heatmap"
+    assert matrix["encodings"]["color"]["scale"]["domain"] == {"min": 0, "max": 1}
+    assert matrix["facet"]["fieldName"] == "model_identity"

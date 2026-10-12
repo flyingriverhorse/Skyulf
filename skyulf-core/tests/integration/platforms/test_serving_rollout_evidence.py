@@ -359,6 +359,30 @@ def test_live_health_thresholds(live, change, expected):
     assert _observe(live).evidence.verdict == expected
 
 
+@pytest.mark.parametrize("maximum,expected", [(20.0, "PASS"), (101.0, "FAIL"), (None, "HOLD")])
+def test_latency_distribution_does_not_change_rollout_health_gates(live, maximum, expected):
+    """New chart evidence must preserve the existing maximum-latency rollout guard."""
+    summary = live[-1]["summary"]
+    summary["latency_max_ms"] = maximum
+    before = _observe(live)
+    summary.update(
+        {
+            "status_4xx_count": 0,
+            "status_5xx_count": 0,
+            "status_other_count": 0,
+            "latency_sample_count": 100,
+            "latency_p50_ms": 10.0,
+            "latency_p95_ms": 15.0,
+            "latency_p99_ms": 19.0,
+            "latency_bucket_edges_ms": [5, 10, 25, 50, 100, 250, 500, 1000],
+            "latency_bucket_counts": [0, 0, 100, 0, 0, 0, 0, 0, 0],
+        }
+    )
+    after = _observe(live)
+    assert before.evidence.verdict == after.evidence.verdict == expected
+    assert before.details_digest != after.details_digest
+
+
 @pytest.mark.parametrize("age", [timedelta(hours=25), timedelta(minutes=-1)])
 def test_stale_or_future_telemetry_holds(live, age):
     """Reissued stale telemetry and future requests cannot certify the current stage."""

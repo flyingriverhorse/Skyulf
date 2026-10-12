@@ -621,6 +621,39 @@ for the rest.
 Dashboard refresh
 reads stored results and does not trigger new monitoring calculations.
 
+The PSI matrix includes numeric and categorical features. Each cell divides a
+recorded PSI by its own recorded limit; values above 1 receive a fixed highlight.
+An absent or nonpositive limit leaves the cell blank. Each identity retains its
+latest 12 full observations and the 10 features with the largest ratios within
+that history. Feature and date filters narrow this retained set; they do not
+retrieve older observations. Observation labels include the year and a sequence
+number, so separate reports for the same window remain separate cells.
+
+The missing-value matrix uses the same observation and feature bounds, ranking
+features by their largest missing fraction. Its reference rate is the reference
+dataset's missing fraction, **not an alert limit**. A recorded quality issue can
+depend on a statistical test or unscored inputs. The tooltip identifies that saved
+decision. Nonfinite fractions remain available in the quality table.
+
+The scoring-volume chart uses one stacked bar per full observation: labeled
+rows and rows not labeled at measurement add up to scored rows. Gray identifies
+observations without measured label coverage. The tooltip shows coverage as a
+percentage. Counts absent from the original report stay blank even if an older
+store row defaulted them to zero. Failed and policy-only reports never invent
+scoring counts; bars from different or overlapping windows must not be added.
+
+The policy-margin comparison uses each identity's latest saved policy window,
+independently of the chart metric and history date filters. Remaining tolerance is
+the direction-aware distance from the saved limit divided by the absolute
+baseline-to-limit distance: 1 is at baseline, 0 is at the limit and negative values
+are beyond it. Bar color follows the saved policy verdict, including boundary
+equality rules. Unavailable, disabled or zero-tolerance policies stay in the
+policy table without a bar. Accuracy and error metrics can therefore share this
+normalized comparison without mixing their original units.
+The **Policy status** legend distinguishes blue **Within tolerance** from red
+**Performance loss**. Rows without a calculable margin remain in the policy
+table and are excluded from this chart and its legend.
+
 Latest PSI bars and the observed-metric table use the newest saved report for each context,
 ranked by observation window and measurement time. A newer empty or failed report
 does not resurrect an older measured value. Historical trend charts retain history.
@@ -673,7 +706,9 @@ usage can include other workloads during the job; it is not exclusive job usage.
 The [compute system tables](https://docs.databricks.com/aws/en/admin/system-tables/compute)
 cover classic compute; serverless usage and very short-lived nodes may have no
 node samples. Availability explains the absence; the cards remain NULL rather
-than displaying zero CPU or memory. CPU and memory trends show averages over time.
+than displaying zero CPU or memory. CPU and memory trends show recorded averages
+and peaks against sample time. The daily cost chart separates billing SKUs and
+uses up to four USD decimal places so small amounts do not disappear into zero.
 
 ### Online serving
 
@@ -692,20 +727,59 @@ enrollments are included.
 | Latest observation per context | Latest full observation per matching enrollment and current configuration, ordered by window end, measurement time and report ID. |
 | Observation history | All matching saved full observations, with native pagination and an optional history window-end filter; there is no global 100-row cutoff. |
 
-Three charts above the detailed tables show captured requests, captured errors
-and mean model latency by request-window end, with each context kept separate.
-The history date control does not change the latest snapshot. **Observation
-status** describes the saved monitoring result, not live endpoint availability.
-Request counts and latency stay per observation: windows may overlap, and
-model-set branches may describe the same parent requests. Do not sum these rows
-as unique traffic or average their latency means into an endpoint SLA. Tables
-preserve those boundaries without a misleading cumulative traffic chart.
+Five charts above the detailed tables show captured requests, HTTP error classes,
+captured error rate, mean/p95/p99 execution latency, and the latency distribution.
+Each model/version/context has a separate panel; **Model**, **Version** and
+**Context** apply to all five. The history window-end control also filters the
+latency matrix, while the latest snapshot stays unchanged. The matrix retains
+only the latest 12 observations per identity before the date selection; use the
+history table to inspect older windows.
 
-Observation tables show Requests in window, Successes, Errors, Mean latency (ms) and
-Max latency (ms). These come from captured inference logs; a request can contain
-multiple prediction rows. Logging is asynchronous and custom-model HTTP 4xx/5xx
-errors may be absent, so these counts do not measure all endpoint traffic.
-Latency describes captured execution durations, not an end-to-end latency SLA.
+| Chart | Reading the result |
+| --- | --- |
+| Captured requests per window | Number of logged requests, including failed responses. One request may contain several prediction rows. |
+| Which captured errors occurred? | Stacked **4xx** (violet), **5xx** (red), and **other non-2xx / class not recorded** (gray). If an older report lacks complete class counts, its entire error total appears in gray. A date plus observation number keeps repeated windows separate. |
+| Captured error rate per window | Captured errors divided by captured requests in that same observation. Missing counts, failed observations and zero requests leave it unmeasured. |
+| Mean and tail model latency per window | Mean, approximate p95 and p99, in milliseconds. Hover for p50, maximum and timed sample count. Small samples can make p95 and p99 equal to the maximum; this is not a separate anomaly. |
+| Where do captured execution times fall? | Nine duration ranges across the latest 12 observations per identity. Each valid column totals 100% of non-null timings. A shared 0-100% blue scale allows comparisons; hover for exact counts and window times. Old, failed, empty or invalid summaries produce no cells. |
+
+For example, a report with ten captured requests, two 4xx responses and one 5xx
+response has a 30% captured error rate. If only eight requests have a recorded
+execution duration, latency percentiles and distribution shares use those eight,
+including any failed responses with durations. A p95 of 250 ms estimates the
+95th percentile of those captured execution durations; it is not the slowest
+request or an end-to-end service guarantee.
+
+Timings use Spark `percentile_approx` with accuracy 10,000. The fixed distribution
+boundaries are 5, 10, 25, 50, 100, 250, 500 and 1,000 ms: the first range is below
+5 ms, each middle range includes its lower bound and excludes its upper bound,
+and the final range is at least 1,000 ms. Null timings are excluded from both the
+percentiles and distribution. No request payloads are read by dashboard queries;
+these fields come from saved aggregate reports.
+
+Latest/history tables also show class counts, p50/p95/p99 and timed sample count.
+Older reports retain the fields originally recorded; missing percentiles are
+blank. Running monitoring with the updated Core creates these new fields; simply
+refreshing or redeploying the dashboard does not backfill old reports. The
+monitoring environment must match the runtime recorded in the registered model
+artifact. Updating the Core requirement alone can fail that runtime check;
+prepare a compatible model artifact before upgrading its monitoring jobs. Because
+serving evidence participates in observation identity, recomputing an old window
+with these added fields creates a new report identity. History can therefore
+contain both calculations of the same window. The rollout controller continues
+to use its existing maximum-latency and error-rate checks; percentiles do not
+replace its admission or promotion gates.
+
+Observation history also shows prediction rows per captured request when saved.
+Its denominator includes failed captured requests. Request counts and latency
+stay per observation: windows may overlap, and model-set branches may describe
+the same parent requests. Do not sum these rows as unique traffic or average their
+latency means into an endpoint SLA. **Observation status** describes the saved
+monitoring result, not live endpoint availability.
+
+Logging is asynchronous and custom-model HTTP 4xx/5xx errors may be absent, so
+captured counts do not measure all endpoint traffic. Latency describes model
+execution durations recorded by the platform, not client/network round-trip time.
 
 | What you see | Next check |
 | --- | --- |

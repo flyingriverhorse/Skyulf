@@ -5,10 +5,12 @@ import json
 import math
 import re
 from datetime import UTC, datetime
+from itertools import pairwise
 from typing import Any
 
 REQUEST_KEY = "databricks_request_id"
 ROW_KEY = "request_row_index"
+_LATENCY_BUCKET_EDGES_MS = (5, 10, 25, 50, 100, 250, 500, 1000)
 _PAYLOAD_COLUMNS = (
     REQUEST_KEY,
     "request_time",
@@ -209,14 +211,51 @@ def _typed_records(frame: Any, columns: tuple[tuple[str, str], ...], prefix: str
     )
 
 
+def _latency_summary(total: Any) -> dict[str, int | float | list[int] | None]:
+    """Describe the same non-null duration population with quantiles and fixed bins."""
+    samples = int(total.latency_sample_count)
+    cumulative = [0, *(int(total[f"below_{edge}"] or 0) for edge in _LATENCY_BUCKET_EDGES_MS)]
+    cumulative.append(samples)
+    quantiles = total.latency_quantiles or [None, None, None]
+    return {
+        "latency_mean_ms": float(total.latency_mean_ms)
+        if total.latency_mean_ms is not None
+        else None,
+        "latency_max_ms": int(total.latency_max_ms) if total.latency_max_ms is not None else None,
+        "latency_sample_count": samples,
+        "latency_bucket_edges_ms": list(_LATENCY_BUCKET_EDGES_MS),
+        "latency_bucket_counts": [right - left for left, right in pairwise(cumulative)],
+        **{
+            f"latency_{name}_ms": float(value) if value is not None else None
+            for name, value in zip(("p50", "p95", "p99"), quantiles, strict=True)
+        },
+    }
+
+
 def _summary(
     payloads: Any, predictions: Any
-) -> tuple[dict[str, int | float | None], datetime | None]:
+) -> tuple[dict[str, int | float | list[int] | None], datetime | None]:
     """Collect only bounded request aggregates and the latest event time."""
     fn = _spark_functions()
     total = payloads.agg(
         fn.count("*").alias("requests"),
         fn.sum(fn.when(fn.col("status_code").between(200, 299), 1).otherwise(0)).alias("successes"),
+        fn.sum(fn.when(fn.col("status_code").between(400, 499), 1).otherwise(0)).alias(
+            "status_4xx"
+        ),
+        fn.sum(fn.when(fn.col("status_code").between(500, 599), 1).otherwise(0)).alias(
+            "status_5xx"
+        ),
+        fn.count("execution_duration_ms").alias("latency_sample_count"),
+        fn.percentile_approx("execution_duration_ms", [0.5, 0.95, 0.99], 10000).alias(
+            "latency_quantiles"
+        ),
+        *(
+            fn.sum(fn.when(fn.col("execution_duration_ms") < edge, 1).otherwise(0)).alias(
+                f"below_{edge}"
+            )
+            for edge in _LATENCY_BUCKET_EDGES_MS
+        ),
         fn.avg("execution_duration_ms").alias("latency_mean_ms"),
         fn.max("execution_duration_ms").alias("latency_max_ms"),
         fn.max("request_time").alias("observed_at"),
@@ -232,10 +271,13 @@ def _summary(
         "request_count": request_count,
         "success_count": success_count,
         "error_count": request_count - success_count,
-        "latency_mean_ms": float(total.latency_mean_ms)
-        if total.latency_mean_ms is not None
-        else None,
-        "latency_max_ms": int(total.latency_max_ms) if total.latency_max_ms is not None else None,
+        "status_4xx_count": int(total.status_4xx or 0),
+        "status_5xx_count": int(total.status_5xx or 0),
+        "status_other_count": request_count
+        - success_count
+        - int(total.status_4xx or 0)
+        - int(total.status_5xx or 0),
+        **_latency_summary(total),
         "prediction_row_count": predictions.count(),
     }, observed
 
@@ -252,7 +294,7 @@ def parse_serving_payloads(
     output_prefix: str,
     start: datetime,
     end: datetime,
-) -> tuple[Any, Any, dict[str, int | float | None], datetime | None]:
+) -> tuple[Any, Any, dict[str, int | float | list[int] | None], datetime | None]:
     """Read one served version into distributed features and saved predictions.
 
     Only scalar aggregates leave Spark. HTTP failures remain in operational
