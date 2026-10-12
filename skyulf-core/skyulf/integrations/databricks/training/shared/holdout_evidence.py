@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 import pyarrow.parquet as pq
 
-from ....mlflow.lifecycle.validation import _validate_holdout_budget
+from ....mlflow.lifecycle.validation import validate_holdout_budget
 from ...data.delta_io.delta import table_identity
 from ...feature_store.lifecycle_config import parse_feature_binding
 from ...feature_store.training import validate_training_frame
@@ -74,7 +74,7 @@ def _read_parquet(path: Path, evidence: dict, spec: Any) -> pd.DataFrame:
         raise ValueError("Saved holdout digest differs from its comparison.")
     _validate_parquet_footer(path, evidence, spec)
     frame = pd.read_parquet(path)
-    _validate_holdout_budget(frame, spec.max_rows, spec.max_bytes)
+    validate_holdout_budget(frame, spec.max_rows, spec.max_bytes)
     if frame_schema(frame) != evidence["schema"] or frame.attrs != evidence["attrs"]:
         raise ValueError("Saved holdout schema or split context differs from its comparison.")
     return frame
@@ -98,7 +98,7 @@ def _validate_parquet_footer(path: Path, evidence: dict, spec: Any) -> None:
 
 def _saved_or_new_frame(client: Any, run_id: str, frame: pd.DataFrame, spec: Any) -> dict:
     """Reuse prepared lifecycle bytes only when they equal the actual comparison rows."""
-    _validate_holdout_budget(frame, spec.max_rows, spec.max_bytes)
+    validate_holdout_budget(frame, spec.max_rows, spec.max_bytes)
     size = _artifact_size(client, run_id)
     if size is None:
         receipt = save_frame_artifact(client, run_id, "holdout", frame)

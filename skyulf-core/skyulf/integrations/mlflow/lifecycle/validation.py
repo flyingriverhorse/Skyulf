@@ -214,7 +214,7 @@ def _validate_holdout(
         raise ValueError("heldout must contain at least two labeled rows.")
 
 
-def _validate_holdout_budget(
+def validate_holdout_budget(
     heldout: pd.DataFrame | pl.DataFrame, max_rows: int, max_bytes: int
 ) -> None:
     """Bound the existing frame before registry access or prediction."""
@@ -255,7 +255,7 @@ def _validate_request(
         or min_improvement < 0
     ):
         raise ValueError("min_improvement must be a finite nonnegative number.")
-    _validate_holdout_budget(heldout, max_rows, max_bytes)
+    validate_holdout_budget(heldout, max_rows, max_bytes)
 
 
 def _checked_artifact(
