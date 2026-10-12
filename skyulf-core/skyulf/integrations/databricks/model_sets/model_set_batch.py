@@ -21,7 +21,7 @@ from ..data.delta_io.cdf_recovery import (
     recovery_receipt_fields,
     validate_recovery_binding,
 )
-from ..data.delta_io.delta import DeltaPublishError, table_identity
+from ..data.delta_io.delta import DeltaPublishError, prediction_commit, table_identity
 from ..feature_store.scoring import (
     feature_source_columns,
     validate_feature_continuation,
@@ -396,7 +396,7 @@ def _commit_set(
         raise DeltaPublishError(
             "Model-set write outcome unknown; inspect target receipt before retry."
         ) from exc
-    committed = latest_source_version(spark, target)
+    committed = prediction_commit(spark, target, latest_source_version(spark, target))
     recorded = _previous_set_receipt(committed, source_id, target_id)
     if recorded != receipt:
         raise DeltaPublishError("Model-set output has no matching committed receipt.")
@@ -499,7 +499,8 @@ def _run_admitted_set(
         raise BatchConflictError("Source or target changed during model-set admission.")
     functions = importlib.import_module("pyspark.sql.functions")
     latest = latest_source_version(spark, target)
-    previous = _previous_set_receipt(latest, source_id, target_id)
+    receipt_commit = prediction_commit(spark, target, latest)
+    previous = _previous_set_receipt(receipt_commit, source_id, target_id)
     check_incremental_bootstrap(spark, target, previous, functions)
     upper, prior, write_mode, noop = _set_read_plan(
         spark,
@@ -515,7 +516,7 @@ def _run_admitted_set(
     )
     validate_feature_continuation(previous, feature_evidence, rebuilding=write_mode == "overwrite")
     if noop:
-        return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
+        return ModelSetBatchResult(upper, 0, 0, int(receipt_commit["version"]), previous, True)
     frame, source_rebuilt = _read_set_frame(
         spark,
         model,
@@ -536,7 +537,7 @@ def _run_admitted_set(
     if source_rebuilt:
         prior, write_mode = None, "overwrite"
     if frame.empty and write_mode != "overwrite":
-        return ModelSetBatchResult(upper, 0, 0, int(latest["version"]), previous, True)
+        return ModelSetBatchResult(upper, 0, 0, int(receipt_commit["version"]), previous, True)
     scored = _score_increment(artifact, frame, previous, write_mode, max_rows, max_bytes)
     receipt = _publication_receipt(
         model,

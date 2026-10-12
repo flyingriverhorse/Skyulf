@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from ...data.delta_io.delta import history, table_identity
+from ...data.delta_io.delta import MAINTENANCE_OPERATIONS, history, table_identity
 from ...scoring.incremental.incremental_batch import bounded_frame
 from ...shared._contracts import column_name
 from .monitoring_config import MonitorConfig
@@ -79,15 +79,7 @@ def _commit_receipt(row: Any) -> dict | None:
         receipt = None
     if isinstance(receipt, dict) and receipt.get("run_id"):
         return receipt
-    if values.get("operation") in {
-        "CREATE TABLE",
-        "OPTIMIZE",
-        "VACUUM START",
-        "VACUUM END",
-        "SET TBLPROPERTIES",
-        "UNSET TBLPROPERTIES",
-        "COMPUTE STATS",
-    }:
+    if values.get("operation") in MAINTENANCE_OPERATIONS | {"CREATE TABLE"}:
         return None
     raise ValueError("Prediction window contains an unreceipted data or schema change.")
 

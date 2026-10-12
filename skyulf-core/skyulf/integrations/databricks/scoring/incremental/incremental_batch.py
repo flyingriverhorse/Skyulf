@@ -26,7 +26,7 @@ from ...data.delta_io.cdf_recovery import (
     recovery_receipt_fields,
     validate_recovery_binding,
 )
-from ...data.delta_io.delta import DeltaPublishError, history, table_identity
+from ...data.delta_io.delta import DeltaPublishError, history, prediction_commit, table_identity
 from ...feature_store.scoring import (
     feature_source_columns,
     validate_feature_continuation,
@@ -76,9 +76,9 @@ def latest_source_version(spark: Any, table: str) -> Any:
     """Read the most recent Delta commit deterministically."""
     functions = importlib.import_module("pyspark.sql.functions")
     row = (
-        history(spark, table)
+        history(spark, table, limit=1)
         .orderBy(functions.desc("version"))
-        .select("version", "userMetadata")
+        .select("version", "userMetadata", "operation")
         .first()
     )
     if row is None:
@@ -87,7 +87,7 @@ def latest_source_version(spark: Any, table: str) -> Any:
 
 
 def last_receipt(latest: Any, source_id: str, target_id: str) -> dict[str, Any] | None:
-    """Trust a watermark only when the latest target commit contains it."""
+    """Trust a watermark only in the latest non-maintenance target commit."""
     raw = latest["userMetadata"]
     if not raw:
         return None
@@ -208,7 +208,8 @@ def run_incremental_batch(
         ):
             raise BatchConflictError("Source or target table identity changed during admission.")
         target_latest = latest_source_version(spark, target_table)
-        previous = last_receipt(target_latest, source_id, target_id)
+        target_receipt = prediction_commit(spark, target_table, target_latest)
+        previous = last_receipt(target_receipt, source_id, target_id)
         validate_feature_continuation(previous, feature_evidence)
         check_incremental_bootstrap(spark, target_table, previous, functions)
         prior_version = int(previous["source_end_version"]) if previous else None
@@ -221,7 +222,7 @@ def run_incremental_batch(
                 upper_version,
                 0,
                 0,
-                int(target_latest["version"]),
+                int(target_receipt["version"]),
                 previous,
                 True,
                 config.model.name,
@@ -246,7 +247,7 @@ def run_incremental_batch(
                 upper_version,
                 0,
                 0,
-                int(target_latest["version"]),
+                int(target_receipt["version"]),
                 previous,
                 True,
                 config.model.name,
@@ -395,14 +396,15 @@ def _recover_incremental_batch(
     ):
         raise BatchConflictError("CDF recovery source or target table identity changed.")
     latest = latest_source_version(spark, target_name)
-    previous = last_receipt(latest, source_id, target_id)
+    receipt = prediction_commit(spark, target_name, latest)
+    previous = last_receipt(receipt, source_id, target_id)
     if check_recovery_state(request, previous, int(latest["version"])):
         return IncrementalBatchResult(
             request["source_start_version"],
             request["source_end_version"],
             0,
             0,
-            int(latest["version"]),
+            int(receipt["version"]),
             previous,
             True,
             request["model_name"],
@@ -744,7 +746,7 @@ def _commit_increment(
         if "Concurrent" in type(exc).__name__ or "DELTA_CONCURRENT" in str(exc):
             raise BatchConflictError("Delta rejected a concurrent incremental write.") from exc
         raise DeltaPublishError("Incremental Delta write failed.") from exc
-    committed = latest_source_version(spark, target_table)
+    committed = prediction_commit(spark, target_table, latest_source_version(spark, target_table))
     recorded = last_receipt(committed, source_id, target_id)
     if recorded is None or recorded.get("request_digest") != digest:
         raise DeltaPublishError("Delta returned without a verifiable incremental receipt.")
