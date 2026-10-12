@@ -549,6 +549,9 @@ def _finish_alias_change(
             != receipt.event_id
         ):
             raise AliasOutcomeUnknownError("Active receipt verification failed.")
+        pending = (client.get_registered_model(receipt.model_name).tags or {}).get(_PENDING_TAG)
+        if pending != receipt.event_id:
+            raise AliasOutcomeUnknownError("Pending alias event ownership changed.")
         client.delete_registered_model_tag(receipt.model_name, _PENDING_TAG)
         assert_no_pending(client, receipt.model_name)
     except Exception as exc:  # noqa: BLE001 - never imply rollback after a possible alias write

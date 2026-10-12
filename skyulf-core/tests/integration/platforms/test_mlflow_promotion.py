@@ -943,6 +943,43 @@ def test_legacy_champion_receipt_can_still_roll_back(case) -> None:
     assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
 
 
+@pytest.mark.parametrize("operation", ["stage", "promote"])
+@pytest.mark.parametrize("replacement", [None, "another-event"])
+def test_alias_completion_preserves_changed_pending_marker(
+    case, monkeypatch, operation, replacement
+) -> None:
+    """Completion must not erase another writer's intent or report lost ownership as success."""
+    client, _, name, _, _, _ = case
+    if operation == "promote":
+        _stage(case)
+    alias = "champion" if operation == "promote" else "challenger"
+    original_set = client.set_registered_model_tag
+    original_delete = client.delete_registered_model_tag
+    delete = Mock(wraps=original_delete)
+
+    def replace_pending(model_name, key, value):
+        """Change ownership at the final active-marker write, after aliases have moved."""
+        original_set(model_name, key, value)
+        if key == f"{alias}_current_event":
+            if replacement is None:
+                original_delete(model_name, "pending_alias_event")
+            else:
+                original_set(model_name, "pending_alias_event", replacement)
+
+    monkeypatch.setattr(client, "set_registered_model_tag", replace_pending)
+    monkeypatch.setattr(client, "delete_registered_model_tag", delete)
+    monkeypatch.setattr(
+        "skyulf.integrations.mlflow.lifecycle.promotion.make_registry_client", lambda *args: client
+    )
+    change_alias = _promote if operation == "promote" else _stage
+    with pytest.raises(AliasOutcomeUnknownError, match="Alias may have changed"):
+        change_alias(case)
+
+    assert client.get_registered_model(name).tags.get("pending_alias_event") == replacement
+    assert "pending_alias_event" not in [call.args[1] for call in delete.call_args_list]
+    assert str(client.get_model_version_by_alias(name, alias).version) == "2"
+
+
 def test_partial_promotion_reports_unknown_outcome(case, monkeypatch) -> None:
     """A failure after changing the previous pointer requires reconciliation."""
     client, _, name, _, _, _ = case
