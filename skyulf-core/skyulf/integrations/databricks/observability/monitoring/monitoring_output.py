@@ -155,7 +155,8 @@ def _performance_policy_section(report: dict, row: dict) -> str:
         ("Window end", evidence.get("window_end")),
         (
             "Failure streak",
-            f"{evidence.get('consecutive_failures', 0)} / {evidence.get('required_windows', 0)}",
+            f"{evidence.get('consecutive_failures', 0)} / "
+            f"{evidence.get('required_windows') or 'Unavailable'}",
         ),
         ("Evaluated windows", json.dumps(evidence.get("evaluated_windows") or [], default=str)),
         ("Action", action.get("action", evidence.get("action", "No action recorded"))),

@@ -159,6 +159,7 @@ def test_policy_observes_completed_window_with_current_label_cutoff(monkeypatch)
     assert result["current_value"] == 1.5
     assert result["action"] == "request_eligible"
     assert result["measurement"]["evidence"]["label_version"] == 8
+    assert result["required_windows"] == policy()["consecutive_windows"]
 
 
 def test_performance_retrain_mode_does_not_enable_drift():
@@ -335,6 +336,9 @@ def test_failed_observation_retains_unavailable_policy_window(monkeypatch):
     from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
         MonitorConfig,
     )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
 
     config = MonitorConfig(
         environment="test",
@@ -345,7 +349,7 @@ def test_failed_observation_retains_unavailable_policy_window(monkeypatch):
         prediction_table="cat.data.predictions",
         label_table="cat.data.labels",
         result_available_at_column="available",
-        performance_policy=policy(),
+        performance_policy=policy() | {"consecutive_windows": 3},
     )
     monkeypatch.setattr(
         monitoring, "observe_model", Mock(side_effect=ValueError("missing registry"))
@@ -358,3 +362,40 @@ def test_failed_observation_retains_unavailable_policy_window(monkeypatch):
     assert saved["status"] == "unavailable"
     assert saved["window_end"] == "2026-10-04T00:00:00+00:00"
     assert saved["consecutive_failures"] == 0
+    assert saved["required_windows"] == 3
+    assert "0 / 3" in render_drift_output(row)
+
+
+@pytest.mark.parametrize("namespace", [None, "cat.monitoring"])
+@pytest.mark.parametrize("historical", [False, True])
+def test_failed_performance_read_retains_required_windows(monkeypatch, namespace, historical):
+    """Missing setup and external read failures must retain the policy's actual window count."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_performance
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+
+    config = MonitorConfig(
+        environment="test",
+        project="demo",
+        model_name="cat.models.model",
+        model_version="2",
+        source_table="cat.data.source",
+        prediction_table="cat.data.predictions",
+        label_table="cat.data.labels",
+        result_available_at_column="available",
+        performance_policy=policy() | {"consecutive_windows": 3},
+    )
+    now = datetime(2026, 10, 5, 12, tzinfo=UTC)
+    window_end = datetime(2026, 10, 3, tzinfo=UTC) if historical else None
+    read = Mock(side_effect=ValueError("unreadable snapshot"))
+    monkeypatch.setattr(monitoring_performance, "observe_performance", read)
+    result = monitoring_performance.observe_performance_safely(
+        None, namespace, config, None, None, {"model_version": "2"}, now, window_end=window_end
+    )
+    assert result["status"] == "unavailable" and result["action"] == "none"
+    assert result["required_windows"] == 3 and result["consecutive_failures"] == 0
+    assert result["window_end"] == (window_end or datetime(2026, 10, 4, tzinfo=UTC)).isoformat()
+    assert read.call_count == int(namespace is not None)

@@ -294,7 +294,13 @@ def _history_by_end(
 
 def _insert_history(by_end: dict[datetime, dict | None], end: datetime, item: dict) -> None:
     """Keep exact replay duplicates once and invalidate conflicting copies."""
-    if end in by_end and by_end[end] != item:
+    previous = by_end.get(end)
+    # Fill only absent legacy metadata; explicit differing counts still conflict.
+    same = previous is not None and (
+        {"required_windows": item.get("required_windows")} | previous
+        == {"required_windows": previous.get("required_windows")} | item
+    )
+    if end in by_end and not same:
         by_end[end] = None
     elif end not in by_end:
         by_end[end] = item
@@ -346,6 +352,7 @@ def _empty_result(setting: dict, current: dict, digest: str) -> dict:
         "window_end": None,
         "evaluated_windows": [],
         "consecutive_failures": 0,
+        "required_windows": setting.get("consecutive_windows"),
         "policy_digest": digest,
         "model_version": setting.get("baseline", {}).get("model_version"),
         "contract_digest": None,

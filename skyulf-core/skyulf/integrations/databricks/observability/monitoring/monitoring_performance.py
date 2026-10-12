@@ -253,7 +253,6 @@ def observe_performance(
         "baseline_reference": (baseline or {}).get(
             "reference", policy["baseline"].get("report_id")
         ),
-        "required_windows": policy["consecutive_windows"],
     }
 
 
@@ -305,4 +304,5 @@ def unavailable_performance(
         "window_end": end.isoformat(),
         "as_of": now.isoformat(),
         "consecutive_failures": 0,
+        "required_windows": policy["consecutive_windows"],
     }

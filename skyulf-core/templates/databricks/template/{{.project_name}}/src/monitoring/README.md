@@ -247,6 +247,12 @@ streak is reached. `report` never requests training, even after three failures.
 With `retrain`, reaching the streak only makes the performance trigger eligible;
 fresh training data, cooldown, active-run and duplicate-request guards still apply.
 
+Policy reports retain the required window count even when labels, a baseline or
+a source snapshot are unavailable. For example, a three-window policy reports
+`0 / 3` after a failed observation; that failure does not count as measured
+degradation. Older reports without a saved required count show `Unavailable` in
+the notebook's failure-streak denominator instead of an invented zero.
+
 To enable performance-driven retraining, change only the relevant model's policy
 from `"mode":"report"` to `"mode":"retrain"` in the producer target variables,
 retain its metric, matching baseline and evidence requirements, then validate and
