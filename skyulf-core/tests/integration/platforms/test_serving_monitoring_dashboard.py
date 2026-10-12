@@ -50,6 +50,7 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         ("negative", "healthy", complete | {"status_4xx_count": -1, "status_other_count": 4}),
         ("failed", "failed", complete),
         ("zero", "healthy", {"request_count": 0, "error_count": 0}),
+        ("zero_timing", "healthy", complete | {"latency_p95_ms": 0, "latency_sample_count": 0}),
     ]
     with sqlite3.connect(":memory:") as connection:
         connection.row_factory = sqlite3.Row
@@ -75,10 +76,22 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         rows = {r["report_id"]: r for r in connection.execute(_sql("serving_windows"), params)}
         assert [rows["new"][key] for key in ("plot_4xx", "plot_5xx", "plot_other")] == [2, 1, 1]
         assert rows["new"]["latency_p50_ms"] == 12 and rows["new"]["latency_sample_count"] == 9
+        assert float(rows["new"]["latency_p95_display"]) == 20
+        assert float(rows["zero_timing"]["latency_p95_display"]) == 0
+        assert str(rows["zero_timing"]["latency_samples_display"]) == "0"
         for name in ("legacy", "partial"):
             assert rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is None
             assert rows[name]["plot_other"] == 3
             assert rows[name]["latency_p95_ms"] is rows[name]["latency_sample_count"] is None
+            assert all(
+                rows[name][field] == "Not recorded"
+                for field in (
+                    "latency_p50_display",
+                    "latency_p95_display",
+                    "latency_p99_display",
+                    "latency_samples_display",
+                )
+            )
         for name in ("inconsistent", "negative"):
             assert rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is None
             assert rows[name]["plot_other"] == 4
@@ -92,9 +105,15 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
     """Another model's newer windows cannot hide the selected model or leak into its results."""
     with sqlite3.connect(":memory:") as connection:
         connection.row_factory = sqlite3.Row
-        connection.create_function(
-            "get_json_object", 2, lambda raw, path: json.loads(raw or "{}").get(path[2:])
-        )
+
+        def json_value(raw, path):
+            """Read nested serving counters just as the native dataset does."""
+            value = json.loads(raw or "{}")
+            for part in path[2:].split("."):
+                value = value.get(part) if isinstance(value, dict) else None
+            return value
+
+        connection.create_function("get_json_object", 2, json_value)
         connection.create_function("concat", -1, lambda *args: "".join(str(v) for v in args))
         connection.create_function("date_format", 2, lambda value, pattern: str(value))
         connection.execute(
@@ -119,7 +138,8 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
                 (monitor, model, enabled, config),
             )
             connection.executemany(
-                "INSERT INTO monitoring_results VALUES (?,? ,?,0,?,?,'healthy','{}','config')",
+                "INSERT INTO monitoring_results VALUES (?,? ,?,0,?,?,'healthy',"
+                '\'{"serving":{"request_count":2,"latency_mean_ms":4,"latency_p95_ms":7}}\',\'config\')',
                 [
                     (monitor, version, f"{monitor}-{i}", i, i)
                     for i in (range(200, 310) if monitor == "other" else [1])
@@ -141,6 +161,24 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
             parameters["serving_monitor"] = "prod / project / other"
             assert list(connection.execute(_sql(dataset), parameters)) == []
             parameters.update(serving_model="", serving_version="", serving_monitor="")
+
+        widget = next(
+            i["widget"]
+            for page in _data()["pages"]
+            for i in page["layout"]
+            if i["widget"]["name"] == "serving_latency_trend"
+        )
+        predicate = " AND ".join(f["expression"] for f in widget["queries"][0]["query"]["filters"])
+        plotted_sql = f"SELECT * FROM ({_sql('serving_windows')}) scoped WHERE {predicate}"
+        plotted = list(connection.execute(plotted_sql, parameters))
+        assert len(plotted) == 13
+        assert {r["report_id"] for r in plotted if r["monitor_id"] == "other"} == {
+            f"other-{i}" for i in range(298, 310)
+        }
+        selected = list(
+            connection.execute(plotted_sql, parameters | {"serving_model": "catalog.schema.a"})
+        )
+        assert len(selected) == 1 and selected[0]["report_id"] == "selected-1"
 
 
 def test_serving_page_shows_bounded_aggregate_context_and_async_empty_state():
@@ -297,19 +335,36 @@ def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
             q["query"]["datasetName"] for q in widgets[name]["queries"]
         }
     errors = widgets["serving_error_trend"]["spec"]
-    assert errors["widgetType"] == "bar" and "mark" not in errors
+    assert errors["widgetType"] == "bar" and errors["mark"]["layout"] == "group"
     assert errors["encodings"]["x"]["fieldName"] == "observation_label"
     colors = {m["value"]: m["color"] for m in errors["encodings"]["color"]["scale"]["mappings"]}
-    assert colors == {"4xx": "#9085E9", "5xx": "#E5484D", "Other / class not recorded": "#7C8CA0"}
-    latency = widgets["serving_latency_trend"]["spec"]["encodings"]
+    assert colors == {
+        "4xx client": "#3B82F6",
+        "5xx server": "#E5484D",
+        "Other / class not recorded": "#7C8CA0",
+    }
+    assert [f["displayName"] for f in errors["encodings"]["y"]["fields"]] == list(colors)
+    assert errors["encodings"]["color"]["legend"]["position"] == "bottom"
+    assert errors["encodings"]["color"]["legend"]["title"] == "HTTP error class"
+    assert errors["encodings"]["label"]["show"] is True
+    assert "Blue: 4xx" in errors["frame"]["description"]
+    assert "Red: 5xx" in errors["frame"]["description"]
+    chart = widgets["serving_latency_trend"]["spec"]
+    assert chart["widgetType"] == "bar" and chart["mark"]["layout"] == "group"
+    latency = chart["encodings"]
+    assert latency["x"]["fieldName"] == "observation_label"
+    assert "lower is faster" in latency["y"]["displayName"]
     assert [f["fieldName"] for f in latency["y"]["fields"]] == [
         "latency_mean_ms",
         "latency_p95_ms",
-        "latency_p99_ms",
     ]
-    assert {"latency_p50_ms", "latency_max_ms", "latency_sample_count"} <= {
-        f["fieldName"] for f in latency["extra"]
-    }
+    assert {
+        "latency_p50_display",
+        "latency_p95_display",
+        "latency_p99_display",
+        "latency_max_ms",
+        "latency_samples_display",
+    } <= {f["fieldName"] for f in latency["extra"]}
     matrix = widgets["serving_latency_distribution"]["spec"]
     assert matrix["widgetType"] == "heatmap"
     assert matrix["encodings"]["color"]["scale"]["domain"] == {"min": 0, "max": 1}

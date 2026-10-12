@@ -2658,7 +2658,12 @@
         " CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count AND classes_complete = 1 THEN status_5xx_count END AS plot_5xx,\n",
         " CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count THEN CASE WHEN classes_complete = 1 THEN status_other_count ELSE error_count END END AS plot_other,\n",
         " concat(date_format(window_end, 'yyyy-MM-dd HH:mm'), ' / ', CAST(ROW_NUMBER() OVER (\n",
-        " PARTITION BY monitor_id, model_version ORDER BY window_end, measured_at, report_id) AS STRING)) AS observation_label\n",
+        " PARTITION BY monitor_id, model_version ORDER BY window_end, measured_at, report_id) AS STRING)) AS observation_label,\n",
+        " ROW_NUMBER() OVER (PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS observation_recency\n",
+        " , COALESCE(CAST(latency_p50_ms AS STRING), 'Not recorded') AS latency_p50_display,\n",
+        " COALESCE(CAST(latency_p95_ms AS STRING), 'Not recorded') AS latency_p95_display,\n",
+        " COALESCE(CAST(latency_p99_ms AS STRING), 'Not recorded') AS latency_p99_display,\n",
+        " COALESCE(CAST(latency_sample_count AS STRING), 'Not recorded') AS latency_samples_display\n",
         "FROM classified\n",
         "ORDER BY window_end DESC, measured_at DESC, report_id DESC\n"
       ],
@@ -11268,6 +11273,20 @@
                     {
                       "expression": "status <> 'failed' AND request_count > 0"
                     }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`report_id`"
+                    }
                   ]
                 }
               }
@@ -11290,11 +11309,11 @@
                   "fields": [
                     {
                       "fieldName": "plot_4xx",
-                      "displayName": "4xx"
+                      "displayName": "4xx client"
                     },
                     {
                       "fieldName": "plot_5xx",
-                      "displayName": "5xx"
+                      "displayName": "5xx server"
                     },
                     {
                       "fieldName": "plot_other",
@@ -11340,11 +11359,11 @@
                     "type": "categorical",
                     "mappings": [
                       {
-                        "value": "4xx",
-                        "color": "#9085E9"
+                        "value": "4xx client",
+                        "color": "#3B82F6"
                       },
                       {
-                        "value": "5xx",
+                        "value": "5xx server",
                         "color": "#E5484D"
                       },
                       {
@@ -11352,14 +11371,22 @@
                         "color": "#7C8CA0"
                       }
                     ]
+                  },
+                  "legend": {
+                    "position": "bottom",
+                    "hideTitle": false,
+                    "title": "HTTP error class"
                   }
+                },
+                "label": {
+                  "show": true
                 }
               },
               "frame": {
                 "showTitle": true,
-                "title": "Which captured errors occurred?",
+                "title": "How many errors of each kind?",
                 "showDescription": true,
-                "description": "4xx, 5xx and other non-2xx responses per observation. Older reports without complete classes keep their total in gray. Repeated windows are separate; do not add them. Platform logging can omit error responses."
+                "description": "Blue: 4xx client errors. Red: 5xx server errors. Gray: other codes or older totals without a recorded class. Each observation has separate bars; 0 means none captured, blank means class not recorded. Repeated windows are separate calculations. Platform logging can omit error responses."
               },
               "facet": {
                 "type": "wrap",
@@ -11377,6 +11404,9 @@
                     "value": 1
                   }
                 }
+              },
+              "mark": {
+                "layout": "group"
               }
             }
           },
@@ -11425,26 +11455,48 @@
                       "expression": "`window_start`"
                     },
                     {
-                      "name": "latency_p50_ms",
-                      "expression": "`latency_p50_ms`"
+                      "name": "latency_p50_display",
+                      "expression": "`latency_p50_display`"
                     },
                     {
                       "name": "latency_p95_ms",
                       "expression": "`latency_p95_ms`"
                     },
                     {
-                      "name": "latency_p99_ms",
-                      "expression": "`latency_p99_ms`"
+                      "name": "latency_p99_display",
+                      "expression": "`latency_p99_display`"
                     },
                     {
-                      "name": "latency_sample_count",
-                      "expression": "`latency_sample_count`"
+                      "name": "latency_samples_display",
+                      "expression": "`latency_samples_display`"
+                    },
+                    {
+                      "name": "observation_label",
+                      "expression": "`observation_label`"
+                    },
+                    {
+                      "name": "latency_p95_display",
+                      "expression": "`latency_p95_display`"
                     }
                   ],
                   "disaggregated": true,
                   "filters": [
                     {
-                      "expression": "status <> 'failed' AND request_count > 0"
+                      "expression": "status <> 'failed' AND request_count > 0 AND observation_recency <= 12"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`report_id`"
                     }
                   ]
                 }
@@ -11452,25 +11504,20 @@
             ],
             "spec": {
               "version": 3,
-              "widgetType": "line",
+              "widgetType": "bar",
               "encodings": {
                 "x": {
-                  "fieldName": "window_end",
-                  "displayName": "Request window end (UTC)",
+                  "fieldName": "observation_label",
+                  "displayName": "Request window end (UTC) / observation",
                   "scale": {
-                    "type": "temporal"
+                    "type": "categorical"
                   },
                   "axis": {
                     "labelAngle": 0
-                  },
-                  "format": {
-                    "type": "date-time",
-                    "date": "locale-number-month",
-                    "time": "locale-hour-minute"
                   }
                 },
                 "y": {
-                  "displayName": "Milliseconds",
+                  "displayName": "Milliseconds per request (lower is faster)",
                   "scale": {
                     "type": "quantitative"
                   },
@@ -11484,15 +11531,11 @@
                   "fields": [
                     {
                       "fieldName": "latency_mean_ms",
-                      "displayName": "Mean"
+                      "displayName": "Average (mean)"
                     },
                     {
                       "fieldName": "latency_p95_ms",
-                      "displayName": "p95"
-                    },
-                    {
-                      "fieldName": "latency_p99_ms",
-                      "displayName": "p99"
+                      "displayName": "Slow requests (p95)"
                     }
                   ]
                 },
@@ -11510,7 +11553,7 @@
                     "displayName": "Request window start (UTC)"
                   },
                   {
-                    "fieldName": "latency_p50_ms",
+                    "fieldName": "latency_p50_display",
                     "displayName": "p50 (ms)"
                   },
                   {
@@ -11518,8 +11561,20 @@
                     "displayName": "Maximum (ms)"
                   },
                   {
-                    "fieldName": "latency_sample_count",
+                    "fieldName": "latency_samples_display",
                     "displayName": "Timed samples"
+                  },
+                  {
+                    "fieldName": "latency_p99_display",
+                    "displayName": "p99 (ms)"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Request window end (UTC)"
+                  },
+                  {
+                    "fieldName": "latency_p95_display",
+                    "displayName": "p95 (ms; Not recorded if unavailable)"
                   }
                 ],
                 "color": {
@@ -11527,16 +11582,12 @@
                     "type": "categorical",
                     "mappings": [
                       {
-                        "value": "Mean",
+                        "value": "Average (mean)",
                         "color": "#3B82F6"
                       },
                       {
-                        "value": "p95",
+                        "value": "Slow requests (p95)",
                         "color": "#D95926"
-                      },
-                      {
-                        "value": "p99",
-                        "color": "#199E70"
                       }
                     ]
                   }
@@ -11544,14 +11595,12 @@
               },
               "frame": {
                 "showTitle": true,
-                "title": "Mean and tail model latency per window",
+                "title": "How long does the model take to answer?",
                 "showDescription": true,
-                "description": "Mean, approximate p95 and p99 of captured execution durations, including failed responses. Not end-to-end latency. Older reports retain mean only; hover for p50, maximum and sample size."
+                "description": "Latest 12 monitoring observations per model/version/context. Each group is one observation. Blue is the average execution time per request; orange is the approximate time 95% of timed requests stayed under. Model computation only, not network time. Missing measurements have no bar and read Not recorded in the detail tooltip; they are not zero. Repeated windows are separate calculations."
               },
               "mark": {
-                "marker": {
-                  "shape": "circle"
-                }
+                "layout": "group"
               },
               "facet": {
                 "type": "wrap",

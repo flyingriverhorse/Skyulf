@@ -728,19 +728,20 @@ enrollments are included.
 | Observation history | All matching saved full observations, with native pagination and an optional history window-end filter; there is no global 100-row cutoff. |
 
 Five charts above the detailed tables show captured requests, HTTP error classes,
-captured error rate, mean/p95/p99 execution latency, and the latency distribution.
+captured error rate, mean/p95 execution latency, and the latency distribution.
 Each model/version/context has a separate panel; **Model**, **Version** and
 **Context** apply to all five. The history window-end control also filters the
-latency matrix, while the latest snapshot stays unchanged. The matrix retains
-only the latest 12 observations per identity before the date selection; use the
+latency matrix, while the latest snapshot stays unchanged. The latency bar chart
+and matrix retain only the latest 12 observations per identity before the date
+selection; use the
 history table to inspect older windows.
 
 | Chart | Reading the result |
 | --- | --- |
 | Captured requests per window | Number of logged requests, including failed responses. One request may contain several prediction rows. |
-| Which captured errors occurred? | Stacked **4xx** (violet), **5xx** (red), and **other non-2xx / class not recorded** (gray). If an older report lacks complete class counts, its entire error total appears in gray. A date plus observation number keeps repeated windows separate. |
+| How many errors of each kind? | Grouped bars with an **HTTP error class** legend: **4xx client** (blue), **5xx server** (red), and **Other / class not recorded** (gray). Value labels show captured counts. Zero means none captured; a missing class count stays blank. If an older report lacks complete class counts, its entire error total appears in gray. A date plus observation number keeps repeated windows separate. |
 | Captured error rate per window | Captured errors divided by captured requests in that same observation. Missing counts, failed observations and zero requests leave it unmeasured. |
-| Mean and tail model latency per window | Mean, approximate p95 and p99, in milliseconds. Hover for p50, maximum and timed sample count. Small samples can make p95 and p99 equal to the maximum; this is not a separate anomaly. |
+| How long does the model take to answer? | Two grouped bars per observation: blue is the average execution time and orange is approximate p95, in milliseconds per request (lower is faster). The last 12 observations per identity are shown separately, including repeated windows. Hover for p50, p99, maximum, timed sample count and exact window timestamps. Small samples can make p95 and p99 equal to the maximum; this is not a separate anomaly. |
 | Where do captured execution times fall? | Nine duration ranges across the latest 12 observations per identity. Each valid column totals 100% of non-null timings. A shared 0-100% blue scale allows comparisons; hover for exact counts and window times. Old, failed, empty or invalid summaries produce no cells. |
 
 For example, a report with ten captured requests, two 4xx responses and one 5xx
@@ -759,7 +760,9 @@ these fields come from saved aggregate reports.
 
 Latest/history tables also show class counts, p50/p95/p99 and timed sample count.
 Older reports retain the fields originally recorded; missing percentiles are
-blank. Running monitoring with the updated Core creates these new fields; simply
+blank in numeric tables and produce no bar. The latency chart's detail tooltip
+shows **Not recorded** for missing p50/p95/p99 and timed sample counts; a recorded
+zero remains zero. Running monitoring with the updated Core creates these new fields; simply
 refreshing or redeploying the dashboard does not backfill old reports. The
 monitoring environment must match the runtime recorded in the registered model
 artifact. Updating the Core requirement alone can fail that runtime check;
