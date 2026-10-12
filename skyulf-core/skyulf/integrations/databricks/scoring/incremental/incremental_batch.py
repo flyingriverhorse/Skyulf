@@ -15,7 +15,7 @@ from skyulf.integrations.databricks.shared._frames import frame_bytes, output_sc
 
 from .....inference.fitted_pipeline import FittedPipelineArtifact
 from .....inference.pipeline_scoring import scoring_counts
-from .....preprocessing.time_series.history import propose_history
+from .....preprocessing.time_series.history import current_history, propose_history
 from ...data.admission import BatchConflictError, PublishAdmission, validate_admission
 from ...data.delta_io.cdf_recovery import (
     CdfHistoryExpired,
@@ -241,18 +241,6 @@ def run_incremental_batch(
             upper_version,
             functions,
         )
-        if frame.empty:
-            return IncrementalBatchResult(
-                prior_version,
-                upper_version,
-                0,
-                0,
-                int(target_receipt["version"]),
-                previous,
-                True,
-                config.model.name,
-                config.model.version,
-            )
         target = spark.table(target_table)
         output_names = check_target(
             spark, selected, target, record_key_columns, period_column, prepared
@@ -628,14 +616,14 @@ def _empty_incremental_predictions(
     prepared: PreparedWorkflow,
     output_names: tuple[str, ...],
 ) -> pd.DataFrame:
-    """Commit an empty bootstrap tail without invoking estimators that require rows."""
+    """Preserve bootstrap or committed history without invoking estimators on empty rows."""
     artifact = prepared.artifact
     if not isinstance(artifact, FittedPipelineArtifact):
         raise TypeError("Empty incremental scoring requires a FittedPipelineArtifact.")
     for step in artifact.pipeline.feature_engineer.fitted_steps:
         params = step["artifact"]
         if params.get("history_mode") == "carry":
-            propose_history(params, [])
+            propose_history(params, current_history(params))
     return pd.DataFrame(columns=output_names)
 
 

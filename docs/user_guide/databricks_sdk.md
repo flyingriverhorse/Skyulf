@@ -577,8 +577,13 @@ print(result.input_count, result.commit_version, result.noop)
 ```
 
 Keep this configuration for scheduled runs; do not supply a period or source
-version on each invocation. A repeat run with no new source inserts makes no
-target write. If an append succeeds but its acknowledgement is lost, the next
+version on each invocation. A repeat at the already committed source version
+makes no target write (`noop=True`). If the source version advances without new
+inserts, scoring commits a zero-row receipt (`noop=False`, both row counts zero)
+to advance the CDF watermark without changing saved predictions or carry history.
+An initially empty source also gets this checkpoint. Monitoring treats it as no
+new prediction batch; configured delayed-label checks still run.
+If an append succeeds but its acknowledgement is lost, the next
 run reads its committed receipt and continues after that source version.
 Source updates and deletes, duplicate keys, a missing or expired change feed,
 and an unrecognized target commit fail without advancing the watermark.
@@ -630,7 +635,9 @@ reconstructs history from that snapshot, without prepending the training seed.
 Later increments read `temporal_history` from the last prediction receipt.
 The new context, source watermark and predictions share one Delta commit.
 A failed write leaves the prior committed context; a retry reads the actual
-receipt, and a no-op makes no write. Receipts have a 64 KiB history budget.
+receipt, and replaying the same source version makes no write. Empty increments
+at newer source versions retain the committed history in their zero-row receipt.
+Receipts have a 64 KiB history budget.
 A changed model or a prior receipt without history requires a fresh target;
 contexts are never silently mixed across models. This is bounded local batch
 execution, not Spark worker or streaming state.

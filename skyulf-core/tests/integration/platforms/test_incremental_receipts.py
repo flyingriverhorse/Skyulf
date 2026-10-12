@@ -2,7 +2,9 @@
 
 import json
 import os
+from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -40,6 +42,38 @@ def test_historical_receipt_queries_keep_unlimited_history():
     spark = Mock()
     history(spark, "workspace.default.predictions")
     spark.sql.assert_called_once_with("DESCRIBE HISTORY `workspace`.`default`.`predictions`")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_empty_increment_keeps_temporal_continuation(tmp_path, engine):
+    """Advancing an empty checkpoint must retain the last rows needed for rolling features."""
+    import numpy as np
+    import pandas as pd
+    from tests.integration.platforms.test_temporal_history import fitted_temporal_pipeline
+
+    from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
+    from skyulf.integrations.databricks.scoring.incremental.history import (
+        history_receipt,
+        incremental_history,
+    )
+    from skyulf.integrations.databricks.scoring.workflow import PreparedWorkflow
+
+    save_pipeline(fitted_temporal_pipeline(engine), tmp_path / "model")
+    artifact = load_pipeline(tmp_path / "model")
+    prepared = cast(PreparedWorkflow, SimpleNamespace(artifact=artifact))
+    rows = pd.DataFrame({"t": [20, 21, 22], "v": [20.0, 21.0, 22.0]})
+    with incremental_history(prepared, None) as first:
+        predict_pipeline(rows[:2], artifact)
+    previous = history_receipt(first)
+    with incremental_history(prepared, previous) as empty:
+        predictions = batch._empty_incremental_predictions(prepared, ("prediction",))
+    assert predictions.empty and list(predictions.columns) == ["prediction"]
+    assert history_receipt(empty) == previous
+    with incremental_history(prepared, history_receipt(empty)):
+        actual = predict_pipeline(rows[2:], artifact)
+    with incremental_history(prepared, None):
+        expected = predict_pipeline(rows, artifact)
+    np.testing.assert_allclose(actual["prediction"], expected["prediction"].iloc[2:])
 
 
 @pytest.fixture(params=["single", "model_set"])
@@ -150,6 +184,98 @@ def test_incremental_continues_after_target_maintenance(receipt_case):
     assert [row.id for row in spark.table(target).orderBy("id").collect()] == [1, 2]
 
 
+@pytest.mark.parametrize("bootstrap", [False, True])
+def test_empty_increment_commits_watermark_and_replays_once(receipt_case, bootstrap):
+    """Empty source windows must advance durable CDF progress without inventing predictions."""
+    spark, source, target, score = receipt_case
+    if bootstrap:
+        spark.sql(f"DELETE FROM {source}").collect()
+        first = None
+    else:
+        first = score()
+        spark.sql(f"ALTER TABLE {source} SET TBLPROPERTIES ('skyulf.test.empty' = 'yes')").collect()
+    upper = batch.latest_source_version(spark, source)["version"]
+    result = score()
+    assert not result.noop
+    assert result.input_count == result.output_count == 0
+    assert result.manifest["source_end_version"] == upper
+    assert result.manifest["source_start_version"] == (
+        None if first is None else first.source_end_version + 1
+    )
+    saved = batch.latest_source_version(spark, target)
+    assert saved["version"] == result.commit_version
+    assert json.loads(saved["userMetadata"]) == result.manifest
+    assert spark.table(target).count() == (0 if bootstrap else 1)
+    replay = score()
+    assert replay.noop and replay.manifest == result.manifest
+    assert replay.commit_version == result.commit_version
+    assert batch.latest_source_version(spark, target)["version"] == result.commit_version
+    _assert_empty_monitoring_window(spark, source, target, result)
+    spark.createDataFrame(
+        [(2, "Tallinn", 9.0)], "id long, city string, amount double"
+    ).write.format("delta").mode("append").saveAsTable(source)
+    next_result = score()
+    assert next_result.input_count == next_result.output_count == 1
+    assert next_result.manifest["source_start_version"] == upper + 1
+    assert [row.id for row in spark.table(target).orderBy("id").collect()] == (
+        [2] if bootstrap else [1, 2]
+    )
+
+
+def _assert_empty_monitoring_window(spark, source, target, result):
+    """A checkpoint without output must not refresh batch freshness in either reader."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        read_current_observation,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_sources import (
+        read_spark_observation,
+    )
+
+    catalog = spark.catalog.currentCatalog()
+    source = source if source.count(".") == 2 else f"{catalog}.{source}"
+    target = target if target.count(".") == 2 else f"{catalog}.{target}"
+    model_set = result.manifest.get("artifact_kind") == "model_set"
+    config = MonitorConfig(
+        environment="test",
+        project="empty_checkpoint",
+        model_name="workspace.test.amount" if model_set else "workspace.test.set",
+        model_version="1",
+        source_table=source,
+        prediction_table=target,
+        **(
+            {
+                "model_set_name": "workspace.test.set",
+                "model_set_version": "1",
+                "model_set_branch": "amount",
+            }
+            if model_set
+            else {}
+        ),
+    )
+    start = spark.sql(f"DESCRIBE HISTORY {target} LIMIT 1").first().timestamp.replace(tzinfo=UTC)
+    end = datetime.now(UTC)
+    for reader in (read_current_observation, read_spark_observation):
+        current, predictions, evidence, observed = reader(
+            spark,
+            config,
+            "1",
+            ("id",),
+            ("city", "amount"),
+            probabilities=0,
+            as_of=end,
+            start=start,
+            end=end,
+        )
+        assert evidence["batches"] == [] and observed is None
+        if reader is read_current_observation:
+            assert current.empty and predictions.empty
+        else:
+            assert current.count() == predictions.count() == 0
+
+
 def test_maintenance_does_not_hide_an_unreceipted_data_write(receipt_case):
     """Skipping maintenance must stop at an intervening data change, never an older good receipt."""
     spark, _, target, score = receipt_case
@@ -208,15 +334,21 @@ def test_prediction_commit_keeps_barriers_and_snapshot_bound(delta_spark, monkey
     assert selected.version == 1 and selected.operation == operation
 
 
-def test_maintenance_during_scoring_still_rejects_stale_publication(receipt_case, monkeypatch):
+@pytest.mark.parametrize("empty", [False, True])
+def test_maintenance_during_scoring_still_rejects_stale_publication(
+    receipt_case, monkeypatch, empty
+):
     """Finding the older receipt must not weaken the physical-version write conflict check."""
     from skyulf.integrations.databricks.model_sets import model_set_batch
 
     spark, source, target, score = receipt_case
     score()
-    spark.createDataFrame(
-        [(2, "Tallinn", 9.0)], "id long, city string, amount double"
-    ).write.format("delta").mode("append").saveAsTable(source)
+    if empty:
+        spark.sql(f"ALTER TABLE {source} SET TBLPROPERTIES ('skyulf.test.empty' = 'yes')").collect()
+    else:
+        spark.createDataFrame(
+            [(2, "Tallinn", 9.0)], "id long, city string, amount double"
+        ).write.format("delta").mode("append").saveAsTable(source)
 
     def maintain_before_commit(original):
         """Inject a real concurrent maintenance commit before the actual guarded publisher."""

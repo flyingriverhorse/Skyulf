@@ -536,8 +536,6 @@ def _run_admitted_set(
     )
     if source_rebuilt:
         prior, write_mode = None, "overwrite"
-    if frame.empty and write_mode != "overwrite":
-        return ModelSetBatchResult(upper, 0, 0, int(receipt_commit["version"]), previous, True)
     scored = _score_increment(artifact, frame, previous, write_mode, max_rows, max_bytes)
     receipt = _publication_receipt(
         model,

@@ -151,6 +151,10 @@ def publish_monitoring_request(dbutils: Any, payload: dict[str, Any]) -> None:
     if registration is None:
         return
     result = payload.get("result", payload)
+    manifest = result.get("manifest") or {}
+    empty_checkpoint = (
+        manifest.get("skyulf_mode") == "incremental_append" and manifest.get("output_count") == 0
+    )
     bindings = (
         {"configs": registration["configs"]}
         if "configs" in registration
@@ -162,7 +166,7 @@ def publish_monitoring_request(dbutils: Any, payload: dict[str, Any]) -> None:
             "namespace": registration["inventory_table"].rsplit(".", 1)[0],
             **bindings,
             "commit_version": result.get("commit_version"),
-            "noop": result.get("noop", False),
-            "has_saved_batch": bool(result.get("manifest")),
+            "noop": result.get("noop", False) or empty_checkpoint,
+            "has_saved_batch": bool(manifest) and not empty_checkpoint,
         },
     )

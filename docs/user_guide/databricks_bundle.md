@@ -1704,8 +1704,11 @@ bounded functional probe after partition-safety and global key checks; saved
 holdout quality gates still evaluate their complete evidence. Existing tables are
 never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
-receipt. A repeat without new rows is a no-op. No monthly date or source
-version is entered for each run.
+receipt. Repeating the committed source version is a no-op. A newer source
+version with no inserts writes a zero-row receipt to advance the watermark;
+saved predictions and temporal history stay intact. Monitoring sees no new
+prediction batch, while configured delayed-label checks continue. No monthly
+date or source version is entered for each run.
 
 With manual approval, the first candidate requires explicit approval to become
 champion. Pinned scoring can use a registered version without that approval. At initialization, choose
