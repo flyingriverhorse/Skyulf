@@ -10,6 +10,7 @@ import json
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
@@ -337,8 +338,11 @@ def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
         "o": "previous",
     }
     payload = {labels[key]: value for key, value in _event_payload(receipt, status).items()}
+    payload["at"] = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     value = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    if len(value.encode("utf-8")) > 256:
+    # Reserve the longest state before preparation can authorize any alias writes.
+    remaining_state_bytes = max(0, len("committed") - len(status))
+    if len(value.encode("utf-8")) + remaining_state_bytes > 256:
         raise ValueError("UC model-version receipt exceeds the 256-byte tag value limit.")
     client.set_model_version_tag(
         receipt.model_name, receipt.new_version, event_tag(receipt.event_id), value
@@ -346,9 +350,15 @@ def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
 
 
 def read_event(raw: str | None) -> Any:
-    """Decode readable receipts while retaining compatibility with compact receipts."""
+    """Decode control fields; validate optional audit time without changing receipt identity.
+
+    The raw readable tag retains ``at`` as the UTC write time of its stored state.
+    Historical readable and compact tags without timestamps remain valid.
+    """
     payload = json.loads(raw) if raw is not None else None
     if isinstance(payload, dict) and "action" in payload:
+        if "at" in payload:
+            _validate_event_time(payload.pop("at"))
         labels = {
             "action": "k",
             "from": "p",
@@ -364,6 +374,15 @@ def read_event(raw: str | None) -> Any:
             raise ValueError("Ambiguous prior-version fields in lifecycle receipt.")
         return {labels[key]: value for key, value in payload.items()}
     return payload
+
+
+def _validate_event_time(value: Any) -> None:
+    """Require a canonical basic ISO-8601 UTC second before ignoring audit metadata."""
+    if not isinstance(value, str):
+        raise ValueError("Lifecycle receipt time must be a UTC timestamp.")
+    parsed = datetime.strptime(value, "%Y%m%dT%H%M%SZ")
+    if parsed.strftime("%Y%m%dT%H%M%SZ") != value:
+        raise ValueError("Lifecycle receipt time must use YYYYMMDDTHHMMSSZ.")
 
 
 def verify_original_receipt(client: Any, receipt: AliasChangeReceipt) -> bool:

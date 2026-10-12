@@ -299,6 +299,24 @@ controlled writers, not tamper-proof authorization tokens.
 The event tag key uses underscores, and its compact value stays within Unity
 Catalog's 256-byte tag-value limit.
 
+New `promotion_<event_id>` tags include `at`, a UTC timestamp such as
+`20261012T182556Z` (12 October 2026, 18:25:56 UTC). It records the writer's clock
+immediately before saving the tag's current `state`: `prepared`, `committed` or
+`aborted`. A final state replaces the preparation time; an unchanged replay keeps
+the saved time. This is not a server commit timestamp or a separate history of
+every phase. Space for the final state is checked before alias changes begin.
+
+Read `at` from the raw model-version tag; `read_event` validates it and returns
+only the control fields used to verify receipts. Existing tags without timestamps
+remain valid and are not backfilled. The returned `AliasChangeReceipt` is unchanged.
+Actor identity is not inferred from the machine or notebook user; use the platform
+audit log to establish who performed a change.
+
+Timestamped tags require Core 0.9.4 or newer: older readers reject the new `at`
+field. Upgrade all jobs that read or write lifecycle tags for the same registered
+model together. After a timestamped event is written, downgrading a job to an older
+Core release will make its lifecycle checks fail. New readers still accept old tags.
+
 `skyulf.integrations.mlflow.lifecycle.rejection.reject_candidate(report, reason=...,
 expected_champion_version=..., admission=..., tracking_uri=..., registry_uri=...)`
 records an explicit operator decision against the exact staged comparison.

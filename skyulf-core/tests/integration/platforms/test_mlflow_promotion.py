@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import asdict, replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -761,12 +762,13 @@ def test_promotion_requires_staged_challenger(case) -> None:
     assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
 
 
-@pytest.mark.parametrize("receipt_format", ["current", "readable_v1"])
+@pytest.mark.parametrize("receipt_format", ["current", "readable_v1", "readable_v2", "compact"])
 def test_promote_and_rollback_persist_receipts(case, receipt_format) -> None:
     """An accepted candidate moves the alias and leaves auditable forward and reverse receipts."""
     client, uri, name, _, _, admission = case
 
     _stage(case)
+    started = datetime.now(UTC).replace(microsecond=0)
     receipt = _promote(case)
     assert receipt.prior_version == "1"
     assert receipt.new_version == "2"
@@ -781,9 +783,22 @@ def test_promote_and_rollback_persist_receipts(case, receipt_format) -> None:
     assert json.loads(tag)["action"] == "promotion"
     assert json.loads(tag)["from_version"] == "1"
     assert "from" not in json.loads(tag)
-    if receipt_format == "readable_v1":
+    assert started <= datetime.fromisoformat(json.loads(tag)["at"]) <= datetime.now(UTC)
+    if receipt_format != "current":
         old_payload = json.loads(tag)
-        old_payload["from"] = old_payload.pop("from_version")
+        del old_payload["at"]
+        if receipt_format == "readable_v1":
+            old_payload["from"] = old_payload.pop("from_version")
+        elif receipt_format == "compact":
+            labels = {
+                "action": "k",
+                "from_version": "p",
+                "proof": "h",
+                "parent": "e",
+                "state": "s",
+                "previous": "o",
+            }
+            old_payload = {labels[key]: value for key, value in old_payload.items()}
         client.set_model_version_tag(
             name, "2", f"promotion_{receipt.event_id}", json.dumps(old_payload)
         )
@@ -808,6 +823,19 @@ def test_promote_and_rollback_persist_receipts(case, receipt_format) -> None:
         "event_id": reversal.event_id,
         "version": "1",
     }
+    saved = client.get_model_version(name, "1").tags[f"promotion_{reversal.event_id}"]
+    assert started <= datetime.fromisoformat(json.loads(saved)["at"]) <= datetime.now(UTC)
+    assert (
+        rollback_promotion(
+            receipt,
+            expected_current_version="2",
+            admission=admission,
+            tracking_uri=uri,
+            registry_uri=uri,
+        )
+        == reversal
+    )
+    assert client.get_model_version(name, "1").tags[f"promotion_{reversal.event_id}"] == saved
 
 
 @pytest.mark.parametrize("previous_version", ["2", "3"])
@@ -1412,3 +1440,86 @@ def test_receipt_rejects_conflicting_version_field_names() -> None:
 
     with pytest.raises(ValueError, match="[Dd]uplicate|[Aa]mbiguous"):
         read_event(json.dumps({"action": "promotion", "from": "1", "from_version": "2"}))
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "initial",
+        "nomination",
+        "challenger",
+        "promotion",
+        "rollback",
+        "rejection",
+        "evaluation_error",
+    ],
+)
+def test_event_timestamp_tracks_each_stored_state(kind, monkeypatch) -> None:
+    """Every lifecycle writer must retain valid UTC time without exhausting the UC tag budget."""
+    from skyulf.integrations.mlflow.lifecycle import promotion
+
+    now = datetime(2026, 10, 12, 18, 25, 56, tzinfo=UTC)
+    clock = Mock(wraps=datetime)
+    clock.now.side_effect = lambda tz: now.astimezone(tz)
+    monkeypatch.setattr(promotion, "datetime", clock, raising=False)
+    client = Mock()
+    previous = None if kind == "evaluation_error" else "9" * 19
+    receipt = AliasChangeReceipt(
+        "event", kind, "model", "champion", "9" * 19, "2", "f" * 64, "e" * 32, previous
+    )
+    for state in ("prepared", "committed", "aborted"):
+        promotion._write_event(client, receipt, state)
+        raw = client.set_model_version_tag.call_args.args[3]
+        payload = json.loads(raw)
+        assert datetime.fromisoformat(payload["at"]) == now
+        assert len(payload["at"]) == 16 and len(raw.encode("utf-8")) <= 256
+        assert promotion.read_event(raw) == {
+            "k": kind,
+            "p": "9" * 19,
+            "h": "f" * 64,
+            "e": "e" * 32,
+            "s": state,
+            "o": previous,
+        }
+        now += timedelta(seconds=1)
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        None,
+        123,
+        "",
+        "202611T182556Z",
+        "20260230T182556Z",
+        "20261012T252556Z",
+        "20261012T182556",
+        "20261012T182556+0000",
+        "２０２６1012T182556Z",
+    ],
+)
+def test_event_timestamp_rejects_malformed_metadata(timestamp) -> None:
+    """Optional audit metadata must not silently accept nulls, impossible dates or ambiguous UTC."""
+    from skyulf.integrations.mlflow.lifecycle.promotion import read_event
+
+    with pytest.raises(ValueError):
+        read_event(json.dumps({"action": "promotion", "state": "committed", "at": timestamp}))
+
+
+def test_event_timestamp_reserves_final_state_before_alias_writes(case) -> None:
+    """A prepared tag fitting exactly must not allow a larger committed tag to fail after mutation."""
+    from skyulf.integrations.mlflow.lifecycle.promotion import commit_change
+
+    client, _, name, _, _, _ = case
+    receipt = AliasChangeReceipt(
+        "bounded", "promotion", name, "champion", "1", "2", "f" * 64, "e" * 70, "2"
+    )
+    before = client.get_registered_model(name)
+    version_tags = client.get_model_version(name, "2").tags
+    with pytest.raises(RegistryOperationError) as caught:
+        commit_change(client, receipt, [("champion", "2", "1")])
+    assert isinstance(caught.value.__cause__, ValueError)
+    assert "256-byte" in str(caught.value.__cause__)
+    after = client.get_registered_model(name)
+    assert after.aliases == before.aliases and after.tags == before.tags
+    assert client.get_model_version(name, "2").tags == version_tags
