@@ -89,7 +89,7 @@ def result_row(
         "window_end": window_end,
         "status": report["status"],
         **{
-            key: int(report.get(key, 0))
+            key: None if report.get(key) is None else int(report[key])
             for key in (
                 "reference_rows",
                 "current_rows",

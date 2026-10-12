@@ -1,7 +1,8 @@
 """Shared monitoring persistence binds snapshots and preserves unobserved models."""
 
+import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import uuid4
@@ -9,6 +10,8 @@ from uuid import uuid4
 import pytest
 
 from skyulf.integrations.databricks.observability.monitoring.monitoring_config import MonitorConfig
+
+COUNT_COLUMNS = ("reference_rows", "current_rows", "scored_rows", "labeled_rows", "drifted_columns")
 
 
 def config():
@@ -36,6 +39,36 @@ def test_result_identity_retries_and_late_labels():
     assert first["report_id"] == retry["report_id"]
     assert first["report_id"] != changed["report_id"]
     assert first["model_name"] == "models.risk.score"
+
+
+@pytest.mark.parametrize(
+    ("counts", "expected"),
+    [
+        ({}, dict.fromkeys(COUNT_COLUMNS)),
+        (dict.fromkeys(COUNT_COLUMNS), dict.fromkeys(COUNT_COLUMNS)),
+        (dict.fromkeys(COUNT_COLUMNS, 0), dict.fromkeys(COUNT_COLUMNS, 0)),
+        (
+            {"reference_rows": "12", "current_rows": 0, "scored_rows": 7},
+            {
+                "reference_rows": 12,
+                "current_rows": 0,
+                "scored_rows": 7,
+                "labeled_rows": None,
+                "drifted_columns": None,
+            },
+        ),
+    ],
+    ids=["absent", "null", "zero", "partial"],
+)
+def test_result_counts_distinguish_unmeasured_from_zero(counts, expected):
+    """Incomplete reports must not fabricate measured zeros or discard available counts."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
+
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    report = {"status": "failed", **counts}
+    row = result_row(config(), "2", now, now, now, report, {})
+    assert {key: row[key] for key in COUNT_COLUMNS} == expected
+    assert json.loads(row["report_json"]) == report
 
 
 def test_optional_metadata_refresh_preserves_observation_identity():
@@ -101,7 +134,7 @@ def test_current_health_does_not_rank_policy_only_windows_as_feature_observation
         {"status": "no_data", "metrics": [], "performance": {"status": "unavailable"}},
         {},
     )
-    assert row["current_rows"] == 0
+    assert row["current_rows"] is None
     assert "current_rows" not in json.loads(row["report_json"])
     query = monitoring_views("ops.monitoring")["current_health"]
     assert "WHERE NOT (status = 'no_data'" in query
@@ -229,6 +262,78 @@ def native_store_namespace(delta_spark):
                     assert store.ensure_owned_object(delta_spark, f"{namespace}.{item.name}")
             delta_spark.sql(f"DROP SCHEMA {table_name(namespace)} CASCADE").collect()
             assert not delta_spark.catalog.databaseExists(namespace)
+
+
+def test_native_nullable_counts_preserve_zero_health_and_legacy_replays(
+    delta_spark, native_store_namespace
+):
+    """Real Delta and health views must distinguish unknown counts without rewriting history."""
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_store as store
+
+    spark = delta_spark
+    namespace = store.ensure_monitoring_store(spark, *native_store_namespace)
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    enrolled = config()
+    zero_config = MonitorConfig.from_dict(enrolled.payload() | {"model_name": "models.risk.zero"})
+    for entry in (enrolled, zero_config):
+        store.enroll_monitor(spark, namespace, entry)
+    legacy = store.result_row(enrolled, "2", now, now, now, {"status": "failed"}, {})
+    legacy.update(dict.fromkeys(COUNT_COLUMNS, 0))
+    store.persist_report(spark, namespace, legacy)
+    retry = store.result_row(enrolled, "2", now, now, now, {"status": "failed"}, {})
+    assert retry["report_id"] == legacy["report_id"]
+    store.persist_report(spark, namespace, retry)
+    later = now + timedelta(days=1)
+    failed = store.result_row(enrolled, "2", later, now, later, {"status": "failed"}, {})
+    zero = store.result_row(
+        zero_config,
+        "2",
+        later,
+        now,
+        later,
+        {"status": "no_data", **dict.fromkeys(COUNT_COLUMNS, 0)},
+        {},
+    )
+    store.persist_report(spark, namespace, failed)
+    store.persist_report(spark, namespace, zero)
+    rows = {
+        row.report_id: row.asDict()
+        for row in spark.table(f"{namespace}.monitoring_results").collect()
+    }
+    assert len(rows) == 3
+    assert all(rows[legacy["report_id"]][key] == 0 for key in COUNT_COLUMNS)
+    assert all(rows[failed["report_id"]][key] is None for key in COUNT_COLUMNS)
+    assert all(rows[zero["report_id"]][key] == 0 for key in COUNT_COLUMNS)
+    assert json.loads(rows[failed["report_id"]]["report_json"]) == {"status": "failed"}
+    summary = spark.sql(
+        f"SELECT count(current_rows) AS measured, avg(current_rows) AS average "
+        f"FROM {namespace}.monitoring_results WHERE report_id <> '{legacy['report_id']}'"
+    ).first()
+    assert summary.measured == 1 and summary.average == 0
+    health = {
+        row.model_name: row.asDict() for row in spark.table(f"{namespace}.current_health").collect()
+    }
+    assert health[enrolled.model_name]["health_status"] == "failed"
+    assert health[enrolled.model_name]["current_rows"] is None
+    assert health[zero_config.model_name]["health_status"] == "no_data"
+    assert health[zero_config.model_name]["current_rows"] == 0
+    latest = later + timedelta(days=1)
+    policy_only = store.result_row(
+        enrolled,
+        "2",
+        latest,
+        later,
+        latest,
+        {"status": "no_data", "performance": {"status": "unavailable"}},
+        {},
+    )
+    store.persist_report(spark, namespace, policy_only)
+    selected = (
+        spark.table(f"{namespace}.current_health")
+        .where(f"model_name = '{enrolled.model_name}'")
+        .first()
+    )
+    assert selected.report_id == failed["report_id"] and selected.current_rows is None
 
 
 @pytest.mark.parametrize("operation", ["ensure_monitoring_store", "initialize_monitoring_store"])

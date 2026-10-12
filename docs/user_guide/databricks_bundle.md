@@ -146,6 +146,13 @@ latest full observation. Confusion-matrix rows are also grouped by model/version
 Counts, scores and windows from different identities are never combined. The three
 Serving history charts remain above their detailed tables.
 
+New `monitoring_results` rows store unmeasured counts as SQL `NULL`: this applies
+to reference, current, scored and labeled rows, and drifted columns. An explicit
+zero remains `0`. Failed or performance-only observations can omit these counts.
+Historical rows and retries keep their saved values; upgrading does not backfill
+old zeros. For custom queries over older reports, check `report_json` to distinguish
+an absent count from a measured zero rather than replacing every `NULL` with `0`.
+
 On **Execution and compute**, copy Workspace and Job ID from **Recent accessible
 jobs** into the two input controls. The list includes one-off runs from the last
 30 days, independently of model enrollment. Inputs also accept IDs not yet listed;
