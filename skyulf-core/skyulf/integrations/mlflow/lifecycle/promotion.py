@@ -887,20 +887,14 @@ def rollback_promotion(
         if active_marker(client, receipt.model_name, current) != receipt.event_id:
             raise AliasConflictError("A newer promotion superseded this rollback receipt.")
         _verify_rollback_roles(client, receipt, current, legacy)
-        # Both rollback destinations must be readable before preparing any writes.
+        # Validate existing destinations before preparing any writes.
         resolve_model(
             receipt.model_name,
             version=receipt.prior_version,
             tracking_uri=tracking_uri,
             registry_uri=registry_uri,
         )
-        if receipt.previous_champion_version is not None:
-            resolve_model(
-                receipt.model_name,
-                version=receipt.previous_champion_version,
-                tracking_uri=tracking_uri,
-                registry_uri=registry_uri,
-            )
+        previous = _rollback_previous_version(client, receipt, tracking_uri, registry_uri)
         reversal = AliasChangeReceipt(
             event_id=uuid4().hex,
             kind="rollback",
@@ -910,15 +904,37 @@ def rollback_promotion(
             new_version=receipt.prior_version,
             comparison_sha256=receipt.comparison_sha256,
             parent_event_id=receipt.event_id,
-            previous_champion_version=receipt.previous_champion_version,
+            previous_champion_version=previous,
         )
         updates: list[tuple[str, str | None, str | None]] = [
             (_ALIAS, receipt.prior_version, current)
         ]
         if not legacy:
-            updates.append((_PREVIOUS, receipt.previous_champion_version, receipt.prior_version))
+            updates.append((_PREVIOUS, previous, receipt.prior_version))
         commit_change(client, reversal, updates)
         return reversal
+
+
+def _rollback_previous_version(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    tracking_uri: str | None,
+    registry_uri: str | None,
+) -> str | None:
+    """Clear a deleted older pointer without treating unreadable artifacts as deleted versions."""
+    previous = receipt.previous_champion_version
+    if previous is None:
+        return None
+    try:
+        client.get_model_version(receipt.model_name, previous)
+    except Exception as exc:  # noqa: BLE001 - distinguish registry absence from artifact errors
+        if error_code(exc) in {"RESOURCE_DOES_NOT_EXIST", "NOT_FOUND"}:
+            return None
+        raise translate_error(exc, name=receipt.model_name, version=previous) from exc
+    resolve_model(
+        receipt.model_name, version=previous, tracking_uri=tracking_uri, registry_uri=registry_uri
+    )
+    return previous
 
 
 def _parse_history_marker(raw: str) -> dict[str, Any]:
@@ -1050,13 +1066,13 @@ def _replayed_rollback(
         new_version=prior_version,
         comparison_sha256=receipt.comparison_sha256,
         parent_event_id=receipt.event_id,
-        previous_champion_version=receipt.previous_champion_version,
+        previous_champion_version=_replayed_previous_version(client, receipt, current, event_id),
     )
     verify_original_receipt(client, reversal)
     if (
         not legacy
         and read_optional_alias(client, receipt.model_name, _PREVIOUS)
-        != receipt.previous_champion_version
+        != reversal.previous_champion_version
     ):
         raise AliasConflictError("Previous champion changed after rollback.")
     challenger = read_optional_alias(client, receipt.model_name, _CHALLENGER)
@@ -1065,6 +1081,22 @@ def _replayed_rollback(
         if challenger == current:
             raise AliasConflictError("Challenger conflicts with the restored champion.")
     return reversal
+
+
+def _replayed_previous_version(
+    client: Any, receipt: AliasChangeReceipt, current: str, event_id: str
+) -> str | None:
+    """Read an explicitly cleared rollback pointer before verifying the complete saved receipt."""
+    if receipt.previous_champion_version is None:
+        return None
+    try:
+        tags = client.get_model_version(receipt.model_name, current).tags or {}
+    except Exception as exc:  # noqa: BLE001 - registry transport boundary
+        raise translate_error(exc, name=receipt.model_name, version=current) from exc
+    event = read_event(tags.get(event_tag(event_id)))
+    if isinstance(event, dict) and "o" in event and event["o"] is None:
+        return None
+    return receipt.previous_champion_version
 
 
 def _verify_rollback_roles(

@@ -1,7 +1,7 @@
 """Explicit alias promotion must preserve pinned comparisons and rollback receipts."""
 
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -36,6 +36,7 @@ from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
 from skyulf.integrations.mlflow.registration.registry import (
     RegistryAccessError,
     RegistryModelNotFoundError,
+    RegistryOperationError,
     register_model,
     resolve_model,
 )
@@ -835,20 +836,35 @@ def test_rollback_restores_prior_previous_champion_pointer(case, previous_versio
     )
 
 
-@pytest.mark.parametrize("unavailable", ["deleted", "denied"])
+@pytest.mark.parametrize("unavailable", ["denied", "transport", "missing_artifact"])
 def test_rollback_unavailable_previous_target_leaves_registry_unchanged(
     case, monkeypatch, unavailable
 ) -> None:
-    """An unavailable second rollback target must fail before any alias or receipt is written."""
+    """Only a deleted version may relax rollback; unreadable existing versions cannot."""
     client, uri, name, _, _, admission = case
     source = client.get_model_version(name, "1")
-    previous = client.create_model_version(name, source.source, run_id=source.run_id)
+    previous_source = (
+        (Path(uri.removeprefix("sqlite:///")).parent / "missing-model").as_uri()
+        if unavailable == "missing_artifact"
+        else source.source
+    )
+    previous = client.create_model_version(name, previous_source, run_id=source.run_id)
     client.set_registered_model_alias(name, "previous_champion", previous.version)
     _stage(case)
     receipt = _promote(case)
     assert receipt.previous_champion_version == str(previous.version)
-    if unavailable == "deleted":
-        client.delete_model_version(name, previous.version)
+    if unavailable == "missing_artifact":
+        original_download = mlflow.artifacts.download_artifacts
+
+        def missing_metadata(*args, **kwargs):
+            """Inject a definite artifact-not-found response for an existing model version."""
+            if kwargs.get("artifact_uri", "").startswith(previous_source):
+                error = mlflow.exceptions.MlflowException("missing metadata")
+                error.error_code = "RESOURCE_DOES_NOT_EXIST"
+                raise error
+            return original_download(*args, **kwargs)
+
+        monkeypatch.setattr(mlflow.artifacts, "download_artifacts", missing_metadata)
         expected_error = RegistryModelNotFoundError
     else:
         original = mlflow.MlflowClient.get_model_version
@@ -856,13 +872,15 @@ def test_rollback_unavailable_previous_target_leaves_registry_unchanged(
         def deny_previous(self, model_name, version, *args, **kwargs):
             """Inject a registry permission refusal only for the second destination."""
             if model_name == name and str(version) == str(previous.version):
-                error = mlflow.exceptions.MlflowException("denied")
-                error.error_code = "PERMISSION_DENIED"
+                error = mlflow.exceptions.MlflowException("registry unavailable")
+                error.error_code = (
+                    "PERMISSION_DENIED" if unavailable == "denied" else "INTERNAL_ERROR"
+                )
                 raise error
             return original(self, model_name, version, *args, **kwargs)
 
         monkeypatch.setattr(mlflow.MlflowClient, "get_model_version", deny_previous)
-        expected_error = RegistryAccessError
+        expected_error = RegistryAccessError if unavailable == "denied" else RegistryOperationError
     model_before = client.get_registered_model(name)
     tags_before = {version: client.get_model_version(name, version).tags for version in ("1", "2")}
 
@@ -885,6 +903,94 @@ def test_rollback_unavailable_previous_target_leaves_registry_unchanged(
     assert {
         version: client.get_model_version(name, version).tags for version in ("1", "2")
     } == tags_before
+
+
+@pytest.fixture
+def deleted_previous_promotion(case):
+    """Leave a valid promotion whose older rollback pointer was actually deleted."""
+    client, uri, name, _, _, admission = case
+    source = client.get_model_version(name, "1")
+    previous = client.create_model_version(name, source.source, run_id=source.run_id)
+    client.set_registered_model_alias(name, "previous_champion", previous.version)
+    _stage(case)
+    receipt = _promote(case)
+    client.delete_model_version(name, previous.version)
+    options = {
+        "expected_current_version": "2",
+        "admission": admission,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    return client, name, receipt, options
+
+
+def test_rollback_deleted_previous_clears_pointer_and_replays(
+    deleted_previous_promotion, monkeypatch
+):
+    """Deleting an older pointer must not block champion recovery or idempotent retry."""
+    client, name, receipt, options = deleted_previous_promotion
+    reversal = rollback_promotion(receipt, **options)
+    assert reversal.new_version == "1"
+    assert reversal.previous_champion_version is None
+    assert json.loads(json.dumps(asdict(reversal)))["previous_champion_version"] is None
+    model = client.get_registered_model(name)
+    assert {alias: str(version) for alias, version in model.aliases.items()} == {"champion": "1"}
+    assert "pending_alias_event" not in model.tags
+    promoted = json.loads(client.get_model_version(name, "2").tags[f"promotion_{receipt.event_id}"])
+    assert promoted["previous"] == receipt.previous_champion_version
+    raw = client.get_model_version(name, "1").tags[f"promotion_{reversal.event_id}"]
+    event = json.loads(raw)
+    assert event["previous"] is None and event["parent"] == receipt.event_id
+    assert event["state"] == "committed" and len(raw.encode("utf-8")) <= 256
+
+    def unexpected_write(*args, **kwargs):
+        """Replay must only verify the committed result, without any new registry writes."""
+        raise AssertionError("rollback replay attempted a write")
+
+    for method in (
+        "set_registered_model_alias",
+        "delete_registered_model_alias",
+        "set_registered_model_tag",
+        "delete_registered_model_tag",
+        "set_model_version_tag",
+    ):
+        monkeypatch.setattr(mlflow.MlflowClient, method, unexpected_write)
+    assert rollback_promotion(receipt, **options) == reversal
+    assert client.get_registered_model(name).tags == model.tags
+
+
+@pytest.mark.parametrize("changed", ["alias", "missing_previous_field"])
+def test_rollback_deleted_previous_replay_rejects_changed_state(
+    deleted_previous_promotion, changed
+):
+    """Only an explicit committed null and an absent alias justify a cleared-pointer replay."""
+    client, name, receipt, options = deleted_previous_promotion
+    reversal = rollback_promotion(receipt, **options)
+    if changed == "alias":
+        client.set_registered_model_alias(name, "previous_champion", "2")
+    else:
+        key = f"promotion_{reversal.event_id}"
+        event = json.loads(client.get_model_version(name, "1").tags[key])
+        del event["previous"]
+        client.set_model_version_tag(name, "1", key, json.dumps(event))
+    before = client.get_registered_model(name)
+    with pytest.raises((AliasConflictError, ValueError)):
+        rollback_promotion(receipt, **options)
+    after = client.get_registered_model(name)
+    assert after.tags == before.tags and after.aliases == before.aliases
+
+
+def test_rollback_missing_prior_champion_still_refuses(deleted_previous_promotion):
+    """A missing older pointer must never authorize rollback to a deleted champion."""
+    client, name, receipt, options = deleted_previous_promotion
+    client.delete_model_version(name, receipt.prior_version)
+    before = client.get_registered_model(name)
+    tags_before = client.get_model_version(name, "2").tags
+    with pytest.raises((AliasConflictError, RegistryModelNotFoundError)):
+        rollback_promotion(receipt, **options)
+    after = client.get_registered_model(name)
+    assert after.tags == before.tags and after.aliases == before.aliases
+    assert client.get_model_version(name, "2").tags == tags_before
 
 
 def test_rollback_rejects_changed_previous_pointer(case) -> None:

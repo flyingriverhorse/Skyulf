@@ -276,6 +276,13 @@ promotion receipt remains reversible. A separate challenger with a verified
 committed lifecycle event survives rollback unchanged. An unverified alias,
 or one pointing at the champion or rollback destination, still blocks rollback.
 
+If the older version recorded as `previous_champion_version` was deleted,
+rollback still restores the prior champion and clears `@previous_champion`;
+the reversal receipt and committed event record a null previous pointer.
+Permission errors, other registry failures, unreadable metadata on an existing
+version, or a missing prior champion still prevent the change. A repeat accepts
+the cleared pointer only while its committed event and absent alias still agree.
+
 MLflow performs these alias changes as separate calls, not one atomic
 transaction. If a later call fails after an earlier alias moved, the operation
 reports an unknown outcome; inspect all three aliases and the prepared event
