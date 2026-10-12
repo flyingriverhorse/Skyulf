@@ -196,6 +196,7 @@ def monitoring_report(
         "reference_rows": reference_count,
         "current_rows": current_count,
         "scored_rows": performance["scored_rows"],
+        "excluded_rows": excluded,
         "labeled_rows": performance["labeled_rows"],
         "label_coverage": performance["label_coverage"],
         "confusion_matrix": performance["confusion_matrix"],

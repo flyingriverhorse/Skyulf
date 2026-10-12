@@ -600,6 +600,7 @@ def build_monitoring_report(
         "reference_rows": len(reference),
         "current_rows": len(current),
         "scored_rows": len(scored),
+        "excluded_rows": excluded,
         "labeled_rows": labeled,
         "label_coverage": labeled / len(scored) if scored else None,
         "drifted_columns": drifted,

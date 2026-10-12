@@ -85,6 +85,7 @@ def test_identical_features_are_healthy_without_labels(engine):
     result = report(engine, reference=reference, current=current, predictions=predictions)
     assert result["status"] == "healthy"
     assert (result["reference_rows"], result["current_rows"], result["scored_rows"]) == (40, 40, 40)
+    assert result["excluded_rows"] == 0
     assert result["labeled_rows"] == 0 and result["label_coverage"] == 0
     assert metric(result, "performance", "accuracy")["status"] == "unavailable"
     json.dumps(result, allow_nan=False)
@@ -211,8 +212,18 @@ def test_excluded_predictions_do_not_enter_performance(engine):
     ]
     result = report(engine, predictions=predictions, labels=labels)
     assert result["scored_rows"] == 1 and result["labeled_rows"] == 1
+    assert json.loads(json.dumps(result, allow_nan=False))["excluded_rows"] == 1
     assert metric(result, "performance", "accuracy")["status"] == "unavailable"
     assert any("excluded" in note for note in result["notes"])
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_missing_predictions_are_not_counted_as_excluded(engine):
+    """Missing saved outputs must remain distinct from explicit scoring exclusions."""
+    result = report(engine, predictions=[{"id": "one", "prediction": "no"}])
+    assert result["current_rows"] == 2
+    assert result["scored_rows"] == 1
+    assert result["excluded_rows"] == 0
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -329,6 +340,7 @@ def test_no_predicted_outputs_cannot_be_healthy(engine, empty):
     )
     result = report(engine, predictions=predictions)
     assert result["scored_rows"] == 0
+    assert result["excluded_rows"] == (0 if empty else 2)
     assert result["status"] == "degraded"
 
 

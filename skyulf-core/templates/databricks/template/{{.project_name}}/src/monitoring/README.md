@@ -343,6 +343,12 @@ scoring when monitoring storage is configured. No JSON model list is required.
 
 ## Measurement and operation
 
+Full monitoring reports include `excluded_rows`: the number of saved prediction
+records explicitly marked `scoring_status="excluded"`. Missing prediction records
+and missing labels do not increase this count. Spark, pandas and Polars reports
+retain it in `report_json`. Existing saved observations are not rewritten; a
+missing count in an older report means unavailable, not zero.
+
 ### Spark execution in generated projects
 
 Generated producer Bundles always use Spark monitoring; no engine selection is

@@ -1,6 +1,7 @@
 """Distributed drift statistics retain exact effect sizes and explicit evidence methods."""
 
 import importlib
+import json
 from decimal import Decimal, localcontext
 
 import numpy as np
@@ -192,3 +193,40 @@ def test_missing_input_requires_saved_prediction(spark):
     missing = next(item for item in report["metrics"] if item["metric_name"] == "missing_fraction")
     assert missing["has_issue"]
     assert report["status"] == "degraded"
+    assert report["excluded_rows"] == 0
+
+
+@pytest.mark.parametrize("excluded", [0, 1, 3, None], ids=["none", "some", "all", "empty"])
+def test_full_report_retains_explicit_exclusion_count(spark, excluded):
+    """Full Spark reports must count only saved exclusions, including empty populations."""
+    from datetime import UTC, datetime
+
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
+        build_spark_monitoring_report,
+    )
+
+    current = spark.createDataFrame([(i, float(i)) for i in range(1, 5)], "id long, x double")
+    rows = (
+        []
+        if excluded is None
+        else [
+            (i, None if i <= excluded else float(i), "excluded" if i <= excluded else "predicted")
+            for i in range(1, 4)
+        ]
+    )
+    predictions = spark.createDataFrame(rows, "id long, prediction double, scoring_status string")
+    report = build_spark_monitoring_report(
+        current,
+        current,
+        predictions,
+        None,
+        feature_columns=("x",),
+        record_key_columns=("id",),
+        target_column="y",
+        result_available_at_column="available",
+        as_of=datetime(2026, 1, 2, tzinfo=UTC),
+        task="regression",
+    )
+    assert report["current_rows"] == 4
+    assert report["scored_rows"] == (0 if excluded is None else 3 - excluded)
+    assert json.loads(json.dumps(report, allow_nan=False))["excluded_rows"] == (excluded or 0)
