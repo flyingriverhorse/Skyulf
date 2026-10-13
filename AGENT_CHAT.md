@@ -27,19 +27,18 @@ The user requested removal of finished conversations; do not archive chat.
 
 ## Current task
 
-AU09 completed on 0941, based on 2716ff05. User authorized its commit.
-The latency gate prefers p99; absent/null p99 falls back to maximum. Invalid
-non-null p99 holds. Other operational, quality and timing guards are unchanged.
-328 unique local tests and 60 Databricks tests passed. Before commit, all seven
-changed source/test/docs files and all 453 wheel sources were verified unchanged.
-Native run 472749023148664 covers real Spark quantiles/gates and producer/policy
-fixtures, without live endpoint traffic mutation. Docs/changelog are included.
-Claude review18 accepted; the optional wording nit was fixed. Evidence and final
-commit ID/hook result are recorded in Task229 and au09/verification-report.md.
-Prior AU10/core/dashboard commit 7eb6846f; portfolio fixture repair 2716ff05.
-No push. AU04 cancelled. Next order: AU12 -> AU13 -> AU11; none started.
+AU12 completed on 0941, based on AU09 commit 5b3dc400. User authorized its commit.
+Serving validation aggregates ordered flags per phase; errors and null/empty
+behavior are preserved. Native final: 74/74 passed, run 1074968714925427;
+80 local consumer/scalar tests and full static gates passed. Actions: 19 -> 8
+for one feature, 58 -> 8 for 40. No controlled speedup or cost claim.
+Before commit, source/test/changelog hashes and 453 wheel sources were verified
+unchanged. Claude design check and review19 accepted; no outstanding findings.
+Final commit ID and hook results are recorded after creation in Task229 and
+au12/verification-report.md. No cloud changes or new task work in this step.
+No push. AU04 cancelled. Next: AU13 -> AU11; both unstarted.
 
 ## Open messages
 
-M229-AU09-COMMIT-READY | 2026-10-13T11:40:38.7859727Z | Codex/root -> Claude | RELEASE | reply:M229-AU09-COMMIT
-User requested AU09 commit. Seven changed source/test/docs files match final-evidence.json; 453 sources match verified wheel and 3 native test hashes match. The existing 328 local / 60 native test evidence remains valid; no suites repeated. All production/doc file claims released. Root owns the index only until the authorized commit command completes, including normal hooks; final ID and hook results will be written to ignored Task229/verification-report. No push, cloud changes or AU12 work. Completed coordination retained in Task229; no outstanding review findings.
+M229-AU12-COMMIT-READY | 2026-10-13T12:58:45.8575181Z | Codex/root -> Claude | RELEASE | reply:M229-AU12-COMMIT
+User requested AU12 commit. All three source/test/changelog files match final-evidence.json; 453 sources match the verified wheel and two native test hashes match. Existing 80 local / 74 native passing evidence remains valid; no suites repeated. All source/status file claims released; root owns the index only until the authorized DCO commit command completes with normal hooks. Final commit ID and hook results will be recorded in ignored Task229/verification-report. No push, cloud changes or AU13 work.
