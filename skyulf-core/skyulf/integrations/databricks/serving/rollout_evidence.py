@@ -404,6 +404,14 @@ def observe_live_rollout(
             return _result(
                 state, now, "HOLD", "Serving observation is missing, stale or future.", details
             )
+        if summary.get("logging_error_count", 0):
+            return _result(
+                state,
+                now,
+                "HOLD",
+                "Serving logging errors prevent complete rollout evidence.",
+                details,
+            )
         verdict, reason = _health_verdict(summary, health_policy)
         if verdict != "PASS":
             return _result(state, now, verdict, reason, details)

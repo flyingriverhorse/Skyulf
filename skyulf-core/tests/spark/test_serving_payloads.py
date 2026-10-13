@@ -109,12 +109,17 @@ def test_operational_summary_keeps_status_classes_and_latency_bucket_boundaries(
     """Every captured error and every timed response must belong to exactly one bucket."""
     durations = [0, 5, 10, 25, 50, 100, 250, 500, 1000, None]
     statuses = [200, 201, 400, 404, 500, 503, 302, 150, 650, 200]
-    rows = [(status, duration, NOW) for status, duration in zip(statuses, durations, strict=True)]
+    rows = [
+        (status, duration, NOW, []) for status, duration in zip(statuses, durations, strict=True)
+    ]
     payloads = spark.createDataFrame(
-        rows, "status_code int, execution_duration_ms long, request_time timestamp"
+        rows,
+        "status_code int, execution_duration_ms long, request_time timestamp, "
+        "logging_error_codes array<string>",
     )
     summary, observed = serving_payloads._summary(payloads, spark.range(7))
     assert summary["request_count"] == 10 and summary["success_count"] == 3
+    assert summary["logging_error_count"] == 0
     assert summary["status_4xx_count"] == summary["status_5xx_count"] == 2
     assert summary["status_other_count"] == 3
     classes = []
@@ -136,9 +141,11 @@ def test_operational_summary_keeps_status_classes_and_latency_bucket_boundaries(
 @pytest.mark.parametrize("durations", [[], [None, None], [12]])
 def test_operational_summary_empty_null_and_single_latency(spark, durations):
     """Unmeasured percentiles remain null and a single timed response has one occupied bucket."""
-    rows = [(200, duration, NOW) for duration in durations]
+    rows = [(200, duration, NOW, None) for duration in durations]
     payloads = spark.createDataFrame(
-        rows, "status_code int, execution_duration_ms long, request_time timestamp"
+        rows,
+        "status_code int, execution_duration_ms long, request_time timestamp, "
+        "logging_error_codes array<string>",
     )
     summary, observed = serving_payloads._summary(payloads, spark.range(0))
     expected = 12.0 if durations == [12] else None
@@ -173,15 +180,6 @@ def test_operational_summary_empty_null_and_single_latency(spark, durations):
             _row("bad", [{"x": 1, "name": "a"}], [{"out_prediction": 3}], sampling_fraction=0.5),
             "sampling",
         ),
-        (
-            _row(
-                "bad",
-                [{"x": 1, "name": "a"}],
-                [{"out_prediction": 3}],
-                logging_error_codes=["MAX_RESPONSE_SIZE_EXCEEDED"],
-            ),
-            "logging",
-        ),
     ],
 )
 def test_partial_or_unsupported_capture_fails_closed(spark, bad_row, match):
@@ -190,12 +188,236 @@ def test_partial_or_unsupported_capture_fails_closed(spark, bad_row, match):
         _parse(spark, [bad_row])
 
 
+def test_logging_errors_exclude_payloads_but_keep_unique_request_counts(spark):
+    """One truncated log must neither erase good predictions nor hide HTTP failures."""
+    good = _row("good", [{"x": 1, "name": "a"}], [{"out_prediction": 2}])
+    null_codes = _row(
+        "null-codes", [{"x": 3, "name": "b"}], [{"out_prediction": 4}], logging_error_codes=None
+    )
+    truncated = _row(
+        "truncated", None, None, logging_error_codes=["MAX_RESPONSE_SIZE_EXCEEDED", "OTHER"]
+    )
+    failed = _row("failed", None, None, status=503, logging_error_codes=["LOGGING_FAILURE"])
+    other = _row("other", None, None, entity="entity-2", logging_error_codes=["OTHER"])
+    current, predictions, summary, _ = _parse(
+        spark,
+        [good, null_codes, truncated, truncated, failed, other],
+        [
+            ("entity-1", "endpoint", "cat.sch.model", "4"),
+            ("entity-2", "endpoint", "cat.sch.model", "5"),
+        ],
+    )
+    assert sorted(r.databricks_request_id for r in current.collect()) == ["good", "null-codes"]
+    assert sorted(r.prediction for r in predictions.collect()) == [2.0, 4.0]
+    assert summary["request_count"] == 4
+    assert summary["success_count"] == 3
+    assert summary["error_count"] == summary["status_5xx_count"] == 1
+    assert summary["logging_error_count"] == 2
+    assert summary["prediction_row_count"] == 2
+
+
+@pytest.mark.parametrize("valid_payload", [False, True])
+def test_all_logging_errors_keep_empty_typed_populations_and_operational_counts(
+    spark, valid_payload
+):
+    """An entirely unusable payload window has no invented feature or prediction rows."""
+    row = _row(
+        "truncated",
+        [{"x": 1, "name": "a"}] if valid_payload else None,
+        [{"out_prediction": 2}] if valid_payload else None,
+        logging_error_codes=["MAX_REQUEST_SIZE_EXCEEDED"],
+    )
+    current, predictions, summary, observed = _parse(spark, [row])
+    assert current.count() == predictions.count() == 0
+    assert current.columns == ["databricks_request_id", "request_row_index", "x", "name"]
+    assert "prediction" in predictions.columns
+    assert summary["request_count"] == summary["success_count"] == 1
+    assert summary["logging_error_count"] == 1
+    assert summary["error_count"] == summary["prediction_row_count"] == 0
+    assert observed == NOW
+
+
+@pytest.mark.parametrize(
+    "overrides,match",
+    [
+        ({"sampling_fraction": 0.5}, "sampling"),
+        ({"databricks_request_id": None}, "identity"),
+        ({"status_code": None}, "metadata"),
+        ({"request_time": None}, "request time"),
+    ],
+)
+def test_logging_errors_do_not_bypass_capture_identity_guards(spark, overrides, match):
+    """Payload exclusion cannot hide missing identity, time, status or sampled traffic."""
+    row = _row("bad", None, None, logging_error_codes=["LOGGING_FAILURE"], **overrides)
+    with pytest.raises(ValueError, match=match):
+        _parse(spark, [row])
+
+
+@pytest.mark.parametrize(
+    "all_flagged,reference_shift,expected_status,expected_decision",
+    [
+        (False, 0, "degraded", "incomplete_drift"),
+        (True, 0, "no_data", "no_drift"),
+        (False, -100, "drift", "ready"),
+    ],
+)
+def test_partial_capture_metrics_preserve_drift_and_performance_eligibility(
+    spark, monkeypatch, all_flagged, reference_shift, expected_status, expected_decision
+):
+    """Real subset metrics retain training signals; missing payloads never become zero error."""
+    from types import SimpleNamespace
+
+    from skyulf.integrations.databricks.jobs.lifecycle.retraining_task import observation_decision
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_performance
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_output import (
+        render_drift_output,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_store import result_row
+    from skyulf.integrations.databricks.observability.monitoring.serving.serving_observation import (
+        add_serving_report_details,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark import (
+        spark_monitoring_sources,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_metrics import (
+        build_spark_monitoring_report,
+    )
+
+    values = range(1, 33)
+    good = _row(
+        "good",
+        [{"x": x, "name": "a" if x % 2 else "b"} for x in values],
+        [{"out_prediction": 2 * x + 5} for x in values],
+    )
+    bad = _row("bad", None, None, logging_error_codes=["MAX_RESPONSE_SIZE_EXCEEDED"])
+    current, predictions, summary, observed = _parse(spark, [bad] if all_flagged else [good, bad])
+    reference = spark.createDataFrame(
+        [(float(x + reference_shift), "a" if x % 2 else "b") for x in values],
+        "x double, name string",
+    )
+    labels = spark.createDataFrame(
+        [("good", x - 1, float(2 * x), NOW) for x in values],
+        "databricks_request_id string, request_row_index int, target double, available_at timestamp",
+    )
+    report = build_spark_monitoring_report(
+        reference,
+        current,
+        predictions,
+        labels,
+        feature_columns=("x", "name"),
+        record_key_columns=("databricks_request_id", "request_row_index"),
+        target_column="target",
+        result_available_at_column="available_at",
+        as_of=NOW,
+        task="regression",
+    )
+    add_serving_report_details(report, summary)
+    config = MonitorConfig(
+        environment="test",
+        project="capture",
+        model_name="cat.sch.model",
+        model_version="4",
+        source_table="cat.sch.payloads",
+        prediction_table="cat.sch.payloads",
+        serving_endpoint="endpoint",
+        execution_engine="spark",
+        reference_namespace="cat.monitoring",
+        label_table="cat.sch.labels",
+        result_available_at_column="available_at",
+        performance_policy={
+            "mode": "retrain",
+            "metric": "mae",
+            "direction": "lower",
+            "baseline": {"kind": "training_holdout", "model_version": "4"},
+            "tolerance": 1.0,
+            "tolerance_mode": "absolute",
+            "window_hours": 24,
+            "label_delay_hours": 24,
+            "minimum_labeled_rows": 10,
+            "minimum_label_coverage": 0.8,
+            "consecutive_windows": 1,
+        },
+    )
+    row = result_row(
+        config, "4", NOW, NOW - timedelta(hours=1), NOW, report, {}, observed_at=observed
+    )
+    assert row["status"] == expected_status
+    assert (row["drifted_columns"] > 0) == (expected_status == "drift")
+    assert (
+        row["current_rows"]
+        == row["scored_rows"]
+        == row["labeled_rows"]
+        == (0 if all_flagged else len(values))
+    )
+    saved = json.loads(row["report_json"])
+    assert saved["serving"]["logging_error_count"] == 1
+    mae = next(m for m in saved["metrics"] if m["metric_name"] == "mae")
+    assert mae["value"] == (None if all_flagged else 5.0)
+    assert "1 captured request" in render_drift_output(row)
+    assert observation_decision(row, config, NOW) == expected_decision
+
+    # Replace only external snapshot/history reads; Spark measurement and policy are real.
+    evidence = {
+        "source_table_id": "payloads",
+        "prediction_table_id": "payloads",
+        "serving": summary,
+    }
+    monkeypatch.setattr(
+        monitoring_performance,
+        "read_serving_observation",
+        lambda *a, **kw: (current, predictions, evidence, observed),
+    )
+    monkeypatch.setattr(
+        spark_monitoring_sources,
+        "read_spark_labels",
+        lambda *a: (labels, {"label_table_id": "labels"}),
+    )
+    monkeypatch.setattr(monitoring_performance, "load_performance_history", lambda *a: [])
+    artifact = SimpleNamespace(
+        manifest=SimpleNamespace(
+            input_columns=("x", "name"),
+            task="regression",
+            classes=(),
+            classification_probabilities=False,
+            pipeline_sha256="a" * 64,
+        ),
+        pipeline=SimpleNamespace(config={}),
+    )
+    spec = SimpleNamespace(record_key_columns=("id",), target_column="target")
+    baseline = {
+        "model_version": "4",
+        "metric": "mae",
+        "contract_digest": monitoring_performance.performance_contract(artifact, spec, config),
+        "value": 0.25,
+        "labeled_rows": 32,
+        "label_coverage": 1.0,
+    }
+    performance = monitoring_performance.observe_performance_safely(
+        spark,
+        "cat.monitoring",
+        config,
+        artifact,
+        spec,
+        {"model_version": "4", "performance_baseline": baseline},
+        NOW + timedelta(days=2),
+    )
+    assert performance["measurement"]["evidence"]["serving"]["logging_error_count"] == 1
+    assert performance["status"] == ("unavailable" if all_flagged else "degraded")
+    assert performance["action"] == ("none" if all_flagged else "request_eligible")
+
+
 def test_conflicting_request_copies_and_entity_mapping_fail(spark):
     """Conflicting retry content or dimension identity cannot be resolved arbitrarily."""
     first = _row("same", [{"x": 1, "name": "a"}], [{"out_prediction": 2}])
     changed = _row("same", [{"x": 1, "name": "a"}], [{"out_prediction": 3}])
     with pytest.raises(ValueError, match="conflicting"):
         _parse(spark, [first, changed])
+    flagged = _row("same", None, None, logging_error_codes=["MAX_RESPONSE_SIZE_EXCEEDED"])
+    with pytest.raises(ValueError, match="conflicting"):
+        _parse(spark, [first, flagged])
     with pytest.raises(ValueError, match="conflicting"):
         _parse(
             spark,

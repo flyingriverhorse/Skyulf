@@ -99,7 +99,7 @@ def _deduplicate(payloads: Any) -> Any:
 
 
 def _check_capture(payloads: Any) -> None:
-    """Reject missing IDs, partial capture, and telemetry sampling."""
+    """Reject missing request metadata and telemetry sampling."""
     fn = _spark_functions()
     if _exists(payloads.filter(fn.col(REQUEST_KEY).isNull() | fn.col("served_entity_id").isNull())):
         raise ValueError("request or served entity identity is missing")
@@ -107,12 +107,6 @@ def _check_capture(payloads: Any) -> None:
         payloads.filter(fn.col("sampling_fraction").isNull() | (fn.col("sampling_fraction") != 1.0))
     ):
         raise ValueError("sampling prevents complete serving observation")
-    if _exists(
-        payloads.filter(
-            fn.col("logging_error_codes").isNotNull() & (fn.size("logging_error_codes") > 0)
-        )
-    ):
-        raise ValueError("logging errors prevent complete serving observation")
     if _exists(payloads.filter(fn.col("request_time").isNull())):
         raise ValueError("serving request time is missing")
     if _exists(payloads.filter(fn.col("status_code").isNull())):
@@ -239,6 +233,7 @@ def _summary(
     fn = _spark_functions()
     total = payloads.agg(
         fn.count("*").alias("requests"),
+        fn.sum(fn.when(fn.size("logging_error_codes") > 0, 1).otherwise(0)).alias("logging_errors"),
         fn.sum(fn.when(fn.col("status_code").between(200, 299), 1).otherwise(0)).alias("successes"),
         fn.sum(fn.when(fn.col("status_code").between(400, 499), 1).otherwise(0)).alias(
             "status_4xx"
@@ -269,6 +264,7 @@ def _summary(
     request_count = int(total.requests)
     return {
         "request_count": request_count,
+        "logging_error_count": int(total.logging_errors or 0),
         "success_count": success_count,
         "error_count": request_count - success_count,
         "status_4xx_count": int(total.status_4xx or 0),
@@ -297,8 +293,10 @@ def parse_serving_payloads(
 ) -> tuple[Any, Any, dict[str, int | float | list[int] | None], datetime | None]:
     """Read one served version into distributed features and saved predictions.
 
-    Only scalar aggregates leave Spark. HTTP failures remain in operational
-    evidence, while successful named rows supply model monitoring populations.
+    Only scalar aggregates leave Spark. HTTP and logging failures remain in
+    operational counts. Only successful requests without logging errors supply
+    features and saved predictions; logging_error_count counts affected requests,
+    not error codes or prediction rows. Identity and sampling checks remain strict.
     """
     fn = _spark_functions()
     _require_columns(payloads, _PAYLOAD_COLUMNS, "inference payloads")
@@ -312,7 +310,10 @@ def parse_serving_payloads(
     selected = _identity(window, entities, endpoint_name, model_name, model_version)
     _check_capture(selected)
     selected = _deduplicate(selected)
-    successes = selected.filter(fn.col("status_code").between(200, 299))
+    successes = selected.filter(
+        fn.col("status_code").between(200, 299)
+        & (fn.col("logging_error_codes").isNull() | (fn.size("logging_error_codes") == 0))
+    )
     parsed = _parse_envelopes(successes)
     current = _typed_records(_expand(parsed, "_inputs"), input_columns)
     predictions = _typed_records(_expand(parsed, "_outputs"), output_columns, output_prefix)

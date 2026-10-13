@@ -2545,6 +2545,8 @@
         " CAST(get_json_object(r.report_json, '$.serving.request_count') AS BIGINT) AS request_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.success_count') AS BIGINT) AS success_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.error_count') AS BIGINT) AS error_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.logging_error_count') AS BIGINT) AS logging_error_count,\n",
+        " COALESCE(CAST(CAST(get_json_object(r.report_json, '$.serving.logging_error_count') AS BIGINT) AS STRING), 'Not recorded') AS logging_errors_display,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_4xx_count') AS BIGINT) AS status_4xx_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_5xx_count') AS BIGINT) AS status_5xx_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_other_count') AS BIGINT) AS status_other_count,\n",
@@ -2630,6 +2632,7 @@
         " CAST(get_json_object(r.report_json, '$.serving.request_count') AS BIGINT) AS request_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.success_count') AS BIGINT) AS success_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.error_count') AS BIGINT) AS error_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.logging_error_count') AS BIGINT) AS logging_error_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_4xx_count') AS BIGINT) AS status_4xx_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_5xx_count') AS BIGINT) AS status_5xx_count,\n",
         " CAST(get_json_object(r.report_json, '$.serving.status_other_count') AS BIGINT) AS status_other_count,\n",
@@ -2660,6 +2663,7 @@
         " concat(date_format(window_end, 'yyyy-MM-dd HH:mm'), ' / ', CAST(ROW_NUMBER() OVER (\n",
         " PARTITION BY monitor_id, model_version ORDER BY window_end, measured_at, report_id) AS STRING)) AS observation_label,\n",
         " ROW_NUMBER() OVER (PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS observation_recency\n",
+        " , COALESCE(CAST(logging_error_count AS STRING), 'Not recorded') AS logging_errors_display\n",
         " , COALESCE(CAST(latency_p50_ms AS STRING), 'Not recorded') AS latency_p50_display,\n",
         " COALESCE(CAST(latency_p95_ms AS STRING), 'Not recorded') AS latency_p95_display,\n",
         " COALESCE(CAST(latency_p99_ms AS STRING), 'Not recorded') AS latency_p99_display,\n",
@@ -10675,6 +10679,10 @@
                     {
                       "name": "latency_p99_ms",
                       "expression": "`latency_p99_ms`"
+                    },
+                    {
+                      "name": "logging_errors_display",
+                      "expression": "`logging_errors_display`"
                     }
                   ],
                   "disaggregated": true,
@@ -10698,7 +10706,7 @@
                 "showTitle": true,
                 "title": "Latest observation per context",
                 "showDescription": true,
-                "description": "One row per enrolled monitor; a failed latest observation clears earlier counts."
+                "description": "One row per enrolled monitor; a failed latest observation clears earlier counts. Requests with logging errors remain in counts; their payloads are excluded from drift and performance."
               },
               "encodings": {
                 "columns": [
@@ -10741,6 +10749,10 @@
                   {
                     "fieldName": "error_count",
                     "displayName": "Captured errors"
+                  },
+                  {
+                    "fieldName": "logging_errors_display",
+                    "displayName": "Requests with logging errors"
                   },
                   {
                     "fieldName": "latency_mean_ms",
@@ -10948,6 +10960,10 @@
                     {
                       "name": "latency_p99_ms",
                       "expression": "`latency_p99_ms`"
+                    },
+                    {
+                      "name": "logging_errors_display",
+                      "expression": "`logging_errors_display`"
                     }
                   ],
                   "disaggregated": true,
@@ -10971,7 +10987,7 @@
                 "showTitle": true,
                 "title": "Observation history - windows may overlap",
                 "showDescription": true,
-                "description": "All matching saved observations with native pagination; history date selection leaves the latest snapshot unchanged."
+                "description": "All matching saved observations with native pagination; history date selection leaves the latest snapshot unchanged. Requests with logging errors remain in counts; their payloads are excluded from drift and performance."
               },
               "encodings": {
                 "columns": [
@@ -11014,6 +11030,10 @@
                   {
                     "fieldName": "error_count",
                     "displayName": "Captured errors"
+                  },
+                  {
+                    "fieldName": "logging_errors_display",
+                    "displayName": "Requests with logging errors"
                   },
                   {
                     "fieldName": "latency_mean_ms",
@@ -11122,6 +11142,10 @@
                     {
                       "name": "window_start",
                       "expression": "`window_start`"
+                    },
+                    {
+                      "name": "logging_errors_display",
+                      "expression": "`logging_errors_display`"
                     }
                   ],
                   "disaggregated": true,
@@ -11178,6 +11202,10 @@
                   {
                     "fieldName": "window_start",
                     "displayName": "Request window start (UTC)"
+                  },
+                  {
+                    "fieldName": "logging_errors_display",
+                    "displayName": "Requests with logging errors"
                   }
                 ]
               },
@@ -11185,7 +11213,7 @@
                 "showTitle": true,
                 "title": "Captured requests per window",
                 "showDescription": true,
-                "description": "Requests in each time window. Each context is separate; repeated or overlapping windows must not be added together."
+                "description": "Requests in each time window. Each context is separate; repeated or overlapping windows must not be added together. Requests with logging errors remain in counts; their payloads are excluded from drift and performance."
               },
               "mark": {
                 "marker": {

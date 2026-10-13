@@ -146,6 +146,47 @@ latest full observation. Confusion-matrix rows are also grouped by model/version
 Counts, scores and windows from different identities are never combined. The three
 Serving history charts remain above their detailed tables.
 
+Serving monitoring keeps captured requests with `logging_error_codes` in the
+HTTP request and status counts, but excludes their input/output payloads from
+drift and model-performance calculations. Exact duplicate deliveries count once;
+conflicting copies of the same request still fail validation. A logging error
+does not turn a successful HTTP response into an HTTP failure.
+
+An otherwise healthy observation becomes `degraded`; measured `drift` and
+`no_data` retain their existing status. Capture completeness is reported separately:
+the saved report's
+`serving.logging_error_count` counts affected requests, not individual error codes
+or prediction rows. The notebook's **Observation notes** shows the excluded count.
+For example, two usable predictions and one request with a truncated log retain
+the two predictions' metrics, with an explicit warning about the missing payload.
+If every payload is excluded, drift and performance remain unavailable.
+
+Metrics on the retained subset may not represent the missing requests. Logging
+errors alone do not block retraining: statistically supported drift or a measured
+performance-policy breach can still request training, subject to the existing
+minimum data, label coverage, consecutive-window and cooldown checks. Candidate
+comparison still decides whether a newly trained model qualifies for promotion.
+The notebook's **Performance policy evidence** shows the affected request count
+for that policy's own window and warns when it uses a partial population. With no
+usable predictions or sufficient labels, the policy remains `unavailable`.
+Daily rollout returns `HOLD` for incomplete capture, so it cannot increase traffic or
+automatically promote the challenger. Missing identity, timestamps or HTTP status,
+and capture sampling other than 100%, still reject the observation. Counts describe
+captured logs rather than all endpoint traffic. Old reports are not rewritten;
+recomputing a window with the new summary can create a new report identity.
+
+The **Online serving** dashboard page shows **Requests with logging errors**
+beside **Captured errors** in **Latest observation per context** and
+**Observation history - windows may overlap**. Hover over a point in
+**Captured requests per window** to see the same count for that observation.
+`0` means the saved observation recorded no logging errors; **Not recorded**
+means the count is absent, including reports saved before this field was added.
+For example, an observation can have 10 captured requests, no HTTP errors and
+2 requests with logging errors: those two requests remain in the request count,
+but their payloads are excluded from drift and performance. Logging errors are
+not added to the HTTP error-class chart. Model, version and context selections
+continue to scope these values; overlapping windows must not be added together.
+
 New `monitoring_results` rows store unmeasured counts as SQL `NULL`: this applies
 to reference, current, scored and labeled rows, and drifted columns. An explicit
 zero remains `0`. Failed or performance-only observations can omit these counts.

@@ -18,7 +18,11 @@ from .monitoring_store import (
     persist_report,
     result_row,
 )
-from .serving.serving_observation import observation_keys, read_serving_observation
+from .serving.serving_observation import (
+    add_serving_report_details,
+    observation_keys,
+    read_serving_observation,
+)
 
 
 def observe_model(
@@ -115,11 +119,7 @@ def observe_model(
         thresholds=config.thresholds,
     )
     if config.serving_endpoint:
-        report["serving"] = observed_evidence["serving"]
-        report.setdefault("notes", []).append(
-            "Serving observations describe captured requests; platform logging is asynchronous "
-            "and may omit HTTP error responses. Counts are not total endpoint traffic."
-        )
+        add_serving_report_details(report, observed_evidence["serving"])
     if config.performance_policy:
         from .monitoring_performance import observe_performance_safely  # noqa: PLC0415
 

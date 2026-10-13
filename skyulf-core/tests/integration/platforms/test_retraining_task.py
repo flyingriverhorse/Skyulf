@@ -165,6 +165,25 @@ def _ready_candidate(config, *, content="a" * 64):
     }
 
 
+@pytest.mark.parametrize(
+    "serving,expected",
+    [
+        ({}, "ready"),
+        ({"logging_error_count": 0}, "ready"),
+        ({"logging_error_count": 1}, "ready"),
+    ],
+)
+def test_supported_drift_remains_eligible_with_partial_serving_capture(serving, expected):
+    """Logging exclusions must not suppress statistically supported retraining signals."""
+    now = datetime(2026, 10, 13, tzinfo=UTC)
+    config = monitor()
+    row = observation(config, now)
+    report = json.loads(row["report_json"])
+    report["serving"] = serving
+    row["report_json"] = json.dumps(report)
+    assert observation_decision(row, config, now) == expected
+
+
 def _job(name="demo_train", job_id=123):
     """Retain the server-returned name so lookup cannot trust a broad API filter."""
     return SimpleNamespace(job_id=job_id, settings=SimpleNamespace(name=name))

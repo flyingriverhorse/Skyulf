@@ -351,6 +351,8 @@ def test_live_exact_stage_metrics_and_physical_evidence(live):
         ({"latency_max_ms": 101.0}, "FAIL"),
         ({"latency_max_ms": None}, "HOLD"),
         ({"error_count": True}, "HOLD"),
+        ({"logging_error_count": 1}, "HOLD"),
+        ({"logging_error_count": 0}, "PASS"),
     ],
 )
 def test_live_health_thresholds(live, change, expected):

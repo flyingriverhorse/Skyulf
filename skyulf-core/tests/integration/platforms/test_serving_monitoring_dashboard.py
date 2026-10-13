@@ -41,6 +41,7 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         "latency_p50_ms": 12,
         "latency_p95_ms": 20,
         "latency_p99_ms": 30,
+        "logging_error_count": 2,
     }
     cases = [
         ("new", "healthy", complete),
@@ -50,7 +51,23 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         ("negative", "healthy", complete | {"status_4xx_count": -1, "status_other_count": 4}),
         ("failed", "failed", complete),
         ("zero", "healthy", {"request_count": 0, "error_count": 0}),
-        ("zero_timing", "healthy", complete | {"latency_p95_ms": 0, "latency_sample_count": 0}),
+        ("null_logging", "healthy", complete | {"logging_error_count": None}),
+        (
+            "http_success",
+            "degraded",
+            complete
+            | {
+                "error_count": 0,
+                "status_4xx_count": 0,
+                "status_5xx_count": 0,
+                "status_other_count": 0,
+            },
+        ),
+        (
+            "zero_timing",
+            "healthy",
+            complete | {"latency_p95_ms": 0, "latency_sample_count": 0, "logging_error_count": 0},
+        ),
     ]
     with sqlite3.connect(":memory:") as connection:
         connection.row_factory = sqlite3.Row
@@ -79,6 +96,33 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         assert float(rows["new"]["latency_p95_display"]) == 20
         assert float(rows["zero_timing"]["latency_p95_display"]) == 0
         assert str(rows["zero_timing"]["latency_samples_display"]) == "0"
+        assert rows["new"]["logging_error_count"] == 2
+        assert str(rows["new"]["logging_errors_display"]) == "2"
+        assert rows["zero_timing"]["logging_error_count"] == 0
+        assert str(rows["zero_timing"]["logging_errors_display"]) == "0"
+        for name in ("legacy", "null_logging"):
+            assert rows[name]["logging_error_count"] is None
+            assert rows[name]["logging_errors_display"] == "Not recorded"
+        assert rows["http_success"]["logging_error_count"] == 2
+        assert rows["http_success"]["error_count"] == 0
+        assert all(rows["http_success"][key] == 0 for key in ("plot_4xx", "plot_5xx", "plot_other"))
+        latest = list(connection.execute(_sql("serving_current"), params))
+        assert len(latest) == 1 and latest[0]["report_id"] == "zero_timing"
+        assert latest[0]["logging_error_count"] == 0
+        assert str(latest[0]["logging_errors_display"]) == "0"
+        for name, expected in (
+            ("new", "2"),
+            ("legacy", "Not recorded"),
+            ("null_logging", "Not recorded"),
+        ):
+            connection.execute("DELETE FROM monitoring_results")
+            summary = next(summary for case, _, summary in cases if case == name)
+            connection.execute(
+                "INSERT INTO monitoring_results VALUES ('m','1',?,0,1,2,'healthy',?,'config')",
+                (name, json.dumps({"serving": summary})),
+            )
+            row = connection.execute(_sql("serving_current"), params).fetchone()
+            assert str(row["logging_errors_display"]) == expected
         for name in ("legacy", "partial"):
             assert rows[name]["plot_4xx"] is rows[name]["plot_5xx"] is None
             assert rows[name]["plot_other"] == 3
@@ -316,6 +360,8 @@ def test_latest_serving_status_does_not_reuse_old_success_after_failure():
         assert set(rows) == {"online", "other"}
         assert rows["online"]["status"] == "failed"
         assert rows["online"]["request_count"] is None
+        assert rows["online"]["logging_error_count"] is None
+        assert rows["online"]["logging_errors_display"] == "Not recorded"
         assert rows["other"]["request_count"] == 20
         assert rows["other"]["served_version"] == "3"
         windows = list(connection.execute(_sql("serving_windows"), params))
@@ -369,3 +415,30 @@ def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
     assert matrix["widgetType"] == "heatmap"
     assert matrix["encodings"]["color"]["scale"]["domain"] == {"min": 0, "max": 1}
     assert matrix["facet"]["fieldName"] == "model_identity"
+
+
+def test_logging_exclusions_are_bound_to_tables_and_volume_tooltip_only():
+    """Logging exclusions must be visible without becoming another HTTP error series."""
+    widgets = {i["widget"]["name"]: i["widget"] for p in _data()["pages"] for i in p["layout"]}
+    field = "logging_errors_display"
+    for name in ("serving_current", "serving_windows", "serving_volume_trend"):
+        widget = widgets[name]
+        assert {"name": field, "expression": f"`{field}`"} in widget["queries"][0]["query"][
+            "fields"
+        ]
+        encodings = widget["spec"]["encodings"]
+        entries = encodings["extra" if name == "serving_volume_trend" else "columns"]
+        column = next(item for item in entries if item["fieldName"] == field)
+        assert column == {"fieldName": field, "displayName": "Requests with logging errors"}
+        if name != "serving_volume_trend":
+            assert (
+                entries.index(column)
+                == next(i for i, item in enumerate(entries) if item["fieldName"] == "error_count")
+                + 1
+            )
+        assert (
+            "payloads are excluded from drift and performance"
+            in widget["spec"]["frame"]["description"]
+        )
+    assert widgets["serving_volume_trend"]["spec"]["encodings"]["y"]["fieldName"] == "request_count"
+    assert field not in json.dumps(widgets["serving_error_trend"])
