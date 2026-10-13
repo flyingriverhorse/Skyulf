@@ -1,5 +1,14 @@
 # Spark ve MLflow — Open Queue
 
+> **13 Ekim 2026 güncellemesi:** Integration/monitoring için güncel sıra ve
+> Spark dışındaki kalan işler [223 takip belgesinde](223-delivery-order-tracker.md)
+> birleştirildi. Bu geniş kuyruktaki eski WAIT/PARTIAL etiketleri doğrudan eksik
+> özellik sayısı değildir: SM-47'nin Inputs kısmı S04'te teslim edildi; SM-53'ün
+> adlandırdığı `local_retraining.py` artık yok. SM-19b `ai_query` uygulanmış,
+> daha geniş kimlik/tip kabulü açıktır. Aşağıdaki eski teslimat bağlantılarının
+> bir kısmı önceki temizliklerde kaldırılmıştır; `.superpowers` ham kanıtları da
+> kullanıcı tarafından silinmiştir. Bu tur yeni runtime/cloud kabulü yapılmadı.
+
 > Active queue: this file (`OPEN_QUEUE_updated.md`), confirmed by the user on
 > 2026-09-28. Use this task order and its added scopes for further work.
 > Feature lifecycle continuation (2026-10-07): new Bundles generate authoritative
