@@ -34,7 +34,7 @@ from .rollout_policy import RolloutEvidence, RolloutState
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RolloutHealthPolicy:
-    """Require explicit operational and label coverage thresholds for live admission."""
+    """Require operational and label bounds, using p99 latency or maximum when absent."""
 
     minimum_requests: int
     maximum_error_rate: float
@@ -310,7 +310,14 @@ def _health_verdict(summary: dict, policy: RolloutHealthPolicy) -> tuple[str, st
         return "HOLD", "Insufficient serving requests for this stage."
     if summary["error_count"] / count > policy.maximum_error_rate:
         return "FAIL", "Serving error rate exceeds the configured maximum."
-    latency = summary.get("latency_max_ms")
+    return _latency_verdict(summary, policy)
+
+
+def _latency_verdict(summary: dict, policy: RolloutHealthPolicy) -> tuple[str, str]:
+    """Bound measured p99, using the legacy maximum only when p99 is unavailable."""
+    latency = summary.get("latency_p99_ms")
+    if latency is None:
+        latency = summary.get("latency_max_ms")
     if not _finite(latency) or latency < 0:
         return "HOLD", "Serving latency is unavailable."
     if latency > policy.maximum_latency_ms:

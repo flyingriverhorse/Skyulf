@@ -68,6 +68,45 @@ def _parse(spark, rows, entity_rows=None, *, output_columns=(("out_prediction", 
     )
 
 
+@pytest.mark.parametrize(
+    "durations,percentile,maximum,expected",
+    [
+        ([10] * 999 + [1000], 10.0, 1000.0, "PASS"),
+        ([10] * 980 + [200] * 20, 200.0, 200.0, "FAIL"),
+        ([0] * 1000, 0.0, 0.0, "PASS"),
+        ([None] * 1000, None, None, "HOLD"),
+    ],
+    ids=["isolated-outlier", "slow-tail", "measured-zero", "unmeasured"],
+)
+def test_native_latency_percentile_drives_rollout_health(
+    spark, durations, percentile, maximum, expected
+):
+    """Native Spark aggregates must distinguish an isolated outlier from a slow tail."""
+    from skyulf.integrations.databricks.serving.rollout_evidence import (
+        RolloutHealthPolicy,
+        _health_verdict,
+    )
+
+    payloads = spark.createDataFrame(
+        [(200, duration, NOW, []) for duration in durations],
+        "status_code int, execution_duration_ms long, request_time timestamp, "
+        "logging_error_codes array<string>",
+    )
+    summary, observed = serving_payloads._summary(payloads, spark.range(0))
+    assert summary["request_count"] == summary["latency_sample_count"] + durations.count(None)
+    assert summary["latency_p99_ms"] == percentile
+    assert summary["latency_max_ms"] == maximum
+    assert observed == NOW
+    health = RolloutHealthPolicy(
+        minimum_requests=100,
+        maximum_error_rate=0.01,
+        maximum_latency_ms=100.0,
+        minimum_labeled_rows=2,
+        minimum_label_coverage=0.5,
+    )
+    assert _health_verdict(summary, health)[0] == expected
+
+
 def test_multirecord_request_keeps_ordinal_nulls_and_deduplicates(spark):
     """Retries cannot multiply predictions or lose null features and row order."""
     row = _row(

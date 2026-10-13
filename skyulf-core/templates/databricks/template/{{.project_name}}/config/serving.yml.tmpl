@@ -46,6 +46,7 @@ rollout:
   health:
     minimum_requests: 100
     maximum_error_rate: 0.01
+    # Bounds p99 model execution time; absent/null p99 falls back to the maximum.
     maximum_latency_ms: 1000.0
     minimum_labeled_rows: 30
     minimum_label_coverage: 0.8

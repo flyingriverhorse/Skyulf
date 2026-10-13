@@ -33,6 +33,20 @@ and registry aliases are separate: reaching 100% does not itself change an alias
 The final approval also checks that the original champion, challenger, comparison
 digest and quality policy still match.
 
+Starting with Core 0.9.4, `health.maximum_latency_ms` bounds **p99 model execution
+time**, the duration at or below which approximately 99% of timed captured
+requests fall. A single unusually slow request can exceed the threshold without
+failing the stage. For example, p99 of 80 ms passes a 100 ms limit even if the
+maximum is 900 ms; p99 of 120 ms fails the same limit and requests rollback.
+This measures model execution, not total client/network response time.
+
+If `latency_p99_ms` is absent or null, the check falls back to `latency_max_ms`
+for older summaries. Recorded zero is valid. An invalid non-null p99, or no
+usable latency in either field, holds the stage. The setting name and unit stay
+unchanged, but its meaning changes from always checking the maximum; review
+your limit before upgrading the controller. Error-rate, minimum request and
+label counts, quality, stage duration and incomplete-log checks still apply.
+
 ## Prepare an isolated endpoint
 
 Use a new A/B endpoint name. Keep an existing SQL function's pinned endpoint
@@ -156,7 +170,7 @@ Fill `rollout` in `config/serving.yml`:
   The job calls both named served versions directly, including the version with
   zero routed traffic.
 - Configure minimum request and label counts, label coverage, maximum error
-  rate and maximum latency in `health`.
+  rate and the latency limit (p99) in `health`.
 - Configure `monitoring` for the concrete challenger version and endpoint.
   `source_table` and `prediction_table` select its inference payload table.
   Use `execution_engine: spark`, an existing `reference_namespace`, and a label

@@ -794,9 +794,13 @@ artifact. Updating the Core requirement alone can fail that runtime check;
 prepare a compatible model artifact before upgrading its monitoring jobs. Because
 serving evidence participates in observation identity, recomputing an old window
 with these added fields creates a new report identity. History can therefore
-contain both calculations of the same window. The rollout controller continues
-to use its existing maximum-latency and error-rate checks; percentiles do not
-replace its admission or promotion gates.
+contain both calculations of the same window. Starting with Core 0.9.4, the
+rollout controller applies `health.maximum_latency_ms` to p99 model execution
+time, falling back to the maximum only when p99 is absent or null. Review this
+limit when upgrading from the previous maximum-only check. Invalid non-null
+p99 holds the stage; request, error-rate, label, quality, timing and incomplete-log
+checks remain in force. Dashboard charts display measurements and do not change
+traffic or promote models.
 
 Observation history also shows prediction rows per captured request when saved.
 Its denominator includes failed captured requests. Request counts and latency
