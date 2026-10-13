@@ -59,11 +59,19 @@ Later runs validate and reuse existing objects without replacing their data or
 view definitions. Explicit `initialize_monitoring_store` remains the upgrade API
 for deliberately refreshing view definitions.
 
+When a release adds views, run that owner upgrade **before upgrading producer
+jobs**. Bootstrap still needs CREATE permission for any missing object; a writer
+with only SELECT/MODIFY fails with the platform's permission error until the owner
+creates the missing views. There is no fallback to partially initialized storage.
+
 | Object | First initialization | Later runs |
 | --- | --- | --- |
 | `model_inventory` (Delta) | Create if absent | Producer MERGE inserts/updates one environment/project/model identity. |
 | `monitoring_results` (Delta) | Create if absent | Monitoring job inserts immutable observations; exact retries deduplicate. |
+| `complete_observations` (view) | Create before dependent views | Exclude policy-only late-label reports from feature/serving selection; preserve failed and zero-row observations. |
 | `current_health` (view) | Create if absent | Reuse; read inventory and latest applicable observation. |
+| `monitoring_identities` (view) | Create after `current_health` | Include enrolled and historical model/version/context identities, including unresolved versions; latest measurement time counts full observations only. |
+| `serving_windows` (view) | Create after `complete_observations` | Share enabled, current-configuration serving windows, error-class fallback and per-context/version ordering across charts. |
 | `metric_history` (view) | Create if absent | Reuse; expand stored report metrics for dashboard queries. |
 | `performance_actions` (Delta) | Create if absent | Append request and skip receipts without rewriting observations. |
 | `retraining_requests` (Delta) | Create if absent with Serializable isolation | Retain request identities, submission receipts and a shared cooldown gate per training job. |
@@ -290,10 +298,35 @@ and minimum new labeled training-row settings are shared request guards for
 either retraining trigger. Model evaluation and approval rules still apply.
 
 For an explicit schema/view upgrade, run `initialize_monitoring_store` after installing the updated Core requirement
-and before updating the dashboard. This adds `performance_actions` and `performance_history`;
-the inventory and observation table schemas stay compatible. Producers using
+and **before deploying or publishing the updated dashboard**. The dashboard reads
+`complete_observations`, `monitoring_identities` and `serving_windows`; refreshing
+an older deployment does not install these dependencies. In an owner-run notebook:
+
+```python
+from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+    initialize_monitoring_store,
+)
+
+namespace = initialize_monitoring_store(spark, monitoring_catalog, monitoring_schema)
+for view in ("complete_observations", "monitoring_identities", "serving_windows"):
+    spark.table(f"{namespace}.{view}").limit(0).collect()
+```
+
+Grant dashboard viewers SELECT on the new views, using the same access policy as
+the existing monitoring views, then publish. The initializer checks ownership of
+every object before changing any of them. Normal producer bootstrap creates only
+missing views and never replaces existing definitions. The inventory and
+observation table schemas and saved data stay compatible. Producers using
 automatic performance retraining also need CREATE TABLE in the monitoring schema
 when the action table is absent, and SELECT/MODIFY on `performance_actions`.
+
+Projects on different Core versions share these views. Keep existing columns and
+their meanings compatible across those versions; coordinate owner upgrades with
+all consumers before changing a view contract. Owner-run monitoring can replace
+view definitions using its installed Core version. Adding a result-table column
+also requires reinitialization to refresh the views' stored column lists.
+Chart labels and missing-value display text stay in the dashboard, so wording
+changes do not require a store upgrade.
 
 Monitoring is enabled by default in newly generated Bundles. Set the independent
 catalog/schema before running them; use monitoring_enabled: "false" to opt out.

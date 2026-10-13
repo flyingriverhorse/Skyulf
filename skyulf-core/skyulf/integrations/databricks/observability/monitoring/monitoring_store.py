@@ -8,6 +8,11 @@ from uuid import uuid4
 
 from ...shared._contracts import table_name
 from .monitoring_config import MonitorConfig, json_digest, qualified_name, store_namespace
+from .monitoring_dashboard_views import (
+    FULL_OBSERVATION,
+    complete_observations_query,
+    dashboard_views,
+)
 from .monitoring_details import investigation_views, observation_identity
 
 OWNER = "skyulf.monitoring.v1"
@@ -132,15 +137,8 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
         "monitoring_results": RESULT_SCHEMA,
         "retraining_requests": REQUEST_SCHEMA,
     }
-    names = (
-        *tables,
-        "current_health",
-        "metric_history",
-        "performance_actions",
-        "performance_history",
-        "monitoring_issues",
-        "model_version_details",
-    )
+    views = monitoring_views(namespace)
+    names = (*tables, "performance_actions", *views)
     for name in names:
         ensure_owned_object(spark, f"{namespace}.{name}")
     for name, ddl in tables.items():
@@ -169,7 +167,7 @@ def initialize_monitoring_store(spark: Any, catalog: str, schema: str) -> str:
     from .performance.performance_actions import initialize_performance_actions  # noqa: PLC0415
 
     initialize_performance_actions(spark, namespace)
-    for name, query in monitoring_views(namespace).items():
+    for name, query in views.items():
         spark.sql(
             f"CREATE OR REPLACE VIEW {table_name(namespace + '.' + name)} "
             f"TBLPROPERTIES ('{PROPERTY}' = '{OWNER}') AS {query}"
@@ -255,10 +253,7 @@ def monitoring_views(namespace: str) -> dict[str, str]:
             SELECT *, ROW_NUMBER() OVER (
                 PARTITION BY monitor_id, config_digest
                 ORDER BY window_end DESC, measured_at DESC, report_id DESC
-            ) AS rank FROM {results}
-            WHERE NOT (status = 'no_data'
-                AND get_json_object(report_json, '$.current_rows') IS NULL
-                AND get_json_object(report_json, '$.performance') IS NOT NULL)
+            ) AS rank FROM {results} WHERE {FULL_OBSERVATION}
         )
         SELECT i.monitor_id, i.environment, i.project, i.model_name,
             i.model_catalog, i.model_schema, i.selection, i.expected_interval_hours,
@@ -295,9 +290,11 @@ def monitoring_views(namespace: str) -> dict[str, str]:
     from .performance.performance_actions import performance_history_query  # noqa: PLC0415
 
     return {
+        "complete_observations": complete_observations_query(namespace),
         "current_health": current,
         "metric_history": metrics,
         "performance_history": performance_history_query(namespace),
+        **dashboard_views(namespace),
         **investigation_views(namespace),
     }
 

@@ -215,6 +215,15 @@ creation time or code evidence are not inferred. Store owners can explicitly run
 `initialize_monitoring_store` to refresh owned view definitions; ordinary runs
 create missing compatible views. Read-only viewers keep their own permissions.
 
+Before deploying an updated monitoring dashboard, the store owner must install
+the matching Core release and run `initialize_monitoring_store` before upgrading
+producer jobs. Writers without CREATE access cannot bootstrap missing views. The shared
+`complete_observations`, `monitoring_identities` and `serving_windows` views keep
+observation selection, model/version/context choices and serving calculations
+consistent across charts. Give viewers SELECT on these views before publishing.
+This upgrade preserves saved tables and observations; dashboard refresh alone
+does not install or upgrade view definitions.
+
 The generated project's `src/monitoring/README.md` explains the shared store,
 dashboard refresh setup and independent optional retraining policies.
 

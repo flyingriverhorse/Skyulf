@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 
 import yaml
+from monitoring_sql_helpers import install_shared_views
 
 TEMPLATE = Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
 
@@ -120,6 +121,7 @@ def test_execution_ids_are_enterable_without_project_named_job_options() -> None
         .replace(" AS STRING", " AS TEXT")
     )
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.executescript(
             "CREATE TABLE jobs(workspace_id TEXT, job_id TEXT, name TEXT, change_time TEXT);"
             "CREATE TABLE runs(workspace_id TEXT, job_id TEXT, period_start_time TEXT, "
@@ -314,7 +316,7 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     assert "threshold AS plot_value" in psi
     assert "report_rank = 1" in psi and "feature_rank <= 10" in psi
     assert "PARTITION BY monitor_id, model_name, model_version" in psi
-    assert "FROM monitoring_results" in psi
+    assert "FROM complete_observations" in psi
     assert "window_end DESC" in psi
     assert "metric_name <> 'ks_test_p_value'" in datasets["drift_trend"]
     chart = widgets["drift_trend"]["spec"]
@@ -330,7 +332,7 @@ def test_charts_keep_model_selection_and_latest_observation_consistent() -> None
     latest = datasets["performance_latest"]
     assert "ORDER BY window_end DESC, measured_at DESC, report_id DESC" in latest
     assert "value IS NOT NULL" not in latest
-    assert "FROM monitoring_results" in latest
+    assert "FROM complete_observations" in latest
     assert "history.report_id = latest_reports.report_id" in latest
     for field in ("model_name", "model_version", "metric_name"):
         control = widgets[
@@ -480,8 +482,7 @@ def test_context_selection_keeps_every_matching_observed_or_unobserved_identity(
     """All matching enrollments must survive selection, including shared model versions."""
     dashboard = _dashboard()
     datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
-    assert "FROM current_health" in datasets["context_choices"]
-    assert "FROM monitoring_results" in datasets["context_choices"]
+    assert "FROM monitoring_identities" in datasets["context_choices"]
     for name in ("metric_history", "quality_history", "performance_measurements"):
         assert "chosen_context" in datasets[name]
         assert "LIMIT 1" not in datasets[name]
@@ -544,13 +545,13 @@ def test_latest_observations_do_not_rank_policy_only_windows_as_feature_reports(
         "confusion_cells",
     ):
         sql = datasets[name]
-        assert "status = 'no_data'" in sql
-        assert "get_json_object(report_json, '$.performance') IS NOT NULL" in sql
-        assert "get_json_object(report_json, '$.current_rows') IS NULL" in sql
+        assert "FROM monitoring_identities" in sql
+        if name != "context_choices":
+            assert "FROM complete_observations" in sql
     assert "FROM performance_history" in datasets["performance_policy"]
     for name in ("drift_psi_chart", "performance_latest"):
         rank_source = datasets[name].split("AS report_rank", 1)[1]
-        assert rank_source.startswith("\n FROM monitoring_results WHERE NOT (status = 'no_data'")
+        assert rank_source.startswith("\n FROM complete_observations")
 
 
 def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> None:
@@ -579,6 +580,7 @@ def test_nullable_context_parameters_keep_all_and_explicit_selections() -> None:
     }
     checked: set[str] = set()
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.execute(
             "CREATE TABLE available_contexts (monitor_id TEXT, model_name TEXT, "
             "model_version TEXT, monitor_context TEXT, latest_measurement INTEGER)"
@@ -671,6 +673,7 @@ def test_performance_snapshot_uses_latest_full_observation_without_inventing_cou
         "UNION ALL SELECT 'unmeasured', 'model-c', '1', 'prod-new'), ranked_reports AS (" + tail
     )
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
 
         def json_value(raw: str, path: str) -> str | None:
@@ -742,6 +745,7 @@ def test_policy_summary_keeps_latest_unavailable_window_and_its_own_metric() -> 
         "'1' AS model_version, 'prod-main' AS monitor_context), policy_ranked AS (" + tail
     )
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
         connection.execute(
             "CREATE TABLE performance_history (monitor_id TEXT, model_name TEXT, model_version TEXT, "
@@ -785,6 +789,7 @@ def test_performance_checks_explain_results_without_claiming_training_started() 
     sql = "".join(dataset["queryLines"])
     labels = sql[sql.index("CASE WHEN source.status IN ('disabled'") :].split("FROM (SELECT", 1)[0]
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         cases = [
             ("healthy", "none", "Within tolerance", "No training requested"),
             ("degraded", "report", "Performance loss", "Report only"),

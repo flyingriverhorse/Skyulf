@@ -100,10 +100,10 @@ def mutations(spark):
 
 
 def test_fresh_store_is_created_once_and_second_producer_needs_no_ddl():
-    """Two model projects must share nine objects without replacing each other's views."""
+    """Two model projects must share twelve objects without replacing each other's views."""
     spark = StoreSpark()
     assert ensure(spark) == "ops.monitoring"
-    assert len(spark.objects) == 9
+    assert len(spark.objects) == 12
     assert not any("REPLACE" in sql or "ALTER" in sql for sql in mutations(spark))
     spark.statements.clear()
     assert ensure(spark) == "ops.monitoring"
@@ -223,7 +223,7 @@ def test_scoring_producer_bootstraps_before_first_inventory_merge(layout):
     result = register_scoring_monitor(spark, workflow(training_layout=layout), settings(), payload)
     assert result is not None
     assert result["inventory_table"] == "ops.monitoring.model_inventory"
-    assert len(spark.objects) == 9
+    assert len(spark.objects) == 12
     assert mutations(spark)[-1].startswith("MERGE")
 
 
@@ -270,7 +270,7 @@ def test_activation_bootstraps_before_first_inventory_merge():
     )
     assert result is not None
     assert result["inventory_table"] == "ops.monitoring.model_inventory"
-    assert len(spark.objects) == 9
+    assert len(spark.objects) == 12
 
 
 @pytest.mark.parametrize("invalid", ["activation", "version", "settings", "receipt"])
@@ -337,7 +337,7 @@ def test_fresh_scheduled_project_creates_empty_store_without_models():
     dbutils = Mock()
     dbutils.widgets.getAll.return_value = settings()
     assert run_project_monitoring_notebook(spark, dbutils) == {"status": "no_active_models"}
-    assert len(spark.objects) == 9
+    assert len(spark.objects) == 12
 
 
 @pytest.mark.parametrize(

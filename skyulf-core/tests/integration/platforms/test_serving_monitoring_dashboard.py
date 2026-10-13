@@ -4,6 +4,12 @@ import json
 import sqlite3
 from pathlib import Path
 
+from monitoring_sql_helpers import install_shared_views
+
+from skyulf.integrations.databricks.observability.monitoring.monitoring_store import (
+    monitoring_views,
+)
+
 _DASHBOARD = (
     Path(__file__).resolve().parents[3]
     / "templates/databricks/template/{{.project_name}}/src/monitoring/monitoring.lvdash.json"
@@ -70,6 +76,7 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         ),
     ]
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
         connection.create_function("get_json_object", 2, scalar)
         connection.create_function("concat", -1, lambda *parts: "".join(str(p) for p in parts))
@@ -166,6 +173,7 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
 def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
     """Another model's newer windows cannot hide the selected model or leak into its results."""
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
 
         def json_value(raw, path):
@@ -287,7 +295,10 @@ def test_serving_page_shows_bounded_aggregate_context_and_async_empty_state():
             "serving_monitor",
         }
         sql = _sql(name)
-        assert "FROM model_inventory" in sql and "monitoring_results" in sql
+        if name == "serving_windows":
+            assert "FROM serving_windows" in sql
+            sql = monitoring_views("ops.monitoring")["serving_windows"]
+        assert "model_inventory" in sql and "complete_observations" in sql
         assert "get_json_object" in sql
         assert "request" not in sql.lower().replace("request_count", "").replace(
             "rows_per_request", ""
@@ -298,6 +309,7 @@ def test_serving_page_shows_bounded_aggregate_context_and_async_empty_state():
 def test_latest_serving_status_does_not_reuse_old_success_after_failure():
     """A failed new observation must clear old request counts for that monitor."""
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
 
         def json_value(raw, path):

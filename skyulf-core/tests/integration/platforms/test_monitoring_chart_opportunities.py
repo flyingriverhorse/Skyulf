@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from monitoring_sql_helpers import install_shared_views
 
 ASSET = (
     Path(__file__).resolve().parents[3]
@@ -32,6 +33,7 @@ def _insert(connection, table, **values):
 def database():
     """Provide recorded reports and metrics with the same identity columns as the store."""
     with sqlite3.connect(":memory:") as connection:
+        install_shared_views(connection)
         connection.row_factory = sqlite3.Row
         connection.create_function(
             "concat", -1, lambda *parts: "".join(str(p or "") for p in parts)

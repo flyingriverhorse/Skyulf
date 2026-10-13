@@ -136,10 +136,10 @@ def test_current_health_does_not_rank_policy_only_windows_as_feature_observation
     )
     assert row["current_rows"] is None
     assert "current_rows" not in json.loads(row["report_json"])
-    query = monitoring_views("ops.monitoring")["current_health"]
+    query = monitoring_views("ops.monitoring")["complete_observations"]
     assert "WHERE NOT (status = 'no_data'" in query
     assert "get_json_object(report_json, '$.current_rows') IS NULL" in query
-    assert "get_json_object(report_json, '$.performance') IS NOT NULL)" in query
+    assert "get_json_object(report_json, '$.performance') IS NOT NULL" in query
 
 
 def test_persistence_rejects_nonfinite_report_values():
