@@ -164,6 +164,13 @@ def _connection() -> sqlite3.Connection:
     )
     connection.execute("ALTER TABLE performance_history ADD COLUMN model_catalog TEXT")
     connection.execute("ALTER TABLE performance_history ADD COLUMN model_schema TEXT")
+    connection.execute(
+        "ALTER TABLE performance_history ADD COLUMN tolerance_mode TEXT DEFAULT 'absolute'"
+    )
+    connection.execute("ALTER TABLE performance_history ADD COLUMN tolerance REAL")
+    connection.execute(
+        "UPDATE performance_history SET tolerance = abs(baseline_value - threshold_value)"
+    )
     return connection
 
 
