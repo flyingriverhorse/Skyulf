@@ -173,6 +173,44 @@ native Inputs and artifacts. A source commit is shown only when the owning run
 already records `mlflow.source.git.commit`; a project Python source digest is
 shown only when the saved artifact records one.
 
+Three additional tables explain how each monitored version was produced:
+
+- **Training candidates** shows saved candidate scores, metric direction, CV
+  evaluation mode and selection reason. Only the selected, registered candidate
+  has a registered version; losing candidates retain their own training run.
+  A single configured model is identified explicitly, without an invented
+  competition score. Run duration is elapsed run time, not isolated fitting time.
+  Post-selection CV is identified separately from an unbiased estimate.
+- **Selected model parameters** lists the fitted estimator's saved settings,
+  including defaults, ensemble and split settings, by parameter name and source.
+  Structured values remain JSON; these are recorded settings, not a new search.
+- **Training datasets and feature sources** shows the saved training/holdout
+  populations, source table and version, membership evidence and feature binding.
+  Delta table identity and Unity Catalog identity are different fields. Version
+  zero is valid. **Dataset Inputs run** opens the verified run containing native
+  Inputs; in a task-based competition this may be the winning child rather than
+  the registered model's parent run.
+
+All three tables use the same Model, Monitored version and Context selection.
+They summarize allowlisted metadata only; raw training rows, executable source
+and complete run configs are not copied into the dashboard. Missing, inaccessible,
+invalid or oversized evidence is reported independently for each section. Empty
+evidence never becomes a zero score or a different version's training history.
+These optional summaries cannot change monitoring or promotion decisions.
+
+Each new observation reads up to three known JSON artifacts and the saved
+competition's child-run metadata. Competition summaries admit at most 32
+candidates; each section admits at most 256 rows and 64 KiB of stored JSON.
+Oversized sections show `too_large` instead of truncating or partially ranking
+candidates. Feature-binding details appear once, on the training-population row.
+
+The summary is copied into the monitoring store. Readers with access to its
+tables/views can see candidate scores, model parameter values and source
+metadata even if they cannot open the original MLflow experiment. Grant store
+access to the intended audience; opening the linked run still requires its own
+permissions. Lookup details contain table/column names, time-window settings,
+table identities and versions, not individual lookup-key values or row filters.
+
 **Aliases at capture** describes the concrete version's alias metadata when the
 monitoring reference was loaded, alongside **Captured at**. It does not describe
 historical deployment identity or guarantee today's registry alias assignment.
@@ -187,6 +225,11 @@ with a reason. Missing creation/code/alias fields remain unavailable rather than
 inferred. Existing store owners can run `initialize_monitoring_store` explicitly
 to refresh owned view definitions; ordinary runs create missing compatible views
 without replacing existing ones. Viewers retain their own data permissions.
+For the training tables, refresh the owned `model_version_details` view to add
+`training_summary_json` before publishing the dashboard. The next new observation
+captures the summary. Refreshing the dashboard or retrying an already saved
+observation does not backfill historical reports; their section status remains
+`not_recorded`.
 
 ## Enable each independent model repository
 

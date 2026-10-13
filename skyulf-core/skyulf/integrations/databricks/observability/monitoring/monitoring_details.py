@@ -161,7 +161,8 @@ def _details_query(objects: dict[str, str]) -> str:
                 get_json_object(r.evidence_json, '$.model_metadata.training_experiment_id')
                     AS training_experiment_id,
                 get_json_object(r.evidence_json, '$.model_metadata.training_source_commit')
-                    AS training_source_commit
+                    AS training_source_commit,
+                get_json_object(r.evidence_json, '$.model_metadata.training') AS training_summary_json
             FROM identities i LEFT JOIN ranked r ON i.monitor_id = r.monitor_id
                 AND i.model_name = r.model_name
                 AND (i.model_version = r.model_version OR

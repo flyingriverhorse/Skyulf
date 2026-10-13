@@ -16,6 +16,7 @@ from ...jobs.lifecycle.lifecycle_tasks import phase_training_spec
 from ...training.fitting.candidate import read_training_snapshot, split_labeled_snapshot
 from ...training.shared.training_evidence import validate_training_evidence
 from .monitoring_config import MonitorConfig
+from .monitoring_training import capture_training_summary
 
 
 def reference_document(client: Any, run_id: str, path: str) -> dict:
@@ -97,12 +98,14 @@ def load_monitoring_artifact(
         "dataset_id": spec.dataset_id,
         "training_evidence_sha256": spec.training_evidence_sha256,
         "reference_population": "training_partition_excluding_holdout",
-        "model_metadata": _model_metadata(client, model, artifact),
+        "model_metadata": _model_metadata(client, model, artifact, saved, filters),
     }
     return artifact, spec, filters, evidence | parent
 
 
-def _model_metadata(client: Any, model: Any, artifact: Any) -> dict:
+def _model_metadata(
+    client: Any, model: Any, artifact: Any, saved_spec: dict, filters: dict
+) -> dict:
     """Capture only operator lineage fields, preserving optional metadata failures."""
     created = getattr(model, "creation_timestamp", None)
     aliases = getattr(model, "aliases", None)
@@ -117,6 +120,7 @@ def _model_metadata(client: Any, model: Any, artifact: Any) -> dict:
         "training_experiment_id": None,
         "training_source_commit": None,
     }
+    run = None
     try:
         run = client.get_run(model.run_id)
         metadata["training_experiment_id"] = str(run.info.experiment_id)
@@ -124,6 +128,9 @@ def _model_metadata(client: Any, model: Any, artifact: Any) -> dict:
     except Exception as exc:  # noqa: BLE001 - optional link metadata cannot invalidate metrics
         metadata["status"] = "unavailable"
         metadata["reason"] = f"training_run_metadata:{type(exc).__name__}"
+    metadata["training"] = capture_training_summary(
+        client, model, artifact, run, saved_spec, filters
+    )
     return metadata
 
 

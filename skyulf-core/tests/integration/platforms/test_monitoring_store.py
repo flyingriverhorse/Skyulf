@@ -86,7 +86,14 @@ def test_optional_metadata_refresh_preserves_observation_identity():
         now,
         now,
         report,
-        evidence | {"model_metadata": {"captured_at": "later", "aliases": ["champion"]}},
+        evidence
+        | {
+            "model_metadata": {
+                "captured_at": "later",
+                "aliases": ["champion"],
+                "training": {"format_version": 1, "parameters": {"status": "recorded", "rows": []}},
+            }
+        },
     )
     assert first["report_id"] == refresh["report_id"]
 

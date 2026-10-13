@@ -201,6 +201,31 @@ native Inputs and artifacts. Historical versions remain concrete.
 **Aliases at capture** has a capture
 timestamp and describes a metadata snapshot, not historical deployment identity.
 
+The same **Training and lineage** page also shows:
+
+- Saved training candidates, their comparable scores, evaluation mode and why
+  one was selected. Only the registered candidate receives a registered version;
+  run duration means wall time, and post-selection CV remains explicitly marked.
+- The selected estimator's saved parameters, defaults, ensemble and split
+  settings as name/value/source rows.
+- Training and holdout row counts, source table/version, separate Delta and UC
+  identities, membership evidence and feature bindings. Version zero is preserved.
+  **Dataset Inputs run** links to the verified owning run, which can be the
+  winning child in a competition whose registered model belongs to its parent.
+
+These tables follow the shared model/version/context filters and display only
+bounded metadata. They do not reread training rows or fit models. Missing,
+inaccessible, invalid or oversized sections remain explicit and cannot change
+the monitoring result or promotion decision.
+
+These summaries are visible to readers of the monitoring store, independently
+of their access to the source experiment. They include model parameter values
+and table/column metadata; opening a linked MLflow run requires separate access.
+Each section is limited to 256 rows and 64 KiB, with at most 32 competition
+candidates. New observations read the saved artifacts again; dashboard refresh
+only queries the stored summary. Feature-binding details appear once on the
+training-population row.
+
 New monitoring observations capture bounded lineage metadata in the existing
 report; dashboard refresh only rereads saved evidence. Retrying an observation
 preserves its first snapshot and prepared Spark references. Older reports show
@@ -215,6 +240,9 @@ producer jobs. Writers without CREATE access cannot bootstrap missing views. The
 `complete_observations`, `monitoring_identities` and `serving_windows` views keep
 observation selection, model/version/context choices and serving calculations
 consistent across charts. Give viewers SELECT on these views before publishing.
+The training tables also require the added `training_summary_json` column in
+`model_version_details`. Summaries arrive with new observations; dashboard
+refresh and retries do not backfill old reports.
 This upgrade preserves saved tables and observations; dashboard refresh alone
 does not install or upgrade view definitions.
 

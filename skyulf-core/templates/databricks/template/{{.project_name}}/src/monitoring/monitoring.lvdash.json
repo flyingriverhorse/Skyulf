@@ -2699,6 +2699,269 @@
           }
         }
       ]
+    },
+    {
+      "name": "training_candidates",
+      "displayName": "Training candidates and selection",
+      "queryLines": [
+        "WITH scoped AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version, monitor_context,\n",
+        "  report_id, training_summary_json\n",
+        " FROM model_version_details\n",
+        " WHERE (COALESCE(:scope_model, '') IN ('', 'All models') OR model_name = :scope_model)\n",
+        "  AND (COALESCE(:scope_version, '') IN ('', 'All versions') OR model_version = :scope_version)\n",
+        "  AND (COALESCE(:scope_monitor, '') IN ('', 'All contexts') OR monitor_context = :scope_monitor)\n",
+        ")\n",
+        "SELECT scoped.monitor_id, scoped.model_catalog, scoped.model_schema,\n",
+        " scoped.model_name, scoped.model_version, scoped.monitor_context, scoped.report_id,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'never_observed'\n",
+        "  ELSE COALESCE(get_json_object(scoped.training_summary_json, '$.candidates.status'), 'not_recorded')\n",
+        " END AS evidence_status,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'No saved monitoring observation for this identity'\n",
+        "  WHEN get_json_object(scoped.training_summary_json, '$.candidates.status') IS NULL\n",
+        "   THEN 'Training evidence was not recorded for this observation'\n",
+        "  ELSE get_json_object(scoped.training_summary_json, '$.candidates.reason')\n",
+        " END AS evidence_reason,\n",
+        " evidence.candidate AS candidate,\n",
+        " evidence.model_type AS model_type,\n",
+        " evidence.strategy AS strategy,\n",
+        " evidence.run_id AS run_id,\n",
+        " evidence.experiment_id AS experiment_id,\n",
+        " evidence.registered_version AS registered_version,\n",
+        " evidence.selected AS selected,\n",
+        " evidence.metric AS metric,\n",
+        " evidence.direction AS direction,\n",
+        " evidence.score AS score,\n",
+        " evidence.score_std AS score_std,\n",
+        " evidence.evaluation_mode AS evaluation_mode,\n",
+        " evidence.unbiased_estimate AS unbiased_estimate,\n",
+        " evidence.selection_reason AS selection_reason,\n",
+        " evidence.duration_seconds AS duration_seconds,\n",
+        " evidence.source AS source,\n",
+        " CASE WHEN NULLIF(evidence.run_id, '') IS NOT NULL AND NULLIF(evidence.experiment_id, '') IS NOT NULL\n",
+        "  THEN concat('/ml/experiments/', evidence.experiment_id, '/runs/', evidence.run_id)\n",
+        " END AS candidate_run_link\n",
+        "FROM scoped\n",
+        "LATERAL VIEW OUTER explode(from_json(get_json_object(scoped.training_summary_json, '$.candidates.rows'), 'array<struct<candidate:string,model_type:string,strategy:string,run_id:string,experiment_id:string,registered_version:string,selected:boolean,metric:string,direction:string,score:double,score_std:double,evaluation_mode:string,unbiased_estimate:boolean,selection_reason:string,duration_seconds:double,source:string>>')) saved AS evidence\n",
+        "ORDER BY model_name, model_version, monitor_context, monitor_id, selected DESC, candidate\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "model_name",
+          "keyword": "scope_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All models"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "model_version",
+          "keyword": "scope_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All versions"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "monitor_context",
+          "keyword": "scope_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All contexts"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "training_parameters",
+      "displayName": "Chosen model parameters",
+      "queryLines": [
+        "WITH scoped AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version, monitor_context,\n",
+        "  report_id, training_summary_json\n",
+        " FROM model_version_details\n",
+        " WHERE (COALESCE(:scope_model, '') IN ('', 'All models') OR model_name = :scope_model)\n",
+        "  AND (COALESCE(:scope_version, '') IN ('', 'All versions') OR model_version = :scope_version)\n",
+        "  AND (COALESCE(:scope_monitor, '') IN ('', 'All contexts') OR monitor_context = :scope_monitor)\n",
+        ")\n",
+        "SELECT scoped.monitor_id, scoped.model_catalog, scoped.model_schema,\n",
+        " scoped.model_name, scoped.model_version, scoped.monitor_context, scoped.report_id,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'never_observed'\n",
+        "  ELSE COALESCE(get_json_object(scoped.training_summary_json, '$.parameters.status'), 'not_recorded')\n",
+        " END AS evidence_status,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'No saved monitoring observation for this identity'\n",
+        "  WHEN get_json_object(scoped.training_summary_json, '$.parameters.status') IS NULL\n",
+        "   THEN 'Training evidence was not recorded for this observation'\n",
+        "  ELSE get_json_object(scoped.training_summary_json, '$.parameters.reason')\n",
+        " END AS evidence_reason,\n",
+        " evidence.section AS section,\n",
+        " evidence.name AS name,\n",
+        " evidence.value AS value,\n",
+        " evidence.source AS source\n",
+        "FROM scoped\n",
+        "LATERAL VIEW OUTER explode(from_json(get_json_object(scoped.training_summary_json, '$.parameters.rows'), 'array<struct<section:string,name:string,value:string,source:string>>')) saved AS evidence\n",
+        "ORDER BY model_name, model_version, monitor_context, monitor_id, section, name\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "model_name",
+          "keyword": "scope_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All models"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "model_version",
+          "keyword": "scope_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All versions"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "monitor_context",
+          "keyword": "scope_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All contexts"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "training_datasets",
+      "displayName": "Training dataset provenance",
+      "queryLines": [
+        "WITH scoped AS (\n",
+        " SELECT monitor_id, model_catalog, model_schema, model_name, model_version, monitor_context,\n",
+        "  report_id, training_summary_json\n",
+        " FROM model_version_details\n",
+        " WHERE (COALESCE(:scope_model, '') IN ('', 'All models') OR model_name = :scope_model)\n",
+        "  AND (COALESCE(:scope_version, '') IN ('', 'All versions') OR model_version = :scope_version)\n",
+        "  AND (COALESCE(:scope_monitor, '') IN ('', 'All contexts') OR monitor_context = :scope_monitor)\n",
+        ")\n",
+        "SELECT scoped.monitor_id, scoped.model_catalog, scoped.model_schema,\n",
+        " scoped.model_name, scoped.model_version, scoped.monitor_context, scoped.report_id,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'never_observed'\n",
+        "  ELSE COALESCE(get_json_object(scoped.training_summary_json, '$.datasets.status'), 'not_recorded')\n",
+        " END AS evidence_status,\n",
+        " CASE WHEN scoped.report_id IS NULL THEN 'No saved monitoring observation for this identity'\n",
+        "  WHEN get_json_object(scoped.training_summary_json, '$.datasets.status') IS NULL\n",
+        "   THEN 'Training evidence was not recorded for this observation'\n",
+        "  ELSE get_json_object(scoped.training_summary_json, '$.datasets.reason')\n",
+        " END AS evidence_reason,\n",
+        " evidence.role AS role,\n",
+        " evidence.name AS name,\n",
+        " evidence.source_table AS source_table,\n",
+        " evidence.source_version AS source_version,\n",
+        " evidence.delta_table_id AS delta_table_id,\n",
+        " evidence.uc_table_id AS uc_table_id,\n",
+        " evidence.dataset_digest AS dataset_digest,\n",
+        " evidence.row_count AS row_count,\n",
+        " evidence.membership_digest AS membership_digest,\n",
+        " evidence.run_id AS run_id,\n",
+        " evidence.experiment_id AS experiment_id,\n",
+        " evidence.feature_binding AS feature_binding,\n",
+        " evidence.source AS source,\n",
+        " evidence.inputs_status AS inputs_status,\n",
+        " CASE WHEN evidence.inputs_status = 'recorded'\n",
+        "  AND NULLIF(evidence.run_id, '') IS NOT NULL AND NULLIF(evidence.experiment_id, '') IS NOT NULL\n",
+        "  THEN concat('/ml/experiments/', evidence.experiment_id, '/runs/', evidence.run_id)\n",
+        " END AS inputs_run_link\n",
+        "FROM scoped\n",
+        "LATERAL VIEW OUTER explode(from_json(get_json_object(scoped.training_summary_json, '$.datasets.rows'), 'array<struct<role:string,name:string,source_table:string,source_version:long,delta_table_id:string,uc_table_id:string,dataset_digest:string,row_count:long,membership_digest:string,run_id:string,experiment_id:string,feature_binding:string,source:string,inputs_status:string>>')) saved AS evidence\n",
+        "ORDER BY model_name, model_version, monitor_context, monitor_id, role, name\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "model_name",
+          "keyword": "scope_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All models"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "model_version",
+          "keyword": "scope_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All versions"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "monitor_context",
+          "keyword": "scope_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All contexts"
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "pages": [
@@ -3127,6 +3390,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_training_candidates",
+                "query": {
+                  "datasetName": "training_candidates",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_model",
+                      "keyword": "scope_model"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_parameters",
+                "query": {
+                  "datasetName": "training_parameters",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_model",
+                      "keyword": "scope_model"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_datasets",
+                "query": {
+                  "datasetName": "training_datasets",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_model",
+                      "keyword": "scope_model"
+                    }
+                  ]
+                }
               }
             ],
             "spec": {
@@ -3261,6 +3563,18 @@
                   {
                     "parameterName": "serving_model",
                     "queryName": "series"
+                  },
+                  {
+                    "parameterName": "scope_model",
+                    "queryName": "parameter_training_candidates"
+                  },
+                  {
+                    "parameterName": "scope_model",
+                    "queryName": "parameter_training_parameters"
+                  },
+                  {
+                    "parameterName": "scope_model",
+                    "queryName": "parameter_training_datasets"
                   }
                 ]
               },
@@ -3708,6 +4022,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_training_candidates",
+                "query": {
+                  "datasetName": "training_candidates",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_version",
+                      "keyword": "scope_version"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_parameters",
+                "query": {
+                  "datasetName": "training_parameters",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_version",
+                      "keyword": "scope_version"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_datasets",
+                "query": {
+                  "datasetName": "training_datasets",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_version",
+                      "keyword": "scope_version"
+                    }
+                  ]
+                }
               }
             ],
             "spec": {
@@ -3842,6 +4195,18 @@
                   {
                     "parameterName": "serving_version",
                     "queryName": "series"
+                  },
+                  {
+                    "parameterName": "scope_version",
+                    "queryName": "parameter_training_candidates"
+                  },
+                  {
+                    "parameterName": "scope_version",
+                    "queryName": "parameter_training_parameters"
+                  },
+                  {
+                    "parameterName": "scope_version",
+                    "queryName": "parameter_training_datasets"
                   }
                 ]
               },
@@ -4289,6 +4654,45 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "parameter_training_candidates",
+                "query": {
+                  "datasetName": "training_candidates",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_monitor",
+                      "keyword": "scope_monitor"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_parameters",
+                "query": {
+                  "datasetName": "training_parameters",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_monitor",
+                      "keyword": "scope_monitor"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "parameter_training_datasets",
+                "query": {
+                  "datasetName": "training_datasets",
+                  "disaggregated": false,
+                  "parameters": [
+                    {
+                      "name": "scope_monitor",
+                      "keyword": "scope_monitor"
+                    }
+                  ]
+                }
               }
             ],
             "spec": {
@@ -4423,6 +4827,18 @@
                   {
                     "parameterName": "serving_monitor",
                     "queryName": "series"
+                  },
+                  {
+                    "parameterName": "scope_monitor",
+                    "queryName": "parameter_training_candidates"
+                  },
+                  {
+                    "parameterName": "scope_monitor",
+                    "queryName": "parameter_training_parameters"
+                  },
+                  {
+                    "parameterName": "scope_monitor",
+                    "queryName": "parameter_training_datasets"
                   }
                 ]
               },
@@ -5533,6 +5949,518 @@
         },
         {
           "widget": {
+            "name": "training_evidence_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Saved training evidence\n",
+                "\n",
+                "Recorded rows show evidence saved for this model/version/context. not_recorded means no saved evidence; unavailable, invalid or too_large explain an incomplete capture; never_observed means no monitoring observation exists. Candidate run wall seconds include the full run lifecycle. CV scores are not necessarily unbiased; inspect Evaluation mode and Unbiased estimate. Hover over candidate, dataset, source table and role cells for provenance details. Dataset Inputs run opens the verified owning run; select Inputs there."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "training_candidates",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "training_candidates",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "evidence_status",
+                      "expression": "`evidence_status`"
+                    },
+                    {
+                      "name": "evidence_reason",
+                      "expression": "`evidence_reason`"
+                    },
+                    {
+                      "name": "candidate",
+                      "expression": "`candidate`"
+                    },
+                    {
+                      "name": "model_type",
+                      "expression": "`model_type`"
+                    },
+                    {
+                      "name": "strategy",
+                      "expression": "`strategy`"
+                    },
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "experiment_id",
+                      "expression": "`experiment_id`"
+                    },
+                    {
+                      "name": "registered_version",
+                      "expression": "`registered_version`"
+                    },
+                    {
+                      "name": "selected",
+                      "expression": "`selected`"
+                    },
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "direction",
+                      "expression": "`direction`"
+                    },
+                    {
+                      "name": "score",
+                      "expression": "`score`"
+                    },
+                    {
+                      "name": "score_std",
+                      "expression": "`score_std`"
+                    },
+                    {
+                      "name": "evaluation_mode",
+                      "expression": "`evaluation_mode`"
+                    },
+                    {
+                      "name": "unbiased_estimate",
+                      "expression": "`unbiased_estimate`"
+                    },
+                    {
+                      "name": "selection_reason",
+                      "expression": "`selection_reason`"
+                    },
+                    {
+                      "name": "duration_seconds",
+                      "expression": "`duration_seconds`"
+                    },
+                    {
+                      "name": "source",
+                      "expression": "`source`"
+                    },
+                    {
+                      "name": "candidate_run_link",
+                      "expression": "`candidate_run_link`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Registered model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Monitored version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Context"
+                  },
+                  {
+                    "fieldName": "evidence_status",
+                    "displayName": "Evidence status"
+                  },
+                  {
+                    "fieldName": "evidence_reason",
+                    "displayName": "Evidence detail"
+                  },
+                  {
+                    "fieldName": "candidate",
+                    "displayName": "Candidate",
+                    "tooltip": {
+                      "templatedText": "Evidence source: {{source}}"
+                    }
+                  },
+                  {
+                    "fieldName": "model_type",
+                    "displayName": "Model type"
+                  },
+                  {
+                    "fieldName": "strategy",
+                    "displayName": "Strategy"
+                  },
+                  {
+                    "fieldName": "registered_version",
+                    "displayName": "Candidate registered version"
+                  },
+                  {
+                    "fieldName": "selected",
+                    "displayName": "Selected"
+                  },
+                  {
+                    "fieldName": "metric",
+                    "displayName": "Selection metric"
+                  },
+                  {
+                    "fieldName": "direction",
+                    "displayName": "Direction"
+                  },
+                  {
+                    "fieldName": "score",
+                    "displayName": "Score"
+                  },
+                  {
+                    "fieldName": "score_std",
+                    "displayName": "Score standard deviation"
+                  },
+                  {
+                    "fieldName": "evaluation_mode",
+                    "displayName": "Evaluation mode"
+                  },
+                  {
+                    "fieldName": "unbiased_estimate",
+                    "displayName": "Unbiased estimate"
+                  },
+                  {
+                    "fieldName": "selection_reason",
+                    "displayName": "Selection reason"
+                  },
+                  {
+                    "fieldName": "duration_seconds",
+                    "displayName": "Candidate run wall seconds"
+                  },
+                  {
+                    "fieldName": "run_id",
+                    "displayName": "Candidate run",
+                    "tooltip": {
+                      "templatedText": "Experiment: {{experiment_id}}"
+                    },
+                    "link": {
+                      "templatedURL": "{{candidate_run_link}}"
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Training candidates and recorded selection"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 15,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "training_parameters",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "training_parameters",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "evidence_status",
+                      "expression": "`evidence_status`"
+                    },
+                    {
+                      "name": "evidence_reason",
+                      "expression": "`evidence_reason`"
+                    },
+                    {
+                      "name": "section",
+                      "expression": "`section`"
+                    },
+                    {
+                      "name": "name",
+                      "expression": "`name`"
+                    },
+                    {
+                      "name": "value",
+                      "expression": "`value`"
+                    },
+                    {
+                      "name": "source",
+                      "expression": "`source`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Registered model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Monitored version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Context"
+                  },
+                  {
+                    "fieldName": "evidence_status",
+                    "displayName": "Evidence status"
+                  },
+                  {
+                    "fieldName": "evidence_reason",
+                    "displayName": "Evidence detail"
+                  },
+                  {
+                    "fieldName": "section",
+                    "displayName": "Parameter section"
+                  },
+                  {
+                    "fieldName": "name",
+                    "displayName": "Parameter"
+                  },
+                  {
+                    "fieldName": "value",
+                    "displayName": "Saved value (JSON)"
+                  },
+                  {
+                    "fieldName": "source",
+                    "displayName": "Evidence source"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chosen model parameters"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 22,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "training_datasets",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "training_datasets",
+                  "fields": [
+                    {
+                      "name": "model_name",
+                      "expression": "`model_name`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "monitor_context",
+                      "expression": "`monitor_context`"
+                    },
+                    {
+                      "name": "evidence_status",
+                      "expression": "`evidence_status`"
+                    },
+                    {
+                      "name": "evidence_reason",
+                      "expression": "`evidence_reason`"
+                    },
+                    {
+                      "name": "role",
+                      "expression": "`role`"
+                    },
+                    {
+                      "name": "name",
+                      "expression": "`name`"
+                    },
+                    {
+                      "name": "source_table",
+                      "expression": "`source_table`"
+                    },
+                    {
+                      "name": "source_version",
+                      "expression": "`source_version`"
+                    },
+                    {
+                      "name": "delta_table_id",
+                      "expression": "`delta_table_id`"
+                    },
+                    {
+                      "name": "uc_table_id",
+                      "expression": "`uc_table_id`"
+                    },
+                    {
+                      "name": "dataset_digest",
+                      "expression": "`dataset_digest`"
+                    },
+                    {
+                      "name": "row_count",
+                      "expression": "`row_count`"
+                    },
+                    {
+                      "name": "membership_digest",
+                      "expression": "`membership_digest`"
+                    },
+                    {
+                      "name": "run_id",
+                      "expression": "`run_id`"
+                    },
+                    {
+                      "name": "experiment_id",
+                      "expression": "`experiment_id`"
+                    },
+                    {
+                      "name": "feature_binding",
+                      "expression": "`feature_binding`"
+                    },
+                    {
+                      "name": "source",
+                      "expression": "`source`"
+                    },
+                    {
+                      "name": "inputs_status",
+                      "expression": "`inputs_status`"
+                    },
+                    {
+                      "name": "inputs_run_link",
+                      "expression": "`inputs_run_link`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "model_name",
+                    "displayName": "Registered model"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Monitored version"
+                  },
+                  {
+                    "fieldName": "monitor_context",
+                    "displayName": "Context"
+                  },
+                  {
+                    "fieldName": "evidence_status",
+                    "displayName": "Evidence status"
+                  },
+                  {
+                    "fieldName": "evidence_reason",
+                    "displayName": "Evidence detail"
+                  },
+                  {
+                    "fieldName": "role",
+                    "displayName": "Dataset role",
+                    "tooltip": {
+                      "templatedText": "Feature binding (JSON): {{feature_binding}}"
+                    }
+                  },
+                  {
+                    "fieldName": "name",
+                    "displayName": "Dataset name",
+                    "tooltip": {
+                      "templatedText": "Dataset digest: {{dataset_digest}}\nMembership digest: {{membership_digest}}"
+                    }
+                  },
+                  {
+                    "fieldName": "source_table",
+                    "displayName": "Source table",
+                    "tooltip": {
+                      "templatedText": "Delta table ID: {{delta_table_id}}\nUnity Catalog table ID: {{uc_table_id}}"
+                    }
+                  },
+                  {
+                    "fieldName": "source_version",
+                    "displayName": "Source table version"
+                  },
+                  {
+                    "fieldName": "row_count",
+                    "displayName": "Recorded row count"
+                  },
+                  {
+                    "fieldName": "source",
+                    "displayName": "Evidence source"
+                  },
+                  {
+                    "fieldName": "inputs_status",
+                    "displayName": "Native Inputs status"
+                  },
+                  {
+                    "fieldName": "run_id",
+                    "displayName": "Dataset Inputs run",
+                    "tooltip": {
+                      "templatedText": "Experiment: {{experiment_id}}\nOpen the run and select Inputs when the link is available."
+                    },
+                    "link": {
+                      "templatedURL": "{{inputs_run_link}}"
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Training datasets and provenance"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 28,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
             "name": "training_alias_capture",
             "queries": [
               {
@@ -5608,7 +6536,7 @@
           },
           "position": {
             "x": 0,
-            "y": 13,
+            "y": 35,
             "width": 12,
             "height": 4
           }
@@ -5624,7 +6552,7 @@
           },
           "position": {
             "x": 0,
-            "y": 17,
+            "y": 39,
             "width": 12,
             "height": 3
           }
