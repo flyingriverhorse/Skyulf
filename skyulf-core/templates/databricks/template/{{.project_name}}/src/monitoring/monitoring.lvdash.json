@@ -3211,7 +3211,11 @@
         " s.monitor_id, s.model_name, s.model_version, s.report_id, s.window_start, s.window_end,\n",
         " s.measured_at, s.observed_at, s.column_name, s.measurement_status, s.value AS psi,\n",
         " s.threshold AS psi_threshold, s.psi_ratio,\n",
-        " concat(date_format(s.window_end, 'yyyy-MM-dd HH:mm'), ' #', CAST(s.report_count - s.report_rank + 1 AS STRING)) AS observation_label\n",
+        " CASE WHEN s.psi_ratio IS NOT NULL THEN CASE WHEN s.psi_ratio > 1 THEN 1 ELSE 0 END END AS psi_over_limit,\n",
+        " concat(CAST(DENSE_RANK() OVER (ORDER BY s.model_name, s.model_version, s.monitor_id) AS STRING), '. ',\n",
+        " substring_index(s.model_name, '.', -1), ' / v', COALESCE(s.model_version, 'unresolved'), ' / ',\n",
+        " s.environment, ' / ', s.project, ' / ', substring(s.monitor_id, 1, 12)) AS model_label,\n",
+        " concat(date_format(s.window_end, 'yy-MM-dd HH:mm'), ' #', CAST(s.report_count - s.report_rank + 1 AS STRING)) AS observation_label\n",
         "FROM selected s JOIN features f ON s.monitor_id = f.monitor_id AND s.model_name = f.model_name\n",
         " AND s.model_version IS NOT DISTINCT FROM f.model_version AND s.column_name = f.column_name\n",
         "WHERE f.feature_rank <= 10\n",
@@ -3339,6 +3343,136 @@
         " '6: 100-<250 ms', '7: 250-<500 ms', '8: 500-<1000 ms', '9: >=1000 ms'), bucket_index + 1) AS latency_range\n",
         "FROM valid LATERAL VIEW posexplode(bin_counts) bins AS bucket_index, bucket_count\n",
         "ORDER BY model_identity, window_end, measured_at, report_id, bucket_index\n"
+      ],
+      "parameters": [
+        {
+          "displayName": "Model",
+          "keyword": "serving_model",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All models"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Monitored version",
+          "keyword": "serving_version",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All versions"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "displayName": "Context",
+          "keyword": "serving_monitor",
+          "dataType": "STRING",
+          "defaultSelection": {
+            "values": {
+              "dataType": "STRING",
+              "values": [
+                {
+                  "value": "All contexts"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "serving_chart_series",
+      "displayName": "Captured errors and execution times by observation",
+      "queryLines": [
+        "WITH captured AS (\n",
+        "WITH windows AS (\n",
+        "WITH serving_inventory AS (\n",
+        " SELECT monitor_id, model_name, enabled, updated_at, config_digest,\n",
+        " concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) AS monitor_context,\n",
+        " get_json_object(config_json, '$.model_version') AS model_version,\n",
+        " get_json_object(config_json, '$.serving_endpoint') AS endpoint,\n",
+        " COALESCE(get_json_object(config_json, '$.model_set_name'), model_name) AS served_model,\n",
+        " COALESCE(get_json_object(config_json, '$.model_set_version'), get_json_object(config_json, '$.model_version')) AS served_version,\n",
+        " get_json_object(config_json, '$.model_set_branch') AS served_branch\n",
+        " FROM model_inventory WHERE (COALESCE(:serving_model, '') IN ('', 'All models') OR model_name = :serving_model) AND enabled = true\n",
+        " AND get_json_object(config_json, '$.serving_endpoint') IS NOT NULL\n",
+        " AND (COALESCE(:serving_monitor, '') IN ('', 'All contexts') OR concat(environment, ' / ', project, ' / ', substring(monitor_id, 1, 12)) = :serving_monitor)\n",
+        ")\n",
+        "SELECT i.monitor_id, i.model_name, COALESCE(r.model_version, i.model_version) AS model_version,\n",
+        " i.monitor_context, i.endpoint, i.served_model, COALESCE(i.served_version, r.model_version) AS served_version,\n",
+        " i.served_branch, r.report_id, r.window_start, r.window_end, r.measured_at,\n",
+        " COALESCE(r.status, 'awaiting_logs') AS status,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.request_count') AS BIGINT) AS request_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.success_count') AS BIGINT) AS success_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.error_count') AS BIGINT) AS error_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.logging_error_count') AS BIGINT) AS logging_error_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.status_4xx_count') AS BIGINT) AS status_4xx_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.status_5xx_count') AS BIGINT) AS status_5xx_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.status_other_count') AS BIGINT) AS status_other_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_sample_count') AS BIGINT) AS latency_sample_count,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_p50_ms') AS DOUBLE) AS latency_p50_ms,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_p95_ms') AS DOUBLE) AS latency_p95_ms,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_p99_ms') AS DOUBLE) AS latency_p99_ms,\n",
+        " get_json_object(r.report_json, '$.serving.latency_bucket_edges_ms') AS latency_bucket_edges_ms,\n",
+        " get_json_object(r.report_json, '$.serving.latency_bucket_counts') AS latency_bucket_counts,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_mean_ms') AS DOUBLE) AS latency_mean_ms,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.latency_max_ms') AS DOUBLE) AS latency_max_ms,\n",
+        " CAST(get_json_object(r.report_json, '$.serving.prediction_row_count') AS BIGINT) AS prediction_row_count\n",
+        "FROM monitoring_results r JOIN serving_inventory i ON r.monitor_id = i.monitor_id AND r.config_digest = i.config_digest\n",
+        "WHERE (COALESCE(:serving_version, '') IN ('', 'All versions') OR COALESCE(r.model_version, i.model_version) = :serving_version) AND NOT (r.status = 'no_data' AND get_json_object(r.report_json, '$.performance') IS NOT NULL AND get_json_object(r.report_json, '$.current_rows') IS NULL)\n",
+        "), classified AS (\n",
+        " SELECT *, CASE WHEN status_4xx_count >= 0 AND status_5xx_count >= 0 AND status_other_count >= 0\n",
+        " AND status_4xx_count + status_5xx_count + status_other_count = error_count THEN 1 ELSE 0 END AS classes_complete\n",
+        " FROM windows\n",
+        ")\n",
+        "SELECT *, concat(model_name, ' / v', COALESCE(model_version, 'unresolved'), ' / ', monitor_id) AS model_identity,\n",
+        " CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count\n",
+        " THEN error_count * 1.0 / request_count END AS error_rate,\n",
+        " CASE WHEN status <> 'failed' AND request_count > 0 AND prediction_row_count >= 0\n",
+        " THEN prediction_row_count * 1.0 / request_count END AS rows_per_request\n",
+        " , CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count AND classes_complete = 1 THEN status_4xx_count END AS plot_4xx,\n",
+        " CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count AND classes_complete = 1 THEN status_5xx_count END AS plot_5xx,\n",
+        " CASE WHEN status <> 'failed' AND request_count > 0 AND error_count BETWEEN 0 AND request_count THEN CASE WHEN classes_complete = 1 THEN status_other_count ELSE error_count END END AS plot_other,\n",
+        " concat(date_format(window_end, 'yyyy-MM-dd HH:mm'), ' / ', CAST(ROW_NUMBER() OVER (\n",
+        " PARTITION BY monitor_id, model_version ORDER BY window_end, measured_at, report_id) AS STRING)) AS observation_label,\n",
+        " ROW_NUMBER() OVER (PARTITION BY monitor_id, model_version ORDER BY window_end DESC, measured_at DESC, report_id DESC) AS observation_recency\n",
+        " , COALESCE(CAST(logging_error_count AS STRING), 'Not recorded') AS logging_errors_display\n",
+        " , COALESCE(CAST(latency_p50_ms AS STRING), 'Not recorded') AS latency_p50_display,\n",
+        " COALESCE(CAST(latency_p95_ms AS STRING), 'Not recorded') AS latency_p95_display,\n",
+        " COALESCE(CAST(latency_p99_ms AS STRING), 'Not recorded') AS latency_p99_display,\n",
+        " COALESCE(CAST(latency_sample_count AS STRING), 'Not recorded') AS latency_samples_display\n",
+        "FROM classified\n",
+        "ORDER BY window_end DESC, measured_at DESC, report_id DESC\n",
+        "), series AS (\n",
+        " SELECT 'errors' AS metric_kind, '4xx client' AS series\n",
+        " UNION ALL SELECT 'errors', '5xx server'\n",
+        " UNION ALL SELECT 'errors', 'Other / class not recorded'\n",
+        " UNION ALL SELECT 'latency', 'Average (mean)'\n",
+        " UNION ALL SELECT 'latency', 'Slow requests (p95)'\n",
+        "), measurements AS (\n",
+        " SELECT captured.*, series.metric_kind, series.series,\n",
+        " CASE series.series WHEN '4xx client' THEN CAST(plot_4xx AS DOUBLE)\n",
+        " WHEN '5xx server' THEN CAST(plot_5xx AS DOUBLE)\n",
+        " WHEN 'Other / class not recorded' THEN CAST(plot_other AS DOUBLE)\n",
+        " WHEN 'Average (mean)' THEN latency_mean_ms\n",
+        " WHEN 'Slow requests (p95)' THEN latency_p95_ms END AS metric_value\n",
+        " FROM captured CROSS JOIN series\n",
+        " WHERE status <> 'failed' AND request_count > 0\n",
+        ")\n",
+        "SELECT * FROM measurements WHERE metric_value IS NOT NULL\n",
+        "ORDER BY window_end, measured_at, report_id, metric_kind, series\n"
       ],
       "parameters": [
         {
@@ -3802,6 +3936,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "series",
+                "query": {
+                  "datasetName": "serving_chart_series",
+                  "parameters": [
+                    {
+                      "name": "serving_model",
+                      "keyword": "serving_model"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -3932,6 +4079,10 @@
                   {
                     "parameterName": "serving_model",
                     "queryName": "parameter_serving_latency_distribution"
+                  },
+                  {
+                    "parameterName": "serving_model",
+                    "queryName": "series"
                   }
                 ]
               },
@@ -4366,6 +4517,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "series",
+                "query": {
+                  "datasetName": "serving_chart_series",
+                  "parameters": [
+                    {
+                      "name": "serving_version",
+                      "keyword": "serving_version"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -4496,6 +4660,10 @@
                   {
                     "parameterName": "serving_version",
                     "queryName": "parameter_serving_latency_distribution"
+                  },
+                  {
+                    "parameterName": "serving_version",
+                    "queryName": "series"
                   }
                 ]
               },
@@ -4930,6 +5098,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "series",
+                "query": {
+                  "datasetName": "serving_chart_series",
+                  "parameters": [
+                    {
+                      "name": "serving_monitor",
+                      "keyword": "serving_monitor"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -5060,6 +5241,10 @@
                   {
                     "parameterName": "serving_monitor",
                     "queryName": "parameter_serving_latency_distribution"
+                  },
+                  {
+                    "parameterName": "serving_monitor",
+                    "queryName": "series"
                   }
                 ]
               },
@@ -5101,7 +5286,7 @@
             "name": "overview_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Model monitoring"
+                "## Model monitoring"
               ]
             }
           },
@@ -5711,7 +5896,21 @@
                 "color": {
                   "fieldName": "series",
                   "scale": {
-                    "type": "categorical"
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Drift detected",
+                        "color": "#E5484D"
+                      },
+                      {
+                        "value": "Checks measured",
+                        "color": "#3B82F6"
+                      },
+                      {
+                        "value": "Checks unavailable",
+                        "color": "#7C8CA0"
+                      }
+                    ]
                   }
                 }
               },
@@ -5782,7 +5981,21 @@
                 "color": {
                   "fieldName": "series",
                   "scale": {
-                    "type": "categorical"
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Performance loss",
+                        "color": "#E5484D"
+                      },
+                      {
+                        "value": "Measured",
+                        "color": "#3B82F6"
+                      },
+                      {
+                        "value": "Insufficient evidence",
+                        "color": "#7C8CA0"
+                      }
+                    ]
                   }
                 }
               },
@@ -5911,7 +6124,7 @@
             "name": "training_lineage_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Training and lineage"
+                "## Training and lineage"
               ]
             }
           },
@@ -6251,7 +6464,7 @@
             "name": "drift_quality_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Drift and data quality"
+                "## Drift and data quality"
               ]
             }
           },
@@ -7481,6 +7694,10 @@
                   "datasetName": "drift_psi_matrix",
                   "fields": [
                     {
+                      "name": "model_label",
+                      "expression": "`model_label`"
+                    },
+                    {
                       "name": "model_identity",
                       "expression": "`model_identity`"
                     },
@@ -7493,82 +7710,160 @@
                       "expression": "`observation_label`"
                     },
                     {
+                      "name": "report_id",
+                      "expression": "`report_id`"
+                    },
+                    {
+                      "name": "window_start",
+                      "expression": "`window_start`"
+                    },
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "name": "measured_at",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "name": "psi",
+                      "expression": "MAX(`psi`)"
+                    },
+                    {
+                      "name": "psi_threshold",
+                      "expression": "MAX(`psi_threshold`)"
+                    },
+                    {
                       "name": "psi_ratio",
                       "expression": "MAX(`psi_ratio`)"
+                    },
+                    {
+                      "name": "psi_over_limit",
+                      "expression": "MAX(`psi_over_limit`)"
                     }
                   ],
-                  "disaggregated": false
+                  "disaggregated": false,
+                  "filters": [
+                    {
+                      "expression": "psi_over_limit IS NOT NULL"
+                    }
+                  ],
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`window_end`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`measured_at`"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`report_id`"
+                    }
+                  ]
                 }
               }
             ],
             "spec": {
               "version": 3,
-              "widgetType": "pivot",
+              "widgetType": "heatmap",
               "encodings": {
-                "rows": [
-                  {
-                    "fieldName": "model_identity",
-                    "displayName": "Model / version / monitoring ID",
-                    "total": {
-                      "show": false
-                    }
+                "x": {
+                  "fieldName": "observation_label",
+                  "displayName": "Data window end (UTC) / observation",
+                  "scale": {
+                    "type": "categorical"
                   },
-                  {
-                    "fieldName": "column_name",
-                    "displayName": "Feature",
-                    "total": {
-                      "show": false
-                    }
+                  "axis": {
+                    "labelAngle": 0
                   }
-                ],
-                "columns": [
-                  {
-                    "fieldName": "observation_label",
-                    "displayName": "Data window end (UTC) / observation",
-                    "total": {
-                      "show": false
-                    }
+                },
+                "y": {
+                  "fieldName": "column_name",
+                  "displayName": "Feature",
+                  "scale": {
+                    "type": "categorical"
                   }
-                ],
-                "cell": {
-                  "type": "multi-cell",
-                  "fields": [
-                    {
-                      "fieldName": "psi_ratio",
-                      "cellType": "text",
-                      "format": {
-                        "type": "number-plain",
-                        "decimalPlaces": {
-                          "type": "max",
-                          "places": 2
-                        }
-                      },
-                      "style": {
-                        "type": "basic",
-                        "rules": [
-                          {
-                            "condition": {
-                              "operand": {
-                                "type": "data-value",
-                                "value": "1"
-                              },
-                              "operator": ">"
-                            },
-                            "backgroundColor": {
-                              "hex": "#E5484D"
-                            }
-                          }
-                        ]
+                },
+                "color": {
+                  "fieldName": "psi_over_limit",
+                  "displayName": "Above PSI limit",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "min": 0,
+                      "max": 1
+                    },
+                    "colorRamp": {
+                      "mode": "custom-sequential",
+                      "colors": {
+                        "start": "#7C8CA0",
+                        "end": "#E5484D"
                       }
                     }
-                  ]
-                }
+                  },
+                  "legend": {
+                    "hide": true
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "psi",
+                    "displayName": "Measured PSI"
+                  },
+                  {
+                    "fieldName": "psi_threshold",
+                    "displayName": "PSI limit"
+                  },
+                  {
+                    "fieldName": "psi_ratio",
+                    "displayName": "PSI / limit"
+                  },
+                  {
+                    "fieldName": "model_identity",
+                    "displayName": "Full model / version / monitoring ID"
+                  },
+                  {
+                    "fieldName": "report_id",
+                    "displayName": "Report"
+                  },
+                  {
+                    "fieldName": "window_start",
+                    "displayName": "Data window start (UTC)"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "displayName": "Data window end (UTC)"
+                  },
+                  {
+                    "fieldName": "measured_at",
+                    "displayName": "Calculated at (UTC)"
+                  }
+                ]
               },
               "frame": {
                 "showTitle": true,
                 "title": "When did each feature drift?",
                 "showDescription": true,
-                "description": "Latest 12 observations and top 10 features per identity. Each cell is PSI / its own limit; red means above 1. Empty cells have no valid limit or measurement. Date filters narrow retained history."
+                "description": "Latest 12 observations and top 10 features per identity. Red: PSI exceeds its own limit. Gray: at or below the limit. Empty: no valid measurement or positive limit. Hover for PSI, limit, ratio and full UTC times. Panel numbers distinguish identities in the current selection."
+              },
+              "facet": {
+                "type": "wrap",
+                "fieldName": "model_label",
+                "scale": {
+                  "type": "categorical"
+                },
+                "layout": {
+                  "column": {
+                    "type": "count",
+                    "value": 2
+                  },
+                  "row": {
+                    "type": "count",
+                    "value": 1
+                  }
+                }
               }
             }
           },
@@ -9353,7 +9648,7 @@
             "name": "execution_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Execution and compute"
+                "## Execution and compute"
               ]
             }
           },
@@ -10416,7 +10711,7 @@
             "name": "serving_title",
             "multilineTextboxSpec": {
               "lines": [
-                "# Online serving"
+                "## Online serving"
               ]
             }
           },
@@ -10834,6 +11129,19 @@
                   ],
                   "disaggregated": false
                 }
+              },
+              {
+                "name": "series",
+                "query": {
+                  "datasetName": "serving_chart_series",
+                  "fields": [
+                    {
+                      "name": "window_end",
+                      "expression": "`window_end`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
               }
             ],
             "spec": {
@@ -10848,6 +11156,10 @@
                   {
                     "fieldName": "window_end",
                     "queryName": "distribution"
+                  },
+                  {
+                    "fieldName": "window_end",
+                    "queryName": "series"
                   }
                 ]
               },
@@ -11253,7 +11565,7 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "serving_windows",
+                  "datasetName": "serving_chart_series",
                   "fields": [
                     {
                       "name": "window_end",
@@ -11280,26 +11592,25 @@
                       "expression": "`window_start`"
                     },
                     {
-                      "name": "plot_4xx",
-                      "expression": "`plot_4xx`"
-                    },
-                    {
-                      "name": "plot_5xx",
-                      "expression": "`plot_5xx`"
-                    },
-                    {
-                      "name": "plot_other",
-                      "expression": "`plot_other`"
-                    },
-                    {
                       "name": "observation_label",
                       "expression": "`observation_label`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    },
+                    {
+                      "name": "metric_value",
+                      "expression": "`metric_value`"
                     }
                   ],
                   "disaggregated": true,
                   "filters": [
                     {
                       "expression": "status <> 'failed' AND request_count > 0"
+                    },
+                    {
+                      "expression": "metric_kind = 'errors'"
                     }
                   ],
                   "orders": [
@@ -11334,22 +11645,11 @@
                   }
                 },
                 "y": {
-                  "fields": [
-                    {
-                      "fieldName": "plot_4xx",
-                      "displayName": "4xx client"
-                    },
-                    {
-                      "fieldName": "plot_5xx",
-                      "displayName": "5xx server"
-                    },
-                    {
-                      "fieldName": "plot_other",
-                      "displayName": "Other / class not recorded"
-                    }
-                  ],
                   "scale": {
-                    "type": "quantitative"
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
                   },
                   "displayName": "Captured errors",
                   "format": {
@@ -11358,7 +11658,8 @@
                       "type": "max",
                       "places": 0
                     }
-                  }
+                  },
+                  "fieldName": "metric_value"
                 },
                 "extra": [
                   {
@@ -11404,7 +11705,9 @@
                     "position": "bottom",
                     "hideTitle": false,
                     "title": "HTTP error class"
-                  }
+                  },
+                  "fieldName": "series",
+                  "displayName": "HTTP error class"
                 },
                 "label": {
                   "show": true
@@ -11452,15 +11755,11 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "serving_windows",
+                  "datasetName": "serving_chart_series",
                   "fields": [
                     {
                       "name": "window_end",
                       "expression": "`window_end`"
-                    },
-                    {
-                      "name": "latency_mean_ms",
-                      "expression": "`latency_mean_ms`"
                     },
                     {
                       "name": "model_identity",
@@ -11487,10 +11786,6 @@
                       "expression": "`latency_p50_display`"
                     },
                     {
-                      "name": "latency_p95_ms",
-                      "expression": "`latency_p95_ms`"
-                    },
-                    {
                       "name": "latency_p99_display",
                       "expression": "`latency_p99_display`"
                     },
@@ -11505,12 +11800,23 @@
                     {
                       "name": "latency_p95_display",
                       "expression": "`latency_p95_display`"
+                    },
+                    {
+                      "name": "series",
+                      "expression": "`series`"
+                    },
+                    {
+                      "name": "metric_value",
+                      "expression": "`metric_value`"
                     }
                   ],
                   "disaggregated": true,
                   "filters": [
                     {
                       "expression": "status <> 'failed' AND request_count > 0 AND observation_recency <= 12"
+                    },
+                    {
+                      "expression": "metric_kind = 'latency'"
                     }
                   ],
                   "orders": [
@@ -11547,7 +11853,10 @@
                 "y": {
                   "displayName": "Milliseconds per request (lower is faster)",
                   "scale": {
-                    "type": "quantitative"
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "per-facet"
+                    }
                   },
                   "format": {
                     "type": "number-plain",
@@ -11556,16 +11865,7 @@
                       "places": 1
                     }
                   },
-                  "fields": [
-                    {
-                      "fieldName": "latency_mean_ms",
-                      "displayName": "Average (mean)"
-                    },
-                    {
-                      "fieldName": "latency_p95_ms",
-                      "displayName": "Slow requests (p95)"
-                    }
-                  ]
+                  "fieldName": "metric_value"
                 },
                 "extra": [
                   {
@@ -11618,14 +11918,24 @@
                         "color": "#D95926"
                       }
                     ]
+                  },
+                  "fieldName": "series",
+                  "displayName": "Execution time",
+                  "legend": {
+                    "position": "bottom",
+                    "hideTitle": false,
+                    "title": "Execution time"
                   }
+                },
+                "label": {
+                  "show": true
                 }
               },
               "frame": {
                 "showTitle": true,
                 "title": "How long does the model take to answer?",
                 "showDescription": true,
-                "description": "Latest 12 monitoring observations per model/version/context. Each group is one observation. Blue is the average execution time per request; orange is the approximate time 95% of timed requests stayed under. Model computation only, not network time. Missing measurements have no bar and read Not recorded in the detail tooltip; they are not zero. Repeated windows are separate calculations."
+                "description": "Latest 12 monitoring observations per model/version/context. Each group is one observation. Blue is the average execution time per request; orange is the approximate time 95% of timed requests stayed under. Model computation only, not network time. Missing measurements have no bar; the observation tables show Not recorded. They are not zero. Repeated windows are separate calculations."
               },
               "mark": {
                 "layout": "group"

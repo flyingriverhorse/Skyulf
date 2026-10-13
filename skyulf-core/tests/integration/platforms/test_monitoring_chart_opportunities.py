@@ -37,6 +37,9 @@ def database():
             "concat", -1, lambda *parts: "".join(str(p or "") for p in parts)
         )
         connection.create_function("date_format", 2, lambda value, pattern: str(value)[:16])
+        connection.create_function(
+            "substring_index", 3, lambda value, sep, count: value.rsplit(sep, -count)[count]
+        )
         connection.create_function("get_json_object", 2, _json_value)
         identity = (
             "monitor_id TEXT, model_catalog TEXT, model_schema TEXT, model_name TEXT, "
@@ -285,6 +288,65 @@ def test_psi_matrix_bounds_each_identity_and_keeps_invalid_limits_null(database)
     assert all(row["psi_ratio"] is None for row in _execute(database, "drift_psi_matrix"))
 
 
+def test_psi_chart_keeps_short_label_collisions_separate_and_marks_only_limit_exceedance(database):
+    """Short model names, hash prefixes and repeated windows must never merge heatmap cells."""
+    for model, monitor in (
+        ("catalog.a.risk", "123456789abc-first"),
+        ("catalog.b.risk", "123456789abc-first"),
+        ("catalog.a.risk", "123456789abc-second"),
+    ):
+        for report, value, threshold in (
+            ("at", 0.2, 0.2),
+            ("above", 0.3, 0.2),
+            ("invalid", 0.3, 0),
+        ):
+            identity = _report(
+                database, f"{model}-{monitor}-{report}", model_name=model, monitor_id=monitor
+            )
+            _insert(
+                database,
+                "metric_history",
+                **identity,
+                column_name="age",
+                category="drift",
+                metric_name="psi",
+                value=value,
+                threshold=threshold,
+            )
+    rows = _execute(database, "drift_psi_matrix")
+    assert len(rows) == 9
+    assert len({row["model_label"] for row in rows}) == 3
+    assert len({(row["model_label"], row["observation_label"]) for row in rows}) == 9
+    assert all("risk / v1" in row["model_label"] for row in rows)
+    for row in rows:
+        case = row["report_id"].rsplit("-", 1)[1]
+        assert row["psi_over_limit"] == {"at": 0, "above": 1, "invalid": None}[case]
+    dashboard = json.loads(ASSET.read_text(encoding="utf-8"))
+    widget = next(
+        c["widget"]
+        for p in dashboard["pages"]
+        for c in p["layout"]
+        if c["widget"]["name"] == "drift_psi_heatmap"
+    )
+    assert widget["spec"]["widgetType"] == "heatmap"
+    color = widget["spec"]["encodings"]["color"]
+    assert color["fieldName"] == "psi_over_limit"
+    assert color["scale"]["domain"] == {"min": 0, "max": 1}
+    assert color["scale"]["colorRamp"]["colors"] == {"start": "#7C8CA0", "end": "#E5484D"}
+    assert {"psi", "psi_threshold", "psi_ratio", "model_identity", "report_id", "window_end"} <= {
+        f["fieldName"] for f in widget["spec"]["encodings"]["extra"]
+    }
+    predicate = " AND ".join(f["expression"] for f in widget["queries"][0]["query"]["filters"])
+    query = "".join(_dataset("drift_psi_matrix")["queryLines"])
+    plotted = list(
+        database.execute(
+            f"SELECT * FROM ({query}) scoped WHERE {predicate}",
+            {"drift_model": "", "drift_version": "", "drift_monitor": ""},
+        )
+    )
+    assert len(plotted) == 6 and all(row["psi_over_limit"] is not None for row in plotted)
+
+
 @pytest.mark.parametrize(
     ("direction", "baseline", "limit", "current", "mode", "status", "expected"),
     [
@@ -412,3 +474,19 @@ def test_new_charts_share_identity_and_date_filters_and_do_not_overlap():
                     and b["y"] < a["y"] + a["height"]
                 )
                 assert not overlaps, (page["name"], item["widget"]["name"], other["widget"]["name"])
+
+
+def test_daily_problem_series_keep_the_same_attention_colors_as_detail_charts():
+    """A drift or performance loss must never inherit the theme's healthy green slot."""
+    dashboard = json.loads(ASSET.read_text(encoding="utf-8"))
+    widgets = {c["widget"]["name"]: c["widget"] for p in dashboard["pages"] for c in p["layout"]}
+    for name, problem, measured, unavailable in (
+        ("overview_drift_trend", "Drift detected", "Checks measured", "Checks unavailable"),
+        ("overview_performance_trend", "Performance loss", "Measured", "Insufficient evidence"),
+    ):
+        scale = widgets[name]["spec"]["encodings"]["color"]["scale"]
+        assert {item["value"]: item["color"] for item in scale["mappings"]} == {
+            problem: "#E5484D",
+            measured: "#3B82F6",
+            unavailable: "#7C8CA0",
+        }

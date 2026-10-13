@@ -106,6 +106,24 @@ def test_serving_operational_series_keep_legacy_counts_and_unavailable_percentil
         assert rows["http_success"]["logging_error_count"] == 2
         assert rows["http_success"]["error_count"] == 0
         assert all(rows["http_success"][key] == 0 for key in ("plot_4xx", "plot_5xx", "plot_other"))
+        series = list(connection.execute(_sql("serving_chart_series"), params))
+        plotted = {(row["report_id"], row["series"]): row["metric_value"] for row in series}
+        assert {key[1]: value for key, value in plotted.items() if key[0] == "new"} == {
+            "4xx client": 2,
+            "5xx server": 1,
+            "Other / class not recorded": 1,
+            "Average (mean)": 15,
+            "Slow requests (p95)": 20,
+        }
+        for name in ("legacy", "partial", "inconsistent", "negative"):
+            assert (name, "4xx client") not in plotted
+            assert (name, "5xx server") not in plotted
+            assert plotted[name, "Other / class not recorded"] == rows[name]["error_count"]
+        assert ("legacy", "Slow requests (p95)") not in plotted
+        assert plotted["zero_timing", "Slow requests (p95)"] == 0
+        assert not {row["report_id"] for row in series} & {"failed", "zero"}
+        assert len(plotted) == len(series)
+        assert all(row["metric_value"] is not None for row in series)
         latest = list(connection.execute(_sql("serving_current"), params))
         assert len(latest) == 1 and latest[0]["report_id"] == "zero_timing"
         assert latest[0]["logging_error_count"] == 0
@@ -206,6 +224,18 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
             assert list(connection.execute(_sql(dataset), parameters)) == []
             parameters.update(serving_model="", serving_version="", serving_monitor="")
 
+        parameters.update(serving_model="catalog.schema.a", serving_version="2")
+        series = list(connection.execute(_sql("serving_chart_series"), parameters))
+        assert {(row["monitor_id"], row["series"], row["metric_value"]) for row in series} == {
+            ("selected", "Average (mean)", 4),
+            ("selected", "Slow requests (p95)", 7),
+        }
+        parameters["serving_version"] = "7"
+        assert not list(connection.execute(_sql("serving_chart_series"), parameters))
+        parameters.update(serving_version="2", serving_monitor="prod / project / other")
+        assert not list(connection.execute(_sql("serving_chart_series"), parameters))
+        parameters.update(serving_model="", serving_version="", serving_monitor="")
+
         widget = next(
             i["widget"]
             for page in _data()["pages"]
@@ -213,16 +243,16 @@ def test_serving_all_models_and_exact_scope_filter_before_history_truncation():
             if i["widget"]["name"] == "serving_latency_trend"
         )
         predicate = " AND ".join(f["expression"] for f in widget["queries"][0]["query"]["filters"])
-        plotted_sql = f"SELECT * FROM ({_sql('serving_windows')}) scoped WHERE {predicate}"
+        plotted_sql = f"SELECT * FROM ({_sql('serving_chart_series')}) scoped WHERE {predicate}"
         plotted = list(connection.execute(plotted_sql, parameters))
-        assert len(plotted) == 13
+        assert len(plotted) == 26
         assert {r["report_id"] for r in plotted if r["monitor_id"] == "other"} == {
             f"other-{i}" for i in range(298, 310)
         }
         selected = list(
             connection.execute(plotted_sql, parameters | {"serving_model": "catalog.schema.a"})
         )
-        assert len(selected) == 1 and selected[0]["report_id"] == "selected-1"
+        assert len(selected) == 2 and {row["report_id"] for row in selected} == {"selected-1"}
 
 
 def test_serving_page_shows_bounded_aggregate_context_and_async_empty_state():
@@ -377,7 +407,7 @@ def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
     dashboard = _data()
     widgets = {i["widget"]["name"]: i["widget"] for p in dashboard["pages"] for i in p["layout"]}
     for name in ("filter_model", "filter_version", "filter_context", "filter_serving_window"):
-        assert "serving_latency_distribution" in {
+        assert {"serving_latency_distribution", "serving_chart_series"} <= {
             q["query"]["datasetName"] for q in widgets[name]["queries"]
         }
     errors = widgets["serving_error_trend"]["spec"]
@@ -389,7 +419,8 @@ def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
         "5xx server": "#E5484D",
         "Other / class not recorded": "#7C8CA0",
     }
-    assert [f["displayName"] for f in errors["encodings"]["y"]["fields"]] == list(colors)
+    assert errors["encodings"]["y"]["fieldName"] == "metric_value"
+    assert errors["encodings"]["color"]["fieldName"] == "series"
     assert errors["encodings"]["color"]["legend"]["position"] == "bottom"
     assert errors["encodings"]["color"]["legend"]["title"] == "HTTP error class"
     assert errors["encodings"]["label"]["show"] is True
@@ -400,10 +431,15 @@ def test_serving_distribution_and_series_follow_filters_and_distinct_colors():
     latency = chart["encodings"]
     assert latency["x"]["fieldName"] == "observation_label"
     assert "lower is faster" in latency["y"]["displayName"]
-    assert [f["fieldName"] for f in latency["y"]["fields"]] == [
-        "latency_mean_ms",
-        "latency_p95_ms",
-    ]
+    assert latency["y"]["fieldName"] == "metric_value"
+    assert latency["color"]["fieldName"] == "series"
+    for name, kind in (("serving_error_trend", "errors"), ("serving_latency_trend", "latency")):
+        widget = widgets[name]
+        query = widget["queries"][0]["query"]
+        assert query["datasetName"] == "serving_chart_series"
+        assert any(f"metric_kind = '{kind}'" in f["expression"] for f in query["filters"])
+        assert widget["spec"]["encodings"]["y"]["scale"]["domain"] == {"type": "per-facet"}
+        assert widget["spec"]["encodings"]["label"]["show"] is True
     assert {
         "latency_p50_display",
         "latency_p95_display",
