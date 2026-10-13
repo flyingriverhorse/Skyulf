@@ -38,12 +38,6 @@ def test_revisit_requires_performance_policy(monkeypatch):
 def test_numeric_ks_result_requires_probability(monkeypatch):
     """Malformed KS evidence must fail before it becomes a report metric, including with -O."""
     frame = MagicMock()
-    frame.count.return_value = 4
-    frame.agg.return_value.first.return_value = {"origin": 0.0, "std": 1.0}
-    frame.schema.__getitem__.return_value.dataType.typeName.return_value = "double"
-    monkeypatch.setattr(drift, "spark_functions", MagicMock)
-    monkeypatch.setattr(drift, "spark_column", MagicMock())
-    monkeypatch.setattr(drift, "has_spark_rows", lambda value: False)
     monkeypatch.setattr(drift, "_numeric_frame", lambda *args: frame)
     monkeypatch.setattr(drift, "_cdf_statistics", lambda *args: (0.5, 1.0))
     monkeypatch.setattr(drift, "_histogram_metrics", lambda *args: (0.5, 0.5))
@@ -56,4 +50,4 @@ def test_numeric_ks_result_requires_probability(monkeypatch):
     )
     thresholds = {"wasserstein": 0.1, "ks_statistic": 0.1, "psi": 0.2, "kl_divergence": 0.1}
     with pytest.raises(ValueError, match="KS evidence requires a p-value"):
-        drift._numeric_result(frame, frame, "x", thresholds)
+        drift._numeric_result(frame, frame, "x", thresholds, 4, 4, 1.0)

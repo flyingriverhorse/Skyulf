@@ -181,25 +181,11 @@ def _ks_p_value_metric(evidence: DriftEvidence, statistic: float, threshold: flo
 
 
 def _numeric_result(
-    reference: Any, current: Any, column: str, thresholds: dict
+    reference: Any, current: Any, column: str, thresholds: dict, n: int, m: int, std: float
 ) -> ColumnDrift | None:
     """Calculate numeric effect statistics and a separately identified inference gate."""
-    f = spark_functions()
-    if has_spark_rows(
-        reference.where(f.abs(spark_column(column).cast("double")) == float("inf"))
-    ) or has_spark_rows(current.where(f.abs(spark_column(column).cast("double")) == float("inf"))):
-        return None
     ref, cur = _numeric_frame(reference, column), _numeric_frame(current, column)
-    n, m = ref.count(), cur.count()
-    if not n or not m:
-        return None
     statistic, distance = _cdf_statistics(ref, cur, n, m)
-    # Center native integer coordinates before converting to double for stable scaling.
-    origin = ref.agg(f.min("value").alias("origin")).first()["origin"]
-    centered = f.col("value") - f.lit(origin)
-    if ref.schema["value"].dataType.typeName() in {"long", "integer", "short", "byte"}:
-        centered = f.col("value").cast("decimal(38,0)") - f.lit(origin)
-    std = float(ref.agg(f.stddev_pop(centered.cast("double")).alias("std")).first()["std"] or 0)
     psi, kl = _histogram_metrics(ref, cur, n, m)
     evidence = _ks_evidence(statistic, n, m)
     metrics = [
@@ -266,29 +252,80 @@ def _categorical_result(
     )
 
 
-def _both_populated(reference: Any, current: Any, column: str) -> bool:
-    """Retain the local no-data precedence even when inferred nullable types differ."""
-    return has_spark_rows(reference.where(spark_column(column).isNotNull())) and has_spark_rows(
-        current.where(spark_column(column).isNotNull())
-    )
+def _population_summaries(
+    frame: Any, columns: tuple[str, ...], numeric: tuple[str, ...], *, origins: bool
+) -> dict[str, dict]:
+    """Collect only scalar preflight summaries in one scan, retaining native minima."""
+    if not columns:
+        return {}
+    f = spark_functions()
+    aggregates = []
+    for column in columns:
+        original = spark_column(column)
+        fields = [f.count(original).alias("populated")]
+        if column in numeric:
+            value = original if is_numeric_column(frame, column) else original.try_cast("double")
+            finite = f.when(finite_spark_value(value), value)
+            fields.extend(
+                [
+                    f.count(finite).alias("count"),
+                    f.max(f.abs(value.cast("double")) == float("inf")).alias("infinite"),
+                    f.count(f.when(original.isNotNull() & value.isNull(), 1)).alias("invalid"),
+                ]
+            )
+            if origins:
+                fields.append(f.min(finite).alias("origin"))
+        aggregates.append(f.struct(*fields).alias(column))
+    return frame.agg(*aggregates).first().asDict(recursive=True)
+
+
+def _has_numeric_data(summary: dict) -> bool:
+    """Require finite observations and reject infinity or failed numeric conversion."""
+    return bool(summary.get("count")) and not summary["infinite"] and not summary["invalid"]
+
+
+def _reference_deviations(reference: Any, ref: dict, cur: dict) -> dict[str, float]:
+    """Batch standard deviations after centering in each column's native coordinates."""
+    f = spark_functions()
+    aggregates = []
+    for column, summary in ref.items():
+        if not _has_numeric_data(summary) or not _has_numeric_data(cur[column]):
+            continue
+        value = spark_column(column)
+        finite = f.when(finite_spark_value(value), value)
+        if reference.schema[column].dataType.typeName() in {"long", "integer", "short", "byte"}:
+            finite = finite.cast("decimal(38,0)")
+        centered = finite - f.lit(summary["origin"])
+        aggregates.append(f.stddev_pop(centered.cast("double")).alias(column))
+    if not aggregates:
+        return {}
+    row = reference.agg(*aggregates).first().asDict()
+    return {column: float(value or 0) for column, value in row.items()}
 
 
 def _column_result(
-    reference: Any, current: Any, column: str, thresholds: dict
+    reference: Any,
+    current: Any,
+    column: str,
+    thresholds: dict,
+    ref_summary: dict,
+    cur_summary: dict,
+    std: float | None,
 ) -> ColumnDrift | None:
     """Classify schema compatibility before selecting a distributed numeric or category kernel."""
     types = importlib.import_module("pyspark.sql.types")
     ref_type, cur_type = reference.schema[column].dataType, current.schema[column].dataType
     categorical = (types.StringType, types.BooleanType)
-    if not _both_populated(reference, current, column):
+    if not ref_summary["populated"] or not cur_summary["populated"]:
         return None
-    if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.StringType):
-        converted = spark_column(column).try_cast("double")
-        if not has_spark_rows(current.where(spark_column(column).isNotNull() & converted.isNull())):
-            current = current.withColumn(column, converted)
-            cur_type = current.schema[column].dataType
-    if isinstance(ref_type, types.NumericType) and isinstance(cur_type, types.NumericType):
-        return _numeric_result(reference, current, column, thresholds)
+    if "count" in ref_summary and not cur_summary["invalid"]:
+        if std is None:
+            return None
+        if isinstance(cur_type, types.StringType):
+            current = current.withColumn(column, spark_column(column).try_cast("double"))
+        return _numeric_result(
+            reference, current, column, thresholds, ref_summary["count"], cur_summary["count"], std
+        )
     if isinstance(ref_type, categorical) and isinstance(cur_type, categorical):
         return _compatible_categories(reference, current, column, thresholds)
     if ref_type != cur_type:
@@ -296,6 +333,28 @@ def _column_result(
             column=column, metrics=[_metric_result("type_drift", 1.0, 0.0)], drift_detected=True
         )
     return None
+
+
+def _column_results(reference: Any, current: Any, columns: tuple, thresholds: dict) -> dict:
+    """Share numeric preflight work while preserving column order and per-feature kernels."""
+    numeric = tuple(
+        column
+        for column in columns
+        if is_numeric_column(reference, column)
+        and (
+            is_numeric_column(current, column)
+            or current.schema[column].dataType.typeName() == "string"
+        )
+    )
+    ref = _population_summaries(reference, columns, numeric, origins=True)
+    cur = _population_summaries(current, columns, numeric, origins=False)
+    deviations = _reference_deviations(reference, ref, cur)
+    return {
+        column: _column_result(
+            reference, current, column, thresholds, ref[column], cur[column], deviations.get(column)
+        )
+        for column in columns
+    }
 
 
 def _compatible_categories(
@@ -372,11 +431,8 @@ def drift_evidence(
         for column in columns
         if column not in reference.columns or column not in current.columns
     ]
-    results = {
-        column: _column_result(reference, current, column, limits)
-        for column in columns
-        if column not in missing
-    }
+    present = tuple(dict.fromkeys(column for column in columns if column not in missing))
+    results = _column_results(reference, current, present, limits)
     _correct_results(results)
     metrics = [
         monitoring_metric("drift", column, "schema_missing", 1.0, 0.0, True) for column in missing
