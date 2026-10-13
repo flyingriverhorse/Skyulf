@@ -35,7 +35,6 @@ def test_identity_controls_are_shared_across_model_pages() -> None:
             "serving_windows",
             "serving_status",
         } <= bound
-        assert not any(name.startswith("execution_") for name in bound)
     for page in dashboard["pages"]:
         if page is global_page:
             continue
@@ -105,33 +104,6 @@ def test_shared_defaults_never_filter_visual_rows_by_an_all_sentinel() -> None:
         assert len(defaults) == 1 and "" not in defaults
 
 
-def test_execution_ids_are_enterable_without_project_named_job_options() -> None:
-    """Valid one-off jobs remain inspectable when no Bundle-named jobs exist."""
-    dashboard = _dashboard()
-    page = next(p for p in dashboard["pages"] if p["name"] == "execution")
-    controls = [w for w in _widgets(page) if w["name"].startswith("filter_execution_")]
-    for control in controls:
-        assert all("fields" not in query["query"] for query in control["queries"])
-    choices = next(d for d in dashboard["datasets"] if d["name"] == "execution_choices")
-    sql = "".join(choices["queryLines"])
-    sql = (
-        sql.replace("system.lakeflow.jobs", "jobs")
-        .replace("system.lakeflow.job_run_timeline", "runs")
-        .replace("current_timestamp() - INTERVAL 30 DAYS", "'2026-09-11'")
-        .replace(" AS STRING", " AS TEXT")
-    )
-    with sqlite3.connect(":memory:") as connection:
-        install_shared_views(connection)
-        connection.executescript(
-            "CREATE TABLE jobs(workspace_id TEXT, job_id TEXT, name TEXT, change_time TEXT);"
-            "CREATE TABLE runs(workspace_id TEXT, job_id TEXT, period_start_time TEXT, "
-            "period_end_time TEXT);"
-            "INSERT INTO runs VALUES ('workspace-a','one-off','2026-10-11','2026-10-11');"
-        )
-        rows = connection.execute(sql).fetchall()
-    assert len(rows) == 1 and rows[0][:2] == ("workspace-a", "one-off")
-
-
 def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
     """A history date choice must never erase unobserved inventory rows."""
     dashboard = _dashboard()
@@ -141,7 +113,6 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
         "overview",
         "drift_quality",
         "performance",
-        "execution",
         "serving",
         "training_lineage",
         "investigation_filters",
@@ -170,7 +141,7 @@ def test_dashboard_inventory_and_history_have_separate_time_scopes() -> None:
 
 
 def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
-    """Every widget field and filter query must bind to its selected dataset."""
+    """Every dataset must be used and each widget/filter must retain a valid binding."""
     dashboard = _dashboard()
     names = {item["name"] for item in dashboard["datasets"]}
     filters = {
@@ -179,11 +150,13 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
         "monitor_context",
     }
     seen_filters: set[str] = set()
+    used_datasets: set[str] = set()
     for page in dashboard["pages"]:
         for widget in _widgets(page):
             queries = {item["name"]: item["query"] for item in widget.get("queries", [])}
             for query in queries.values():
                 assert query["datasetName"] in names
+                used_datasets.add(query["datasetName"])
             spec = widget.get("spec", {})
             widget_type = spec.get("widgetType")
             if widget_type and widget_type.startswith("filter-"):
@@ -228,6 +201,7 @@ def test_dashboard_fields_and_filters_bind_to_real_datasets() -> None:
                     else 2
                 )
     assert filters <= seen_filters
+    assert used_datasets == names
     assert not {"environment", "project"} & seen_filters
     assert all(
         field["name"] not in {"environment", "project"}
@@ -508,8 +482,6 @@ def test_context_selection_keeps_every_matching_observed_or_unobserved_identity(
         "trend_version",
         "trend_monitor",
         "performance_metric",
-        "execution_workspace",
-        "execution_job",
     }
 
 
@@ -552,22 +524,6 @@ def test_latest_observations_do_not_rank_policy_only_windows_as_feature_reports(
     for name in ("drift_psi_chart", "performance_latest"):
         rank_source = datasets[name].split("AS report_rank", 1)[1]
         assert rank_source.startswith("\n FROM complete_observations")
-
-
-def test_execution_cost_requires_exact_scope_and_preserves_unpriced_usage() -> None:
-    """Empty portable settings must never expose arbitrary workspace spend or fake exact cost."""
-    dashboard = _dashboard()
-    datasets = {item["name"]: "".join(item["queryLines"]) for item in dashboard["datasets"]}
-    for name in ("execution_runs", "execution_cost"):
-        assert ":execution_workspace" in datasets[name]
-        assert ":execution_job" in datasets[name]
-    cost = datasets["execution_cost"]
-    assert "system.billing.usage" in cost
-    assert "system.billing.list_prices" in cost
-    assert "unpriced_records" in cost
-    assert "currency_code = 'USD'" in cost
-    assert "COALESCE(lp.pricing" not in cost
-    assert "Select a workspace and job" in datasets["execution_status"]
 
 
 def test_nullable_context_parameters_keep_all_and_explicit_selections() -> None:

@@ -120,7 +120,6 @@ narrow it further.
 | Drift and data quality | Every matching model/version/context, with its own latest observation. | Separate feature PSI comparisons and drift histories, with detailed quality measurements. |
 | Model performance | Every matching model/version/context, including disabled and unmeasured policies. | Per-identity prediction/label coverage, metric history, policy comparisons and classification evidence. |
 | Online serving | All matching serving enrollments, separated by model/version/context; choose Model to narrow them. | Distinguish monitored and served versions; inspect captured counts and latency per observation in tables and three window charts. |
-| Execution and compute | The explicitly selected workspace and job, independently of model filters. | Job runs, estimated attributed cost and available compute telemetry. |
 
 Drift and Performance time charts and date filters use **Data window end (UTC)**.
 For data from 09:00 to 10:00, the point appears at 10:00 even if checks ran later.
@@ -193,11 +192,6 @@ zero remains `0`. Failed or performance-only observations can omit these counts.
 Historical rows and retries keep their saved values; upgrading does not backfill
 old zeros. For custom queries over older reports, check `report_json` to distinguish
 an absent count from a measured zero rather than replacing every `NULL` with `0`.
-
-On **Execution and compute**, copy Workspace and Job ID from **Recent accessible
-jobs** into the two input controls. The list includes one-off runs from the last
-30 days, independently of model enrollment. Inputs also accept IDs not yet listed;
-telemetry and billing may arrive later. Neither input silently selects a job.
 
 Lineage tables retain unresolved NULL versions explicitly.
 

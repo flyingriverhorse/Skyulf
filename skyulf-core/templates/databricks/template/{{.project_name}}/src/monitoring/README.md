@@ -21,10 +21,8 @@ state when migrating ownership; never deploy a second owner against it.
 
 Changing training/scoring compute to a cluster does not enable monitoring, change
 its storage destination, or enable automatic retraining. The generated monitoring
-job has its own serverless environment. Job runs and attributed billing appear
-after Databricks system telemetry becomes available. CPU/RAM cards and trends use
-classic cluster node samples during the selected job; serverless CPU/RAM is not
-exposed by these system tables and stays unavailable, never zero.
+job has its own serverless environment. Use Databricks to inspect job run
+history, compute usage and billing.
 
 Native AI/BI is the visualization product, distinct from Databricks Data Profiling.
 This Bundle does not provision a separate native data profile. The older
@@ -161,7 +159,7 @@ Use the **shared filter panel** for Model, Monitored version and Context.
 These choices persist across Overview, Training and lineage, Drift and quality,
 Model performance and Online serving. Model names include catalog and schema.
 Drift and Performance include every matching identity, selecting its latest
-evidence independently. Execution and compute has a separate Workspace/Job scope.
+evidence independently.
 The full page scope table and optional controls are described under Dashboard layout below.
 
 **Training and lineage** shows every identity matching the shared filters.
@@ -562,7 +560,6 @@ never falls back to another model.
 | Drift and data quality | Every matching model/version/context, with its own latest observation. | Separate feature PSI comparisons and drift histories, with detailed quality measurements. |
 | Model performance | Every matching model/version/context, including disabled and unmeasured policies. | Per-identity prediction/label coverage, metric history, policy comparisons and classification evidence. |
 | Online serving | All matching serving enrollments, separated by model/version/context; choose Model to narrow them. | Distinguish monitored and served versions; inspect captured counts and latency per observation in tables and three window charts. |
-| Execution and compute | The explicitly selected workspace and job, independently of model filters. | Job runs, estimated attributed cost and available compute telemetry. |
 
 Overview puts the issue list before trends. Four counters show distinct registered
 models, monitoring registrations, issue rows and distinct scoring-input tables.
@@ -725,48 +722,6 @@ report. Counts from different identities are never combined. Numeric class indic
 preserve identity when display labels collide. Measured zeros are real counts; unavailable
 classification, regression and historical reports without a stored matrix show an
 explicit status. The matrix is independent of history date and target filters.
-
-### Execution and compute
-
-This page has its own Workspace and Job selection. Shared model filters do not
-attribute a job's spend to one model; a job may process several models.
-
-This page requires SELECT access to `system.lakeflow.jobs`,
-`system.lakeflow.job_run_timeline`, `system.lakeflow.job_task_run_timeline`,
-`system.compute.node_timeline`, `system.billing.usage` and
-`system.billing.list_prices`. Dashboard readers need these permissions themselves;
-a permission error is not evidence of zero usage. The portable dashboard leaves
-workspace and job selections empty. Deployment-specific defaults may select exact
-owned IDs after verification. **Recent accessible jobs** lists jobs with runs in the last 30 days, including
-one-off submissions and jobs whose names do not follow the Bundle convention.
-Copy Workspace and Job ID from that table into the two input controls. Both
-inputs accept exact IDs even when system metadata has not arrived. The list is
-independent of model enrollment and does not establish model cost attribution.
-
-Both workspace ID and job ID must match before execution or billing rows are
-shown. Execution details summarize the last 30 days of run timeline records.
-Billing includes only usage with an explicit matching job ID. It preserves usage
-units and correction quantities, joins the applicable USD list price by SKU,
-cloud, unit and effective time, and reports unpriced records separately. Priced
-cost is an estimate, not an invoice or full project cost. Shared compute without
-job attribution is excluded. System telemetry and billing can arrive late; empty
-results do not prove that a job did not run or incur cost.
-
-CPU combines user and system utilization; memory uses `mem_used_percent`.
-The queries join task compute IDs to node samples using account, workspace and
-cluster identity, bounded to overlapping task time in the last 30 days. Overlapping
-tasks/retries are merged before aggregation so shared nodes are not counted twice.
-Average cards weight each node sample by its observed duration; peak cards show
-the highest individual node sample, not a cluster-wide capacity percentage.
-Each metric excludes missing samples from its own denominator. Shared-cluster
-usage can include other workloads during the job; it is not exclusive job usage.
-
-The [compute system tables](https://docs.databricks.com/aws/en/admin/system-tables/compute)
-cover classic compute; serverless usage and very short-lived nodes may have no
-node samples. Availability explains the absence; the cards remain NULL rather
-than displaying zero CPU or memory. CPU and memory trends show recorded averages
-and peaks against sample time. The daily cost chart separates billing SKUs and
-uses up to four USD decimal places so small amounts do not disappear into zero.
 
 ### Online serving
 
