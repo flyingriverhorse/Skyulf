@@ -68,6 +68,12 @@ To upgrade, change that one version to a published release and redeploy. Jobs ne
 package-index access. Saved models check their producer's runtime versions;
 validate compatibility or retrain before upgrading production.
 
+Before changing the pin, follow **Upgrade steps for generated Databricks projects**
+for every release between your current pin and the new one. They are published
+with each release, because they are written after this project was generated:
+<https://github.com/flyingriverhorse/Skyulf/blob/master/changelog/0.9.x.md>
+(later series have their own file in the same folder).
+
 ## 2. Validate and deploy the selected target
 
 Fill the selected target's workspace, catalog/schema and identity values before

@@ -82,7 +82,13 @@ def test_schema_offers_multi_model_handoff():
     """Multi-model users must see the same opt-in handoff prompt as other layouts."""
     root = Path(__file__).resolve().parents[3] / "templates/databricks"
     schema = json.loads((root / "databricks_template_schema.json").read_text())
-    assert "skip_prompt_if" not in schema["properties"]["score_handoff"]
+    from jsonschema import Draft7Validator
+
+    values = {name: spec["default"] for name, spec in schema["properties"].items()}
+    values["training_layout"] = "multi_target"
+    # Only the explicit quick setup may accept the disabled default unasked.
+    rule = schema["properties"]["score_handoff"]["skip_prompt_if"]
+    assert not Draft7Validator(rule).is_valid(values)
 
 
 def test_initialization_saves_parent_handoff_separately(workflow_config, tracked):

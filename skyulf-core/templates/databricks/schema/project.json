@@ -17,6 +17,13 @@
     "description": "1. Data | Project folder and Bundle name (letters, digits and underscores)",
     "pattern": "^[a-z][a-z0-9_]*$"
   },
+  "setup_mode": {
+    "order": 1.5,
+    "type": "string",
+    "default": "detailed",
+    "description": "Setup detail: detailed = review every setting now (dozens of questions); quick = answer only the task, source table and columns, accept the documented default for everything else and edit config/*.yml and deployment/ afterwards",
+    "enum": ["detailed", "quick"]
+  },
   "inference_mode": {
     "order": 2,
     "type": "string",

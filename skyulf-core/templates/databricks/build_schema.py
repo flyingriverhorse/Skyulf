@@ -50,7 +50,7 @@ def render_schema(source: Path) -> str:
         properties |= fields
     if not properties:
         raise ValueError("No prompt properties found in schema topic files.")
-    properties = _weight_questions(properties)
+    properties = _quick_setup(_weight_questions(properties))
     _validate_prompt_orders(properties)
     metadata["properties"] = dict(sorted(properties.items(), key=lambda item: item[1]["order"]))
     return _format_schema(metadata)
@@ -205,6 +205,27 @@ def _add_weighted_choice(result: dict[str, Any], name: str, field: dict[str, Any
     field["skip_prompt_if"] = {"anyOf": [skip, {"properties": {flag: {"const": "true"}}}]}
     weighted["skip_prompt_if"] = {"anyOf": [skip, {"properties": {flag: {"const": "false"}}}]}
     result[name + "_weighted"] = weighted
+
+
+_QUICK_PROMPTS = re.compile(
+    r"training_layout|project_name|setup_mode|task|source_table_name|record_key_columns"
+    r"|input_columns|target_column|branch_count"
+    r"|branch_[1-8]_(?:task|target_column|input_columns)"
+)
+
+
+def _quick_setup(properties: dict[str, Any]) -> dict[str, Any]:
+    """Let quick setup accept each optional default while keeping facts that have none."""
+    if "setup_mode" not in properties:
+        return properties
+    # Required: a missing answer must ask the question, not silently accept its default.
+    quick = {"properties": {"setup_mode": {"const": "quick"}}, "required": ["setup_mode"]}
+    for name, field in properties.items():
+        skip = field.get("skip_prompt_if")
+        if _QUICK_PROMPTS.fullmatch(name) or skip == {}:
+            continue  # An empty condition already hides the prompt in every mode.
+        field["skip_prompt_if"] = quick if skip is None else {"anyOf": [skip, quick]}
+    return properties
 
 
 def _format_schema(schema: dict[str, Any]) -> str:

@@ -322,6 +322,17 @@ Random full-snapshot training hides observation-date questions. Result-availabil
 questions appear only when you enable that separate filter. Schedule and
 policy-cluster details likewise appear only when selected.
 
+The third question, `setup_mode`, chooses how much to answer now. `detailed`, the
+default, reviews every setting, which is dozens of questions. `quick` asks only for
+the layout, project name, task, source table, record keys and target and input
+columns (eight questions for one target) and accepts the documented default for
+everything else. Both produce the same files for the same answers; change any
+default afterwards in `config/*.yml` and `deployment/`. Answer files that omit
+`setup_mode` keep the detailed path.
+
+Before raising a project's Core pin, follow the **Upgrade steps for generated
+Databricks projects** listed under each release in the changelog.
+
 Advanced settings use defaults without additional questions. Set them with
 `--config-file` using an existing example, or edit the generated
 `config/training.yml` defaults or `config/inference.yml` before running preview:

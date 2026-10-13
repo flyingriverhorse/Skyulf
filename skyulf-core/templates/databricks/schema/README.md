@@ -94,6 +94,15 @@ The generated `order` values leave slots for these derived questions; maintain
 relative source orders in the topic files. Never hand-maintain a separate list of
 weight-supported models.
 
+`setup_mode` (in `project.json`) is the quick-setup choice. With `quick`, the
+builder hides every prompt except the names in `_QUICK_PROMPTS` in
+`build_schema.py`: layout, project, task, source table, record keys and the
+target/input columns of each active target. Hidden prompts take their defaults,
+so every new prompt needs a working default; add its name to `_QUICK_PROMPTS`
+only when no default can be right. `detailed` stays the default so existing
+answer files keep the full guided path. Prompts whose `skip_prompt_if` is empty
+remain hidden in both modes.
+
 Source orders may use one decimal place to insert a shared prompt between existing
 questions (for example, `7.1` after `7`). The builder multiplies these by ten and
 emits integer CLI orders. Duplicate final orders fail with both field names,

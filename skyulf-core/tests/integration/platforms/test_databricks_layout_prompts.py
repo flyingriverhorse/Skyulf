@@ -12,6 +12,7 @@ SCHEMA = (
 SHARED_FIELDS = {
     "training_layout",
     "project_name",
+    "setup_mode",
     "engine",
     "inference_mode",
     "catalog",

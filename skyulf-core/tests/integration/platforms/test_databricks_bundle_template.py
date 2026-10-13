@@ -37,7 +37,12 @@ def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
     setting = schema["properties"]["auto_rebuild_on_cdf_expiry"]
     assert setting["default"] == "false"
     assert setting["enum"] == ["false", "true"]
-    assert "skip_prompt_if" not in setting
+    values = {name: spec["default"] for name, spec in schema["properties"].items()}
+    for layout in ("single_model", "model_competition", "multi_target"):
+        # Only the explicit quick setup may accept the disabled default unasked.
+        assert not Draft7Validator(setting["skip_prompt_if"]).is_valid(
+            values | {"training_layout": layout}
+        )
     assert Draft7Validator(setting).is_valid("true")
     assert not Draft7Validator(setting).is_valid(True)
     assert not Draft7Validator(setting).is_valid("yes")
