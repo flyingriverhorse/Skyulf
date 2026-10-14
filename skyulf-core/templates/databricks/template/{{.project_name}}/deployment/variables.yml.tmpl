@@ -65,9 +65,12 @@ variables:
   monitoring_pause_status:
     description: Explicitly unpause after reference preparation and verification
     default: "PAUSED"
+{{- if and .monitoring_catalog (not .monitoring_schema)}}
+{{- template "ERROR_monitoring_schema_is_required_with_monitoring_catalog" . -}}
+{{- end}}
   monitoring_enabled:
-    description: Enroll activated models and measure drift after scoring; false pauses monitoring
-    default: "true"
+    description: Enroll activated models and measure drift after scoring; set true only with catalog and schema
+    default: "{{if .monitoring_catalog}}true{{else}}false{{end}}"
   monitoring_dashboard_url:
     description: Published shared dashboard HTTPS URL shown in monitoring and drift task output
     default: ""
@@ -76,10 +79,10 @@ variables:
     default: ""
   monitoring_catalog:
     description: Central monitoring catalog, independent of model and input catalogs
-    default: ""
+    default: "{{.monitoring_catalog}}"
   monitoring_schema:
-    description: Existing central monitoring schema shared by model repositories
-    default: ""
+    description: Central monitoring schema shared by model repositories; created on first use if allowed
+    default: "{{.monitoring_schema}}"
   monitoring_label_table:
     description: Optional fully qualified table of actual outcomes for monitoring
     default: ""

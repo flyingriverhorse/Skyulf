@@ -1,6 +1,7 @@
 """Project-owned custom steps must demonstrate distinct training and feature contracts."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,18 @@ FEATURES = (
 def _custom_module(filename):
     """Load exactly the source shipped to users with isolated custom registrations."""
     return load_project_module((FEATURES / filename).read_text(encoding="utf-8"))
+
+
+def _class_example():
+    """Load the documented Calculator/Applier pair exactly as users copy it."""
+    page = FEATURES.parents[6] / "docs/user_guide/databricks_custom_steps.md"
+    blocks = re.findall(
+        r"<!-- example:custom-class-code -->\s*```python\n(.*?)```",
+        page.read_text(encoding="utf-8"),
+        re.DOTALL,
+    )
+    assert len(blocks) == 1, "Missing or duplicate custom-class-code example"
+    return load_project_module(blocks[0])
 
 
 def _copy_features(tmp_path):
@@ -146,7 +159,7 @@ def test_rare_categories_function_and_class_versions_match(engine, categorical):
     if categorical:  # category dtype must still accept the new "Other" value
         train["city"], score["city"] = train.city.astype("category"), score.city.astype("category")
     function_step = _custom_module("preprocessing.py").rare_categories("city", 0.2)
-    class_step = _custom_module("custom/advanced_class_step.py").class_rare_categories("city", 0.2)
+    class_step = _class_example().class_rare_categories("city", 0.2)
     for step in (function_step, class_step):
         state, result = _fit_apply(step, _native(train, engine), _native(score, engine))
         learned = state.get("state", state)  # fitted_step nests what learn() returned
@@ -161,12 +174,12 @@ def test_rare_categories_function_and_class_versions_match(engine, categorical):
 
 def test_rare_categories_rejects_invalid_share():
     """A share outside (0, 1) is a typo (5 instead of 0.05) and must fail early."""
-    for filename, factory in [
-        ("preprocessing.py", "rare_categories"),
-        ("custom/advanced_class_step.py", "class_rare_categories"),
-    ]:
+    for build in (
+        _custom_module("preprocessing.py").rare_categories,
+        _class_example().class_rare_categories,
+    ):
         with pytest.raises(ValueError, match="min_share"):
-            getattr(_custom_module(filename), factory)("city", min_share=5)
+            build("city", min_share=5)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

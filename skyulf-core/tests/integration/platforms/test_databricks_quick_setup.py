@@ -19,6 +19,9 @@ SHARED = {
     "setup_mode",
     "source_table_name",
     "record_key_columns",
+    # No default can name a monitoring store; blank answers start without monitoring.
+    "monitoring_catalog",
+    "monitoring_schema",
 }
 ONE_TARGET = SHARED | {"task", "input_columns", "target_column"}
 LAYOUTS = ["single_model", "model_competition", "multi_target"]
@@ -97,11 +100,12 @@ def test_quick_setup_asks_each_configured_branch_for_its_own_task_and_columns(co
 
 
 @pytest.mark.parametrize("layout", LAYOUTS)
-def test_detailed_setup_stays_the_default_and_keeps_its_questions(layout):
-    """Existing answer files omit the new choice and must keep the full guided path."""
-    assert PROPERTIES["setup_mode"]["default"] == "detailed"
-    detailed = set(_asked(training_layout=layout))
+def test_quick_setup_is_default_and_detailed_keeps_its_questions(layout):
+    """First-time users get the short wizard; detailed setup keeps every relevant choice."""
+    assert PROPERTIES["setup_mode"]["default"] == "quick"
+    detailed = set(_asked(setup_mode="detailed", training_layout=layout))
     quick = set(_asked(setup_mode="quick", training_layout=layout))
+    assert set(_cli_asked(training_layout=layout)) == quick
     assert quick < detailed
     assert {"compute_mode", "retraining_mode", "deployment_identity"} <= detailed
     assert len(detailed) > 40
@@ -168,9 +172,11 @@ def test_cli_asks_exactly_the_questions_the_schema_describes(layout, task, mode)
 )
 def test_cli_reaches_branch_and_candidate_questions(layout, expected):
     """These questions were unreachable while their rules relied on an ignored keyword."""
-    asked = _cli_asked(training_layout=layout)
+    asked = _cli_asked(setup_mode="detailed", training_layout=layout)
     assert expected in asked
-    assert "search_strategy" in _cli_asked(training_layout="single_model", search_settings="custom")
+    assert "search_strategy" in _cli_asked(
+        setup_mode="detailed", training_layout="single_model", search_settings="custom"
+    )
 
 
 def test_each_list_offers_its_default_first():

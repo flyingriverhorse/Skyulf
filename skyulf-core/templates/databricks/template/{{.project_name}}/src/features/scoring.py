@@ -33,12 +33,15 @@ skipped as a whole; separate the steps to retain the feature-only check.
 Both custom lists below are EMPTY by default. Their commented rules are examples,
 not active business requirements. To use one, uncomment its dictionary inside the
 returned list, adapt the columns/limits, and select "custom" or "combined". Merely
-changing SCORING_MODE does not enable these examples. Function paths point to
-custom/scoring_custom.py. Leave either list empty to omit those rules.
+changing SCORING_MODE does not enable these examples. Each "function" names a
+function defined at the end of this file. Leave either list empty to omit rules.
 Combined custom callbacks receive the original accepted inputs; the pre-split
 normalization copy is only for selection. Saved model transformations run once.
 The model saves the resolved choice and code; edits apply to NEW model versions.
 """
+
+import numpy as np
+import pandas as pd
 
 SCORING_MODE = "pre_split"  # Options: pre_split, custom, combined
 SKIP_TARGET_PRE_SPLIT_STEPS = False
@@ -68,7 +71,7 @@ def build_eligibility_rules():
         # {
         #     "name": "observed_value",
         #     "version": "1",
-        #     "function": "custom.scoring_custom.require_observed_values",
+        #     "function": "scoring.require_observed_values",
         #     "params": {"columns": ["feature_value"]},
         # },
         # Example 2: the same value must be finite and between 0 and 120 inclusive.
@@ -77,7 +80,7 @@ def build_eligibility_rules():
         # {
         #     "name": "allowed_range",
         #     "version": "1",
-        #     "function": "custom.scoring_custom.require_value_range",
+        #     "function": "scoring.require_value_range",
         #     "params": {"column": "feature_value", "minimum": 0.0, "maximum": 120.0},
         # },
     ]
@@ -94,7 +97,7 @@ def build_output_rules():
         # {
         #     "name": "prediction_band",
         #     "version": "1",
-        #     "function": "custom.scoring_custom.prediction_band",
+        #     "function": "scoring.prediction_band",
         #     "params": {
         #         "column": "prediction",
         #         "thresholds": [10.0, 50.0],
@@ -128,3 +131,66 @@ def build_combined_rules():
 def profit(inputs, predictions, params):
     """Example callback: subtract cost from revenue, activated only by the rule above."""
     return (predictions["revenue__prediction"] - predictions["cost__prediction"]).to_frame("profit")
+
+
+# Eligibility callbacks selected above as scoring.<function>.
+
+
+def require_observed_values(frame, params):
+    """Explain which required observed fields are missing without dropping records."""
+    columns = params["columns"]
+    missing = frame.loc[:, columns].isna()
+    return pd.Series(
+        [
+            "missing:" + ",".join(missing.columns[row].tolist()) if row.any() else None
+            for row in missing.to_numpy()
+        ],
+        index=frame.index,
+        dtype="string",
+    )
+
+
+def require_value_range(frame, params):
+    """Accept finite numeric values within inclusive limits; numeric strings are allowed."""
+    column = params["column"]
+    lower, upper = params.get("minimum"), params.get("maximum")
+    _validate_range(lower, upper)
+    values = pd.to_numeric(frame[column], errors="coerce")
+    accepted = values.notna() & np.isfinite(values)
+    if lower is not None:
+        accepted &= values >= lower
+    if upper is not None:
+        accepted &= values <= upper
+    return pd.Series(None, index=frame.index, dtype="string").mask(
+        ~accepted.fillna(False), f"outside_range:{column}"
+    )
+
+
+def _validate_range(lower, upper):
+    """Reject missing, nonfinite or contradictory bounds before evaluating rows."""
+    bounds = [value for value in (lower, upper) if value is not None]
+    invalid = any(type(value) not in (int, float) or not np.isfinite(value) for value in bounds)
+    if not bounds or invalid or (lower is not None and upper is not None and lower > upper):
+        raise ValueError("Range checks require finite ordered limits and at least one bound.")
+
+
+# Output callbacks selected above as scoring.<function>.
+
+
+def prediction_band(frame, predictions, params):
+    """Map an estimate or class probability to declared ordered business bands."""
+    thresholds = np.asarray(params["thresholds"], dtype=float)
+    labels = params["labels"]
+    if (
+        thresholds.ndim != 1
+        or not np.isfinite(thresholds).all()
+        or (np.diff(thresholds) <= 0).any()
+        or len(labels) != len(thresholds) + 1
+    ):
+        raise ValueError("Bands require increasing finite thresholds and one extra label.")
+    values = predictions[params.get("column", "prediction")]
+    positions = np.searchsorted(thresholds, values.to_numpy(dtype=float), side="right")
+    bands = pd.Series(
+        [labels[position] for position in positions], index=frame.index, dtype="string"
+    )
+    return pd.DataFrame({params.get("output", "band"): bands.mask(values.isna())})

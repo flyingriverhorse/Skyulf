@@ -17,6 +17,7 @@ def _setup(**overrides):
     """Read actual initializer predicates with competition selected."""
     properties = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(training_layout="model_competition", **overrides)
     visible = {
         name

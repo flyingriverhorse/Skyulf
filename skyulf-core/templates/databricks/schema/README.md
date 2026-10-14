@@ -42,6 +42,8 @@ placeholders, matching the other environments.
 | `model_set.json` | Set name, promotion, outputs/views and source-change policy |
 | `deployment.json` | Compute, cluster policy and cost tags |
 | `identities.json` | Optional personal targets, shared run identities and job ACL ownership |
+| `serving.json` | Optional feature publication, online serving and daily traffic rollout |
+| `explanations.json` | Saved SHAP reports and evaluation charts |
 
 Each topic file is a JSON object whose keys are the existing wizard field names:
 
@@ -114,8 +116,9 @@ builder hides every prompt except the names in `_QUICK_PROMPTS` in
 `build_schema.py`: layout, project, task, source table, record keys and the
 target/input columns of each active target. Hidden prompts take their defaults,
 so every new prompt needs a working default; add its name to `_QUICK_PROMPTS`
-only when no default can be right. `detailed` stays the default so existing
-answer files keep the full guided path. Prompts whose `skip_prompt_if` is empty
+only when no default can be right. `quick` is the default; choosing `detailed`
+reveals the relevant model, search, branch and deployment settings. Explicit
+answer-file values are honored in either mode. Prompts whose `skip_prompt_if` is empty
 remain hidden in both modes.
 
 Source orders may use one decimal place to insert a shared prompt between existing

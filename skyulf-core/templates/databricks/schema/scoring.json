@@ -4,14 +4,7 @@
     "type": "string",
     "default": "",
     "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
-    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
-    "skip_prompt_if": {
-      "properties": {
-        "training_layout": {
-          "const": "multi_target"
-        }
-      }
-    }
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
   },
   "prediction_table_name": {
     "order": 8,

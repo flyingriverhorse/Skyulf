@@ -430,6 +430,8 @@ def test_offline_preview_names_filter_phase_and_project_recipe(workflow_config):
     assert "config/pre_split.yml" in preview
     assert "config/preprocessing.yml" in preview
     assert "fold-local preprocessing/model" in preview
+    assert "saved pre-split eligibility when reuse_pre_split is enabled" in preview
+    assert "training row exclusions are not repeated during scoring" not in preview
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

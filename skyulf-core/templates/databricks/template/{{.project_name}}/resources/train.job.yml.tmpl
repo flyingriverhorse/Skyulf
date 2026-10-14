@@ -27,6 +27,8 @@ resources:
           default: ""
         - name: promotion_receipt_json
           default: ""
+        - name: allow_unloadable_champion
+          default: ""
 {{if eq .retraining_mode "scheduled"}}
       schedule:
         quartz_cron_expression: ${var.retraining_cron_expression}
@@ -56,6 +58,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
+              allow_unloadable_champion: '{{"{{job.parameters.allow_unloadable_champion}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
@@ -182,6 +185,7 @@ resources:
               reference_json: '{{"{{tasks.initialize_run.values.reference_json}}"}}'
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
               decision_result_state: '{{"{{tasks.model_decision.result_state}}"}}'
+              workspace_host: ${workspace.host}
 {{else}}
         - &lifecycle_task
           task_key: initialize_run
@@ -206,6 +210,7 @@ resources:
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
               rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
               promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
+              allow_unloadable_champion: '{{"{{job.parameters.allow_unloadable_champion}}"}}'
               config_path: ${workspace.file_path}/config/training.yml
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
@@ -397,6 +402,7 @@ resources:
               reference_json: '{{"{{tasks.initialize_run.values.reference_json}}"}}'
               tracking_uri: '{{"{{tasks.initialize_run.values.tracking_uri}}"}}'
               decision_result_state: '{{"{{tasks.model_decision.result_state}}"}}'
+              workspace_host: ${workspace.host}
 {{end}}
         - task_key: monitoring_allowed
           description: Register shared deployments only; skip ephemeral development models

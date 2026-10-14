@@ -24,6 +24,7 @@ def test_shap_prompts_are_opt_in_and_bounded():
     """Optional explanations must not ask budgets or install work by default."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     assert values["shap_enabled"] == "false"
     budgets = ("shap_max_samples", "shap_max_features", "shap_max_display_samples")
     assert all(not _visible(properties, name, values) for name in budgets)
@@ -39,6 +40,7 @@ def test_nested_policy_questions_follow_active_metadata_and_task():
     """Guided setup must expose only the metadata required by its nested policy."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(cv_enabled="true", cv_type="nested_cv", cv_nested_type="time_series_split")
     assert _visible(properties, "cv_nested_type", values)
     assert all(
@@ -56,6 +58,7 @@ def test_search_questions_follow_strategy_and_keep_cv_single():
     """Search setup should expose relevant controls with Core defaults first."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     assert "search_mode" not in properties
     assert _visible(properties, "search_strategy", values)
     assert _visible(properties, "search_settings", values)
@@ -123,6 +126,7 @@ def test_ordinary_model_hides_ensemble_and_raw_parameter_prompts():
     """Ordinary training should not ask for unrelated composition or raw JSON settings."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     assert not _visible(properties, "model_params", values)
     assert all(
         not _visible(properties, name, values)
@@ -152,6 +156,7 @@ def test_single_ensemble_prompts_follow_selected_model(task, model, controls):
     """Each ensemble needs its own base menus and controls without the other task's prompts."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(training_layout="single_model", task=task)
     values[f"{task}_model"] = model
     expected = controls | {f"{task}_base_count", f"{task}_base_1", f"{task}_base_2"}
@@ -178,6 +183,7 @@ def test_cv_questions_follow_enabled_method():
     """Fold settings should appear only when they can affect candidate scoring."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     assert not _visible(properties, "cv_folds", values)
     assert not _visible(properties, "cv_type", values)
     values["cv_enabled"] = "true"
@@ -197,6 +203,7 @@ def test_nested_temporal_hides_unused_randomization_questions():
     """Temporal nested splitting must not ask for shuffling or its unused seed."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(cv_enabled="true", cv_type="nested_cv", cv_nested_type="time_series_split")
     assert not _visible(properties, "cv_shuffle", values)
     assert not _visible(properties, "cv_random_state", values)
@@ -207,6 +214,7 @@ def test_temporal_cv_opens_required_data_questions_with_default_window(method):
     """Selecting chronological CV must expose its clock and final holdout window."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(cv_enabled="true", cv_type=method, cv_nested_type="time_series_split")
     assert not _visible(properties, "split_strategy", values)
     for name in (

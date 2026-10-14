@@ -701,11 +701,20 @@ def test_cli_independent_schedules_preserve_shared_three_job_graph(
                 assert variables[f"{prefix}_{suffix}"]["default"] == expected
                 assert f"{prefix}_{suffix}" not in config
     tasks = {task["task_key"]: task for task in jobs["train"]["tasks"]}
-    readme = (project / "README.md").read_text(encoding="utf-8")
-    documented_contract = re.search(r'workflow_contract: "(\d+)"', readme)
+    guides = "\n".join(
+        (project / name).read_text(encoding="utf-8") for name in ("TRAINING.md", "SCORING.md")
+    )
+    public_guides = Path(__file__).resolve().parents[4] / "docs/user_guide"
+    assert "databricks_training_reports.html" in guides
+    assert "databricks_scoring.html" in guides
+    reference = "\n".join(
+        (public_guides / name).read_text(encoding="utf-8")
+        for name in ("databricks_training_reports.md", "databricks_scoring.md")
+    )
+    documented_contract = re.search(r'workflow_contract: "(\d+)"', reference)
     assert documented_contract is not None
     for task in jobs["train"]["tasks"] + jobs["score"]["tasks"]:
-        assert task["task_key"] in readme
+        assert task["task_key"] in reference
         if "notebook_task" in task:
             assert task["notebook_task"]["base_parameters"][
                 "workflow_contract"
@@ -1122,6 +1131,7 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
         "expected_champion_version",
         "rejection_reason",
         "promotion_receipt_json",
+        "allow_unloadable_champion",
     }
     parameters = tasks["initialize_run"]["notebook_task"]["base_parameters"]
     for name in defaults:

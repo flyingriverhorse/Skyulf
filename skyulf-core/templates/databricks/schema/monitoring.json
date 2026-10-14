@@ -1,0 +1,16 @@
+{
+  "monitoring_catalog": {
+    "order": 749,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Monitoring store catalog shared by your models, for drift and performance tracking. Leave blank to start without monitoring; enable it later in deployment/variables.yml",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  },
+  "monitoring_schema": {
+    "order": 750,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Monitoring store schema inside that catalog; required with a catalog, blank when monitoring is off. Created on first use when the run-as identity may create schemas",
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+  }
+}

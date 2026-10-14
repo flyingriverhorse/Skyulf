@@ -38,8 +38,9 @@ def test_cdf_recovery_wizard_is_visible_and_disabled_by_default():
     assert setting["default"] == "false"
     assert setting["enum"] == ["false", "true"]
     values = {name: spec["default"] for name, spec in schema["properties"].items()}
+    values["setup_mode"] = "detailed"
     for layout in ("single_model", "model_competition", "multi_target"):
-        # Only the explicit quick setup may accept the disabled default unasked.
+        # Detailed setup exposes this choice; quick setup accepts the disabled default.
         assert not Draft7Validator(setting["skip_prompt_if"]).is_valid(
             values | {"training_layout": layout}
         )
@@ -60,6 +61,7 @@ def test_initializer_only_shows_task_specific_models_and_metrics(task):
     schema = json.loads((WORKFLOW.parents[4] / "databricks_template_schema.json").read_text())
     properties = schema["properties"]
     values = {name: field["default"] for name, field in properties.items()}
+    values["setup_mode"] = "detailed"
     values["task"] = task
     other = "regression" if task == "classification" else "classification"
     for suffix in ("model", "metric"):
@@ -106,6 +108,7 @@ def test_date_questions_follow_declared_representation(prefix, kind, text_kind, 
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(split_strategy="temporal", filter_unavailable_results="true")
     values.update({f"{prefix}_time_kind": kind, f"{prefix}_text_kind": text_kind})
     assert f"{prefix}_time_kind" in properties
@@ -126,6 +129,7 @@ def test_unused_dates_hide_all_followup_questions(prefix):
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     for suffix in ("time_kind", "text_kind", "time_format", "time_timezone", "date_only"):
         assert Draft7Validator(properties[f"{prefix}_{suffix}"]["skip_prompt_if"]).is_valid(values)
 
@@ -139,6 +143,7 @@ def test_optional_setup_sections_hide_their_details_until_selected(enabled):
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     if enabled:
         values.update(cv_enabled="true", retraining_mode="scheduled", compute_mode="policy_cluster")
     for name in (
@@ -163,6 +168,7 @@ def test_data_settings_use_defaults_without_extra_prompts(task):
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(task=task, cv_enabled="true", training_sample_rows="1000")
     for name in (
         "training_version",
@@ -194,6 +200,7 @@ def test_schedule_questions_follow_each_independent_mode(train_mode, score_mode)
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(retraining_mode=train_mode, scoring_mode=score_mode)
     for prefix, mode in (("retraining", train_mode), ("scoring", score_mode)):
         assert properties[f"{prefix}_pause_status"]["default"] == "UNPAUSED"
@@ -214,6 +221,7 @@ def test_window_control_questions_follow_active_data_policies(window, strategy, 
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(
         training_window_mode=window,
         split_strategy=strategy,
@@ -239,6 +247,7 @@ def test_explicit_boundary_questions_only_apply_to_fixed_windows(window, strateg
         "properties"
     ]
     values = {key: spec["default"] for key, spec in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(training_window_mode=window, split_strategy=strategy)
     for field in ("start", "holdout_start", "cutoff"):
         visible = window == "fixed_window" and (field != "holdout_start" or strategy == "temporal")

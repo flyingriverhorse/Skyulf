@@ -193,6 +193,7 @@ def test_weighted_prompt_conditions_use_only_active_model_menu(prefix):
 
     properties = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
     values = {key: field["default"] for key, field in properties.items()}
+    values["setup_mode"] = "detailed"
     values.update(training_layout="multi_target" if prefix else "single_model")
     values[prefix + "task"] = "classification"
     values[prefix + "sample_weight_enabled"] = "true"

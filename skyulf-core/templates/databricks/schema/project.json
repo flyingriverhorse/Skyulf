@@ -20,9 +20,9 @@
   "setup_mode": {
     "order": 1.5,
     "type": "string",
-    "default": "detailed",
-    "description": "Setup detail: detailed = review every setting now (dozens of questions); quick = answer only the task, source table and columns, accept the documented default for everything else and edit config/*.yml and deployment/ afterwards",
-    "enum": ["detailed", "quick"]
+    "default": "quick",
+    "description": "Setup detail: quick = answer the task, source table and columns, accept the documented defaults and edit config/*.yml and deployment/ afterwards; detailed = review all relevant settings now",
+    "enum": ["quick", "detailed"]
   },
   "inference_mode": {
     "order": 2,

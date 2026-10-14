@@ -37,7 +37,7 @@ def _visible(**overrides):
     """Evaluate real initializer predicates with all defaults filled as the CLI does."""
     props = json.loads((ROOT / "databricks_template_schema.json").read_text())["properties"]
     values = {name: prop["default"] for name, prop in props.items()}
-    values.update({"training_layout": "model_competition", **overrides})
+    values.update({"setup_mode": "detailed", "training_layout": "model_competition", **overrides})
     shown = {
         name
         for name, prop in props.items()

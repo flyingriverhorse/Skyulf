@@ -32,8 +32,9 @@ Rules:
   - params={...} is passed to your functions as their last argument.
   - replace=True overwrites an existing column; otherwise output must be new.
 
-custom/advanced_class_step.py shows rare_categories written as a class pair
-(Calculator/Applier), so you can compare both ways.
+Add your own factories here, or in another module under src/features selected as
+<file>.<factory>. The public custom-steps guide shows rare_categories written as
+a Calculator/Applier class pair for steps that need one.
 """
 
 import numpy as np
@@ -104,7 +105,7 @@ def frequency_encoding(columns):
 
 # ---------------------------------------------------------------------------
 # Example 3 - fitted_step that cleans a text column: group rare categories.
-# The same step is written as a class pair in custom/advanced_class_step.py.
+# The custom-steps guide shows the same step written as a class pair.
 #   rare_categories("city", min_share=0.05)
 #   training city: 60% London, 38% Paris, 2% Oslo  ->  learns ["London", "Paris"]
 #   scoring  city: London, Oslo, Tokyo, null        ->  London, Other, Other, null
