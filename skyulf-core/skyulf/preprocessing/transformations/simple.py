@@ -105,7 +105,7 @@ class SimpleTransformationApplier(BaseApplier):
     name="Simple Transformation",
     category="Preprocessing",
     description="Apply simple mathematical transformations (log, sqrt, etc.).",
-    params={"func": "log", "columns": []},
+    params={"transformations": []},
     learns_from_data=False,
 )
 class SimpleTransformationCalculator(BaseCalculator):

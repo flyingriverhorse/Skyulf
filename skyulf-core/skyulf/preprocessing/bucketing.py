@@ -807,7 +807,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
     name="K-Bins Discretizer",
     category="Preprocessing",
     description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
-    params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []},
+    params={"n_bins": 5, "label_format": "ordinal", "strategy": "quantile", "columns": []},
     learns_from_data=True,
 )
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):

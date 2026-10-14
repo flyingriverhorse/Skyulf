@@ -8,6 +8,13 @@ from skyulf.core.meta.decorators import node_meta
 from skyulf.registry import NodeRegistry
 
 
+@pytest.fixture(autouse=True)
+def isolate_registry(monkeypatch):
+    """Dummy registrations must not leak into later production catalog checks."""
+    for name in ("_calculators", "_appliers", "_metadata"):
+        monkeypatch.setattr(NodeRegistry, name, getattr(NodeRegistry, name).copy())
+
+
 class _DummyApplier:
     """Minimal stand-in applier class for registry tests."""
 
