@@ -19,11 +19,19 @@ class PinnedEndpointSpec:
     logging_catalog: str
     logging_schema: str
     logging_table_prefix: str
-    logging_mode: Literal["telemetry", "ai_gateway"] = "telemetry"
+    logging_mode: Literal["telemetry", "ai_gateway", "disabled"] = "telemetry"
 
     def __post_init__(self) -> None:
         """Reject mutable selectors and unsafe service or UC identifiers."""
         _validate_selector(self)
+        if not isinstance(self.logging_mode, str) or self.logging_mode not in {
+            "telemetry",
+            "ai_gateway",
+            "disabled",
+        }:
+            raise ValueError("logging_mode must be telemetry, ai_gateway or disabled.")
+        if self.logging_mode == "disabled":
+            return  # No payload table: callers own any prediction storage.
         for label, value in (
             ("logging_catalog", self.logging_catalog),
             ("logging_schema", self.logging_schema),
@@ -31,11 +39,6 @@ class PinnedEndpointSpec:
         ):
             if not is_uc_identifier(value):
                 raise ValueError(f"{label} must be a simple UC identifier.")
-        if not isinstance(self.logging_mode, str) or self.logging_mode not in {
-            "telemetry",
-            "ai_gateway",
-        }:
-            raise ValueError("logging_mode must be telemetry or ai_gateway.")
 
     @property
     def model_uri(self) -> str:
@@ -45,6 +48,11 @@ class PinnedEndpointSpec:
     @property
     def inference_table(self) -> str:
         """Return the expected inference payload table or view name."""
+        if self.logging_mode == "disabled":
+            raise ValueError(
+                "Endpoint payload logging is disabled; there is no inference table. Use "
+                "logging_mode telemetry or ai_gateway for rollout and serving monitoring."
+            )
         return f"{self.logging_catalog}.{self.logging_schema}.{self.logging_table_prefix}_payload"
 
     @property

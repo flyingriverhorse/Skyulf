@@ -370,3 +370,13 @@ def test_native_config_start_time_requires_bounded_integer_milliseconds(api, pla
     endpoint["config"]["start_time"] = stamp
     with pytest.raises(ValueError, match="configuration"):
         api.rollout_endpoint_ready(endpoint, plan, challenger_percentage=0)
+
+
+def test_rollout_rejects_endpoints_without_payload_logging(api, plans):
+    """Health evidence comes from payload logs, so a logging-disabled release cannot roll out."""
+    quiet = []
+    for plan in plans:
+        config = {key: value for key, value in plan.config.items() if key != "telemetry_config"}
+        quiet.append(replace(plan, spec=replace(plan.spec, logging_mode="disabled"), config=config))
+    with pytest.raises(ValueError, match="payload logs"):
+        api.build_rollout_endpoint(*quiet)

@@ -54,6 +54,10 @@ def _matching_contract(champion: PinnedEndpointPlan, challenger: PinnedEndpointP
     second = {key: value for key, value in challenger.config.items() if key != "config"}
     if first != second or champion.spec.logging_mode != challenger.spec.logging_mode:
         raise ValueError("Rollout plans must use the same endpoint logging configuration.")
+    if champion.spec.logging_mode == "disabled":
+        raise ValueError(
+            "Daily rollout reads endpoint payload logs; use logging_mode telemetry or ai_gateway."
+        )
 
 
 def _served_entity(plan: PinnedEndpointPlan, name: str) -> dict[str, Any]:

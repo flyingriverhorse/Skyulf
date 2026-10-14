@@ -495,3 +495,36 @@ def test_model_set_sql_preserves_record_keys_and_component_outcomes(tmp_path, ar
         "`left__exclusion_reason`: STRING, `right__prediction`: DOUBLE, "
         "`right__scoring_status`: STRING, `right__exclusion_reason`: STRING>"
     )
+
+
+def test_disabled_logging_creates_an_endpoint_without_inference_tables(resolved, artifact, package):
+    """Callers writing their own ai_query tables can serve without endpoint payload logging."""
+    from databricks.sdk.errors import NotFound
+
+    quiet = PinnedEndpointSpec(
+        "sm23b-quiet", "main.ml.model", "7", "", "", "", logging_mode="disabled"
+    )
+    plan = build_pinned_endpoint(quiet, resolved=resolved, artifact=artifact, package_info=package)
+    assert set(plan.config) == {"name", "config"}
+    with pytest.raises(ValueError, match="logging is disabled"):
+        _ = quiet.inference_table
+    client = SimpleNamespace(serving_endpoints=Mock())
+    client.serving_endpoints.get.side_effect = NotFound("absent")
+    create_pinned_endpoint(client, plan)
+    kwargs = client.serving_endpoints.create.call_args.kwargs
+    assert "ai_gateway" not in kwargs and "telemetry_config" not in kwargs
+    ready = {
+        "name": "sm23b-quiet",
+        "state": {"ready": "READY", "config_update": "NOT_UPDATING"},
+        "config": {"served_entities": plan.config["config"]["served_entities"]},
+    }
+    assert endpoint_ready(ready, plan)
+    logged = {**ready, "ai_gateway": {"inference_table_config": {"enabled": True}}}
+    with pytest.raises(ValueError, match="differs"):
+        endpoint_ready(logged, plan)
+
+
+def test_logged_modes_still_require_logging_destinations():
+    """Only the explicit disabled mode may omit the payload table destination."""
+    with pytest.raises(ValueError, match="logging_catalog"):
+        PinnedEndpointSpec("sm23b-test", "main.ml.model", "7", "", "observability", "sm23b")

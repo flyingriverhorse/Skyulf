@@ -155,7 +155,7 @@ def build_pinned_endpoint(
             "inference_table_config": {"sampling_fraction": 1.0},
             "enabled_telemetry_features": ["TELEMETRY_FEATURE_INFERENCE_TABLE"],
         }
-    else:
+    elif spec.logging_mode == "ai_gateway":
         config["ai_gateway"] = {
             "inference_table_config": {
                 "enabled": True,
@@ -241,8 +241,10 @@ def _require_config(endpoint: Any, plan: PinnedEndpointPlan) -> None:
             raise ValueError("Serving endpoint config differs from the pinned plan.")
     if plan.spec.logging_mode == "telemetry":
         _require_telemetry(endpoint, plan.spec)
-    else:
+    elif plan.spec.logging_mode == "ai_gateway":
         _require_gateway(endpoint, expected["ai_gateway"])
+    else:
+        _require_no_payload_logging(endpoint)
 
 
 def _require_telemetry(endpoint: Any, spec: PinnedEndpointSpec) -> None:
@@ -270,6 +272,16 @@ def _require_gateway(endpoint: Any, expected: dict[str, Any]) -> None:
             raise ValueError("Serving endpoint config differs from the pinned plan.")
     if _field(usage, "enabled") is not True:
         raise ValueError("Serving endpoint config differs from the pinned plan.")
+
+
+def _require_no_payload_logging(endpoint: Any) -> None:
+    """A disabled-logging plan must not silently admit an endpoint that logs payloads."""
+    telemetry = _field(_field(endpoint, "telemetry_config"), "inference_table_config")
+    gateway = _field(_field(endpoint, "ai_gateway"), "inference_table_config")
+    if telemetry is not None or _field(gateway, "enabled") is True:
+        raise ValueError(
+            "Serving endpoint config differs from the pinned plan: payload logging is on."
+        )
 
 
 def endpoint_ready(endpoint: Any, plan: PinnedEndpointPlan) -> bool:
@@ -330,7 +342,8 @@ def create_pinned_endpoint(client: Any, plan: PinnedEndpointPlan) -> Any:
         "name": plan.spec.endpoint_name,
         "config": serving.EndpointCoreConfigInput.from_dict(plan.config["config"]),
     }
-    kwargs["ai_gateway"] = serving.AiGatewayConfig.from_dict(plan.config["ai_gateway"])
+    if "ai_gateway" in plan.config:
+        kwargs["ai_gateway"] = serving.AiGatewayConfig.from_dict(plan.config["ai_gateway"])
     return client.serving_endpoints.create(**kwargs)
 
 

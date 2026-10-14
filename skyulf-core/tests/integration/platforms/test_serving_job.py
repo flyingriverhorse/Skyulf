@@ -2,6 +2,7 @@
 
 import json
 import runpy
+import sys
 from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib import import_module
@@ -361,3 +362,28 @@ def test_online_setup_refuses_incomplete_config_before_endpoint_mutation(api):
             None, {"enabled": True, "exclusive_writer": True}, client=workspace
         )
     assert workspace.mock_calls == []
+
+
+def test_daily_rollout_labels_evidence_with_the_deployed_target(api, tmp_path, monkeypatch):
+    """Rollout evidence must name the Bundle target that ran it, not a fixed template value."""
+    path = tmp_path / "serving.yml"
+    path.write_text(
+        "rollout:\n  enabled: true\n  exclusive_writer: true\n  monitoring:\n    environment: syst\n"
+    )
+    seen = {}
+    monkeypatch.setattr(
+        api, "run_daily_rollout", lambda spark, settings, **_: seen.setdefault("s", settings)
+    )
+    monkeypatch.setitem(sys.modules, "databricks.sdk", SimpleNamespace(WorkspaceClient=Mock))
+    monkeypatch.setitem(
+        sys.modules, "mlflow.tracking", SimpleNamespace(MlflowClient=lambda **_: Mock())
+    )
+    dbutils = Mock()
+    dbutils.widgets.get.return_value = str(path)
+    dbutils.widgets.getAll.return_value = {"bundle_target": "prod"}
+    api.run_daily_rollout_notebook(None, dbutils)
+    assert seen["s"]["monitoring"]["environment"] == "prod"
+    dbutils.widgets.getAll.return_value = {}
+    seen.clear()
+    api.run_daily_rollout_notebook(None, dbutils)
+    assert seen["s"]["monitoring"]["environment"] == "syst"

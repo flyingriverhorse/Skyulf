@@ -309,7 +309,16 @@ def run_daily_rollout_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
         tracking_uri=settings.get("tracking_uri", "databricks"),
         registry_uri=settings.get("registry_uri", "databricks-uc"),
     )
+    settings = _bind_rollout_target(settings, dbutils.widgets.getAll().get("bundle_target", ""))
     return run_daily_rollout(spark, settings, client=WorkspaceClient(), registry_client=registry)
+
+
+def _bind_rollout_target(settings: dict[str, Any], target: str) -> dict[str, Any]:
+    """Label rollout evidence with the deployed Bundle target; older jobs keep the YAML value."""
+    monitoring = settings.get("monitoring")
+    if not target or not isinstance(monitoring, dict):
+        return settings
+    return {**settings, "monitoring": {**monitoring, "environment": target}}
 
 
 def run_online_publication_notebook(spark: Any, dbutils: Any) -> dict[str, Any]:
