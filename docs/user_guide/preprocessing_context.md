@@ -8,6 +8,35 @@ to make a saved artifact available; diagnosing your own artifact does not retrai
 The existing step still owns its calculation. Training calls `fit`; inference
 calls `apply` with the information saved during training.
 
+| Question | Answer |
+| --- | --- |
+| What does it check? | A saved model's preprocessing on a small sample, without refitting. |
+| Why use it? | A step that changes results when a request is split, repeated or reordered can give wrong batch predictions. |
+| When does it run? | After training, only when you turn it on, for example with `preprocessing_probe: true`. |
+| What does it not do? | It does not block promotion, change the model, or approve Spark or serving use. |
+
+## Prerequisites and outcome
+
+Use Python 3.12 or newer and an activated virtual environment:
+
+```bash
+uv venv --python 3.12
+# Activate .venv using your shell.
+uv pip install skyulf-core
+```
+
+For checkout development, use `uv pip install -e ./skyulf-core` instead.
+For an existing artifact, reproduce its recorded dependency versions before
+loading; only load artifacts from trusted producers. No Spark session, API
+server or MLflow service is needed for the two complete examples below.
+
+The first example returns a diagnostic dictionary and checks saved GroupImputer
+and encoder behavior on missing/unseen values. The second returns predictions
+and a proposed lag-history continuation. Neither a context label nor a passing
+sample diagnostic certifies a Spark worker, REST or SQL serving path. Choose
+built-in steps from the [preprocessing recipe catalog](preprocessing_recipes.md);
+users do not need to annotate every built-in YAML entry with context.
+
 ## What does context mean?
 
 Context describes **the other input rows needed during inference**. It does not
@@ -63,6 +92,7 @@ through `score_pipeline_with_history`. Supply the actual request frame in
 the saved engine/schema. Each step retains its own transformed tail; subsequent
 requests receive the returned JSON-compatible state:
 
+<!-- skyulf-example: illustrative history-api -->
 ```python
 from skyulf.inference.pipeline_scoring import score_pipeline_with_history
 
@@ -110,6 +140,7 @@ For a custom function, declare its actual behavior in the existing factory in
 `src/features/preprocessing.py`. For example, replace the shipped `log_feature`
 factory with this version; keep its existing `log1p_value` calculation:
 
+<!-- skyulf-example: illustrative custom-factory -->
 ```python
 def log_feature(column):
     """Add a per-row logarithm with no request-time population statistics."""
@@ -145,6 +176,7 @@ does not inspect the separate project scoring/pre-split eligibility policy.
 For an advanced custom class, add an optional static method to its existing
 Applier class, alongside its existing `apply`:
 
+<!-- skyulf-example: illustrative custom-applier -->
 ```python
 from skyulf.core.capabilities import ExecutionCapability
 
@@ -168,6 +200,34 @@ Spark/REST admission certificate.
 It means: **take this already fitted pipeline, try its saved preprocessing on
 these example inputs in several ways, and return what happened**.
 
+For example, scaling one customer's income should give the same result whether
+that customer arrives alone or with 100 other customers. The probe compares
+the whole sample with single rows, chunks of 2 and 7, reversed order and a
+repeated call. It also tries empty input and checks that applying a step does
+not mutate its input or saved state. The expected values, column order and
+dtypes come from applying the same fitted state to the whole sample.
+
+```mermaid
+flowchart LR
+    A["Loaded fitted pipeline"] --> B["Small input sample"]
+    B --> C["Whole-frame apply: expected output"]
+    C --> D["Repeat, chunks 1/2/7, reverse, empty"]
+    D --> E["Compare output and unchanged state"]
+    E --> F["Diagnostic report"]
+```
+
+Enable it when adding custom preprocessing, investigating group/window/lag
+behavior or preparing a model for Spark workers or REST requests. Those callers
+may divide input into independent batches; a hidden dependence on other rows
+can change the answer. Declared group/window/global steps stop the independent
+batch probe with `requires_context`, so their intended history must be tested
+through the appropriate context API instead.
+
+This checks saved **apply**, never **fit/learn**. It does not measure prediction
+quality, prove every future input safe or grant Spark/REST admission. The
+separate partition-safety checks inspect supported code and fitted state before
+worker execution; a passing probe cannot override them.
+
 | Name | What you provide or receive |
 | --- | --- |
 | `artifact` | A `FittedPipelineArtifact`: the loaded pipeline plus its manifest and saved fitted state. It is not a model-name string, endpoint or unfitted estimator. |
@@ -190,9 +250,11 @@ This standalone example creates a tiny fitted artifact so the origin of every
 variable is clear. In a real project, replace the training section with loading
 your existing artifact; you do not retrain to run the probe.
 
+<!-- skyulf-example: native context-probe -->
 ```python
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pandas as pd
 
@@ -221,26 +283,34 @@ pipeline.fit(
 )
 
 # Training is finished. Save once; all following checks use this fitted state.
-artifact_path = Path("artifacts/context_demo")
-save_pipeline(pipeline, artifact_path)
-artifact = load_pipeline(artifact_path)
+with TemporaryDirectory() as temporary:
+    artifact_path = Path(temporary) / "context_demo"
+    save_pipeline(pipeline, artifact_path)
+    artifact = load_pipeline(artifact_path)
 
-# These are model inputs, including missing income and a previously unseen segment.
-sample = pd.DataFrame({
-    "segment": ["A", "B", "NEW"],
-    "income": [None, 1600.0, None],
-})
-report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
+    # These are model inputs, including missing income and a previously unseen segment.
+    sample = pd.DataFrame({
+        "segment": ["A", "B", "NEW"],
+        "income": [None, 1600.0, None],
+    })
+    report = probe_fitted_preprocessing(artifact, sample, chunk_sizes=(1, 2))
 
-print(report["status"])
-for step in report["steps"]:
-    print(step["name"], step.get("context"), step["status"])
+    assert report["status"] == "passed"
+    assert [step["context"] for step in report["steps"]] == ["row", "row"]
+    assert all(step["status"] == "passed" for step in report["steps"])
+    print(report["status"])
+    for step in report["steps"]:
+        print(step["name"], step.get("context"), step["status"])
 
-# Optional: persist diagnostic evidence locally. No prediction table is written.
-Path("preprocessing_report.json").write_text(
-    json.dumps(report, indent=2), encoding="utf-8"
-)
+    # Optional: persist diagnostic evidence locally. No prediction table is written.
+    (Path(temporary) / "preprocessing_report.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8"
+    )
 ```
+
+The artifact and optional JSON report are temporary in this example. To keep
+them, select a new persistent artifact directory and your own report path.
+The artifact saver rejects an existing destination.
 
 Expected summary:
 
@@ -266,14 +336,17 @@ defaults:
   preprocessing_probe: true
 ```
 
-The default is `false`. Single-model, competition and multi-target training use the
-same saved-model check. Each fit checks its saved and reloaded artifact using at most the first 256 holdout input rows and
-uses the probe's 8 MiB frame limit; it does not log the sample values or refit.
-The run records `preprocessing_probe.json`, displayed under **Preprocessing
-diagnostics** in the training report. The SDK equivalent is
-`TrainingSpec(..., preprocessing_probe=True)`, passed to `train_candidate`.
-To enable it on an existing specification:
+The default is `false`. Single-model, competition and multi-target training use the same saved-model
+check. Each fit checks its saved and reloaded artifact using at most the first 256 holdout input
+rows and uses the probe's 8 MiB frame limit; it does not log the sample values or refit. The run
+records `preprocessing_probe.json`. Open **Workflows > train run > train_and_tune > Output >
+Preprocessing diagnostics** for a single model, or the corresponding **train_<name>** task for
+competition/model-set branches. The final **training_report** summary points to the fitting run; the
+full diagnostic belongs to the fitting task. The SDK equivalent is
+`TrainingSpec(..., preprocessing_probe=True)`, passed to `train_candidate`. To enable it on an
+existing specification:
 
+<!-- skyulf-example: illustrative probe-option -->
 ```python
 from dataclasses import replace
 
@@ -295,15 +368,26 @@ effects; the row/byte limits are not a sandbox or execution timeout.
 | Field or status | Meaning and next action |
 | --- | --- |
 | Top-level `status: passed` | All required sample checks and the final feature schema matched. Inspect context and empty-input support too. |
+| Top-level `status: failed` | A step/check failed or the final schema mismatched. Inspect the first failing step. If the holdout wrapper has only `error_type`, reproduce the artifact/input check locally; values and exception messages are redacted. |
+| Top-level `status: failed` + `error_type`, empty `steps` | The training wrapper could not start the probe. A common cause is a holdout sample over the 8 MiB input limit: the first 256 rows of a wide table. `error_type` is then `ValueError`. Reproduce locally with a smaller sample. |
+| Top-level `status: requires_context` | A step needs group, window or global rows, or carried history. Later steps are `not_run` and `feature_schema` is `not_run`. See the `requires_context` step row below. |
+| Top-level `status: not_run`, `reason: empty_holdout` | There were no holdout rows to probe. Check the split dates/filters and train with a nonempty holdout before claiming diagnostic coverage. |
 | `checks` | `full`, `repeat`, `chunks:N`, `reverse` and `empty` name the attempted strategy. |
 | `failed` + `output_mismatch` | Inspect the named step for batch statistics, order, dtype changes or numerical rounding. |
 | `state_mutation` / `input_mutation` | The step changed its saved state or received input during apply. Keep learned state read-only and return transformed data separately. |
+| `invalid_output_frame_or_budget` | The step output was not a pandas or Polars frame, had duplicate columns or nested cells, or exceeded the row or 8 MiB byte limit. A wide one-hot output over 8 MiB is a common case. Probe locally with fewer rows or a larger `max_bytes`. |
+| `output_engine_mismatch` | The step returned a different frame type than it received, for example pandas for a Polars input. Return the input engine's frame type. |
+| `output_row_order_mismatch` | For pandas, the output index differs from the input index: the step dropped, reordered or re-indexed rows. Keep the input index and row order. |
+| `missing_expected_output` | Internal guard: a comparison ran without a full-sample result. The probe normally stops before this; report it as a probe defect. |
 | `apply_error` + `error_type` | The existing apply raised. Reproduce the named step locally with trusted data; sample-bearing exception messages are omitted from the report. |
 | `invalid_step_contract` | Saved identity/configuration/validation could not be inspected. Check the artifact and the optional validator; do not infer numerical parity. |
 | `requires_context` | Supply a separately designed group/history execution path; changing the label to `row` does not resolve the dependency. |
 | `skipped` | The normal prediction chain skips this fitted training step. No apply test ran for it. |
 | `not_run` | An earlier step failed or required context, so no result is claimed for this step. |
 | `empty` check: `not_supported` | Empty input raised. Other checks can pass; this does not promise support for empty requests. |
+| `feature_schema: passed` | Final columns, order and dtypes match the saved model feature schema. |
+| `feature_schema: mismatch` | Final features differ from the saved schema. Fix the responsible transform and retrain a consistent artifact. |
+| `feature_schema: not_run` | A preceding failure or context requirement prevented the final schema comparison. Resolve that first. A wrapper result may omit this field entirely. |
 | `state_validation: node_owned` | The preprocessing owner inspected its saved state. This can be a pandas/Polars diagnostic contract; it does not mean worker admission. |
 | `state_validation: unavailable` | No applicable node-owned validator exists for this fitted state. Empirical checks may still pass. |
 | `admission: diagnostic_only` | The report grants no distributed or endpoint eligibility. |
@@ -392,7 +476,7 @@ external services accessed by trusted custom code are not isolated.
 
 See [preprocessing placement](preprocessing_placement.md), the
 [Databricks Python SDK](databricks_sdk.md), and
-[Bundle distributed inference](databricks_bundle.md#distributed-inference-settings)
+[Bundle distributed inference](databricks_spark_scoring.md)
 for their separate execution requirements.
 
 ## Runnable history continuation
@@ -403,9 +487,11 @@ passing the returned history advances that tail without changing the artifact.
 The example uses one stream. For multiple entities, set `group_by` and supply
 ordered observations for each entity.
 
+<!-- skyulf-example: native history -->
 ```python
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import pandas as pd
@@ -440,29 +526,39 @@ pipeline.fit(
     SplitDataset(train=observations.iloc[:8], test=observations.iloc[8:]),
     target_column="target",
 )
-artifact_path = Path("artifacts/history_demo")
-save_pipeline(pipeline, artifact_path)
-artifact = load_pipeline(artifact_path)
-requests = pd.DataFrame({"time": [10, 11], "value": [11.0, 12.0]})
+with TemporaryDirectory() as temporary:
+    artifact_path = Path(temporary) / "history_demo"
+    save_pipeline(pipeline, artifact_path)
+    artifact = load_pipeline(artifact_path)
+    requests = pd.DataFrame({"time": [10, 11], "value": [11.0, 12.0]})
 
-first = score_pipeline_with_history(requests.iloc[:1], artifact)
-# JSON round-trip represents transporting the proposed state to another call.
-state = json.loads(json.dumps(first.history))
-second = score_pipeline_with_history(
-    requests.iloc[1:], load_pipeline(artifact_path), history_state=state,
-)
-expected = score_pipeline_with_history(requests, artifact)
-np.testing.assert_allclose(
-    pd.concat([first.frame, second.frame])["prediction"],
-    expected.frame["prediction"],
-)
-assert second.history == expected.history
+    first = score_pipeline_with_history(requests.iloc[:1], artifact)
+    # JSON round-trip represents transporting the proposed state to another call.
+    state = json.loads(json.dumps(first.history))
+    second = score_pipeline_with_history(
+        requests.iloc[1:], load_pipeline(artifact_path), history_state=state,
+    )
+    expected = score_pipeline_with_history(requests, artifact)
+    np.testing.assert_allclose(
+        pd.concat([first.frame, second.frame])["prediction"],
+        expected.frame["prediction"],
+    )
+    assert second.history == expected.history
 
-# Independent row/chunk comparisons cannot stand in for this history session.
-context_report = probe_fitted_preprocessing(artifact, requests)
-assert context_report["status"] == "requires_context"
-assert context_report["steps"][1]["status"] == "not_run"
+    # Independent row/chunk comparisons cannot stand in for this history session.
+    context_report = probe_fitted_preprocessing(artifact, requests)
+    assert context_report["status"] == "requires_context"
+    assert context_report["steps"][1]["status"] == "not_run"
+    print("Continued predictions:", pd.concat([first.frame, second.frame])["prediction"].tolist())
+    print("Probe status:", context_report["status"])
 ```
+
+The printed continued predictions are approximately `[33.0, 36.0]`. The
+concatenated request and two continued calls have equal predictions and history,
+as the assertions verify. The diagnostic reports `requires_context`
+for the lag step and `not_run` for the following imputer. This is the expected
+signal to use history continuation; it is not a failed model fit. The returned
+`history` is a proposal until your application stores it successfully.
 
 After each successful request, commit its predictions and proposed history in
 one transaction. A later request must read that committed history. If either
@@ -477,3 +573,12 @@ history limits; late or repeated rows are rejected. Complete-group custom
 callbacks still require complete groups in each frame, and custom windows still
 require their own caller-supplied history. This built-in continuation does not
 make those arbitrary callbacks stateful.
+
+## Next steps
+
+Use [the inference flow](inference_flow.md) to choose whole-frame versus worker
+execution and [MLflow packaging](mlflow_models.md) to understand separate fitted
+recipe certification. [Batch scoring](databricks_batch.md) covers the integration
+that publishes predictions and durable incremental state. Keep diagnostic
+reports as evidence for the exact artifact, sample, engine and dependencies
+checked; rerun after relevant preprocessing or runtime changes.

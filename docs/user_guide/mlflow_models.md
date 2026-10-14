@@ -1,20 +1,23 @@
-# MLflow model packaging
+# Package and reload a model with MLflow
 
-## Library layout and upgrades
+Package a fitted model once, load its `runs:/...` URI and verify that predictions
+match direct Skyulf inference. Registration selects named model versions;
+[registry aliases](mlflow_registry.md) and endpoint deployment are later operations.
 
-MLflow implementation lives under `skyulf.integrations.mlflow`: `models` owns
-pyfunc adapters, `spark` owns distributed prediction and worker environments,
-`lifecycle` owns validation and champion/challenger decisions, `registration`
-owns registry resolution, and `runs` owns tracking. Shared client, signature and
-nullable transport helpers live in `shared`.
+## Choose an artifact
 
-Use these grouped paths directly. The former `local_model` and
-`local_feature_model` modules and their renamed APIs have been removed. Saved
-packages that reference removed paths may require rebuilding and logging with
-the current imports; see [upgrading integration code](databricks_sdk.md#upgrading-integration-code).
-The root exports `TrackingConfig`, `TrackingRun` and `track_run` without loading
-the optional MLflow dependency. Worker wheels and source certificates cover the
-entire `skyulf` package.
+| You need | Package and prediction route |
+| --- | --- |
+| Existing fitted pandas/Polars preprocessing, including recipes outside portable support | `save_pipeline` then `log_pipeline_model`; direct `predict_pipeline` or MLflow pyfunc. Bounded whole-frame execution is the base contract. |
+| A supported portable feature state and estimator, with a possible distributed Spark consumer | `build_bundle` then `log_model`; direct `predict_local`, pyfunc or the separately validated Spark routes. |
+| Distributed execution of a fitted pandas package | Use only the separately inspected/certified Spark pyfunc route; logging alone does not certify a recipe. |
+
+Install `uv pip install "skyulf-core[mlflow]"` in a Python 3.12+ environment.
+Pin a published release and resolved dependencies for repeatable jobs. New
+integration contracts shown here require the matching release/build; development
+verification against a checkout does not prove the published package contains
+them. For an unpublished build, distribute its exact wheel to consumers through
+your package delivery process.
 
 ## Fitted pipelines (pandas or Polars)
 
@@ -25,39 +28,57 @@ raw and model-feature column order and dtypes, dependency versions, and a payloa
 checksum. It never fits the pipeline again. It is separate from the portable
 Spark-capable `InferenceBundle` described below.
 
+<!-- skyulf-example: native models -->
 ```python
+from pathlib import Path
+
 import mlflow
 import pandas as pd
 
-from skyulf.inference.fitted_pipeline import (
-    load_pipeline,
-    predict_pipeline,
-    save_pipeline,
-)
+from skyulf.data.dataset import SplitDataset
+from skyulf.inference.fitted_pipeline import load_pipeline, predict_pipeline, save_pipeline
 from skyulf.integrations.mlflow import TrackingConfig, track_run
 from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
+from skyulf.pipeline import SkyulfPipeline
 
-# fitted_pipeline was already trained on pandas or Polars data.
-save_pipeline(fitted_pipeline, "artifacts/fitted-pipeline")
-config = TrackingConfig(
-    enabled=True,
-    tracking_uri="sqlite:///mlflow.db",
-    experiment_name="customer-risk",
+frame = pd.DataFrame({
+    "x": [1., 2., 3., 4., 5., 6., 7., 8.],
+    "target": [2., 4., 6., 8., 10., 12., 14., 16.],
+})
+fitted_pipeline = SkyulfPipeline({
+    "preprocessing": [], "modeling": {"type": "linear_regression"},
+})
+fitted_pipeline.fit(
+    SplitDataset(train=frame.iloc[:6], test=frame.iloc[6:]), target_column="target"
 )
-with track_run(config, run_name="fit-2026-09") as run:
+save_pipeline(fitted_pipeline, "artifacts/fitted-pipeline")
+tracking_uri = "sqlite:///" + (Path.cwd() / "mlflow.db").as_posix()
+config = TrackingConfig(
+    enabled=True, tracking_uri=tracking_uri, experiment_name="model-packaging",
+)
+with track_run(config, run_name="linear-model") as run:
     model_uri = log_pipeline_model(
-        "artifacts/fitted-pipeline",
-        run_id=run.run_id,
-        artifact_path="model",
-        tracking_uri=config.tracking_uri,
+        "artifacts/fitted-pipeline", run_id=run.run_id,
+        artifact_path="model", tracking_uri=tracking_uri,
     )
 
-request_frame = pd.DataFrame({"age": [42.0], "income": [72000.0]})
+request_frame = pd.DataFrame({"x": [9., 10.]})
 artifact = load_pipeline("artifacts/fitted-pipeline")
 direct_predictions = predict_pipeline(request_frame, artifact)
-mlflow.set_tracking_uri(config.tracking_uri)
-pyfunc_predictions = mlflow.pyfunc.load_model(model_uri).predict(request_frame)
+mlflow.set_tracking_uri(tracking_uri)
+loaded = mlflow.pyfunc.load_model(model_uri)
+pyfunc_predictions = loaded.predict(request_frame)
+pd.testing.assert_frame_equal(direct_predictions, pyfunc_predictions)
+print(model_uri)
+print(pyfunc_predictions)  # prediction: approximately 18.0 and 20.0
 ```
+
+Run the complete block in an empty working directory. Keep `mlflow.db` and its
+artifact storage. Start `mlflow ui --backend-store-uri sqlite:///mlflow.db`, open
+**Experiments > model-packaging > linear-model > Artifacts > model**, and inspect
+`MLmodel`, the saved environment and packaged artifact. The returned URI pins
+this run and artifact path. A successful load/parity assertion demonstrates
+replay in this environment; it does not deploy the model.
 
 The example columns must match the fitted pipeline's actual raw schema. Direct
 local prediction accepts a pandas or Polars frame, validates column names,
@@ -83,13 +104,42 @@ columns keep numeric signatures and do not need this string transport.
 
 Use the public helper with a loaded model:
 
+<!-- skyulf-example: native models -->
 ```python
+# Continue the imports/config from the complete example above.
 from skyulf.integrations.mlflow.models.pipeline_model import prepare_pyfunc_input
 
-loaded = mlflow.pyfunc.load_model(model_uri)
-# raw_frame contains the original, typed values expected by this artifact.
-request = prepare_pyfunc_input(raw_frame, loaded)
-predictions = loaded.predict(request)
+nullable = pd.DataFrame({
+    "count": pd.Series([1, None, 3, 4, 5, 6, 7, 8], dtype="Int64"),
+    "flag": pd.Series([True, None, False, True, False, True, False, True], dtype="boolean"),
+    "x": [1., 2., 3., 4., 5., 6., 7., 8.],
+    "target": [2., 4., 6., 8., 10., 12., 14., 16.],
+})
+nullable_pipeline = SkyulfPipeline({
+    "preprocessing": [
+        {"name": "fill_count", "transformer": "SimpleImputer",
+         "params": {"columns": ["count"], "strategy": "mean"}},
+        {"name": "fill_flag", "transformer": "SimpleImputer",
+         "params": {"columns": ["flag"], "strategy": "constant", "fill_value": False}},
+    ],
+    "modeling": {"type": "linear_regression"},
+})
+nullable_pipeline.fit(
+    SplitDataset(train=nullable.iloc[:6], test=nullable.iloc[6:]), target_column="target"
+)
+save_pipeline(nullable_pipeline, "artifacts/nullable-pipeline")
+with track_run(config, run_name="nullable-model") as run:
+    nullable_uri = log_pipeline_model(
+        "artifacts/nullable-pipeline", run_id=run.run_id,
+        artifact_path="model", tracking_uri=tracking_uri,
+    )
+nullable_model = mlflow.pyfunc.load_model(nullable_uri)
+raw_frame = nullable.iloc[:3].drop(columns="target")
+request = prepare_pyfunc_input(raw_frame, nullable_model)
+assert request["count"].tolist() == ["1", None, "3"]
+assert request["flag"].tolist() == ["true", None, "false"]
+expected = predict_pipeline(raw_frame, load_pipeline("artifacts/nullable-pipeline"))
+pd.testing.assert_frame_equal(expected, nullable_model.predict(request))
 ```
 
 For example, an `Int64` column `[25, None, 40]` travels as
@@ -142,7 +192,7 @@ batch inference, including inside a Databricks Python task with the recorded
 dependencies installed. It does **not** certify independent HTTP row requests,
 Spark worker partitions, or Spark-native feature engineering by itself. Newly
 logged, inspected pandas artifacts may additionally carry a partition-safety
-certificate for the [Spark pyfunc route](databricks_bundle.md#distributed-inference-settings).
+certificate for the [Spark pyfunc route](databricks_spark_scoring.md).
 That adapter revalidates the loaded artifact, package signature, source hash and
 certificate before creating a named-input UDF with all output columns. Workers
 revalidate the same evidence on load. This package does not write Delta tables.
@@ -177,35 +227,25 @@ uv pip install "skyulf-core[mlflow]"
 used to create a client-bound `track_run` when it is not already configured as
 MLflow's process-wide URI:
 
+<!-- skyulf-example: native models -->
 ```python
-import mlflow
-
-from skyulf.inference.bundle import build_bundle
-from skyulf.integrations.mlflow import TrackingConfig, track_run
+# Continue the first complete example: fitted_pipeline, config and request_frame.
+from skyulf.inference.bundle import build_bundle, predict_local
 from skyulf.integrations.mlflow.models.model import log_model
 
 bundle = build_bundle(
-    fitted_pipeline,
-    input_stage="raw",  # use "features" when callers already apply FE
-    feature_order=("age", "income"),
+    fitted_pipeline, input_stage="raw", feature_order=("x",),
 )
-config = TrackingConfig(
-    enabled=True,
-    tracking_uri="sqlite:///mlflow.db",
-    experiment_name="customer-risk",
-)
-
-with track_run(config, run_name="fit-2026-09") as run:
-    model_uri = log_model(
-        bundle,
-        run_id=run.run_id,
-        artifact_path="skyulf-model",
-        tracking_uri=config.tracking_uri,
+with track_run(config, run_name="portable-model") as run:
+    portable_uri = log_model(
+        bundle, run_id=run.run_id, artifact_path="portable-model",
+        tracking_uri=tracking_uri,
     )
-
-mlflow.set_tracking_uri(config.tracking_uri)
-loaded = mlflow.pyfunc.load_model(model_uri)
-predictions = loaded.predict(request_frame)
+portable_loaded = mlflow.pyfunc.load_model(portable_uri)
+pd.testing.assert_frame_equal(
+    predict_local(request_frame, bundle), portable_loaded.predict(request_frame)
+)
+print(portable_uri)
 ```
 
 The returned URI is `runs:/<run_id>/<artifact_path>`. Uploading uses an
@@ -216,16 +256,14 @@ feature schema. Regression outputs and classification labels, class order,
 probability columns, and saved threshold decisions remain the bundle's
 contract.
 
-The model signature uses named tabular columns. MLflow may reorder named input
-columns and safely cast compatible values before the adapter receives the
-`pandas.DataFrame`; undeclared extra columns are ignored by MLflow. Positional
-NumPy or list input, and inputs missing a declared column, are rejected.
-Bundle dtypes that MLflow cannot represent exactly, such as `int8`, are
-rejected during packaging instead of being silently widened. Input examples
-are one synthetic row derived from the manifest schema and never a training or
-production row. This is MLflow's input transport contract; direct
-`predict_local` calls still reject different column orders, extra columns and
-dtype mismatches. See [MLflow signature enforcement](https://mlflow.org/docs/latest/model/signatures/).
+The model signature uses named tabular columns. MLflow may reorder named input columns and safely
+cast compatible values before the adapter receives the `pandas.DataFrame`; undeclared extra columns
+are ignored by MLflow. Positional NumPy or list input, and inputs missing a declared column, are
+rejected. Bundle dtypes that MLflow cannot represent exactly, such as `int8`, are rejected during
+packaging instead of being silently widened. Input examples are one synthetic row derived from the
+manifest schema and never a training or production row. This is MLflow's input transport contract;
+direct `predict_local` calls still reject different column orders, extra columns and dtype
+mismatches. See [MLflow signature enforcement](https://mlflow.org/docs/latest/model/signatures/).
 
 The pyfunc entry point accepts named pandas frames (or named inputs that MLflow
 can convert). A pipeline trained with Polars can produce the same bundle;
@@ -254,3 +292,29 @@ adds pinned UC source reads and bounded Delta publication; the
 [Bundle guide](databricks_bundle.md) describes distributed scoring and deployment
 settings. Those integrations keep their own schema, context and admission checks;
 logging a model alone does not deploy it or create a prediction table.
+
+## If packaging or loading fails
+
+| Symptom | Action |
+| --- | --- |
+| Raw columns/order/dtype differ | Use the recorded schema; direct inference is stricter than MLflow named-column alignment. |
+| Nullable integer/Boolean rejected | Use native typed values with `prepare_pyfunc_input` once, or send the declared string/null wire values directly. |
+| Missing package or version mismatch | Install the recorded requirements and matching published release or unpublished wheel before loading. |
+| Portable export rejects a step/dtype | Use a fitted-pipeline package for bounded scoring or change the recipe and verify it; do not assume Spark eligibility. |
+| Predictions differ | Compare the same raw rows, fit engine, class order and threshold setting; stop before promotion. |
+| Artifact cannot load after an upgrade | Use a compatible build or rebuild/log the trusted producer's model under current imports. |
+
+## Library layout and upgrades
+
+MLflow implementation lives under `skyulf.integrations.mlflow`: `models` owns
+pyfunc adapters, `spark` owns distributed prediction and worker environments,
+`lifecycle` owns validation and champion/challenger decisions, `registration`
+owns registry resolution, and `runs` owns tracking. Shared client, signature and
+nullable transport helpers live in `shared`.
+
+Use these grouped paths directly. The former `local_model` and `local_feature_model` modules and
+their renamed APIs have been removed. Saved packages that reference removed paths may require
+rebuilding and logging with the current imports; see
+[upgrading integration code](databricks_project_upgrade.md#upgrade-integration-code). The root
+exports `TrackingConfig`, `TrackingRun` and `track_run` without loading the optional MLflow
+dependency. Worker wheels and source certificates cover the entire `skyulf` package.

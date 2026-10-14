@@ -4,10 +4,72 @@ Inference reuses the preprocessing and model learned during training. The
 execution choice determines where those saved transformations run and which
 artifacts can be used. It does not fit a new imputer, scaler or model.
 
-For a runnable starting point, use the [Python SDK example](databricks_sdk.md#fit-and-score-a-small-batch)
-for a bounded frame, or the [Spark bundle example](inference_bundles.md#native-spark-fe-and-worker-model-inference)
-for distributed input. Install the model's recorded dependencies in each
-process that loads it.
+For a runnable starting point, use the
+[Python SDK example](databricks_sdk.md#fit-and-score-a-small-batch) for a bounded frame, or the
+[Spark bundle example](inference_bundles.md#native-spark-fe-and-worker-model-inference) for
+distributed input. Install the model's recorded dependencies in each process that loads it.
+
+```mermaid
+flowchart LR
+    A["Saved artifact"] --> B{"Where does it run?"}
+    B --> C["score_pipeline or predict_local: one Python process"]
+    B --> D["predict_spark: native_features"]
+    B --> E["predict_spark: python_pipeline"]
+    B --> F["Bundle inference_mode: spark"]
+    D --> G["Spark workers: model on batches"]
+    E --> G
+    F --> G
+```
+
+The local path holds the whole frame in one process. The Spark paths keep the
+table distributed and run the fitted model on worker batches. Each path is
+explained below.
+
+## Run the local form first
+
+Use Python 3.12 or newer and an activated virtual environment. Install with
+`uv pip install skyulf-core` (or `uv pip install -e ./skyulf-core` from a
+checkout). This complete example needs no Spark, MLflow or cloud connection:
+
+<!-- skyulf-example: native fitted-flow -->
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import numpy as np
+import pandas as pd
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+from skyulf.inference.pipeline_scoring import score_pipeline
+from skyulf.pipeline import SkyulfPipeline
+
+training = pd.DataFrame({"amount": [10.0, 30.0], "target": [100.0, 300.0]})
+pipeline = SkyulfPipeline({
+    "preprocessing": [
+        {"name": "fill", "transformer": "SimpleImputer",
+         "params": {"columns": ["amount"], "strategy": "mean"}},
+        {"name": "scale", "transformer": "StandardScaler",
+         "params": {"columns": ["amount"]}},
+    ],
+    "modeling": {"type": "linear_regression"},
+})
+pipeline.fit(SplitDataset(train=training, test=training.head(0)), target_column="target")
+incoming = pd.DataFrame({"amount": [40.0, np.nan]})
+with TemporaryDirectory() as temporary:
+    destination = Path(temporary) / "fitted_model"
+    save_pipeline(pipeline, destination)
+    artifact = load_pipeline(destination)
+    result = score_pipeline(incoming, artifact)
+    np.testing.assert_allclose(result["prediction"], [400.0, 200.0], atol=1e-12)
+    print(result.to_string(index=False))
+```
+
+There is no holdout here: the example verifies saved inference arithmetic, not
+model accuracy. The result is a pandas frame with predictions 400.0 and 200.0.
+The latter comes from the saved training mean, 20.0. See the
+[quickstart](pipeline_quickstart.md) for a held-out metric and the
+[artifact guide](inference_bundles.md) for the portable representation.
 
 ## What training saves
 
@@ -67,11 +129,30 @@ DataFrame. For `input_stage="raw"`, it applies saved preprocessing first. A
 preprocessing. Applying a scaler twice gives the wrong input; the API cannot
 infer from numeric values whether a column has already been scaled.
 
-`runtime="standalone"` in `WorkflowConfig` selects general Python integration
-on any compute. `runtime="databricks"` enables Databricks integration and is
-required for UC Delta publication. The pandas/Polars `engine` and Bundle
-`inference_mode="local"`/`"spark"` are independent choices. The old SDK
-`runtime="local"` value is rejected; update existing workflow configurations.
+These settings answer different questions:
+
+| Setting | What it chooses | Example |
+| --- | --- | --- |
+| Workflow `runtime` | Platform integration and source/sink availability | `standalone` for a general Python process; `databricks` for Databricks integration and UC Delta publication |
+| `engine` | Saved/local DataFrame execution | `pandas` or `polars`; a fitted artifact records its training engine |
+| Bundle/SDK `inference_mode` | Whole-frame scoring or certified distributed prediction | `local` or `spark`; the certified Spark route requires pandas |
+| Portable runner `mode` | Where the portable FE executes | `native_features` or `python_pipeline` |
+| `spark_udf_env_manager` / MLflow `env_manager` | How worker Python dependencies are provided | `virtualenv` restores an environment; `local` uses the installed worker environment |
+
+SDK `runtime` accepts `standalone`, `databricks` or `spark`; select `standalone`
+for a general Python workflow. Preflight rejects `runtime="spark"` because Spark
+scoring uses a separate batch runner. A cloud driver can still run whole-frame Python
+scoring. Conversely, a Spark table source does not by itself select distributed
+model inference. The certified SDK Spark route also validates its registered
+model, incremental UC source and Delta sink contract; use the
+[SDK](databricks_sdk.md) and [Bundle](databricks_spark_scoring.md)
+guides for that complete setup.
+
+`env_manager="local"` describes a dependency policy, not driver execution or
+`inference_mode="local"`. It requires the correct packages already installed
+in workers. `virtualenv` needs an environment-restoration-capable compute
+profile; validate that choice on the actual compute. Neither setting enables an
+unsupported transformer or supplies missing group/history context.
 
 ## Native Spark preprocessing and a Python model
 
@@ -112,7 +193,7 @@ supported preprocessing and model together within independent worker batches.
 It has the same portable preprocessing scope and supports regression and
 classification. Choosing this mode does not admit arbitrary fitted Python nodes.
 
-A separate [certified MLflow pyfunc path](databricks_bundle.md#distributed-inference-settings)
+A separate [certified MLflow pyfunc path](databricks_spark_scoring.md)
 uses inspected pandas fitted-pipeline packages. Its admission rules include the
 exact fitted recipe, estimator, schema, source identity and worker environment.
 Its supported recipes differ from the portable bundle's native Spark appliers.
@@ -166,3 +247,21 @@ Scheduling, Delta publication, HTTP serving and SQL invocation are separate
 integration choices. Use the [batch publication guide](databricks_batch.md),
 [MLflow packaging guide](mlflow_models.md) and [Bundle guide](databricks_bundle.md)
 for the corresponding contracts.
+
+## Check the boundary when results differ
+
+Check the artifact's input stage, feature names/order/dtypes and recorded
+runtime first. Feeding prepared features to a raw-input artifact applies saved
+preprocessing twice. Re-fitting on a request learns different state. Splitting
+context-dependent rows across independent calls can change results even when
+the saved state is identical.
+
+For Spark, validate identity keys and the exact admitted recipe before measuring
+throughput; compare output by key with a bounded reference. Batch row limits
+control model calls, while Arrow transport and loaded estimators consume their
+own memory. A schema error, missing dependency or unsupported fitted node needs
+correction at its own boundary; an execution-mode switch is not a universal fix.
+
+Use [context diagnostics](preprocessing_context.md) to investigate sample
+batch/order differences, [Spark setup](spark.md) for worker and identity rules,
+and [MLflow registry](mlflow_registry.md) to resolve a deployed model version.

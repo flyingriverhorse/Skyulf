@@ -1,174 +1,236 @@
-# MLflow model registry
+# Register, compare and select model versions
 
-Skyulf keeps model publication and model selection as explicit operations. The
-registry adapter is optional: importing the core package does not import MLflow,
-open a client, or contact a registry.
+This walkthrough registers two real fitted models, evaluates both on the same
+holdout, initializes a first champion, stages a challenger, promotes it and
+rolls back using the verified promotion receipt. It uses a local SQLite registry;
+[Unity Catalog admission](#stage-promote-and-roll-back-a-local-pipeline) needs
+a shared authority and platform permissions.
 
-Install the integration in the environment that publishes or resolves models:
+Registration creates a version. It does not deploy an endpoint, score a table
+or move an alias. Resolve an alias once at the start of a scoring job so a later
+alias change cannot change that job's selected version.
 
-```bash
-uv pip install "skyulf-core[mlflow]"
-```
+## Prerequisites
 
-`register_model` publishes a model already logged by `log_model` as a new
-registered-model version. It accepts a `runs:/<run_id>/<artifact_path>` URI and
-returns MLflow's model-version object. Registration never assigns an alias:
-promotion is a separate operation owned by the caller.
+Use Python 3.12+, `uv pip install "skyulf-core[mlflow]"`, and a fresh writable
+working directory. Pin the published release and resolved dependencies used by
+your jobs. The full guarded lifecycle and recovery contracts in this guide
+require their matching release/build; when validating unreleased changes,
+install the matching checkout or exact development wheel in every participating
+job. A development package version does not prove publication of those changes.
 
+Only load trusted model artifacts. Their pickle payload can execute code;
+checksums prove content identity, not producer trust.
+
+## Create two versions and compare them
+
+Run these blocks in order in one Python session. The first block supplies all
+model, run, source and holdout variables. The baseline is deliberately weak; the
+candidate learns `target = 2*x`. The four held-out rows never participate in fitting.
+
+<!-- skyulf-example: native registry -->
 ```python
-from skyulf.integrations.mlflow.models.model import log_model
-from skyulf.integrations.mlflow.registration.registry import register_model
+from dataclasses import asdict
+from pathlib import Path
+import json
 
-model_uri = log_model(
-    bundle,
-    run_id=run_id,
-    artifact_path="model",
-    tracking_uri="sqlite:///tracking.db",
+import pandas as pd
+from mlflow import MlflowClient
+
+from skyulf.data.dataset import SplitDataset
+from skyulf.inference.fitted_pipeline import save_pipeline
+from skyulf.integrations.mlflow import TrackingConfig, track_run
+from skyulf.integrations.mlflow.models.pipeline_model import log_pipeline_model
+from skyulf.integrations.mlflow.registration.registry import (
+    register_model, resolve_model, load_registered_pipeline,
 )
-version = register_model(
-    model_uri,
-    "customer_risk",
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-print(version.version)
-```
-
-Resolve exactly one selector at the start of a job. An alias is looked up once;
-the returned object carries the concrete version URI, so a later alias move does
-not change the model used by the running job.
-
-```python
-from skyulf.integrations.mlflow.registration.registry import resolve_model
-
-resolved = resolve_model(
-    "customer_risk",
-    alias="champion",
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-assert resolved.model_uri == f"models:/{resolved.name}/{resolved.version}"
-
-# The versioned URI can be carried into a Spark batch or another runner.
-print(resolved.signature, resolved.digest)
-```
-
-Passing both `alias` and `version`, or neither, is a configuration error. The
-adapter reports missing models, access failures, and missing MLflow as separate
-exception types so a runner can choose the right remediation. The `signature`
-and `digest` fields are read from the packaged MLflow model metadata; they are
-validation data, not a second feature-engineering implementation.
-
-For Unity Catalog, pass a three-part model name (`catalog.schema.model`) and a
-`databricks-uc` registry URI. Tracking and registry URIs remain separate. Grant the job identity the model
-permissions required by its operation, including `EXECUTE` for loading a UC model.
-Validate the recorded dependencies and artifact contract on the selected compute.
-
-Load the selected artifact with `load_registered_bundle`. It uses the pinned
-name/version and the package's declared bundle path, rejects paths outside the
-downloaded package, and checks the package/bundle digest against `resolved.digest`.
-The same bundle can then be passed to `predict_local` or either Spark inference
-mode, subject to their existing schema and FE capabilities.
-
-For fitted pandas/Polars packages created with `log_pipeline_model`, use
-`load_registered_pipeline(resolved, ...)` instead. It verifies the
-declared local artifact path, scope, engine and payload digest against the
-pinned registry version. That package supports whole-frame pandas/Polars inference;
-it does not become a Spark bundle merely because it is registered.
-
-```python
-from skyulf.integrations.mlflow.registration.registry import load_registered_bundle
-
-bundle = load_registered_bundle(
-    resolved,
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-assert bundle.semantic_digest == resolved.digest
-```
-
-## How the adapters use Skyulf Core
-
-The Databricks Python workflow calls Skyulf Core's existing pipeline fit and
-prediction methods. Its UC reader and Delta writer handle transport and
-publication; they do not reimplement feature engineering or model behavior.
-The MLflow adapter packages that same saved pipeline, resolves a registry
-alias to a concrete version, and loads the artifact for prediction or
-comparison. Held-out evaluation runs the saved pipeline once and passes its
-predictions and class-ordered probabilities to Core's model metric calculators.
-There is no separate Databricks or MLflow training algorithm.
-
-For example, a training job can log every available held-out metric to
-its own MLflow run without implementing a second evaluator:
-
-```python
-from skyulf.inference.pipeline_evaluation import evaluate_holdout
-from skyulf.integrations.mlflow.runs.tracking import TrackingConfig, track_run
-
-metrics = evaluate_holdout(artifact, heldout, target_column="target")
-with track_run(
-    TrackingConfig(enabled=True, experiment_name="customer-risk"),
-    run_name="candidate-training",
-) as run:
-    run.log_metrics(metrics)
-```
-
-## Compare a candidate before promotion
-
-For a fitted pandas/Polars pipeline, resolve both registered versions to
-concrete identities and evaluate them on the **same held-out labeled rows**.
-Pin the source snapshot and split in the caller; `dataset_id` records that
-identity in the report but does not verify the underlying table by itself.
-The report also records the running Skyulf Core version and both model digests.
-The comparison uses the saved FE, model, class order and tuned thresholds.
-It accepts a row/memory budget and rejects incompatible tasks or class labels.
-
-```python
-from skyulf.integrations.mlflow.registration.registry import resolve_model
 from skyulf.integrations.mlflow.lifecycle.validation import compare_registered_pipeline_models
+from skyulf.integrations.mlflow.lifecycle.promotion import (
+    AliasConflictError, LocalAliasAdmission, initialize_champion, stage_challenger,
+    promote_candidate, rollback_promotion,
+)
+from skyulf.pipeline import SkyulfPipeline
 
-candidate = resolve_model(
-    "catalog.schema.customer_risk", version="2", registry_uri="databricks-uc"
+tracking_uri = "sqlite:///" + (Path.cwd() / "registry-demo.db").as_posix()
+registry_uri = tracking_uri
+model_name = "revenue_demo"  # choose a new name if repeating the walkthrough
+endpoints = {"tracking_uri": tracking_uri, "registry_uri": registry_uri}
+config = TrackingConfig(
+    enabled=True, tracking_uri=tracking_uri, experiment_name="registry-demo",
 )
-champion = resolve_model(
-    "catalog.schema.customer_risk", alias="champion", registry_uri="databricks-uc"
+frame = pd.DataFrame({
+    "x": [1., 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+    "target": [2., 4., 6., 8., 10., 12., 14., 16., 18., 20.],
+})
+training, heldout = frame.iloc[:6].copy(), frame.iloc[6:].copy()
+references = []
+for label, estimator in [
+    ("baseline", {"type": "decision_tree_regressor",
+                  "params": {"max_depth": 1, "random_state": 42}}),
+    ("candidate", {"type": "linear_regression"}),
+]:
+    pipeline = SkyulfPipeline({"preprocessing": [], "modeling": estimator})
+    pipeline.fit(SplitDataset(train=training, test=heldout), target_column="target")
+    path = Path("artifacts") / label
+    save_pipeline(pipeline, path)
+    with track_run(config, run_name=label) as run:
+        uri = log_pipeline_model(
+            path, run_id=run.run_id, artifact_path="model", tracking_uri=tracking_uri,
+        )
+    created = register_model(uri, model_name, **endpoints)
+    references.append(resolve_model(model_name, version=created.version, **endpoints))
+baseline, candidate = references
+assert baseline.version != candidate.version
+print(baseline.model_uri, candidate.model_uri)
+
+policy = dict(
+    target_column="target", dataset_id="synthetic-v1/holdout-rows-7-10",
+    metric="heldout_rmse", min_improvement=0.1, quality_threshold=20.0,
+    max_rows=100, max_bytes=1_000_000, **endpoints,
 )
-report = compare_registered_pipeline_models(
-    candidate,
-    champion,
-    heldout,  # bounded pandas or Polars frame with raw inputs and true labels
-    target_column="target",
-    dataset_id="catalog.schema.labels@version=42/split=holdout-v1",
-    metric="heldout_rmse",
-    min_improvement=0.1,
-    quality_threshold=5.0,  # maximum acceptable RMSE
-    max_rows=10_000,
-    max_bytes=20_000_000,
-    registry_uri="databricks-uc",
+bootstrap = compare_registered_pipeline_models(baseline, None, heldout, **policy)
+report = compare_registered_pipeline_models(candidate, baseline, heldout, **policy)
+assert report.eligible
+failed_gate = compare_registered_pipeline_models(
+    baseline, candidate, heldout, **{**policy, "quality_threshold": 1.0},
 )
-print(report.eligible, report.reason, report.candidate_metrics)
+assert not failed_gate.eligible and failed_gate.reason == "quality_gate_failed"
+print(report.reason, report.candidate_metrics, report.champion_metrics)
+Path("comparison.json").write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
 ```
 
-The report contains all finite metrics available for the task and labeled
-holdout. Regression includes MAE, MSE, RMSE, R2, MAPE and explained variance.
-Classification includes accuracy, balanced accuracy, weighted precision/recall/F1,
-Matthews correlation, binary precision/recall/F1 and, when defined, log loss,
-ROC-AUC and PR-AUC variants. Optional metrics such as geometric-mean score may
-be absent when their dependency or the required label distribution is unavailable.
-Probability metrics use the saved model's class order; hard-label metrics use
-its effective prediction thresholds.
+Expect versions `1` and `2` for a new registered name. The candidate RMSE is
+close to zero and the baseline RMSE is larger. Actual versions come from the
+returned references; never assume numeric literals in a production job.
+`dataset_id` describes caller-pinned rows; it does not independently verify a
+Delta snapshot or reconstruct the split.
 
-Choose one primary metric before evaluating candidates. Error metrics
-(MAE/MSE/RMSE/MAPE/log loss) minimize; the other selectable scores maximize.
-`quality_threshold` is an upper limit for error metrics and a lower limit for
-scores. A tie does not qualify. If no champion exists, pass `None` and
-inspect the candidate report; this never creates a champion. The report is
-read-only; the caller explicitly logs the desired numeric metrics to its
-MLflow run. Unlabeled production predictions cannot produce supervised
-quality metrics until their true labels arrive.
-Evaluation does not move aliases, publish predictions or deploy endpoints.
-Promotion is a separate, explicit operation. Monthly candidate training and
-the generated [local-engine Bundle](databricks_bundle.md) reuse these services.
+## Initialize, stage, promote and roll back
+
+No champion exists in a fresh model. Initialization requires a fresh evaluation
+and an absolute `quality_threshold`; a comparison without a champion is not
+eligible for ordinary promotion. All alias changes use one admission authority.
+
+```mermaid
+flowchart LR
+    A["compare_registered_pipeline_models"] --> B["initialize_champion"]
+    A --> C["stage_challenger"]
+    C --> D["promote_candidate"]
+    D --> E["promotion receipt"]
+    E --> F["rollback_promotion"]
+```
+
+`initialize_champion` applies only when no champion exists. Staging, promotion
+and rollback each re-check the registry state they expect.
+
+<!-- skyulf-example: native registry -->
+```python
+admission = LocalAliasAdmission(Path("alias-locks"))
+mutation = dict(
+    target_column="target", admission=admission,
+    max_rows=100, max_bytes=1_000_000, **endpoints,
+)
+initial = initialize_champion(bootstrap, heldout, **mutation)
+staging = stage_challenger(
+    report, heldout, expected_champion_version=baseline.version, **mutation,
+)
+receipt = promote_candidate(
+    report, heldout, expected_champion_version=baseline.version, **mutation,
+)
+Path("promotion-receipt.json").write_text(
+    json.dumps(asdict(receipt), indent=2), encoding="utf-8",
+)
+assert resolve_model(model_name, alias="champion", **endpoints).version == candidate.version
+# The original comparison's expected champion is now stale.
+try:
+    promote_candidate(
+        report, heldout, expected_champion_version=baseline.version, **mutation,
+    )
+except AliasConflictError:
+    pass
+else:
+    raise AssertionError("A stale champion must block promotion")
+reversal = rollback_promotion(
+    receipt, expected_current_version=candidate.version,
+    admission=admission, **endpoints,
+)
+assert resolve_model(model_name, alias="champion", **endpoints).version == baseline.version
+print(asdict(receipt), asdict(reversal))
+```
+
+For a new name, alias assignments change as follows:
+
+| After operation | champion | challenger | previous_champion |
+| --- | --- | --- | --- |
+| Registration/comparison | absent | absent | absent |
+| Initialize baseline | baseline (`1`) | absent | absent |
+| Stage candidate | baseline (`1`) | candidate (`2`) | absent |
+| Promote candidate | candidate (`2`) | absent | baseline (`1`) |
+| Roll back this receipt | baseline (`1`) | absent | absent |
+
+`previous_challenger` is separate contender history. In this walkthrough there
+is no displaced contender, so it stays absent. Keep the returned receipts and
+comparison evidence; a prepared event alone is not proof of a completed move.
+Rollback restores the matching prior champion and rollback pointer, not endpoint
+traffic or prediction tables.
+
+Start `mlflow ui --backend-store-uri sqlite:///registry-demo.db`. Open
+**Models > revenue_demo** to inspect both versions and aliases. Follow each
+version's source run to **Artifacts > model**. Inspect version tags for validation
+status, event IDs and committed lifecycle evidence. `comparison.json` and
+`promotion-receipt.json` above are caller-owned local files, not automatically
+uploaded run artifacts.
+
+## Pin and load the selected model
+
+Continue the session to pin the rolled-back champion and load its exact fitted
+artifact. For a portable package logged with `log_model`, use
+`load_registered_bundle` instead.
+
+<!-- skyulf-example: native registry -->
+```python
+from skyulf.inference.fitted_pipeline import predict_pipeline
+
+selected = resolve_model(model_name, alias="champion", **endpoints)
+artifact = load_registered_pipeline(selected, **endpoints)
+predictions = predict_pipeline(pd.DataFrame({"x": [11., 12.]}), artifact)
+assert selected.model_uri == f"models:/{model_name}/{selected.version}"
+print(selected.version, selected.digest, predictions)
+```
+
+Select exactly one of `alias` and `version`. Resolution reads the package metadata;
+the loader verifies the selected artifact's kind, scope, engine and digest. A later
+alias move does not redirect `selected`. Resolution/loading does not predict or
+move aliases; the explicit prediction call above does.
+
+## Choose gates and handle failures
+
+| Option or failure | Meaning and action |
+| --- | --- |
+| `min_improvement` | Required absolute difference on the chosen metric. A tie never passes, even at zero. |
+| `quality_threshold` | Maximum for error/loss, minimum for score metrics. Required for first-champion initialization. |
+| `quality_gates` | Optional additional absolute metric bounds; every gate must pass, including for the first champion. |
+| `report.eligible=False` | Inspect `reason` and measured metrics. A rejected comparison may be staged for inspection; promotion refuses it. |
+| Stale champion/challenger | Re-resolve roles, review the competing change, recompare the same intended holdout and submit an explicitly reviewed expectation. |
+| Holdout/config changed | Build fresh evidence; lifecycle functions recompute and reject a changed comparison. |
+| `RegistryModelNotFoundError` | Check the exact name/version and retention. Do not silently fall back to another model. |
+| `RegistryAccessError` | Configure the job identity's operation-specific permissions. |
+| `AliasOutcomeUnknownError` | Stop alias writers and use the reconciliation procedure below; an alias call may already have succeeded. |
+
+Regression includes MAE, MSE, RMSE, R2, MAPE and explained variance.
+Classification includes hard-label scores and probability metrics when defined
+for the labels and saved class order. Some optional metrics can be absent.
+Error metrics minimize; other supported scores maximize. Missing/nonfinite
+required gate metrics fail the gate. Evaluation uses saved preprocessing and
+threshold decisions, is unweighted, and needs true labels. Unlabeled production
+predictions cannot establish supervised quality.
+
+For Unity Catalog use `catalog.schema.model`, `tracking_uri="databricks"` and
+`registry_uri="databricks-uc"`. The job needs catalog/schema use privileges and
+operation-specific model privileges, including `EXECUTE` to load a model;
+publication and alias mutation also need their corresponding write authority.
+Registry access does not grant source/target table permissions. Use the shared
+admission and recovery contracts below before production lifecycle automation.
 
 ## Stage, promote, and roll back a local pipeline
 
@@ -201,45 +263,9 @@ must use the same non-expiring admission authority, and registry write
 permissions must be restricted to that controlled path. A local development
 store can use LocalAliasAdmission with a shared lock directory:
 
-~~~python
-from skyulf.integrations.mlflow.lifecycle.promotion import (
-    LocalAliasAdmission,
-    promote_candidate,
-    rollback_promotion,
-    stage_challenger,
-)
+The complete local example above uses this provider. All local writers must
+share its lock directory.
 
-admission = LocalAliasAdmission("/var/lib/skyulf/alias-locks")
-staging = stage_challenger(
-    report,
-    heldout,
-    target_column="target",
-    expected_champion_version="1",
-    admission=admission,
-    max_rows=10_000,
-    max_bytes=20_000_000,
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-receipt = promote_candidate(
-    report,
-    heldout,
-    target_column="target",
-    expected_champion_version="1",
-    admission=admission,
-    max_rows=10_000,
-    max_bytes=20_000_000,
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-reversal = rollback_promotion(
-    receipt,
-    expected_current_version=receipt.new_version,
-    admission=admission,
-    tracking_uri="sqlite:///tracking.db",
-    registry_uri="sqlite:///registry.db",
-)
-~~~
 
 For Unity Catalog, use DeltaAliasAdmission(spark, control_table) with a
 separate, preprovisioned Delta control table containing exactly one row:
@@ -307,15 +333,14 @@ the saved time. This is not a server commit timestamp or a separate history of
 every phase. Space for the final state is checked before alias changes begin.
 
 Read `at` from the raw model-version tag; `read_event` validates it and returns
-only the control fields used to verify receipts. Existing tags without timestamps
-remain valid and are not backfilled. The returned `AliasChangeReceipt` is unchanged.
+only the control fields used to verify receipts. A tag without `at` is also
+valid. The returned `AliasChangeReceipt` has no timestamp field.
 Actor identity is not inferred from the machine or notebook user; use the platform
 audit log to establish who performed a change.
 
-Timestamped tags require Core 0.9.4 or newer: older readers reject the new `at`
-field. Upgrade all jobs that read or write lifecycle tags for the same registered
-model together. After a timestamped event is written, downgrading a job to an older
-Core release will make its lifecycle checks fail. New readers still accept old tags.
+Every job that reads or writes lifecycle tags for one registered model must use the same Skyulf Core
+version. See [project upgrades](databricks_project_upgrade.md#lifecycle-tags-and-alias-recovery)
+before changing that version.
 
 `skyulf.integrations.mlflow.lifecycle.rejection.reject_candidate(report, reason=...,
 expected_champion_version=..., admission=..., tracking_uri=..., registry_uri=...)`
@@ -364,6 +389,7 @@ New lifecycle operations save their full recovery intent before publishing
 the pending marker. Use the pending event ID and its destination model
 version from the failed operation's logs and `promotion_<event_id>` tag:
 
+<!-- skyulf-example: illustrative receipt-reconciliation -->
 ```python
 from skyulf.integrations.mlflow.lifecycle.promotion import (
     reconcile_alias_change,
@@ -397,17 +423,22 @@ They abort if their metadata is untouched; an already committed event can
 finish its remaining markers. Partly applied metadata without a committed
 event requires manual inspection.
 
-Recovery storage uses `alias_intent` and numbered `alias_intent_0000` slots on
-the destination version. A manifest verifies the complete snapshot's digest;
-each ASCII chunk is at most 256 bytes. The next operation on that version
-reuses these slots only after the pending guard is clear. Compact event tags
-remain available, but a superseded recovery snapshot cannot repair an older
-event. The writer reserves room for intent, final status and event tags before
-preparation and rejects operations exceeding the 50-tag model or model-version
-budget. This follows the [Unity Catalog tag limits](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/migrate-to-uc#tags).
-Existing receipts can eventually exhaust that budget; archive reviewed audit
-evidence before deliberately retiring obsolete tags. Never remove current
-control receipts or pending recovery evidence to make room.
+Recovery storage uses `alias_intent` and numbered `alias_intent_0000` slots on the destination
+version. A manifest verifies the complete snapshot's digest; each ASCII chunk is at most 256 bytes.
+The next operation on that version reuses these slots only after the pending guard is clear. Compact
+event tags remain available, but a superseded recovery snapshot cannot repair an older event. The
+writer reserves room for intent, final status and event tags before preparation and rejects
+operations exceeding the 50-tag model or model-version budget. This follows the
+[Unity Catalog tag limits](https://docs.databricks.com/aws/en/machine-learning/manage-model-lifecycle/migrate-to-uc#tags).
+Existing receipts can eventually exhaust that budget; archive reviewed audit evidence before
+deliberately retiring obsolete tags. Never remove current control receipts or pending recovery
+evidence to make room.
+
+Each chunk is framed as `|...|` and the manifest records `"encoding":"json-framed-v1"`. Run
+`reconcile_alias_change` with a Core release that reads framed intents, such as the writers'
+release. An older Core reader raises `Alias intent digest differs from its stored chunks` for a
+framed manifest. That error means a version mismatch, not corrupted evidence; install the matching
+Core and retry before considering manual recovery.
 
 For a partial or historical operation without complete recovery intent:
 

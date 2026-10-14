@@ -1,6 +1,34 @@
-# Pipeline Quickstart
+# Pipeline quickstart
 
-This guide shows a production-style workflow: split → fit → evaluate → predict → save/load.
+Train a classifier, read its held-out accuracy, predict new raw rows and verify
+that saving/reloading preserves the predictions. Everything runs in one Python
+process; no API server, Canvas, Spark session or MLflow service is needed.
+
+## Install and prepare the input
+
+Use Python 3.12 or newer in an activated virtual environment:
+
+```bash
+uv venv --python 3.12
+# Activate .venv using your shell, then install into that environment.
+uv pip install skyulf-core
+```
+
+For a repository checkout, replace the last command with
+`uv pip install -e ./skyulf-core`. The example uses pandas, NumPy and
+scikit-learn supplied by the core installation. Preserve their versions when
+moving a saved artifact between environments.
+
+| Column | Training type | Meaning | New prediction rows |
+| --- | --- | --- | --- |
+| `age` | Floating point, nullable | Numeric feature | Include, even if missing |
+| `city` | String | Categorical feature | Include; unseen values are allowed by this recipe |
+| `target` | Integer 0 or 1 | Class label | Omit |
+
+Split before learning the imputation mean or category vocabulary. Otherwise
+holdout observations can influence training features and make evaluation
+optimistic. The explicit first split below learns subsequent steps from six
+training rows, then applies the saved state to two held-out rows.
 
 ## What data shape should I pass?
 
@@ -23,84 +51,97 @@ If you prefer a scikit-learn-style workflow (`X`/`y` + `train_test_split`), see:
 
 This single snippet is intentionally end-to-end (no duplicated setup across steps).
 
+<!-- skyulf-example: native quickstart -->
 ```python
-import tempfile
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import numpy as np
 import pandas as pd
 
 from skyulf import SkyulfPipeline
 
-# 1) Define a pipeline config
-# Each preprocessing step is:
-#   {"name": "...", "transformer": "TransformerType", "params": {...}}
 config = {
     "preprocessing": [
-        {
-            "name": "split",
-            "transformer": "TrainTestSplitter",
-            "params": {
-                "test_size": 0.25,
-                "validation_size": 0.0,
-                "random_state": 42,
-                "shuffle": True,
-                "stratify": True,
-                "target_column": "target",
-            },
-        },
-        {
-            "name": "impute",
-            "transformer": "SimpleImputer",
-            "params": {"strategy": "mean", "columns": ["age"]},
-        },
-        {
-            "name": "encode",
-            "transformer": "OneHotEncoder",
-            "params": {"columns": ["city"], "drop_original": True, "handle_unknown": "ignore"},
-        },
+        {"name": "split", "transformer": "TrainTestSplitter", "params": {
+            "test_size": 0.25, "validation_size": 0.0,
+            "random_state": 42, "shuffle": True, "stratify": True,
+            "target_column": "target",
+        }},
+        {"name": "impute", "transformer": "SimpleImputer",
+         "params": {"strategy": "mean", "columns": ["age"]}},
+        {"name": "encode", "transformer": "OneHotEncoder", "params": {
+            "columns": ["city"], "drop_original": True,
+            "handle_unknown": "ignore", "max_categories": None,
+        }},
     ],
     "modeling": {
         "type": "random_forest_classifier",
         "params": {"n_estimators": 50, "random_state": 42},
     },
 }
-
-# 2) Training data (includes the target column)
-df = pd.DataFrame(
-    {
-        "age": [10, 20, None, 40, 50, 60, None, 80],
-        "city": ["A", "B", "A", "C", "B", "A", "C", "B"],
-        "target": [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
-
-# 3) Fit (learn params on train split, apply to test split)
+training = pd.DataFrame({
+    "age": [10.0, 20.0, None, 40.0, 50.0, 60.0, None, 80.0],
+    "city": ["A", "B", "A", "C", "B", "A", "C", "B"],
+    "target": [0, 1, 0, 1, 1, 0, 1, 0],
+})
 pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(df, target_column="target")
-print("Metrics keys:", list(metrics.keys()))
+metrics = pipeline.fit(training, target_column="target")
 
-preprocessing = metrics["preprocessing"]
-print(preprocessing["summary"]["fit_time"])
-print(preprocessing["steps"]["1:impute"]["details"]["fill_values"])
-# preprocessing["fit_time"], ["peak_memory_bytes"], ["rows_in"], and
-# ["rows_out"] remain compatibility aliases for the summary values above.
+# This is the held-out report, rather than training accuracy or metric names.
+test_report = metrics["modeling"]["splits"]["test"]
+accuracy = test_report.metrics["accuracy"]
+assert 0.0 <= accuracy <= 1.0
+fill_values = metrics["preprocessing"]["steps"]["1:impute"]["details"]["fill_values"]
+assert fill_values == {"age": 37.5}
+print("Held-out accuracy:", accuracy)
+print("Training fill values:", fill_values)
 
-# 4) Predict (feature-only dataframe)
-incoming = pd.DataFrame({"age": [25, None], "city": ["A", "C"]})
-preds = pipeline.predict(incoming)
-print("Preds:")
-print(preds)
+# Pass raw features: predict applies the fitted imputer and encoder once.
+incoming = pd.DataFrame({"age": [25.0, None], "city": ["A", "NEW"]})
+predictions = pipeline.predict(incoming)
+assert len(predictions) == len(incoming)
+assert set(predictions).issubset({0, 1})
+print("Predictions:", predictions.tolist())
 
-# 5) Save / load
-with tempfile.TemporaryDirectory() as tmp:
-    model_path = Path(tmp) / "model.pkl"
+with TemporaryDirectory() as temporary:
+    model_path = Path(temporary) / "model.pkl"
     pipeline.save(model_path)
-    loaded = SkyulfPipeline.load(model_path)
-    preds2 = loaded.predict(incoming)
-
-print("Preds after reload:")
-print(preds2)
+    restored = SkyulfPipeline.load(model_path)
+    np.testing.assert_array_equal(predictions, restored.predict(incoming))
+print("Reload predictions match")
 ```
+
+The example produces a held-out accuracy of `0.5`, fill values
+`{'age': 37.5}`, predictions `[0, 0]` and `Reload predictions match` with the
+shown recipe. A two-row holdout demonstrates the API; it does not establish a
+useful model. Evaluate representative data before using predictions for decisions.
+
+The missing age uses the saved training mean, 37.5. The unseen city `NEW` receives
+zeros in all learned city indicators because `handle_unknown="ignore"` is set;
+it does not create a new feature or refit the vocabulary. Increasing the training
+sample or changing package versions can change predictions and metrics.
+
+## Change the recipe deliberately
+
+| Setting | Effect |
+| --- | --- |
+| Split `test_size`, `validation_size`, `random_state` | Choose evaluation populations and reproducibility; stratification needs enough rows per class |
+| Imputer `columns`, `strategy` | Choose which missing values are filled and what is learned on training data |
+| Encoder `handle_unknown`, `max_categories` | Control new-category behavior and grouping; `None` disables category grouping here |
+| Model `type`, `params` | Select the registered estimator and its parameters |
+
+If you provide an existing `SplitDataset`, omit the splitter from this recipe.
+Keep original feature names, order and compatible types for prediction. Do not
+pass already encoded/scaled features back into `pipeline.predict`: they would
+be transformed again.
+
+A `modeling_error` entry means evaluation failed even if fitting completed;
+inspect it before treating the run as evaluated. Missing input columns, a
+non-numeric unencoded feature or insufficient rows for stratification need input
+or configuration correction. A split with no usable held-out rows has no usable
+held-out accuracy. Only load pickle artifacts from trusted producers; they can
+execute Python when loaded. The temporary file above is removed after the check.
 
 ## Inspecting a pipeline
 
@@ -134,6 +175,7 @@ to contain identical rows.
 A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
 docs, PR descriptions, and model registries:
 
+<!-- skyulf-example: native quickstart -->
 ```python
 print(pipeline.describe())
 # Human-readable summary: each preprocessing step with its params, then the model.
@@ -163,3 +205,15 @@ Model nodes show the algorithm in readable form (`Random Forest Classifier`).
 
 Mermaid labels are always emitted double-quoted, so node names containing
 parentheses, brackets, or quotes stay parseable.
+
+## Continue from here
+
+Use [step-by-step without config](step_by_step_no_config.md) to inspect each
+learned state, [preprocessing recipes](preprocessing_recipes.md) to select other
+registered transformations, and [inference artifacts](inference_bundles.md) for
+explicit saved schemas and portable execution. [Preprocessing placement](preprocessing_placement.md)
+explains leakage and filter placement.
+
+This example is the standalone library. Canvas runs through its backend job and
+artifact services; its completed-run reports and inference page use those
+services rather than this temporary local pickle.
