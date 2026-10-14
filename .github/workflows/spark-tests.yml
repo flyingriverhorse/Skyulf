@@ -28,7 +28,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Install Spark and MLflow test dependencies
         run: uv pip install --system -r requirements-spark.txt -r requirements-mlflow.txt
       - name: Require the Spark pyfunc integration dependencies
@@ -61,7 +61,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Install optional Delta test dependencies
         run: uv pip install --system -r requirements-delta.txt
       - name: Exercise real Delta transactions and publish admission
