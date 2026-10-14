@@ -328,7 +328,8 @@ the layout, project name, task, source table, record keys and target and input
 columns (eight questions for one target) and accepts the documented default for
 everything else. Both produce the same files for the same answers; change any
 default afterwards in `config/*.yml` and `deployment/`. Answer files that omit
-`setup_mode` keep the detailed path.
+`setup_mode` keep the detailed path. Every list starts with its default, so pressing
+Enter accepts it.
 
 Before raising a project's Core pin, follow the **Upgrade steps for generated
 Databricks projects** listed under each release in the changelog.

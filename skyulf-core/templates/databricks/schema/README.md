@@ -94,6 +94,21 @@ The generated `order` values leave slots for these derived questions; maintain
 relative source orders in the topic files. Never hand-maintain a separate list of
 weight-supported models.
 
+Write `skip_prompt_if` rules with `properties` (`const`, `enum`, `pattern`),
+`anyOf`, `allOf` and `not`. The Databricks CLI evaluates only `properties`,
+`required` and `anyOf` and silently drops the rest, so the builder rewrites every
+rule into alternatives of allowed choices before writing the root schema; a long
+"all choices but these" list becomes a short pattern that is checked against the
+whole list. A rule may read only list questions (`enum`) asked before its own
+question. The build fails on a later or free-text question, an unknown keyword,
+or a rule that can never match. The root schema therefore differs in shape from
+the topic files, never in meaning; `test_generated_rules_mean_what_the_topic_files_say`
+compares the two.
+
+The CLI highlights the first item of a list and has no list default, so the
+builder writes each `enum` with its `default` first. Keep the readable order in
+the topic files.
+
 `setup_mode` (in `project.json`) is the quick-setup choice. With `quick`, the
 builder hides every prompt except the names in `_QUICK_PROMPTS` in
 `build_schema.py`: layout, project, task, source table, record keys and the

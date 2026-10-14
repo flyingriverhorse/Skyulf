@@ -240,10 +240,13 @@ def bind_lookup_tables(value: Any, bindings: dict[str, str]) -> dict[str, Any]:
     config = deepcopy(_mapping(value, {"lookups"}, "feature_lookup"))
     if type(config.get("lookups")) is not list:
         raise ValueError("feature_lookup.lookups must be a list.")
-    for lookup in config["lookups"]:
+    for index, lookup in enumerate(config["lookups"]):
         if type(lookup) is not dict or not isinstance(lookup.get("table_name"), str):
             raise ValueError("feature_lookup table_name must be a string.")
         for key, replacement in bindings.items():
             lookup["table_name"] = lookup["table_name"].replace("{" + key + "}", replacement)
-        validate_uc_name(lookup["table_name"])
+        try:
+            validate_uc_name(lookup["table_name"])
+        except ValueError as exc:  # A generated placeholder is empty until the operator fills it.
+            raise ValueError(f"feature_lookup.lookups[{index}].table_name: {exc}") from exc
     return config

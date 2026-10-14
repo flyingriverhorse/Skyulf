@@ -11,6 +11,7 @@ from skyulf.integrations.databricks.feature_store.config import (
     FeatureTrainingSpec,
 )
 from skyulf.integrations.databricks.feature_store.lifecycle_config import (
+    bind_lookup_tables,
     binding_json,
     deserialize_feature_spec,
     parse_feature_binding,
@@ -112,3 +113,17 @@ def test_workflow_lookup_rejects_unconsumed_feature():
             label="target",
             input_columns=("another_feature",),
         )
+
+
+@pytest.mark.parametrize("table", ["", "{catalog}.{input_schema}.bad name", "a.b.c.d"])
+def test_unbound_lookup_table_error_names_the_setting_to_complete(table):
+    """A generated placeholder fails smoke; the operator must learn which field to fill."""
+    lookups = [
+        {"table_name": "{catalog}.{input_schema}.history"},
+        {"table_name": table},
+    ]
+    bindings = {"catalog": "workspace", "input_schema": "features"}
+    with pytest.raises(ValueError, match="one to three simple identifiers") as error:
+        bind_lookup_tables({"lookups": lookups}, bindings)
+    assert str(error.value).startswith("feature_lookup.lookups[1].table_name: ")
+    assert lookups[1]["table_name"] == table  # editable YAML values stay untouched

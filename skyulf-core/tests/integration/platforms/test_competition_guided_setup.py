@@ -61,7 +61,9 @@ def test_candidate_questions_follow_count_and_task(task, count):
     for position in range(1, 9):
         name = f"competition_{task}_model_{position}"
         assert (name in shown) == (position <= int(count))
-        assert props[name]["enum"] == props[f"{task}_model"]["enum"]
+        # Same choices; each list starts with its own default, which Enter selects.
+        assert sorted(props[name]["enum"]) == sorted(props[f"{task}_model"]["enum"])
+        assert props[name]["enum"][0] == props[name]["default"]
     other = "classification" if task == "regression" else "regression"
     assert not any(name.startswith(f"competition_{other}_model_") for name in shown)
     assert not {"regression_search_metric", "classification_search_metric"} & shown

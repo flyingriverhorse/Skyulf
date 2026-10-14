@@ -31,11 +31,8 @@ def _read_object(path: Path) -> dict[str, Any]:
         raise ValueError(f"{path.name}: {exc}") from exc
 
 
-def render_schema(source: Path) -> str:
-    """Combine metadata and prompt definitions without silently replacing fields."""
-    metadata = _read_object(source / "metadata.json")
-    if "properties" in metadata:
-        raise ValueError("metadata.json must not define properties; use topic files.")
+def _source_properties(source: Path) -> dict[str, Any]:
+    """Merge topic files and derived questions, keeping rules as their authors wrote them."""
     properties: dict[str, Any] = {}
     for path in sorted(source.glob("*.json")):
         if path.name == "metadata.json":
@@ -50,7 +47,15 @@ def render_schema(source: Path) -> str:
         properties |= fields
     if not properties:
         raise ValueError("No prompt properties found in schema topic files.")
-    properties = _quick_setup(_weight_questions(properties))
+    return _weight_questions(properties)
+
+
+def render_schema(source: Path) -> str:
+    """Combine metadata and prompt definitions without silently replacing fields."""
+    metadata = _read_object(source / "metadata.json")
+    if "properties" in metadata:
+        raise ValueError("metadata.json must not define properties; use topic files.")
+    properties = _default_first(_quick_setup(_cli_rules(_source_properties(source))))
     _validate_prompt_orders(properties)
     metadata["properties"] = dict(sorted(properties.items(), key=lambda item: item[1]["order"]))
     return _format_schema(metadata)
@@ -145,20 +150,22 @@ def _active_model_condition(name: str, constraint: Any) -> dict[str, Any]:
 def _weight_controls(prefix: str, order: int, skip: dict[str, Any]) -> dict[str, Any]:
     """Ask opt-in and source column before the corresponding model selections."""
     flag = prefix + "sample_weight_enabled"
+    label = f"Branch {prefix.split('_')[1]} | " if prefix else ""
     return {
         flag: {
             "order": order,
             "type": "string",
             "default": "false",
             "enum": ["false", "true"],
-            "description": "Use sample weights? false = No (default); true = Yes.",
+            "description": label + "Use sample weights? false = No (default); true = Yes.",
             "skip_prompt_if": skip,
         },
         prefix + "weight_column": {
             "order": order + 1,
             "type": "string",
             "default": "training_weight",
-            "description": "Training-only sample-weight column (excluded from model features).",
+            "description": label
+            + "Training-only sample-weight column (excluded from model features).",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
             "skip_prompt_if": {"anyOf": [skip, {"properties": {flag: {"const": "false"}}}]},
         },
@@ -224,7 +231,215 @@ def _quick_setup(properties: dict[str, Any]) -> dict[str, Any]:
         skip = field.get("skip_prompt_if")
         if _QUICK_PROMPTS.fullmatch(name) or skip == {}:
             continue  # An empty condition already hides the prompt in every mode.
-        field["skip_prompt_if"] = quick if skip is None else {"anyOf": [skip, quick]}
+        options = [] if skip is None else skip["anyOf"] if set(skip) == {"anyOf"} else [skip]
+        field["skip_prompt_if"] = {"anyOf": [*options, quick]} if options else quick
+    return properties
+
+
+# The CLI evaluates only properties (const, enum, pattern), required and anyOf in a skip rule;
+# it drops not and allOf without an error. Each rule is therefore rewritten as OR of ANDs
+# over the allowed choices of earlier questions. An alternative maps a question to
+# (allowed choices, answer must exist); [] never matches and [{}] always matches.
+_ALWAYS: list[dict[str, Any]] = [{}]
+
+
+def _allowed(constraint: dict[str, Any], choices: list[str]) -> frozenset[str]:
+    """List the choices one const/enum/pattern constraint accepts."""
+    unknown = set(constraint) - {"const", "enum", "pattern"}
+    if unknown:
+        raise ValueError(f"Unsupported skip rule constraint: {sorted(unknown)}")
+    return frozenset(
+        choice
+        for choice in choices
+        if ("const" not in constraint or choice == constraint["const"])
+        and ("enum" not in constraint or choice in constraint["enum"])
+        and ("pattern" not in constraint or re.search(constraint["pattern"], choice))
+    )
+
+
+def _both(left: list[dict[str, Any]], right: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Require two alternative lists together; contradictory combinations disappear."""
+    result = []
+    for one in left:
+        for two in right:
+            merged = dict(one)
+            for name, (allowed, must) in two.items():
+                if name in merged:
+                    allowed, must = merged[name][0] & allowed, merged[name][1] or must
+                merged[name] = (allowed, must)
+            if all(allowed for allowed, _ in merged.values()):
+                result.append(merged)
+    return result
+
+
+def _rule_parts(
+    rule: dict[str, Any], domains: dict[str, list[str]], negate: bool
+) -> list[list[dict[str, Any]]]:
+    """Translate each keyword of one rule object, pushing a pending NOT into it."""
+    parts: list[list[dict[str, Any]]] = []
+    for name, constraint in rule.get("properties", {}).items():
+        allowed = _allowed(constraint, domains[name])
+        # A missing answer satisfies a constraint, so its negation needs the answer.
+        choice = (frozenset(domains[name]) - allowed, True) if negate else (allowed, False)
+        parts.append([{name: choice}])
+    for key in ("anyOf", "allOf"):
+        if key not in rule:
+            continue
+        options = [_alternatives(item, domains, negate) for item in rule[key]]
+        if (key == "anyOf") != negate:
+            parts.append([item for option in options for item in option])
+            continue
+        combined = _ALWAYS
+        for option in options:
+            combined = _both(combined, option)
+        parts.append(combined)
+    if "not" in rule:
+        parts.append(_alternatives(rule["not"], domains, not negate))
+    return parts
+
+
+def _alternatives(
+    rule: dict[str, Any], domains: dict[str, list[str]], negate: bool = False
+) -> list[dict[str, Any]]:
+    """Rewrite one rule as alternatives; De Morgan turns NOT(a AND b) into NOT a OR NOT b."""
+    unknown = set(rule) - {"properties", "anyOf", "allOf", "not"}
+    if unknown:
+        raise ValueError(f"Unsupported skip rule keyword: {sorted(unknown)}")
+    parts = _rule_parts(rule, domains, negate)
+    if negate:
+        return [item for part in parts for item in part]
+    combined = _ALWAYS
+    for part in parts:
+        combined = _both(combined, part)
+    return combined
+
+
+def _merge_once(options: list[dict[str, Any]]) -> bool:
+    """Join two alternatives that differ only in one question's allowed choices."""
+    for first, one in enumerate(options):
+        for second in range(first + 1, len(options)):
+            two = options[second]
+            different = [name for name in one if one[name] != two.get(name)]
+            if one.keys() != two.keys() or len(different) != 1:
+                continue
+            name = different[0]
+            if one[name][1] == two[name][1]:
+                options[first] = one | {name: (one[name][0] | two[name][0], one[name][1])}
+                del options[second]
+                return True
+    return False
+
+
+def _implied(one: dict[str, Any], other: dict[str, Any]) -> bool:
+    """Tell whether every answer set matching one alternative also matches the other."""
+    return all(
+        name in one and one[name][0] <= allowed and (one[name][1] or not must)
+        for name, (allowed, must) in other.items()
+    )
+
+
+def _tidy(options: list[dict[str, Any]], domains: dict[str, list[str]]) -> list[dict[str, Any]]:
+    """Drop constraints that allow every choice, then merged and implied alternatives."""
+    cleaned: list[dict[str, Any]] = []
+    for option in options:
+        kept = {
+            name: choice for name, choice in option.items() if choice[0] != frozenset(domains[name])
+        }
+        if not kept:
+            return _ALWAYS
+        if kept not in cleaned:
+            cleaned.append(kept)
+    if _merge_once(cleaned):
+        return _tidy(cleaned, domains)
+    return [
+        one
+        for one in cleaned
+        if not any(other != one and _implied(one, other) for other in cleaned)
+    ]
+
+
+def _without_prefixes(prefixes: set[str]) -> str:
+    """Match text starting with none of these equal-length prefixes, without lookahead."""
+    heads = sorted({prefix[0] for prefix in prefixes})
+    options = ["[^" + "".join(heads) + "]"]
+    for head in heads:
+        rest = {prefix[1:] for prefix in prefixes if prefix[0] == head and len(prefix) > 1}
+        if rest:
+            options.append(head + "(?:" + _without_prefixes(rest) + ")")
+    return "|".join(options)
+
+
+def _choice_rule(allowed: frozenset[str], choices: list[str]) -> dict[str, Any]:
+    """Write a set of choices compactly; a long all-but-these list becomes a checked pattern."""
+    listed = [choice for choice in choices if choice in allowed]
+    if len(listed) == 1:
+        return {"const": listed[0]}
+    excluded = [choice for choice in choices if choice not in allowed]
+    for length in range(1, 1 + min(map(len, excluded))):
+        prefixes = {choice[:length] for choice in excluded}
+        if any(choice[:length] in prefixes for choice in listed):
+            continue
+        pattern = "^(?:" + _without_prefixes(prefixes) + ")"
+        exact = all(bool(re.search(pattern, choice)) == (choice in allowed) for choice in choices)
+        if exact and len(pattern) + 60 < len(json.dumps(listed)):
+            return {"pattern": pattern}
+        break
+    return {"enum": listed}
+
+
+def _write_rule(options: list[dict[str, Any]], domains: dict[str, list[str]]) -> dict[str, Any]:
+    """Emit alternatives with the keywords the CLI evaluates and nothing else."""
+    written = [
+        {
+            "properties": {
+                name: _choice_rule(allowed, domains[name]) for name, (allowed, _) in one.items()
+            }
+        }
+        for one in options
+    ]
+    return written[0] if len(written) == 1 else {"anyOf": written}
+
+
+def _earlier_choices(name: str, rule: Any, properties: dict[str, Any]) -> None:
+    """Require rules to read only list answers given before their own question."""
+    if isinstance(rule, list):
+        for item in rule:
+            _earlier_choices(name, item, properties)
+    if not isinstance(rule, dict):
+        return
+    for key, value in rule.items():
+        for other in value if key == "properties" else ():
+            field = properties.get(other, {})
+            choices = field.get("enum")
+            if not choices or not all(type(choice) is str for choice in choices):
+                raise ValueError(f"{name}: skip rule needs a list question, not {other}.")
+            if field["order"] >= properties[name]["order"]:
+                raise ValueError(f"{name}: skip rule reads the later question {other}.")
+        _earlier_choices(name, value, properties)
+
+
+def _cli_rules(properties: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite every skip rule into the subset the Databricks CLI evaluates."""
+    domains = {name: field["enum"] for name, field in properties.items() if "enum" in field}
+    for name, field in properties.items():
+        rule = field.get("skip_prompt_if")
+        if not rule:
+            continue  # Absent always asks and {} never asks; the CLI reads both correctly.
+        _earlier_choices(name, rule, properties)
+        options = _tidy(_alternatives(rule, domains), domains)
+        if not options:
+            raise ValueError(f"{name}: skip rule can never match; remove it.")
+        field["skip_prompt_if"] = {} if options == _ALWAYS else _write_rule(options, domains)
+    return properties
+
+
+def _default_first(properties: dict[str, Any]) -> dict[str, Any]:
+    """Offer each default first: the CLI highlights the first choice and has no list default."""
+    for field in properties.values():
+        choices = field.get("enum")
+        if choices and field.get("default") in choices:
+            default = field["default"]
+            field["enum"] = [default, *(choice for choice in choices if choice != default)]
     return properties
 
 

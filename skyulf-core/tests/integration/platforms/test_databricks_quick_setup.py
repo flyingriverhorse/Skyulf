@@ -21,6 +21,7 @@ SHARED = {
     "record_key_columns",
 }
 ONE_TARGET = SHARED | {"task", "input_columns", "target_column"}
+LAYOUTS = ["single_model", "model_competition", "multi_target"]
 
 
 def _asked(**answers):
@@ -48,10 +49,10 @@ def _cli_valid(schema, values):
     return "anyOf" not in schema or any(_cli_valid(item, values) for item in schema["anyOf"])
 
 
-def _cli_asked(properties, **answers):
+def _cli_asked(**answers):
     """Replay the CLI: each prompt sees only the values assigned before it."""
     values, asked = {}, []
-    for name, field in properties.items():
+    for name, field in PROPERTIES.items():
         rule = field.get("skip_prompt_if")
         if rule is not None and _cli_valid(rule, values):
             values[name] = field["default"]
@@ -61,14 +62,18 @@ def _cli_asked(properties, **answers):
     return asked
 
 
-def _without_quick_rule(field):
-    """Recover the rule a prompt had before quick setup existed."""
-    rule = field.get("skip_prompt_if")
-    if rule == QUICK:
-        return {key: value for key, value in field.items() if key != "skip_prompt_if"}
-    if isinstance(rule, dict) and rule.get("anyOf", [None])[-1] == QUICK:
-        return field | {"skip_prompt_if": rule["anyOf"][0]}
-    return field
+def _keywords(node, found):
+    """Collect every schema keyword used outside the per-question constraints."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "properties":
+                found |= {keyword for constraint in value.values() for keyword in constraint}
+            else:
+                found.add(key)
+                _keywords(value, found)
+    for item in node if isinstance(node, list) else ():
+        _keywords(item, found)
+    return found
 
 
 @pytest.mark.parametrize("layout", ["single_model", "model_competition"])
@@ -91,7 +96,7 @@ def test_quick_setup_asks_each_configured_branch_for_its_own_task_and_columns(co
     assert set(asked) == SHARED | {"branch_count"} | branches
 
 
-@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("layout", LAYOUTS)
 def test_detailed_setup_stays_the_default_and_keeps_its_questions(layout):
     """Existing answer files omit the new choice and must keep the full guided path."""
     assert PROPERTIES["setup_mode"]["default"] == "detailed"
@@ -124,12 +129,10 @@ def test_quick_rule_is_only_added_as_an_alternative_to_each_existing_rule():
     assert {"catalog", "schema", "model_params", "search_space"} <= set(always_hidden)
     for name, field in PROPERTIES.items():
         rule = field.get("skip_prompt_if")
-        if rule in (None, {}, QUICK):
+        if rule in (None, {}, QUICK) or '"setup_mode"' not in json.dumps(rule):
             continue
-        assert set(rule) == {"anyOf"} or '"setup_mode"' not in json.dumps(rule), name
-        if '"setup_mode"' in json.dumps(rule):
-            assert rule["anyOf"][1] == QUICK and len(rule["anyOf"]) == 2, name
-            assert '"setup_mode"' not in json.dumps(rule["anyOf"][0]), name
+        assert set(rule) == {"anyOf"} and rule["anyOf"][-1] == QUICK, name
+        assert '"setup_mode"' not in json.dumps(rule["anyOf"][:-1]), name
 
 
 def test_quick_rule_needs_an_answer_instead_of_matching_a_missing_one():
@@ -140,20 +143,44 @@ def test_quick_rule_needs_an_answer_instead_of_matching_a_missing_one():
     assert _cli_valid(rule, {"setup_mode": "quick"})
 
 
-@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
-def test_quick_setup_holds_under_the_rules_the_cli_itself_evaluates(layout):
-    """The CLI ignores not/allOf, so the promise must not depend on a full JSON Schema reader."""
-    before = {name: _without_quick_rule(field) for name, field in PROPERTIES.items()}
-    detailed = _cli_asked(PROPERTIES, training_layout=layout)
-    assert [name for name in detailed if name != "setup_mode"] == [
-        name for name in _cli_asked(before, training_layout=layout) if name != "setup_mode"
+def test_skip_rules_use_only_what_the_cli_evaluates():
+    """The CLI drops not/allOf/oneOf silently, which hid every branch and candidate question."""
+    used = set()
+    for field in PROPERTIES.values():
+        _keywords(field.get("skip_prompt_if", {}), used)
+    assert used <= {"anyOf", "required", "const", "enum", "pattern"}
+
+
+@pytest.mark.parametrize("mode", ["detailed", "quick"])
+@pytest.mark.parametrize("layout", LAYOUTS)
+@pytest.mark.parametrize("task", ["regression", "classification"])
+def test_cli_asks_exactly_the_questions_the_schema_describes(layout, task, mode):
+    """A full JSON Schema reader and the CLI's partial one must walk the same wizard."""
+    answers = {"training_layout": layout, "task": task, "setup_mode": mode}
+    assert _cli_asked(**answers) == _asked(**answers)
+    rich = answers | {"cv_enabled": "true", "search_settings": "custom", "branch_count": "3"}
+    assert _cli_asked(**rich) == _asked(**rich)
+
+
+@pytest.mark.parametrize(
+    ("layout", "expected"),
+    [("multi_target", "branch_count"), ("model_competition", "competition_candidate_count")],
+)
+def test_cli_reaches_branch_and_candidate_questions(layout, expected):
+    """These questions were unreachable while their rules relied on an ignored keyword."""
+    asked = _cli_asked(training_layout=layout)
+    assert expected in asked
+    assert "search_strategy" in _cli_asked(training_layout="single_model", search_settings="custom")
+
+
+def test_each_list_offers_its_default_first():
+    """The CLI highlights the first choice, so Enter must mean the documented default."""
+    wrong = [
+        name
+        for name, field in PROPERTIES.items()
+        if "enum" in field and field["enum"][0] != field["default"]
     ]
-    quick = _cli_asked(PROPERTIES, setup_mode="quick", training_layout=layout)
-    assert {"training_layout", "project_name", "setup_mode", "source_table_name"} <= set(quick)
-    assert set(quick) <= ONE_TARGET | {"branch_count"} | {
-        name for name in PROPERTIES if re.fullmatch(r"branch_[1-8]_(task|\w+_columns?)", name)
-    }
-    assert len(quick) < len(detailed)
+    assert not wrong
 
 
 def test_upgrade_steps_have_one_central_home_that_first_run_points_to():
