@@ -8,11 +8,23 @@ _MANIFEST = "alias_intent"
 _PREFIX = "alias_intent_"
 _CHUNK_BYTES = 256
 _MAX_CHUNKS = 48
+_ENCODING = "json-framed-v1"
 
 
 def _chunk_key(index: int) -> str:
     """Address a reusable slot without accumulating tags for each completed event."""
     return f"{_PREFIX}{index:04d}"
+
+
+def _decode_chunks(chunks: list[str], encoding: str) -> str:
+    """Unwrap exact ASCII bytes while retaining recovery of legacy unframed JSON."""
+    if encoding == "json":
+        return "".join(chunks)
+    if encoding != _ENCODING:
+        raise ValueError("Unsupported alias intent encoding.")
+    if any(len(chunk) < 3 or chunk[0] != "|" or chunk[-1] != "|" for chunk in chunks):
+        raise ValueError("Alias intent chunk framing is invalid.")
+    return "".join(chunk[1:-1] for chunk in chunks)
 
 
 def read_alias_intent(tags: dict[str, str]) -> dict[str, Any]:
@@ -24,7 +36,7 @@ def read_alias_intent(tags: dict[str, str]) -> dict[str, Any]:
     chunks = [tags[_chunk_key(index)] for index in range(count)]
     if any(len(chunk.encode("ascii")) > _CHUNK_BYTES for chunk in chunks):
         raise ValueError("Alias intent chunk exceeds the tag limit.")
-    raw = "".join(chunks)
+    raw = _decode_chunks(chunks, manifest.get("encoding", "json"))
     if hashlib.sha256(raw.encode("ascii")).hexdigest() != manifest["sha256"]:
         raise ValueError("Alias intent digest differs from its stored chunks.")
     payload = json.loads(raw)
@@ -34,14 +46,19 @@ def read_alias_intent(tags: dict[str, str]) -> dict[str, Any]:
 
 
 def _encoded_intent(payload: dict[str, Any]) -> dict[str, str]:
-    """Split bounded ASCII JSON so every tag stays within the UC byte limit."""
+    """Frame bounded ASCII JSON chunks so UC never sees whitespace at a tag boundary."""
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    chunks = [raw[index : index + _CHUNK_BYTES] for index in range(0, len(raw), _CHUNK_BYTES)]
+    width = _CHUNK_BYTES - 2
+    chunks = [f"|{raw[index : index + width]}|" for index in range(0, len(raw), width)]
     if len(chunks) > _MAX_CHUNKS:
         raise ValueError("Alias recovery intent exceeds its bounded registry capacity.")
     values = {_chunk_key(index): chunk for index, chunk in enumerate(chunks)}
     values[_MANIFEST] = json.dumps(
-        {"chunks": len(chunks), "sha256": hashlib.sha256(raw.encode("ascii")).hexdigest()},
+        {
+            "chunks": len(chunks),
+            "encoding": _ENCODING,
+            "sha256": hashlib.sha256(raw.encode("ascii")).hexdigest(),
+        },
         sort_keys=True,
         separators=(",", ":"),
     )
