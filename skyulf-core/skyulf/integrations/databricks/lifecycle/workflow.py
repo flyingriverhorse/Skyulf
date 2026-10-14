@@ -91,17 +91,29 @@ class BundleActionResult:
     next_actions: dict[str, dict[str, str]]
 
 
+def _decision_actions(candidate: Any, policy: str) -> dict[str, dict[str, str]]:
+    """Offer approve/reject, or only the explicit override when the champion is unloadable."""
+    if not isinstance(candidate, CandidateResult):
+        return {}
+    unloadable = candidate.comparison.reason == "champion_runtime_unavailable"
+    if policy != "manual_approval" and not unloadable:
+        return {}
+    evidence = {
+        "candidate_version": candidate.model_version,
+        "expected_champion_version": candidate.comparison.champion_version or "none",
+    }
+    actions = {"approve": {"lifecycle_action": "approve", **evidence}}
+    if unloadable:
+        actions["approve"]["allow_unloadable_champion"] = "true"
+    if policy == "manual_approval":
+        actions["reject"] = {"lifecycle_action": "reject", **evidence}
+    return actions
+
+
 def next_actions(result: Any, policy: str) -> dict[str, dict[str, str]]:
     """Expose the exact evidence accepted by existing Core approval and rollback APIs."""
-    actions: dict[str, dict[str, str]] = {}
     candidate = result.candidate if isinstance(result, AutoTrainingOutcome) else result
-    if isinstance(candidate, CandidateResult) and policy == "manual_approval":
-        for action in ("approve", "reject"):
-            actions[action] = {
-                "lifecycle_action": action,
-                "candidate_version": candidate.model_version,
-                "expected_champion_version": candidate.comparison.champion_version or "none",
-            }
+    actions = _decision_actions(candidate, policy)
     receipt = result.alias_change if isinstance(result, AutoTrainingOutcome) else result
     if isinstance(receipt, AliasChangeReceipt) and receipt.kind == "promotion":
         actions["rollback"] = {
@@ -747,6 +759,7 @@ def run_action(
     rejection_reason: str = "",
     promotion_receipt: AliasChangeReceipt | None = None,
     recovery_request: dict[str, Any] | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> Any:
     """Delegate training, scoring and explicit lifecycle actions to existing Core services."""
     _validate_action_layout(config, action)
@@ -768,14 +781,13 @@ def run_action(
             rejection_reason=rejection_reason,
         )
     if action == "approve":
-        if policy != "manual_approval" or "promotion_policy" not in config:
-            raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
         return approve_candidate(
             spark,
             config,
             candidate_version=candidate_version,
             comparison_sha256=comparison_sha256,
             expected_champion_version=expected_champion_version,
+            allow_unloadable_champion=allow_unloadable_champion,
         )
     if action == "train":
         return _run_training_action(

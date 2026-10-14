@@ -303,6 +303,11 @@ def _prepare_dataset(spark: Any, store: PhaseStore) -> dict[str, Any]:
 def _select_best_model(spark: Any, store: PhaseStore) -> dict[str, Any]:
     """Verify the selected fitted candidate and expose its training-side leaderboard."""
     verified = _load_training_evidence(store)
+    if store.request["config"].get("inference_mode", "local") == "spark":
+        # Reject before registration what the Spark score job would reject after promotion.
+        from .....inference.partition_safety import require_partition_safe_pipeline  # noqa: PLC0415
+
+        require_partition_safe_pipeline(verified.artifact)
     if "competition" in store.request:
         return {
             **verified.fitted["competition"],

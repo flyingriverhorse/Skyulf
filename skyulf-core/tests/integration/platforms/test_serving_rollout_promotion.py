@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from importlib import import_module
 from importlib.util import find_spec
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pandas as pd
@@ -336,7 +337,7 @@ def test_manual_wrapper_retains_policy_gate_and_exclusive_default(monkeypatch):
     assert callable(operation), "Saved approval extraction is missing"
     shared = Mock(return_value="receipt")
     monkeypatch.setattr(approval, "approve_saved_candidate", shared)
-    arguments = {
+    arguments: dict[str, Any] = {
         "candidate_version": "2",
         "comparison_sha256": "a" * 64,
         "expected_champion_version": "1",
@@ -396,7 +397,7 @@ def test_fresh_guard_blocks_new_mutation_but_not_committed_replay(saved_approval
     """Expired completion evidence prevents new alias writes but cannot hide a committed receipt."""
     config, reader, promoter = saved_approval
     guard = Mock(side_effect=ValueError("Final evidence is stale"))
-    options = {
+    options: dict[str, Any] = {
         "candidate_version": "2",
         "comparison_sha256": "a" * 64,
         "expected_champion_version": "1",

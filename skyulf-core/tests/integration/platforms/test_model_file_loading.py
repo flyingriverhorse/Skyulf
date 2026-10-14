@@ -358,7 +358,7 @@ def test_empty_saved_model_keeps_pipeline_validation(workflow_config, changes, e
 
 @pytest.mark.parametrize(
     "layout,action",
-    [("single_model", "train"), ("multi_target", "score"), ("model_competition", "score")],
+    [("single_model", "train"), ("multi_target", "score")],
 )
 def test_empty_model_exception_excludes_training_and_other_layouts(workflow_config, layout, action):
     """Training and other layout contracts must still require a resolved model declaration."""

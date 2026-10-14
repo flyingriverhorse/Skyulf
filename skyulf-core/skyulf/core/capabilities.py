@@ -130,8 +130,31 @@ def require_capability(
         ):
             return
     raise UnsupportedExecutionError(
-        node_type, operation, engine, "No declared support for this operation and configuration."
+        node_type,
+        operation,
+        engine,
+        "No declared support for this operation and configuration."
+        + _supported_configs(
+            capabilities, engine, operation, (execution_kind, row_effect, context)
+        ),
     )
+
+
+def _supported_configs(
+    capabilities: tuple, engine: str, operation: str, effects: tuple[str | None, ...]
+) -> str:
+    """Name the settings declared for this exact engine, operation and effect request."""
+    settings = sorted(
+        {
+            ", ".join(f"{key}={value}" for key, value in capability.config_match)
+            for capability in capabilities
+            if capability.engine == engine
+            and capability.operation == operation
+            and capability.config_match
+            and _matches_effects(capability, *effects)
+        }
+    )
+    return f" Supported settings here: {'; '.join(settings)}." if settings else ""
 
 
 def _matches_effects(

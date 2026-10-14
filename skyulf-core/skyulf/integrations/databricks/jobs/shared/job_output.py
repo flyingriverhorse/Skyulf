@@ -375,6 +375,13 @@ def _append_scoring_provenance(
         )
 
 
+def render_operator_options(actions: dict[str, dict[str, str]], receipt: dict[str, Any]) -> str:
+    """Render copyable train-job parameters for callers outside the single-model report."""
+    sections: list[str] = []
+    _append_operator_options(sections, {"next_actions": actions}, receipt)
+    return "".join(sections)
+
+
 def _append_operator_options(
     sections: list[str], payload: dict[str, Any], receipt: dict[str, Any]
 ) -> None:
@@ -404,6 +411,12 @@ def _append_operator_options(
             )
         else:
             sections.append(f"<h3>Available action: {_text(next_action)}</h3>")
+            if parameters.get("allow_unloadable_champion") == "true":
+                sections.append(
+                    "<p><strong>The champion was not compared:</strong> this Core release "
+                    "cannot load it. Approve only after reviewing the candidate's own metrics "
+                    "and quality gates.</p>"
+                )
         sections.append(
             "<p>Use Run with different settings on the same train job. "
             "Clear fields not listed below.</p>"

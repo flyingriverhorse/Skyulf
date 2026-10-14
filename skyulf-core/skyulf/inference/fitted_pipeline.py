@@ -132,6 +132,10 @@ def _validate_tuned_thresholds(
         raise ValueError("Tuned thresholds require fitted classification thresholds.")
 
 
+class ArtifactRuntimeMismatchError(ValueError):
+    """A saved artifact was produced by different pinned runtime versions."""
+
+
 def _check_runtime(manifest: FittedPipelineManifest) -> None:
     """Reject incompatible Python or dependency versions before loading pickle."""
     verify_project_requirements(manifest.project_requirements)
@@ -147,7 +151,7 @@ def _check_runtime(manifest: FittedPipelineManifest) -> None:
             else actual == expected
         )
         if not matches:
-            raise ValueError(
+            raise ArtifactRuntimeMismatchError(
                 f"Local artifact runtime mismatch for {name}: requires {expected}, found {actual}."
             )
 

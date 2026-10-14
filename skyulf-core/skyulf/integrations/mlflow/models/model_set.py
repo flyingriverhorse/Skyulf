@@ -22,7 +22,7 @@ from ....inference.fitted_pipeline import (
     load_pipeline,
     read_bounded_artifact,
 )
-from ....inference.model_set import ModelSetArtifact, load_model_set
+from ....inference.model_set import ModelSetArtifact, load_model_set, read_model_set_manifest
 from ....inference.model_set_scoring import model_set_output_schema, predict_model_set
 from ....inference.project_code import MAX_PROJECT_SOURCE_BYTES
 from ....inference.project_dependencies import (
@@ -242,6 +242,40 @@ def _merge_requirements(requirements: dict[str, str], pins: Iterable[str]) -> No
         requirements[key] = normalized
 
 
+def _checked_set_reference(
+    resolved: ResolvedModel, tracking_uri: str | None, registry_uri: str | None
+) -> Any:
+    """Validate a concrete set identity and return its registry client."""
+    if not isinstance(resolved, ResolvedModel):
+        raise TypeError("resolved must be a ResolvedModel.")
+    validate_registry_options(resolved.name, tracking_uri, registry_uri)
+    validate_concrete_version(resolved)
+    if not isinstance(resolved.digest, str) or not resolved.digest.strip():
+        raise ValueError("Resolved model set requires a digest.")
+    return mlflow.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
+
+
+def read_registered_model_set_manifest(
+    resolved: ResolvedModel,
+    *,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> Any:
+    """Verify a registered set's bytes and digest without loading its component pipelines."""
+    client = _checked_set_reference(resolved, tracking_uri, registry_uri)
+    with downloaded_registered_payload(mlflow, client, resolved, tracking_uri, "model_set") as (
+        local,
+        model,
+    ):
+        local, model, _ = unwrap_feature_package(local, model)
+        manifest = read_model_set_manifest(
+            packaged_artifact_path(local, model.flavors, "model_set")
+        )
+    if manifest.set_sha256 != resolved.digest:
+        raise ValueError("Registered model set digest differs from resolved identity.")
+    return manifest
+
+
 def load_registered_model_set(
     resolved: ResolvedModel,
     *,
@@ -249,13 +283,7 @@ def load_registered_model_set(
     registry_uri: str | None = None,
 ) -> ModelSetArtifact:
     """Load one concrete trusted set and verify package kind and complete digest."""
-    if not isinstance(resolved, ResolvedModel):
-        raise TypeError("resolved must be a ResolvedModel.")
-    validate_registry_options(resolved.name, tracking_uri, registry_uri)
-    validate_concrete_version(resolved)
-    if not isinstance(resolved.digest, str) or not resolved.digest.strip():
-        raise ValueError("Resolved model set requires a digest.")
-    client = mlflow.MlflowClient(tracking_uri=tracking_uri, registry_uri=registry_uri)
+    client = _checked_set_reference(resolved, tracking_uri, registry_uri)
     with downloaded_registered_payload(mlflow, client, resolved, tracking_uri, "model_set") as (
         local,
         model,

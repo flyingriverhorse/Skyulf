@@ -71,7 +71,10 @@ def competition_candidates(document: dict[str, Any]) -> tuple[dict[str, Any], st
     allowed = {"model", "tuning", "decision_threshold", "preprocessing_recipe", "explainability"}
     unsupported = set(document["defaults"]) & {"features_path", "pre_split_recipe"}
     if unsupported:
-        raise ValueError(f"Competition does not support YAML defaults: {sorted(unsupported)}.")
+        raise ValueError(
+            f"Competition does not support YAML defaults: {sorted(unsupported)}. "
+            "All candidates use recipes.default in config/pre_split.yml; edit that list instead."
+        )
     candidates = {}
     entries = model_entries(document)
     for name, overrides in document["models"].items():

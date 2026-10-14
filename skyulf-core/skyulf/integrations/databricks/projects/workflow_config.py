@@ -297,6 +297,11 @@ def _validate_pipeline_model(
         raise ValueError("Configured model does not match the declared task.")
 
 
+def _saved_model_action(action: str, layout: str) -> bool:
+    """Saved-model actions read only YAML; score and operators reuse the saved winner."""
+    return action != "train" and layout in {"single_model", "model_competition"}
+
+
 def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str, Any]:
     """Validate a resolved project without starting Spark, fitting or accessing MLflow.
 
@@ -320,8 +325,8 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     validate_workflow_pipeline(
         config,
         task,
-        allow_empty_model=(
-            action != "train" and config.get("training_layout", "single_model") == "single_model"
+        allow_empty_model=_saved_model_action(
+            action, config.get("training_layout", "single_model")
         ),
     )
     _training_contract(config, action)
@@ -595,7 +600,8 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
     )
     lines.append(
         "Fixed feature cleanup is saved as a pipeline prefix and applied once to raw model inputs; "
-        "training row exclusions are not repeated during scoring."
+        "project scoring reuses saved pre-split eligibility when reuse_pre_split is enabled; "
+        "target-reading filters require explicit skip_target_steps."
     )
     lines.append(
         "Fold-local preprocessing (after final split; "

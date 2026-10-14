@@ -256,7 +256,7 @@ def test_template_scoring_rules_are_usable_from_saved_package():
             {
                 "name": "observed",
                 "version": "1",
-                "function": "custom.scoring_custom.require_observed_values",
+                "function": "scoring.require_observed_values",
                 "params": {"columns": ["x"]},
             }
         ],
@@ -264,7 +264,7 @@ def test_template_scoring_rules_are_usable_from_saved_package():
             {
                 "name": "band",
                 "version": "1",
-                "function": "custom.scoring_custom.prediction_band",
+                "function": "scoring.prediction_band",
                 "params": {"thresholds": [10.0, 50.0], "labels": ["low", "medium", "high"]},
                 "columns": [{"name": "band", "dtype": "string"}],
             }
@@ -367,6 +367,6 @@ def test_template_scoring_range_rejects_invalid_limits(limits):
         / "templates/databricks/template/{{.project_name}}/src/features"
     )
     module = load_project_module(project_source(root, exclude_feature_groups=True))
-    custom = importlib.import_module(f"{module.__name__}.custom.scoring_custom")
+    custom = importlib.import_module(f"{module.__name__}.scoring")
     with pytest.raises(ValueError, match="finite ordered"):
         custom.require_value_range(pd.DataFrame({"x": [3.0]}), {"column": "x", **limits})

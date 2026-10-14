@@ -216,7 +216,7 @@ def test_completion_publishes_score_request_only_after_verified_result(monkeypat
     ],
 )
 def test_generated_notebooks_bind_their_own_phase_and_defer_exit(monkeypatch, filename, phase):
-    """Normal job nodes preserve their phase and JSON result without requesting HTML."""
+    """The final report enables HTML while every node preserves phase and exit JSON."""
     from skyulf.integrations.databricks.jobs.shared import job_runtime
 
     path = (
@@ -234,7 +234,9 @@ def test_generated_notebooks_bind_their_own_phase_and_defer_exit(monkeypatch, fi
         run_name="__main__",
         init_globals={"spark": None, "dbutils": dbutils, "displayHTML": display},
     )
-    assert execute.call_args.kwargs.get("display_html") is None
+    assert execute.call_args.kwargs.get("display_html") is (
+        display if phase == "complete" else None
+    )
     assert execute.call_args.kwargs["phase"] == phase
     assert execute.call_args.kwargs["exit_notebook"] is False
     assert ("preprocessing_path" in execute.call_args.kwargs) == (phase == "initialize")

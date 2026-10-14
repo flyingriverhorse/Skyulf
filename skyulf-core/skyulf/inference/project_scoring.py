@@ -168,11 +168,22 @@ def _is_null(value: Any) -> bool:
     return value is None or value is pd.NA or (isinstance(value, Real) and bool(np.isnan(value)))
 
 
+def _call_rule(module: ModuleType, rule: dict[str, Any], frame: pd.DataFrame, *args: Any) -> Any:
+    """Explain a callback that reads a column this model never receives."""
+    try:
+        return _resolve(module, rule["function"])(*args)
+    except KeyError as exc:
+        raise ValueError(
+            f"Scoring rule {rule['name']!r} raised KeyError {exc}: a missing params key, or a "
+            f"column this model does not receive. Its input columns are {list(frame.columns)}."
+        ) from exc
+
+
 def _eligibility(frame: pd.DataFrame, config: dict[str, Any], module: ModuleType) -> pd.Series:
     """Collect the first exclusion reason without changing callback inputs."""
     reasons = pd.Series(pd.NA, index=frame.index, dtype="string")
     for rule in config["eligibility"]:
-        values = _resolve(module, rule["function"])(frame.copy(deep=True), deepcopy(rule["params"]))
+        values = _call_rule(module, rule, frame, frame.copy(deep=True), deepcopy(rule["params"]))
         _check_rows(values, frame, pd.Series)
         if any(
             not _is_null(value) and (not isinstance(value, str) or not value.strip())
@@ -232,8 +243,13 @@ def _outputs(
     """Run ordered rules, allowing later rules to read earlier declared outputs."""
     result = predictions.copy(deep=True)
     for rule in config["outputs"]:
-        values = _resolve(module, rule["function"])(
-            frame.copy(deep=True), result.copy(deep=True), deepcopy(rule["params"])
+        values = _call_rule(
+            module,
+            rule,
+            frame,
+            frame.copy(deep=True),
+            result.copy(deep=True),
+            deepcopy(rule["params"]),
         )
         _check_rows(values, frame, pd.DataFrame)
         expected = [column["name"] for column in rule["columns"]]

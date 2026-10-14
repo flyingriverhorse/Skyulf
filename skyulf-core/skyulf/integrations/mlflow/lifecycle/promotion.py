@@ -888,11 +888,14 @@ def _validated_report(
     tracking_uri: str | None,
     registry_uri: str | None,
     require_eligible: bool = True,
+    allow_unloadable_champion: bool = False,
 ) -> str:
     """Re-evaluate the pinned candidate and return its comparison digest."""
     if not isinstance(report, ModelComparisonReport):
         raise TypeError("report must be a ModelComparisonReport.")
-    _validate_report_approval(report, expected_champion_version, require_eligible)
+    _validate_report_approval(
+        report, expected_champion_version, require_eligible, allow_unloadable_champion
+    )
     candidate = resolve_model(
         report.model_name,
         version=report.candidate_version,
@@ -926,7 +929,7 @@ def _validated_report(
     )
     if report.holdout_reference is not None:
         fresh = replace(fresh, holdout_reference=report.holdout_reference)
-    if fresh != report or (require_eligible and not fresh.eligible):
+    if fresh != report:
         raise ValueError("Pinned comparison no longer matches the supplied report.")
     return comparison_digest(fresh)
 
@@ -1130,8 +1133,14 @@ def promote_candidate(
     max_bytes: int,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
-    """Re-evaluate a pinned report and explicitly promote only a better candidate."""
+    """Re-evaluate a pinned report and explicitly promote only a better candidate.
+
+    ``allow_unloadable_champion`` admits a candidate whose champion this Core release
+    cannot load; its absolute quality gates must pass and the comparison digest
+    records that the champion was not measured.
+    """
     validate_admission(admission, registry_uri)
     digest = _validated_report(
         report,
@@ -1142,6 +1151,7 @@ def promote_candidate(
         max_bytes=max_bytes,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
+        allow_unloadable_champion=allow_unloadable_champion,
     )
     mlflow = require_mlflow()
     client = make_registry_client(mlflow, tracking_uri, registry_uri)
@@ -1319,7 +1329,10 @@ def _verify_champion_receipt(client: Any, model_name: str, current: str) -> None
 
 
 def _validate_report_approval(
-    report: ModelComparisonReport, expected_champion_version: str | None, require_eligible: bool
+    report: ModelComparisonReport,
+    expected_champion_version: str | None,
+    require_eligible: bool,
+    allow_unloadable_champion: bool = False,
 ) -> None:
     """Check comparison identity and requested promotion approval before re-evaluation."""
     if expected_champion_version != report.champion_version or (
@@ -1331,8 +1344,38 @@ def _validate_report_approval(
         )
     ):
         raise ValueError("Expected champion version must match the comparison report.")
-    if require_eligible and (not report.eligible or report.reason != "candidate_improved"):
+    _validate_promotion_decision(report, require_eligible, allow_unloadable_champion)
+
+
+def _validate_promotion_decision(
+    report: ModelComparisonReport, require_eligible: bool, allow_unloadable_champion: bool
+) -> None:
+    """Allow an improved candidate, or an unmeasured champion only by explicit override."""
+    if allow_unloadable_champion:
+        _validate_unloadable_approval(report)
+        return
+    if not require_eligible:
+        return
+    if report.reason == "champion_runtime_unavailable":
+        raise ValueError(
+            "The champion cannot be loaded by this Core release, so it was not compared. "
+            "Approve explicitly with allow_unloadable_champion=true after reviewing the candidate."
+        )
+    if not report.eligible or report.reason != "candidate_improved":
         raise ValueError("Comparison does not approve candidate promotion.")
+
+
+def _validate_unloadable_approval(report: ModelComparisonReport) -> None:
+    """Admit an unmeasured champion only with an absolute bound the candidate passes."""
+    if report.reason != "champion_runtime_unavailable":
+        raise ValueError(
+            "allow_unloadable_champion applies only when the champion cannot be loaded."
+        )
+    if report.quality_threshold is None or not quality_gates_pass(report):
+        raise ValueError(
+            "allow_unloadable_champion requires a configured quality_threshold "
+            "and passing quality gates."
+        )
 
 
 def _initial_alias_updates(

@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
-from ....inference.fitted_pipeline import FittedPipelineArtifact
+from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError, FittedPipelineArtifact
 from ....inference.pipeline_evaluation import evaluate_holdout
 from ..registration.registry import (
     ResolvedModel,
@@ -79,6 +79,8 @@ class ModelComparisonReport:
     reason: str
     quality_gates: dict[str, float] | None = None
     holdout_reference: dict[str, Any] | None = None
+    # Set only when the current Core release cannot load the champion's pinned runtime.
+    champion_unavailable: str | None = None
 
 
 def _validate_threshold(metric: str, value: float, field: str) -> None:
@@ -163,6 +165,8 @@ def comparison_payload(report: ModelComparisonReport) -> dict[str, Any]:
         payload.pop("quality_gates")
     if report.holdout_reference is None:
         payload.pop("holdout_reference")
+    if report.champion_unavailable is None:
+        payload.pop("champion_unavailable")
     return payload
 
 
@@ -322,9 +326,14 @@ def _metric_improvement(
 
 
 def _comparison_decision(
-    improvement: float | None, quality_passed: bool, min_improvement: float
+    improvement: float | None,
+    quality_passed: bool,
+    min_improvement: float,
+    champion_unavailable: str | None = None,
 ) -> tuple[bool, str]:
     """Explain promotion eligibility while preserving explicit first-champion approval."""
+    if champion_unavailable is not None:
+        return False, "champion_runtime_unavailable"
     if improvement is None:
         return False, "no_champion"
     if not quality_passed:
@@ -373,10 +382,8 @@ def compare_registered_pipeline_models(
     candidate_artifact = _checked_artifact(
         candidate, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
-    champion_artifact = (
-        _checked_artifact(champion, tracking_uri=tracking_uri, registry_uri=registry_uri)
-        if champion is not None
-        else None
+    champion_artifact, champion_unavailable = _champion_artifact(
+        champion, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
     task = candidate_artifact.manifest.task
     validate_quality_policy(metric, quality_threshold, quality_gates, task=task)
@@ -391,7 +398,9 @@ def compare_registered_pipeline_models(
             candidate_metrics, metric, quality_threshold, quality_gates
         )
     )
-    eligible, reason = _comparison_decision(improvement, quality_passed, min_improvement)
+    eligible, reason = _comparison_decision(
+        improvement, quality_passed, min_improvement, champion_unavailable
+    )
     return ModelComparisonReport(
         dataset_id=dataset_id,
         row_count=len(heldout),
@@ -411,7 +420,22 @@ def compare_registered_pipeline_models(
         eligible=eligible,
         reason=reason,
         quality_gates=dict(quality_gates) if quality_gates else None,
+        champion_unavailable=champion_unavailable,
     )
+
+
+def _champion_artifact(
+    champion: ResolvedModel | None, *, tracking_uri: str | None, registry_uri: str | None
+) -> tuple[Any, str | None]:
+    """Load the champion, reporting only a pinned-runtime mismatch instead of failing."""
+    if champion is None:
+        return None, None
+    try:
+        return _checked_artifact(
+            champion, tracking_uri=tracking_uri, registry_uri=registry_uri
+        ), None
+    except ArtifactRuntimeMismatchError as exc:
+        return None, str(exc)
 
 
 def _validate_additional_gates(

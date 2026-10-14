@@ -7,6 +7,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock
 
 import pandas as pd
@@ -431,7 +432,7 @@ def test_quality_gates_survive_durable_training_and_approval(staged, policy, mon
     tags = client.get_model_version(config["model_name"], "1").tags
     assert json.loads(tags["quality_gate_heldout_r2"])["threshold"] == 0.5
     if policy == "manual_approval":
-        options = {
+        options: dict[str, Any] = {
             "candidate_version": "1",
             "comparison_sha256": candidate["comparison_sha256"],
             "expected_champion_version": None,
@@ -1512,3 +1513,39 @@ def test_readable_failed_data_stage_cannot_publish_success(staged, monkeypatch):
     assert run.info.status == "FAILED"
     assert "skyulf.lifecycle.result.attempt" not in run.data.tags
     assert not client.search_registered_models()
+
+
+@pytest.mark.parametrize("strategy", ["median", "mean"])
+def test_spark_projects_reject_unscorable_candidates_before_registration(staged, strategy):
+    """A Spark-scored project must not register or promote a model its score job rejects."""
+    mlflow = pytest.importorskip("mlflow")
+    _, client, config, _, _ = staged
+    config.update(inference_mode="spark")
+    config["pipeline"] = {
+        "preprocessing": [
+            {
+                "name": "fill",
+                "transformer": "SimpleImputer",
+                "params": {"columns": ["x"], "strategy": strategy},
+            }
+        ],
+        "modeling": {"type": "linear_regression"},
+    }
+    previous_uri = mlflow.get_tracking_uri()
+    mlflow.set_tracking_uri(config["tracking_uri"])
+    try:
+        initialized = _call(
+            staged, "initialize", config=config, action="train", experiment_name="staged"
+        )
+        loaded = _call(staged, "load_data", initialized.reference)
+        split = _call(staged, "prepare_dataset", loaded.reference)
+        trained = _call(staged, "train", split.reference)
+        if strategy == "median":
+            with pytest.raises(Exception, match="SimpleImputer.*strategy=mean") as rejected:
+                _call(staged, "select_best_model", trained.reference)
+            assert "strategy=median" not in str(rejected.value)  # local-only, not worker-admitted
+            assert not client.search_model_versions(f"name='{config['model_name']}'")
+        else:
+            _call(staged, "select_best_model", trained.reference)
+    finally:
+        mlflow.set_tracking_uri(previous_uri)

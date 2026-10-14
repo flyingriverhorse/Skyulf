@@ -38,7 +38,11 @@ from ..feature_store.scoring import (
     validate_feature_snapshot,
     validate_feature_source,
 )
-from ..jobs.shared.job_output import render_bundle_output, render_scoring_summary
+from ..jobs.shared.job_output import (
+    render_bundle_output,
+    render_operator_options,
+    render_scoring_summary,
+)
 from ..jobs.shared.job_runtime import (
     OPERATOR_FIELDS,
     notebook_output,
@@ -482,6 +486,11 @@ def run_model_set_operator(
     from ...mlflow.lifecycle.model_set_lifecycle import rollback_model_set  # noqa: PLC0415
 
     action = values["lifecycle_action"]
+    if options.get("allow_unloadable_champion"):
+        raise ValueError(
+            "allow_unloadable_champion is not supported for model sets; approve the set with "
+            "the Core release that produced its champion."
+        )
     config = validate_workflow_config(
         read_notebook_config(values) if config is None else config, action=action
     )
@@ -535,13 +544,52 @@ def run_model_set_operator(
     return {"action": action, "model_set_name": settings["model_name"], "receipt": asdict(result)}
 
 
+def _set_decision_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Offer approval only for a passing pending set; rejection needs no passing gates."""
+    candidate = payload.get("model_set_candidate")
+    quality = payload.get("quality") or {}
+    if (
+        not candidate
+        or payload.get("promotion_policy") != "manual_approval"
+        or payload.get("alias_change") is not None
+        or "passed" not in quality
+    ):
+        return {}
+    evidence = {
+        "candidate_version": str(candidate["version"]),
+        "expected_champion_version": quality.get("expected_champion_version") or "none",
+    }
+    actions = {"approve": {"lifecycle_action": "approve", **evidence}} if quality["passed"] else {}
+    return {**actions, "reject": {"lifecycle_action": "reject", **evidence}}
+
+
+def set_operator_actions(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Derive the exact train-job parameters a set decision or promotion accepts next."""
+    actions = _set_decision_actions(payload)
+    receipt = payload.get("alias_change") or payload.get("receipt")
+    if isinstance(receipt, dict) and receipt.get("kind") == "promotion":
+        actions["rollback"] = {
+            "lifecycle_action": "rollback",
+            "expected_champion_version": receipt["new_version"],
+            "promotion_receipt_json": json.dumps(receipt, sort_keys=True, separators=(",", ":")),
+        }
+    return actions
+
+
 def render_model_set_result(payload: dict[str, Any]) -> str:
     """Show concrete set identity and explicit operator actions with escaped evidence."""
     if payload.get("recovery_required"):
         return render_bundle_output(payload)
     raw = html.escape(json.dumps(payload, indent=2, default=str, allow_nan=False))
     if "noop" not in payload:
-        return "<h2>Model set result</h2><pre>" + raw + "</pre>"
+        receipt = payload.get("alias_change") or payload.get("receipt") or {}
+        return (
+            "<h2>Model set result</h2>"
+            + render_operator_options(set_operator_actions(payload), receipt)
+            + "<h3>Decision details (JSON)</h3><pre>"
+            + raw
+            + "</pre>"
+        )
     summary = render_scoring_summary(
         {
             **payload,

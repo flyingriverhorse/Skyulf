@@ -375,7 +375,7 @@ def test_combined_scoring_orders_filters_and_preserves_first_reason(tmp_path, en
         steps=[_missing("target", "labels"), *steps],
     )
     root = tmp_path / "src/features"
-    custom = root / "custom/scoring_custom.py"
+    custom = root / "scoring.py"
     source = custom.read_text(encoding="utf-8").replace(
         '    columns = params["columns"]',
         '    assert (frame.feature_value >= 0).all(), "pre-split must run first"\n'
@@ -421,7 +421,7 @@ def test_combined_all_excluded_skips_custom_callbacks_and_model(tmp_path, engine
     """No custom rule or model should run when pre-split already excludes the batch."""
     config = _project(tmp_path, mode="combined", engine=engine, steps=[_missing("feature_value")])
     root = tmp_path / "src/features"
-    custom = root / "custom/scoring_custom.py"
+    custom = root / "scoring.py"
     source = custom.read_text(encoding="utf-8").replace(
         '    columns = params["columns"]', '    raise AssertionError("custom callback ran")'
     )

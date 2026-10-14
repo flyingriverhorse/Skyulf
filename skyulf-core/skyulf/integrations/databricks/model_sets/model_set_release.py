@@ -33,7 +33,18 @@ def champion_artifact(name: str, version: str | None, endpoints: dict) -> ModelS
     """Load the one captured set version instead of resolving component champion aliases."""
     if version is None:
         return None
-    return load_registered_model_set(resolve_model(name, version=version, **endpoints), **endpoints)
+    from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError  # noqa: PLC0415
+
+    try:
+        return load_registered_model_set(
+            resolve_model(name, version=version, **endpoints), **endpoints
+        )
+    except ArtifactRuntimeMismatchError as exc:
+        raise ValueError(
+            f"Champion model set {name} v{version} was produced by another Core release and "
+            f"cannot be compared ({exc}). Train and approve replacement sets with that release; "
+            "the unloadable-champion override is available for single and competition models only."
+        ) from exc
 
 
 def pin_model_set_baseline(

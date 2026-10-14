@@ -178,6 +178,7 @@ def approve_candidate(
     candidate_version: str | None,
     comparison_sha256: str | None,
     expected_champion_version: str | None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
     """Re-evaluate the saved holdout and approve without retraining or changing score selection.
 
@@ -186,7 +187,11 @@ def approve_candidate(
     saved training specification. A repeated committed request returns its
     original receipt only while that transition remains active.
     """
-    if config.get("promotion_policy") != "manual_approval":
+    # An unloadable champion holds automatic promotion, so its explicit override is
+    # the one approval allowed under either policy.
+    if "promotion_policy" not in config or (
+        config["promotion_policy"] != "manual_approval" and not allow_unloadable_champion
+    ):
         raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
     return approve_saved_candidate(
         spark,
@@ -195,6 +200,7 @@ def approve_candidate(
         comparison_sha256=comparison_sha256,
         expected_champion_version=expected_champion_version,
         admission=ExclusiveAliasWriterAdmission(),
+        allow_unloadable_champion=allow_unloadable_champion,
     )
 
 
@@ -207,6 +213,7 @@ def approve_saved_candidate(
     expected_champion_version: str | None,
     admission: AliasAdmission,
     fresh_approval_guard: Callable[[], None] | None = None,
+    allow_unloadable_champion: bool = False,
 ) -> AliasChangeReceipt:
     """Approve pinned saved evidence under the caller's shared alias authority.
 
@@ -267,10 +274,27 @@ def approve_saved_candidate(
     }
     if fresh_approval_guard is not None:
         fresh_approval_guard()
+    return _activate(report, native, expected_champion_version, allow_unloadable_champion, options)
+
+
+def _activate(
+    report: Any,
+    native: Any,
+    expected_champion_version: str | None,
+    allow_unloadable_champion: bool,
+    options: dict[str, Any],
+) -> AliasChangeReceipt:
+    """Initialize the first champion or promote over the expected one."""
     if expected_champion_version is None:
+        if allow_unloadable_champion:
+            raise ValueError("allow_unloadable_champion needs an existing champion version.")
         return initialize_champion(report, native, **options)
     return promote_candidate(
-        report, native, expected_champion_version=expected_champion_version, **options
+        report,
+        native,
+        expected_champion_version=expected_champion_version,
+        allow_unloadable_champion=allow_unloadable_champion,
+        **options,
     )
 
 
