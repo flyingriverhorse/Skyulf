@@ -109,6 +109,7 @@ dev = [
     "hypothesis>=6.100,<7.0.0",
     "syrupy>=4.0.0",
     "pytest-benchmark>=5.0.0,<6.0.0",
+    "pytest-xdist>=3.6.0,<4.0.0",  # Local parallel runs (scripts/test_targets.py); CI shards instead
     "jsonschema>=4.0.0,<5.0.0",  # Databricks template prompt visibility tests
     "mlflow>=3.10,<4.0",  # Tracking integration tests and type checking
     "PyYAML>=6.0.3,<7",  # Optional Bundle configuration and template checks

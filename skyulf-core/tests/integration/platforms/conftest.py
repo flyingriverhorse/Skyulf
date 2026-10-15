@@ -1,4 +1,4 @@
-"""Optional real Delta fixture shared by the batch integration tests."""
+"""Shared platform fixtures: the template render cache and the optional real Delta session."""
 
 import importlib
 import importlib.util
@@ -7,6 +7,27 @@ import sys
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def template_render_cache(tmp_path_factory):
+    """Let identical template answer sets render once per session (per xdist worker).
+
+    `_initialize_project` in test_databricks_bundle_generation reads this directory;
+    set SKYULF_RENDER_CACHE=0 to render every call through the CLI again.
+    """
+    with pytest.MonkeyPatch.context() as env:
+        env.setenv("SKYULF_RENDER_CACHE_DIR", str(tmp_path_factory.mktemp("render-cache")))
+        yield
+
+
+def pytest_terminal_summary(terminalreporter):
+    """Report render-cache use so a speedup can be explained by its hit rate."""
+    stats = getattr(sys.modules.get("test_databricks_bundle_generation"), "RENDER_STATS", None)
+    if stats and any(stats.values()):
+        terminalreporter.write_line(
+            f"template render cache: {stats['hits']} hits, {stats['renders']} CLI renders"
+        )
 
 
 @pytest.fixture

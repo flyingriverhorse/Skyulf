@@ -97,6 +97,17 @@ the user should not need to relay messages between agents.
   IDs. Do not start bare `pytest`, whole-repository/layer suites, or full coverage
   after a small change. Full local test runs require an explicit user request; GitHub CI keeps
   its complete suites, coverage thresholds and existing checks.
+- Test targets: `python scripts/test_targets.py` runs `smoke`, the local default
+  (template schema `--check`, documentation contract tests, the node admission
+  table, render snapshots). `affected [--list] [--base REF]` maps changed and
+  untracked files to explicit test files (mapping rules in the script docstring;
+  never a directory) and uses `-n auto` when pytest-xdist is installed. `full`
+  only prints the CI commands.
+- Template render tests share a per-session render cache, one per xdist worker;
+  `SKYULF_RENDER_CACHE=0` turns it off. After an intended template change, refresh
+  the render snapshots and review the `.ambr` diff:
+  `SKYULF_BUNDLE_OFFLINE_CLI=1 pytest skyulf-core/tests/integration/platforms/test_databricks_render_snapshots.py --snapshot-update`.
+  CI compares them in the `databricks-example-gate` job.
 - Reproduce each defect with a focused failing test, then verify its fix. At
   batch completion, run the deduplicated union of affected test files and direct
   integration consumers once. Explain any expansion using the changed behavior.

@@ -83,6 +83,48 @@ jobs:
       - name: Type check (Ty)
         run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
+  databricks-example-gate:
+    name: Databricks example projects drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Databricks CLI 1.17.0
+        # Offline `bundle init` only; no workspace credentials are configured.
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/databricks/cli/releases/download/v1.17.0/databricks_cli_1.17.0_linux_amd64.tar.gz \
+            --output databricks.tar.gz
+          echo "6b5c1e08f484d33b4e75eabe0ee3ba1bb9d19d7beedd4b14a1e6993f52a01e23  databricks.tar.gz" | sha256sum --check --strict
+          mkdir -p databricks-bin
+          tar -xzf databricks.tar.gz -C databricks-bin databricks
+          echo "$RUNNER_TEMP/databricks-bin" >> "$GITHUB_PATH"
+      - name: Check the example projects against the template
+        run: bash .github/scripts/run_check.sh "Databricks example drift" python skyulf-core/templates/databricks/build_example_project.py --check
+      # The core test shards have no CLI, so this is the only CI job that renders.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-3.12-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-3.12-
+      - name: Install dependencies (uv)
+        run: uv pip install --system -q -r requirements-ci.txt
+      - name: Compare rendered template snapshots
+        env:
+          SKYULF_BUNDLE_OFFLINE_CLI: "1"
+        run: |
+          bash .github/scripts/run_check.sh "Databricks render snapshots" \
+            python -m pytest skyulf-core/tests/integration/platforms/test_databricks_render_snapshots.py -q
+
   backend-tests:
     name: Backend Tests
     uses: ./.github/workflows/backend-tests.yml
