@@ -51,6 +51,8 @@ Unchanged replay is a no-op; failed rules/writes do not advance the watermark.
 {{if eq .inference_mode "spark"}}  Spark requires admitted pandas-fitted artifacts and exact worker dependencies.
   The generated environment manager is `{{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}`; prediction batches default
   to 10000 rows. Arbitrary callbacks and temporal carry are not admitted.
+  Training lints and probes saved eligibility/output rules; check them first with
+  `python src/tools/preview.py --action train` (see https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html#when-the-probe-fails).
 {{else}}  Local means whole-frame scoring on selected compute; size each initial/rebuild
   population against `max_rows` and `max_input_mb`.
 {{end}}

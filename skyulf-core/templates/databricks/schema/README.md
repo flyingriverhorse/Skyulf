@@ -120,6 +120,9 @@ only when no default can be right. `quick` is the default; choosing `detailed`
 reveals the relevant model, search, branch and deployment settings. Explicit
 answer-file values are honored in either mode. Prompts whose `skip_prompt_if` is empty
 remain hidden in both modes.
+`build_schema.py` hides ensemble voting weights and per-slot `voting`, `cv`,
+`passthrough`, `calibrate` and `calibration_cv` this way (`_HYPERPARAMETER_PROMPTS`):
+member models are asked, their settings default in `config/training.yml`.
 
 Source orders may use one decimal place to insert a shared prompt between existing
 questions (for example, `7.1` after `7`). The builder multiplies these by ten and

@@ -29,5 +29,33 @@
       "true"
     ],
     "description": "6. Deployment | Manage shared job permissions in this Bundle? false = keep access managed by your existing platform; true = configure deployment/variables.yml"
+  },
+  "pipeline_owner": {
+    "order": 751,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | User email given CAN_MANAGE on every target besides the deployer (your CI may pass --var pipeline_owner). Leave blank to use the deployer",
+    "pattern": "^[^\\s\"'\\x5c]*$"
+  },
+  "test_view_group": {
+    "order": 752,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Workspace group given CAN_VIEW on the shared test target. Leave blank for no group",
+    "pattern": "^[^\"\\x5c]*$"
+  },
+  "syst_view_group": {
+    "order": 753,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Workspace group given CAN_VIEW on the shared syst target. Leave blank for no group",
+    "pattern": "^[^\"\\x5c]*$"
+  },
+  "prod_view_group": {
+    "order": 754,
+    "type": "string",
+    "default": "",
+    "description": "6. Deployment | Workspace group given CAN_VIEW on the shared prod target. Leave blank for no group",
+    "pattern": "^[^\"\\x5c]*$"
   }
 }

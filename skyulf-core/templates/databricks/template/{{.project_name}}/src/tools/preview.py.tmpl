@@ -41,6 +41,7 @@ def _project_preview(config, path, bindings, action):
                 "config_path": str(path),
                 "workflow_contract": "3",
                 "deployed_score_handoff": config["score_handoff"],
+                "deployed_auto_rebuild_on_cdf_expiry": "{{.auto_rebuild_on_cdf_expiry}}",
                 **bindings,
             }
         )
@@ -65,7 +66,10 @@ def main():
     parser.add_argument("--list-preprocessors", action="store_true")
     args = parser.parse_args()
     path = project_config_path(Path(__file__).resolve().parents[2])
-    config = read_workflow_config(path)
+    try:
+        config = read_workflow_config(path)
+    except ValueError as exc:
+        parser.exit(2, f"Configuration error: {exc}\n")
     if args.list_models or args.list_preprocessors:
         for node_id, meta in sorted(NodeRegistry.get_all_metadata().items()):
             calculator = NodeRegistry.get_calculator(node_id)

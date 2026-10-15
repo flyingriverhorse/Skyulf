@@ -17,7 +17,25 @@
       "false",
       "true"
     ],
-    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running."
+    "description": "Online features | Add explicit online endpoint setup and saved freshness policy configuration? Independent of publication and rollout. Requires pandas, non-temporal lookup and single-model or competition training. Configure training.yml and serving.yml before running.",
+    "skip_prompt_if": {
+      "anyOf": [
+        {
+          "properties": {
+            "training_layout": {
+              "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "engine": {
+              "const": "polars"
+            }
+          }
+        }
+      ]
+    }
   },
   "include_online_publication": {
     "order": 905,

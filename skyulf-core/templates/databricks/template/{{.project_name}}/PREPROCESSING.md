@@ -54,6 +54,9 @@ and target filters separate when feature checks must remain.
 Upstream `groups/` code is not captured with model recipes. Keep model functions
 in phase/custom modules and do not import feature-group producers from them.
 Custom local examples do not establish Spark-worker or endpoint admission.
+Spark and online-feature projects lint and probe `column_step`/`fitted_step` code
+in training; check it first with `python src/tools/preview.py --action train` (see
+https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html#when-the-probe-fails).
 
 ## Detailed instructions
 

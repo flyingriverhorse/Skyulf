@@ -39,7 +39,8 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
         training_layout=layout,
         compute_mode=compute,
         include_online_publication="true",
-        include_online_serving="true",
+        # Core supports online serving only for single-model and competition training.
+        include_online_serving=str(layout != "multi_target").lower(),
         include_daily_rollout="true",
     )
     requirements = (project / "deployment/requirements.txt").read_text().splitlines()
@@ -56,13 +57,14 @@ def test_generated_jobs_install_core_from_one_shared_requirement(
     jobs = {}
     for resource in (project / "resources").glob("*.yml"):
         jobs.update(yaml.safe_load(resource.read_text())["resources"]["jobs"])
+    online_serving = {"online_serving_setup"} if layout != "multi_target" else set()
     assert set(jobs) == {
         "train",
         "score",
         "monitoring",
         "online_publication",
-        "online_serving_setup",
         "daily_rollout",
+        *online_serving,
     }
     for role, job in jobs.items():
         filename = (

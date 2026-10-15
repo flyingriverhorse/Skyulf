@@ -7,6 +7,12 @@
 {{- $weighted := eq (index $v (print $weight_prefix "sample_weight_enabled")) "true" -}}
 {{- $suffix := "" -}}{{- if $weighted -}}{{- $suffix = "_weighted" -}}{{- end -}}
 {{- $count := index $v (printf "%s%s_base_count" $p $task) -}}
+{{- $seen := "," -}}
+{{- range $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1 -}}{{- if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count)) -}}
+{{- $name := index $v (printf "%s%s_base_%s%s" $p $task $base $suffix) -}}
+{{- if (regexp (printf ",%s," $name)).MatchString $seen -}}{{- template "ERROR_ensemble_base_models_must_differ" . -}}{{- end -}}
+{{- $seen = printf "%s%s," $seen $name -}}
+{{- end -}}{{- end -}}
 {
 {{$indent}}    "base_estimators": [{{range $i, $base := (regexp "[0-9]+").FindAllString "1 2 3 4 5 6 7 8 9 10 11 12 13 14" -1}}{{if or (lt (len $base) (len $count)) (and (eq (len $base) (len $count)) (le $base $count))}}{{if $i}}, {{end}}{{printf "%q" (index $v (printf "%s%s_base_%s%s" $p $task $base $suffix))}}{{end}}{{end}}],
 {{$indent}}    "tune_base_models": true,
@@ -27,6 +33,11 @@
 {{- $custom := eq (index $v (printf "%ssearch_settings" $p)) "custom" -}}
 {{- $halving := or (eq $strategy "halving_grid") (eq $strategy "halving_random") -}}
 {{- $resource := "n_samples" -}}{{- if and $halving $custom -}}{{- $resource = index $v (printf "%ssearch_resource" $p) -}}{{- end -}}
+{{- /* Models whose Core estimator has n_estimators; test_databricks_wizard_guards.py checks Core. */ -}}
+{{- $estimator_resource_models := "^(adaboost|extra_trees|gradient_boosting|lgbm|random_forest|xgboost)_" -}}
+{{- if and (eq $resource "n_estimators") (not ((regexp $estimator_resource_models).MatchString .model)) -}}
+{{- template "ERROR_search_resource_n_estimators_requires_a_model_with_n_estimators" . -}}
+{{- end -}}
 {{- $params := index $v (printf "%smodel_params" $p) -}}{{- $space := index $v (printf "%ssearch_space" $p) -}}
 {{- $metric := index $v (printf "%s%s_search_metric" $p .task) -}}
 {{- if eq $v.training_layout "model_competition" -}}{{- $params = "{}" -}}{{- $space = "{}" -}}{{- $metric = (regexp "^heldout_").ReplaceAllString (index $v (printf "%s_metric" .task)) "" -}}{{- end -}}

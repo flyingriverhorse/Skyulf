@@ -1,63 +1,120 @@
-# First run and project changes
+# Start here
+
+Read this page first. It takes **{{.project_name}}** from setup to a trained
+model and a scored table; the other Markdown files answer later questions.
+
+{{if eq .training_layout "multi_target"}}This project trains one model per target and packages them as one model set that is
+approved and scored together.
+{{else if eq .training_layout "model_competition"}}This project trains several candidate models for one target; cross-validation
+picks one winner, which becomes the registered candidate.
+{{else}}This project trains one model for one target and registers it as a candidate.
+{{end}}Training runs **{{.engine}}** in one bounded Python process; scoring uses
+**{{.inference_mode}}** inference. Run every command beside `databricks.yml`.
+
+## Before the first run
+
+Setup writes placeholders where it cannot know your workspace. Replace them and
+check that the data exists before you deploy:
+
+| Where | What to set |
+| --- | --- |
+| `deployment/targets.yml` | `host` under `test`{{if eq .personal_development_targets "true"}} and `test_development`{{end}}: replace `https://replace-test.example.invalid` with your workspace URL. |
+| `deployment/variables.yml` | `test_catalog`, `test_input_schema`, `test_output_schema` and `test_metadata_schema` (`REPLACE_TEST_*`){{if eq .personal_development_targets "true"}}, plus `test_development_input_schema`, `test_development_output_schema` and `test_development_metadata_schema`{{end}}. |
+| Commands below | `YOUR_PROFILE`: an authenticated Databricks CLI profile for that workspace. |
+| Unity Catalog | The catalog, schemas and source table must exist. The table needs the record key, input and target columns from setup, and Change Data Feed on before the first score. |
+| `config/training.yml` | A numeric `quality_threshold`{{if eq .training_layout "multi_target"}} in every `models` entry{{end}}, if you will approve the first champion or promote automatically. Set it before training; a trained version keeps its policy. |
+| `deployment/variables.yml` (optional) | Monitoring runs only when `monitoring_enabled` is `"true"` and `monitoring_catalog`/`monitoring_schema` name the store. |
+
+For the shared `test` target, check that `test_root_path` in `deployment/variables.yml`
+is a workspace folder your team can write to. The local checks below do not flag
+these placeholders.
+
+## First train and score
+
+Replace `YOUR_PROFILE` in every command.
+
+1. **Check locally.** Smoke and preview read configuration only, not source data
+   or workspace access:
+
+   ```powershell
+   uv pip install -r deployment/train-requirements.txt
+   python src/tools/smoke.py
+   python src/tools/preview.py --action train
+   ```
+
+2. **Validate and deploy:**
+
+   ```powershell
+   databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
+   databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
+   ```
+
+3. **Train:**
+
+   ```powershell
+   databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE train
+   ```
+
+4. **Read the report.** {{if eq .training_layout "multi_target"}}Open `train_<name>`, `training_report` (`models_report.py`) and `model_decision`;
+   review every component before activating the set.
+{{else if eq .training_layout "model_competition"}}Open the candidate fits, `select_best_model` and `training_report`. Only the
+   winner is compared on the protected holdout; a failed winner does not promote a runner-up.
+{{else}}Open `train_and_tune` and `training_report`. Registration alone does not
+   activate a candidate.
+{{end}}   Start with **Where to look** in `training_report` > Output.
+
+5. **Approve.** {{if eq .promotion_policy "automatic"}}This project promotes automatically when the quality gates pass; the
+   report shows the decision. To roll back, copy the **If rollback is needed** block
+{{else}}Copy the **Available action: approve** block from the report (the first
+   approval uses expected champion `none`)
+{{end}}   into the train job's **Run now with different parameters**; see
+   [operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
+
+6. **Score:**
+
+   ```powershell
+   databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE score
+   ```
+
+   {{if eq .training_layout "multi_target"}}Ordinary runs score the approved set champion; `score_model_version` selects
+   a concrete set version for one run.
+{{else if eq .score_model_selection "champion"}}Scoring resolves the champion alias, so a version must be promoted first.
+{{else}}Scoring uses the pinned `model_version` in `config/inference.yml` (`"1"` for
+   a new model) and needs no approval. Change it to score a later version.
+{{end}}{{if eq .score_handoff "after_alias_change"}}   An approval or promotion starts a score run by itself; inspect that run first.
+{{end}}   Check the committed output, then `monitoring_report` and `evaluate_retraining`.
+   Before monitoring an unactivated pinned candidate for the first time, prepare its
+   [reference](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html).
 
 ## When you need it
 
-Start this **{{.training_layout}}** project with **{{.engine}}** training and
-**{{.inference_mode}}** inference. Run commands beside `databricks.yml`.
+| Question | Read |
+| --- | --- |
+| Which file owns a setting? | [README.md](README.md) |
+| How do I change the model, search, CV or quality gates? | [TRAINING.md](TRAINING.md) |
+| How do I add cleanup, filters or fitted steps? | [PREPROCESSING.md](PREPROCESSING.md) |
+| How do I write my own steps or scoring rules? | [src/features/README.md](src/features/README.md) |
+| Does a step need groups or history, and how do I probe it? | [PREPROCESSING_CONTEXT.md](PREPROCESSING_CONTEXT.md) |
+| How do I build feature tables before training? | [FEATURE_TABLES.md](FEATURE_TABLES.md) |
+| How do I choose the scored version or add business rules? | [SCORING.md](SCORING.md) |
+| How do I serve the model or call it from SQL? | [SERVING.md](SERVING.md) |
+| How do I set targets, identities, compute and schedules? | [deployment/README.md](deployment/README.md) |
+| How do I turn on monitoring and read the dashboard? | [src/monitoring/README.md](src/monitoring/README.md) |
+| How do I preview or refresh the training graph locally? | [src/tools/README.md](src/tools/README.md) |
+
+## If something fails
+
+Start with the first failing task and record its run ID, target and
+model{{if eq .training_layout "multi_target"}} set{{end}} version. A monitoring failure does not undo committed predictions.
+
+- [Exact validation errors and fixes](https://www.skyulf.com/manual/user_guide/databricks_troubleshooting.html)
+- [Create and preview a project](https://www.skyulf.com/manual/user_guide/databricks_project_setup.html)
+- [Complete worked project](https://www.skyulf.com/manual/user_guide/databricks_bundle_walkthrough.html)
+
+## Upgrading this project
+
 This template pins `skyulf-core[mlflow]==0.9.3` in `deployment/requirements.txt`;
 public guides describe the current revision. Before changing the pin, follow
 [Upgrade an existing project](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
 and **Upgrade steps for generated Databricks projects** in the
 [release notes](https://github.com/flyingriverhorse/Skyulf/blob/master/changelog/0.9.x.md).
-
-## What to edit
-
-[README.md](README.md) maps every setting to its file and guide. Before the first run,
-set the target host and namespaces in `deployment/`. Monitoring runs only when
-`deployment/variables.yml` names a monitoring catalog and schema.
-
-Source tables and record-key columns must already exist. Set an absolute
-`quality_threshold` before training if you intend to approve the first champion.
-Quick setup accepts editable defaults; detailed setup asks applicable choices.
-
-## The command
-
-Replace `YOUR_PROFILE` with the authenticated profile for the selected target.
-
-```powershell
-uv pip install -r deployment/train-requirements.txt
-python src/tools/smoke.py
-python src/tools/preview.py --action train
-databricks bundle validate --strict -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
-databricks bundle deploy -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE
-databricks bundle run -t {{if eq .personal_development_targets "true"}}test_development{{else}}test{{end}} --profile YOUR_PROFILE train
-```
-
-Inspect the concrete candidate and decision before running `score` with the same
-target/profile. If training already started a child score run, inspect it first.
-For first-time monitoring of an unactivated pinned candidate, prepare its
-reference before scoring: [reference preparation](https://www.skyulf.com/manual/user_guide/databricks_monitoring_enrollment.html).
-
-## What you should see
-
-{{if eq .training_layout "multi_target"}}Open `train_<name>`, `training_report` (`models_report.py`) and `model_decision`.
-The set has one complete pinned release; review all components before activation.
-{{else if eq .training_layout "model_competition"}}Open candidate fits, `select_best_model` and `training_report`. Only the selected
-winner receives protected holdout comparison; a failed winner does not promote a runner-up.
-{{else}}Open `train_and_tune` and `training_report`. Registration alone does not activate a candidate.
-{{end}}Start with **Where to look** in `training_report` > Output. Copy an **Available action**
-or **If rollback is needed** block into the train job's **Run now with different parameters**:
-[operator actions](https://www.skyulf.com/manual/user_guide/databricks_lifecycle.html#operator-actions-through-run-now).
-Inspect committed score output, then `monitoring_report` and `evaluate_retraining`.
-Dashboard refresh displays saved measurements; it does not calculate new ones.
-
-## Common errors and fixes
-
-Smoke and preview check local configuration, not source data or workspace access.
-A downstream monitoring failure does not undo committed predictions. Start with
-the first failing task and record its run ID, target and model/set version.
-
-- [Complete worked project](https://www.skyulf.com/manual/user_guide/databricks_bundle_walkthrough.html)
-- [Create and preview a project](https://www.skyulf.com/manual/user_guide/databricks_project_setup.html)
-- [Exact validation errors and fixes](https://www.skyulf.com/manual/user_guide/databricks_troubleshooting.html)
-- [Upgrade an existing project](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)

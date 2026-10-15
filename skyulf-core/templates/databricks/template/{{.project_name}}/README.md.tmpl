@@ -1,29 +1,11 @@
 # {{.project_name}}
 
-Start with [First run and project changes](START_HERE.md) for the selected layout,
-file ownership, execution order and troubleshooting. This page maps the project; the linked guides keep each topic in one place.
+New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
+first train and score, and which guide answers which question. This page maps
+each setting to the file that owns it.
 
 Skyulf 0.9.3 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
 compute. Training and preprocessing fit in one bounded Python process on this compute. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses a bounded frame in the saved pandas/Polars engine.{{end}}
-
-## Read in this order
-
-| Goal | Guide |
-| --- | --- |
-| First deploy, train and score | [START_HERE.md](START_HERE.md) |
-| Preview configuration, check syntax and refresh local graphs | [Local tools](src/tools/README.md) |
-| Training fields, layouts, tuning, evaluation and activation | [TRAINING.md](TRAINING.md) |
-| Built-in/custom recipes and pre-split rules | [PREPROCESSING.md](PREPROCESSING.md) |
-| Group/window context and saved-state diagnostics | [PREPROCESSING_CONTEXT.md](PREPROCESSING_CONTEXT.md) |
-| Optional upstream feature groups and merged tables | [FEATURE_TABLES.md](FEATURE_TABLES.md) |
-| Score model versions, apply business rules and recover publication | [SCORING.md](SCORING.md) |
-| Serving, SQL calls and online feature publication | [SERVING.md](SERVING.md) |
-| Workspace targets, identities, dependencies and deployment | [deployment/README.md](deployment/README.md) |
-| Enroll models, measure drift/performance and operate the shared dashboard | [Monitoring guide](src/monitoring/README.md) |
-
-These short guides ship with this project revision and link to detailed topic
-pages. Public documentation can describe a newer release; use the release
-upgrade notes before changing deployed jobs.
 
 ## Where to make a change
 
@@ -52,22 +34,9 @@ blank answers start without monitoring. Neither mode inspects source rows.
 Empty `config/features.yml` groups create no feature job or merged table;
 training and scoring read their configured sources directly.
 
-## Before the first cloud run
-
-1. Configure existing source tables, unique record keys and real target/input columns.
-2. Set the target's workspace, catalog/schema bindings and identities.
-3. Install the generated training requirements and run the offline checks below.
-4. Validate and deploy the chosen target using [START_HERE.md](START_HERE.md).
-5. Inspect the training result's concrete version before running score.
-
-Fitting saves preprocessing and model state. Editing a recipe afterwards does
-not change that saved state; train a new version. Promotion, score selection and
-online traffic allocation are separate decisions with separate evidence.
-
-## Offline checks
-
-Run `python src/tools/smoke.py` for syntax/configuration checks and
-`python src/tools/preview.py --action train` to resolve trusted recipe builders.
-Neither proves model fit or workspace permissions. See
-[setup and preview](https://www.skyulf.com/manual/user_guide/databricks_project_setup.html)
-and the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).
+These short guides ship with this project revision and link to detailed topic
+pages. Public documentation can describe a newer release; use the release
+upgrade notes before changing deployed jobs. Fitting saves preprocessing and
+model state, so editing a recipe afterwards needs a new trained version.
+Promotion, score selection and online traffic are separate decisions. All public
+guides are listed in the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).

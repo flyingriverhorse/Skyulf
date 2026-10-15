@@ -32,7 +32,7 @@ def _read_object(path: Path) -> dict[str, Any]:
 
 
 def _source_properties(source: Path) -> dict[str, Any]:
-    """Merge topic files and derived questions, keeping rules as their authors wrote them."""
+    """Merge topic files and derived questions; rules stay as written except hidden settings."""
     properties: dict[str, Any] = {}
     for path in sorted(source.glob("*.json")):
         if path.name == "metadata.json":
@@ -47,7 +47,23 @@ def _source_properties(source: Path) -> dict[str, Any]:
         properties |= fields
     if not properties:
         raise ValueError("No prompt properties found in schema topic files.")
-    return _weight_questions(properties)
+    return _hide_hyperparameters(_weight_questions(properties))
+
+
+# Ensemble settings that tune a chosen model rather than choose one. Base count, base and
+# final models stay asked; `_weighted` names are sample-weight menus, not voting weights.
+_HYPERPARAMETER_PROMPTS = re.compile(
+    r".*ensemble_(?:[1-8]_)?(?:(?:regression|classification)_weight_[0-9]+"
+    r"|voting|cv|passthrough|calibrate|calibration_cv)"
+)
+
+
+def _hide_hyperparameters(properties: dict[str, Any]) -> dict[str, Any]:
+    """Keep hyperparameters as answer-file inputs whose defaults reach config/training.yml."""
+    for name, field in properties.items():
+        if _HYPERPARAMETER_PROMPTS.fullmatch(name):
+            field["skip_prompt_if"] = {}  # Matches every answer set: never asked, still settable.
+    return properties
 
 
 def render_schema(source: Path) -> str:

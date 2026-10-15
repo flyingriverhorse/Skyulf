@@ -138,22 +138,14 @@ def test_ordinary_model_hides_ensemble_and_raw_parameter_prompts():
 @pytest.mark.parametrize(
     ("task", "model", "controls"),
     [
-        ("regression", "voting_regressor", {"regression_weight_1", "regression_weight_2"}),
-        ("regression", "stacking_regressor", {"regression_final", "cv", "passthrough"}),
-        (
-            "classification",
-            "voting_classifier",
-            {"classification_weight_1", "classification_weight_2", "voting", "calibrate"},
-        ),
-        (
-            "classification",
-            "stacking_classifier",
-            {"classification_final", "cv", "passthrough", "calibrate"},
-        ),
+        ("regression", "voting_regressor", set()),
+        ("regression", "stacking_regressor", {"regression_final"}),
+        ("classification", "voting_classifier", set()),
+        ("classification", "stacking_classifier", {"classification_final"}),
     ],
 )
 def test_single_ensemble_prompts_follow_selected_model(task, model, controls):
-    """Each ensemble needs its own base menus and controls without the other task's prompts."""
+    """Each ensemble asks only its own model choices; its settings stay answer-file inputs."""
     properties = _properties()
     values = {name: item["default"] for name, item in properties.items()}
     values["setup_mode"] = "detailed"

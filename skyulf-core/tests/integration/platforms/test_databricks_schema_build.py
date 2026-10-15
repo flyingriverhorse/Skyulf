@@ -349,4 +349,5 @@ def test_generated_rules_mean_what_the_topic_files_say():
             values = {other: randomizer.choice(source[other]["enum"]) for other in names(original)}
             assert oracle.is_valid(values) == cli_valid(rule, values), (name, values)
             compared += 1
-    assert compared > 25000
+    # Hidden ensemble settings have no rule left to compare, which leaves about 21000.
+    assert compared > 20000

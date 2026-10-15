@@ -34,6 +34,16 @@ def offline_workspace(tmp_path, monkeypatch):
                 result = {"id": state["id"], "userName": state["userName"], "active": True}
             elif self.path.startswith("/api/2.0/workspace/get-status"):
                 result = {"object_type": "DIRECTORY", "object_id": 1}
+            elif self.path.startswith("/api/2.0/permissions/directories/"):
+                # Target permissions make validate read the deploy folder's ACL.
+                grant = {"permission_level": "CAN_MANAGE", "inherited": False}
+                result = {
+                    "object_id": "/directories/1",
+                    "object_type": "directory",
+                    "access_control_list": [
+                        {"user_name": state["userName"], "all_permissions": [grant]}
+                    ],
+                }
             elif self.path.startswith("/api/2.0/policies/clusters/list"):
                 result = {"policies": [{"policy_id": "local-policy-id", "name": "local-policy"}]}
             elif self.path == "/.well-known/databricks-config":
@@ -128,7 +138,12 @@ def test_resolved_personal_targets_isolate_users_and_pause_clocks(
             assert job["name"] == f"dev_alice_{key}"
             assert job["schedule"]["pause_status"] == "PAUSED"
             assert not job.get("run_as", {}).get("service_principal_name")
-            assert not job.get("permissions")
+            # Deployer and the default pipeline_owner are the same user: one owner entry.
+            owner = {
+                "level": "IS_OWNER",
+                "user_name": bundle["workspace"]["current_user"]["userName"],
+            }
+            assert job["permissions"] == [owner]
             assert job["max_concurrent_runs"] == 1
         score_tasks = {task["task_key"]: task for task in jobs["score"]["tasks"]}
         assert score_tasks["score"]["notebook_task"]["base_parameters"]["resource_suffix"]
@@ -215,7 +230,8 @@ def test_resolved_shared_targets_preserve_identity_and_acl_choices(
     for job in ("train", "score", "monitoring"):
         variables[f"{job}_permissions"]["default"] = [
             {"level": "CAN_MANAGE_RUN", "group_name": f"{job}-operators"},
-            {"level": "CAN_MANAGE", "user_name": "alice@example.invalid"},
+            # The deployer already manages every target; job ACLs name other principals.
+            {"level": "CAN_MANAGE", "user_name": "bob@example.invalid"},
         ]
     path.write_text(yaml.safe_dump(contents, sort_keys=False), encoding="utf-8")
     bundle = _resolve(project, target, offline_workspace)
@@ -294,8 +310,9 @@ def test_external_identity_and_acl_management_remain_optional(tmp_path, offline_
     assert "train_permissions" not in result["variables"]
     assert "monitoring_permissions" not in result["variables"]
     assert "monitoring_service_principal" not in result["variables"]
+    owner = {"level": "IS_OWNER", "user_name": "alice@example.invalid"}
     for job in result["resources"]["jobs"].values():
-        assert not job.get("permissions")
+        assert job["permissions"] == [owner]  # Target managers only; no per-job ACLs.
         assert not job.get("run_as", {}).get("service_principal_name")
 
 

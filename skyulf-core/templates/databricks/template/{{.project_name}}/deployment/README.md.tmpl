@@ -9,6 +9,8 @@ workflow or company adapter is generated. Keep credentials outside these files.
 - Personal development targets: `{{.personal_development_targets}}`.
 - Shared execution identity: `{{.deployment_identity}}`.
 - Managed per-job permissions: `{{.manage_job_permissions}}`.
+- Every target grants `CAN_MANAGE` to the deployer and `pipeline_owner`
+  (`--var pipeline_owner=<email>` in CI); shared targets may add a `CAN_VIEW` group.
 {{if eq .inference_mode "spark"}}
 - Spark scoring uses `spark_udf_env_manager={{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}`
   and 10000-row batches; certified worker runtime requirements still apply.

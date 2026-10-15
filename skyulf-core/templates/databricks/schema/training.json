@@ -2,7 +2,7 @@
   "split_strategy": {
     "type": "string",
     "default": "random",
-    "description": "1. Data | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training. Default source: full snapshot for random, rolling calendar for temporal. Override training_window_mode in an init file.",
+    "description": "1. Data | How to reserve test rows? random = random rows; temporal = newer rows for testing and older rows for training. Default source: full snapshot for random, rolling calendar for temporal. Not asked after a full_snapshot window (always random).",
     "enum": [
       "random",
       "temporal"
@@ -14,6 +14,13 @@
           "properties": {
             "training_layout": {
               "const": "multi_target"
+            }
+          }
+        },
+        {
+          "properties": {
+            "training_window_mode": {
+              "const": "full_snapshot"
             }
           }
         },
@@ -99,7 +106,7 @@
       "rolling_calendar",
       "rolling_days"
     ],
-    "order": 28,
+    "order": 23.5,
     "skip_prompt_if": {
       "properties": {
         "training_layout": {

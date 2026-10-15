@@ -7,6 +7,13 @@
 {{- $split := index $v (print $p "split_strategy") -}}{{- if $temporal -}}{{- $split = "temporal" -}}{{- end -}}
 {{- $window := index $v (print $p "training_window_mode") -}}
 {{- if eq $window "auto" -}}{{- if eq $split "temporal" -}}{{- $window = "rolling_calendar" -}}{{- else -}}{{- $window = "full_snapshot" -}}{{- end -}}{{- end -}}
+{{- if and (eq $window "full_snapshot") (eq $split "temporal") -}}
+{{- template "ERROR_training_window_mode_full_snapshot_requires_random_split" . -}}
+{{- end -}}
+{{- $stratified := or ((regexp "^stratified_").MatchString $cv_type) (and (eq $cv_type "nested_cv") ((regexp "^stratified_").MatchString $nested)) -}}
+{{- if and $cv $stratified (eq $task "regression") -}}
+{{- template "ERROR_stratified_cv_requires_task_classification" . -}}
+{{- end -}}
 {{$i}}task: {{$task}}
 {{$i}}input_columns: [{{range $n, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString (index $v (print $p "input_columns")) -1}}{{if $n}}, {{end}}{{printf "%q" $column}}{{end}}]
 {{$i}}target_column: {{printf "%q" (index $v (print $p "target_column"))}}

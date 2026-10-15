@@ -1,6 +1,9 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
 # Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
 variables:
+  pipeline_owner:
+    description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
+    default: "{{if .pipeline_owner}}{{.pipeline_owner}}{{else}}${workspace.current_user.userName}{{end}}"
   job_tags:
     description: Optional job attribution tags for either compute mode
     type: complex

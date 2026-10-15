@@ -120,7 +120,8 @@ def test_quick_choice_is_asked_before_every_question_it_hides():
         for name, field in PROPERTIES.items()
         if '"setup_mode"' in json.dumps(field.get("skip_prompt_if", {}))
     ]
-    assert len(hidden) > 2000
+    # About 1700: ensemble weights and voting/stacking settings are hidden in every mode.
+    assert len(hidden) > 1500
     assert all(PROPERTIES[name]["order"] > gate for name in hidden)
     assert all("default" in PROPERTIES[name] for name in hidden)
 
@@ -177,6 +178,45 @@ def test_cli_reaches_branch_and_candidate_questions(layout, expected):
     assert "search_strategy" in _cli_asked(
         setup_mode="detailed", training_layout="single_model", search_settings="custom"
     )
+
+
+@pytest.mark.parametrize(
+    ("answers", "prefix"),
+    [
+        (
+            {"training_layout": "single_model", "regression_model": "voting_regressor"},
+            "single_ensemble_",
+        ),
+        (
+            {
+                "training_layout": "model_competition",
+                "competition_regression_model_1": "voting_regressor",
+            },
+            "competition_ensemble_1_",
+        ),
+        (
+            {"training_layout": "multi_target", "branch_1_regression_model": "stacking_regressor"},
+            "branch_1_ensemble_",
+        ),
+    ],
+)
+def test_ensembles_ask_member_models_but_not_their_settings(answers, prefix):
+    """Weights and voting/stacking settings would multiply the wizard; members stay a choice."""
+    hidden = re.compile(
+        r".*ensemble_(?:[1-8]_)?(?:\w+_weight_\d+|voting|cv|passthrough|calibrat\w+)"
+    )
+    settings = [name for name in PROPERTIES if hidden.fullmatch(name)]
+    assert len(settings) > 500
+    assert all(PROPERTIES[name]["skip_prompt_if"] == {} for name in settings)
+    assert all("default" in PROPERTIES[name] for name in settings)
+    asked = _cli_asked(setup_mode="detailed", task="regression", **answers)
+    members = {name for name in asked if name.startswith(prefix)}
+    assert {name.removeprefix(prefix) for name in members} >= {
+        "regression_base_count",
+        "regression_base_1",
+        "regression_base_2",
+    }
+    assert not members & set(settings)
 
 
 def test_each_list_offers_its_default_first():

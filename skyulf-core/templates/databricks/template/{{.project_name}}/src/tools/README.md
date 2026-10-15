@@ -44,6 +44,7 @@ before deployment; passing preview does not verify data or cloud permissions.
 | Tool and when to use it | Command |
 | --- | --- |
 | `smoke.py`: check YAML, Python syntax and package snapshots without running editable hooks. | `python src/tools/smoke.py` |
+| `smoke.py --probe`: fit on a local sample and run the Spark/endpoint admission lint and probe before a training job. Export one with `SELECT * FROM <training_table> LIMIT 256`; columns must match `input_columns` plus the target. Training on the real holdout decides. | `python src/tools/smoke.py --probe sample.csv` |
 | `refresh_feature_graph.py`: after changing upstream feature groups/merges. | `python src/tools/refresh_feature_graph.py` |
 | `refresh_training_graph.py`: after changing competition candidates or model-set branch names/count; single model is unchanged. | `python src/tools/refresh_training_graph.py` |
 | `configure_monitoring_dashboard.py`: configure refresh of an existing dashboard in a target. | `python src/tools/configure_monitoring_dashboard.py --dashboard-id YOUR_DASHBOARD_ID --target test` |

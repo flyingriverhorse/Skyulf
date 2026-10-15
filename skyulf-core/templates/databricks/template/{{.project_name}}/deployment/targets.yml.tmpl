@@ -1,11 +1,21 @@
 # Shared environments are independent of your CI/CD provider.
 # Personal development targets deliberately have no shared run_as or job ACL overrides.
+# Every target lets the deployer and pipeline_owner manage its resources;
+# shared targets can add a read-only group chosen in setup.
 # Personal names retain the train/score/monitoring role after the user prefix.
 targets:
   test:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .test_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .test_view_group}}
+{{- end}}
     workspace:
       host: https://replace-test.example.invalid
       root_path: ${var.test_root_path}
@@ -59,7 +69,11 @@ targets:
   test_development:
     mode: development
     default: true
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
@@ -96,7 +110,15 @@ targets:
   syst:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .syst_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .syst_view_group}}
+{{- end}}
     workspace:
       host: https://replace-syst.example.invalid
       root_path: ${var.syst_root_path}
@@ -150,7 +172,11 @@ targets:
   syst_development:
     mode: development
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
@@ -187,7 +213,15 @@ targets:
   prod:
     mode: production
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
+{{- if .prod_view_group}}
+      - level: CAN_VIEW
+        group_name: {{printf "%q" .prod_view_group}}
+{{- end}}
     workspace:
       host: https://replace-prod.example.invalid
       root_path: ${var.prod_root_path}
@@ -241,7 +275,11 @@ targets:
   prod_development:
     mode: development
     default: false
-    permissions: []
+    permissions:
+      - level: CAN_MANAGE
+        user_name: ${workspace.current_user.userName}
+      - level: CAN_MANAGE
+        user_name: ${var.pipeline_owner}
     presets:
       name_prefix: "dev_${workspace.current_user.short_name}_"
       trigger_pause_status: PAUSED
