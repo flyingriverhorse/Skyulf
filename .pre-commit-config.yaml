@@ -11,12 +11,15 @@
 # hooks (trailing-whitespace, end-of-file-fixer, ruff-format). Rewriting their
 # whitespace is pointless and, when a file is partially staged, triggers
 # pre-commit's stash/un-stash conflict → "Rolling back fixes" → aborted commit.
+# The NYC taxi example projects are `bundle init` output that
+# build_example_project.py --check compares byte for byte, so they are excluded too.
 exclude: |
   (?x)^(
     static/ml_canvas/assets/.*|
     frontend/ml-canvas/dist/.*|
     .*\.min\.(js|css)|
-    .*__snapshots__/.*\.ambr
+    .*__snapshots__/.*\.ambr|
+    skyulf-core/templates/databricks/examples/nyctaxi/.*
   )$
 
 repos:

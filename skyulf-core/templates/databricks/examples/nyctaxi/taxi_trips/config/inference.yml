@@ -16,3 +16,4 @@ model_set:
   source_change_policy: reject
   publication:
     mode: all
+

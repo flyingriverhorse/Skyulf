@@ -61,3 +61,5 @@ targets:
       output_schema: ${var.prod_output_schema}
       metadata_schema: ${var.prod_metadata_schema}
       resource_suffix: ""
+
+

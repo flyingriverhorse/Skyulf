@@ -230,3 +230,4 @@ resources:
             client: ${var.serverless_environment_version}
             dependencies:
               - -r ${workspace.file_path}/deployment/train-requirements.txt
+
