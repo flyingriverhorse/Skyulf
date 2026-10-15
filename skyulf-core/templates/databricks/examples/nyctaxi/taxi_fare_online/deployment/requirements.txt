@@ -1,0 +1,16 @@
+# Shared training and scoring environment. Keep exact pins here.
+# Initial model/ensemble selections are included automatically. After editing
+# model Python files, update their optional packages here before redeploying.
+skyulf-core[mlflow]==0.9.3
+mlflow==3.16.1
+PyYAML==6.0.3
+databricks-feature-engineering==0.18.1
+imbalanced-learn==0.14.1
+sklearn-compat==0.1.5
+
+optuna==4.5.0
+optuna-integration==4.5.0
+cmaes==0.13.0
+
+# Custom preprocessing and scoring dependencies are installed in both jobs.
+-r ../src/features/requirements.txt

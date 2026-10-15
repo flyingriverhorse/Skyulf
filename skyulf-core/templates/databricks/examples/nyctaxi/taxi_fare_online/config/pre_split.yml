@@ -1,0 +1,12 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# These filters choose training rows only: serving endpoints accept no saved
+# scoring rules, so src/features/scoring.py does not reuse them.
+version: 1
+recipes:
+  default:
+    # Reads the fare target: valid labels only.
+    - custom: pre_split.value_range
+      params: {column: fare_amount, minimum: 0.01, maximum: 300}
+    - custom: pre_split.value_range
+      params: {column: trip_distance, minimum: 0.01, maximum: 100}

@@ -1,0 +1,13 @@
+# Fixed row eligibility before the training split; never learn statistics here.
+# Select with pre_split_recipe in config/training.yml (default: default).
+# Competition shares its pre-split recipe. Scoring can reuse the saved filters.
+version: 1
+recipes:
+  default:
+    # Competition candidates share this default pre-split recipe.
+    - custom: pre_split.value_range
+      params: {column: trip_distance, minimum: 0.01, maximum: 100}
+    - custom: pre_split.value_range
+      params: {column: duration_min, minimum: 1, maximum: 240}
+    - custom: trip_rules.known_zips
+      params: {columns: [pickup_zip, dropoff_zip]}

@@ -1,0 +1,20 @@
+# Ordered model transformations, fitted on training rows after the split.
+# Select a recipe with preprocessing_recipe in config/training.yml (default: default).
+# Built-ins use transformer + params. Custom factories live in src/features/preprocessing.py.
+version: 1
+recipes:
+  default: []
+  spark_safe:
+    # Only steps admitted for Spark workers and serving endpoints.
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params: {columns: [trip_distance, duration_min], strategy: mean}
+    - name: cap_outliers
+      transformer: ClipValues
+      params: {bounds: {trip_distance: {lower: 0, upper: 60}, duration_min: {lower: 0, upper: 180}}}
+    - name: zip_onehot
+      transformer: OneHotEncoder
+      params: {columns: [pickup_zip], handle_unknown: ignore, max_categories: null}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min]}

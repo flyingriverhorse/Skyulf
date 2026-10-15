@@ -1,0 +1,22 @@
+# Ordered model transformations, fitted on training rows after the split.
+# Select a recipe with preprocessing_recipe in config/training.yml (default: default).
+# Built-ins use transformer + params. Custom factories live in src/features/preprocessing.py.
+version: 1
+recipes:
+  default: []
+  fare_inputs:
+    - custom: preprocessing.log_feature
+      params: {column: trip_distance}
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params: {columns: [trip_distance, duration_min], strategy: median}
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [pickup_zip]}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min]}
+  zone_inputs:
+    - custom: preprocessing.rare_categories
+      params: {column: pickup_zip, min_share: 0.01}
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [pickup_zip, dropoff_zip]}
