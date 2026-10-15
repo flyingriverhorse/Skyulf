@@ -29,6 +29,7 @@ from ._probe_frames import (
     validate_frame,
 )
 from ._probe_strategies import run_check
+from ._tuning_metadata import tuning_metadata_columns
 from .fitted_pipeline import FittedPipelineArtifact, validate_pipeline_input
 
 
@@ -218,12 +219,15 @@ def _records(artifact: FittedPipelineArtifact) -> list[tuple[dict, dict, bool]]:
     configs = [
         dict(step) for step in engineer.steps_config if step["transformer"] not in unrecorded
     ]
-    if len(configs) != len(engineer.fitted_steps):
+    # The internal CV metadata drop is a validated no-op on the raw inference schema.
+    metadata = tuning_metadata_columns(artifact)
+    fitted = engineer.fitted_steps[1:] if metadata else engineer.fitted_steps
+    if len(configs) != len(fitted):
         raise ValueError("Incomplete fitted preprocessing history.")
     active = {id(record) for record in engineer._transform_steps(preserve_rows=True)}
     return [
         (record, config, id(record) in active)
-        for record, config in zip(engineer.fitted_steps, configs, strict=True)
+        for record, config in zip(fitted, configs, strict=True)
     ]
 
 

@@ -1,6 +1,7 @@
 """Build finite monitoring evidence from bounded saved feature and prediction rows."""
 
 import math
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -149,7 +150,7 @@ def _probability_columns(
     predictions: pl.DataFrame, classes: tuple, task: str, scored: dict[tuple, dict]
 ) -> tuple[str, ...]:
     """Validate the complete saved class-ordered probability contract."""
-    columns = tuple(name for name in predictions.columns if name.startswith("probability_"))
+    columns = tuple(name for name in predictions.columns if re.fullmatch(r"probability_\d+", name))
     if not columns:
         return ()
     expected = tuple(f"probability_{index}" for index in range(len(classes)))

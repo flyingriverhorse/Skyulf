@@ -167,6 +167,26 @@ def test_set_factory_resolves_owned_names_and_preserves_legacy(tmp_path, workflo
     assert result["prediction_table"] == "workspace.outputs.example_set_scores_dev"
 
 
+@pytest.mark.parametrize(
+    "inference_mode,explicit,expected",
+    [("spark", False, True), ("pandas", True, True), ("pandas", False, False)],
+)
+def test_set_packaging_inherits_resolved_probe_admission(
+    tmp_path, workflow_config, inference_mode, explicit, expected
+):
+    """The set's combined callbacks need the same automatic admission as its branch models."""
+    from skyulf.integrations.databricks.jobs.shared.job_runtime import read_notebook_config
+    from skyulf.integrations.databricks.model_sets.model_set_project import load_project_model_set
+
+    values, _ = _project(tmp_path, workflow_config)
+    _enable(tmp_path)
+    base = read_notebook_config(values)
+    base.update(inference_mode=inference_mode, admit_probed_custom_steps=explicit)
+    result = load_project_model_set(values, base_config=base)
+    assert result is not None
+    assert result.get("admit_probed_custom_steps", False) is expected
+
+
 @pytest.mark.parametrize("name", ["other.models.set_dev", "workspace.models.set"])
 def test_set_factory_rejects_escaping_names(tmp_path, workflow_config, name):
     """A set cannot bypass catalog ownership or the active deployment suffix."""

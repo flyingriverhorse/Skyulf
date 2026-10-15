@@ -7,6 +7,7 @@ import sys
 from copy import deepcopy
 from dataclasses import asdict, replace
 from importlib import import_module
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -368,6 +369,141 @@ def test_local_probe_sample_fits_and_probes_offline(tmp_path, mode, passed):
     else:
         with pytest.raises(ValueError, match=r"\(perturb: output_mismatch\)"):
             local_admission_probe(config, HOLDOUT)
+
+
+def _search_probe_setup(tmp_path, method):
+    """Build a small real search with metadata deliberately excluded from model inputs."""
+    config: dict[str, Any] = {
+        **_project(tmp_path, context=None),
+        "input_columns": ["x"],
+        "target_column": "target",
+        "cv_enabled": True,
+        "cv_folds": 2,
+        "cv_type": method,
+        "cv_shuffle": method == "nested_cv",
+        "cv_inner_folds": 2,
+        "cv_nested_type": "stratified_k_fold" if method == "nested_cv" else "auto",
+    }
+    config["pipeline"]["modeling"] = {
+        "type": "hyperparameter_tuner",
+        "base_model": {"type": "decision_tree_classifier"},
+        "strategy": "grid",
+        "metric": "accuracy",
+        "n_trials": 1,
+        "search_space": {"max_depth": [2]},
+        "tune_threshold": method == "nested_cv",
+    }
+    sample = pd.DataFrame(
+        {"x": [float(i % 7) for i in range(80)], "target": [i % 2 for i in range(80)]}
+    )
+    if method == "time_series_split":
+        config["event_column"] = "observed_at"
+        sample["observed_at"] = pd.date_range("2025-01-01", periods=80, tz="UTC")
+    if method == "group_k_fold":
+        config["cv_group_column"] = "household"
+        sample["household"] = [i // 4 for i in range(80)]
+    return config, sample
+
+
+@pytest.mark.parametrize("method", ["nested_cv", "time_series_split", "group_k_fold"])
+def test_local_probe_preserves_workflow_search_folds(tmp_path, monkeypatch, method):
+    """The local pre-check must bind workflow CV and retain split-only metadata like training."""
+    from skyulf.integrations.databricks.scoring.batch import frame_batch
+
+    config, sample = _search_probe_setup(tmp_path, method)
+    fitted = []
+
+    def capture_fit(*args, **kwargs):
+        """Inspect the genuinely fitted artifact, without replacing its training behavior."""
+        artifact = fit_workflow(*args, **kwargs)
+        fitted.append(artifact)
+        return artifact
+
+    monkeypatch.setattr(frame_batch, "fit_workflow", capture_fit)
+    original = deepcopy(config)
+    result = local_admission_probe(config, sample)
+    assert config == original
+    assert fitted[0].pipeline.config["modeling"]["cv_type"] == method
+    assert fitted[0].manifest.input_columns == ("x",)
+    assert result == "Spark admission probe passed on 80 sample rows: clip_duration."
+
+
+@pytest.fixture
+def metadata_artifact(tmp_path):
+    """Fit and seal an actual time-CV pipeline so guard tests inspect real saved state."""
+    from skyulf.integrations.databricks.training.tuning.search import prepare_search_pipeline
+
+    config, sample = _search_probe_setup(tmp_path, "time_series_split")
+    pipeline = prepare_search_pipeline(
+        config["pipeline"],
+        CVSpec.from_workflow(config),
+        target_column="target",
+        event_column="observed_at",
+    )
+    pipeline["admit_probed_custom_steps"] = True
+    path = tmp_path / "artifact"
+    artifact = fit_workflow(
+        pipeline,
+        SplitDataset(train=sample, test=sample.head(0)),
+        target_column="target",
+        artifact_path=path,
+        max_rows=100,
+        max_bytes=1024 * 1024,
+    )
+    return seal_partition_probe(artifact, sample, path, enabled=True), sample
+
+
+def test_time_cv_metadata_drop_is_admitted_and_preserves_partition_predictions(metadata_artifact):
+    """The internal metadata drop is harmless for raw inference and must retain its evidence."""
+    artifact, sample = metadata_artifact
+    evidence = require_partition_safe_pipeline(artifact)
+    assert evidence.steps[0].action == "drop_fit_metadata"
+    raw = sample[["x"]]
+    expected = predict_pipeline(raw, artifact)
+    actual = pd.concat(
+        [predict_pipeline(raw.iloc[i : i + 7], artifact) for i in range(0, len(raw), 7)]
+    )
+    pd.testing.assert_frame_equal(actual.reset_index(drop=True), expected.reset_index(drop=True))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "duplicate",
+        "order",
+        "state",
+        "applier",
+        "instance_state",
+        "result",
+        "feature",
+    ],
+)
+def test_time_cv_metadata_drop_rejects_altered_evidence(metadata_artifact, mutation):
+    """Recognizing the built-in drop must never admit arbitrary omissions or changed callbacks."""
+    artifact, _ = metadata_artifact
+    records = artifact.pipeline.feature_engineer.fitted_steps
+    record = records[0]
+    if mutation == "missing":
+        records.pop(0)
+    elif mutation == "duplicate":
+        records.append(deepcopy(record))
+    elif mutation == "order":
+        records.reverse()
+    elif mutation == "state":
+        record["artifact"]["columns"] = ["x"]
+    elif mutation == "applier":
+        record["applier"] = records[1]["applier"]
+    elif mutation == "instance_state":
+        record["applier"].unexpected = True
+    elif mutation == "result":
+        artifact.pipeline.model_estimator.model[1].excluded_feature_columns = []
+    else:
+        record["artifact"]["columns"] = ["x"]
+        artifact.pipeline.model_estimator.model[1].excluded_feature_columns = ["x"]
+        artifact.pipeline.config["modeling"]["cv_time_column"] = "x"
+    with pytest.raises(UnsupportedExecutionError, match="Tuning metadata removal"):
+        require_partition_safe_pipeline(artifact)
 
 
 def test_perturb_catches_batch_dependence_that_chunks_miss(tmp_path):

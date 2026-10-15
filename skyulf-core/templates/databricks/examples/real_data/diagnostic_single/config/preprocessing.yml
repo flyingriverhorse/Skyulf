@@ -1,0 +1,10 @@
+version: 1
+recipes:
+  default: []
+  measured_shape:
+    - custom: preprocessing.circularity
+    - custom: preprocessing.clip_measurements
+      params: {columns: [mean_radius, mean_texture, mean_perimeter, mean_area]}
+    - name: fill_measurements
+      transformer: SimpleImputer
+      params: {strategy: mean}

@@ -165,19 +165,28 @@ def _metric_summary(saved: dict, cv: dict, task: str) -> dict:
     return {"metric_summary": figure}
 
 
-def _cv_charts(evidence: dict, task: str) -> dict:
-    """Keep different metric units on separate axes and disclose post-selection CV."""
+def _cv_series(evidence: dict, task: str) -> tuple[tuple[str, ...], list[dict]]:
+    """Read ordinary fold metrics or the named nested outer-fold selection score."""
     names = (
         ("rmse", "mae", "r2")
         if task == "regression"
         else ("accuracy", "f1_weighted", "roc_auc", "log_loss")
     )
+    folds = evidence.get("folds", [])
+    if evidence.get("method") == "nested_cv":
+        metric = evidence["scoring_metric"]
+        names = (metric,)
+        folds = [{"fold": fold["fold"], "metrics": {metric: fold["outer_score"]}} for fold in folds]
+    return names, folds
+
+
+def _cv_charts(evidence: dict, task: str) -> dict:
+    """Keep different metric units on separate axes and disclose post-selection CV."""
+    names, folds = _cv_series(evidence, task)
     figures = {}
     for name in names:
         points = [
-            (fold["fold"], fold["metrics"][name])
-            for fold in evidence.get("folds", [])
-            if name in fold["metrics"]
+            (fold["fold"], fold["metrics"][name]) for fold in folds if name in fold["metrics"]
         ]
         if not points or not all(math.isfinite(value) for _, value in points):
             continue

@@ -92,6 +92,7 @@ def load_project_model_set(
     _set_policy(bound)
     result = {key: bound[key] for key in settings}
     result["publication"] = _bind_publication(settings.get("publication"), bindings)
+    result["admit_probed_custom_steps"] = probed_admission(base)
     return result
 
 

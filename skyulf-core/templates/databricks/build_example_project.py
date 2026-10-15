@@ -1,6 +1,6 @@
-"""Regenerate the prepared NYC taxi example projects from the real Bundle template.
+"""Regenerate the prepared example projects from the real Bundle template.
 
-Each example is ordinary CLI output for its answer file in examples/nyctaxi/,
+Each example is ordinary CLI output for its answer file in examples/,
 without the template's sample code it does not use, plus the files its author
 wrote (recipes, scoring rules, custom steps) and a few text edits to the
 generated training.yml that keep its comments. Everything else must match
@@ -76,7 +76,44 @@ PROJECTS = {
     },
     "taxi_high_fare": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
     "taxi_trips": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
+    "diagnostic_single": {
+        "group": "real_data",
+        "sources": (
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "src/features/pre_split.py",
+            "src/features/preprocessing.py",
+            "src/features/scoring.py",
+            "src/features/numeric.py",
+        ),
+        "removed": SAMPLES,
+        "training_edits": (
+            PROBE,
+            (
+                "  quality_threshold: 0.85\n",
+                "  quality_threshold: 0.85\n  preprocessing_recipe: measured_shape\n  pre_split_recipe: valid_measurements\n",
+            ),
+        ),
+    },
+    "bike_demand_set": {
+        "group": "real_data",
+        "sources": (
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "src/features/pre_split.py",
+            "src/features/preprocessing.py",
+            "src/features/scoring.py",
+            "src/features/numeric.py",
+        ),
+        "removed": SAMPLES,
+        "training_edits": (PROBE,),
+    },
 }
+
+
+def example_root(name):
+    """Locate the source group without changing the generated project layout."""
+    return ROOT / "examples" / PROJECTS[name].get("group", "nyctaxi")
 
 
 def project_files(project):
@@ -105,7 +142,7 @@ def generate_example(directory, name):
             "init",
             str(ROOT),
             "--config-file",
-            str(EXAMPLES / f"{name}.json"),
+            str(example_root(name) / f"{name}.json"),
             "--output-dir",
             str(directory),
         ],
@@ -123,7 +160,7 @@ def generate_example(directory, name):
     for source in spec["sources"]:
         destination = project / source
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(EXAMPLES / name / source, destination)
+        shutil.copyfile(example_root(name) / name / source, destination)
     training_path = project / "config/training.yml"
     text = training_path.read_text(encoding="utf-8")
     # Edit text, not parsed YAML, so the generated explanatory comments survive.
@@ -137,7 +174,7 @@ def generate_example(directory, name):
 
 def changed_files(name, generated):
     """List paths whose stored bytes differ from the regenerated example."""
-    stored = project_files(EXAMPLES / name)
+    stored = project_files(example_root(name) / name)
     return sorted(
         path for path in generated.keys() | stored.keys() if generated.get(path) != stored.get(path)
     )
@@ -156,18 +193,18 @@ def main():
         if args.check:
             stale += [f"{name}/{path}" for path in changed]
             continue
-        obsolete = project_files(EXAMPLES / name).keys() - generated.keys()
+        obsolete = project_files(example_root(name) / name).keys() - generated.keys()
         if obsolete:
             parser.error(f"Review obsolete {name} files first: " + ", ".join(sorted(obsolete)))
         for path, content in generated.items():
-            destination = EXAMPLES / name / path
+            destination = example_root(name) / name / path
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(content)
         print(f"Updated {name} ({len(generated)} files, {len(changed)} changed).")
     if args.check:
         if stale:
             parser.exit(1, "Examples differ: " + ", ".join(stale) + "\n")
-        print(f"NYC taxi examples are current ({len(PROJECTS)} projects).")
+        print(f"Prepared examples are current ({len(PROJECTS)} projects).")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,8 @@ from .....inference.probed_steps import (
 )
 from .....inference.project_code import fresh_project_module
 from ....databricks.shared._frames import frame_bytes
+from ..tuning.cv import CVSpec
+from ..tuning.search import prepare_search_pipeline
 
 
 def seal_partition_probe(
@@ -107,11 +109,22 @@ def local_admission_probe(config: dict[str, Any], sample: pd.DataFrame) -> str:
     """
     from ...scoring.batch.frame_batch import fit_workflow  # noqa: PLC0415
 
+    cv = CVSpec.from_workflow(config)
+    pipeline = prepare_search_pipeline(
+        config["pipeline"],
+        cv,
+        target_column=config["target_column"],
+        event_column=config.get("event_column"),
+    )
     columns = [*config["input_columns"], config["target_column"]]
+    for key in ("cv_time_column", "cv_group_column"):
+        column = pipeline.get("modeling", {}).get(key)
+        if column and column not in columns:
+            columns.append(column)
     rows = sample.loc[:, columns].reset_index(drop=True)
     with tempfile.TemporaryDirectory(prefix="skyulf-probe-sample-") as directory:
         artifact = fit_workflow(
-            config["pipeline"],
+            pipeline,
             SplitDataset(train=rows, test=rows.head(0)),
             target_column=config["target_column"],
             artifact_path=Path(directory) / "model",

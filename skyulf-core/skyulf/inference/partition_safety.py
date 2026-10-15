@@ -37,6 +37,7 @@ from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
 from . import _partition_trees as batch_trees
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
+from ._tuning_metadata import tuning_metadata_columns
 from .fitted_pipeline import FittedPipelineArtifact
 from .pipeline_scoring import scoring_output_schema
 from .probed_rules import require_probed_rules
@@ -159,7 +160,7 @@ def _check_model(artifact: FittedPipelineArtifact) -> Any:
     if vars(actual_applier):
         raise _reject("model", "Overridden model applier is unsupported.")
     if tuning_result is not None:
-        _check_tuning_result(tuning_result, model)
+        _check_tuning_result(tuning_result, model, tuning_metadata_columns(artifact))
     actual = f"{type(model).__module__}.{type(model).__qualname__}"
     if actual != artifact.manifest.model_class:
         raise _reject("model", "Manifest model class disagrees with fitted model.")
@@ -180,12 +181,16 @@ def _model_parts(estimator: StatefulEstimator) -> tuple[Any, Any, TuningResult |
     return model, estimator.applier.base_applier, result
 
 
-def _check_tuning_result(result: TuningResult, model: Any) -> None:
+def _check_tuning_result(
+    result: TuningResult, model: Any, metadata_columns: tuple[str, ...]
+) -> None:
     """Validate fixed serving policy and exclude unreviewed metadata/callback behavior."""
     if set(vars(result)) != {field.name for field in fields(TuningResult)}:
         raise _reject("model", "Custom tuning result state is unsupported.")
     _check_instance_methods(result)
-    if type(result.excluded_feature_columns) is not list or result.excluded_feature_columns:
+    if type(result.excluded_feature_columns) is not list or result.excluded_feature_columns != list(
+        metadata_columns
+    ):
         raise _reject(
             "model", "Tuned feature exclusions require separate partition-safety evidence."
         )
@@ -289,11 +294,24 @@ def _steps(artifact: FittedPipelineArtifact) -> tuple[PartitionStepEvidence, ...
     """Require complete ordered fitted history before granting per-step evidence."""
     engineer = artifact.pipeline.feature_engineer
     configs = _step_configs(engineer)
-    if len(configs) != len(engineer.fitted_steps):
+    metadata = tuning_metadata_columns(artifact)
+    fitted = engineer.fitted_steps[1:] if metadata else engineer.fitted_steps
+    if len(configs) != len(fitted):
         raise _reject("pipeline", "Incomplete or unsupported fitted step history.")
     active = {id(step) for step in engineer._transform_steps(preserve_rows=True)}
     result = []
-    for record, config in zip(engineer.fitted_steps, configs, strict=True):
+    if metadata:
+        state = engineer.fitted_steps[0]["artifact"]
+        result.append(
+            PartitionStepEvidence(
+                "tuning_time_columns",
+                "TuningColumnDrop",
+                "drop_fit_metadata",
+                json.dumps(_pack(state), sort_keys=True),
+                artifact_digest(state).hex(),
+            )
+        )
+    for record, config in zip(fitted, configs, strict=True):
         try:
             skipped = record["type"] in _SKIPS
             if (id(record) in active) == skipped:

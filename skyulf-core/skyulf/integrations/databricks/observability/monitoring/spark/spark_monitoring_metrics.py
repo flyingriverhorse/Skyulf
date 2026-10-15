@@ -2,6 +2,7 @@
 
 import importlib
 import math
+import re
 from datetime import datetime
 from functools import reduce
 from operator import and_, or_
@@ -98,7 +99,7 @@ def scored_predictions(predictions: Any, task: str, classes: tuple) -> tuple[Any
 
 def _probability_names(scored: Any, classes: tuple, task: str) -> tuple[str, ...]:
     """Validate the saved probability schema and explicit class-index order."""
-    columns = tuple(name for name in scored.columns if name.startswith("probability_"))
+    columns = tuple(name for name in scored.columns if re.fullmatch(r"probability_\d+", name))
     if not columns:
         return ()
     expected = tuple(f"probability_{index}" for index in range(len(classes)))
@@ -152,7 +153,7 @@ def _join_pairs(scored: Any, labels: Any, keys: tuple, target: str) -> Any:
     """Project internal join keys so user columns cannot collide with evidence aliases."""
     key_aliases = [spark_column(key).alias(f"__sm_key_{index}") for index, key in enumerate(keys)]
     truth = labels.select(*key_aliases, spark_column(target).alias("__sm_truth"))
-    output_columns = [name for name in scored.columns if name.startswith("probability_")]
+    output_columns = [name for name in scored.columns if re.fullmatch(r"probability_\d+", name)]
     outputs = scored.select(
         *key_aliases, spark_column("prediction"), *[spark_column(name) for name in output_columns]
     )

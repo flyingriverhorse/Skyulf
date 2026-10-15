@@ -15,6 +15,32 @@ from skyulf.integrations.databricks.observability.monitoring.monitoring_metrics 
 AS_OF = datetime(2026, 10, 1, tzinfo=UTC)
 
 
+@pytest.mark.parametrize("distributed", [False, True])
+@pytest.mark.parametrize("extra", ["probability_band", "probability_score"])
+def test_custom_probability_named_output_is_not_a_class_probability(
+    monkeypatch, distributed, extra
+):
+    """Extra scoring outputs must not invalidate the saved class probability contract."""
+    from types import SimpleNamespace
+
+    from skyulf.integrations.databricks.observability.monitoring import monitoring_metrics as native
+    from skyulf.integrations.databricks.observability.monitoring.spark import (
+        spark_monitoring_metrics as spark_metrics,
+    )
+
+    columns = ["prediction", "probability_0", "probability_1", extra]
+    if distributed:
+        monkeypatch.setattr(spark_metrics, "has_spark_rows", lambda frame: False)
+        actual = spark_metrics._probability_names(
+            SimpleNamespace(columns=columns), (0, 1), "classification"
+        )
+    else:
+        actual = native._probability_columns(
+            pl.DataFrame(schema=dict.fromkeys(columns, pl.String)), (0, 1), "classification", {}
+        )
+    assert actual == ("probability_0", "probability_1")
+
+
 def frame(engine: str, rows: list[dict]) -> pd.DataFrame | pl.DataFrame:
     """Keep the same input records for both supported frame engines."""
     return (

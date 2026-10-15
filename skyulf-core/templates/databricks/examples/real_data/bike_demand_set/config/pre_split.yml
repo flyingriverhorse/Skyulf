@@ -1,0 +1,13 @@
+version: 1
+recipes:
+  default: []
+  valid_casual:
+    - custom: pre_split.valid_clock
+    - name: known_target
+      transformer: DropMissingRows
+      params: {subset: [casual]}
+  valid_registered:
+    - custom: pre_split.valid_clock
+    - name: known_target
+      transformer: DropMissingRows
+      params: {subset: [registered]}

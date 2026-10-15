@@ -1,0 +1,99 @@
+# Shared training settings; model entries override whole values from defaults.
+# Custom transformations stay in src/features. Scoring uses the saved fitted model.
+# preprocessing_recipe selects a list in config/preprocessing.yml.
+# pre_split_recipe selects a list in config/pre_split.yml.
+# Keep custom functions in src/features/preprocessing.py and pre_split.py.
+# See PREPROCESSING.md; do not add pipeline.preprocessing here.
+version: 1
+defaults:
+  config_version: 1
+  training_layout: multi_target
+  engine: pandas
+
+  preprocessing_probe: true # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  training_table: "{catalog}.{input_schema}.observations_train"
+  record_key_columns: ["record_id"]
+  model_name: "{catalog}.{metadata_schema}.bike_demand_set_model{resource_suffix}"
+  promotion_policy: manual_approval
+  evaluation_charts: {enabled: true}
+  explainability: {method: shap, max_samples: 32, max_features: 30, max_display_samples: 2}
+models:
+
+  "casual":
+    model_name: "{catalog}.{metadata_schema}.bike_demand_set_casual{resource_suffix}"
+    preprocessing_recipe: weather_and_clock
+    pre_split_recipe: valid_casual
+    task: regression
+    input_columns: ["season", "yr", "mnth", "hr", "holiday", "weekday", "workingday", "weathersit", "temp", "atemp", "hum", "windspeed"]
+    target_column: "casual"
+    split_strategy: temporal
+    training_window_mode: fixed_window
+    test_size: 0.2
+    random_state: 42
+    stratify: false
+    cv_enabled: true
+    cv_folds: 3
+    cv_type: time_series_split
+    cv_shuffle: false
+    cv_random_state: 42
+    cv_gap: 0
+    filter_unavailable_results: false
+    event_column: "observed_at"
+    event_time_parsing: {format: null, timezone: null, date_only: reject}
+    start: "2011-01-01T00:00:00Z"
+    holdout_start: "2012-07-01T00:00:00Z"
+    cutoff: "2012-10-01T00:00:00Z"
+    max_rows: 20000
+    max_input_mb: 64
+    metric: heldout_rmse
+    min_improvement: 0
+    quality_threshold: 100.0
+
+    model:
+      type: random_forest_regressor
+    tuning:
+      strategy: random
+      metric: rmse
+      n_trials: 2
+      random_state: 42
+      search_space: {"n_estimators":[64],"max_depth":[10,16],"min_samples_leaf":[2]}
+
+  "registered":
+    model_name: "{catalog}.{metadata_schema}.bike_demand_set_registered{resource_suffix}"
+    preprocessing_recipe: weather_and_clock
+    pre_split_recipe: valid_registered
+    task: regression
+    input_columns: ["season", "yr", "mnth", "hr", "holiday", "weekday", "workingday", "weathersit", "temp", "atemp", "hum", "windspeed"]
+    target_column: "registered"
+    split_strategy: temporal
+    training_window_mode: fixed_window
+    test_size: 0.2
+    random_state: 42
+    stratify: false
+    cv_enabled: true
+    cv_folds: 3
+    cv_type: time_series_split
+    cv_shuffle: false
+    cv_random_state: 42
+    cv_gap: 0
+    filter_unavailable_results: false
+    event_column: "observed_at"
+    event_time_parsing: {format: null, timezone: null, date_only: reject}
+    start: "2011-01-01T00:00:00Z"
+    holdout_start: "2012-07-01T00:00:00Z"
+    cutoff: "2012-10-01T00:00:00Z"
+    max_rows: 20000
+    max_input_mb: 64
+    metric: heldout_rmse
+    min_improvement: 0
+    quality_threshold: 180.0
+
+    model:
+      type: random_forest_regressor
+    tuning:
+      strategy: random
+      metric: rmse
+      n_trials: 2
+      random_state: 42
+      search_space: {"n_estimators":[64],"max_depth":[10,16],"min_samples_leaf":[2]}
+

@@ -53,7 +53,9 @@ def test_normal_generation_excludes_the_prepared_examples(tmp_path, layout):
 def test_prepared_example_matches_regeneration_and_previews(tmp_path, name):
     """A stored example must equal template output plus its own files, and its recipes must run."""
     regenerated = BUILDER["generate_example"](tmp_path, name)
-    assert BUILDER["project_files"](regenerated) == BUILDER["project_files"](EXAMPLES / name)
+    assert BUILDER["project_files"](regenerated) == BUILDER["project_files"](
+        BUILDER["example_root"](name) / name
+    )
     assert yaml.safe_load((regenerated / "config/training.yml").read_text())["defaults"][
         "preprocessing_probe"
     ]
@@ -78,7 +80,7 @@ def test_example_copies_of_static_template_files_are_current(name):
     compared = 0
     for source in TEMPLATE.rglob("*"):
         relative = source.relative_to(TEMPLATE).as_posix()
-        copy = EXAMPLES / name / relative
+        copy = BUILDER["example_root"](name) / name / relative
         if (
             not source.is_file()
             or source.suffix in {".tmpl", ".pyc"}

@@ -1,0 +1,228 @@
+# src/features: where feature code lives and how YAML selects it
+
+This folder holds every piece of Python a model needs besides the estimator.
+Nothing here runs on its own. A config file names a function in this folder,
+and the training or scoring job calls it at a fixed point in the flow.
+
+## One table to remember
+
+| Folder or file | What it holds | Selected from | Runs when | Learns from data | Saved in the model |
+| --- | --- | --- | --- | --- | --- |
+| `groups/*.py` | Spark functions that build shared feature tables | `config/features.yml` (`transform: src/features/groups/<file>.py:<function>`) | The separate `features` job, before any training | No | No; the merged Delta table is the input |
+| `pre_split.py` | Row filters: keep or drop a training row | `config/pre_split.yml` (`custom: pre_split.<factory>`) | Training job, before the train/holdout split | Never | Yes; `scoring.py` can replay them |
+| `preprocessing.py` | Fitted steps: learn on training rows, replay later | `config/preprocessing.yml` (`custom: preprocessing.<factory>`) | Training job, after the split, inside every CV fold | Yes; the learned dict is saved | Yes; batch scoring replays the saved state. Spark scoring and endpoints admit built-in steps, plus your `column_step`/`fitted_step` only with the opt-in below |
+| `scoring.py` | Which rows get a prediction and which extra columns are published | `SCORING_MODE` and the three `build_*_rules()` lists in the file | Batch score job only | No | Yes; the rules travel with the model version |
+| Any other `<file>.py` | Your own factories, selected as `<file>.<factory>` | Same YAML files as above | Same as the factory kind | Depends on the factory | Yes |
+| `assets.json` + `assets/` | Small lookup files your code reads | Listed in `assets.json`, read with `read_project_asset` | Whenever a step reads them | No | Yes; edit means a new training run |
+| `requirements.txt` | Exact pins your code imports | Installed by `deployment/requirements.txt` | Job start | No | Pins are recorded |
+
+`groups/` is the odd one out. It produces input tables with Spark before a model
+exists, so it is excluded from the model snapshot and must not be imported from
+the other files. Everything else is pandas code that is copied into the model
+version at training time; editing it later changes only new versions.
+
+## How a YAML line reaches a function
+
+```text
+config/training.yml
+  defaults:            (or one entry under models:)
+    pre_split_recipe: default            # name of a list in config/pre_split.yml
+    preprocessing_recipe: zones_and_trips # name of a list in config/preprocessing.yml
+        |
+        v
+config/preprocessing.yml
+  recipes:
+    zones_and_trips:
+      - custom: trip_rules.clip_outliers  # <file>.<factory> inside src/features
+        params: {column: duration_min}    # keyword arguments of the factory
+      - name: scale                       # a built-in step: name + transformer + params
+        transformer: StandardScaler
+        params: {columns: [trip_distance]}
+        |
+        v
+src/features/trip_rules.py
+  def clip_outliers(column):              # the factory; returns a step
+      return fitted_step("clip_duration_min", learn_bounds, clip_values,
+                         output=column, replace=True, params={"column": column})
+```
+
+Rules of the chain:
+
+- A recipe name that is missing from `training.yml` means `default`. Each YAML
+  file always has a `default` list; an empty list is allowed.
+- `custom:` is `<module>.<factory>`. The module is any `.py` file directly under
+  `src/features` (`pre_split`, `preprocessing`, `scoring`, `trip_rules`, ...).
+  The file name is free; the examples keep filters in `pre_split.py` and
+  fitted steps in `preprocessing.py` only for readability.
+- `params` are passed to the factory as keyword arguments. The factory decides
+  what the step's own `params` dict looks like.
+- A built-in step has no `custom:`; it names a registered transformer. The
+  public [preprocessing recipes catalog](https://www.skyulf.com/manual/user_guide/preprocessing_recipes.html)
+  lists them with their parameters.
+- Competition candidates share one pre-split recipe; a candidate may override
+  `preprocessing_recipe`. A model set (`multi_target`) names both recipes per
+  model entry, so each model can filter and preprocess differently.
+
+## The three factory kinds
+
+| Factory | Your functions | Use it for |
+| --- | --- | --- |
+| `filter_step(name, fn, columns=[...], params={...})` | `fn(df, params) -> True/False per row` | Row eligibility. Reads only the row. Never changes values. |
+| `column_step(name, fn, output="new_col", params={...})` | `fn(df, params) -> one value per row` | A derived column with nothing to learn, such as `log(1 + x)`. |
+| `fitted_step(name, learn, apply, output=..., replace=..., params={...})` | `learn(df, y, params) -> dict` on training rows, `apply(df, state, params) -> column(s)` everywhere | Anything learned: means, quantiles, category shares, mappings. |
+
+`fitted_step` is the one that makes training and scoring agree: `learn` runs on
+the training rows of each fold, the returned dict is saved with the model, and
+`apply` receives exactly that dict on holdout rows and on batch scoring rows.
+Write `learn` so the dict is plain JSON: strings, numbers, lists, no NaN.
+
+Spark scoring (`inference_mode: spark`) and serving endpoints run a stricter
+admission: every worker scores its own partition without seeing other rows and
+loads only reviewed code, so they accept the built-in steps listed in the
+public Spark scoring guide (SimpleImputer, StandardScaler, MinMaxScaler,
+ClipValues, GroupImputer, OneHotEncoder, FeatureInteraction) and a fixed set of
+models. `scoring.py` rules are always rejected there. Row filters are skipped
+at scoring time, so they pass. Your own `column_step` and `fitted_step`
+functions are rejected unless you opt in: set `admit_probed_custom_steps: true`
+under `defaults` in `config/training.yml` and declare each such step
+`inference_context="row"` in its factory. Training then checks every declared
+step on up to 256 holdout rows and needs at least 16 (whole, repeated, chunks
+of 1, 2 and 7, reversed, with a renumbered row index and an empty batch),
+stops before registration if one check fails, and seals the passing evidence
+into the model; Spark scoring and endpoints admit the step only when that
+evidence matches the saved code and state. Do not read `df.index` or keep
+caches in module globals: Spark batches get a fresh index, and each worker
+process has its own globals. The check is evidence, not proof. Steps declared
+`group`, `window` or `global`, or not declared at all, stay rejected. The
+alternative is to move the calculation into a `groups/` Spark producer that
+runs before the model.
+
+## Worked example: `taxi_high_fare`
+
+The `examples/nyctaxi/taxi_high_fare` project classifies whether a trip's fare
+is above 15. Follow one row through its files.
+
+**1. `config/training.yml`** names the columns and the preprocessing recipe. The
+pre-split recipe is not named, so `default` is used.
+
+```yaml
+defaults:
+  input_columns: ["pickup_hour", "pickup_dow", "trip_distance", "duration_min", "pickup_zip", "dropoff_zip"]
+  target_column: "high_fare"
+  preprocessing_recipe: zones_and_trips
+```
+
+**2. `config/pre_split.yml`**, list `default`, decides which rows may train.
+Two filters come from the shipped `pre_split.py`, one from the project's own
+`trip_rules.py`:
+
+```yaml
+recipes:
+  default:
+    - custom: pre_split.value_range
+      params: {column: trip_distance, minimum: 0.01, maximum: 100}
+    - custom: pre_split.value_range
+      params: {column: duration_min, minimum: 1, maximum: 240}
+    - custom: trip_rules.known_zips
+      params: {columns: [pickup_zip, dropoff_zip]}
+```
+
+`trip_rules.known_zips(columns=[...])` wraps `zips_known(df, params)` with
+`filter_step`. A row with a missing zone is dropped before the split. Nothing is
+learned, so the filter can later be replayed on scoring rows unchanged.
+
+**3. `config/preprocessing.yml`**, list `zones_and_trips`, runs after the split
+on training rows and is saved with the model:
+
+```yaml
+recipes:
+  zones_and_trips:
+    - custom: preprocessing.frequency_encoding
+      params: {columns: [pickup_zip, dropoff_zip]}
+    - custom: trip_rules.clip_outliers
+      params: {column: duration_min}
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params: {columns: [trip_distance, duration_min], strategy: median}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min]}
+```
+
+`trip_rules.clip_outliers("duration_min")` is a `fitted_step`: `learn_bounds`
+reads the 1st and 99th percentile of `duration_min` on the training fold and
+returns `{"low": ..., "high": ...}`; `clip_values` clips every later batch with
+those two saved numbers. The two built-ins after it need no Python at all.
+
+**4. `src/features/scoring.py`** decides what happens at batch scoring time.
+This project sets `SCORING_MODE = "custom"`: the pre-split filters are not
+replayed; instead one eligibility rule (`scoring.require_value_range` on
+`trip_distance`) marks implausible rows with a reason and an empty prediction,
+and one output rule (`scoring.prediction_band` on `probability_1`) adds a
+`fare_band` column. Both functions are defined at the end of `scoring.py`, and
+the rule's `"function"` field names them the same way YAML names factories.
+
+So `trip_rules.py` is used twice, by two different config files, and nowhere
+else: once as a filter before the split, once as a fitted step after it. The
+module name only has to match the prefix in `custom:`.
+
+**Compare the other examples.** `taxi_fare` uses only built-ins (`spark_safe`
+recipe) because Spark scoring replays steps per partition and keeps no scoring
+rules. `taxi_trips` names a different pre-split and preprocessing recipe per
+model entry and uses `SCORING_MODE = "combined"` with
+`SKIP_TARGET_PRE_SPLIT_STEPS = True`, so the saved filters are replayed except the
+one that reads the target, then a combined rule multiplies the two models'
+results. `taxi_fare_online` adds a `feature_lookup` in `training.yml` whose
+columns arrive from an online store at request time; its recipe uses built-in
+steps only, because endpoints run the same admission as Spark scoring. `FEATURES.md` next to the example projects in the
+Skyulf repository (`skyulf-core/templates/databricks/examples/nyctaxi/`) draws
+each flow.
+
+## Where each piece runs
+
+```text
+features job (optional, Spark)      groups/*.py  ->  merged Delta table = training_table
+train job                           pre_split recipe -> split -> preprocessing recipe fitted
+                                    per CV fold and on the final training rows -> model
+score job (batch, pandas/polars)    scoring.py eligibility -> saved preprocessing -> predict
+                                    -> scoring.py outputs -> prediction table
+score job (Spark inference)         built-in steps (+ opted-in probed row steps) per partition
+                                    -> predict; no other custom steps, no rules
+serving endpoint                    optional feature lookup -> built-in and opted-in steps
+                                    -> predict; same admission
+```
+
+## Adding your own module
+
+1. Create `src/features/my_rules.py` with top-level `def` functions and one
+   factory per step. Import `filter_step`, `column_step` or `fitted_step` from
+   `skyulf.preprocessing`. Use relative imports for helpers inside this folder;
+   never import from `groups/`.
+2. Reference it from a recipe as `custom: my_rules.<factory>` with `params`
+   matching the factory's keyword arguments, then name that recipe in
+   `config/training.yml`.
+3. Data files go under `src/features/assets/`, listed in `assets.json`, read with
+   `read_project_asset(__package__, "assets/<file>")`. Extra packages go in
+   `requirements.txt` with exact pins.
+4. Check before deploying, from the project root:
+
+   ```bash
+   python src/tools/preview.py --action train
+   python src/tools/preview.py --action score
+   python src/tools/smoke.py
+   ```
+
+   `preview` resolves every recipe and rule and prints the fitted plan;
+   `smoke` compiles the package the way the train job will load it.
+
+## Read next
+
+- [PREPROCESSING.md](../../PREPROCESSING.md): files to edit and critical rules
+  for recipes in this project.
+- [groups/README.md](groups/README.md) and [FEATURE_TABLES.md](../../FEATURE_TABLES.md):
+  Spark feature groups.
+- [SCORING.md](../../SCORING.md): scoring modes and the prediction table.
+- Public guides: [custom steps](https://www.skyulf.com/manual/user_guide/databricks_custom_steps.html),
+  [feature tables](https://www.skyulf.com/manual/user_guide/databricks_features.html),
+  [scoring](https://www.skyulf.com/manual/user_guide/databricks_scoring.html),
+  [online features](https://www.skyulf.com/manual/user_guide/databricks_online_features.html).
