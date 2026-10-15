@@ -179,4 +179,11 @@ if __name__ == "__main__":
         create_dashboard=args.create_dashboard,
     )
     print("Dashboard refresh", "disabled" if args.disable else "configured", "in", overlay)
+    if args.create_dashboard:
+        # One dashboard shows every model in the shared store; a second owner makes a copy.
+        print(
+            "This project now owns the monitoring dashboard. Create it in only one project:"
+            " give every other project the same monitoring_catalog/monitoring_schema and run"
+            " this tool there with --dashboard-url <this dashboard's published URL>."
+        )
     print("Validate and redeploy the Bundle before running monitoring.")

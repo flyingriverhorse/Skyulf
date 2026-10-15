@@ -209,6 +209,12 @@ Both setup modes ask two monitoring questions, after the deployment questions:
 | `monitoring_catalog` | Existing catalog for the shared monitoring store, or blank | Default of `monitoring_catalog` |
 | `monitoring_schema` | Schema in that catalog; required when a catalog is given, blank otherwise | Default of `monitoring_schema` |
 
+Give every project the same catalog and schema, reserved for monitoring (for
+example `skyulf_monitoring`), not the project's own schema: all models then
+appear in one store and one dashboard. Only one project creates the dashboard;
+the others connect to it with `--dashboard-url`, see
+[the shared dashboard](databricks_monitoring_dashboard.md).
+
 A catalog answer sets `monitoring_enabled` to `"true"`: train and score enroll
 models and run monitoring. A blank catalog sets `monitoring_enabled` to
 `"false"`: train and score run without monitoring. A catalog without a schema
