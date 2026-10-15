@@ -3,8 +3,9 @@
 <span id="databricks-bundle-configuration-reference"></span>
 
 Start with the [end-to-end project guide](databricks_bundle_walkthrough.md) to
-create a project, train a model and publish predictions. Use the topic pages below
-for a specific change. Generated project Markdown contains short instructions
+create a project, train a model and publish predictions. Before you generate one,
+[choose a project shape](databricks_choose.md): layout, prediction path and what
+runs on Spark. Use the topic pages below for a specific change. Generated project Markdown contains short instructions
 and links to these references.
 
 The project pins its Core version in `deployment/requirements.txt`. These public

@@ -107,17 +107,30 @@ inherit execution settings they cannot support.
 
 ### Job access
 
-Every target includes `permissions: []`, ready for environment-specific access
-entries. An empty list declares no additional grants. Entries added here apply
-to every job in that target, including optional feature and online jobs.
-Personal targets have their own list and do not
-inherit a shared target's permissions. For example:
+Every target grants `CAN_MANAGE` to the deploying identity and to
+`${var.pipeline_owner}`. Entries here apply to every job in that target,
+including optional feature and online jobs. Shared `test`, `syst` and `prod`
+targets also grant `CAN_VIEW` to a workspace group when detailed setup was given
+one. Personal targets have their own list, with the two managers only:
 
 ```yaml
 permissions:
+  - level: CAN_MANAGE
+    user_name: ${workspace.current_user.userName}
+  - level: CAN_MANAGE
+    user_name: ${var.pipeline_owner}
   - level: CAN_VIEW
-    group_name: YOUR_ENVIRONMENT_VIEWERS
+    group_name: "YOUR_ENVIRONMENT_VIEWERS"
 ```
+
+`pipeline_owner` is a variable in `deployment/variables.yml`. Its default is the
+setup answer, or the deploying user when the answer was blank; listing the same
+user twice is accepted. CI/CD can set it per deployment with
+`--var pipeline_owner=<email>` or `BUNDLE_VAR_pipeline_owner`. Change a view
+group by editing `group_name` in `deployment/targets.yml`; remove the entry to
+grant none.
+When CI deploys as a service principal, `current_user.userName` is its
+application ID: change that entry's `user_name` key to `service_principal_name`.
 
 Use the optional per-job lists below when the jobs need different access.
 Avoid duplicating the same principal at target and job scope.

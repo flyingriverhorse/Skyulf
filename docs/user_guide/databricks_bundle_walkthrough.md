@@ -7,6 +7,14 @@ Optional chapters explain how feature tables, serving and rollout attach to this
 same lifecycle. The [glossary](databricks_glossary.md) defines the terms; the
 [troubleshooting guide](databricks_troubleshooting.md) starts from error messages.
 
+Four finished projects built from this template on `samples.nyctaxi.trips` are in the
+[NYC taxi examples](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi):
+a single model with Spark scoring, a single model served online with feature lookups,
+a model competition, and a model set with combined scoring. Each has its setup answers,
+and one SQL file creates their tables. To copy the closest one instead of following
+this guide, see
+[start from the closest example](databricks_project_setup.md#start-from-the-closest-example).
+
 Commands run from your generated project unless a step says otherwise. Replace
 `YOUR_PROFILE`, workspace host and the approved catalog/schema with your own.
 Examples of expected output are expectations, not claims about your workspace.

@@ -18,14 +18,16 @@ The linked section explains the cause and the fix.
 | Message or symptom | Where to fix it |
 | --- | --- |
 | `Pre-split step '<step>' reads target '<target>'. Set SKIP_TARGET_PRE_SPLIT_STEPS=True or SCORING_MODE='custom'.` | [Below](#a-pre-split-step-reads-the-target) |
-| `feature_lookup.lookups[<n>].table_name: Table name must contain one to three simple identifiers.` | [Below](#a-feature-lookup-table-name-is-incomplete) |
+| `feature_lookup.lookups[<n>].table_name: Unity Catalog names must be catalog.schema.name; each part a simple identifier (letters, digits, underscore; not starting with a digit).` | [Below](#a-feature-lookup-table-name-is-incomplete) |
+| `feature_lookup.lookups[<n>] is not filled in: complete feature_lookup and online_features in config/training.yml, or regenerate with include_online_serving=false.` | [Below](#a-feature-lookup-table-name-is-incomplete) |
 | `Automatic promotion requires quality_threshold.` | [Below](#automatic-promotion-has-no-quality-threshold) |
 | `AliasOutcomeUnknownError`, or a pending alias event | [Lifecycle recovery](databricks_lifecycle_recovery.md#common-errors-and-fixes) |
 | `Project and job definitions disagree; regenerate/redeploy the Bundle together.` after a Core or template upgrade (workflow contract) | [Project upgrade](databricks_project_upgrade.md#common-errors-and-fixes) |
 | The same message after changing `score_handoff` in `config/inference.yml` | Redeploy the Bundle; see [score handoff](databricks_scoring.md#schedules-handoff-and-execution-engines) |
 | `Training source exceeds max_rows.`, `Training source exceeds max_bytes.` or `Training input exceeds max_rows.` | [Training data](databricks_training_data.md#common-errors-and-fixes) |
-| `Initial scoring source exceeds the configured max_rows budget.` or `Source increment exceeds max_rows.` | [Scoring](databricks_scoring.md#common-errors) |
+| `Initial scoring source exceeds the configured max_rows budget.` or `Source increment exceeds max_rows.` | [Scoring](databricks_scoring.md#common-errors-and-fixes) |
 | `<node>.apply on pandas: <reason>`, for example `project_scoring.apply on pandas: Custom scoring and reused pre-split rules are unsupported.` (Spark admission) | [Distributed inference](databricks_spark_scoring.md) |
+| An online endpoint returns `Encountered an unexpected error while evaluating the model. ... Error ''` | [Online features](databricks_online_features.md#check-missing-and-stale-features): read the served model logs |
 | A Unity Catalog permission error in a job run | [Deployment](databricks_deployment.md#common-errors-and-fixes); test the job's `run_as` identity |
 | `Set both monitoring_catalog and monitoring_schema.` | Set both in `deployment/variables.yml`, or leave both blank with `monitoring_enabled: "false"`. See [if no destination is set](databricks_monitoring_setup.md#if-no-destination-is-set) |
 | `Local artifact runtime mismatch for skyulf-core: requires ..., found ...` or report reason `champion_runtime_unavailable` | The model was produced by another runtime. Approve a reviewed replacement with `allow_unloadable_champion=true`, or run with the producing release. See [champion from an older Core release](databricks_lifecycle.md#champion-from-an-older-core-release). |
@@ -49,7 +51,7 @@ The linked section explains the cause and the fix.
 | [Model sets](databricks_model_sets.md#common-errors-and-fixes) | Replacement stays challenger, quality failures, Spark admission |
 | [Approve, reject and roll back](databricks_lifecycle.md#common-errors-and-fixes) | Missing quality threshold, changed champion, scoring after promotion |
 | [Lifecycle recovery](databricks_lifecycle_recovery.md#common-errors-and-fixes) | Uncertain alias changes |
-| [Scoring](databricks_scoring.md#common-errors) | Champion selection, eligibility, budgets, schema |
+| [Scoring](databricks_scoring.md#common-errors-and-fixes) | Champion selection, eligibility, budgets, schema |
 | [Monitoring overview](databricks_monitoring.md#common-errors-and-fixes) | Monitoring destination, nothing monitored, old dashboard results |
 | [Monitoring store setup](databricks_monitoring_setup.md#common-errors-and-fixes) | Store permissions and upgrades |
 | [Monitoring enrollment](databricks_monitoring_enrollment.md#common-errors-and-fixes) | Enrollment and references |
@@ -118,14 +120,15 @@ and [scoring eligibility](databricks_scoring.md#2-decide-eligibility-before-trai
 Example message for the second lookup:
 
 ```text
-feature_lookup.lookups[1].table_name: Table name must contain one to three simple identifiers.
+feature_lookup.lookups[1].table_name: Unity Catalog names must be catalog.schema.name; each part a simple identifier (letters, digits, underscore; not starting with a digit).
 ```
 
 **Cause.** `feature_lookup.lookups[N].table_name` is blank, contains an unresolved
-placeholder or has invalid identifier syntax. The index is zero-based: `[0]` is
-the first list entry and `[1]` is the second. A syntactically valid name with fewer
-than three parts instead produces `Unity Catalog names must contain catalog.schema.name.`
-These checks validate names locally; passing them does not prove the table exists
+placeholder, has fewer than three parts or has invalid identifier syntax. The index
+is zero-based: `[0]` is the first list entry and `[1]` is the second. A completely
+blank generated entry (no `table_name`, `lookup_key` or `feature_names`) reports
+`feature_lookup.lookups[N] is not filled in: ...` instead: fill the entry, or
+regenerate the project with `include_online_serving=false`. These checks validate names locally; passing them does not prove the table exists
 or that the job can read it.
 
 **Fix.** In `config/training.yml`, find the effective `feature_lookup` under

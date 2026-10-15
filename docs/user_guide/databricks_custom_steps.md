@@ -92,8 +92,12 @@ the API used by existing projects.
 #### Function signatures and execution
 
 These are the helper signatures. Optional `inference_context` declares row,
-group, window or global dependence for diagnostics; it does not grant Spark or
-REST serving admission.
+group, window or global dependence for diagnostics. Alone it does not grant
+Spark or REST serving admission: training lints and probes your steps first, and
+`"row"` is optional there while `group`, `window` and `global` stay rejected. See
+[Admit your own row steps](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in)
+and, when a step is rejected,
+[When the probe fails](databricks_spark_scoring.md#when-the-probe-fails).
 
 ```text
 column_step(name, function, *, output, replace=False, params=None, inference_context=None)

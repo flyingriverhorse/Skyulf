@@ -106,6 +106,7 @@ nav:
       - Get Started:
         - End-to-End Project Guide: user_guide/databricks_bundle_walkthrough.md
         - Topic Index: user_guide/databricks_bundle.md
+        - Choose a Project Shape: user_guide/databricks_choose.md
         - Project Setup and Preview: user_guide/databricks_project_setup.md
         - Deployment and Access: user_guide/databricks_deployment.md
         - Project Upgrades: user_guide/databricks_project_upgrade.md

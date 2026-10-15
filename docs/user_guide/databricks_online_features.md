@@ -428,7 +428,7 @@ lookup to repeat those transformations. `log_feature_model_set` also accepts
 `online_policy`; its raw saved guard covers the model-set request before its
 components run.
 
-### Admit and query the registered package
+### Next: create the endpoint
 
 Continue with
 [endpoint admission and requests](databricks_serving.md#admit-and-query-the-registered-package).
@@ -546,11 +546,24 @@ restore the entity's real feature values and a current production timestamp,
 synchronize again and verify a successful request. Do not leave a shared entity
 with intentionally stale test features.
 
-The native Feature Engineering wrapper can return a generic model-evaluation
-error to the REST caller. Inspect the served model's logs for the underlying
-`Online required feature` or `Online freshness feature` exception. Check that
-the traceback belongs to the rejected request; a generic HTTP error alone does
-not establish that the freshness policy ran.
+The native Feature Engineering wrapper replaces every model error with a generic
+one, so the REST caller only sees `Encountered an unexpected error while evaluating
+the model. ... Error ''`. Read the reason from the served model's logs:
+
+```bash
+databricks serving-endpoints logs <endpoint-name> <served-model-name> --profile <profile>
+```
+
+The served model name is in `databricks serving-endpoints get <endpoint-name>`
+(`config.served_entities[].name`, for example `customer_model-1`). Look for one of:
+
+```text
+Online required features have no value in 1 of 1 rows (first row 0): total_spend, feature_updated_at. The lookup key has no row in the online table, or the published value is null.
+Online freshness feature 'feature_updated_at' is stale in 1 of 1 rows: oldest age 7200s exceeds 3600s (max_age_seconds). Refresh and republish the feature table.
+```
+
+Check that the traceback belongs to the rejected request; a generic HTTP error
+alone does not establish that the freshness policy ran.
 
 The latest-value policy does not replace historical evaluation evidence. New
 feature-bound candidates save their enriched holdout in

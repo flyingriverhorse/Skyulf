@@ -13,7 +13,7 @@ calls `apply` with the information saved during training.
 | What does it check? | A saved model's preprocessing on a small sample, without refitting. |
 | Why use it? | A step that changes results when a request is split, repeated or reordered can give wrong batch predictions. |
 | When does it run? | After training, only when you turn it on, for example with `preprocessing_probe: true`. |
-| What does it not do? | It does not block promotion, change the model, or approve Spark or serving use. |
+| What does it not do? | It does not block promotion, change the model, or alone approve Spark or serving use. Your own row steps need the separate [opt-in](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in). |
 
 ## Prerequisites and outcome
 
@@ -192,8 +192,9 @@ def inference_capability(state, *, engine):
 Use that example only if the class actually supports both engines and preserves
 rows. Otherwise narrow it. Omitting a declaration keeps context `unknown`.
 Editing the factory/class affects newly trained artifacts; an existing model
-continues using its captured source. A declaration is a claim to test, not a
-Spark/REST admission certificate.
+continues using its captured source. A declaration alone is a claim to test,
+not a Spark/REST admission certificate. For `column_step` and `fitted_step`,
+see the [opt-in for your own row steps](databricks_spark_scoring.md#admit-your-own-row-steps-opt-in).
 
 ## What does `report = probe_fitted_preprocessing(artifact, sample)` do?
 

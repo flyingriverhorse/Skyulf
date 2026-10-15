@@ -273,8 +273,13 @@ deletes. See [source changes](databricks_scoring.md#source-changes-are-separate-
 With `inference_mode: spark`, every component must pass Spark admission. Admission runs at
 activation (manual approval or automatic promotion) and again at scoring. Independent outputs and
 `composition_config` with `weighted_sum`/`weighted_mean` are admitted. Function rules from
-`build_combined_rules()` are not. Component scoring rules from `build_model_rules()` also block
-Spark. See the [Spark support table](databricks_spark_scoring.md#what-spark-scoring-supports).
+`build_combined_rules()` and component scoring rules from `build_model_rules()` are admitted when
+training linted and probed them: packaging probes each combined rule on up to 256 rows of the
+set's training source, changing one row's inputs and component predictions at a time, and seals
+the evidence in the set. A failing rule stops packaging with a message naming the rule and check.
+Reused pre-split eligibility stays rejected. See the
+[Spark support table](databricks_spark_scoring.md#what-spark-scoring-supports) and
+[When the probe fails](databricks_spark_scoring.md#when-the-probe-fails).
 
 ### Train branches from the Python SDK
 
@@ -347,5 +352,5 @@ results are in the score job's `score` task.
 | Changed branch names are rejected | A replacement needs the same branches and component names; create a new set for a new layout. |
 | `combined_only` fails | Add saved combined rules, then train and package a new set. |
 | Editing rules has no effect | Train and package a new set; scoring uses the saved rules. |
-| Spark admission rejects the set | Remove function rules and component scoring rules, or use `inference_mode: local`. |
+| Spark admission rejects the set | Read the named rule and check, then follow [When the probe fails](databricks_spark_scoring.md#when-the-probe-fails); or use `inference_mode: local`. |
 | Update or delete fails scoring | Choose `source_change_policy: rebuild_on_change` deliberately. |

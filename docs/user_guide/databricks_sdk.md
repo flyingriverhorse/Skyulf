@@ -230,22 +230,14 @@ print(model_uri, metrics)
 The held-out labels are used only for evaluation. Monthly scoring reads raw
 features without labels and applies the already fitted FE and model.
 
-## Preprocessing diagnostics
+## Optional preprocessing probe
 
-Set `TrainingSpec(..., preprocessing_probe=True)` to inspect the saved and
-reloaded preprocessing on at most the first 256 holdout rows. The option defaults
-to `False`. The 8 MiB input/output budget keeps the sample bounded; the report
-is saved as `preprocessing_probe.json` on the candidate's MLflow training run.
-
-This checks saved state, schema, repeated application, chunk/order consistency
-and mutation where the step's context allows those comparisons. It does not
-refit or measure model quality and does not change promotion policy. A step
-requiring groups or history reports `requires_context`, with later steps
-`not_run`; that is a request for the right execution context, not proof of a
-broken pipeline. See [the runnable example and report guide](preprocessing_context.md)
-for all statuses and direct `probe_fitted_preprocessing(artifact, sample)` use.
-The preflight prediction sample described above is a separate check that also
-calls the model.
+Set `TrainingSpec(..., preprocessing_probe=True)` (default `False`) to check the
+saved and reloaded preprocessing on at most the first 256 holdout rows. The
+report is saved as `preprocessing_probe.json` on the candidate's MLflow training
+run. [Preprocessing diagnostics](preprocessing_context.md#how-to-read-the-report)
+explains what it checks and every status. The preflight prediction sample
+described above is a separate check that also calls the model.
 
 ## Train a candidate when labels are ready
 

@@ -151,6 +151,34 @@ def test_databricks_topic_links_resolve_after_splitting_guides():
     assert checked
 
 
+SHARED_HEADINGS = {
+    # Every task page follows the same five-part outline, so these repeat by design.
+    "when you need it": "per-page outline",
+    "what to edit": "per-page outline",
+    "the command": "per-page outline",
+    "what you should see": "per-page outline",
+    "common errors and fixes": "per-page outline",
+}
+
+
+def test_databricks_guides_give_each_topic_heading_one_owner_page():
+    """A topic written on two pages drifts apart; one page owns it and the others link."""
+    owners = {}
+    for page in sorted(GUIDES.glob("databricks_*.md")):
+        document = re.sub(r"```.*?```", "", page.read_text(encoding="utf-8"), flags=re.DOTALL)
+        for heading in re.findall(r"^#{2,3} (.+)$", document, re.MULTILINE):
+            key = " ".join(re.sub(r"[^a-z0-9 ]", " ", heading.lower()).split())
+            owners.setdefault(key, set()).add(page.name)
+    repeated = {
+        key: sorted(pages)
+        for key, pages in owners.items()
+        if len(pages) > 1 and key not in SHARED_HEADINGS
+    }
+    assert not repeated, (
+        f"Merge into one owner page and link, or whitelist with a reason: {repeated}"
+    )
+
+
 def _blocks(page, language):
     """Read executable declarations directly from the published guide source."""
     return re.findall(rf"```{language}\n(.*?)```", page.read_text(encoding="utf-8"), re.DOTALL)

@@ -6,6 +6,37 @@ Create an editable project before its first deployment. For a complete example w
 follow the [end-to-end guide](databricks_bundle_walkthrough.md). Initialization is offline and does
 not inspect your tables.
 
+### Start from the closest example
+
+Copying a finished project is usually faster than answering the setup wizard.
+Four NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
+
+| Your project | Copy | Notes |
+| --- | --- | --- |
+| One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
+| One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
+| One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |
+| Several targets approved together | `taxi_trips` | Model set with a combined scoring rule |
+
+1. Copy the project folder out of
+   [`examples/nyctaxi`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/nyctaxi).
+2. Run `load_nyctaxi.sql` in the Databricks SQL editor with `catalog` set to
+   `workspace` (or yours) and `schema` set to the project name. It creates the
+   source tables and never overwrites one.
+3. In `deployment/targets.yml`, replace `https://replace-test.example.invalid`
+   with your workspace URL. If your catalog is not `workspace`, change
+   `test_catalog` and `monitoring_catalog` in `deployment/variables.yml`.
+4. Run `databricks bundle deploy -t test --profile <profile>`, then
+   `databricks bundle run train -t test --profile <profile>`.
+
+Then swap the taxi tables, columns and recipes for your own. The examples README
+owns the complete steps, approval and serving. Not sure which shape fits? See
+[choose a project shape](databricks_choose.md).
+
+### Generate a project with the wizard
+
+When no example is close, generate the project:
+
 ```mermaid
 flowchart LR
     A["databricks bundle init"] --> B["Edit config/*.yml and deployment/"]

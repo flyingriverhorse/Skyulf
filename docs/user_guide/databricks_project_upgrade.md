@@ -218,7 +218,7 @@ the same Core version, and upgrade them together.
 - New tuning and fitted-configuration parameters appear only on training runs
   made with the updated Core; existing runs are not backfilled.
 
-### Spark scoring
+### Spark scoring changes
 
 A whole-frame MLflow package logged without a Spark safety certificate cannot
 use `inference_mode: spark`. Log a new certified version. Configurations without
@@ -249,7 +249,7 @@ use `inference_mode: spark`. Log a new certified version. Configurations without
 - Training evidence from experimental releases, and candidates saved without
   sampling evidence, must be recreated before approval.
 
-### Monitoring and serving
+### Monitoring and serving changes
 
 - New projects ask for the monitoring catalog and schema and start with
   `monitoring_enabled: "false"` when they are blank. Existing projects keep
@@ -273,6 +273,9 @@ use `inference_mode: spark`. Log a new certified version. Configurations without
   configured limits before upgrading the rollout job.
 - Add `bundle_target: ${bundle.target}` to the `daily_rollout` task parameters so
   rollout evidence names the target that ran it instead of `monitoring.environment`.
+- If your CI/CD passes `--var pipeline_owner` or requires target permissions, add a
+  `pipeline_owner` variable and each target's `permissions` list as in a newly
+  generated project; see [job access](databricks_deployment.md#job-access).
 
 ### Upgrade integration code
 

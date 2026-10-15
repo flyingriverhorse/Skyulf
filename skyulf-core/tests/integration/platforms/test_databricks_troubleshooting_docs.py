@@ -61,13 +61,15 @@ def test_lookup_table_error_and_qualified_name_fix_are_documented():
     settings = {
         "lookups": [
             {"table_name": "{catalog}.{input_schema}.history"},
-            {"table_name": ""},
+            # Keys are filled, so this is a missing name rather than the blank generated stub.
+            {"table_name": "", "lookup_key": ["id"], "feature_names": ["balance"]},
         ]
     }
     bindings = {"catalog": "workspace", "input_schema": "features"}
     message = (
         "feature_lookup.lookups[1].table_name: "
-        "Table name must contain one to three simple identifiers."
+        "Unity Catalog names must be catalog.schema.name; each part a simple identifier "
+        "(letters, digits, underscore; not starting with a digit)."
     )
     with pytest.raises(ValueError) as error:
         bind_lookup_tables(settings, bindings)

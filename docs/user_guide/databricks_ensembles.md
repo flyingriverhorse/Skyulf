@@ -3,7 +3,7 @@
 This page covers ensemble candidates in a generated Databricks Bundle's
 `config/training.yml`: the voting and stacking `model.params` fields, nested
 member search axes, worked voting, stacking and calibrated examples, and the
-wizard questions for each ensemble slot. Read it when one model candidate
+setup questions and defaults for each slot. Read it when one model candidate
 should combine several learners. The worked examples append a `models` block to
 the [common setup header](databricks_tuning.md#common-setup-for-the-worked-examples)
 in the tuning guide.
@@ -131,23 +131,30 @@ models:
         logistic_regression__estimator__C: [0.1, 1.0]
 ```
 
-## Wizard questions for each slot
+## Setup questions and defaults for each slot
 
 Detailed setup repeats the ensemble question group for the selected single
 model, each competition candidate, and each multi-target branch. It asks for
-the member count (default two), each distinct member, each voting weight
-(default one), and the stacking final estimator where applicable. Regression
-offers up to 14 member positions and classification up to 13; installed optional
-packages and weighted-mode eligibility still constrain the choices. Selecting
-two members exposes two member questions, rather than silently filling every
-available position.
+the member count (default two), each distinct member and the stacking final
+estimator where applicable. Regression offers up to 14 member positions and
+classification up to 13; installed optional packages and weighted-mode
+eligibility still constrain the choices. Selecting two members exposes two
+member questions, rather than silently filling every available position.
 
-The same slot also has conditional questions for classification `voting`
-(default `soft`), stacking `cv` (wizard default **3**, versus **5** when omitted
-from hand-written YAML), stacking `passthrough` (default `false`), classification
-`calibrate` (default `false`) and `calibration_cv` (default **3**). The `calibrate`
-answer becomes `calibrate_base_models` in YAML. Calibration method defaults to
-`sigmoid`; edit YAML to select `isotonic`.
+The wizard does not ask for the settings below. Each slot writes their defaults
+into `model.params` in `config/training.yml`; edit them there, or set them in an
+answer file before generation:
+
+| Setting | Answer-file suffix | Default |
+| --- | --- | --- |
+| Voting weight of member `K` | `weight_K` | `1` |
+| Classification voting mode | `voting` | `soft` |
+| Stacking folds | `cv` | **3** (**5** when omitted from hand-written YAML) |
+| Stacking `passthrough` | `passthrough` | `false` |
+| Calibrate classification members | `calibrate` (YAML `calibrate_base_models`) | `false` |
+| Calibration folds | `calibration_cv` | **3** |
+
+Calibration method defaults to `sigmoid`; edit YAML to select `isotonic`.
 
 The answer-file names follow these patterns, with `N` the candidate/branch
 number, `task` equal to `regression` or `classification`, and `K` the member
@@ -165,10 +172,10 @@ For the shared slot suffixes `voting`, `cv`, `passthrough`, `calibrate` and
 `branch_1_ensemble_passthrough`.
 
 For example, `competition_ensemble_2_regression_base_1: "ridge"` selects the
-first member of candidate two; its `weight_1` question applies only to voting.
-The wizard writes these choices into that model's `params`; the editable YAML
+first member of candidate two; its `weight_1` key applies only to voting.
+Setup writes these choices into that model's `params`; the editable YAML
 is the place for detailed member overrides, calibration and manual nested axes.
-Inspect the emitted entry because quick setup can retain defaults without
-showing every advanced prompt. Shared competition search settings and per-branch
-settings still obey the same accepted tuning fields and budgets in the
+Inspect the emitted entry because setup keeps these defaults without asking.
+Shared competition search settings and per-branch settings still obey the same
+accepted tuning fields and budgets in the
 [tuning guide](databricks_tuning.md#competition-budget).

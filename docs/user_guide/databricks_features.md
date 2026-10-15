@@ -411,7 +411,7 @@ existing online store and endpoint admission. Current generated online policy
 transport supports pandas single-model/competition training and non-temporal
 lookup; it is not a historical asof endpoint or a multi-target online flow.
 
-## Common errors
+## Common errors and fixes
 
 | Symptom | Check and fix |
 | --- | --- |

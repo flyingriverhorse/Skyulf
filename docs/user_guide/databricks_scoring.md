@@ -474,7 +474,7 @@ The runtime rejects a YAML/job handoff mismatch. Merely configuring
 own dataset snapshots and lifecycle evidence. [Endpoint callers](databricks_serving.md)
 can consume predictions without publishing a Delta prediction table.
 
-## Common errors
+## Common errors and fixes
 
 | Symptom | Action |
 | --- | --- |
