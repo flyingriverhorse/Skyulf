@@ -186,7 +186,10 @@ def _bundle_action_options(
         options["recovery_request"] = recovery_request
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
-            config, options["candidate_version"], action=action
+            config,
+            options["candidate_version"],
+            action=action,
+            allow_unloadable_champion=options.get("allow_unloadable_champion", False),
         )
     if action == "train":
         options.update(experiment_name=experiment_name, artifact_path=artifact_path)
@@ -357,7 +360,10 @@ def _prepared_notebook_request(
     options = operator_options(action, values)
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
-            config, options["candidate_version"], action=action
+            config,
+            options["candidate_version"],
+            action=action,
+            allow_unloadable_champion=options.get("allow_unloadable_champion", False),
         )
     return {
         "config": config,

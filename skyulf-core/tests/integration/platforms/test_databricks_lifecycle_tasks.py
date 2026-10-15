@@ -1549,3 +1549,155 @@ def test_spark_projects_reject_unscorable_candidates_before_registration(staged,
             _call(staged, "select_best_model", trained.reference)
     finally:
         mlflow.set_tracking_uri(previous_uri)
+
+
+_PROBED_SOURCE = '''
+from skyulf.preprocessing import fitted_step
+
+
+def learn(df, y):
+    """Learn the training mean once."""
+    return {"mean": float(df["x"].mean())}
+
+
+def apply_saved(df, state):
+    """Use only the saved mean, so every Spark batch gets the same answer."""
+    return df["x"] - state["mean"]
+
+
+def build_preprocessing():
+    """One custom step; its declaration is optional for row-local code."""
+    return [fitted_step("centred", learn, apply_saved, output="z", inference_context=__CONTEXT__)]
+'''
+
+
+_RULES_SOURCE = """
+import pandas as pd
+
+
+def build_preprocessing():
+    return []
+
+
+def too_large(frame, params):
+    limit = __LIMIT__
+    return pd.Series(["too_large" if value > limit else None for value in frame["x"]],
+                     index=frame.index, dtype="object")
+
+
+def build_scoring():
+    return {"eligibility": [{"name": "too_large", "version": "1", "function": "too_large",
+                             "params": {"limit": 1000}}], "outputs": []}
+"""
+
+
+@pytest.mark.parametrize("limit", ['params["limit"]', 'frame["x"].mean()'])
+def test_spark_projects_probe_saved_scoring_rules_before_registration(
+    staged, tmp_path, monkeypatch, limit
+):
+    """Row-local rules pass the Spark check; a batch-statistic rule stops training first."""
+    mlflow = pytest.importorskip("mlflow")
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+
+    _, client, config, _, _ = staged
+    _probe_sized_source(monkeypatch)
+    path = tmp_path / "preprocessing.py"
+    path.write_text(_RULES_SOURCE.replace("__LIMIT__", limit), encoding="utf-8")
+    config.update(inference_mode="spark")
+    config.update(load_project_workflow(config, path))
+    previous_uri = mlflow.get_tracking_uri()
+    mlflow.set_tracking_uri(config["tracking_uri"])
+    try:
+        initialized = _call(
+            staged, "initialize", config=config, action="train", experiment_name="staged"
+        )
+        loaded = _call(staged, "load_data", initialized.reference)
+        split = _call(staged, "prepare_dataset", loaded.reference)
+        if "mean" in limit:
+            with pytest.raises(Exception, match="Scoring rule 'too_large' reads a batch statistic"):
+                _call(staged, "train", split.reference)
+            assert not client.search_model_versions(f"name='{config['model_name']}'")
+            return
+        trained = _call(staged, "train", split.reference)
+        selected = _call(staged, "select_best_model", trained.reference)
+        assert selected.output["selection_mode"] == "single_candidate"
+    finally:
+        mlflow.set_tracking_uri(previous_uri)
+
+
+def _probe_sized_source(monkeypatch):
+    """Serve 90 rows so the 20% holdout meets the probe's 16-row minimum."""
+    from skyulf.integrations.databricks.lifecycle import workflow
+    from skyulf.integrations.databricks.training.fitting import candidate
+
+    frame = pd.DataFrame({"id": range(90), "x": range(90), "target": range(0, 180, 2)})
+    frame.attrs.update(source_table_id="delta-log-id", source_uc_table_id="uc-object-id")
+    monkeypatch.setattr(candidate, "read_training_snapshot", lambda spark, spec: frame.copy())
+    monkeypatch.setattr(workflow, "read_training_snapshot", lambda spark, spec: frame.copy())
+
+
+@pytest.mark.parametrize("case", ["automatic", "group", "changed_request"])
+def test_spark_projects_probe_custom_steps_automatically(staged, tmp_path, monkeypatch, case):
+    """A Spark project probes custom steps without a flag; declared group steps stay rejected.
+
+    The sealed evidence is the only key allowed to differ from the requested config.
+    """
+    mlflow = pytest.importorskip("mlflow")
+    from skyulf.integrations.databricks.jobs.lifecycle import lifecycle_tasks
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+
+    _, client, config, _, _ = staged
+    _probe_sized_source(monkeypatch)
+    path = tmp_path / "preprocessing.py"
+    context = "'group'" if case == "group" else "None"
+    path.write_text(_PROBED_SOURCE.replace("__CONTEXT__", context), encoding="utf-8")
+    config.update(inference_mode="spark")
+    config.update(load_project_workflow(config, path))
+    previous_uri = mlflow.get_tracking_uri()
+    mlflow.set_tracking_uri(config["tracking_uri"])
+    try:
+        initialized = _call(
+            staged, "initialize", config=config, action="train", experiment_name="staged"
+        )
+        loaded = _call(staged, "load_data", initialized.reference)
+        split = _call(staged, "prepare_dataset", loaded.reference)
+        trained = _call(staged, "train", split.reference)
+        if case == "group":
+            with pytest.raises(Exception, match="centred.*inference_context='group'"):
+                _call(staged, "select_best_model", trained.reference)
+            assert not client.search_model_versions(f"name='{config['model_name']}'")
+            return
+        if case == "changed_request":
+            original = lifecycle_tasks.selected_request
+
+            def without_flag(store):
+                """Drop the opt-in from the request so a key other than the evidence differs."""
+                request, effective = original(store)
+                effective = {k: v for k, v in effective.items() if k != "admit_probed_custom_steps"}
+                return request, effective
+
+            monkeypatch.setattr(lifecycle_tasks, "selected_request", without_flag)
+            with pytest.raises(Exception, match="configuration or project source differs"):
+                _call(staged, "select_best_model", trained.reference)
+            return
+        selected = _call(staged, "select_best_model", trained.reference)
+        assert selected.output["selection_mode"] == "single_candidate"
+        # The logged package must carry the certificate the score job requires, and its
+        # pyfunc load_context recheck must accept it and run the custom step.
+        from skyulf.inference.fitted_pipeline import predict_pipeline
+        from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
+        from skyulf.integrations.mlflow.spark.spark_model import SAFETY_KEY
+
+        uri = selected.output["model_uri"]
+        info = mlflow.models.get_model_info(uri)
+        certificate = (info.metadata or {})[SAFETY_KEY]
+        assert [step["action"] for step in certificate["steps"]] == ["apply_probed"]
+        rows = pd.DataFrame({"x": [3, 11, 17]})
+        artifact = load_run_pipeline(
+            uri, digest=selected.output["model_digest"], tracking_uri=config["tracking_uri"]
+        )
+        packaged = mlflow.pyfunc.load_model(uri).predict(rows)
+        expected = predict_pipeline(rows, artifact)["prediction"].to_numpy()
+        assert packaged["prediction"].to_numpy() == pytest.approx(expected)
+    finally:
+        mlflow.set_tracking_uri(previous_uri)

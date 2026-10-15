@@ -6,6 +6,7 @@ from typing import Any
 
 from skyulf.integrations.mlflow.shared._client import require_mlflow
 
+from .....inference.probed_steps import without_partition_probe
 from ....mlflow.registration.registry import load_run_pipeline, packaged_artifact_path
 from ...lifecycle._lifecycle_data import training_partitions
 from ...lifecycle._lifecycle_state import LifecycleContext, LifecyclePhaseResult, PhaseStore
@@ -124,7 +125,7 @@ def _adopt_model(store: PhaseStore, winner: dict, recipe: dict) -> str:
             **expected_config,
             "training_weights": prepared["holdout"]["attrs"]["training_weights"],
         }
-    if artifact.pipeline.config != expected_config:
+    if without_partition_probe(artifact.pipeline.config) != expected_config:
         raise ValueError("Winning model configuration differs from its frozen recipe.")
     with TemporaryDirectory(prefix="skyulf-winner-adoption-") as directory:
         package = Path(store.client.download_artifacts(winner["run_id"], "model", directory))

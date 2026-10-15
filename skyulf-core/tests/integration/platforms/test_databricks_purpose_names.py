@@ -169,6 +169,7 @@ def test_training_spec_serialization_keeps_saved_keys():
     assert restored == spec
     historical = dict(payload)
     assert historical.pop("online_policy_json") is None
+    assert historical.pop("admit_probed_custom_steps") is False
     assert TrainingSpec.from_payload(json.loads(json.dumps(historical))) == spec
     digest = sha256(
         json.dumps(historical, sort_keys=True, separators=(",", ":")).encode()

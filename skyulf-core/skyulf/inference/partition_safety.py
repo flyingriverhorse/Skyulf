@@ -23,7 +23,13 @@ from ..pipeline import SkyulfPipeline
 from ..pipeline.seal import artifact_digest
 from ..preprocessing.drop_and_missing.deduplicate import DeduplicateApplier
 from ..preprocessing.drop_and_missing.drop_rows import DropMissingRowsApplier
-from ..preprocessing.function_steps import RowFilterFunctionApplier
+from ..preprocessing.function_steps import (
+    ColumnFunctionApplier,
+    ColumnFunctionCalculator,
+    FittedFunctionApplier,
+    FittedFunctionCalculator,
+    RowFilterFunctionApplier,
+)
 from ..preprocessing.imputation.simple import SimpleImputerApplier, SimpleImputerCalculator
 from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
@@ -32,7 +38,9 @@ from . import _partition_nodes as batch_nodes
 from . import _partition_trees as batch_trees
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
 from .fitted_pipeline import FittedPipelineArtifact
-from .pipeline_scoring import prediction_output_schema
+from .pipeline_scoring import scoring_output_schema
+from .probed_rules import require_probed_rules
+from .probed_steps import function_state_sha256, require_probed_step
 
 _APPLIERS = {
     "SimpleImputer": SimpleImputerApplier,
@@ -49,13 +57,19 @@ _SKIPS = {
     "DropMissingRows": DropMissingRowsApplier,
     "RowFilterFunction": RowFilterFunctionApplier,
 }
+# Project function steps: admitted only with sealed training probe evidence.
+_PROBED = {"ColumnFunction": ColumnFunctionApplier, "FittedFunction": FittedFunctionApplier}
+_PROBED_CALCULATORS = {
+    "ColumnFunction": ColumnFunctionCalculator,
+    "FittedFunction": FittedFunctionCalculator,
+}
 _UNRECORDED = {"TrainTestSplitter", "Split", "feature_target_split"}
 _MODELS = {LinearRegression: LinearRegressionApplier, LogisticRegression: LogisticRegressionApplier}
 
 
 @dataclass(frozen=True)
 class PartitionStepEvidence:
-    """Detached evidence of one reviewed apply or existing inference skip."""
+    """Detached evidence of one reviewed apply, probed apply or existing inference skip."""
 
     name: str
     node_type: str
@@ -95,10 +109,6 @@ def _check_pipeline(artifact: FittedPipelineArtifact) -> None:
         or type(pipeline.feature_engineer) is not FeatureEngineer
     ):
         raise _reject("pipeline", "Custom pipeline or feature orchestration is unsupported.")
-    if pipeline.config.get("project_scoring") is not None:
-        raise _reject(
-            "project_scoring", "Custom scoring and reused pre-split rules are unsupported."
-        )
     _check_schemas(artifact)
     _check_engine_context(pipeline.feature_engineer)
     for component in (pipeline, pipeline.feature_engineer):
@@ -204,7 +214,7 @@ def _check_step_identity(record: dict, config: dict) -> None:
     node = record["type"]
     if config["name"] != record["name"] or config["transformer"] != node:
         raise ValueError("Configured step disagrees with fitted name/type.")
-    expected = _APPLIERS.get(node, _SKIPS.get(node))
+    expected = _APPLIERS.get(node) or _SKIPS.get(node) or _PROBED.get(node)
     if expected is None or type(record["applier"]) is not expected:
         raise ValueError("Unknown node or unreviewed applier identity.")
     if NodeRegistry.get_applier(node) is not expected:
@@ -215,10 +225,14 @@ def _check_step_identity(record: dict, config: dict) -> None:
         raise ValueError("Carry history cannot execute on independent workers.")
 
 
-def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
+def _inspect_step(
+    record: dict, config: dict, artifact: FittedPipelineArtifact | None = None
+) -> PartitionStepEvidence:
     """Validate one known apply body without invoking its fit, apply or callbacks."""
     node, name = record["type"], record["name"]
     _check_step_identity(record, config)
+    if node in _PROBED:
+        return _inspect_probed_step(record, config, artifact)
     if node in _SKIPS:
         return PartitionStepEvidence(
             name,
@@ -244,8 +258,36 @@ def _inspect_step(record: dict, config: dict) -> PartitionStepEvidence:
     )
 
 
-def _steps(engineer: FeatureEngineer) -> tuple[PartitionStepEvidence, ...]:
+def _inspect_probed_step(
+    record: dict, config: dict, artifact: FittedPipelineArtifact | None
+) -> PartitionStepEvidence:
+    """Admit a project function step only with the opt-in flag and matching probe evidence.
+
+    Without the loaded artifact there is no sealed evidence, so the step is rejected.
+    """
+    node = record["type"]
+    if NodeRegistry.get_calculator(node) is not _PROBED_CALCULATORS[node]:
+        raise ValueError("Unreviewed calculator registration.")
+    state, params, _ = resolve_fitted_step(record, config, require_portable=False)
+    require_probed_step(
+        artifact.pipeline.config if artifact is not None else {},
+        artifact.manifest.project_source_sha256 if artifact is not None else None,
+        record["name"],
+        node,
+        state,
+    )
+    return PartitionStepEvidence(
+        record["name"],
+        node,
+        "apply_probed",
+        json.dumps(_pack(params), sort_keys=True),
+        function_state_sha256(state),
+    )
+
+
+def _steps(artifact: FittedPipelineArtifact) -> tuple[PartitionStepEvidence, ...]:
     """Require complete ordered fitted history before granting per-step evidence."""
+    engineer = artifact.pipeline.feature_engineer
     configs = _step_configs(engineer)
     if len(configs) != len(engineer.fitted_steps):
         raise _reject("pipeline", "Incomplete or unsupported fitted step history.")
@@ -258,7 +300,7 @@ def _steps(engineer: FeatureEngineer) -> tuple[PartitionStepEvidence, ...]:
                 raise ValueError(
                     "Effective preserve_rows chain disagrees with reviewed skip contract."
                 )
-            result.append(_inspect_step(record, config))
+            result.append(_inspect_step(record, config, artifact))
         except (KeyError, TypeError, ValueError) as exc:
             raise _reject(
                 str(record.get("type", "unknown")), f"Step {record.get('name')!r}: {exc}"
@@ -272,7 +314,10 @@ def require_partition_safe_pipeline(artifact: FittedPipelineArtifact) -> Partiti
     No Spark session, callback or model prediction is invoked. Loaders must first
     verify the payload digest; workers recompute this evidence and compare with
     the driver certificate. Captured project source alone is not executable
-    inference behavior and does not grant or remove node admission.
+    inference behavior and does not grant or remove node admission. Project
+    ``column_step``/``fitted_step`` steps (undeclared or declared ``"row"``) and
+    saved scoring rules are admitted only with matching training lint and probe
+    evidence sealed in the pipeline config (``probed_steps``, ``probed_rules``).
     """
     if type(artifact) is not FittedPipelineArtifact:
         raise TypeError("Expected a loaded FittedPipelineArtifact.")
@@ -287,7 +332,7 @@ def require_partition_safe_pipeline(artifact: FittedPipelineArtifact) -> Partiti
 def _pipeline_evidence(artifact: FittedPipelineArtifact) -> PartitionSafetyEvidence:
     """Build evidence after admission while keeping malformed metadata fail-closed."""
     _check_pipeline(artifact)
-    steps = _steps(artifact.pipeline.feature_engineer)
+    steps = (*_steps(artifact), *_rules(artifact))
     model = _check_model(artifact)
     try:
         configured = artifact.pipeline.config.get("preprocessing", [])
@@ -309,6 +354,19 @@ def _pipeline_evidence(artifact: FittedPipelineArtifact) -> PartitionSafetyEvide
         manifest.fitted_engine,
         config_digest,
         state_digest,
-        tuple((column.name, column.dtype) for column in prediction_output_schema(artifact)),
+        # Equals the raw prediction schema unless saved scoring rules add their columns.
+        tuple((column.name, column.dtype) for column in scoring_output_schema(artifact)),
         steps,
+    )
+
+
+def _rules(artifact: FittedPipelineArtifact) -> tuple[PartitionStepEvidence, ...]:
+    """Admit saved scoring rules only with sealed probe evidence, recorded as rules_probed."""
+    try:
+        admitted = require_probed_rules(artifact)
+    except ValueError as exc:
+        raise _reject("project_scoring", str(exc)) from exc
+    return tuple(
+        PartitionStepEvidence(name, node, "rules_probed", config_json, digest)
+        for name, node, config_json, digest in admitted
     )

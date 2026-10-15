@@ -134,6 +134,37 @@ def test_shap_competition_preserves_winner_and_child_reports(staged):
         assert "data:image/png;base64," in report
 
 
+def test_spark_competition_seals_probe_evidence_for_each_candidate(staged, tmp_path, monkeypatch):
+    """Each candidate fit must seal its own probe evidence so the Spark winner is admitted."""
+    from test_databricks_lifecycle_tasks import _PROBED_SOURCE, _probe_sized_source
+
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.mlflow.registration.registry import load_run_pipeline
+
+    _, _, config, _, _ = staged
+    _probe_sized_source(monkeypatch)
+    path = tmp_path / "preprocessing.py"
+    path.write_text(_PROBED_SOURCE.replace("__CONTEXT__", "None"), encoding="utf-8")
+    config.update(inference_mode="spark")
+    config.update(load_project_workflow(config, path))
+    _competition(config)
+    weak = config["competition"]["candidates"]["weak"]["pipeline"]
+    weak.update(deepcopy(config["pipeline"]), modeling=weak["modeling"])
+    prepared = _call(staged, "initialize", config=config, action="train", experiment_name="staged")
+    loaded = _call(staged, "load_data", prepared.reference)
+    split = _call(staged, "prepare_dataset", loaded.reference)
+    trained = _call(staged, "train", split.reference)
+    assert trained.output["competition"]["winner"] == "strong"
+    for row in trained.output["competition"]["leaderboard"]:
+        artifact = load_run_pipeline(
+            row["model_uri"], digest=row["model_digest"], tracking_uri=config["tracking_uri"]
+        )
+        pipeline: dict[str, Any] = dict(artifact.pipeline.config)
+        assert [step["name"] for step in pipeline["partition_probe"]["steps"]] == ["centred"]
+    selected = _call(staged, "select_best_model", trained.reference)
+    assert selected.output["candidate_count"] == 2
+
+
 def test_cv_required_before_reading_source(staged, monkeypatch):
     """Competition cannot rank candidates by the independent final holdout."""
     from skyulf.integrations.databricks.lifecycle import workflow

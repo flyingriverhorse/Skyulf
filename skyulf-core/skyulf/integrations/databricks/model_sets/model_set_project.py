@@ -12,7 +12,8 @@ from typing import Any
 from skyulf.integrations.mlflow.shared._client import make_registry_client, require_mlflow
 
 from ....inference._manifest import ColumnSpec
-from ....inference.model_set import ComponentReference, save_model_set
+from ....inference.model_set import ComponentReference, load_model_set, save_model_set
+from ....inference.probed_composition import function_rules, sealed_composition_config
 from ....inference.project_code import load_project_module
 from ...mlflow.lifecycle.promotion import ExclusiveAliasWriterAdmission, controlled_champion_version
 from ...mlflow.registration.registry import (
@@ -50,7 +51,7 @@ from ..jobs.shared.job_runtime import (
     read_notebook_config,
     validate_job_parameters,
 )
-from ..lifecycle.workflow import bind_target_name, resolve_target_config
+from ..lifecycle.workflow import bind_target_name, probed_admission, resolve_target_config
 from ..projects._project_files import project_source, read_source
 from ..projects.workflow_config import validate_workflow_config
 from ..projects.yaml_config import read_inference_config
@@ -350,21 +351,34 @@ def package_training_model_set(
         component_artifacts=component_artifacts,
     )
     validate_component_bindings(branches, component_artifacts)
+    quality_evidence = {
+        "expected_champion_version": config.get("expected_champion_version"),
+        "comparisons": {
+            name: result.comparison_sha256 for name, result in outcome.components.items()
+        },
+    }
     with tempfile.TemporaryDirectory(prefix="skyulf-model-set-") as directory:
-        path = Path(directory) / "set"
-        saved = save_model_set(
-            path,
-            components=components,
-            record_key_schema=keys,
-            composition_source=composition_source,
-            composition_config=config["composition_config"],
-            quality_evidence={
-                "expected_champion_version": config.get("expected_champion_version"),
-                "comparisons": {
-                    name: result.comparison_sha256 for name, result in outcome.components.items()
-                },
-            },
-        )
+
+        def save(name: str, composition: dict[str, Any] | None) -> Any:
+            """Save one complete package copy with the given composition config."""
+            return save_model_set(
+                Path(directory) / name,
+                components=components,
+                record_key_schema=keys,
+                composition_source=composition_source,
+                composition_config=composition,
+                quality_evidence=quality_evidence,
+            )
+
+        composition = dict(config["composition_config"] or {"outputs": []})
+        composition.pop("partition_probe", None)  # only training writes the evidence
+        saved = save("set", composition)
+        if probed_admission(config) and function_rules(composition):
+            # Spark/online sets: probe combined function rules and seal the evidence.
+            sample = _composition_sample(source, saved.manifest)
+            sealed = sealed_composition_config(load_model_set(saved.directory), sample)
+            saved = save("sealed", sealed)
+        path = saved.directory
         binding = union_feature_binding(
             component_artifacts,
             tuple(column.name for column in saved.manifest.input_schema),
@@ -392,6 +406,14 @@ def package_training_model_set(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+
+
+def _composition_sample(source: Any, manifest: Any) -> Any:
+    """Collect up to 256 source rows with the set's keys and inputs for the probe."""
+    names = list(dict.fromkeys(column.name for column in manifest.input_schema))
+    keys = list(manifest.record_key_columns)
+    # Ordered by record keys so retrying the same training run probes the same rows.
+    return source.select(*names).orderBy(*keys).limit(256).toPandas()
 
 
 def _log_training_set_package(

@@ -17,6 +17,7 @@ import polars as pl
 
 from skyulf.integrations.mlflow.shared._client import get_or_create_experiment
 
+from .....inference.probed_steps import without_partition_probe
 from .....inference.project_code import load_project_module, project_source_digest
 from ....mlflow.lifecycle.challenger import ChallengerLifecycle
 from ....mlflow.lifecycle.promotion import AliasChangeReceipt, ExclusiveAliasWriterAdmission
@@ -337,6 +338,7 @@ def _validate_pinned_spec(fitted_spec: dict[str, Any], pinned_spec: dict[str, An
         "reserved_weight_columns": [],
         "weights_python_source": None,
         "weights_python_sha256": None,
+        "admit_probed_custom_steps": False,
     }
     if {key: value for key, value in (defaults | fitted_spec).items() if key not in enriched} != {
         key: value for key, value in (defaults | pinned_spec).items() if key not in enriched
@@ -370,7 +372,8 @@ def _load_training_evidence(store: PhaseStore) -> _ReplayEvidence:
         artifact.manifest.fitted_engine != config["engine"]
         or artifact.manifest.project_source_sha256 != source_sha
         or fitted["project_source_sha256"] != source_sha
-        or artifact.pipeline.config != effective_config
+        # Training seals probe evidence after fitting; everything else must match the request.
+        or without_partition_probe(artifact.pipeline.config) != effective_config
     ):
         raise ValueError(
             "Fitted model engine, configuration or project source differs from invocation."

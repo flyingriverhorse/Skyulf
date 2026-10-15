@@ -23,12 +23,14 @@ def test_ensemble_questions_are_independent_per_candidate():
     )
     assert "competition_ensemble_1_classification_base_3" in shown
     assert "competition_ensemble_2_classification_base_3" not in shown
-    assert "competition_ensemble_1_voting" in shown
-    assert "competition_ensemble_2_voting" not in shown
     assert "competition_ensemble_2_classification_final" in shown
     assert "competition_ensemble_1_classification_final" not in shown
-    assert "competition_ensemble_1_classification_weight_3" in shown
-    assert "competition_ensemble_2_classification_weight_1" not in shown
+    # Settings of a chosen ensemble come from training.yml defaults or an answer file.
+    assert not any(
+        name.startswith("competition_ensemble_")
+        and name.endswith(("_voting", "_cv", "_passthrough", "_calibrate", "_weight_1"))
+        for name in shown
+    )
     assert not any(name.startswith("competition_ensemble_3_") for name in shown)
     assert "logistic_regression" in props["competition_ensemble_1_classification_base_1"]["enum"]
 
@@ -80,11 +82,9 @@ def test_inactive_ensemble_slots_do_not_open_questions():
     )
     assert {
         "competition_ensemble_2_classification_base_count",
-        "competition_ensemble_2_cv",
         "competition_ensemble_2_classification_final",
-        "competition_ensemble_2_calibrate",
     } <= shown
-    assert "competition_ensemble_2_voting" not in shown
+    assert not {"competition_ensemble_2_cv", "competition_ensemble_2_calibrate"} & shown
 
 
 @pytest.mark.parametrize("layout", ["single_model", "multi_target"])

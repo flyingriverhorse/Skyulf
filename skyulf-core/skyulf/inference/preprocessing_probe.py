@@ -1,10 +1,12 @@
 """Explicit diagnostics for the real saved preprocessing inference path.
 
 This executes trusted model code on a bounded sample. Passing observations are
-not partition admission, a sandbox, or proof for unobserved inputs. Load models
+not partition admission, a sandbox, or proof for unobserved inputs; see
+``probed_steps`` for the opt-in evidence built from them. Load models
 through load_pipeline first to verify their packages and payload checksums.
 """
 
+from collections.abc import Callable
 from copy import deepcopy
 from typing import Any
 
@@ -24,10 +26,9 @@ from ._probe_frames import (
     assert_same,
     copy_frame,
     probe_sizes,
-    reverse_frame,
-    slice_frame,
     validate_frame,
 )
+from ._probe_strategies import run_check
 from .fitted_pipeline import FittedPipelineArtifact, validate_pipeline_input
 
 
@@ -118,55 +119,11 @@ def _run_check(
     expected: Frame | None,
     budgets: tuple[int, int],
 ) -> tuple[dict, Frame | None]:
-    """Return redacted evidence for one strategy, preserving mutation failures on empty input."""
-    try:
-        result = _execute_check(name, deepcopy(record), frame, expected, budgets)
-        return {"name": name, "status": "passed"}, result
-    except ProbeFailure as exc:
-        return {"name": name, "status": "failed", "reason": str(exc)}, None
-    except Exception as exc:  # noqa: BLE001 - report arbitrary trusted callback failures
-        return {
-            "name": name,
-            "status": "not_supported" if name == "empty" else "failed",
-            "reason": "apply_error",
-            "error_type": type(exc).__name__,
-        }, None
-
-
-def _execute_check(
-    name: str,
-    record: dict,
-    frame: Frame,
-    expected: Frame | None,
-    budgets: tuple[int, int],
-) -> Frame | None:
-    """Use unchanged apply code for full, repeated, partitioned and reordered requests."""
-    if name == "full":
-        return _apply_checked(record, frame, *budgets)
-    if expected is None:
-        raise ProbeFailure("missing_expected_output")
-    if name.startswith("chunks:"):
-        _check_chunks(record, frame, expected, int(name.split(":")[1]), budgets)
-    elif name == "reverse":
-        actual = _apply_checked(record, reverse_frame(frame), *budgets)
-        assert_same(expected, reverse_frame(actual))
-    elif name == "empty":
-        actual = _apply_checked(record, slice_frame(frame, 0, 0), *budgets)
-        assert_same(slice_frame(expected, 0, 0), actual)
-    else:
-        # Reuse the same detached state twice to expose request-to-request changes.
-        for _ in range(2):
-            assert_same(expected, _apply_checked(record, frame, *budgets))
-    return None
-
-
-def _check_chunks(
-    record: dict, frame: Frame, expected: Frame, size: int, budgets: tuple[int, int]
-) -> None:
-    """Compare each chunk before concatenation could conceal dtype promotion."""
-    for start in range(0, len(frame), size):
-        actual = _apply_checked(record, slice_frame(frame, start, size), *budgets)
-        assert_same(slice_frame(expected, start, size), actual)
+    """Run one shared strategy on a detached copy of the fitted record."""
+    detached = deepcopy(record)
+    return run_check(
+        name, lambda current: _apply_checked(detached, current, *budgets), frame, expected
+    )
 
 
 def _probe_step(
@@ -179,6 +136,8 @@ def _probe_step(
     *,
     active: bool,
     project_sha: str | None,
+    perturb: bool = False,
+    fresh: Callable[[dict], dict] | None = None,
 ) -> tuple[dict, Frame]:
     """Report declared context and empirical behavior without granting execution support."""
     detail: dict[str, Any] = {
@@ -202,20 +161,45 @@ def _probe_step(
     if detail["context"] in {"group", "window", "global"} or detail["history_mode"] == "carry":
         detail["status"] = "requires_context"
         return detail, frame
-    return _probe_checks(detached, detail, frame, sizes, budgets)
+    fresh_record = fresh(deepcopy(detached)) if perturb and fresh is not None else None
+    strategies = _strategies(sizes, perturb=perturb, fresh=fresh_record is not None)
+    return _probe_checks(detached, detail, frame, strategies, budgets, fresh_record)
+
+
+def _strategies(sizes: tuple[int, ...], *, perturb: bool, fresh: bool) -> tuple[str, ...]:
+    """List the checks after ``full``; admission adds perturb and fresh_module."""
+    return (
+        "repeat",
+        *(f"chunks:{size}" for size in sizes),
+        "reverse",
+        "index_shift",
+        "empty",
+        *(("perturb",) if perturb else ()),
+        *(("fresh_module",) if fresh else ()),
+    )
 
 
 def _probe_checks(
-    record: dict, detail: dict, frame: Frame, sizes: tuple[int, ...], budgets: tuple[int, int]
+    record: dict,
+    detail: dict,
+    frame: Frame,
+    strategies: tuple[str, ...],
+    budgets: tuple[int, int],
+    fresh_record: dict | None = None,
 ) -> tuple[dict, Frame]:
-    """Keep the first successful full output as the next step's observed input."""
+    """Keep the first successful full output as the next step's observed input.
+
+    ``fresh_module`` runs ``fresh_record``: the same saved step bound to a freshly
+    loaded copy of the project code.
+    """
     full, transformed = _run_check("full", record, frame, None, budgets)
     detail["checks"].append(full)
     if transformed is None:
         detail["status"] = "failed"
         return detail, frame
-    for name in ("repeat", *(f"chunks:{size}" for size in sizes), "reverse", "empty"):
-        check, _ = _run_check(name, record, frame, transformed, budgets)
+    for name in strategies:
+        source = fresh_record if name == "fresh_module" and fresh_record else record
+        check, _ = _run_check(name, source, frame, transformed, budgets)
         detail["checks"].append(check)
     detail["status"] = (
         "failed" if any(c["status"] == "failed" for c in detail["checks"]) else "passed"
@@ -288,14 +272,21 @@ def probe_fitted_preprocessing(
     chunk_sizes: tuple[int, ...] = (1, 2, 7),
     max_rows: int = 256,
     max_bytes: int = 8 * 1024 * 1024,
+    perturb_nodes: tuple[str, ...] = (),
+    fresh: Callable[[dict], dict] | None = None,
 ) -> dict[str, Any]:
     """Diagnose saved apply behavior on an explicit bounded local sample.
+
+    ``fresh`` rebinds a record to a freshly loaded copy of the project code for
+    the ``fresh_module`` check on those steps. ``perturb_nodes`` adds the ``perturb`` check (one row's inputs changed at a
+    time; other rows' outputs must not move) for steps of those node types.
 
     Uses no fit/learn methods. Each strategy receives detached fitted records.
     Checks exact schema, values, order and semantic fitted-state mutation. Known
     group/window/global steps require context and stop this independent-partition
     probe. Unknown custom steps may pass samples but remain unverified for remote
-    admission. Empty-input exceptions are reported as not_supported.
+    admission; only ``probed_steps`` turns a passing row-declared function step
+    into opt-in evidence. Empty-input exceptions are reported as not_supported.
 
     Load the artifact with load_pipeline first; this diagnostic does not
     repeat disk/package verification. Trusted callbacks can access globals or
@@ -343,6 +334,8 @@ def probe_fitted_preprocessing(
             (max_rows, max_bytes),
             active=active,
             project_sha=artifact.manifest.project_source_sha256,
+            perturb=record["type"] in perturb_nodes,
+            fresh=fresh,
         )
         report["steps"].append(detail)
         if detail["status"] not in {"passed", "skipped"}:

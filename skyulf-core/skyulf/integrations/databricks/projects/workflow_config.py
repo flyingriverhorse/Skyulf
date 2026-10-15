@@ -12,7 +12,12 @@ from ....modeling.base import BaseModelCalculator
 from ....registry import NodeRegistry
 from ...mlflow.lifecycle.validation import validate_quality_policy
 from ..data.training.training_dates import training_date_spec
-from ..lifecycle.workflow import training_settings, training_spec, training_window_mode
+from ..lifecycle.workflow import (
+    probed_admission,
+    training_settings,
+    training_spec,
+    training_window_mode,
+)
 from ..observability.charts.evaluation_chart_data import chart_settings
 from ..observability.reports.explanations import validate_explanation_config
 from ..scoring.shared.prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
@@ -26,6 +31,7 @@ from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_role
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
     "preprocessing_probe",
+    "admit_probed_custom_steps",
     "feature_lookup",
     "online_features",
     *WEIGHT_FIELDS,
@@ -611,7 +617,23 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )
     lines.extend(_preview_model_and_scoring(checked, cv))
+    if action == "train" and probed_admission(checked) is True:
+        lines.extend(_preview_admission(checked["pipeline"]))
     return "\n".join(lines)
+
+
+def _preview_admission(pipeline: dict[str, Any]) -> list[str]:
+    """Run training's Spark admission lint offline; the probe itself needs a fitted model."""
+    from ....inference.probed_rules import preview_admission_lint  # noqa: PLC0415
+
+    found = preview_admission_lint(pipeline)
+    if not found:
+        return []
+    return [
+        "Spark/endpoint admission lint (training also probes these on holdout rows; "
+        "run smoke.py --probe <sample> to probe locally):",
+        *(f"  {line}" for line in found),
+    ]
 
 
 def migrate_workflow_config(

@@ -1,10 +1,13 @@
 """Explicit, dependency-free contracts for optional Unity Catalog lookups."""
 
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
 
-from ..shared._contracts import column_name, table_name
+from ..shared._contracts import column_name
+
+_UC_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2}")
 
 
 def validate_feature_columns(
@@ -21,9 +24,11 @@ def validate_feature_columns(
 
 def validate_uc_name(value: str) -> None:
     """Require a catalog-qualified name for this Unity Catalog-only adapter."""
-    table_name(value)
-    if len(value.split(".")) != 3:
-        raise ValueError("Unity Catalog names must contain catalog.schema.name.")
+    if type(value) is not str or not _UC_NAME.fullmatch(value):
+        raise ValueError(
+            "Unity Catalog names must be catalog.schema.name; each part a simple identifier "
+            "(letters, digits, underscore; not starting with a digit)."
+        )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

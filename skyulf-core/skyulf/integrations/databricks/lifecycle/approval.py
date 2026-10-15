@@ -41,17 +41,35 @@ from ..training.shared.training_evidence import (
 )
 
 
+def _require_lookup_policy(
+    config: dict[str, Any], action: str, allow_unloadable_champion: bool
+) -> None:
+    """Allow saved-proof lookup for manual decisions or the explicit override approval."""
+    manual = config.get("promotion_policy") == "manual_approval"
+    override = action == "approve" and allow_unloadable_champion
+    if action not in {"approve", "reject"} or not (manual or override):
+        raise ValueError(
+            "Evidence lookup requires manual_approval and approve/reject, "
+            "or approve with allow_unloadable_champion=true."
+        )
+
+
 def resolve_candidate_comparison_digest(
-    config: dict[str, Any], candidate_version: str, *, action: str
+    config: dict[str, Any],
+    candidate_version: str,
+    *,
+    action: str,
+    allow_unloadable_champion: bool = False,
 ) -> str:
     """Resolve a named candidate's proof from its active committed lifecycle receipt.
 
     This is the Bundle convenience path, not a latest-candidate lookup. The
     strict approval/rejection service still verifies the downloaded comparison,
     expected champion and active receipt against the full returned digest.
+    The unloadable-champion override is the one approval allowed under automatic
+    promotion, so its lookup is allowed there too.
     """
-    if config.get("promotion_policy") != "manual_approval" or action not in {"approve", "reject"}:
-        raise ValueError("Evidence lookup requires manual_approval and approve/reject.")
+    _require_lookup_policy(config, action, allow_unloadable_champion)
     if not isinstance(candidate_version, str) or not re.fullmatch(
         r"[1-9][0-9]*", candidate_version
     ):

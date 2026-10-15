@@ -196,13 +196,7 @@ def run_online_publication(
         return {"status": "DISABLED"}
     if action not in {"start", "status", "stop", "restart"}:
         raise ValueError("Publication action must be start, status, stop or restart.")
-    spec = OnlinePublicationSpec(
-        **{
-            name: settings[name]
-            for name in ("source_table", "online_table", "online_store", "source_table_id")
-        },
-        publish_mode=settings.get("publish_mode", "TRIGGERED"),
-    )
+    spec = _publication_spec(settings)
     admission = SingleWriterAdmission()
     if action == "start":
         receipt = publish_online_features(
@@ -280,6 +274,41 @@ def _online_setup_contract(
         raise ValueError(
             "online_serving endpoint or publication fields are incomplete or unknown."
         ) from exc
+
+
+def _publication_spec(settings: dict[str, Any]) -> OnlinePublicationSpec:
+    """Build the publication job's typed contract from its YAML section."""
+    return OnlinePublicationSpec(
+        **{
+            name: settings[name]
+            for name in ("source_table", "online_table", "online_store", "source_table_id")
+        },
+        publish_mode=settings.get("publish_mode", "TRIGGERED"),
+    )
+
+
+def validate_serving_section(section: str, settings: Any) -> None:
+    """Apply a serving job's own pre-remote checks to one ``config/serving.yml`` section.
+
+    Every section needs the explicit ``enabled`` switch. Enabled online serving
+    and online publication sections must also build the contracts their jobs
+    build before any workspace call. Nothing here reads Spark, MLflow or the
+    network, so a passing check does not prove the pinned resources exist.
+
+    Args:
+        section: ``online_serving``, ``rollout`` or ``online_publication``.
+        settings: The section's parsed YAML value.
+
+    Raises:
+        ValueError: The section is malformed or incomplete.
+        KeyError: An enabled publication section lacks a required field.
+    """
+    if not _enabled(settings):
+        return
+    if section == "online_serving":
+        _online_setup_contract(settings)
+    elif section == "online_publication":
+        _publication_spec(settings)
 
 
 def _notebook_settings(dbutils: Any, section: str) -> dict[str, Any]:

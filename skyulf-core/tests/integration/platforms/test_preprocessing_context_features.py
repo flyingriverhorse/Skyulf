@@ -150,7 +150,15 @@ def _replay(directory):
         assert step["row_effect"] == ("filter" if node in DETECTORS else "preserve"), report
         expected_checks = [
             {"name": name, "status": "passed"}
-            for name in ("full", "repeat", "chunks:1", "chunks:2", "reverse", "empty")
+            for name in (
+                "full",
+                "repeat",
+                "chunks:1",
+                "chunks:2",
+                "reverse",
+                "index_shift",
+                "empty",
+            )
         ]
         assert step["checks"] == expected_checks, report
         assert report["status"] == "passed", report

@@ -102,8 +102,7 @@ def validate_online_features(
         return
     if not frame.columns.is_unique or not set(policy.required_features).issubset(frame.columns):
         raise ValueError("Online required feature columns are missing or duplicated.")
-    if frame.loc[:, list(policy.required_features)].isna().any().any():
-        raise ValueError("Online required feature values must be present and non-null.")
+    _require_lookup_values(frame, policy.required_features)
     instant = time.time() if now is None else now
     if not _finite_number(instant):
         raise ValueError("Online validation clock must be finite UTC epoch seconds.")
@@ -111,14 +110,41 @@ def validate_online_features(
         _validate_timestamp(frame[name], name, maximum_age, instant)
 
 
+def _require_lookup_values(frame: pd.DataFrame, required: tuple[str, ...]) -> None:
+    """Name the empty features and rows; serving clients only see this in endpoint logs."""
+    missing = frame.loc[:, list(required)].isna()
+    rows = missing.any(axis=1).to_numpy()
+    if not rows.any():
+        return
+    names = ", ".join(column for column in required if missing[column].any())
+    raise ValueError(
+        f"Online required features have no value in {int(rows.sum())} of {len(frame)} rows "
+        f"(first row {int(rows.argmax())}): {names}. The lookup key has no row in the "
+        "online table, or the published value is null."
+    )
+
+
 def _validate_timestamp(values: pd.Series, name: str, maximum_age: float, now: float) -> None:
     """Validate exact numeric times without accepting strings or booleans."""
     if not pd.api.types.is_numeric_dtype(values.dtype) or pd.api.types.is_bool_dtype(values.dtype):
         raise ValueError(f"Online freshness feature {name!r} must contain numeric epoch seconds.")
     numbers = values.to_numpy(dtype=float)
-    ages = now - numbers
-    if not np.isfinite(numbers).all() or (ages < 0).any() or (ages > maximum_age).any():
-        raise ValueError(f"Online freshness feature {name!r} is nonfinite, stale or future.")
+    finite = np.isfinite(numbers)
+    ages = np.where(finite, now - numbers, 0.0)
+    prefix = f"Online freshness feature {name!r}"
+    for failed, problem in (
+        (~finite, "is not a finite epoch time"),
+        (ages < 0, "is in the future"),
+    ):
+        if failed.any():
+            raise ValueError(f"{prefix} {problem} in {int(failed.sum())} of {len(numbers)} rows.")
+    stale = ages > maximum_age
+    if stale.any():
+        raise ValueError(
+            f"{prefix} is stale in {int(stale.sum())} of {len(numbers)} rows: oldest age "
+            f"{ages.max():.0f}s exceeds {maximum_age:.0f}s (max_age_seconds). Refresh and "
+            "republish the feature table."
+        )
 
 
 def saved_online_policy(

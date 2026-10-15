@@ -7,10 +7,13 @@ untrusted input or a sandbox. Imported third-party packages must be installed.
 import hashlib
 import re
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from threading import RLock
 from types import ModuleType
 from typing import Any
+from uuid import uuid4
 
 from ..preprocessing.function_steps import FILTER_STEP
 from ..registry import NodeRegistry
@@ -50,6 +53,26 @@ def load_project_module(source: str) -> ModuleType:
             discard_project_package(name)
             raise
         return module
+
+
+@contextmanager
+def fresh_project_module(source: str) -> Iterator[ModuleType]:
+    """Load trusted source again under a unique name, as a fresh worker process would.
+
+    The admission probe compares results from this copy with the warm module
+    that training used, exposing values kept in classes, function attributes,
+    default arguments or module globals. The copy is removed afterwards.
+    """
+    name = f"{_PREFIX}{project_source_digest(source)}_fresh_{uuid4().hex}"
+    module = ModuleType(name)
+    module.__file__ = f"<{name}>"
+    module.__dict__["__skyulf_source__"] = source
+    sys.modules[name] = module
+    try:
+        exec(compile(source, module.__file__, "exec"), module.__dict__)  # nosec B102 - trusted project/model code
+        yield module
+    finally:
+        discard_project_package(name)
 
 
 def custom_step(

@@ -399,7 +399,9 @@ def column_step(
     """Build columns from ``function(df)`` or ``function(df, params)``.
 
     ``inference_context`` optionally declares row, group, window or global input
-    dependence for diagnostics. It does not authorize distributed execution.
+    dependence for diagnostics. Alone it does not authorize distributed execution:
+    Spark and endpoints admit the step only after training linted and probed it.
+    Undeclared and ``"row"`` steps are eligible; group/window/global are not.
     """
     return {
         "name": name,
@@ -427,7 +429,9 @@ def fitted_step(
     """Build a step reusing ``learn(df, y)`` state in ``apply(df, state)``.
 
     ``inference_context`` optionally declares row, group, window or global input
-    dependence for diagnostics. Learned state alone supplies no such promise.
+    dependence for diagnostics. Learned state alone supplies no such promise:
+    Spark and endpoints admit the step only after training linted and probed it.
+    Undeclared and ``"row"`` steps are eligible; group/window/global are not.
     """
     return {
         "name": name,

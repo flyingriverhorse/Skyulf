@@ -83,6 +83,37 @@ def test_missing_feature_fails(frame):
         validate_online_features(frame, _policy(), now=1000.0)
 
 
+def test_missing_lookup_values_name_features_rows_and_cause():
+    """Endpoint logs are the only place this reason survives, so it must say what to fix."""
+    from skyulf.integrations.databricks.feature_store.online_policy import validate_online_features
+
+    frame = pd.DataFrame({"x": [3.0, None, None], "fresh_at": [1000.0, None, 1000.0]})
+    message = (
+        r"Online required features have no value in 2 of 3 rows \(first row 1\): "
+        r"x, fresh_at\. The lookup key has no row in the online table, or the published "
+        r"value is null"
+    )
+    with pytest.raises(ValueError, match=message):
+        validate_online_features(frame, _policy(), now=1000.0)
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        (900.0, r"'fresh_at' is stale in 1 of 2 rows: oldest age 100s exceeds 60s"),
+        (1010.0, r"'fresh_at' is in the future in 1 of 2 rows"),
+        (float("inf"), r"'fresh_at' is not a finite epoch time in 1 of 2 rows"),
+    ],
+)
+def test_freshness_failures_report_the_age_and_the_limit(value, message):
+    """A stale feature must tell the operator how old it is versus max_age_seconds."""
+    from skyulf.integrations.databricks.feature_store.online_policy import validate_online_features
+
+    frame = pd.DataFrame({"x": [3.0, 4.0], "fresh_at": [1000.0, value]})
+    with pytest.raises(ValueError, match=message):
+        validate_online_features(frame, _policy(), now=1000.0)
+
+
 def test_fresh_boundary_keeps_input_unchanged():
     """The inclusive age boundary preserves the original values and row order."""
     from skyulf.integrations.databricks.feature_store.online_policy import validate_online_features

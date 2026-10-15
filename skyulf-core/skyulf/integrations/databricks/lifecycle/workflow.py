@@ -247,6 +247,21 @@ def _scoring_config(config: dict[str, Any]) -> WorkflowConfig:
     )
 
 
+def probed_admission(config: dict[str, Any]) -> Any:
+    """Probe custom steps and rules automatically when Spark or online serving will run them.
+
+    Training sees ``inference_mode`` and ``online_features``; endpoint-only
+    projects configured in ``config/serving.yml`` keep the manual
+    ``admit_probed_custom_steps`` opt-in. A non-boolean opt-in is passed through
+    unchanged so the spec rejects it.
+    """
+    flag = config.get("admit_probed_custom_steps", False)
+    if type(flag) is not bool:
+        return flag
+    automatic = config.get("inference_mode") == "spark" or config.get("online_features") is not None
+    return flag or automatic
+
+
 def training_spec(config: dict[str, Any]) -> TrainingSpec:
     """Keep the evaluation split and source snapshot identical across actions."""
     training_window_mode(config)
@@ -262,6 +277,7 @@ def training_spec(config: dict[str, Any]) -> TrainingSpec:
 
     return TrainingSpec(
         preprocessing_probe=config.get("preprocessing_probe", False),
+        admit_probed_custom_steps=probed_admission(config),
         online_policy_json=workflow_online_policy_json(config),
         feature_lookup_json=workflow_lookup_json(config),
         table=config["training_table"],

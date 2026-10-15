@@ -1,5 +1,6 @@
 """A champion from another Core release must hold promotion until an explicit, gated override."""
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -157,3 +158,64 @@ def test_report_offers_the_override_under_either_policy(case, old_champion, poli
         "allow_unloadable_champion": "true",
     }
     assert ("reject" in actions) == (policy == "manual_approval")
+
+
+def _saved_proof(monkeypatch):
+    """Serve one committed challenger receipt so only the policy guard decides."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks.lifecycle import approval
+
+    event = {"k": "challenger", "s": "committed", "h": "b" * 64}
+    client = Mock()
+    client.get_model_version.return_value = SimpleNamespace(
+        tags={"promotion_event": json.dumps(event)}
+    )
+    monkeypatch.setattr(approval, "controlled_champion_version", lambda *a, **kw: "1")
+    monkeypatch.setattr(approval, "active_marker", lambda *a, **kw: "event")
+    monkeypatch.setattr(approval, "require_mlflow", lambda: object())
+    monkeypatch.setattr(approval, "make_registry_client", lambda *a: client)
+    return approval
+
+
+def test_override_finds_saved_proof_under_automatic_policy(monkeypatch):
+    """The job's approve form must work without a digest when automatic promotion held."""
+    approval = _saved_proof(monkeypatch)
+    config = {"promotion_policy": "automatic", "model_name": "workspace.test.model"}
+    with pytest.raises(ValueError, match="manual_approval"):
+        approval.resolve_candidate_comparison_digest(config, "2", action="approve")
+    with pytest.raises(ValueError, match="manual_approval"):
+        approval.resolve_candidate_comparison_digest(
+            config, "2", action="reject", allow_unloadable_champion=True
+        )
+    digest = approval.resolve_candidate_comparison_digest(
+        config, "2", action="approve", allow_unloadable_champion=True
+    )
+    assert digest == "b" * 64
+
+
+def test_job_passes_the_override_to_the_proof_lookup(monkeypatch):
+    """Without the flag the automatic-policy lookup refuses before approval can run."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks.jobs.shared import job_runtime
+
+    resolver = Mock(return_value="b" * 64)
+    monkeypatch.setattr(job_runtime, "resolve_candidate_comparison_digest", resolver)
+    monkeypatch.setattr(job_runtime, "run_action", Mock())
+    config = {
+        "score_model_selection": "pinned_version",
+        "promotion_policy": "automatic",
+        "score_handoff": "after_alias_change",
+        "model_name": "workspace.test.model",
+        "model_version": "1",
+    }
+    params = {
+        "lifecycle_action": "approve",
+        "candidate_version": "3",
+        "expected_champion_version": "1",
+        "allow_unloadable_champion": "true",
+    }
+    job_runtime.run_bundle_action(None, config, params, task_role="lifecycle")
+    resolver.assert_called_once_with(config, "3", action="approve", allow_unloadable_champion=True)

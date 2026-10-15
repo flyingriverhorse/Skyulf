@@ -26,6 +26,7 @@ from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
 from .....inference.pipeline_evaluation import evaluate_holdout
+from .....inference.probed_steps import PROBED_NODES
 from .....inference.project_code import is_project_filter_step
 from .....leakage import step_learns_from_data
 from .....preprocessing.split import DataSplitter
@@ -67,7 +68,11 @@ from ...observability.reports.explanations import (
 from ...scoring.batch.frame_batch import fit_workflow
 from ...shared._contracts import column_name, table_name
 from ..shared.holdout_evidence import save_holdout_reference
-from ..shared.preprocessing_checks import log_preprocessing_probe
+from ..shared.preprocessing_checks import (
+    log_partition_probe,
+    log_preprocessing_probe,
+    seal_partition_probe,
+)
 from ..shared.training_evidence import build_training_evidence, evidence_digest
 from ..shared.training_inputs import capture_training_uc_id, log_training_inputs
 from ..shared.training_parameters import log_training_parameters
@@ -136,6 +141,7 @@ class TrainingSpec:
     feature_binding_json: str | None = None
     online_policy_json: str | None = None
     preprocessing_probe: bool = False
+    admit_probed_custom_steps: bool = False
 
     @classmethod
     def from_payload(cls, payload: dict[str, Any]) -> TrainingSpec:
@@ -181,7 +187,12 @@ class TrainingSpec:
 
     def _validate_label_policy(self) -> None:
         """Require explicit booleans for label eligibility and optional diagnostics."""
-        for field in ("filter_unavailable_results", "drop_missing_labels", "preprocessing_probe"):
+        for field in (
+            "filter_unavailable_results",
+            "drop_missing_labels",
+            "preprocessing_probe",
+            "admit_probed_custom_steps",
+        ):
             if type(getattr(self, field)) is not bool:
                 raise ValueError(f"{field} must be boolean.")
 
@@ -355,7 +366,7 @@ class TrainingSpec:
             settings.pop("training_evidence_sha256")
         if not self.pre_split_steps:
             settings.pop("pre_split_steps")
-        for field in ("max_rows", "max_bytes", "preprocessing_probe"):
+        for field in ("max_rows", "max_bytes", "preprocessing_probe", "admit_probed_custom_steps"):
             settings.pop(field)
         for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
             value = getattr(self, field)
@@ -921,6 +932,12 @@ def candidate_config(
     pipeline_config.pop("pre_split_target_contract", None)
     if contract:
         pipeline_config["pre_split_target_contract"] = contract
+    # Only the training spec opts in, and only training writes the probe evidence.
+    pipeline_config.pop("partition_probe", None)
+    pipeline_config.pop("admit_probed_custom_steps", None)
+    if spec.admit_probed_custom_steps and _needs_probe(pipeline_config):
+        # Sealed in the fitted pipeline so Spark admission reads the opt-in from the payload.
+        pipeline_config["admit_probed_custom_steps"] = True
     cv.validate_pipeline(
         pipeline_config, target_column=spec.target_column, event_column=spec.event_column
     )
@@ -938,6 +955,15 @@ def candidate_config(
     )
     _validate_champion_version(champion_version)
     return pipeline_config
+
+
+def _needs_probe(pipeline_config: dict[str, Any]) -> bool:
+    """Report whether the recipe has function steps or scoring rules to probe."""
+    steps = pipeline_config.get("preprocessing", [])
+    scoring = pipeline_config.get("project_scoring") or {}
+    return any(step.get("transformer") in PROBED_NODES for step in steps) or bool(
+        scoring.get("eligibility") or scoring.get("outputs")
+    )
 
 
 def _candidate_cv(
@@ -1053,6 +1079,9 @@ def fit_candidate(
         max_rows=spec.max_rows,
         max_bytes=spec.max_bytes,
     )
+    artifact = seal_partition_probe(
+        artifact, native_holdout, artifact_path, enabled=spec.admit_probed_custom_steps
+    )
     if _native_search_cv(search, evaluate_cv, pipeline_config):
         cv_results = post_selection_cv(
             native_train,
@@ -1065,6 +1094,8 @@ def fit_candidate(
     if pipeline_config.get("explainability"):
         log_training_explanations(run, artifact, native_train)
     log_preprocessing_probe(run, artifact, native_holdout, enabled=spec.preprocessing_probe)
+    if spec.admit_probed_custom_steps:
+        log_partition_probe(run, artifact)
     evidence = build_training_evidence(
         spec, holdout, project_source_sha256=artifact.manifest.project_source_sha256
     )

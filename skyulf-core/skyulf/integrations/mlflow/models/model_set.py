@@ -52,6 +52,7 @@ from ..shared._nullable_transport import (
 )
 from ..spark._spark_environment import pyfunc_environment
 from ..spark._spark_output import (
+    nullable_outputs,
     prepare_spark_output,
     require_spark_output,
     score_prediction_batches,
@@ -138,7 +139,12 @@ class SkyulfModelSetPythonModel(mlflow.pyfunc.PythonModel):
         result = score_prediction_batches(
             model_input, partial(predict_model_set, artifact=self._artifact), params, spark_output
         )
-        return prepare_spark_output(result, model_set_output_schema(self._artifact), spark_output)
+        return prepare_spark_output(
+            result,
+            model_set_output_schema(self._artifact),
+            spark_output,
+            nullable=nullable_outputs(self._artifact),
+        )
 
 
 def log_model_set(

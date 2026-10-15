@@ -222,6 +222,7 @@ def test_empty_recipe_preserves_legacy_dataset_identity():
         "max_rows",
         "max_bytes",
         "preprocessing_probe",
+        "admit_probed_custom_steps",
         "survivor_key_sha256",
         "training_evidence_sha256",
         "group_column",

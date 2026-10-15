@@ -285,5 +285,5 @@ def test_simple_operator_form_passes_full_saved_digest_to_strict_service(monkeyp
     if action == "reject":
         params["rejection_reason"] = "Business review"
     job_runtime.run_bundle_action(None, _config(), params, task_role="lifecycle")
-    resolver.assert_called_once_with(_config(), "2", action=action)
+    resolver.assert_called_once_with(_config(), "2", action=action, allow_unloadable_champion=False)
     assert execute.call_args.kwargs["comparison_sha256"] == "b" * 64
