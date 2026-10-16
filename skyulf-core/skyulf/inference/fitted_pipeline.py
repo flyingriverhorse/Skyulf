@@ -21,7 +21,8 @@ from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
 from ..preprocessing._target_labels import original_labels
-from ._manifest import checksum, runtime_requirements
+from ._manifest import checksum, label_dtype, runtime_requirements
+from ._model_requirements import native_model_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
 from .project_dependencies import (
     parse_project_requirements,
@@ -141,7 +142,7 @@ def _check_runtime(manifest: FittedPipelineManifest) -> None:
     verify_project_requirements(manifest.project_requirements)
     current = dict(runtime_requirements())
     required = dict(manifest.requirements)
-    if set(required) != set(current):
+    if tuple(name for name, _ in manifest.requirements) != tuple(current):
         raise ValueError("Local artifact runtime requirements are incomplete.")
     for name in ("python", "skyulf-core", "scikit-learn", "numpy", "scipy", "pandas", "polars"):
         actual, expected = current[name], required[name]
@@ -231,6 +232,8 @@ def load_pipeline(path: str | Path) -> FittedPipelineArtifact:
             manifest.use_tuned_thresholds,
             format_version=manifest.format_version,
         )
+        # _check_runtime already validated these pins, allowing Python patch differences.
+        .model_copy(update={"requirements": manifest.requirements})
         != manifest
     ):
         raise ValueError("Local artifact manifest disagrees with its fitted pipeline.")
@@ -294,6 +297,8 @@ def predict_pipeline(
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
     native = validate_pipeline_input(frame, artifact)
+    if not len(native):
+        return _empty_prediction(frame, artifact.manifest)
     prediction = np.asarray(
         artifact.pipeline.predict(
             native, use_tuned_thresholds=artifact.manifest.use_tuned_thresholds
@@ -316,6 +321,19 @@ def predict_pipeline(
     return result
 
 
+def _empty_prediction(
+    frame: pd.DataFrame | pl.DataFrame, manifest: FittedPipelineManifest
+) -> pd.DataFrame:
+    """Return the declared empty output without invoking preprocessing or estimators."""
+    index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(0)
+    dtype = "float64" if manifest.task == "regression" else label_dtype(manifest.classes)
+    result = pd.DataFrame({"prediction": pd.Series(index=index, dtype=dtype)}, index=index)
+    if manifest.task == "classification" and manifest.classification_probabilities:
+        for position in range(len(manifest.classes)):
+            result[f"probability_{position}"] = pd.Series(index=index, dtype="float64")
+    return result
+
+
 def _prediction_frame(
     frame: pd.DataFrame | pl.DataFrame, manifest: FittedPipelineManifest
 ) -> pd.DataFrame | pl.DataFrame:
@@ -334,6 +352,12 @@ def _project_contract(pipeline: SkyulfPipeline) -> tuple[str, ...]:
             raise ValueError("Project scoring requires saved project Python source.")
         validate_scoring_config(config, source)
     pins = set(source_project_requirements(source) if source else ())
+    pins.update(
+        native_model_requirements(
+            getattr(pipeline, "model_estimator", None),
+            [record["artifact"] for record in pipeline.feature_engineer.fitted_steps],
+        )
+    )
     for record in pipeline.feature_engineer.fitted_steps:
         if record["type"] == "sentence_embedder":
             pins.update(_embedding_requirements(record["artifact"]))
