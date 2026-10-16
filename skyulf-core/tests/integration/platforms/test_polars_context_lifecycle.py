@@ -220,12 +220,15 @@ def _replay_imputation_statistic(directory):
         [artifact.pipeline.predict(sample[i : i + 1]) for i in range(len(sample))]
     )
     np.testing.assert_array_equal(predictions, singles)
-    if strategy == "mode" and isinstance(sample, pd.DataFrame):
+    if isinstance(sample, pd.DataFrame):
         certificate = require_partition_safe_pipeline(artifact)
         assert certificate.fitted_engine == "pandas"
         assert len(certificate.steps) == 1 and certificate.steps[0].node_type == node
         config = dict(json.loads(certificate.steps[0].config_json)["items"])
-        assert config["strategy"] == {"kind": "string", "value": "most_frequent"}
+        assert config["strategy"] == {
+            "kind": "string",
+            "value": "most_frequent" if strategy == "mode" else "median",
+        }
     else:
         with pytest.raises(UnsupportedExecutionError):
             require_partition_safe_pipeline(artifact)
@@ -238,7 +241,7 @@ def _replay_imputation_statistic(directory):
 @pytest.mark.parametrize("node", ["SimpleImputer", "GroupImputer"])
 @pytest.mark.parametrize("strategy", ["median", "mode"])
 def test_imputation_statistic_context_survives_saved_model_reload(tmp_path, engine, node, strategy):
-    """Median and mode replay saved rows while only pandas modes retain worker admission."""
+    """Median and mode replay saved rows with worker admission only for pandas-fitted models."""
     training = pd.DataFrame(
         {"g": [1, 1, 2, 2] * 2, "x": [1.0, 4.0, 9.0, None] * 2, "target": range(8)}
     )

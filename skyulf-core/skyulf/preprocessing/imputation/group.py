@@ -271,13 +271,7 @@ def _polars_fill(
             config_match=(("strategy", strategy),),
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
-        for strategy in ("mean", "most_frequent")
-    )
-    + tuple(
-        ExecutionCapability(
-            engine, "apply", "local", "preserve", "row", config_match=(("strategy", "median"),)
-        )
-        for engine in ("pandas", "polars")
+        for strategy in ("mean", "most_frequent", "median")
     ),
 )
 @node_meta(

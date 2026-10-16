@@ -191,20 +191,10 @@ class SimpleImputerApplier(BaseApplier):
             execution_kind,
             "preserve",
             "row",
-            config_match=(("strategy", "most_frequent"),),
+            config_match=(("strategy", strategy),),
         )
         for engine, execution_kind in (("pandas", "python_batch"), ("polars", "local"))
-    )
-    + tuple(
-        ExecutionCapability(
-            engine,
-            "apply",
-            "local",
-            "preserve",
-            "row",
-            config_match=(("strategy", "median"),),
-        )
-        for engine in ("pandas", "polars")
+        for strategy in ("most_frequent", "median")
     ),
 )
 @node_meta(
