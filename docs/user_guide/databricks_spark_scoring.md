@@ -91,26 +91,59 @@ recipe: a name in this table does not promise support for every parameter choice
 | Purpose | Candidate steps |
 | --- | --- |
 | Cleaning and types | `AliasReplacement`, `Casting`, `InvalidValueReplacement`, `TextCleaning`, `ValueReplacement` |
-| Missing data | `DropMissingColumns`, `MissingIndicator`, `KNNImputer` |
+| Missing data | `DropMissingColumns`, `MissingIndicator`, `KNNImputer`, `IterativeImputer` |
 | Encoding | `DummyEncoder`, `HashEncoder`, `LabelEncoder`, `OrdinalEncoder`, `TargetEncoder`, `WOEEncoder` |
-| Scaling and transformations | `MaxAbsScaler`, `RobustScaler`, `Winsorize`, `SimpleTransformation`, `GeneralTransformation` |
+| Scaling and transformations | `MaxAbsScaler`, `RobustScaler`, `Winsorize`, `SimpleTransformation`, `GeneralTransformation`, `PowerTransformer` |
+| Outlier exclusion | `IQR`, `ZScore`, `EllipticEnvelope`, `ManualBounds` (see [rows that are not scored](#rows-that-are-not-scored)) |
 | Binning | `CustomBinning`, `GeneralBinning`, `KBinsDiscretizer` |
 | Feature generation | `FeatureGeneration`, `FeatureGenerationNode`, `FeatureMath`, `PolynomialFeatures`, `PolynomialFeaturesNode` |
 | Feature selection | `CorrelationThreshold`, `ModelBasedSelection`, `UnivariateSelection`, `VarianceThreshold`, `feature_selection` |
 | Dates and geography | `DateFeatures`, `GeoDistance`, `H3Index` (requires its optional package) |
 | Text | `count_vectorizer`, `hashing_vectorizer`, `tfidf_vectorizer`, `tokenizer` |
 
-Six built-in steps are never admitted here, because a worker batch would change
-their result:
+Six of these steps needed a change before Spark and endpoints could use them,
+because their earlier behaviour let one row affect the others in its batch:
 
-| Step | Why Spark and endpoints reject it | Use instead |
+| Step | Earlier problem | Behaviour now |
 | --- | --- | --- |
-| `IQR`, `ZScore`, `EllipticEnvelope`, `ManualBounds` | As model preprocessing they drop the rows they flag as outliers, so a request of 10 rows could return 8 predictions. Spark and endpoints must return one result per input row. | Cap values with `Winsorize` or `ClipValues`, or remove outliers from training rows only in `config/pre_split.yml` (`ManualBounds` is admitted there). |
-| `PowerTransformer` | If the transform fails on any value in a batch, for example a zero or negative value with Box-Cox, the step leaves the whole batch unchanged. One row then decides the result for every other row in its batch. | `SimpleTransformation` or `GeneralTransformation` with a fixed formula such as `log1p`. |
-| `IterativeImputer` | When every value in a batch is missing, it skips its learned rounds and returns only the initial fill. A row's imputed value then depends on what else is in its batch. | `SimpleImputer`, `GroupImputer` or `KNNImputer`. |
+| `IQR`, `ZScore`, `EllipticEnvelope`, `ManualBounds` | They dropped the rows they flagged, so a request of 10 rows could return 8 predictions. | The flagged row stays in the output without a prediction, marked `excluded` with reason `outlier:<step name>`. The bounds are learned at training, so each row is judged on its own values. |
+| `PowerTransformer` | One value it could not transform, for example zero or a negative value with Box-Cox, left the whole batch untransformed. | Each value is transformed on its own. A row with a value that cannot be transformed (zero or negative with Box-Cox, infinity, or a result too large to represent) is marked `excluded` with reason `invalid:<step name>`; the other rows are unaffected. A missing value is not invalid: it stays missing, so a later imputer can fill it. With Box-Cox, every row that has a zero or negative value is excluded, so use Yeo-Johnson for columns that contain zeros, such as counts. If more than 10% of the step's training rows would be excluded as invalid (missing values do not count), training stops with an error that names the share and suggests Yeo-Johnson or repairing those rows first. |
+| `IterativeImputer` | When every value in a batch was missing, it skipped its learned rounds and returned only the initial fill. | The learned rounds always run, so a row is filled the same way in any batch. Posterior sampling (`sample_posterior: true`) and unsupported estimators stay rejected. |
 
 Window steps, resampling, inspection nodes and `sentence_embedder` are not
-added by this admission path either.
+added by this admission path.
+
+#### Rows that are not scored
+
+When an outlier step or `PowerTransformer` excludes a row, the output still
+has one row per input row. The excluded row has:
+
+- an empty (null) `prediction` and empty probability columns;
+- `scoring_status` = `excluded` (scored rows have `predicted`);
+- `exclusion_reason` naming the first step that excluded it, for example
+  `outlier:trip_distance_iqr` or `invalid:fare_power`. A later step never
+  overwrites it. The `outlier:` and `invalid:` prefixes separate a deliberate
+  filter from a value the fitted step cannot handle, usually a data error.
+
+The same rule applies to whole-frame scoring, Spark scoring and serving
+endpoints. During training the excluded rows are left out of model fitting;
+each step's `rows_in` and `rows_out` in the training result show how many were
+left out. Monitoring adds `exclusion_rate` (all excluded rows) and
+`invalid_exclusion_rate` (rows excluded by `invalid:` reasons) to the quality
+table, as shares of all stored prediction outcomes; a rising
+`invalid_exclusion_rate` usually means a data-quality problem upstream rather
+than model drift. Performance monitoring uses only the scored rows. Whatever
+reads the predictions must handle
+an empty prediction: decide in the consuming application whether to use a
+default value, send the row for review or show "not scored"; do not read an
+empty prediction as zero or as the negative class.
+
+Adding one of these steps adds the `scoring_status` and `exclusion_reason`
+columns to the model's output, so a scoring table written by an earlier
+version has a different schema. Write the new version to a new table or
+migrate the existing one before switching. How training measures a model that
+excludes rows is described in
+[models that exclude rows](databricks_lifecycle.md#models-that-exclude-rows).
 
 Admission is decided for your saved settings, not for the step name. The tests
 fit every listed step with one typical recipe; a different setting of the same
@@ -143,8 +176,19 @@ predictions, supported probabilities and configured thresholds on transformed
 holdout rows. Nested estimator identities are checked too. Model `fresh_module`
 replays separately serialized state; it does not reload a third-party package.
 The model's empty check calls the saved prediction API and verifies its declared
-empty output schema without invoking the estimator. Nonempty comparisons stay
-exact, including dtypes, with no numerical tolerance.
+empty output schema without invoking the estimator. Nonempty comparisons follow
+the comparison rule described under
+[floating-point rounding](#when-a-built-in-step-or-model-is-rejected).
+
+Each step and the model is checked on its own, and the complete prediction
+chain is checked once more end to end: the raw holdout rows are scored as a
+whole, again, and in batches of 1 and 7 rows, through every preprocessing step,
+the model and any saved scoring rules. This catches a rounding difference that
+a step's own check allows but that changes a label after the model, for
+example a value close to a tree's split point. At least 16 holdout rows must
+reach each step and at least 16 must receive a prediction at the end; rows
+excluded on the way do not count. A recipe that leaves fewer rows fails
+training with a message naming where the rows were lost.
 
 Look at `partition_probe.json` in the training run: `builtins` contains the
 preprocessing evidence and `model` contains model evidence. The recomputed
@@ -201,7 +245,9 @@ The check has two parts, and every step and rule must pass both:
    is a heuristic: it does not see other modules or dynamic calls, so the probe
    still runs.
 2. **Probe.** On the first 256 holdout rows (at least 16 are required), each
-   step or rule must give identical results on the whole sample, when scored
+   step or rule must give the same results (floating-point values within the
+   [rounding tolerance](#when-a-built-in-step-or-model-is-rejected)) on the
+   whole sample, when scored
    again, in chunks of 1, 2 and 7 rows, in reverse order, with the row index
    renumbered, on an empty batch, and when one row's inputs change (other rows
    must not move). Spark gives each batch a fresh `0, 1, 2, ...` index and can
@@ -312,29 +358,35 @@ the lint. A rejection stops training before the model is registered and names
 the part and the check, for example:
 
 ```text
-Model partition probe failed chunks:1: output_mismatch. Exact partition parity
-is required; retrain with a compatible configuration.
+Model partition probe failed chunks:1: output_mismatch. Partition parity
+requires exact labels and the fixed floating tolerance; retrain with a
+compatible configuration.
 ```
 
 The check name tells you what differed:
 
 | Check | What it compares | Usual cause | What to do |
 | --- | --- | --- | --- |
-| `repeat` | The same rows scored twice | Randomness at prediction time | Fix `random_state`; avoid estimators that sample when predicting. |
-| `chunks:1`, `chunks:2`, `chunks:7` | Batches of 1, 2 and 7 rows against the whole sample | Output depends on the batch size: a whole-batch fallback, a dtype that follows the data, or floating-point rounding (below) | Choose a setting from the step's table above, use stable dtypes, or replace the step or final learner. |
+| `repeat` | The same rows scored twice; must match exactly, with no rounding tolerance | Randomness at prediction time | Fix `random_state`; avoid estimators that sample when predicting. |
+| `chunks:1`, `chunks:2`, `chunks:7` | Batches of 1, 2 and 7 rows against the whole sample | Output depends on the batch size beyond the rounding tolerance (below): a whole-batch fallback, or a dtype that follows the data | Choose a setting from the step's table above, use stable dtypes, or replace the step. |
 | `reverse`, `index_shift` | Reversed row order; renumbered index | The step reads row order or the pandas index | Use a step that only reads column values. |
 | `empty` | A batch with no rows | The step fails or changes dtypes on empty input | Report it: built-in steps are expected to handle empty batches. |
 | `perturb` | Change one row's inputs; the other rows must not move | The step reads other rows' values, such as a whole-batch fallback, or fails on a value training never saw | Use a setting that handles unseen values row by row, for example `handle_unknown: ignore` on `OneHotEncoder`. |
 | `fresh_module` | Reload the saved state in a new process | State that does not survive saving | Retrain; report it if it persists. |
 
-**Floating-point rounding.** Comparisons are exact, to the last digit. A
-stacking model whose final learner combines member outputs by matrix
-arithmetic, for example the default `logistic_regression` final learner, can
-differ in the last digit (about `2e-16`) between a batch of one row and a
-larger batch, because the numeric library chooses a different calculation path
-for each batch size. Predicted labels do not change, but the exact check rejects
-the model with `chunks:1: output_mismatch`. Use a tree-based final learner such
-as `decision_tree`, or score that model with `inference_mode: local`.
+**Floating-point rounding.** Floating-point results can differ in the last
+digits between batch sizes, because the numeric library chooses a different
+calculation path for each batch size. For example, a stacking model whose
+default `logistic_regression` final learner combines member outputs differs by
+about `2e-16` between a batch of one row and a larger batch. The probe therefore
+compares floating-point columns, such as probabilities, regression predictions
+and transformed numeric features, with a fixed tolerance: two values match when
+`|a - b| <= 1e-12 + 1e-9 * |b|`, and missing values must be in the same places.
+Everything else stays exact: predicted labels, integer, text and boolean
+values, column names, order and dtypes, the row index and the row count. A
+difference larger than the tolerance, or a single changed label, still rejects
+the model. Evidence saved before this rule (evidence version 1) is not accepted;
+retrain to create new evidence.
 
 Change the rejected step's or model's settings, or remove it, and retrain.
 

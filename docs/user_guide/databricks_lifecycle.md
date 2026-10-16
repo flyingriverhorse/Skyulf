@@ -97,6 +97,58 @@ Training resolves the current champion; a stale explicit `champion_version`
 fails before fit. Generic Core training remains alias-free unless a caller
 supplies the explicit `on_registered` lifecycle callback.
 
+### Models that exclude rows
+
+Fitted outlier steps (`IQR`, `ZScore`, `EllipticEnvelope`, `ManualBounds`) and
+`PowerTransformer` can leave a holdout row without a prediction (see
+[rows that are not scored](databricks_spark_scoring.md#rows-that-are-not-scored)).
+For such a model, training computes every metric on the scored rows only and
+records how many rows that is:
+
+| Metric | Meaning |
+| --- | --- |
+| `heldout_total_rows` | Holdout rows given to the model |
+| `heldout_scored_rows` | Rows that received a prediction |
+| `heldout_excluded_rows` | Rows excluded by an outlier or invalid-value step |
+| `heldout_scored_fraction` | `heldout_scored_rows / heldout_total_rows` |
+
+A model that skips difficult rows can look better than it is, so two coverage
+rules apply by default. Both are policy fields in `config/training.yml`, next to
+`min_improvement`:
+
+```yaml
+min_scored_fraction: 0.90   # null turns this rule off
+max_coverage_drop: 0.05     # 0.05 = five percentage points; null turns it off
+```
+
+1. **Minimum coverage (`min_scored_fraction`).** At least this fraction of the
+   holdout rows must be scored. A candidate below it is rejected, even if its
+   metrics pass. The default is `0.90`.
+2. **No large drop against the champion (`max_coverage_drop`).** The
+   candidate's coverage may be at most this much lower than the champion's.
+   With a champion at 99% coverage and the default `0.05`, a candidate at 96%
+   can be compared, but one at 93% is rejected even though it passes the 90%
+   rule.
+
+Both values accept a number from 0 to 1, or `null` to turn the rule off. They
+sit wherever `min_improvement` is set: once for a single model or a competition,
+and separately for each multi-target branch. Generation writes the defaults; to
+change them before generation, put `min_scored_fraction` and
+`max_coverage_drop` (or `branch_N_min_scored_fraction` and
+`branch_N_max_coverage_drop` for branch `N`) in the answer file. The setup
+wizard does not ask for them. A `quality_gates` entry for
+`heldout_scored_fraction` remains possible as an additional bound; the stricter
+of the two applies. Models without an excluding step always score 100% of the
+rows, so these rules never reject them.
+
+When both rules pass, the candidate and the champion are compared on the
+holdout rows that **both** scored. Refitted outlier bounds move slightly with
+every retraining, so the two models rarely exclude exactly the same rows;
+comparing only the shared rows keeps the comparison fair. Each model's own
+coverage is checked separately against the two rules above, never on the
+shared rows. A model without any excluding step has a coverage of 100%, so
+replacing it with one that excludes rows is limited by the same 5-point margin.
+
 Training runs and model versions share readable metadata: `train_data_version`,
 `test_data_version`, `train_data_destination`, `test_data_destination`,
 `model_type`, `candidate_date_tag`, and `engine`. Optional `risk_category` is

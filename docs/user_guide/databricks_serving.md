@@ -184,7 +184,12 @@ The SQL function from step 3 already wraps `ai_query` with the model's typed
 inputs: it sends numeric NULLs as `NaN` and nullable integers/booleans as text, so
 the saved imputation still applies (a bare `ai_query` would send a NULL number as
 `0`). Every input row returns exactly one result; the endpoint never drops rows.
-Keep keys outside the call so results join back. `call_sql()` renders the call
+A model with a fitted outlier step or `PowerTransformer` can return a result
+with an empty `prediction`, `scoring_status` = `excluded` and an
+`exclusion_reason` such as `outlier:<step name>` or `invalid:<step name>` (see
+[rows that are not scored](databricks_spark_scoring.md#rows-that-are-not-scored)).
+Handle that case explicitly in the caller; do not treat the empty prediction
+as zero. Keep keys outside the call so results join back. `call_sql()` renders the call
 for a table alias:
 
 ```sql

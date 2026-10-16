@@ -143,12 +143,12 @@ endpoint-only project enables it with `defaults.admit_probed_custom_steps: true`
 The check, its evidence and the full model list are described in
 [Score on Spark workers](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
 
-Before you choose a stacking final learner for Spark or an endpoint, read
-[floating-point rounding](databricks_spark_scoring.md#when-a-built-in-step-or-model-is-rejected):
-a linear final learner such as the default `logistic_regression` can be
-rejected even though its labels never change. A tree-based final learner, for
-example `final_estimator: decision_tree`, passes. Voting, including soft voting,
-passed the same checks on real data.
+A linear final learner such as the default `logistic_regression` can differ in
+the last floating-point digits between batch sizes. The check allows such
+[rounding differences](databricks_spark_scoring.md#when-a-built-in-step-or-model-is-rejected)
+in probabilities but never a changed label. Voting, including soft voting, and
+stacking with a `decision_tree` final learner passed the same checks on real
+data.
 
 ## Setup questions and defaults for each slot
 
