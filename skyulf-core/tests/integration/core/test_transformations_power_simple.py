@@ -223,60 +223,46 @@ def test_power_transformer_apply_transforms_present_columns_and_names_missing_on
     assert "['b']" in caplog.text
 
 
-def test_power_transformer_apply_polars_swallows_exception(
+def test_power_transformer_apply_polars_raises_unexpected_exception(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the polars path must be logged, not raised (lines 112-114).
-
-    Fail-open is only defensible while it stays observable, so the ERROR record
-    and its traceback are pinned alongside the unchanged frame.
-    """
+    """Unexpected implementation failures must not silently return untransformed neighbours."""
     import skyulf.preprocessing.transformations.power as power_mod
 
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
 
     def _boom(*args, **kwargs):
+        """Represent an implementation failure rather than one invalid numeric value."""
         raise RuntimeError("simulated transform failure")
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
     pl_df = pl.from_pandas(df)
-    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
-        out = PowerTransformerApplier().apply(pl_df, art)
-    # Exception swallowed; original frame returned unchanged.
-    assert out.equals(pl_df)
-    assert "PowerTransformer (Polars) application failed" in caplog.text
-    assert "RuntimeError: simulated transform failure" in caplog.text
+    with pytest.raises(RuntimeError, match="simulated transform failure"):
+        PowerTransformerApplier().apply(pl_df, art)
+    assert pl_df.equals(pl.from_pandas(df))
 
 
-def test_power_transformer_apply_pandas_swallows_exception(
+def test_power_transformer_apply_pandas_raises_unexpected_exception(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the pandas path must be logged, not raised (lines 130-131).
-
-    The caller's own frame must come back, not a copy whose columns were already
-    cast to float64 — the polars path returns the untouched original, and a
-    failed transform should not change dtypes on either engine.
-    """
+    """An unexpected transform error must surface without changing the caller's frame."""
     import skyulf.preprocessing.transformations.power as power_mod
 
     df = pd.DataFrame({"a": [1, 2, 3]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
 
     def _boom(*args, **kwargs):
+        """Represent an implementation failure rather than one invalid numeric value."""
         raise RuntimeError("simulated transform failure")
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
-    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
-        out = PowerTransformerApplier().apply(df, art)
-    # Exception swallowed; original values returned unchanged.
-    pd.testing.assert_frame_equal(out, df)
-    assert out is df
-    assert str(out["a"].dtype) == "int64"
-    assert "PowerTransformer (Pandas) application failed" in caplog.text
-    assert "RuntimeError: simulated transform failure" in caplog.text
+    before = df.copy()
+    with pytest.raises(RuntimeError, match="simulated transform failure"):
+        PowerTransformerApplier().apply(df, art)
+    pd.testing.assert_frame_equal(df, before)
 
 
 # ---------------------------------------------------------------------------

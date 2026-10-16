@@ -26,13 +26,13 @@ from skyulf.pipeline import SkyulfPipeline
 from skyulf.pipeline.seal import artifact_digest
 from skyulf.registry import NodeRegistry
 
-_CONTEXT_REJECTIONS = {
-    "EllipticEnvelope",
-    "IQR",
-    "IterativeImputer",
-    "ManualBounds",
-    "PowerTransformer",
-    "ZScore",
+_INELIGIBLE_NODES = {
+    "LagFeatures",
+    "RollingAggregate",
+    "Oversampling",
+    "Undersampling",
+    "DataSnapshot",
+    "DatasetProfile",
 }
 
 
@@ -63,18 +63,12 @@ def _fit_builtin(node, recipes):
     return record, {"name": "probe", "transformer": node, "params": config}, frame
 
 
-@pytest.mark.parametrize(
-    "node", [*PROBED_BUILTINS, *sorted(_CONTEXT_REJECTIONS - set(PROBED_BUILTINS))]
-)
+@pytest.mark.parametrize("node", PROBED_BUILTINS)
 def test_builtin_saved_state_partition_checks(node, builtin_recipes):
-    """A real saved recipe passes every exact check or retains its known context rejection."""
+    """A real saved recipe passes the checks under the fixed numerical comparison policy."""
     if node == "H3Index":
         pytest.importorskip("h3")
     record, recipe, frame = _fit_builtin(node, builtin_recipes)
-    if node in _CONTEXT_REJECTIONS:
-        with pytest.raises(ValueError, match="row-preserving|not eligible"):
-            builtin_contract(record, recipe)
-        return
     builtin_contract(record, recipe)
     detail, _ = _probe_step(
         record,
@@ -92,7 +86,7 @@ def test_builtin_saved_state_partition_checks(node, builtin_recipes):
     assert checks == dict.fromkeys(REQUIRED_CHECKS, "passed"), detail
 
 
-@pytest.mark.parametrize("node", sorted(_CONTEXT_REJECTIONS))
+@pytest.mark.parametrize("node", sorted(_INELIGIBLE_NODES))
 def test_known_global_or_filtering_nodes_have_no_probe_identity(node):
     """A different recipe cannot admit a node explicitly excluded from the reviewed scope."""
     from skyulf.inference._partition_builtins import builtin_applier
@@ -370,3 +364,18 @@ def test_builtin_mapping_keys_are_not_method_overrides(category):
     builtin_contract(record, {"name": "alias", "transformer": "AliasReplacement", "params": params})
     output = record["applier"].apply(frame, state)
     assert output["cat"].tolist() == ["goods", "other"]
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("version", 1), ("float_tolerance", None), ("float_tolerance", {"rtol": 1e-6, "atol": 1e-12})],
+)
+def test_old_or_changed_comparison_policy_is_rejected(sealed_builtin_path, field, value):
+    """Every admission route must require the trusted versioned tolerance policy."""
+    artifact = load_pipeline(sealed_builtin_path)
+    evidence = artifact.pipeline.config.get("partition_probe", {})
+    assert evidence["version"] == 2
+    assert evidence["float_tolerance"] == {"rtol": 1e-9, "atol": 1e-12}
+    evidence[field] = value
+    with pytest.raises(UnsupportedExecutionError, match="comparison policy"):
+        require_partition_safe_pipeline(artifact)

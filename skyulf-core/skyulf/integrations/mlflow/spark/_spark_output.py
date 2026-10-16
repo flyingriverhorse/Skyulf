@@ -6,6 +6,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ....inference.fitted_pipeline import has_outlier_steps
+
 SPARK_OUTPUT_PARAM = "spark_output"
 # Marks a null in a mixed string column; the driver turns it back into SQL null.
 SPARK_NULL_TEXT = "␀null␀"
@@ -87,12 +89,12 @@ def require_spark_output(
 def nullable_outputs(artifact: Any) -> bool:
     """Report whether saved scoring rules can leave excluded rows null in the output.
 
-    A pipeline has rules in ``project_scoring``; a model set has them when any
-    component's saved output schema carries ``scoring_status``.
+    A pipeline can exclude rows through ``project_scoring`` or fitted outlier
+    filters. A set carries exclusions when a component schema has ``scoring_status``.
     """
     pipeline = getattr(artifact, "pipeline", None)
     if pipeline is not None:
-        return pipeline.config.get("project_scoring") is not None
+        return pipeline.config.get("project_scoring") is not None or has_outlier_steps(artifact)
     return any(
         column.name == "scoring_status"
         for component in artifact.manifest.components

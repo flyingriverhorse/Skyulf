@@ -45,7 +45,7 @@ def _forbidden(*args, **kwargs):
     raise AssertionError("Unexpected fit or transform during inspection")
 
 
-@pytest.mark.parametrize("node,context", [("KNNImputer", "row"), ("IterativeImputer", "global")])
+@pytest.mark.parametrize("node,context", [("KNNImputer", "row"), ("IterativeImputer", "row")])
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_saved_estimator_metadata_inspection_is_pure(node, context, engine, monkeypatch):
     """A fitted estimator must be inspected without learning, transforming or worker admission."""
@@ -125,20 +125,18 @@ def test_knn_replays_saved_donors_for_unseen_null_singleton_and_empty(engine, we
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_iterative_saved_rounds_require_global_context_for_all_null_request(engine, monkeypatch):
-    """An entirely missing singleton takes sklearn's initial-fill shortcut, unlike a mixed batch."""
+def test_iterative_saved_rounds_replay_for_all_null_request(engine, monkeypatch):
+    """An entirely missing singleton must replay the same saved rounds as a mixed request."""
     record = _record("IterativeImputer", engine)
     state = record["artifact"]
     sample = _frame(engine, {"a": [None, 2.0, None, 7.0], "b": [None, None, 3.0, 14.0]})
     before = artifact_digest(state)
     detail, _ = _probe(record, sample, engine, monkeypatch)
-    assert detail["status"] == "requires_context"
-    assert detail["context"] == "global"
+    assert detail["status"] == "passed"
+    assert detail["context"] == "row"
     full = record["applier"].apply(sample, state)
     singleton = record["applier"].apply(_slice(sample, [0]), state)
-    assert singleton["a"].to_list() == [2.4]
-    assert singleton["b"].to_list() == [5.2]
-    assert full["a"].to_list()[0] != singleton["a"].to_list()[0]
+    np.testing.assert_allclose(singleton.to_numpy(), full.to_numpy()[:1], rtol=1e-9, atol=1e-12)
     _assert_equal(record["applier"].apply(sample, state), full)
     _assert_equal(record["applier"].apply(_slice(sample, []), state), _slice(full, []))
     assert artifact_digest(state) == before

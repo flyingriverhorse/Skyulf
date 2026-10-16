@@ -202,10 +202,10 @@ def test_ordinal_bins_use_fitted_edges_for_singleton_and_reordered_batches(
 @pytest.mark.parametrize(
     "method,companion", [("box-cox", -1.0), ("box-cox", np.inf), ("yeo-johnson", np.inf)]
 )
-def test_invalid_power_batch_logs_fail_open_without_changing_replay(
+def test_invalid_power_batch_logs_its_policy_without_changing_replay(
     engine, node_type, method, companion, caplog
 ):
-    """Invalid input follows the logged fail-open policy without changing later valid replay."""
+    """PowerTransformer invalid-to-NaN and GeneralTransformation fallback stay observable."""
     train = _frame({"x": [1.0, 2.0, 4.0, 10.0, 30.0]}, engine)
     config = (
         {"columns": ["x"], "method": method}
@@ -219,7 +219,11 @@ def test_invalid_power_batch_logs_fail_open_without_changing_replay(
     batch = applier.apply(_frame({"x": [3.0, companion]}, engine), artifact)
 
     assert alone["x"].to_list()[0] != 3.0
-    _assert_frame_equal(batch, _frame({"x": [3.0, companion]}, engine), engine)
+    if node_type == "PowerTransformer":
+        assert batch["x"].to_list()[0] == alone["x"].to_list()[0]
+        assert np.isnan(batch["x"].to_list()[1])
+    else:
+        _assert_frame_equal(batch, _frame({"x": [3.0, companion]}, engine), engine)
     replay = applier.apply(_frame({"x": [3.0]}, engine), artifact)
     _assert_frame_equal(replay, alone, engine)
     expected_logger = "skyulf.preprocessing.transformations." + (

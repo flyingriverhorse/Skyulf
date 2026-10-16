@@ -11,7 +11,10 @@ from .probed_steps import (
     PROBE_KEY,
     PROBE_VERSION,
     REQUIRED_CHECKS,
+    require_comparison_policy,
     require_passed,
+    require_pipeline_probe,
+    require_step_rows,
 )
 
 
@@ -40,6 +43,7 @@ def builtin_entry(record: dict, recipe: dict) -> dict[str, Any]:
 def builtin_evidence(artifact: FittedPipelineArtifact, report: dict) -> list[dict[str, Any]]:
     """Seal successful observations only after the built-in's own contracts accept its state."""
     _require_rows(report.get("sample_rows"))
+    require_comparison_policy(report, version_key="report_version")
     recipes = {item["name"]: dict(item) for item in artifact.pipeline.feature_engineer.steps_config}
     details = {(item["name"], item["node_type"]): item for item in report.get("steps", [])}
     entries = []
@@ -48,6 +52,9 @@ def builtin_evidence(artifact: FittedPipelineArtifact, report: dict) -> list[dic
             continue
         entry = builtin_entry(record, recipes[record["name"]])
         detail = details.get((record["name"], record["type"]), {})
+        entry["input_rows"] = require_step_rows(
+            detail.get("input_rows"), report["sample_rows"], f"Built-in step {record['name']!r}"
+        )
         require_passed(f"Built-in step {record['name']!r}", detail, report)
         if any(item["name"] == entry["name"] for item in entries):
             raise ValueError("Built-in probe evidence requires unique step names.")
@@ -71,6 +78,10 @@ def require_probed_builtin(
         if isinstance(entries, list)
         else []
     )
+    if len(matches) == 1:
+        expected["input_rows"] = require_step_rows(
+            matches[0].get("input_rows"), evidence["rows"], f"Built-in step {record['name']!r}"
+        )
     if matches != [expected]:
         raise ValueError(
             "Built-in training probe evidence is missing or changed; retrain the model."
@@ -88,6 +99,7 @@ def _require_envelope(evidence: Any, project_sha: str | None) -> dict:
     """Keep source binding when present and reject incomplete bounded-sample evidence."""
     if not isinstance(evidence, dict):
         raise ValueError("No built-in training probe evidence was saved; retrain the model.")
+    require_comparison_policy(evidence)
     if (
         type(evidence.get("version")) is not int
         or evidence.get("version") != PROBE_VERSION
@@ -97,4 +109,5 @@ def _require_envelope(evidence: Any, project_sha: str | None) -> dict:
     _require_rows(evidence.get("rows"))
     if evidence.get("project_source_sha256") != project_sha:
         raise ValueError("Built-in training probe evidence belongs to other project source.")
+    require_pipeline_probe(evidence)
     return evidence

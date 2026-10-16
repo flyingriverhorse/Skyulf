@@ -13,7 +13,7 @@ from skyulf.integrations.mlflow.shared._client import make_registry_client, requ
 
 from ....inference._manifest import ColumnSpec
 from ....inference.model_set import ComponentReference, load_model_set, save_model_set
-from ....inference.probed_composition import function_rules, sealed_composition_config
+from ....inference.probed_composition import requires_composition_probe, sealed_composition_config
 from ....inference.project_code import load_project_module
 from ...mlflow.lifecycle.promotion import ExclusiveAliasWriterAdmission, controlled_champion_version
 from ...mlflow.registration.registry import (
@@ -374,8 +374,8 @@ def package_training_model_set(
         composition = dict(config["composition_config"] or {"outputs": []})
         composition.pop("partition_probe", None)  # only training writes the evidence
         saved = save("set", composition)
-        if probed_admission(config) and function_rules(composition):
-            # Spark/online sets: probe combined function rules and seal the evidence.
+        if probed_admission(config) and requires_composition_probe(load_model_set(saved.directory)):
+            # Include arithmetic that can amplify tolerated component prediction noise.
             sample = _composition_sample(source, saved.manifest)
             sealed = sealed_composition_config(load_model_set(saved.directory), sample)
             saved = save("sealed", sealed)

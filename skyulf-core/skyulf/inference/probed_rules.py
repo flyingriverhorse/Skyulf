@@ -261,11 +261,17 @@ def probe_rule_detail(
     return detail
 
 
-def _predictions(artifact: FittedPipelineArtifact, rows: pd.DataFrame) -> pd.DataFrame:
-    """Predict eligible rows with the model's own engine and typed output columns."""
+def _predictions(
+    artifact: FittedPipelineArtifact, rows: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return surviving raw rows and typed predictions in the same positional order."""
     native = pl.from_pandas(rows) if artifact.manifest.fitted_engine == "polars" else rows
     predicted = predict_pipeline(native, artifact).reset_index(drop=True)
-    return pd.DataFrame(
+    if "scoring_status" in predicted:
+        keep = predicted["scoring_status"].eq("predicted")
+        rows = rows.loc[keep.to_numpy()].reset_index(drop=True)
+        predicted = predicted.loc[keep].reset_index(drop=True)
+    return rows, pd.DataFrame(
         {
             column.name: _typed_column(predicted[column.name], column.dtype)
             for column in prediction_output_schema(artifact)
@@ -311,7 +317,9 @@ def _probe_outputs(
     """Probe output rules on up to 256 eligible rows taken from the whole holdout."""
     reasons = _scoring_eligibility(full, config, module)
     eligible = full.loc[reasons.isna().to_numpy()].head(_SAMPLE_ROWS).reset_index(drop=True)
-    results = _predictions(artifact, eligible) if len(eligible) else pd.DataFrame()
+    eligible, results = (
+        _predictions(artifact, eligible) if len(eligible) else (eligible, pd.DataFrame())
+    )
     details = []
     for rule in config["outputs"]:
         raw, previous = list(eligible.columns), list(results.columns)

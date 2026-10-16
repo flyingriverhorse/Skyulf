@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from joblib import parallel_config
@@ -12,6 +13,7 @@ from ..modeling._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+from ..preprocessing._helpers import select_rows_by_position
 from ..preprocessing._target_labels import encoded_labels
 from .fitted_pipeline import FittedPipelineArtifact, predict_pipeline
 
@@ -30,6 +32,8 @@ def evaluate_holdout(
     Binary F1 uses the artifact's second class as the positive label.
     An optional observer receives actual labels and predictions after scoring,
     allowing integrations to sample the exact outputs without repeating inference.
+    Fitted outlier filters contribute metrics only for predicted rows, with
+    total/scored/excluded counts. The observer still receives every input row.
     Evaluation uses sequential joblib prediction to keep parallel forest sums
     reproducible for exact registry evidence checks. Saved model parameters and
     normal training/batch prediction parallelism remain unchanged. This does not
@@ -43,10 +47,42 @@ def evaluate_holdout(
     actual = heldout[target_column].to_numpy()
     with parallel_config(backend="sequential"):
         predictions = predict_pipeline(features, artifact)
-    raw_metrics = _holdout_metrics(artifact, features, heldout, target_column, actual, predictions)
+    raw_metrics = _evaluated_metrics(
+        artifact, features, heldout, target_column, actual, predictions
+    )
     if on_predictions is not None:
         on_predictions(actual, predictions)
     return {f"heldout_{name}": value for name, value in sanitize_metrics(raw_metrics).items()}
+
+
+def _evaluated_metrics(
+    artifact: FittedPipelineArtifact,
+    features: pd.DataFrame | pl.DataFrame,
+    heldout: pd.DataFrame | pl.DataFrame,
+    target_column: str,
+    actual: Any,
+    predictions: pd.DataFrame,
+) -> dict[str, Any]:
+    """Evaluate only predicted outcomes and make outlier coverage explicit."""
+    if "scoring_status" not in predictions:
+        return _holdout_metrics(artifact, features, heldout, target_column, actual, predictions)
+    positions = np.flatnonzero(predictions["scoring_status"].eq("predicted").to_numpy())
+    if len(positions) < 2:
+        raise ValueError("Outlier-filtered holdout must contain at least two scored rows.")
+    metrics = _holdout_metrics(
+        artifact,
+        select_rows_by_position(features, positions),
+        select_rows_by_position(heldout, positions),
+        target_column,
+        actual[positions],
+        predictions.iloc[positions],
+    )
+    return {
+        **metrics,
+        "total_rows": len(predictions),
+        "scored_rows": len(positions),
+        "excluded_rows": len(predictions) - len(positions),
+    }
 
 
 def _validate_holdout(

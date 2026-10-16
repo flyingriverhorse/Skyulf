@@ -12,6 +12,9 @@ from skyulf.inference.model_set import ComponentReference, load_model_set, save_
 from skyulf.inference.model_set_partition_safety import require_partition_safe_model_set
 from skyulf.inference.model_set_scoring import predict_model_set
 from skyulf.inference.probed_composition import sealed_composition_config
+from skyulf.integrations.databricks.projects.project import load_project_workflow
+from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+from skyulf.integrations.databricks.training.shared.preprocessing_checks import seal_partition_probe
 from skyulf.pipeline import SkyulfPipeline
 
 SOURCE = '''
@@ -128,6 +131,161 @@ def test_sealed_config_keeps_the_rules_and_identity(tmp_path):
     artifact = _sealed(tmp_path)
     config = artifact.manifest.composition_config
     assert config["outputs"] == RULES["outputs"]
-    assert json.loads(artifact.manifest.composition_config_json)["partition_probe"]["version"] == 1
+    assert json.loads(artifact.manifest.composition_config_json)["partition_probe"]["version"] == 2
     unsealed, _ = _set(tmp_path, name="plain")
     assert unsealed.manifest.set_sha256 != artifact.manifest.set_sha256
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("version", 1), ("float_tolerance", None), ("float_tolerance", {"rtol": 1e-6, "atol": 1e-12})],
+)
+def test_old_or_changed_comparison_policy_is_rejected(tmp_path, field, value):
+    """Every admission route must require the trusted versioned tolerance policy."""
+    artifact = _sealed(tmp_path)
+    config = artifact.manifest.composition_config
+    assert config["partition_probe"]["version"] == 2
+    assert config["partition_probe"]["float_tolerance"] == {"rtol": 1e-9, "atol": 1e-12}
+    config["partition_probe"][field] = value
+    changed, _ = _set(tmp_path, config=config, name="policy-changed")
+    with pytest.raises(ValueError, match="comparison policy"):
+        require_partition_safe_model_set(changed)
+
+
+def _amplified_set(tmp_path, mode="function", weight=1e13):
+    """Build an actual probed component whose tiny batch noise reaches composition."""
+    project = tmp_path / "features"
+    project.mkdir()
+    (project / "__init__.py").write_text(
+        "from skyulf.preprocessing import column_step\n"
+        "def tiny_noise(df):\n"
+        "    return df['x'] + 1e-13 * getattr(df['x'], 'mean')()\n"
+        "def build_preprocessing(recipe='default'):\n"
+        "    return [column_step('noise', tiny_noise, output='x', replace=True, "
+        "inference_context='row')]\n",
+        encoding="utf-8",
+    )
+    config = load_project_workflow(
+        {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
+        project,
+    )["pipeline"]
+    config["admit_probed_custom_steps"] = True
+    train = pd.DataFrame({"x": [-1.0, 1.0] * 16, "target": [-1.0, 1.0] * 16})
+    path = tmp_path / "component"
+    fitted = fit_workflow(
+        config,
+        SplitDataset(train=train, test=train.head(0)),
+        target_column="target",
+        artifact_path=path,
+        max_rows=100,
+        max_bytes=100000,
+    )
+    sample = pd.DataFrame({"id": range(16), "x": [-2.5e-14, 1.0] * 8})
+    component = seal_partition_probe(fitted, sample, path, enabled=True)
+    source = (
+        "import pandas as pd\n"
+        "def outputs(raw, predictions, params):\n"
+        "    return pd.DataFrame({'flag': (predictions.a__prediction > 0).astype('int64')}, "
+        "index=raw.index)\n"
+    )
+    rules = {
+        "outputs": [
+            {
+                "name": "flag",
+                "version": "1",
+                "function": "outputs",
+                "params": {},
+                "columns": [{"name": "flag", "dtype": "int64"}],
+                "required_components": ["a"],
+            }
+        ]
+    }
+    if mode == "declarative":
+        source = "raise AssertionError('inactive composition source executed')"
+        rules = {
+            "outputs": [
+                {
+                    "name": "flag",
+                    "version": "1",
+                    "operation": "weighted_sum",
+                    "params": {"inputs": ["a__prediction"], "weights": [weight]},
+                    "columns": [{"name": "flag", "dtype": "float64"}],
+                    "required_components": ["a"],
+                }
+            ]
+        }
+    saved = save_model_set(
+        tmp_path / "set",
+        {
+            "a": (
+                ComponentReference(
+                    name="a", version="1", digest=component.manifest.pipeline_sha256
+                ),
+                path,
+            )
+        },
+        record_key_schema=(ColumnSpec(name="id", dtype="int64"),),
+        composition_source=source,
+        composition_config=rules,
+    )
+    artifact = load_model_set(saved.directory)
+    return artifact, sample
+
+
+@pytest.mark.parametrize("mode", ["function", "declarative"])
+def test_combined_decision_cannot_amplify_tolerated_component_noise(tmp_path, mode):
+    """Component float agreement must not hide a changed final business decision."""
+    artifact, sample = _amplified_set(tmp_path, mode)
+    whole = predict_model_set(sample, artifact)
+    singleton = pd.concat([predict_model_set(sample.iloc[i : i + 1], artifact) for i in range(16)])
+    assert whole.flag.iloc[0] > 0
+    assert singleton.flag.iloc[0] <= 0
+    with pytest.raises(
+        ValueError, match="Model-set partition probe failed chunks:1: output_mismatch"
+    ):
+        sealed_composition_config(artifact, sample)
+
+
+def test_declarative_empirical_components_require_final_proof(tmp_path):
+    """Arithmetic on empirically admitted components needs its own final parity evidence."""
+    artifact, sample = _amplified_set(tmp_path, "declarative", weight=1.0)
+    with pytest.raises(ValueError, match="probe evidence"):
+        require_partition_safe_model_set(artifact)
+    config = sealed_composition_config(artifact, sample)
+    assert config["partition_probe"]["pipeline"]["rows"] == 16
+    saved = save_model_set(
+        tmp_path / "sealed",
+        {
+            component.branch: (
+                component.reference,
+                artifact.directory / "components" / component.branch,
+            )
+            for component in artifact.manifest.components
+        },
+        record_key_schema=artifact.manifest.record_key_schema,
+        composition_source=(artifact.directory / "composition.py").read_text(),
+        composition_config=config,
+    )
+    assert (
+        require_partition_safe_model_set(load_model_set(saved.directory))["composition_contract"]
+        == "row_local_operations_v1"
+    )
+
+
+@pytest.mark.parametrize("tamper", ["missing", "checks", "rows", "row_type"])
+def test_combined_rules_require_final_output_evidence(tmp_path, tamper):
+    """Rule-local evidence alone cannot authorize composed outputs under float tolerance."""
+    artifact = _sealed(tmp_path)
+    config = artifact.manifest.composition_config
+    evidence = config["partition_probe"]
+    if tamper == "missing":
+        evidence.pop("pipeline", None)
+    else:
+        detail = evidence.setdefault("pipeline", {"rows": len(SAMPLE), "checks": []})
+        if tamper == "checks":
+            detail["checks"] = [{"name": "full", "status": "passed"}]
+        else:
+            detail["rows"] = 19 if tamper == "rows" else 20.0
+    changed, _ = _set(tmp_path, config=config, name="missing-final-proof")
+    with pytest.raises(ValueError, match="pipeline partition probe"):
+        require_partition_safe_model_set(changed)

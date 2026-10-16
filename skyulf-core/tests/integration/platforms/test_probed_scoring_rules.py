@@ -266,3 +266,20 @@ def test_reused_pre_split_without_evidence_is_rejected(tmp_path):
         UnsupportedExecutionError, match="Reused pre-split eligibility: .*has no entry"
     ):
         require_partition_safe_pipeline(artifact)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("version", 1), ("float_tolerance", None), ("float_tolerance", {"rtol": 1e-6, "atol": 1e-12})],
+)
+def test_old_or_changed_comparison_policy_is_rejected(tmp_path, field, value):
+    """Every admission route must require the trusted versioned tolerance policy."""
+    artifact = _sealed(tmp_path)
+    assert artifact.pipeline.config["partition_probe"]["version"] == 2
+    assert artifact.pipeline.config["partition_probe"]["float_tolerance"] == {
+        "rtol": 1e-9,
+        "atol": 1e-12,
+    }
+    artifact.pipeline.config["partition_probe"][field] = value
+    with pytest.raises(UnsupportedExecutionError, match="comparison policy"):
+        require_partition_safe_pipeline(artifact)

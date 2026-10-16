@@ -2,6 +2,7 @@
 
 import logging
 import re
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -74,16 +75,24 @@ def _polars_missing_counts(X_pl: Any, cols: list[str]) -> tuple[dict[str, int], 
     return counts, sum(counts.values())
 
 
-def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: bool) -> Any:
+def _sklearn_transform_subset(
+    X: Any,
+    cols: list[str],
+    imputer: Any,
+    is_polars: bool,
+    *,
+    transform: Callable[[Any, np.ndarray], Any] | None = None,
+) -> Any:
     """Run a fitted sklearn imputer over X[cols] and write back into a copy of X.
 
     Used by KNN + Iterative imputers; both share the exact same transform shape.
     Returns the transformed frame (Polars or Pandas, matching the input).
     """
+    transform = transform or _transform_imputer
     if is_polars:
         X_subset = X.select(cols)
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        X_transformed = _transform_imputer(imputer, X_np)
+        X_transformed = transform(imputer, X_np)
         if hasattr(X_transformed, "to_numpy"):
             X_transformed = X_transformed.to_numpy()
         new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
@@ -99,7 +108,7 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
         X_subset[ext_cols] = X_subset[ext_cols].astype("float64")
         X_out[ext_cols] = X_out[ext_cols].astype("float64")
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
-    X_transformed = _transform_imputer(imputer, X_input)
+    X_transformed = transform(imputer, X_input)
     X_out[cols] = X_transformed
     return X_out
 

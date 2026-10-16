@@ -11,10 +11,11 @@ import polars as pl
 
 from .....data.dataset import SplitDataset
 from .....inference._partition_builtins import PROBED_BUILTINS, fresh_builtin_record
+from .....inference._probe_frames import COMPARISON_VERSION, float_tolerance
 from .....inference.fitted_pipeline import FittedPipelineArtifact, load_pipeline, save_pipeline
 from .....inference.preprocessing_probe import probe_fitted_preprocessing
 from .....inference.probed_builtins import builtin_evidence, has_builtin_steps
-from .....inference.probed_models import has_probed_model, probe_model
+from .....inference.probed_models import has_probed_model, probe_model, probe_pipeline
 from .....inference.probed_rules import (
     has_scoring_rules,
     lint_rules,
@@ -23,6 +24,7 @@ from .....inference.probed_rules import (
 )
 from .....inference.probed_steps import (
     PROBE_KEY,
+    PROBE_VERSION,
     PROBED_NODES,
     fresh_rebinder,
     has_function_steps,
@@ -91,7 +93,8 @@ def partition_admission_evidence(
         evidence = _custom_admission_evidence(artifact, holdout)
     else:
         evidence = {
-            "version": 1,
+            "version": PROBE_VERSION,
+            "float_tolerance": float_tolerance(),
             "rows": min(len(holdout), 256),
             "chunk_sizes": [1, 2, 7],
             "steps": [],
@@ -104,13 +107,15 @@ def partition_admission_evidence(
             evidence["builtins"] = builtin_evidence(artifact, report)
     if has_probed_model(artifact):
         evidence["model"] = probe_model(artifact, holdout)
+    if any(evidence.get(section) for section in ("steps", "builtins", "rules", "model")):
+        evidence["pipeline"] = probe_pipeline(artifact, holdout)
     return evidence
 
 
 def _custom_admission_evidence(
     artifact: FittedPipelineArtifact, holdout: pd.DataFrame | pl.DataFrame
 ) -> dict[str, Any]:
-    """Preserve the source-bound version-one step and rule certificate contract."""
+    """Seal current comparison policy with the source-bound step and rule contracts."""
     source = require_project_source(artifact)
     lint_steps(artifact)
     lint_rules(artifact)
@@ -229,7 +234,8 @@ def _holdout_probe(
 ) -> dict[str, Any]:
     """Keep values and exception messages out of a failed or unavailable check."""
     report: dict[str, Any] = {
-        "report_version": 1,
+        "report_version": COMPARISON_VERSION,
+        "float_tolerance": float_tolerance(),
         "status": "not_run",
         "admission": "diagnostic_only",
         "sample_rows": min(len(holdout), 256),

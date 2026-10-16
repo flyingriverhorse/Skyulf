@@ -30,20 +30,42 @@ logger = logging.getLogger(__name__)
 def _power_transform_array(
     X_vals: np.ndarray, params: dict[str, Any], cols: list[str], valid_cols: list[str]
 ) -> np.ndarray:
-    """Run the rebuilt PowerTransformer over a numpy array; return transformed array."""
+    """Transform valid values independently, replacing invalid inputs/results with NaN."""
+    values = np.array(X_vals, dtype=np.float64, copy=True)
+    invalid = np.isinf(values)
+    if params.get("method", "yeo-johnson") == "box-cox":
+        invalid |= values <= 0
+    values[invalid] = np.nan
+    if np.isfinite(values).any():
+        values = _transform_valid_power(values, params, cols, valid_cols)
+    invalid |= np.isinf(values)
+    values[invalid] = np.nan
+    count = int(np.count_nonzero(invalid))
+    if count:
+        logger.warning("PowerTransformer replaced %d invalid value(s) with NaN", count)
+    return values
+
+
+def _transform_valid_power(
+    values: np.ndarray, params: dict[str, Any], cols: list[str], valid_cols: list[str]
+) -> np.ndarray:
+    """Apply saved lambdas then scaler arithmetic without batch-wide finite-output checks."""
     col_indices = [cols.index(c) for c in valid_cols]
     lambdas_arr = np.array(params["lambdas"])[col_indices]
     pt = build_pretrained_power_transformer(
         method=params.get("method", "yeo-johnson"),
-        standardize=params.get("standardize", True),
+        standardize=False,
         lambdas_arr=lambdas_arr,
-        scaler_params=params.get("scaler_params", {}) or {},
-        col_indices=col_indices,
-        n_total_cols=len(cols),
+        scaler_params=None,
     )
-    X_trans = pt.transform(X_vals)
-    # sklearn may be configured with transform_output="pandas".
-    return X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+        transformed = np.asarray(pt.transform(values))
+        if params.get("standardize", True):
+            scaler = params["scaler_params"]
+            transformed = (transformed - np.asarray(scaler["mean"])[col_indices]) / np.asarray(
+                scaler["scale"]
+            )[col_indices]
+    return transformed
 
 
 def _filter_power_columns(X_pd: pd.DataFrame, cols: list[str], method: str) -> list[str]:
@@ -111,23 +133,19 @@ class PowerTransformerApplier(BaseApplier):
 
     @staticmethod
     def inference_capability(state: dict, *, engine: str) -> ExecutionCapability | None:
-        """Expose whole-request fallback when any value prevents a power transform."""
+        """Describe per-value invalid-to-NaN handling without executing the transform."""
         if engine not in ("pandas", "polars"):
             return None
         PowerTransformerApplier.validate_inference_state(state)
-        context = "global" if state.get("columns") else "row"
-        return ExecutionCapability(engine, "apply", "local", "preserve", context)
+        return ExecutionCapability(engine, "apply", "local", "preserve", "row")
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Rebuild the transformer from stored lambdas and transform ``X``; ``y`` untouched.
 
-        Fails open, like every applier in ``preprocessing/transformations/``: a
-        failed transform is logged at ERROR with its traceback and leaves the data
-        unchanged, so a degraded frame beats a hard failure at inference time.
-        Every path that leaves data untransformed logs — including the one that
-        used not to, a frame missing columns the transformer was fitted on, which
-        is train/serve skew rather than a no-op and is warned about by name.
+        Invalid numeric values become NaN and are counted in a warning. Valid
+        neighbours keep their fitted transform. Missing fitted columns are
+        warned about; malformed state and unexpected implementation errors raise.
         """
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
@@ -142,14 +160,10 @@ class PowerTransformerApplier(BaseApplier):
         if not valid_cols:
             return X, _y
 
-        try:
-            X_vals = X.select(valid_cols).to_numpy()
-            X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
-            series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
-            return X.with_columns(series), _y
-        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
-            logger.exception("PowerTransformer (Polars) application failed")
-            return X, _y
+        X_vals = X.select(valid_cols).to_numpy()
+        X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+        series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
+        return X.with_columns(series), _y
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -160,20 +174,13 @@ class PowerTransformerApplier(BaseApplier):
         if not valid_cols:
             return X, _y
 
-        try:
-            # Computed before the copy so a failure hands back the caller's frame
-            # rather than one whose columns were already cast to float64, matching
-            # what the polars path returns.
-            subset = decimal_columns_to_float(X[valid_cols], valid_cols)
-            X_vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
-            X_trans = np.asarray(_power_transform_array(X_vals, params, cols, valid_cols))
-            df_out = X.copy()
-            # Replace selected columns so nullable integers and Decimal objects
-            # can receive float results without incompatible-dtype assignment.
-            df_out[valid_cols] = X_trans
-        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
-            logger.exception("PowerTransformer (Pandas) application failed")
-            return X, _y
+        subset = decimal_columns_to_float(X[valid_cols], valid_cols)
+        X_vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
+        X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+        df_out = X.copy()
+        # Replace selected columns so nullable integers and Decimal objects
+        # can receive float results without incompatible-dtype assignment.
+        df_out[valid_cols] = X_trans
         return df_out, _y
 
 

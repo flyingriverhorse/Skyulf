@@ -342,3 +342,28 @@ def test_probe_inspects_local_state_without_worker_validation(tmp_path, monkeypa
         assert step["reason"] == "invalid_step_contract"
         assert step["checks"] == []
     assert artifact_digest(artifact.pipeline.feature_engineer.fitted_steps) == before
+
+
+@pytest.mark.parametrize("dtype", ["float64", "Float64"])
+def test_preprocessing_input_mutation_remains_exact(dtype):
+    """Even sub-tolerance changes to callback inputs must invalidate a probe."""
+    from skyulf.inference._probe_frames import ProbeFailure
+    from skyulf.inference.preprocessing_probe import _apply_checked
+
+    class Mutator:
+        """Represent a callback making a tiny in-place change to its input."""
+
+        def apply(self, frame, state):
+            """Change only an input value, below the allowed output tolerance."""
+            frame.iloc[0, 0] += 1e-13
+            return frame
+
+    frame = pd.DataFrame({"value": pd.Series([0.5, 0.75], dtype=dtype)})
+    with pytest.raises(ProbeFailure, match="input_mutation"):
+        _apply_checked(
+            {"applier": Mutator(), "artifact": {}, "name": "mutate", "type": "custom"},
+            frame,
+            10,
+            10000,
+        )
+    assert frame.iloc[0, 0] == 0.5

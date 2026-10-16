@@ -310,14 +310,52 @@ def _predict_eligible(
     )
     predictions = predict(model_frame)
     _check_rows(predictions, selected, pd.DataFrame)
-    if list(predictions.columns) != list(prediction_dtypes):
+    reasons = _prediction_reasons(predictions, prediction_dtypes)
+    predicted = reasons.isna()
+    result = pd.DataFrame(index=selected.index)
+    schema = {**prediction_dtypes, **dict(scoring_output_columns(config))}
+    for name, dtype in schema.items():
+        result[name] = _typed_column(pd.Series(pd.NA, index=selected.index), dtype)
+    if predicted.any():
+        estimates = predictions.loc[predicted, list(prediction_dtypes)].copy(deep=True)
+        for name, dtype in prediction_dtypes.items():
+            estimates[name] = _typed_column(estimates[name], dtype)
+        outputs = _outputs(
+            selected.loc[predicted].reset_index(drop=True),
+            estimates.reset_index(drop=True),
+            config,
+            module,
+        )
+        outputs.index = selected.index[predicted]
+        result.loc[predicted, list(schema)] = outputs
+    result["exclusion_reason"] = reasons
+    return result
+
+
+def _prediction_reasons(predictions: pd.DataFrame, prediction_dtypes: dict[str, str]) -> pd.Series:
+    """Validate native outlier outcomes before merging them with project policy decisions."""
+    columns = list(prediction_dtypes)
+    reasons = pd.Series(pd.NA, index=predictions.index, dtype="string")
+    if "scoring_status" in predictions:
+        columns.extend(["scoring_status", "exclusion_reason"])
+    if list(predictions.columns) != columns:
         raise ValueError("Prediction columns must exactly match their recorded schema.")
-    if predictions.isna().any().any():
+    if "scoring_status" in predictions:
+        status = predictions["scoring_status"]
+        if not status.isin(["predicted", "excluded"]).all():
+            raise ValueError("Prediction scoring_status must describe every requested row.")
+        reasons = predictions["exclusion_reason"].astype("string")
+        excluded = status.eq("excluded")
+        if (
+            not np.array_equal(reasons.notna(), excluded)
+            or reasons.loc[excluded].str.strip().eq("").any()
+        ):
+            raise ValueError("Prediction exclusion reasons must match excluded rows.")
+        if predictions.loc[excluded, list(prediction_dtypes)].notna().any().any():
+            raise ValueError("Excluded predictions must contain only missing estimates.")
+    if predictions.loc[reasons.isna(), list(prediction_dtypes)].isna().any().any():
         raise ValueError("Estimator outputs must not contain missing values.")
-    predictions = predictions.copy(deep=True)
-    for name, dtype in prediction_dtypes.items():
-        predictions[name] = _typed_column(predictions[name], dtype)
-    return _outputs(selected, predictions, config, module)
+    return reasons
 
 
 def run_project_scoring(
@@ -352,7 +390,9 @@ def run_project_scoring(
     if eligible.any():
         scored = _predict_eligible(raw, eligible, frame, predict, config, module, prediction_dtypes)
         scored.index = raw.index[eligible]
-        result.loc[eligible, list(schema)] = scored
+        result.loc[eligible, list(schema)] = scored[list(schema)]
+        reasons.loc[eligible] = scored["exclusion_reason"]
+    eligible = reasons.isna()
     result["scoring_status"] = pd.Series(
         np.where(eligible, "predicted", "excluded"), index=raw.index, dtype="string"
     )

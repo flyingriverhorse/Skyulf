@@ -18,6 +18,7 @@ ADMITTED_MODEL = "admitted: reviewed exact model applier"
 INFERENCE_SKIP = "admitted: training-only row filter, skipped at inference"
 PROBED = "admitted: only with sealed training probe evidence"
 PROBED_BUILTIN = "admitted: row-preserving built-in state with sealed training probe evidence"
+PROBED_EXCLUSION = "admitted: fitted outlier exclusions with sealed training probe evidence"
 SPLIT_MARKER = "admitted: split marker, absent from the fitted history"
 
 UNREVIEWED = "not admitted: no reviewed partition-safe applier yet"
@@ -68,6 +69,7 @@ DECLARATIONS: dict[str, str] = {
             "H3Index",
             "HashEncoder",
             "InvalidValueReplacement",
+            "IterativeImputer",
             "KBinsDiscretizer",
             "KNNImputer",
             "LabelEncoder",
@@ -77,6 +79,7 @@ DECLARATIONS: dict[str, str] = {
             "OrdinalEncoder",
             "PolynomialFeatures",
             "PolynomialFeaturesNode",
+            "PowerTransformer",
             "RobustScaler",
             "SimpleTransformation",
             "TargetEncoder",
@@ -90,8 +93,7 @@ DECLARATIONS: dict[str, str] = {
         ),
         PROBED_BUILTIN,
     ),
-    **dict.fromkeys(("IQR", "EllipticEnvelope", "ManualBounds", "ZScore"), ROW_FILTER),
-    **dict.fromkeys(("IterativeImputer", "PowerTransformer"), GLOBAL_STATE),
+    **dict.fromkeys(("IQR", "EllipticEnvelope", "ManualBounds", "ZScore"), PROBED_EXCLUSION),
     **dict.fromkeys(("LagFeatures", "RollingAggregate"), WINDOW),
     **dict.fromkeys(("Oversampling", "Undersampling"), RESAMPLING),
     **dict.fromkeys(("DataSnapshot", "DatasetProfile"), INSPECTION),

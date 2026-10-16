@@ -31,6 +31,7 @@ from ..preprocessing.function_steps import (
     RowFilterFunctionApplier,
 )
 from ..preprocessing.imputation.simple import SimpleImputerApplier, SimpleImputerCalculator
+from ..preprocessing.outliers._exclusion import is_outlier_step
 from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
 from ..registry import NodeRegistry
@@ -292,12 +293,12 @@ def _inspect_step(
 def _inspect_builtin_step(
     record: dict, config: dict, artifact: FittedPipelineArtifact | None
 ) -> PartitionStepEvidence:
-    """Admit a known row-preserving built-in only with matching fitted-state evidence."""
+    """Admit a known built-in's preserved or excluded outcomes with matching evidence."""
     state, params = require_probed_builtin(artifact, record, config)
     return PartitionStepEvidence(
         record["name"],
         record["type"],
-        "apply_probed_builtin",
+        "exclude_outliers" if is_outlier_step(record) else "apply_probed_builtin",
         json.dumps(_pack(params), sort_keys=True),
         artifact_digest(state).hex(),
     )

@@ -238,8 +238,8 @@ def test_admission_never_predicts(tmp_path, monkeypatch):
     assert require_partition_safe_pipeline(load_pipeline(path)).steps[-1].action == "model_probed"
 
 
-def test_exact_floating_partition_difference_fails_closed(tmp_path):
-    """Numerically close BLAS batch differences must never be hidden by a tolerance."""
+def test_floating_regression_roundoff_is_admitted(tmp_path):
+    """Numerically close BLAS batch differences use the approved fixed output tolerance."""
     rng = np.random.default_rng(147)
     frame = pd.DataFrame(rng.normal(size=(80, 5)), columns=list("abcde"))
     frame["y"] = frame.to_numpy() @ np.array([0.1, 0.3, 0.7, 0.9, 1.1])
@@ -247,8 +247,80 @@ def test_exact_floating_partition_difference_fails_closed(tmp_path):
     pipeline.fit(SplitDataset(train=frame.iloc[:48], test=frame.iloc[48:]), target_column="y")
     path = tmp_path / "exact"
     save_pipeline(pipeline, path)
-    with pytest.raises(ValueError, match="Model partition probe failed chunks:1: output_mismatch"):
-        _seal(load_pipeline(path), frame.iloc[48:], path, enabled=True)
+    sealed = _seal(load_pipeline(path), frame.iloc[48:], path, enabled=True)
+    assert require_partition_safe_pipeline(sealed).steps[-1].action == "model_probed"
+
+
+def test_real_lr_stacking_roundoff_seals_with_versioned_tolerance(tmp_path):
+    """RF+ET->LR on real data must pass without relaxing predicted class labels."""
+    from sklearn.datasets import load_breast_cancer
+    from sklearn.model_selection import train_test_split
+
+    source = load_breast_cancer(as_frame=True)
+    frame = source.data.iloc[:, [0]].copy()
+    frame["target"] = source.target
+    train, holdout = train_test_split(
+        frame, test_size=0.4, stratify=frame.target, random_state=20261016
+    )
+    pipeline: Any = SkyulfPipeline(
+        {
+            "preprocessing": [],
+            "modeling": {
+                "type": "stacking_classifier",
+                "params": {
+                    "base_estimators": ["random_forest", "extra_trees"],
+                    "base_estimator_params": {
+                        name: {
+                            "n_estimators": 24,
+                            "max_depth": 5,
+                            "n_jobs": 1,
+                            "random_state": 20261016,
+                        }
+                        for name in ("random_forest", "extra_trees")
+                    },
+                    "final_estimator": "logistic_regression",
+                    "final_estimator_params": {
+                        "solver": "liblinear",
+                        "max_iter": 500,
+                        "random_state": 20261016,
+                    },
+                    "cv": 3,
+                    "n_jobs": 1,
+                    "passthrough": False,
+                },
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=train, test=holdout), target_column="target")
+    path = tmp_path / "lr-stacking"
+    save_pipeline(pipeline, path)
+    artifact = load_pipeline(path)
+    rows = holdout.drop(columns="target")
+    whole = predict_pipeline(rows, artifact)
+    pieces = pd.concat(
+        [predict_pipeline(rows.iloc[index : index + 1], artifact) for index in range(len(rows))]
+    )
+    np.testing.assert_array_equal(whole.prediction, pieces.prediction)
+    difference = np.max(np.abs(whole.probability_1.to_numpy() - pieces.probability_1.to_numpy()))
+    assert difference <= 1e-12
+    sealed = _seal(artifact, holdout, path, enabled=True)
+    evidence = sealed.pipeline.config["partition_probe"]
+    assert evidence["version"] == 2
+    assert evidence["float_tolerance"] == {"rtol": 1e-9, "atol": 1e-12}
+    assert require_partition_safe_pipeline(sealed).steps[-1].action == "model_probed"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("version", 1), ("float_tolerance", None), ("float_tolerance", {"rtol": 1e-6, "atol": 1e-12})],
+)
+def test_model_rejects_old_or_altered_tolerance_evidence(tmp_path, field, value):
+    """Worker admission must bind the exact current floating comparison policy."""
+    artifact, holdout, path = _artifact(tmp_path)
+    sealed = _seal(artifact, holdout, path, enabled=True)
+    sealed.pipeline.config["partition_probe"][field] = value
+    with pytest.raises(UnsupportedExecutionError):
+        require_partition_safe_pipeline(sealed)
 
 
 @pytest.mark.parametrize("node", ["hist_gradient_boosting_classifier", "ridge_regression", "svc"])
@@ -390,3 +462,31 @@ def test_native_tree_swap_invalidates_sealed_model_evidence(tmp_path, node):
     assert not predict_pipeline(rows, sealed).equals(before)
     with pytest.raises(UnsupportedExecutionError, match="fitted state"):
         require_partition_safe_pipeline(sealed)
+
+
+@pytest.mark.parametrize("mode", ["probability", "float_label", "input_mutation"])
+def test_model_probe_rejects_meaningful_drift_and_exact_semantic_changes(
+    tmp_path, monkeypatch, mode
+):
+    """Tolerance must not hide changed probabilities, class identities or mutated inputs."""
+    from skyulf.inference import probed_models
+
+    artifact, holdout, _ = _artifact(tmp_path)
+    original = probed_models._output
+
+    def changed_output(current, frame):
+        """Keep real fitted prediction and introduce one narrowly controlled violation."""
+        result = original(current, frame)
+        if mode == "float_label":
+            result["prediction"] = result["prediction"].astype(float)
+        if mode == "input_mutation":
+            frame.iloc[0, 0] += 1e-13
+        elif len(frame) == 1:
+            column = "probability_1" if mode == "probability" else "prediction"
+            result[column] += 1e-6 if mode == "probability" else 1e-13
+        return result
+
+    monkeypatch.setattr(probed_models, "_output", changed_output)
+    reason = "input_mutation" if mode == "input_mutation" else "output_mismatch"
+    with pytest.raises(ValueError, match=reason):
+        probed_models.probe_model(artifact, holdout)

@@ -18,6 +18,7 @@ from typing import Any
 
 from ..pipeline.seal import artifact_digest
 from ..preprocessing.function_steps import COLUMN_STEP, FITTED_STEP, resolve_function
+from ._probe_frames import COMPARISON_VERSION, float_tolerance
 from .fitted_pipeline import FittedPipelineArtifact
 from .row_local_lint import (
     BATCH_SIZE,
@@ -31,8 +32,9 @@ from .row_local_lint import (
 FLAG_KEY = "admit_probed_custom_steps"
 PROBE_KEY = "partition_probe"
 PROBED_NODES = (COLUMN_STEP, FITTED_STEP)
-PROBE_VERSION = 1
+PROBE_VERSION = COMPARISON_VERSION
 CHUNK_SIZES = (1, 2, 7)
+PIPELINE_CHECKS = ("full", "repeat", "chunks:1", "chunks:7")
 REQUIRED_CHECKS = (
     "full",
     "repeat",
@@ -191,6 +193,16 @@ def require_sample_rows(rows: int, where: str = "holdout") -> None:
         )
 
 
+def require_step_rows(rows: Any, maximum: int, label: str) -> int:
+    """Require enough actual step inputs, independently of the original raw sample count."""
+    if type(rows) is not int or not MIN_ROWS <= rows <= min(maximum, 256):
+        raise ValueError(
+            f"{label} requires 16 to 256 actual input rows, bounded by the raw holdout; "
+            "use a holdout with at least 16 rows surviving earlier filters and retrain."
+        )
+    return rows
+
+
 def partition_probe_evidence(artifact: FittedPipelineArtifact, report: dict) -> dict[str, Any]:
     """Build sealed evidence from a probe report, or fail naming the step and check.
 
@@ -205,23 +217,29 @@ def partition_probe_evidence(artifact: FittedPipelineArtifact, report: dict) -> 
             "(preprocessing.py), so Spark workers run the probed code."
         )
     require_sample_rows(report["sample_rows"])
+    require_comparison_policy(report, version_key="report_version")
     eligible = eligible_probed_steps(artifact)
     _require_unique(eligible)
     steps = {(step.get("name"), step.get("node_type")): step for step in report.get("steps", [])}
     evidence = []
     for record in eligible:
         detail = steps.get((record["name"], record["type"]), {})
+        input_rows = require_step_rows(
+            detail.get("input_rows"), report["sample_rows"], f"Custom step {record['name']!r}"
+        )
         require_passed(f"Custom step {record['name']!r}", detail, report)
         evidence.append(
             {
                 "name": record["name"],
                 "node_type": record["type"],
                 "state_sha256": function_state_sha256(record["artifact"]),
+                "input_rows": input_rows,
                 "checks": passed_checks(),
             }
         )
     return {
         "version": PROBE_VERSION,
+        "float_tolerance": float_tolerance(),
         "lint_version": LINT_VERSION,
         "rows": report["sample_rows"],
         "chunk_sizes": list(CHUNK_SIZES),
@@ -384,6 +402,7 @@ def require_probed_step(
     entry = evidence_entry(
         config.get(PROBE_KEY), project_sha, "steps", {"name": name, "node_type": node}
     )
+    require_step_rows(entry.get("input_rows"), config[PROBE_KEY]["rows"], f"Custom step {name!r}")
     if entry.get("state_sha256") != function_state_sha256(state):
         raise ValueError(
             f"Training probe evidence does not match this step's saved state; {_RETRAIN}."
@@ -419,10 +438,55 @@ def evidence_entry(
     return matches[0]
 
 
+def require_scored_rows(rows: Any, maximum: int) -> int:
+    """Reject a final serving probe with too few actually executed prediction outcomes."""
+    if type(rows) is not int or not MIN_ROWS <= rows <= maximum:
+        raise ValueError(
+            "Raw pipeline partition probe needs at least 16 actually predicted outcomes "
+            "within its raw sample; widen or reorder a representative holdout and retrain."
+        )
+    return rows
+
+
+def require_pipeline_probe(evidence: dict) -> None:
+    """Require complete raw-input observations, in addition to individual component probes."""
+    detail = evidence.get("pipeline")
+    if (
+        type(detail) is not dict
+        or set(detail) != {"rows", "scored_rows", "checks"}
+        or detail.get("checks") != [{"name": name, "status": "passed"} for name in PIPELINE_CHECKS]
+    ):
+        raise ValueError(
+            "Missing or invalid raw pipeline partition probe evidence; retrain the model."
+        )
+    rows = detail.get("rows")
+    if type(rows) is not int or not MIN_ROWS <= rows <= 256 or rows != evidence.get("rows"):
+        raise ValueError("Invalid raw pipeline partition probe row count; retrain the model.")
+    require_scored_rows(detail.get("scored_rows"), rows)
+
+
+def require_comparison_policy(probe: dict, *, version_key: str = "version") -> None:
+    """Reject old evidence and policy changes rather than trusting caller-supplied tolerances."""
+    policy = probe.get("float_tolerance")
+    expected = float_tolerance()
+    if (
+        type(probe.get(version_key)) is not int
+        or probe[version_key] != PROBE_VERSION
+        or type(policy) is not dict
+        or set(policy) != set(expected)
+        or any(
+            type(policy[key]) is not float or policy[key] != value
+            for key, value in expected.items()
+        )
+    ):
+        raise ValueError(f"Unsupported training probe comparison policy; {_RETRAIN}.")
+
+
 def _check_envelope(probe: Any, project_sha: str | None, source_key: str) -> None:
-    """Require version-1 evidence with the fixed checks, bound to the saved project source."""
+    """Require current comparison evidence with fixed checks bound to the saved project source."""
     if not isinstance(probe, dict):
         raise ValueError(f"No training probe evidence was saved; {_RETRAIN}.")
+    require_comparison_policy(probe)
     if (
         probe.get("version") != PROBE_VERSION
         or probe.get("lint_version") != LINT_VERSION
@@ -436,3 +500,5 @@ def _check_envelope(probe: Any, project_sha: str | None, source_key: str) -> Non
         raise ValueError(
             f"Training probe evidence covers fewer than {MIN_ROWS} holdout rows; {_RETRAIN}."
         )
+    if source_key == "project_source_sha256":
+        require_pipeline_probe(probe)

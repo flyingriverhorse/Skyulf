@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer, 
 from sklearn.preprocessing import OrdinalEncoder
 
 from ..preprocessing.inference_context import get_inference_capability
+from ..preprocessing.outliers._exclusion import is_outlier_step
 from ..registry import NodeRegistry
 from ._fitted_contract import resolve_fitted_step
 
@@ -22,6 +23,7 @@ _OWNERS = {
     "DateFeatures": ("time_series.date_features", "DateFeatures"),
     "DropMissingColumns": ("drop_and_missing.drop_columns", "DropMissingColumns"),
     "DummyEncoder": ("encoding.dummy", "DummyEncoder"),
+    "EllipticEnvelope": ("outliers.elliptic", "EllipticEnvelope"),
     "FeatureGeneration": ("feature_generation.generation", "FeatureGeneration"),
     "FeatureGenerationNode": ("feature_generation.generation", "FeatureGeneration"),
     "FeatureMath": ("feature_generation.generation", "FeatureGeneration"),
@@ -31,15 +33,19 @@ _OWNERS = {
     "H3Index": ("geo.h3_index", "H3Index"),
     "HashEncoder": ("encoding.hash", "HashEncoder"),
     "InvalidValueReplacement": ("cleaning.invalid_value", "InvalidValueReplacement"),
+    "IQR": ("outliers.iqr", "IQR"),
+    "IterativeImputer": ("imputation.iterative", "IterativeImputer"),
     "KBinsDiscretizer": ("bucketing", "KBinsDiscretizer"),
     "KNNImputer": ("imputation.knn", "KNNImputer"),
     "LabelEncoder": ("encoding.label", "LabelEncoder"),
+    "ManualBounds": ("outliers.manual_bounds", "ManualBounds"),
     "MaxAbsScaler": ("scaling.maxabs", "MaxAbsScaler"),
     "MissingIndicator": ("drop_and_missing.missing_indicator", "MissingIndicator"),
     "ModelBasedSelection": ("feature_selection.model_based", "ModelBasedSelection"),
     "OrdinalEncoder": ("encoding.ordinal", "OrdinalEncoder"),
     "PolynomialFeatures": ("feature_generation.polynomial", "PolynomialFeatures"),
     "PolynomialFeaturesNode": ("feature_generation.polynomial", "PolynomialFeatures"),
+    "PowerTransformer": ("transformations.power", "PowerTransformer"),
     "RobustScaler": ("scaling.robust", "RobustScaler"),
     "SimpleTransformation": ("transformations.simple", "SimpleTransformation"),
     "TargetEncoder": ("encoding.target", "TargetEncoder"),
@@ -49,6 +55,7 @@ _OWNERS = {
     "VarianceThreshold": ("feature_selection.variance", "VarianceThreshold"),
     "WOEEncoder": ("encoding.woe", "WOEEncoder"),
     "Winsorize": ("outliers.winsorize", "Winsorize"),
+    "ZScore": ("outliers.zscore", "ZScore"),
     "feature_selection": ("feature_selection.facade", "FeatureSelection"),
     "count_vectorizer": ("vectorization.count_vectorizer", "CountVectorizer"),
     "hashing_vectorizer": ("vectorization.hashing_vectorizer", "HashingVectorizer"),
@@ -116,7 +123,7 @@ def builtin_applier(node: str) -> type | None:
 
 
 def builtin_contract(record: dict, config: dict) -> tuple[Any, dict]:
-    """Keep fitted validation, row context and row preservation mandatory before probing."""
+    """Require fitted row-local behavior, explicitly preserving outlier exclusion outcomes."""
     node = record["type"]
     applier = record["applier"]
     expected = builtin_applier(node)
@@ -127,7 +134,12 @@ def builtin_contract(record: dict, config: dict) -> tuple[Any, dict]:
     _check_nested_state(record["artifact"], set())
     state, params, _ = resolve_fitted_step(record, config, require_portable=False)
     capability = get_inference_capability(node, params, state, engine="pandas", applier=applier)
-    if capability is None or (capability.context, capability.row_effect) != ("row", "preserve"):
+    row_effects = {"filter", "preserve"} if is_outlier_step(record) else {"preserve"}
+    if (
+        capability is None
+        or capability.context != "row"
+        or capability.row_effect not in row_effects
+    ):
         raise ValueError(
             f"Built-in step {record['name']!r} ({node}) requires validated row-preserving "
             "inference. Filtering rows or using other request rows cannot be admitted by a probe."

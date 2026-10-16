@@ -298,10 +298,27 @@ def _comparison_metrics(
     target_column: str,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
     """Evaluate the same labeled rows with both saved pipelines, without fitting."""
-    candidate_metrics = evaluate_holdout(candidate, heldout, target_column=target_column)
+    masks: list[tuple[bool, ...]] = []
+
+    def capture_rows(actual: Any, predictions: pd.DataFrame) -> None:
+        """Record positional coverage without altering the evaluated labels or outputs."""
+        masks.append(
+            tuple(predictions["scoring_status"].eq("predicted"))
+            if "scoring_status" in predictions
+            else (True,) * len(actual)
+        )
+
+    candidate_metrics = evaluate_holdout(
+        candidate, heldout, target_column=target_column, on_predictions=capture_rows
+    )
     if champion is None:
         return candidate_metrics, None
-    return candidate_metrics, evaluate_holdout(champion, heldout, target_column=target_column)
+    champion_metrics = evaluate_holdout(
+        champion, heldout, target_column=target_column, on_predictions=capture_rows
+    )
+    if masks[0] != masks[1]:
+        raise ValueError("Candidate and champion must score the same heldout rows.")
+    return candidate_metrics, champion_metrics
 
 
 def _selected_metric(metrics: dict[str, float], metric: str) -> float:

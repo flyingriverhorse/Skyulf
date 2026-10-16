@@ -163,7 +163,7 @@ def test_row_step_with_flag_is_admitted_and_worker_recomputes_certificate(tmp_pa
     """An evidenced row step must be certified as apply_probed and recompute equal on a worker."""
     artifact, path = _sealed(tmp_path, kind=kind)
     probe = artifact.pipeline.config["partition_probe"]
-    assert probe["version"] == 1 and probe["rows"] == 20 and probe["chunk_sizes"] == [1, 2, 7]
+    assert probe["version"] == 2 and probe["rows"] == 20 and probe["chunk_sizes"] == [1, 2, 7]
     assert probe["project_source_sha256"] == artifact.manifest.project_source_sha256
     assert [step["name"] for step in probe["steps"]] == ["clip_duration"]
     assert [check["name"] for check in probe["steps"][0]["checks"]] == ["lint", *REQUIRED_CHECKS]
@@ -585,7 +585,7 @@ def _wrong_source(probe, artifact):
 
 def _wrong_version(probe, artifact):
     """Use an evidence format admission does not understand."""
-    probe["version"] = 2
+    probe["version"] = 999
 
 
 def _fewer_chunks(probe, artifact):
@@ -621,7 +621,7 @@ def _missing_evidence(probe, artifact):
         (_wrong_digest, "does not match this step's saved state"),
         (_changed_state, "does not match this step's saved state"),
         (_wrong_source, "other project source"),
-        (_wrong_version, "evidence version"),
+        (_wrong_version, "comparison policy"),
         (_fewer_chunks, "evidence version"),
         (_failed_check, "does not show every check passed"),
         (_empty_not_supported, "does not show every check passed"),
@@ -730,3 +730,20 @@ def test_admission_probe_runs_automatically_for_spark_and_online_projects(
     assert probed_admission(workflow_config) is expected
     if "online_features" not in settings:
         assert training_spec(workflow_config).admit_probed_custom_steps is expected
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("version", 1), ("float_tolerance", None), ("float_tolerance", {"rtol": 1e-6, "atol": 1e-12})],
+)
+def test_old_or_changed_comparison_policy_is_rejected(tmp_path, field, value):
+    """Every admission route must require the trusted versioned tolerance policy."""
+    artifact, _ = _sealed(tmp_path)
+    assert artifact.pipeline.config["partition_probe"]["version"] == 2
+    assert artifact.pipeline.config["partition_probe"]["float_tolerance"] == {
+        "rtol": 1e-9,
+        "atol": 1e-12,
+    }
+    artifact.pipeline.config["partition_probe"][field] = value
+    with pytest.raises(UnsupportedExecutionError, match="comparison policy"):
+        require_partition_safe_pipeline(artifact)

@@ -10,21 +10,26 @@ from collections.abc import Callable
 from copy import deepcopy
 from typing import Any
 
+import numpy as np
 import pandas as pd
+import polars as pl
 
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
 from ..pipeline.seal import artifact_digest
 from ..preprocessing._spark import use_spark
 from ..preprocessing.inference_context import get_inference_capability
+from ..preprocessing.outliers._exclusion import apply_outlier_filter, is_outlier_step
 from ..preprocessing.pipeline import FeatureEngineer, _apply_prediction_step
 from ..registry import NodeRegistry
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
 from ._probe_frames import (
+    COMPARISON_VERSION,
     Frame,
     ProbeFailure,
     assert_same,
     copy_frame,
+    float_tolerance,
     probe_sizes,
     validate_frame,
 )
@@ -97,20 +102,37 @@ def _apply_checked(record: dict, frame: Frame, max_rows: int, max_bytes: int) ->
     before_frame = copy_frame(argument)
     before_state = _state_digest(record)
     try:
-        result = _apply_prediction_step(argument, record)
+        result = (
+            _outlier_mask(argument, record)
+            if is_outlier_step(record)
+            else _apply_prediction_step(argument, record)
+        )
     finally:
         if _state_digest(record) != before_state:
             raise ProbeFailure("state_mutation")
-        assert_same(before_frame, argument, "input_mutation")
+        assert_same(before_frame, argument, "input_mutation", exact=True)
     try:
         validate_frame(result, max_rows, max_bytes)
     except (TypeError, ValueError):
         raise ProbeFailure("invalid_output_frame_or_budget") from None
     if type(result) is not type(frame):
         raise ProbeFailure("output_engine_mismatch")
-    if isinstance(frame, pd.DataFrame) and not frame.index.equals(result.index):
+    if (
+        isinstance(frame, pd.DataFrame)
+        and isinstance(result, pd.DataFrame)
+        and not frame.index.equals(result.index)
+    ):
         raise ProbeFailure("output_row_order_mismatch")
     return result
+
+
+def _outlier_mask(frame: Frame, record: dict) -> Frame:
+    """Probe the actual full-length exclusion decision rather than a shortened frame."""
+    _, positions = apply_outlier_filter(frame, record)
+    keep = np.isin(np.arange(len(frame)), positions)
+    if isinstance(frame, pd.DataFrame):
+        return pd.DataFrame({"keep": keep}, index=frame.index)
+    return pl.DataFrame({"keep": keep})
 
 
 def _run_check(
@@ -144,6 +166,7 @@ def _probe_step(
     detail: dict[str, Any] = {
         "name": record["name"],
         "node_type": record["type"],
+        "input_rows": len(frame),
         "action": "apply" if active else "skip_preserve_rows",
         "context": "unknown",
         "checks": [],
@@ -159,6 +182,8 @@ def _probe_step(
     if not active:
         detail["status"] = "skipped"
         return detail, frame
+    if is_outlier_step(detached):
+        detail["action"] = "exclude_outliers"
     if detail["context"] in {"group", "window", "global"} or detail["history_mode"] == "carry":
         detail["status"] = "requires_context"
         return detail, frame
@@ -205,6 +230,8 @@ def _probe_checks(
     detail["status"] = (
         "failed" if any(c["status"] == "failed" for c in detail["checks"]) else "passed"
     )
+    if is_outlier_step(record):
+        transformed, _ = apply_outlier_filter(copy_frame(frame), deepcopy(record))
     return detail, transformed
 
 
@@ -286,7 +313,8 @@ def probe_fitted_preprocessing(
     time; other rows' outputs must not move) for steps of those node types.
 
     Uses no fit/learn methods. Each strategy receives detached fitted records.
-    Checks exact schema, values, order and semantic fitted-state mutation. Known
+    Checks exact schema, order, null masks and semantic fitted-state mutation;
+    floating outputs use the fixed tolerance recorded in the report. Known
     group/window/global steps require context and stop this independent-partition
     probe. Unknown custom steps may pass samples but remain unverified for remote
     admission; only ``probed_steps`` turns a passing row-declared function step
@@ -309,7 +337,8 @@ def probe_fitted_preprocessing(
     use_spark(current, engineer.execution_options, engineer.frame_spec)
     validate_frame(current, max_rows, max_bytes)
     report: dict[str, Any] = {
-        "report_version": 1,
+        "report_version": COMPARISON_VERSION,
+        "float_tolerance": float_tolerance(),
         "status": "passed",
         "admission": "diagnostic_only",
         "sample_rows": len(sample),

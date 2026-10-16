@@ -21,6 +21,7 @@ from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
 from ..preprocessing._target_labels import original_labels
+from ..preprocessing.outliers._exclusion import is_outlier_step
 from ._manifest import checksum, label_dtype, runtime_requirements
 from ._model_requirements import native_model_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
@@ -29,7 +30,7 @@ from .project_dependencies import (
     source_project_requirements,
     verify_project_requirements,
 )
-from .project_scoring import validate_scoring_config
+from .project_scoring import _typed_column, validate_scoring_config
 
 _MAX_MANIFEST_BYTES = 64 * 1024
 _MAX_PIPELINE_BYTES = 256 * 1024 * 1024
@@ -291,12 +292,14 @@ def require_pipeline_scope(
 def predict_pipeline(
     frame: pd.DataFrame | pl.DataFrame, artifact: FittedPipelineArtifact
 ) -> pd.DataFrame:
-    """Apply the fitted preprocessing and model with the recorded fit engine."""
+    """Apply saved preprocessing and publish null outcomes for fitted outlier exclusions."""
     if not isinstance(artifact, FittedPipelineArtifact):
         raise TypeError("Expected a FittedPipelineArtifact.")
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
     native = validate_pipeline_input(frame, artifact)
+    if has_outlier_steps(artifact):
+        return _predict_with_exclusions(frame, native, artifact)
     if not len(native):
         return _empty_prediction(frame, artifact.manifest)
     prediction = np.asarray(
@@ -308,16 +311,66 @@ def predict_pipeline(
         raise ValueError("Local pipeline prediction shape disagrees with input rows.")
     index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))
     result = pd.DataFrame({"prediction": pd.Series(prediction, index=index)})
+    _add_probabilities(result, native, artifact)
+    return result
+
+
+def _add_probabilities(
+    result: pd.DataFrame,
+    native: pd.DataFrame | pl.DataFrame,
+    artifact: FittedPipelineArtifact,
+) -> None:
+    """Append recorded classifier probabilities while preserving the ordinary prediction path."""
     if (
         artifact.manifest.task == "classification"
         and artifact.manifest.classification_probabilities
     ):
         transformed = artifact.pipeline.feature_engineer.transform(native, preserve_rows=True)
         probabilities = np.asarray(artifact.pipeline._predict_proba_transformed(transformed))
-        if probabilities.shape != (len(frame), len(artifact.manifest.classes)):
+        if probabilities.shape != (len(result), len(artifact.manifest.classes)):
             raise ValueError("Local pipeline probability shape disagrees with recorded classes.")
         for position in range(len(artifact.manifest.classes)):
             result[f"probability_{position}"] = probabilities[:, position]
+
+
+def has_outlier_steps(artifact: FittedPipelineArtifact) -> bool:
+    """Identify saved filters whose prediction outputs require explicit coverage columns."""
+    return any(is_outlier_step(step) for step in artifact.pipeline.feature_engineer.fitted_steps)
+
+
+def _predict_with_exclusions(
+    frame: pd.DataFrame | pl.DataFrame,
+    native: pd.DataFrame | pl.DataFrame,
+    artifact: FittedPipelineArtifact,
+) -> pd.DataFrame:
+    """Scatter eligible predictions into typed, full-length nullable output columns."""
+    pipeline, manifest = artifact.pipeline, artifact.manifest
+    transformed, positions, reasons = pipeline.feature_engineer.transform_with_exclusions(native)
+    index = frame.index if isinstance(frame, pd.DataFrame) else pd.RangeIndex(len(frame))
+    empty = _empty_prediction(frame.head(0), manifest)
+    result = pd.DataFrame(index=pd.RangeIndex(len(frame)))
+    label = "float64" if manifest.task == "regression" else label_dtype(manifest.classes)
+    for column in empty:
+        dtype = label if column == "prediction" else "float64"
+        result[column] = _typed_column(pd.Series(pd.NA, index=result.index), dtype)
+    if len(positions):
+        result.loc[positions, "prediction"] = np.asarray(
+            pipeline._predict_transformed(
+                transformed, use_tuned_thresholds=manifest.use_tuned_thresholds
+            )
+        )
+        if manifest.task == "classification" and manifest.classification_probabilities:
+            probabilities = np.asarray(pipeline._predict_proba_transformed(transformed))
+            if probabilities.shape != (len(positions), len(manifest.classes)):
+                raise ValueError(
+                    "Local pipeline probability shape disagrees with recorded classes."
+                )
+            result.loc[positions, list(empty.columns[1:])] = probabilities
+    result["scoring_status"] = pd.Series(
+        np.where(reasons.isna(), "predicted", "excluded"), index=result.index, dtype="string"
+    )
+    result["exclusion_reason"] = reasons
+    result.index = index
     return result
 
 

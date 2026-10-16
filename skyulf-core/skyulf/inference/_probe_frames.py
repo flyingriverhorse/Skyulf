@@ -11,6 +11,9 @@ from pandas.testing import assert_frame_equal as assert_pandas_equal
 from polars.testing import assert_frame_equal as assert_polars_equal
 
 Frame = pd.DataFrame | pl.DataFrame
+FLOAT_RTOL = 1e-9
+FLOAT_ATOL = 1e-12
+COMPARISON_VERSION = 2
 _SCALARS = (str, bytes, bool, int, float, complex, date, datetime, time, timedelta, Decimal)
 
 
@@ -250,16 +253,83 @@ def reverse_frame(frame: Frame) -> Frame:
     return frame.reverse()
 
 
-def assert_same(expected: Frame, actual: Frame, reason: str = "output_mismatch") -> None:
-    """Compare engine, ordered schema, nulls, index and values exactly."""
+def float_tolerance() -> dict[str, float]:
+    """Return the fixed output policy recorded in diagnostic and admission evidence."""
+    return {"rtol": FLOAT_RTOL, "atol": FLOAT_ATOL}
+
+
+def assert_same(
+    expected: Frame,
+    actual: Frame,
+    reason: str = "output_mismatch",
+    *,
+    exact: bool = False,
+    exact_columns: tuple[str, ...] = (),
+) -> None:
+    """Compare structure exactly, tolerating only floating outputs outside exact columns.
+
+    Classification label columns must be supplied through ``exact_columns``;
+    input mutation checks use ``exact=True``. Integer and other nonfloating
+    values never receive a numerical tolerance. Null and NaN positions stay exact.
+    """
     if type(expected) is not type(actual):
         raise ProbeFailure(reason)
     try:
         if isinstance(expected, pd.DataFrame):
-            assert_pandas_equal(
-                expected, cast(pd.DataFrame, actual), check_exact=True, check_index_type=False
-            )
+            _assert_pandas_same(expected, cast(pd.DataFrame, actual), exact, exact_columns)
         else:
-            assert_polars_equal(expected, cast(pl.DataFrame, actual), check_exact=True)
+            _assert_polars_same(expected, cast(pl.DataFrame, actual), exact, exact_columns)
     except (AssertionError, TypeError, ValueError):
         raise ProbeFailure(reason) from None
+
+
+def _assert_float_values(expected: np.ndarray, actual: np.ndarray, exact: bool) -> None:
+    """Keep nullable floating labels exact instead of relying on pandas extension comparisons."""
+    if exact:
+        np.testing.assert_array_equal(actual, expected)
+    else:
+        np.testing.assert_allclose(
+            actual, expected, rtol=FLOAT_RTOL, atol=FLOAT_ATOL, equal_nan=True
+        )
+
+
+def _assert_pandas_same(
+    expected: pd.DataFrame, actual: pd.DataFrame, exact: bool, exact_columns: tuple[str, ...]
+) -> None:
+    """Bind pandas schema/index/null masks before comparing floating values separately."""
+    assert_pandas_equal(expected.iloc[:0], actual.iloc[:0], check_exact=True)
+    assert_pandas_equal(expected.isna(), actual.isna(), check_exact=True)
+    floating = [name for name in expected if pd.api.types.is_float_dtype(expected[name].dtype)]
+    strict = [name for name in expected if name not in floating]
+    assert_pandas_equal(expected[strict], actual[strict], check_exact=True)
+    for name in floating:
+        dtype = str(getattr(expected[name].dtype, "numpy_dtype", expected[name].dtype))
+        _assert_float_values(
+            expected[name].to_numpy(dtype=dtype, na_value=np.nan),
+            actual[name].to_numpy(dtype=dtype, na_value=np.nan),
+            exact or name in exact_columns,
+        )
+
+
+def _assert_polars_same(
+    expected: pl.DataFrame, actual: pl.DataFrame, exact: bool, exact_columns: tuple[str, ...]
+) -> None:
+    """Keep Polars height, schema and distinct null/NaN masks exact."""
+    if expected.shape != actual.shape:
+        raise AssertionError("Frame shapes differ")
+    assert_polars_equal(expected.head(0), actual.head(0), check_exact=True)
+    assert_polars_equal(
+        expected.select(pl.all().is_null()), actual.select(pl.all().is_null()), check_exact=True
+    )
+    floating = [name for name, dtype in expected.schema.items() if dtype.is_float()]
+    strict = [name for name in expected.columns if name not in floating]
+    assert_polars_equal(expected.select(strict), actual.select(strict), check_exact=True)
+    assert_polars_equal(
+        expected.select(floating).select(pl.all().is_nan()),
+        actual.select(floating).select(pl.all().is_nan()),
+        check_exact=True,
+    )
+    for name in floating:
+        _assert_float_values(
+            expected[name].to_numpy(), actual[name].to_numpy(), exact or name in exact_columns
+        )

@@ -27,6 +27,7 @@ from ._target_labels import record_target_labels
 from ._weight_policy import prepare_pipeline_weights
 from .base import StatefulTransformer
 from .dispatcher import _check_xy_engine_parity
+from .outliers._exclusion import apply_outlier_filter, is_outlier_step
 from .time_series.lag import LagFeaturesApplier
 from .time_series.rolling import RollingAggregateApplier
 
@@ -252,6 +253,27 @@ class FeatureEngineer:
         if preserve_rows:
             skipped.update(self._ROW_DROPPING_TYPES)
         return [step for step in self.fitted_steps if step["type"] not in skipped]
+
+    def transform_with_exclusions(self, data: Any) -> tuple[Any, np.ndarray, pd.Series]:
+        """Apply fitted filters while retaining the first reason for each original row.
+
+        Training and ordinary transform still remove outliers. Saved scoring uses
+        the returned positions to publish a null outcome for each removed row.
+        Other filters and permutations keep the ordinary prediction guard.
+        """
+        positions = np.arange(len(data))
+        reasons = pd.Series(pd.NA, index=pd.RangeIndex(len(data)), dtype="string")
+        for step in self._transform_steps(preserve_rows=True):
+            if not len(data):
+                break
+            if is_outlier_step(step):
+                data, kept = apply_outlier_filter(data, step)
+                excluded = ~np.isin(np.arange(len(positions)), kept)
+                reasons.iloc[positions[excluded]] = f"outlier:{step['name']}"
+                positions = positions[kept]
+            else:
+                data = _apply_prediction_step(data, step)
+        return data, positions, reasons
 
     def transform_tracking_order(self, data: Any) -> tuple[Any, np.ndarray]:
         """Transform local features and report each output row's original input position.

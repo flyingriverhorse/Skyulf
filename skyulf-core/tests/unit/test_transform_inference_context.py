@@ -1,4 +1,4 @@
-"""Saved power transforms expose batch fallback without learning request statistics."""
+"""Saved power transforms describe their actual per-value or whole-request behavior."""
 
 from copy import deepcopy
 from typing import Any
@@ -56,7 +56,7 @@ def _probe(record, sample, engine):
 @pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
-    """Inspection must neither fit nor run transforms while describing global fallback."""
+    """Inspection must describe context without fitting or running transforms."""
     record = _record(node, engine)
     state = record["artifact"]
     before = artifact_digest(state)
@@ -71,13 +71,13 @@ def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
     monkeypatch.setattr(SkPowerTransformer, "fit", forbidden)
     assert applier.validate_inference_state(state) is state
     assert get_inference_capability(node, {}, state, engine=engine) == ExecutionCapability(
-        engine, "apply", "local", "preserve", "global"
+        engine, "apply", "local", "preserve", "row" if node == "PowerTransformer" else "global"
     )
     assert get_inference_capability(node, {}, state, engine="spark") is None
     assert artifact_digest(state) == before
 
 
-@pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])
+@pytest.mark.parametrize("node", ["GeneralTransformation"])
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("method,bad", [("box-cox", -1.0), ("yeo-johnson", np.inf)])
 @pytest.mark.parametrize("standardize", [False, True])
@@ -153,7 +153,7 @@ def test_power_genuine_numpy_selection_and_flag(engine):
     config = {"columns": [np.str_("x")], "standardize": np.bool_(True)}
     state = NodeRegistry.get_calculator("PowerTransformer")().fit(_frame(engine), config)
     capability = get_inference_capability("PowerTransformer", config, state, engine=engine)
-    assert capability is not None and capability.context == "global"
+    assert capability is not None and capability.context == "row"
 
 
 @pytest.mark.parametrize("node", ["GeneralTransformation", "PowerTransformer"])

@@ -68,7 +68,11 @@ def test_declared_admissions_match_the_partition_review():
     }
     assert _declared(admission.INFERENCE_SKIP) == set(partition_safety._SKIPS)
     assert _declared(admission.PROBED) == set(partition_safety._PROBED)
-    assert _declared(admission.PROBED_BUILTIN) == set(_partition_builtins.PROBED_BUILTINS)
+    exclusions = {"IQR", "EllipticEnvelope", "ManualBounds", "ZScore"}
+    assert _declared(admission.PROBED_EXCLUSION) == exclusions
+    assert (
+        _declared(admission.PROBED_BUILTIN) == set(_partition_builtins.PROBED_BUILTINS) - exclusions
+    )
     assert _declared(admission.SPLIT_MARKER) == partition_safety._UNRECORDED & nodes
 
 
