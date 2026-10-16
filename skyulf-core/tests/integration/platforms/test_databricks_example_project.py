@@ -35,6 +35,7 @@ def test_normal_generation_excludes_the_prepared_examples(tmp_path, layout):
     assert not (project / "examples").exists()
     assert not list(project.rglob("trip_rules.py"))
     training = yaml.safe_load((project / "config/training.yml").read_text())
+    assert training["defaults"]["admit_probed_custom_steps"] is False
     for entry in training["models"].values():
         config = training["defaults"] | entry
         assert config.get("preprocessing_recipe", "default") == "default"
@@ -139,3 +140,73 @@ def test_loader_creates_every_column_the_examples_read():
         assert answers["source_table_name"] == "trips_train"
         assert answers.get("score_source_table_name") == "trips_score"
         assert (needed - looked_up) | keys <= tables["trips_train"] & tables["trips_score"]
+
+
+def test_robust_taxi_saved_recipe_preserves_excluded_and_missing_rows(tmp_path):
+    """The shipped recipe must seal admission and keep target-free requests aligned after reload."""
+    import pandas as pd
+
+    from skyulf.data.dataset import SplitDataset
+    from skyulf.inference.fitted_pipeline import load_pipeline
+    from skyulf.inference.partition_safety import require_partition_safe_pipeline
+    from skyulf.inference.pipeline_scoring import score_pipeline
+    from skyulf.integrations.databricks.lifecycle.workflow import training_spec
+    from skyulf.integrations.databricks.projects.project import load_project_workflow
+    from skyulf.integrations.databricks.projects.yaml_config import read_workflow_config
+    from skyulf.integrations.databricks.scoring.batch.frame_batch import fit_workflow
+    from skyulf.integrations.databricks.training.fitting.candidate import candidate_config
+    from skyulf.integrations.databricks.training.shared.preprocessing_checks import (
+        seal_partition_probe,
+    )
+    from skyulf.integrations.databricks.training.tuning.cv import CVSpec
+
+    project = EXAMPLES / "taxi_fare_robust"
+    config = load_project_workflow(
+        read_workflow_config(project / "config/training.yml"), project / "src/features"
+    )
+    rows = pd.DataFrame(
+        {
+            "pickup_hour": [float(i % 24) for i in range(160)],
+            "pickup_dow": [float(i % 7 + 1) for i in range(160)],
+            "trip_distance": [float(i % 12) / 3 for i in range(160)],
+            "duration_min": [float(i % 20 + 1) for i in range(160)],
+            "pickup_zip": ["10001" if i % 2 else "10002" for i in range(160)],
+            "fare_amount": [float(i % 12 + 5) for i in range(160)],
+        }
+    )
+    spec = training_spec(config | {"training_table": "workspace.test.trips", "training_version": 0})
+    assert config["admit_probed_custom_steps"] is False and spec.admit_probed_custom_steps is True
+    pipeline = candidate_config(
+        spec,
+        config["pipeline"],
+        engine="pandas",
+        cv=CVSpec.from_workflow(config),
+        metric="heldout_rmse",
+        min_improvement=0.0,
+        champion_version=None,
+        quality_threshold=6.0,
+        risk_category=None,
+    )
+    assert pipeline.get("admit_probed_custom_steps") is True
+    path = tmp_path / "artifact"
+    fitted = fit_workflow(
+        pipeline,
+        SplitDataset(train=rows.iloc[:120], test=rows.iloc[120:]),
+        target_column="fare_amount",
+        artifact_path=path,
+        max_rows=200,
+        max_bytes=1024 * 1024,
+    )
+    seal_partition_probe(fitted, rows.iloc[120:], path, enabled=True)
+    artifact = load_pipeline(path)
+    assert len(artifact.manifest.feature_columns) == 5  # Fits the example's SHAP budget.
+    require_partition_safe_pipeline(artifact)
+    requests = rows.iloc[:4].drop(columns="fare_amount").copy()
+    requests["trip_distance"] = [2.0, 99.0, -1.0, float("nan")]
+    requests.loc[3, "duration_min"] = float("nan")
+    scored = score_pipeline(requests, artifact)
+    assert scored["scoring_status"].tolist() == ["predicted", "excluded", "excluded", "predicted"]
+    assert scored.loc[1, "exclusion_reason"] == "outlier:distance_outliers"
+    reason = scored.loc[2, "exclusion_reason"]
+    assert isinstance(reason, str) and "trip_distance_range" in reason
+    assert scored["prediction"].isna().tolist() == [False, True, True, False]

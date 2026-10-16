@@ -74,6 +74,20 @@ PROJECTS = {
         "removed": (*SAMPLES, "src/features/preprocessing.py"),
         "training_edits": (LOOKUP_FILL, PROBE),
     },
+    "taxi_fare_robust": {
+        "sources": (
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "config/serving.yml",
+            "deployment/targets.yml",
+            "src/features/pre_split.py",
+            "src/features/scoring.py",
+            "src/serve.py",
+            "SERVE_EXAMPLE.md",
+        ),
+        "removed": (*SAMPLES, "src/features/preprocessing.py"),
+        "training_edits": (PROBE,),
+    },
     "taxi_high_fare": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
     "taxi_trips": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
     "diagnostic_single": {

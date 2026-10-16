@@ -184,3 +184,151 @@ def test_optional_serialization_failure_records_unavailable(monkeypatch):
     assert sample is None
     assert metadata["status"] == "unavailable"
     assert "RuntimeError" in metadata["reason"]
+
+
+@pytest.mark.parametrize("task", ["regression", "classification"])
+def test_saved_exclusion_sample_plots_only_scored_pairs(tmp_path, monkeypatch, task):
+    """Persisted nullable predictions must yield aligned diagnostics without changing the sample."""
+    pytest.importorskip("matplotlib")
+    from skyulf.data.dataset import SplitDataset
+    from skyulf.inference.fitted_pipeline import load_pipeline, save_pipeline
+    from skyulf.inference.pipeline_evaluation import evaluate_holdout
+    from skyulf.integrations.databricks.observability.charts import evaluation_chart_report
+    from skyulf.pipeline import SkyulfPipeline
+
+    values = np.arange(1, 41, dtype=float)
+    frame = pd.DataFrame(
+        {"x": values, "target": values * 2 if task == "regression" else values % 2}
+    )
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {"name": "bounds", "transformer": "IQR", "params": {"columns": ["x"]}}
+            ],
+            "modeling": {
+                "type": "linear_regression" if task == "regression" else "logistic_regression"
+            },
+        }
+    )
+    pipeline.fit(SplitDataset(train=frame[:32], test=frame[32:]), target_column="target")
+    save_pipeline(pipeline, tmp_path / "model")
+    artifact = load_pipeline(tmp_path / "model")
+    client = ArtifactClient()
+    spec = fitted_candidate().spec
+    observer = chart_recorder(
+        SimpleNamespace(client=client, run_id="run"),
+        artifact,
+        spec,
+        {"enabled": True, "max_rows": 3},
+    )
+    heldout = pd.DataFrame(
+        {
+            "x": [1.0, 2.0, 3.0, 4.0, 1000.0],
+            "target": [2.0, 4.0, 6.0, 8.0, 2000.0]
+            if task == "regression"
+            else [0.0, 1.0, 0.0, 1.0, 0.0],
+        }
+    )
+    evaluate_holdout(artifact, heldout, target_column="target", on_predictions=observer)
+    sample, metadata = load_chart_sample(client, "run", artifact.manifest.pipeline_sha256)
+    assert sample is not None and sample.scoring_status.tolist().count("excluded") == 1
+    original_files = dict(client.files)
+    monkeypatch.setattr(evaluation_chart_report, "load_run_pipeline", lambda *a, **k: artifact)
+    monkeypatch.setattr(evaluation_chart_report, "_estimator_figures", lambda *a: ({}, []))
+    monkeypatch.setattr(evaluation_chart_report, "evidence_charts", lambda *a: {})
+    captured = []
+
+    def publish(client, destination, figures, *, prefix, caption):
+        """Inspect real chart content while other tests cover MLflow image uploads."""
+        for name, figure in figures.items():
+            if name == "actual_vs_predicted":
+                plotted = figure.axes[0].collections[0].get_offsets()
+                expected = sample.loc[
+                    sample.scoring_status.eq("predicted"), ["observed", "prediction"]
+                ]
+                np.testing.assert_allclose(plotted, expected.to_numpy(dtype=float))
+            figure.clear()
+        captured.append(caption)
+        return list(figures)
+
+    monkeypatch.setattr(evaluation_chart_report, "publish_figures", publish)
+    report = evaluation_chart_report.report_model(
+        client,
+        "unused",
+        {
+            "run_id": "run",
+            "model_digest": artifact.manifest.pipeline_sha256,
+            "dataset_id": spec.dataset_id,
+            "holdout_key_sha256": spec.holdout_key_sha256,
+            "holdout_rows": len(heldout),
+        },
+        destination="charts",
+        prefix="single",
+    )
+    assert report["sample_rows"] == 3 and report["holdout_rows"] == 5
+    assert report["sample_scored_rows"] == 2 and report["sample_excluded_rows"] == 1
+    assert report["sample_excluded_by_reason"] == {"outlier:bounds": 1}
+    assert report["image_keys"] and "1 excluded" in captured[0]
+    assert client.files == original_files
+
+
+def _status_artifact():
+    """Describe a regression model with declared scoring statuses for focused contract checks."""
+    return SimpleNamespace(
+        manifest=SimpleNamespace(task="regression", classes=(), classification_probabilities=False),
+        pipeline=SimpleNamespace(config={"project_scoring": {"eligibility": [], "outputs": []}}),
+    )
+
+
+@pytest.mark.parametrize("survivors", [0, 1])
+def test_small_scored_chart_population_is_explicit(survivors):
+    """An almost entirely excluded sample must skip diagnostics without inventing data."""
+    from skyulf.integrations.databricks.observability.charts.evaluation_chart_report import (
+        _scored_chart_sample,
+    )
+    from skyulf.integrations.databricks.observability.charts.evaluation_charts import (
+        diagnostic_charts,
+    )
+
+    frame = pd.DataFrame(
+        {
+            "observed": [1.0] * (survivors + 1),
+            "prediction": [1.0] * survivors + [None],
+            "scoring_status": ["predicted"] * survivors + ["excluded"],
+            "exclusion_reason": [None] * survivors + ["outlier:bounds"],
+        }
+    )
+    report = {}
+    plotted = _scored_chart_sample(frame, _status_artifact(), report)
+    figures, reasons = diagnostic_charts("regression", plotted.observed, plotted, (), 20)
+    assert figures == {} and reasons == ["Holdout sample has fewer than two rows."]
+    assert report["sample_scored_rows"] == survivors and report["sample_excluded_rows"] == 1
+
+
+@pytest.mark.parametrize("corruption", ["column", "status", "prediction"])
+def test_chart_exclusion_support_does_not_hide_corrupt_predictions(corruption):
+    """Only explicit exclusions may leave the diagnostic population; malformed values still fail."""
+    from skyulf.integrations.databricks.observability.charts.evaluation_chart_report import (
+        _scored_chart_sample,
+    )
+    from skyulf.integrations.databricks.observability.charts.evaluation_charts import (
+        diagnostic_charts,
+    )
+
+    frame = pd.DataFrame(
+        {
+            "observed": [1.0, 2.0],
+            "prediction": [1.0, 2.0],
+            "scoring_status": ["predicted", "predicted"],
+            "exclusion_reason": [None, None],
+        }
+    )
+    if corruption == "column":
+        frame["undeclared"] = 1
+    elif corruption == "status":
+        frame.loc[0, "scoring_status"] = None
+    else:
+        frame.loc[0, "prediction"] = np.nan
+    with pytest.raises(ValueError, match="contract|status|finite"):
+        plotted = _scored_chart_sample(frame, _status_artifact(), {})
+        diagnostic_charts("regression", plotted.observed, plotted, (), 20)

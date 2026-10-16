@@ -8,12 +8,13 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from .....inference.fitted_pipeline import FittedPipelineArtifact
+from .....inference.fitted_pipeline import FittedPipelineArtifact, has_exclusion_steps
 from .....modeling._explainability.shap_explanation import compute_shap_explanation
 from .explanation_report import render_explanation_report
 
 _DEFAULTS = {"max_samples": 100, "max_features": 30, "max_display_samples": 10}
 _LIMITS = {"max_samples": (1, 200), "max_features": (1, 50), "max_display_samples": (0, 50)}
+_MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS = 2
 
 
 def validate_explanation_config(pipeline: dict[str, Any]) -> None:
@@ -121,6 +122,28 @@ def _explanation_result(explanation: Any, evidence: dict[str, Any]) -> dict[str,
     return {**evidence, "status": "completed", "shap": explanation}
 
 
+def _explanation_features(
+    artifact: FittedPipelineArtifact,
+    sampled: pd.DataFrame | pl.DataFrame,
+    evidence: dict[str, Any],
+) -> pd.DataFrame | pl.DataFrame:
+    """Retain exclusion counts while preparing only rows the saved model accepts."""
+    engineer = artifact.pipeline.feature_engineer
+    if not has_exclusion_steps(artifact):
+        return engineer.transform(sampled, preserve_rows=True)
+    transformed, _, reasons = engineer.transform_with_exclusions(sampled)
+    evidence.update(
+        sampled_rows=len(sampled),
+        explained_rows=len(transformed),
+        excluded_rows=int(reasons.notna().sum()),
+        excluded_by_reason={
+            str(reason): int(count) for reason, count in reasons.value_counts().items()
+        },
+        sample_count=len(transformed),
+    )
+    return transformed
+
+
 def _explain_sample(
     artifact: FittedPipelineArtifact,
     sampled: pd.DataFrame | pl.DataFrame,
@@ -128,11 +151,13 @@ def _explain_sample(
 ) -> dict[str, Any]:
     """Reuse fitted preprocessing and explain the fitted estimator without refitting."""
     try:
-        transformed = artifact.pipeline.feature_engineer.transform(sampled, preserve_rows=True)
+        transformed = _explanation_features(artifact, sampled, evidence)
     except ValueError as exc:
         return {**evidence, "reason": "inference_transform_unavailable", "detail": str(exc)}
     limits = evidence["limits"]
     count = evidence["sample_count"]
+    if "excluded_rows" in evidence and count < _MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS:
+        return {**evidence, "reason": "too_few_rows_after_exclusions"}
     reason = _transformed_unavailable_reason(artifact, transformed, count, limits["max_features"])
     if reason:
         return {**evidence, "reason": reason}

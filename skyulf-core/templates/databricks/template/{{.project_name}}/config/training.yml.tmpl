@@ -34,6 +34,10 @@ defaults:
         max_age_seconds: null
 {{end}}
   preprocessing_probe: false # Optional preprocessing diagnostics; first 256 holdout rows, 8 MiB. See PREPROCESSING_CONTEXT.md.
+  # Spark and online-feature projects check admission automatically, even when false below.
+  # Set true for endpoint-only projects to seal the same lint + probe evidence during training.
+  # Details: https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html
+  admit_probed_custom_steps: false
   training_table: "{catalog}.{input_schema}.{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}"
 {{if ne .training_version "null"}}  training_version: {{.training_version}}
 {{end}}  record_key_columns: [{{range $i, $column := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .record_key_columns -1}}{{if $i}}, {{end}}{{printf "%q" $column}}{{end}}]

@@ -1,0 +1,8 @@
+# Fixed eligibility before splitting. Scoring reuses only the input-column rule.
+version: 1
+recipes:
+  default:
+    - custom: pre_split.value_range
+      params: {column: fare_amount, minimum: 0.01, maximum: 300}
+    - custom: pre_split.value_range
+      params: {column: trip_distance, minimum: 0, maximum: 100}

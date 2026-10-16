@@ -742,7 +742,7 @@ below is also supported (returning `None` explicitly disables all scoring rules)
 ```python
 # src/features/scoring.py
 
-def build_scoring():
+def build_model_rules():
     return {
         "eligibility": [{
             "name": "observed_fields", "version": "1",
@@ -758,6 +758,10 @@ def build_scoring():
         }],
     }
 ```
+
+Export `build_model_rules` from `src/features/__init__.py`, as the template does.
+Older projects exporting only `build_scoring` remain supported. If both are
+defined, Skyulf uses `build_model_rules`; no forwarding alias is needed.
 
 For classification, the band rule can use `probability_0`, `probability_1`, etc.;
 class order comes from the saved artifact manifest. Callbacks are ordinary trusted

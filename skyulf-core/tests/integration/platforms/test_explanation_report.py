@@ -55,6 +55,27 @@ def test_unavailable_reports_do_not_import_plotting(status, monkeypatch):
     assert "data:image" not in report
 
 
+def test_report_shows_excluded_population_even_when_unavailable():
+    """A small surviving sample must remain understandable without hiding rejected rows."""
+    from skyulf.integrations.databricks.observability.reports.explanation_report import (
+        render_explanation_report,
+    )
+
+    report = render_explanation_report(
+        {
+            "status": "unavailable",
+            "reason": "too_few_rows_after_exclusions",
+            "sampled_rows": 10,
+            "explained_rows": 1,
+            "excluded_rows": 9,
+            "excluded_by_reason": {"outlier:<bounds>": 9},
+        }
+    )
+    assert "Sampled rows: 10" in report
+    assert "rows accepted for explanation: 1" in report and "excluded rows: 9" in report
+    assert "outlier:&lt;bounds&gt;: 9" in report and "<bounds>" not in report
+
+
 def test_notebook_displays_each_training_run_once(tmp_path):
     """Multi-model outputs must show each child's evidence without duplicate reports."""
     from skyulf.integrations.databricks.observability.reports.explanation_report import (

@@ -128,6 +128,17 @@ def render_explanation_report(evidence: dict[str, Any]) -> str:
         "<p>Training samples only; holdout rows are not explained. Feature names and values "
         "are after fitted preprocessing. Importance describes model behavior, not causality.</p>",
     ]
+    if "sampled_rows" in evidence:
+        reasons = ", ".join(
+            f"{reason}: {count}" for reason, count in evidence["excluded_by_reason"].items()
+        )
+        sections.append(
+            f"<p>Sampled rows: {_text(evidence['sampled_rows'])}; "
+            f"rows accepted for explanation: {_text(evidence['explained_rows'])}; "
+            f"excluded rows: {_text(evidence['excluded_rows'])}. "
+            f"Exclusion reasons: {_text(reasons or 'none')}. "
+            "At least 2 accepted rows are required; the sample is not topped up.</p>"
+        )
     if evidence.get("run_id"):
         url = f"/ml/experiments/{evidence['experiment_id']}/runs/{evidence['run_id']}"
         sections.append(

@@ -1,0 +1,21 @@
+# Every learned value comes from training rows; prediction replays the saved state.
+version: 1
+recipes:
+  default:
+    - name: distance_outliers
+      transformer: IQR
+      params: {columns: [trip_distance], multiplier: 1.5}
+    - name: power_measurements
+      transformer: PowerTransformer
+      # Yeo-Johnson admits zero. Missing values pass through to the next step.
+      params: {columns: [trip_distance, duration_min], method: yeo-johnson, standardize: false}
+    - name: fill_numeric
+      transformer: SimpleImputer
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min], strategy: mean}
+    - name: encode_zone
+      transformer: OrdinalEncoder
+      # One numeric feature keeps this high-cardinality zone within the SHAP feature budget.
+      params: {columns: [pickup_zip], handle_unknown: use_encoded_value, unknown_value: -1}
+    - name: scale
+      transformer: StandardScaler
+      params: {columns: [pickup_hour, pickup_dow, trip_distance, duration_min]}

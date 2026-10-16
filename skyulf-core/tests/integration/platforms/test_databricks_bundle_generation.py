@@ -485,7 +485,7 @@ def test_multi_target_output_selection_renders_custom_destinations(tmp_path, mod
     assert settings["publication"]["mode"] == mode
     captured, source = capture_set_rules(values, settings)
     assert captured["composition_config"] == {"outputs": []}
-    assert load_project_module(source).build_scoring()["reuse_pre_split"] is True
+    assert load_project_module(source).build_model_rules()["reuse_pre_split"] is True
     if mode == "separate_views":
         assert (
             settings["publication"]["model_view_template"]

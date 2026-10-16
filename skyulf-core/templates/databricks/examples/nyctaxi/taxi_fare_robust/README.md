@@ -1,0 +1,42 @@
+# taxi_fare_robust
+
+New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
+first train and score, and which guide answers which question. This page maps
+each setting to the file that owns it.
+
+Skyulf 0.9.3 Bundle: **regression** with **pandas** training and **spark** inference, using **serverless**
+compute. Training and preprocessing fit in one bounded Python process on this compute. Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.
+
+## Where to make a change
+
+| Change | File |
+| --- | --- |
+| Sources, record keys, model inputs, targets and training limits | `config/training.yml` defaults/model entries |
+| Model, tuning, CV, quality gates and recipe selection | `config/training.yml` |
+| Fixed cleanup and training eligibility | `config/pre_split.yml` |
+| Fitted preprocessing | `config/preprocessing.yml` |
+| Saved model selection, score source/output and change policy | `config/inference.yml` |
+| Upstream feature groups and their checked merge | `config/features.yml`, `src/features/groups/` |
+| Custom features, scoring rules and packaged assets | `src/features/` |
+| Online publication, endpoint setup and rollout | `config/serving.yml`, when generated |
+| Host, namespaces, run identities, compute and schedules | `deployment/targets.yml`, `deployment/variables.yml` |
+| Monitoring store and on/off switch | `monitoring_catalog`, `monitoring_schema`, `monitoring_enabled` in `deployment/variables.yml` |
+| Installed Core and optional dependencies | `deployment/*requirements.txt` |
+
+The shared runtime pin is `skyulf-core[mlflow]==0.9.3` in
+`deployment/requirements.txt`. Use the Core release matching this template
+([runtime packaging](https://www.skyulf.com/manual/user_guide/databricks_deployment.html#runtime-packaging)). Changing the pin
+does not migrate saved models or rewrite already generated project files.
+
+Quick setup accepts editable defaults. Detailed setup asks applicable model,
+branch, competition and deployment choices. Both ask for the monitoring store;
+blank answers start without monitoring. Neither mode inspects source rows.
+Empty `config/features.yml` groups create no feature job or merged table;
+training and scoring read their configured sources directly.
+
+These short guides ship with this project revision and link to detailed topic
+pages. Public documentation can describe a newer release; use the release
+upgrade notes before changing deployed jobs. Fitting saves preprocessing and
+model state, so editing a recipe afterwards needs a new trained version.
+Promotion, score selection and online traffic are separate decisions. All public
+guides are listed in the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).

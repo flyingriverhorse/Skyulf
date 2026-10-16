@@ -157,9 +157,13 @@ so read only columns that every component receives.
 This example deliberately selects `custom`, so the documented reasons come
 from the two custom rules rather than an earlier pre-split exclusion. In
 `src/features/scoring.py`, change SCORING_MODE and replace these two existing
-functions. Keep the generated build_model_rules/build_scoring wrappers and other
+functions. Keep the generated `build_model_rules()` factory and other
 functions. The callback implementations already ship at the end of
 `scoring.py`.
+
+Skyulf calls `build_model_rules()` when it is defined. Older projects that export
+only `build_scoring()` remain supported; if both names exist, `build_model_rules()`
+takes precedence. New projects do not need an alias between the two names.
 
 ```python
 SCORING_MODE = "custom"

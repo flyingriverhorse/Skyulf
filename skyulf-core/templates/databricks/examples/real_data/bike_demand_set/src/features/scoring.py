@@ -23,9 +23,6 @@ def build_model_rules():
     }
 
 
-build_scoring = build_model_rules
-
-
 def known_hour(frame, params):
     """Explain missing-hour exclusions without dropping the source record."""
     return pd.Series(None, index=frame.index, dtype="string").mask(

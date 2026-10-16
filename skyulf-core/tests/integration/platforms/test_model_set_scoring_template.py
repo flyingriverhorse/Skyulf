@@ -13,9 +13,9 @@ def test_shared_scoring_exports_both_rule_stages_without_active_business_example
     module = load_project_module(
         project_source(TEMPLATE / "src/features", exclude_feature_groups=True)
     )
-    assert module.build_scoring() == {"reuse_pre_split": True, "skip_target_steps": False}
+    assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}
     assert module.build_combined_rules() == []
-    assert module.build_model_rules() == module.build_scoring()
+    assert not hasattr(module, "build_scoring")
     assert not (TEMPLATE / "src/composition").exists()
 
 

@@ -26,6 +26,7 @@ from skyulf.integrations.databricks.shared._frames import frame_bytes
 
 from .....data.dataset import SplitDataset
 from .....inference.pipeline_evaluation import evaluate_holdout
+from .....inference.probed_rules import scoring_rules
 from .....inference.probed_steps import PROBED_NODES
 from .....inference.project_code import is_project_filter_step
 from .....leakage import step_learns_from_data
@@ -964,9 +965,8 @@ def candidate_config(
 def _needs_probe(pipeline_config: dict[str, Any]) -> bool:
     """Report whether the recipe has function steps or scoring rules to probe."""
     steps = pipeline_config.get("preprocessing", [])
-    scoring = pipeline_config.get("project_scoring") or {}
     return any(step.get("transformer") in PROBED_NODES for step in steps) or bool(
-        scoring.get("eligibility") or scoring.get("outputs")
+        scoring_rules(pipeline_config.get("project_scoring"))
     )
 
 

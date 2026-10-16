@@ -18,9 +18,6 @@ def build_model_rules():
     return {"eligibility": build_eligibility_rules(), "outputs": build_output_rules()}
 
 
-build_scoring = build_model_rules
-
-
 def build_eligibility_rules():
     """Exclude trips whose distance is not a plausible taxi ride."""
     return [

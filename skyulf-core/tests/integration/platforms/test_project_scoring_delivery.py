@@ -34,6 +34,34 @@ def build_scoring():
 """
 
 
+@pytest.mark.parametrize("legacy_present", [False, True])
+def test_canonical_model_rules_hook_is_selected(tmp_path, legacy_present):
+    """New projects need no alias and an older hook cannot override their model rules."""
+    source = tmp_path / "preprocessing.py"
+    code = SOURCE.replace("def build_scoring():", "def build_model_rules():")
+    if legacy_present:
+        code += "\ndef build_scoring():\n    raise AssertionError('legacy hook called')\n"
+    source.write_text(code, encoding="utf-8")
+    workflow = load_project_workflow(
+        {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}}, source
+    )
+    policy = workflow["pipeline"]["project_scoring"]
+    assert policy["eligibility"][0]["name"] == "nonnegative"
+    assert policy["outputs"][0]["params"] == {"threshold": 10}
+
+
+@pytest.mark.parametrize("value", [None, False, "not a function"])
+def test_invalid_canonical_model_rules_hook_does_not_fall_back(tmp_path, value):
+    """A misspelled canonical factory must not silently activate a different policy."""
+    source = tmp_path / "preprocessing.py"
+    source.write_text(SOURCE + f"\nbuild_model_rules = {value!r}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="build_model_rules must be a function"):
+        load_project_workflow(
+            {"pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}}},
+            source,
+        )
+
+
 def fitted_scoring_artifact(tmp_path, engine="pandas"):
     """Save a real model with an editable project scoring hook."""
     source = tmp_path / "preprocessing.py"
@@ -250,7 +278,7 @@ def test_template_scoring_rules_are_usable_from_saved_package():
     )
     source = project_source(root, exclude_feature_groups=True)
     module = load_project_module(source)
-    assert module.build_scoring() == {"reuse_pre_split": True, "skip_target_steps": False}
+    assert module.build_model_rules() == {"reuse_pre_split": True, "skip_target_steps": False}
     config = {
         "eligibility": [
             {

@@ -114,6 +114,73 @@ def test_real_shap_explains_a_saved_training_artifact(tmp_path) -> None:
     assert result["sample_count"] == 3
     assert result["shap"]["feature_names"] == list(artifact.manifest.feature_columns)
     assert len(result["shap"]["samples"]) == 2
+    assert (
+        not {"sampled_rows", "explained_rows", "excluded_rows", "excluded_by_reason"}
+        & result.keys()
+    )
+
+
+def _exclusion_artifact(tmp_path, engine, transformer):
+    """Fit genuine filters on valid data before probing explicit excluded samples."""
+    frame = pd.DataFrame({"x": list(range(1, 41)), "target": list(range(2, 82, 2))}, dtype=float)
+    params = {"columns": ["x"]}
+    if transformer == "PowerTransformer":
+        params.update(method="box-cox", standardize=False)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [{"name": "bounds", "transformer": transformer, "params": params}],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    native = pl.from_pandas(frame) if engine == "polars" else frame
+    pipeline.fit(SplitDataset(train=native[:32], test=native[32:]), target_column="target")
+    cast(dict[str, Any], pipeline.config)["explainability"] = {
+        "method": "shap",
+        "max_samples": 10,
+        "max_display_samples": 2,
+    }
+    save_pipeline(pipeline, tmp_path / "model")
+    return load_pipeline(tmp_path / "model")
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "transformer, bad, reason",
+    [
+        ("IQR", [1000.0], "outlier:bounds"),
+        ("PowerTransformer", [0.0, -1.0, float("inf")], "invalid:bounds"),
+    ],
+)
+def test_shap_explains_survivors_and_counts_excluded_rows(
+    tmp_path, engine, transformer, bad, reason
+):
+    """A rejected row must not hide explanations for valid rows or disappear from the evidence."""
+    pytest.importorskip("shap")
+    artifact = _exclusion_artifact(tmp_path, engine, transformer)
+    frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, *bad]})
+    result = explain_training_artifact(artifact, frame)
+    assert result is not None and result["status"] == "completed"
+    assert result["sampled_rows"] == len(frame)
+    assert result["sample_count"] == result["explained_rows"] == 3
+    assert result["excluded_rows"] == len(bad)
+    assert result["excluded_by_reason"] == {reason: len(bad)}
+    assert result["shap"]["feature_names"] == ["x"]
+
+
+@pytest.mark.parametrize("survivors", [0, 1])
+def test_too_few_survivors_keeps_exclusion_evidence(tmp_path, monkeypatch, survivors):
+    """Zero or one accepted row cannot be presented as an explanation population."""
+    artifact = _exclusion_artifact(tmp_path, "pandas", "IQR")
+    monkeypatch.setattr(
+        "skyulf.integrations.databricks.observability.reports.explanations.compute_shap_explanation",
+        lambda *a, **k: pytest.fail("SHAP must not run below the survivor minimum"),
+    )
+    result = explain_training_artifact(artifact, pd.DataFrame({"x": [1.0] * survivors + [1000.0]}))
+    assert result is not None and result["status"] == "unavailable"
+    assert result["reason"] == "too_few_rows_after_exclusions"
+    assert result["explained_rows"] == survivors
+    assert result["sampled_rows"] == survivors + 1
+    assert result["excluded_by_reason"] == {"outlier:bounds": 1}
 
 
 @pytest.mark.parametrize(

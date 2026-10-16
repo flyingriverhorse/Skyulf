@@ -10,8 +10,8 @@ and the training or scoring job calls it at a fixed point in the flow.
 | --- | --- | --- | --- | --- | --- |
 | `groups/*.py` | Spark functions that build shared feature tables | `config/features.yml` (`transform: src/features/groups/<file>.py:<function>`) | The separate `features` job, before any training | No | No; the merged Delta table is the input |
 | `pre_split.py` | Row filters: keep or drop a training row | `config/pre_split.yml` (`custom: pre_split.<factory>`) | Training job, before the train/holdout split | Never | Yes; `scoring.py` can replay them |
-| `preprocessing.py` | Fitted steps: learn on training rows, replay later | `config/preprocessing.yml` (`custom: preprocessing.<factory>`) | Training job, after the split, inside every CV fold | Yes; the learned dict is saved | Yes; batch scoring replays the saved state. Spark scoring and endpoints admit built-in steps, plus your `column_step`/`fitted_step` only with the opt-in below |
-| `scoring.py` | Which rows get a prediction and which extra columns are published | `SCORING_MODE` and the three `build_*_rules()` lists in the file | Batch score job only | No | Yes; the rules travel with the model version |
+| `preprocessing.py` | Fitted steps: learn on training rows, replay later | `config/preprocessing.yml` (`custom: preprocessing.<factory>`) | Training job, after the split, inside every CV fold | Yes; the learned dict is saved | Yes; replayed at prediction time. Spark and endpoints require admission evidence for eligible recipes, as explained below |
+| `scoring.py` | Which rows get a prediction and which extra columns are published | `SCORING_MODE` and the three `build_*_rules()` lists in the file | Scoring; Spark and endpoints require the checks below | No | Yes; the rules travel with the model version |
 | Any other `<file>.py` | Your own factories, selected as `<file>.<factory>` | Same YAML files as above | Same as the factory kind | Depends on the factory | Yes |
 | `assets.json` + `assets/` | Small lookup files your code reads | Listed in `assets.json`, read with `read_project_asset` | Whenever a step reads them | No | Yes; edit means a new training run |
 | `requirements.txt` | Exact pins your code imports | Installed by `deployment/requirements.txt` | Job start | No | Pins are recorded |
@@ -76,26 +76,27 @@ the training rows of each fold, the returned dict is saved with the model, and
 `apply` receives exactly that dict on holdout rows and on batch scoring rows.
 Write `learn` so the dict is plain JSON: strings, numbers, lists, no NaN.
 
-Spark scoring (`inference_mode: spark`) and serving endpoints run a stricter
-admission: every worker scores its own partition without seeing other rows and
-loads only reviewed code, so they accept the built-in steps listed in the
-public Spark scoring guide (SimpleImputer, StandardScaler, MinMaxScaler,
-ClipValues, GroupImputer, OneHotEncoder, FeatureInteraction) and a fixed set of
-models. `scoring.py` rules are always rejected there. Row filters are skipped
-at scoring time, so they pass. Your own `column_step` and `fitted_step`
-functions are rejected unless you opt in: set `admit_probed_custom_steps: true`
-under `defaults` in `config/training.yml` and declare each such step
-`inference_context="row"` in its factory. Training then checks every declared
-step on up to 256 holdout rows and needs at least 16 (whole, repeated, chunks
-of 1, 2 and 7, reversed, with a renumbered row index and an empty batch),
-stops before registration if one check fails, and seals the passing evidence
-into the model; Spark scoring and endpoints admit the step only when that
-evidence matches the saved code and state. Do not read `df.index` or keep
-caches in module globals: Spark batches get a fresh index, and each worker
-process has its own globals. The check is evidence, not proof. Steps declared
-`group`, `window` or `global`, or not declared at all, stay rejected. The
-alternative is to move the calculation into a `groups/` Spark producer that
-runs before the model.
+Spark scoring (`inference_mode: spark`) and serving endpoints score independent
+batches. They admit reviewed built-ins and models, plus eligible built-in
+recipes, models, `column_step`/`fitted_step` functions and scoring rules that
+passed the training checks. Reused pre-split filters count as scoring rules;
+training-only filters do not run at prediction time.
+
+Spark and online-feature projects run admission checks automatically, including
+when `defaults.admit_probed_custom_steps` is `false`. Set it to `true` in
+`config/training.yml` for an endpoint-only project. Training lints custom code
+and probes the fitted recipe on bounded holdout rows before sealing evidence
+with its saved code and state. A separate `preprocessing_probe` diagnostic
+report does not grant admission. An `inference_context="row"` declaration is
+optional; `group`, `window` and `global` declarations remain unsupported here.
+
+Do not read `df.index` or keep mutable caches in module globals: each worker
+gets its own process and batches. Passing checks are evidence for the fitted
+recipe and tested rows, not a guarantee for every future input. See
+[Score on Spark workers](https://www.skyulf.com/manual/user_guide/databricks_spark_scoring.html)
+for supported settings, minimum probe rows, exclusions and troubleshooting.
+Calculations that need other rows can instead run in a `groups/` Spark producer
+before the model.
 
 ## Worked example: `taxi_high_fare`
 

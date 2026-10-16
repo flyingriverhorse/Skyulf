@@ -153,6 +153,16 @@ Pairwise coefficient outputs are capped at 20 boundaries. Sample diagnostics are
 labelled with their row count; full-holdout scalar metrics are never overwritten.
 Missing classes or unavailable model capabilities are reported explicitly.
 
+If the saved output includes `scoring_status`, prediction diagnostics plot only
+rows marked `predicted`. Excluded rows remain in the original uniform sample;
+their null predictions are not turned into zeros. Each component report records
+`sample_scored_rows`, `sample_excluded_rows` and `sample_excluded_by_reason`.
+Chart captions and task output show how many sampled rows were accepted or excluded.
+These are sample counts, not the full holdout's exclusion counts. Fewer than two
+predicted sample rows skip prediction diagnostics; available model and training
+evidence charts can still be shown. Sampling, saved labels and evaluation metrics
+are unchanged, and malformed predictions still raise an error.
+
 The task is an independent leaf with no retries. A chart failure can mark the
 overall job failed but does not undo model decisions or repeat training. Inspect
 the chart task and `skyulf.charts.status`; do not repair an old lifecycle invocation.

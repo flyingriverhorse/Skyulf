@@ -23,9 +23,6 @@ def build_model_rules():
     }
 
 
-build_scoring = build_model_rules
-
-
 def build_eligibility_rules():
     """Both models need a recorded pickup zone."""
     return [

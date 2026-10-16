@@ -8,6 +8,14 @@ build_model_rules() configures one model. build_combined_rules() below configure
 cross-model calculations such as revenue minus cost. Both run in multi-model
 scoring, in that order. Single-model scoring uses only build_model_rules().
 
+Spark workers and serving endpoints replay saved rules batch by batch. Training
+checks them automatically in Spark and online-feature projects (lint + probe).
+Custom checks and outputs must depend only on their own row, not other rows'
+means, ranks, groups or batch size. Fitted steps can also exclude rows:
+outlier filters report outlier:<step>, PowerTransformer reports invalid:<step>.
+A pre-split or custom eligibility reason found first is kept. Skyulf calls
+build_model_rules(); older projects may still use the name build_scoring.
+
 eligibility = checks BEFORE prediction. A check returns None for an accepted row
 or a text reason for an excluded row. Excluded rows stay in the result table with
 an empty prediction. They are not silently deleted.
@@ -56,10 +64,6 @@ def build_model_rules():
         return reuse
     custom = {"eligibility": build_eligibility_rules(), "outputs": build_output_rules()}
     return custom if SCORING_MODE == "custom" else {**reuse, **custom}
-
-
-# Keep existing callers and custom feature packages compatible.
-build_scoring = build_model_rules
 
 
 # 1. BEFORE prediction: which input rows may reach the model?

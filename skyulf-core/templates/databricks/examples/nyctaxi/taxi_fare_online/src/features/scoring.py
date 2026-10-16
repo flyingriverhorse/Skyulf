@@ -1,17 +1,15 @@
 """Scoring rules for the online fare model: none.
 
-Serving endpoints (like Spark scoring) reject any scoring rules saved with the
-model, including a reused pre-split recipe. The filters in config/pre_split.yml
-therefore select training rows only; validate request values in the caller.
+This example deliberately saves no scoring rules: config/pre_split.yml selects
+training rows only, and the caller validates request values. Spark and endpoints
+can also replay saved scoring rules and reused pre-split filters when training
+has linted and probed them. See the taxi_fare_robust example for that alternative.
 """
 
 
 def build_model_rules():
     """Save no scoring rules with the model."""
     return None
-
-
-build_scoring = build_model_rules
 
 
 def build_combined_rules():

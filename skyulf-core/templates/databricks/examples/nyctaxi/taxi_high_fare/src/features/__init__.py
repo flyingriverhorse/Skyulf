@@ -7,6 +7,6 @@ for model helpers. The groups/ folder is reserved for upstream Spark table produ
 and excluded from model snapshots. Existing model versions use their saved source.
 """
 
-from .scoring import build_combined_rules, build_model_rules, build_scoring
+from .scoring import build_combined_rules, build_model_rules
 
-__all__ = ["build_scoring", "build_model_rules", "build_combined_rules"]
+__all__ = ["build_model_rules", "build_combined_rules"]

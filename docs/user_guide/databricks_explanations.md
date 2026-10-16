@@ -100,6 +100,17 @@ Budgets apply per fitted model: eight candidates can each compute an
 explanation. Samples are training inputs transformed with saved preprocessing;
 holdout labels, record keys and time/target metadata are not explanation features.
 
+For models with fitted exclusion steps, such as IQR or PowerTransformer, SHAP
+uses only sampled rows accepted by those saved steps. The report records
+`sampled_rows`, `explained_rows`, `excluded_rows` and `excluded_by_reason`;
+`sample_count` is the accepted count. For example, 100 sampled rows with 11 IQR
+exclusions produce explanations for 89 rows and an `outlier:<step>` count of 11.
+The HTML shows these counts too. At least two rows must survive; otherwise the
+result is `unavailable` with reason `too_few_rows_after_exclusions`. The sample
+is not topped up. This describes the fitted preprocessing population, not custom
+scoring eligibility or business outputs. Models without exclusion steps retain
+their existing evidence fields.
+
 ## The command
 
 From the generated project root, after merging all required files:
@@ -156,6 +167,7 @@ choices affect attribution; SHAP is not causal evidence.
 | No explanation artifact | Check whether explainability was off in the fitting run, or whether fit failed before saving it. Absence alone is not a successful explanation. |
 | `feature_limit_exceeded` | Transformed width exceeds the guard. Inspect encoded/generated columns; raise the guard only within 50, or train a deliberately smaller feature set. |
 | `empty_training_frame`, `missing_input_columns` | No usable training sample or missing saved input columns. Repair the source/split/feature contract before retraining. |
+| `too_few_rows_after_exclusions` | Fewer than two sampled rows survived the fitted exclusion steps. Read the counts and reasons; check the data and fitted thresholds before changing the sample budget. |
 | `inference_transform_unavailable`, `row_count_changed`, `feature_schema_mismatch` | Saved preprocessing cannot produce the expected row-preserving feature frame. Inspect the transform and context requirements. |
 | `model_unavailable`, `shap_unavailable` | No usable estimator/explainer result. Check training logs, model compatibility and installed dependencies; a supported training model need not be supported by the selected SHAP explainer. |
 | `shap_feature_schema_mismatch`, `invalid_shap_result` | Returned SHAP columns or finite JSON values do not match the saved contract. Keep the failure evidence and investigate the estimator/dependency combination. |

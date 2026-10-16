@@ -28,9 +28,6 @@ def build_model_rules():
     }
 
 
-build_scoring = build_model_rules
-
-
 def required_shape(frame, params):
     """Preserve missing-shape rows with an exclusion reason instead of losing them."""
     missing = frame[["mean_area", "mean_perimeter"]].isna().any(axis=1)

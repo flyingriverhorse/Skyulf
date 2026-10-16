@@ -6,7 +6,7 @@ Every project splits feature work into three places, each with one job:
 |---|---|---|---|
 | `config/pre_split.yml` (+ `src/features/pre_split.py`) | Before the train/holdout split | Never | Only if `scoring.py` reuses it |
 | `config/preprocessing.yml` (+ `src/features/preprocessing.py`) | After the split, fitted on training rows | Yes; state is saved with the model | Always, replayed from the saved state |
-| `src/features/scoring.py` | When scoring | No | Batch scoring only; Spark scoring and serving endpoints accept no rules |
+| `src/features/scoring.py` | When scoring | No | Saved rules also run on Spark and endpoints when training has linted and probed them |
 
 ```mermaid
 flowchart LR
@@ -62,8 +62,9 @@ None of them is derived from the fare, so the target cannot leak.
   (0.01-100), using `pre_split.value_range`. Training rows only.
 - **Preprocessing `default`:** clipping, mean imputation (including the zone
   features) and scaling; all admitted by serving.
-- **Scoring:** none. Endpoints reject saved scoring rules, so the pre-split
-  filters are not reused; the calling application validates requests.
+- **Scoring:** none by choice in this example. The pre-split filters select
+  training rows only; the calling application validates requests. Probed rules
+  can also run on endpoints, as the robust example below demonstrates.
 
 ```mermaid
 flowchart LR
@@ -80,6 +81,56 @@ flowchart LR
     end
     M -. "approved version" .-> SP
 ```
+
+## taxi_fare_robust: one saved pipeline, three prediction paths
+
+Inputs and target match `taxi_fare`. This example emphasizes what happens to
+each row, including rows that cannot receive a prediction.
+
+- **Pre-split:** fare 0.01-300 and distance 0-100. Fixed eligibility, no learned
+  statistics. Missing input distances survive for later imputation.
+- **Preprocessing:** IQR learns distance bounds from training rows and excludes
+  outliers. Yeo-Johnson transforms distance and duration, including zeros;
+  numeric means fill missing values; ordinal encoding stores pickup zones as
+  one numeric feature (unknown zones become -1); standard scaling finishes the
+  trip measurements. Zone codes are category identifiers, not a geographic
+  distance. The saved model has five input features after these transformations.
+- **Scoring:** reuses the distance rule, skips the fare rule because the target
+  is not available in a request. Excluded rows keep their place and carry an
+  empty prediction, `scoring_status` and `exclusion_reason`.
+- **Admission:** automatic for `inference_mode: spark`. Training checks the
+  saved rules, fitted steps and model before registration. The separate
+  diagnostic probe is enabled too; it does not itself grant admission.
+- **Serving:** raw inputs, no feature lookup. The `src/serve.py` helper, called
+  explicitly from a notebook, reads compute/readiness settings from `config/serving.yml`, creates
+  one endpoint, and creates its typed `ai_query` SQL function. REST and SQL
+  return results; callers decide whether to write a table.
+- **SHAP:** explains sampled rows that survive the fitted exclusion steps and
+  reports sampled, accepted and excluded counts with reasons. At least two rows
+  must survive; otherwise the report says `too_few_rows_after_exclusions`.
+  Evaluation charts likewise omit excluded predictions and disclose their
+  counts within the original saved holdout sample.
+
+```mermaid
+flowchart LR
+    T["trips_train"] --> A["sample up to 4096 rows"]
+    A --> F["fare + distance eligibility"]
+    F --> S["split"]
+    S --> P["IQR → Yeo-Johnson → mean imputation → zone encoding → scale"]
+    P --> M["random forest + saved admission evidence"]
+    M --> G["RMSE and coverage gates → champion"]
+    G --> B["Spark UDF → trips_predictions"]
+    G --> E["explicit pinned endpoint setup"]
+    E --> R["REST raw trip requests"]
+    E --> Q["typed SQL function → ai_query"]
+    B & R & Q --> O["prediction, or excluded + reason"]
+```
+
+The 1.5-IQR gate on right-skewed trip distances can reject legitimate long trips.
+The sample policy therefore lowers the standard 90% coverage floor to 80%,
+while still requiring RMSE <= 6. Review the excluded
+population for your use case. See
+[SERVE_EXAMPLE.md](taxi_fare_robust/SERVE_EXAMPLE.md) for concrete requests and SQL.
 
 ## taxi_high_fare: competition of four classifiers
 
