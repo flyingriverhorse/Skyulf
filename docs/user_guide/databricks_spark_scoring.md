@@ -66,10 +66,13 @@ choices than distributed scoring admits.
 | --- | --- |
 | Linear models | Exact `LinearRegression` and `LogisticRegression`. |
 | Tree models | Exact `DecisionTreeRegressor/Classifier`, `RandomForestRegressor/Classifier` and `ExtraTreesRegressor/Classifier`; single-output fitted trees only. Custom subclasses or replaced inference methods are rejected. |
-| XGBoost | Exact `XGBRegressor` with reviewed gbtree state and `reg:squarederror` or `reg:logistic` objective; no custom callbacks/objectives or DART. This does not admit XGBClassifier. |
-| Fitted preprocessing | Reviewed `SimpleImputer`, `StandardScaler`, `MinMaxScaler`, `ClipValues`, `GroupImputer`, `OneHotEncoder` and `FeatureInteraction` states. Each must pass its configuration/state checks and preserve rows. Settings: `SimpleImputer` strategy `mean`, `constant` or `most_frequent` (not `median`); `GroupImputer` `mean` or `most_frequent`; `OneHotEncoder` `max_categories: null` with `include_missing: false`; the others in any validated configuration. A Spark project rejects other settings in `validate_model` (`select_best_model` for competitions) before registration. |
+| XGBoost | Exact `XGBRegressor` with reviewed gbtree state and `reg:squarederror` or `reg:logistic` objective; no custom callbacks/objectives or DART. `XGBClassifier` instead needs sealed model probe evidence. |
+| Additional models | AdaBoost, gradient boosting, histogram gradient boosting, nearest neighbours and LightGBM classifiers/regressors; Bernoulli/Gaussian/Multinomial Naive Bayes; calibrated classifier; ElasticNet, Lasso and Ridge regression; SGD classifier, SVC and SVR. Exact built-in classes and their saved configurations need sealed model probe evidence. |
+| Voting and stacking | Classifiers and regressors need ensemble-level probe evidence. Every fitted member, calibration estimator and stacking final estimator must have an accepted exact identity. Replacing a member invalidates admission. |
+| Reviewed preprocessing | `SimpleImputer`, `StandardScaler`, `MinMaxScaler`, `ClipValues`, `GroupImputer`, `OneHotEncoder` and `FeatureInteraction`. Each must pass its configuration/state checks and preserve rows. `SimpleImputer` supports `mean`, `constant`, `most_frequent` and `median`; `GroupImputer` supports `mean`, `most_frequent` and `median`. `OneHotEncoder` requires `max_categories: null` and `include_missing: false`. Median uses saved training values through the pandas worker path; this does not add a native Spark median codec. |
+| Other built-in preprocessing | Eligible row-preserving steps need sealed evidence for their actual saved state and recipe; see the table below. A successful probe cannot override a declared group/window/global context or row filtering. |
 | Skipped fitted row steps | `Deduplicate`, `DropMissingRows` and `RowFilterFunction` (`filter_step`) are skipped by the prediction chain to preserve request rows. They do not filter each worker batch. |
-| Tuning and thresholds | Reviewed fitted tuning wrappers are supported. Tuned feature exclusions are rejected; tuned thresholds require LogisticRegression or an admitted tree classifier and a valid class-to-threshold mapping. |
+| Tuning and thresholds | Reviewed fitted tuning wrappers are supported. Arbitrary tuned feature exclusions are rejected; recorded CV time/group metadata removal retains its existing contract. Tuned thresholds need a valid class-to-threshold mapping and a reviewed classifier or matching probed model evidence. SGD with hinge loss and SVC without probability support retain label-only outputs. |
 | Model sets | Every component must pass admission, including its saved scoring rules and reused pre-split recipe. Independent outputs, declared numeric `weighted_sum`/`weighted_mean` composition and combined function rules from `build_combined_rules()` are supported; function rules need sealed training probe evidence (see below). |
 | Saved project scoring rules | Eligibility and output rules are admitted when training linted and probed them (see below); Spark and online-feature projects do this automatically. The result columns (`scoring_status`, `exclusion_reason` and the declared outputs) travel through the Spark UDF and endpoints. Reused pre-split eligibility (`SCORING_MODE` `pre_split` or `combined`) is admitted when its steps are row-local and probed: fixed built-in edits, `DropMissingRows`, `ManualBounds` and `filter_step` functions. `Deduplicate` and custom filter classes in the reuse are rejected; `validate_model` rejects them before registration. `preview.py --action score` prints `Project scoring rules: disabled` when none are saved. |
 | Custom/context-dependent code | `column_step`/`fitted_step` steps are admitted when training linted and probed them (see below). An `inference_context="row"` declaration is optional. `group`, `window` and `global` declarations, custom classes from `custom_step`, unreviewed fitted states and temporal carry history are rejected. A passing `preprocessing_probe` report alone grants no admission. |
@@ -78,6 +81,84 @@ Models packaged with [feature lookup](databricks_features.md) require
 `inference_mode: spark`; whole-frame mode rejects them, including feature-backed
 model-set components. They score through the Feature Engineering `score_batch`
 route. Lookup does not relax the model/preprocessing checks.
+
+### Built-in recipes and model evidence
+
+The following additional steps can be admitted when the saved recipe preserves
+rows, declares row context and passes every probe check. Admission is per fitted
+recipe: a name in this table does not promise support for every parameter choice.
+
+| Purpose | Candidate steps |
+| --- | --- |
+| Cleaning and types | `AliasReplacement`, `Casting`, `InvalidValueReplacement`, `TextCleaning`, `ValueReplacement` |
+| Missing data | `DropMissingColumns`, `MissingIndicator`, `KNNImputer` |
+| Encoding | `DummyEncoder`, `HashEncoder`, `LabelEncoder`, `OrdinalEncoder`, `TargetEncoder`, `WOEEncoder` |
+| Scaling and transformations | `MaxAbsScaler`, `RobustScaler`, `Winsorize`, `SimpleTransformation`, `GeneralTransformation` |
+| Binning | `CustomBinning`, `GeneralBinning`, `KBinsDiscretizer` |
+| Feature generation | `FeatureGeneration`, `FeatureGenerationNode`, `FeatureMath`, `PolynomialFeatures`, `PolynomialFeaturesNode` |
+| Feature selection | `CorrelationThreshold`, `ModelBasedSelection`, `UnivariateSelection`, `VarianceThreshold`, `feature_selection` |
+| Dates and geography | `DateFeatures`, `GeoDistance`, `H3Index` (requires its optional package) |
+| Text | `count_vectorizer`, `hashing_vectorizer`, `tfidf_vectorizer`, `tokenizer` |
+
+Six built-in steps are never admitted here, because a worker batch would change
+their result:
+
+| Step | Why Spark and endpoints reject it | Use instead |
+| --- | --- | --- |
+| `IQR`, `ZScore`, `EllipticEnvelope`, `ManualBounds` | As model preprocessing they drop the rows they flag as outliers, so a request of 10 rows could return 8 predictions. Spark and endpoints must return one result per input row. | Cap values with `Winsorize` or `ClipValues`, or remove outliers from training rows only in `config/pre_split.yml` (`ManualBounds` is admitted there). |
+| `PowerTransformer` | If the transform fails on any value in a batch, for example a zero or negative value with Box-Cox, the step leaves the whole batch unchanged. One row then decides the result for every other row in its batch. | `SimpleTransformation` or `GeneralTransformation` with a fixed formula such as `log1p`. |
+| `IterativeImputer` | When every value in a batch is missing, it skips its learned rounds and returns only the initial fill. A row's imputed value then depends on what else is in its batch. | `SimpleImputer`, `GroupImputer` or `KNNImputer`. |
+
+Window steps, resampling, inspection nodes and `sentence_embedder` are not
+added by this admission path either.
+
+Admission is decided for your saved settings, not for the step name. The tests
+fit every listed step with one typical recipe; a different setting of the same
+step can behave differently, and training then stops with the failing check
+instead of registering a model that would score inconsistently. Typical cases:
+
+- **Output type depends on the data.** `Casting` to `int64` turns a column
+  into floats when a batch contains text it cannot parse, so a single bad row
+  changes the dtype of its whole batch. Cast to the nullable `Int64` instead;
+  its dtype stays the same in every batch.
+- **State saved in an older format.** Some encoders (`DummyEncoder`,
+  `HashEncoder`, `LabelEncoder`, `OrdinalEncoder`, `WOEEncoder`) saved by
+  earlier versions render categories from the whole batch. Retrain to save the
+  current per-row state.
+- **Settings that read other rows.** A few steps use other rows only for
+  particular options. The error names the step and the check; see
+  [When a built-in step or model is rejected](#when-a-built-in-step-or-model-is-rejected).
+
+Spark and online-feature projects run the checks automatically. Endpoint-only
+projects enable the same training check with
+`defaults.admit_probed_custom_steps: true` in `config/training.yml`; despite its
+historical name, this setting also seals built-in and model evidence. Train and
+register a new version after enabling it. Editing an old artifact's flag does
+not create evidence.
+
+Built-in code uses an exact calculator/applier identity check instead of project
+source lint. Its saved state and resolved recipe are fingerprinted; the replay
+check creates a fresh stateless applier over detached state. Model probes check
+predictions, supported probabilities and configured thresholds on transformed
+holdout rows. Nested estimator identities are checked too. Model `fresh_module`
+replays separately serialized state; it does not reload a third-party package.
+The model's empty check calls the saved prediction API and verifies its declared
+empty output schema without invoking the estimator. Nonempty comparisons stay
+exact, including dtypes, with no numerical tolerance.
+
+Look at `partition_probe.json` in the training run: `builtins` contains the
+preprocessing evidence and `model` contains model evidence. The recomputed
+Spark/endpoint certificate records `apply_probed_builtin` and `model_probed`.
+No project source directory is required for a pipeline using only built-ins.
+Custom functions still require their captured source and lint checks. These
+bounded observations are evidence for the trained recipe, not proof for every
+future input or every library version. Workers need the same supported runtime
+and optional packages as the saved model.
+
+XGBoost and LightGBM fingerprints now include their native learned trees.
+Artifacts with earlier fingerprints or probe evidence need fresh evidence and
+repackaging with the corrected runtime. Copying the old certificate into a new
+package is not supported.
 
 ### Admit your own row steps (opt-in)
 
@@ -224,6 +305,39 @@ uses the sample as both training rows and holdout, so it shows how the code
 behaves on those rows only. Training on the real holdout makes the final
 decision.
 
+#### When a built-in step or model is rejected
+
+Built-in steps and models run the same probe checks as your own code, without
+the lint. A rejection stops training before the model is registered and names
+the part and the check, for example:
+
+```text
+Model partition probe failed chunks:1: output_mismatch. Exact partition parity
+is required; retrain with a compatible configuration.
+```
+
+The check name tells you what differed:
+
+| Check | What it compares | Usual cause | What to do |
+| --- | --- | --- | --- |
+| `repeat` | The same rows scored twice | Randomness at prediction time | Fix `random_state`; avoid estimators that sample when predicting. |
+| `chunks:1`, `chunks:2`, `chunks:7` | Batches of 1, 2 and 7 rows against the whole sample | Output depends on the batch size: a whole-batch fallback, a dtype that follows the data, or floating-point rounding (below) | Choose a setting from the step's table above, use stable dtypes, or replace the step or final learner. |
+| `reverse`, `index_shift` | Reversed row order; renumbered index | The step reads row order or the pandas index | Use a step that only reads column values. |
+| `empty` | A batch with no rows | The step fails or changes dtypes on empty input | Report it: built-in steps are expected to handle empty batches. |
+| `perturb` | Change one row's inputs; the other rows must not move | The step reads other rows' values, such as a whole-batch fallback, or fails on a value training never saw | Use a setting that handles unseen values row by row, for example `handle_unknown: ignore` on `OneHotEncoder`. |
+| `fresh_module` | Reload the saved state in a new process | State that does not survive saving | Retrain; report it if it persists. |
+
+**Floating-point rounding.** Comparisons are exact, to the last digit. A
+stacking model whose final learner combines member outputs by matrix
+arithmetic, for example the default `logistic_regression` final learner, can
+differ in the last digit (about `2e-16`) between a batch of one row and a
+larger batch, because the numeric library chooses a different calculation path
+for each batch size. Predicted labels do not change, but the exact check rejects
+the model with `chunks:1: output_mismatch`. Use a tree-based final learner such
+as `decision_tree`, or score that model with `inference_mode: local`.
+
+Change the rejected step's or model's settings, or remove it, and retrain.
+
 ## Capacity and worker environment
 
 `max_rows` and `max_input_mb` bound local training, not the distributed scoring
@@ -249,6 +363,20 @@ Skyulf wheel. A package logged without a certificate cannot use Spark; log a new
 certified version. A pickle alone provides no Spark capability. Workers recheck loaded
 state and runtime versions. Nullable integer and Boolean transport is handled
 before Arrow conversion.
+
+When a fitted artifact retains an XGBoost or LightGBM estimator, saving it
+automatically records that library's exact installed version. This includes
+members inside voting, stacking and calibrated models. MLflow packaging adds
+these pins to its requirements, and loading checks them before unpickling the
+model. A plain sklearn model does not require either native library merely
+because it was installed during training. Python must have the same major and
+minor version; a different patch version is accepted. The other recorded
+runtime dependencies must match exactly.
+
+Re-export and repackage older native artifacts that lack these dependency pins.
+Native-model fingerprints and partition probe evidence created before the
+corrected native-state hashing must also be regenerated; changing only a
+manifest does not update or validate the saved model.
 
 For a repeatable native/worker/Bundle comparison, see
 [Measuring inference capacity](spark_benchmark.md#measuring-inference-capacity).

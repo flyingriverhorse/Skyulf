@@ -41,8 +41,8 @@ independent batches, so the same admission applies to both.
 | Part | On Spark workers and endpoints | Details |
 | --- | --- | --- |
 | Training, tuning and CV | Never distributed: one bounded pandas or Polars process | [Spark scoring](databricks_spark_scoring.md) |
-| Built-in models | A reviewed subset: linear and logistic regression, decision trees, random and extra trees, `XGBRegressor` | [Support table](databricks_spark_scoring.md#what-spark-scoring-supports) |
-| Built-in preprocessing steps | A reviewed subset, each with configuration checks | [Support table](databricks_spark_scoring.md#what-spark-scoring-supports) |
+| Built-in models | Reviewed linear/logistic/tree models and `XGBRegressor`; additional models and voting/stacking with matching training probe evidence | [Support table](databricks_spark_scoring.md#what-spark-scoring-supports) |
+| Built-in preprocessing steps | Reviewed steps (including median imputers), plus eligible row-preserving recipes with matching training probe evidence | [Recipe boundaries](databricks_spark_scoring.md#built-in-recipes-and-model-evidence) |
 | Your `column_step` and `fitted_step` functions, saved scoring rules | Admitted when training lints and probes them | [When the probe fails](databricks_spark_scoring.md#when-the-probe-fails) |
 | Steps that need other rows (`group`, `window`, `global`), `custom_step` classes | Rejected; keep `inference_mode: local` | [Custom steps](databricks_custom_steps.md) |
 

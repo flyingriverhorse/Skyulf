@@ -131,6 +131,25 @@ models:
         logistic_regression__estimator__C: [0.1, 1.0]
 ```
 
+## Spark scoring and serving endpoints
+
+Voting, stacking and calibrated ensembles can score on Spark workers
+(`inference_mode: spark`) and behind serving endpoints. Training first checks
+the fitted ensemble as one model: every member, every calibration estimator and
+the stacking final learner must be a supported built-in model, and the
+ensemble's own predictions must give the same results in batches of any size.
+Spark and online-feature projects run this check automatically; an
+endpoint-only project enables it with `defaults.admit_probed_custom_steps: true`.
+The check, its evidence and the full model list are described in
+[Score on Spark workers](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
+
+Before you choose a stacking final learner for Spark or an endpoint, read
+[floating-point rounding](databricks_spark_scoring.md#when-a-built-in-step-or-model-is-rejected):
+a linear final learner such as the default `logistic_regression` can be
+rejected even though its labels never change. A tree-based final learner, for
+example `final_estimator: decision_tree`, passes. Voting, including soft voting,
+passed the same checks on real data.
+
 ## Setup questions and defaults for each slot
 
 Detailed setup repeats the ensemble question group for the selected single

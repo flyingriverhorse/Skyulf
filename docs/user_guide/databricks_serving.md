@@ -28,6 +28,18 @@ prediction table: an `ai_query` caller decides where results go, for example
 the saved pandas pipeline on independent batches, so both admit only the steps
 and models listed in [Spark scoring support](databricks_spark_scoring.md#what-spark-scoring-supports).
 
+Additional built-in models, voting/stacking and eligible preprocessing recipes
+need the training evidence described in
+[built-in recipes and model evidence](databricks_spark_scoring.md#built-in-recipes-and-model-evidence).
+For an endpoint-only project, set `defaults.admit_probed_custom_steps: true`
+in `config/training.yml` before training. Spark and online-feature projects
+already enable it. `prepare_pinned_endpoint` recomputes the certificate from
+the exact registered package; changing a serving setting cannot admit an old
+model without evidence. Missing or changed evidence requires retraining and
+registering a new version. Inspect `partition_probe.json` in that training run:
+the model and built-in step records explain what was checked. Serving uses the
+same `model_probed` and `apply_probed_builtin` certificate actions as Spark.
+
 ```mermaid
 flowchart LR
     A["prepare_pinned_endpoint"] --> B["create_pinned_endpoint"]
