@@ -10,8 +10,11 @@ import pandas as pd
 import polars as pl
 
 from .....data.dataset import SplitDataset
+from .....inference._partition_builtins import PROBED_BUILTINS, fresh_builtin_record
 from .....inference.fitted_pipeline import FittedPipelineArtifact, load_pipeline, save_pipeline
 from .....inference.preprocessing_probe import probe_fitted_preprocessing
+from .....inference.probed_builtins import builtin_evidence, has_builtin_steps
+from .....inference.probed_models import has_probed_model, probe_model
 from .....inference.probed_rules import (
     has_scoring_rules,
     lint_rules,
@@ -42,18 +45,23 @@ def seal_partition_probe(
     *,
     enabled: bool,
 ) -> FittedPipelineArtifact:
-    """Lint and probe custom steps and scoring rules, sealing passing evidence.
+    """Probe built-ins/models and lint/probe custom steps and rules, sealing evidence.
 
     Runs when Spark admission applies (``enabled``: Spark or online-feature
     projects, or ``admit_probed_custom_steps``) and the pipeline has a
-    ``column_step``/``fitted_step`` or saved scoring rules. Uses the same first
-    256 holdout rows as the diagnostic probe and needs at least 16 of them. A
+    eligible built-in/model, function step or saved scoring rules. Uses the
+    same first 256 holdout rows as the diagnostic probe and needs at least 16. A
     lint finding, a failing check, or a step that changes JSON values in its
     module's globals while probed raises before the model is logged, naming the
     step or rule, the check and a fix. The evidence lives in ``pipeline.config``
     so the payload checksum covers it; the artifact is re-saved and reloaded.
     """
-    if not enabled or not (has_function_steps(artifact) or has_scoring_rules(artifact)):
+    if not enabled or not (
+        has_function_steps(artifact)
+        or has_scoring_rules(artifact)
+        or has_probed_model(artifact)
+        or has_builtin_steps(artifact)
+    ):
         return artifact
     if artifact.manifest.fitted_engine != "pandas":
         # Spark workers and endpoints admit only pandas-fitted models; nothing to seal.
@@ -75,23 +83,54 @@ def seal_partition_probe(
 def partition_admission_evidence(
     artifact: FittedPipelineArtifact, holdout: pd.DataFrame | pl.DataFrame
 ) -> dict[str, Any]:
-    """Lint first, then probe steps and rules; return evidence or raise a guided error.
+    """Probe eligible model state and source-bound steps/rules, or raise a guided error.
 
     Also used offline by ``smoke.py --probe`` on a locally fitted model.
     """
+    if has_function_steps(artifact) or has_scoring_rules(artifact):
+        evidence = _custom_admission_evidence(artifact, holdout)
+    else:
+        evidence = {
+            "version": 1,
+            "rows": min(len(holdout), 256),
+            "chunk_sizes": [1, 2, 7],
+            "steps": [],
+        }
+        if has_builtin_steps(artifact):
+            report = _holdout_probe(
+                artifact, holdout, perturb_nodes=PROBED_BUILTINS, fresh=fresh_builtin_record
+            )
+            evidence["project_source_sha256"] = artifact.manifest.project_source_sha256
+            evidence["builtins"] = builtin_evidence(artifact, report)
+    if has_probed_model(artifact):
+        evidence["model"] = probe_model(artifact, holdout)
+    return evidence
+
+
+def _custom_admission_evidence(
+    artifact: FittedPipelineArtifact, holdout: pd.DataFrame | pl.DataFrame
+) -> dict[str, Any]:
+    """Preserve the source-bound version-one step and rule certificate contract."""
     source = require_project_source(artifact)
     lint_steps(artifact)
     lint_rules(artifact)
     before = module_state(artifact)
     with fresh_project_module(source) as fresh:
         old = "_skyulf_project_" + str(artifact.manifest.project_source_sha256)
+        rebind = fresh_rebinder(old, fresh.__name__)
         report = _holdout_probe(
             artifact,
             holdout,
-            perturb_nodes=PROBED_NODES,
-            fresh=fresh_rebinder(old, fresh.__name__),
+            perturb_nodes=(*PROBED_NODES, *PROBED_BUILTINS),
+            fresh=lambda record: (
+                fresh_builtin_record(record)
+                if record["type"] in PROBED_BUILTINS
+                else rebind(record)
+            ),
         )
         evidence = partition_probe_evidence(artifact, report)
+        if has_builtin_steps(artifact):
+            evidence["builtins"] = builtin_evidence(artifact, report)
         require_unchanged_module_state(artifact, before)
         if has_scoring_rules(artifact):
             evidence["rules"] = rule_evidence(
@@ -133,7 +172,10 @@ def local_admission_probe(config: dict[str, Any], sample: pd.DataFrame) -> str:
         )
         evidence = partition_admission_evidence(artifact, rows)
     names = [step["name"] for step in evidence["steps"]]
+    names += [step["name"] for step in evidence.get("builtins", [])]
     names += [rule["name"] for rule in evidence.get("rules", [])]
+    if "model" in evidence:
+        names.append(evidence["model"]["node_type"])
     return f"Spark admission probe passed on {len(rows)} sample rows: {', '.join(names) or 'none'}."
 
 

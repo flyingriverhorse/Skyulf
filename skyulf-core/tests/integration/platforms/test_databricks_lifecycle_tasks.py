@@ -1516,8 +1516,8 @@ def test_readable_failed_data_stage_cannot_publish_success(staged, monkeypatch):
 
 
 @pytest.mark.parametrize("strategy", ["median", "mean"])
-def test_spark_projects_reject_unscorable_candidates_before_registration(staged, strategy):
-    """A Spark-scored project must not register or promote a model its score job rejects."""
+def test_spark_projects_accept_saved_mean_and_median_candidates(staged, strategy):
+    """A Spark-scored project may select validated saved medians without refitting them."""
     mlflow = pytest.importorskip("mlflow")
     _, client, config, _, _ = staged
     config.update(inference_mode="spark")
@@ -1540,13 +1540,8 @@ def test_spark_projects_reject_unscorable_candidates_before_registration(staged,
         loaded = _call(staged, "load_data", initialized.reference)
         split = _call(staged, "prepare_dataset", loaded.reference)
         trained = _call(staged, "train", split.reference)
-        if strategy == "median":
-            with pytest.raises(Exception, match="SimpleImputer.*strategy=mean") as rejected:
-                _call(staged, "select_best_model", trained.reference)
-            assert "strategy=median" not in str(rejected.value)  # local-only, not worker-admitted
-            assert not client.search_model_versions(f"name='{config['model_name']}'")
-        else:
-            _call(staged, "select_best_model", trained.reference)
+        selected = _call(staged, "select_best_model", trained.reference)
+        assert selected.reference["run_id"] == trained.reference["run_id"]
     finally:
         mlflow.set_tracking_uri(previous_uri)
 

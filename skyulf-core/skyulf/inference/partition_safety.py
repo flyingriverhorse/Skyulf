@@ -37,9 +37,12 @@ from ..registry import NodeRegistry
 from . import _partition_nodes as batch_nodes
 from . import _partition_trees as batch_trees
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
+from ._partition_builtins import PROBED_BUILTINS, builtin_applier
 from ._tuning_metadata import tuning_metadata_columns
 from .fitted_pipeline import FittedPipelineArtifact
 from .pipeline_scoring import scoring_output_schema
+from .probed_builtins import require_probed_builtin
+from .probed_models import require_probed_model
 from .probed_rules import require_probed_rules
 from .probed_steps import function_state_sha256, require_probed_step
 
@@ -140,7 +143,7 @@ def _check_schemas(artifact: FittedPipelineArtifact) -> None:
 
 
 def _check_model(artifact: FittedPipelineArtifact) -> Any:
-    """Admit only reviewed deterministic estimators and their exact prediction wrappers."""
+    """Admit reviewed or sealed-probed estimators through exact prediction wrappers."""
     estimator = artifact.pipeline.model_estimator
     if type(estimator) is not StatefulEstimator:
         raise _reject("model", "Custom or absent model estimator is unsupported.")
@@ -151,20 +154,32 @@ def _check_model(artifact: FittedPipelineArtifact) -> Any:
         or batch_trees.tree_applier(model)
         or batch_nodes.xgboost_applier(model)
     )
-    if applier is None or type(actual_applier) is not applier:
+    probed = applier is None
+    if probed:
+        _require_model_probe(artifact)
+    elif type(actual_applier) is not applier:
         raise _reject(
             "model",
             "Only reviewed exact linear, logistic, sklearn tree and XGBRegressor models are admitted.",
         )
-    _check_instance_methods(model)
+    if not probed:
+        _check_instance_methods(model)
     if vars(actual_applier):
         raise _reject("model", "Overridden model applier is unsupported.")
     if tuning_result is not None:
-        _check_tuning_result(tuning_result, model, tuning_metadata_columns(artifact))
+        _check_tuning_result(tuning_result, model, tuning_metadata_columns(artifact), probed=probed)
     actual = f"{type(model).__module__}.{type(model).__qualname__}"
     if actual != artifact.manifest.model_class:
         raise _reject("model", "Manifest model class disagrees with fitted model.")
     return estimator.model
+
+
+def _require_model_probe(artifact: FittedPipelineArtifact) -> dict:
+    """Keep model certificate failures attached to the model admission boundary."""
+    try:
+        return require_probed_model(artifact)
+    except (TypeError, ValueError) as exc:
+        raise _reject("model", str(exc)) from exc
 
 
 def _model_parts(estimator: StatefulEstimator) -> tuple[Any, Any, TuningResult | None]:
@@ -182,7 +197,7 @@ def _model_parts(estimator: StatefulEstimator) -> tuple[Any, Any, TuningResult |
 
 
 def _check_tuning_result(
-    result: TuningResult, model: Any, metadata_columns: tuple[str, ...]
+    result: TuningResult, model: Any, metadata_columns: tuple[str, ...], *, probed: bool = False
 ) -> None:
     """Validate fixed serving policy and exclude unreviewed metadata/callback behavior."""
     if set(vars(result)) != {field.name for field in fields(TuningResult)}:
@@ -197,10 +212,14 @@ def _check_tuning_result(
     thresholds = result.decision_thresholds
     if thresholds is None:
         return
-    if (
-        type(model) not in {LogisticRegression, *batch_trees.CLASSIFIERS}
-        or type(thresholds) is not dict
-    ):
+    _check_thresholds(thresholds, model, probed)
+
+
+def _check_thresholds(thresholds: Any, model: Any, probed: bool) -> None:
+    """Require numeric class weights for reviewed or empirically checked classifiers."""
+    if (not probed and type(model) not in {LogisticRegression, *batch_trees.CLASSIFIERS}) or type(
+        thresholds
+    ) is not dict:
         raise _reject(
             "model", "Tuned thresholds require a reviewed classifier class-weight mapping."
         )
@@ -214,12 +233,17 @@ def _step_configs(engineer: FeatureEngineer) -> list[dict[str, Any]]:
     return [dict(step) for step in engineer.steps_config if step["transformer"] not in _UNRECORDED]
 
 
+def _expected_step_applier(node: str) -> type | None:
+    """Resolve one reviewed or explicitly probed owner without trusting registry substitutions."""
+    return _APPLIERS.get(node) or _SKIPS.get(node) or _PROBED.get(node) or builtin_applier(node)
+
+
 def _check_step_identity(record: dict, config: dict) -> None:
     """Reject changed recipe ordering, unknown identities and instance overrides."""
     node = record["type"]
     if config["name"] != record["name"] or config["transformer"] != node:
         raise ValueError("Configured step disagrees with fitted name/type.")
-    expected = _APPLIERS.get(node) or _SKIPS.get(node) or _PROBED.get(node)
+    expected = _expected_step_applier(node)
     if expected is None or type(record["applier"]) is not expected:
         raise ValueError("Unknown node or unreviewed applier identity.")
     if NodeRegistry.get_applier(node) is not expected:
@@ -238,6 +262,8 @@ def _inspect_step(
     _check_step_identity(record, config)
     if node in _PROBED:
         return _inspect_probed_step(record, config, artifact)
+    if node in PROBED_BUILTINS:
+        return _inspect_builtin_step(record, config, artifact)
     if node in _SKIPS:
         return PartitionStepEvidence(
             name,
@@ -260,6 +286,20 @@ def _inspect_step(
     )
     return PartitionStepEvidence(
         name, node, "apply", json.dumps(_pack(params), sort_keys=True), artifact_digest(state).hex()
+    )
+
+
+def _inspect_builtin_step(
+    record: dict, config: dict, artifact: FittedPipelineArtifact | None
+) -> PartitionStepEvidence:
+    """Admit a known row-preserving built-in only with matching fitted-state evidence."""
+    state, params = require_probed_builtin(artifact, record, config)
+    return PartitionStepEvidence(
+        record["name"],
+        record["type"],
+        "apply_probed_builtin",
+        json.dumps(_pack(params), sort_keys=True),
+        artifact_digest(state).hex(),
     )
 
 
@@ -352,6 +392,23 @@ def _pipeline_evidence(artifact: FittedPipelineArtifact) -> PartitionSafetyEvide
     _check_pipeline(artifact)
     steps = (*_steps(artifact), *_rules(artifact))
     model = _check_model(artifact)
+    probe = artifact.pipeline.config.get("partition_probe", {})
+    if not isinstance(probe, dict):
+        raise _reject("model", "Malformed model partition probe evidence.")
+    if "model" in probe:
+        detail = _require_model_probe(artifact)
+        steps = (
+            *steps,
+            PartitionStepEvidence(
+                "model",
+                detail["node_type"],
+                "model_probed",
+                json.dumps(
+                    {"class": detail["class"], "applier": detail["applier"]}, sort_keys=True
+                ),
+                detail["state_sha256"],
+            ),
+        )
     try:
         configured = artifact.pipeline.config.get("preprocessing", [])
         if artifact_digest(configured) != artifact_digest(

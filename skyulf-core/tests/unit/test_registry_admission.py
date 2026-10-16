@@ -5,7 +5,12 @@ import pytest
 import skyulf.modeling  # noqa: F401 - registers the model nodes
 import skyulf.preprocessing  # noqa: F401 - registers the preprocessing nodes
 from skyulf import registry_admission as admission
-from skyulf.inference import _partition_trees, partition_safety
+from skyulf.inference import (
+    _partition_builtins,
+    _partition_models,
+    _partition_trees,
+    partition_safety,
+)
 from skyulf.registry import NodeRegistry
 
 # The deprecated "Split" alias is a registered node in its own right and warns on lookup.
@@ -58,8 +63,12 @@ def test_declared_admissions_match_the_partition_review():
 
     assert _declared(admission.ADMITTED_BY_CAPABILITY) == set(partition_safety._APPLIERS)
     assert _declared(admission.ADMITTED_MODEL) == reviewed_models & nodes
+    assert _declared(admission.PROBED_MODEL) == {
+        item[0] for item in _partition_models.CONTRACTS.values()
+    }
     assert _declared(admission.INFERENCE_SKIP) == set(partition_safety._SKIPS)
     assert _declared(admission.PROBED) == set(partition_safety._PROBED)
+    assert _declared(admission.PROBED_BUILTIN) == set(_partition_builtins.PROBED_BUILTINS)
     assert _declared(admission.SPLIT_MARKER) == partition_safety._UNRECORDED & nodes
 
 

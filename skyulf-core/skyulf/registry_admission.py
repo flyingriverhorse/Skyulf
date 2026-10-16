@@ -17,6 +17,7 @@ ADMITTED_BY_CAPABILITY = "admitted: pandas python_batch apply capability"
 ADMITTED_MODEL = "admitted: reviewed exact model applier"
 INFERENCE_SKIP = "admitted: training-only row filter, skipped at inference"
 PROBED = "admitted: only with sealed training probe evidence"
+PROBED_BUILTIN = "admitted: row-preserving built-in state with sealed training probe evidence"
 SPLIT_MARKER = "admitted: split marker, absent from the fitted history"
 
 UNREVIEWED = "not admitted: no reviewed partition-safe applier yet"
@@ -24,7 +25,10 @@ WINDOW = "not admitted: reads neighbouring rows (window context)"
 RESAMPLING = "not admitted: training-only resampling changes the row count"
 INSPECTION = "not admitted: inspection node without a reviewed apply"
 TEXT = "not admitted: text vectorizer or embedder without a reviewed applier"
+ROW_FILTER = "not admitted: fitted preprocessing removes prediction rows"
+GLOBAL_STATE = "not admitted: active fitted transformation can depend on the whole request"
 UNREVIEWED_MODEL = "not admitted: model without a reviewed exact applier"
+PROBED_MODEL = "admitted: exact model and nested members with sealed training probe evidence"
 CLUSTERING = "not admitted: clustering is not a Databricks task type"
 ENSEMBLE = "not admitted: stacking and voting composition is not reviewed"
 
@@ -55,7 +59,6 @@ DECLARATIONS: dict[str, str] = {
             "DateFeatures",
             "DropMissingColumns",
             "DummyEncoder",
-            "EllipticEnvelope",
             "FeatureGeneration",
             "FeatureGenerationNode",
             "FeatureMath",
@@ -64,20 +67,16 @@ DECLARATIONS: dict[str, str] = {
             "GeoDistance",
             "H3Index",
             "HashEncoder",
-            "IQR",
             "InvalidValueReplacement",
-            "IterativeImputer",
             "KBinsDiscretizer",
             "KNNImputer",
             "LabelEncoder",
-            "ManualBounds",
             "MaxAbsScaler",
             "MissingIndicator",
             "ModelBasedSelection",
             "OrdinalEncoder",
             "PolynomialFeatures",
             "PolynomialFeaturesNode",
-            "PowerTransformer",
             "RobustScaler",
             "SimpleTransformation",
             "TargetEncoder",
@@ -87,11 +86,12 @@ DECLARATIONS: dict[str, str] = {
             "VarianceThreshold",
             "WOEEncoder",
             "Winsorize",
-            "ZScore",
             "feature_selection",
         ),
-        UNREVIEWED,
+        PROBED_BUILTIN,
     ),
+    **dict.fromkeys(("IQR", "EllipticEnvelope", "ManualBounds", "ZScore"), ROW_FILTER),
+    **dict.fromkeys(("IterativeImputer", "PowerTransformer"), GLOBAL_STATE),
     **dict.fromkeys(("LagFeatures", "RollingAggregate"), WINDOW),
     **dict.fromkeys(("Oversampling", "Undersampling"), RESAMPLING),
     **dict.fromkeys(("DataSnapshot", "DatasetProfile"), INSPECTION),
@@ -99,12 +99,12 @@ DECLARATIONS: dict[str, str] = {
         (
             "count_vectorizer",
             "hashing_vectorizer",
-            "sentence_embedder",
             "tfidf_vectorizer",
             "tokenizer",
         ),
-        TEXT,
+        PROBED_BUILTIN,
     ),
+    "sentence_embedder": TEXT,
     **dict.fromkeys(
         (
             "adaboost_classifier",
@@ -129,12 +129,12 @@ DECLARATIONS: dict[str, str] = {
             "svr",
             "xgboost_classifier",
         ),
-        UNREVIEWED_MODEL,
+        PROBED_MODEL,
     ),
     **dict.fromkeys(("birch", "gaussian_mixture", "kmeans", "minibatch_kmeans"), CLUSTERING),
     **dict.fromkeys(
         ("stacking_classifier", "stacking_regressor", "voting_classifier", "voting_regressor"),
-        ENSEMBLE,
+        PROBED_MODEL,
     ),
 }
 
