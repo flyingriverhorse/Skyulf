@@ -10,6 +10,10 @@ online_serving:
     endpoint_name: ""
     model_name: ""
     model_version: "" # A concrete registered version, never an alias.
+    workload_type: CPU # CPU | CPU_MEDIUM | CPU_LARGE
+    workload_size: Small # Small | Medium | Large
+    scale_to_zero_enabled: true
+    ready_timeout_s: 3600 # Setup waits for READY + NOT_UPDATING.
     # Databricks writes <logging_catalog>.<logging_schema>.<logging_table_prefix>_payload.
     logging_catalog: "workspace"
     logging_schema: "taxi_fare_online"

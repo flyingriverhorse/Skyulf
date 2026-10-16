@@ -19,7 +19,7 @@ REST serving works independently of whether you create the SQL function.
 | --- | --- | --- | --- |
 | Batch `score` job, `inference_mode: local` | One Python process on job compute | Scheduled or handoff scoring of a bounded table | Job compute while it runs |
 | Batch `score` job, `inference_mode: spark` | Spark workers via `mlflow.pyfunc.spark_udf`; no endpoint | Large scheduled scoring into Delta | Job compute while it runs |
-| REST endpoint (this page) | Databricks Model Serving | Applications needing one request at a time | Endpoint compute while provisioned; scale to zero is enabled |
+| REST endpoint (this page) | Databricks Model Serving | Applications needing one request at a time | Endpoint compute while provisioned; scale to zero is enabled by default |
 | SQL function with `ai_query` (this page) | Model Serving, called from SQL | Analysts, SQL jobs and dashboards querying the endpoint | Endpoint plus the SQL warehouse or cluster |
 
 The batch job never calls an endpoint, and the endpoint never writes the
@@ -217,21 +217,40 @@ endpoint payload logs, not caller-written tables.
 ### 2. Create the REST endpoint and check readiness
 
 ```python
-create_pinned_endpoint(client, endpoint)  # Run once for this new endpoint name.
+ready = create_pinned_endpoint(client, endpoint)  # Create once and wait for readiness.
 ```
 
-Creation is asynchronous. Check the endpoint page, then run this in a later cell:
+Databricks builds the endpoint asynchronously. This helper polls for readiness
+using `endpoint.spec.ready_timeout_s` (3600 seconds by default), then returns
+the ready endpoint. It requires `READY` and `NOT_UPDATING` and checks the exact
+model version, workload and logging configuration. A failed native update or
+an API error remaining after the SDK's own retries propagates.
+The polling timeout does not interrupt an HTTP request already in progress:
+the injected SDK client's HTTP timeout and retry budget are separate. A ready
+response received from that in-flight request can complete the wait after the
+polling deadline. Configure the client's transport limits when elapsed request
+time also needs a tighter bound.
+
+If the wait expires, `TimeoutError` leaves the endpoint intact. Inspect the
+endpoint page and its build logs. Resume waiting for the same admitted plan:
+
+```python
+from skyulf.integrations.databricks.serving import wait_for_pinned_endpoint_ready
+
+ready = wait_for_pinned_endpoint_ready(client, endpoint)
+```
+
+For one immediate check without waiting:
 
 ```python
 require_pinned_endpoint_ready(client, endpoint)
 ```
 
-This requires `READY` and `NOT_UPDATING`, and checks the exact model version,
-workload and logging configuration. Retry the readiness check after provisioning;
-do not repeatedly call creation. An existing endpoint name is rejected. The
-helper does not overwrite endpoints or change model aliases.
+Prediction and SQL enrollment use this immediate check. Do not repeatedly call
+creation: an existing endpoint name is rejected. The helper does not overwrite
+endpoints or change model aliases.
 
-The endpoint uses CPU/Small with scale-to-zero enabled. Idle endpoints can stop serving compute
+The default is CPU/Small with scale-to-zero enabled. Idle endpoints can stop serving compute
 after the platform's inactivity interval, and the next request can incur a cold start. This is
 separate from SQL warehouse compute and billing. See
 [Databricks custom model serving](https://docs.databricks.com/aws/en/machine-learning/model-serving/custom-models).
@@ -324,6 +343,10 @@ online_serving:
     endpoint_name: customer-online-v3
     model_name: models.risk.customer_online
     model_version: "3"
+    workload_type: CPU
+    workload_size: Small
+    scale_to_zero_enabled: true
+    ready_timeout_s: 3600
     logging_catalog: ops
     logging_schema: serving
     logging_table_prefix: customer_online_v3
@@ -352,14 +375,15 @@ databricks bundle deploy -t test
 databricks bundle run online_serving_setup -t test
 ```
 
-The setup result reports `SUBMITTED`, `model_uri`, `input_schema` and a typed
+The setup result reports `READY`, `model_uri`, `input_schema` and a typed
 `request_example` derived from the actual native signature. Replace its example
-values with a real entity and all other required request values. Wait for native
-endpoint readiness, then send that request body to
+values with a real entity and all other required request values, then send that request body to
 `POST /serving-endpoints/customer-online-v3/invocations` or use
-`query_named_records` in the SDK example below. A setup submission does not establish feature
-availability. Rerunning setup never overwrites an existing endpoint; inspect an
-ambiguous creation result before taking another action.
+`query_named_records` in the SDK example below. Endpoint readiness does not
+establish that every requested entity has current features; the saved lookup
+policy checks that at prediction time. Rerunning setup never overwrites an
+existing endpoint. On timeout, inspect the existing endpoint and resume an
+explicit wait; do not rerun creation with the same name.
 
 Save the returned `request_example` object as `request.json`, replace its sample
 values, and query after the endpoint reports readiness:
@@ -373,6 +397,46 @@ Required source metadata can survive in the native signature, even when excluded
 from estimator inputs. Inspect `input_schema`; do not assume every model accepts
 keys alone. Direct REST callers can override fetched values. Freshness validation
 checks the received values and does not attest their source.
+
+#### Endpoint compute and setup timeout
+
+These settings belong to `online_serving.endpoint`. They are also keyword
+arguments of `PinnedEndpointSpec` for a regular endpoint without online lookup.
+
+| Setting | Default | Supported values and effect |
+| --- | --- | --- |
+| `workload_type` | `CPU` | `CPU`, `CPU_MEDIUM`, `CPU_LARGE`: CPU memory tiers. Availability depends on your Databricks workspace. GPU model packages are outside this setup. |
+| `workload_size` | `Small` | `Small`, `Medium`, `Large`: serving capacity. Larger sizes can cost more; choose using your measured traffic. |
+| `scale_to_zero_enabled` | `true` | A YAML boolean. Set `false` to keep serving compute provisioned while idle; `true` permits cold starts. Some workspaces require `true`; platform restrictions are returned as errors. |
+| `ready_timeout_s` | `3600` | A positive integer in seconds. Controls the setup wait only; it does not change request timeout or get sent as an endpoint setting. |
+
+For example, to keep a Medium endpoint warm and allow 30 minutes for startup:
+
+```yaml
+workload_type: CPU
+workload_size: Medium
+scale_to_zero_enabled: false
+ready_timeout_s: 1800
+```
+
+Place those four lines under `online_serving.endpoint`. A changed YAML file
+does not update an existing endpoint. Setup is create-only: use a new endpoint
+name and explicitly move your callers after verifying it. A daily rollout must
+use the same workload type, size and scale-to-zero setting for champion and
+challenger; each plan can have its own client-side wait timeout.
+
+To seed these values during Bundle initialization, the answer-file keys are
+`serving_workload_type`, `serving_workload_size`,
+`serving_scale_to_zero_enabled` and `serving_ready_timeout_s`. All four are
+hidden from interactive questions but accepted in an answer JSON file. As with
+other initialization answers, use strings there (for example `"false"` and
+`"1800"`); the generated `serving.yml` contains typed booleans and integers.
+The generated setup job and task also have a total runtime cap, controlled by
+the existing Bundle variable `monitoring_timeout_seconds` (7200 by default).
+Keep that cap above `ready_timeout_s` plus model/publication inspection time.
+Increasing the wait in YAML alone cannot extend the Databricks job deadline.
+See [Databricks endpoint configuration](https://docs.databricks.com/aws/en/machine-learning/model-serving/create-manage-serving-endpoints)
+for the platform's compute and readiness behavior.
 
 ### Admit and query the registered package
 

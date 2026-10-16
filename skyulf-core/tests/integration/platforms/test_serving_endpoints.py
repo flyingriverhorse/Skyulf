@@ -111,6 +111,177 @@ def test_config_pins_certified_model_and_inference_logging(spec, resolved, artif
     assert plan.input_columns == ("x",)
 
 
+def test_endpoint_settings_keep_existing_defaults(spec):
+    """Old callers retain the existing compute choice and a bounded setup wait."""
+    assert (spec.workload_type, spec.workload_size, spec.scale_to_zero_enabled) == (
+        "CPU",
+        "Small",
+        True,
+    )
+    assert spec.ready_timeout_s == 3600
+
+
+@pytest.mark.parametrize("kind", ["CPU", "CPU_MEDIUM", "CPU_LARGE"])
+@pytest.mark.parametrize("size", ["Small", "Medium", "Large"])
+def test_endpoint_compute_overrides_reach_native_config(
+    spec, resolved, artifact, package, kind, size
+):
+    """Explicit compute values must survive admission into the native create body."""
+    configured = replace(
+        spec,
+        workload_type=kind,
+        workload_size=size,
+        scale_to_zero_enabled=False,
+        ready_timeout_s=120,
+    )
+    plan = build_pinned_endpoint(
+        configured, resolved=resolved, artifact=artifact, package_info=package
+    )
+    entity = plan.config["config"]["served_entities"][0]
+    assert entity["workload_type"] == kind
+    assert entity["workload_size"] == size
+    assert entity["scale_to_zero_enabled"] is False
+    assert "ready_timeout_s" not in entity
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("workload_type", "GPU_SMALL"),
+        ("workload_type", "cpu"),
+        ("workload_type", None),
+        ("workload_type", []),
+        ("workload_size", "small"),
+        ("workload_size", "XLarge"),
+        ("workload_size", False),
+        ("workload_size", []),
+        ("scale_to_zero_enabled", "false"),
+        ("scale_to_zero_enabled", 0),
+        ("scale_to_zero_enabled", None),
+        ("ready_timeout_s", True),
+        ("ready_timeout_s", 0),
+        ("ready_timeout_s", -1),
+        ("ready_timeout_s", 1.5),
+        ("ready_timeout_s", "3600"),
+        ("ready_timeout_s", None),
+    ],
+)
+def test_endpoint_settings_reject_invalid_values_before_native_io(spec, field, value):
+    """Configuration mistakes must fail clearly, including truthy strings and booleans as integers."""
+    with pytest.raises(ValueError, match=field):
+        replace(spec, **{field: value})
+
+
+def _setup_clock(monkeypatch):
+    """Advance setup time deterministically without making the tests sleep."""
+    from skyulf.integrations.databricks.serving import endpoints
+
+    clock = [0.0]
+
+    def advance(seconds):
+        """Simulate only the requested polling delay."""
+        clock[0] += seconds
+
+    monkeypatch.setattr(endpoints, "monotonic", lambda: clock[0], raising=False)
+    monkeypatch.setattr(endpoints, "sleep", advance, raising=False)
+    return clock
+
+
+def test_create_waits_for_settled_ready_configuration(
+    spec, resolved, artifact, package, monkeypatch
+):
+    """A submitted create or READY with a pending update is not a successful setup."""
+    from databricks.sdk.errors import NotFound
+
+    configured = replace(spec, logging_mode="disabled")
+    plan = build_pinned_endpoint(
+        configured, resolved=resolved, artifact=artifact, package_info=package
+    )
+    ready = deepcopy(plan.config) | {"state": {"ready": "READY", "config_update": "NOT_UPDATING"}}
+    pending = deepcopy(ready)
+    pending["state"]["config_update"] = "IN_PROGRESS"
+    client = SimpleNamespace(serving_endpoints=Mock())
+    client.serving_endpoints.get.side_effect = [NotFound("absent"), pending, ready]
+    clock = _setup_clock(monkeypatch)
+    assert create_pinned_endpoint(client, plan) == ready
+    client.serving_endpoints.create.assert_called_once()
+    assert clock[0] > 0
+
+
+def test_create_timeout_never_retries_or_deletes_endpoint(
+    spec, resolved, artifact, package, monkeypatch
+):
+    """Timeout must leave the submitted resource available for inspection and explicit recovery."""
+    from databricks.sdk.errors import NotFound
+
+    configured = replace(spec, logging_mode="disabled", ready_timeout_s=2)
+    plan = build_pinned_endpoint(
+        configured, resolved=resolved, artifact=artifact, package_info=package
+    )
+    pending = {"state": {"ready": "NOT_READY", "config_update": "IN_PROGRESS"}}
+    client = SimpleNamespace(serving_endpoints=Mock())
+    client.serving_endpoints.get.side_effect = [NotFound("absent"), pending, pending]
+    clock = _setup_clock(monkeypatch)
+    with pytest.raises(TimeoutError, match="sm23b-test.*2"):
+        create_pinned_endpoint(client, plan)
+    client.serving_endpoints.create.assert_called_once()
+    client.serving_endpoints.delete.assert_not_called()
+    assert clock[0] == 2
+
+
+@pytest.mark.parametrize("update", ["UPDATE_FAILED", "UPDATE_CANCELED"])
+def test_create_stops_on_failed_deployment(spec, resolved, artifact, package, monkeypatch, update):
+    """A terminal platform failure must surface immediately instead of waiting until timeout."""
+    from databricks.sdk.errors import NotFound
+
+    configured = replace(spec, logging_mode="disabled")
+    plan = build_pinned_endpoint(
+        configured, resolved=resolved, artifact=artifact, package_info=package
+    )
+    client = SimpleNamespace(serving_endpoints=Mock())
+    client.serving_endpoints.get.side_effect = [
+        NotFound("absent"),
+        {"state": {"ready": "NOT_READY", "config_update": update}},
+    ]
+    clock = _setup_clock(monkeypatch)
+    with pytest.raises(ValueError, match=update):
+        create_pinned_endpoint(client, plan)
+    assert clock[0] == 0
+
+
+def test_wait_rejects_wrong_ready_config_immediately(
+    spec, resolved, artifact, package, monkeypatch
+):
+    """A settled endpoint serving a different model cannot pass by waiting longer."""
+    from skyulf.integrations.databricks.serving import wait_for_pinned_endpoint_ready
+
+    plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=package)
+    ready = deepcopy(_ready_telemetry_response(plan))
+    ready["config"]["served_entities"][0]["entity_version"] = "99"
+    client = SimpleNamespace(api_client=Mock())
+    client.api_client.do.return_value = ready
+    clock = _setup_clock(monkeypatch)
+    with pytest.raises(ValueError, match="selector"):
+        wait_for_pinned_endpoint_ready(client, plan)
+    assert clock[0] == 0
+
+
+def test_wait_propagates_api_failure_without_retry(spec, resolved, artifact, package, monkeypatch):
+    """Permission errors must not be disguised as an hour-long readiness timeout."""
+    from databricks.sdk.errors import PermissionDenied
+
+    from skyulf.integrations.databricks.serving import wait_for_pinned_endpoint_ready
+
+    plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=package)
+    client = SimpleNamespace(api_client=Mock())
+    client.api_client.do.side_effect = PermissionDenied("denied")
+    clock = _setup_clock(monkeypatch)
+    with pytest.raises(PermissionDenied):
+        wait_for_pinned_endpoint_ready(client, plan)
+    client.api_client.do.assert_called_once()
+    assert clock[0] == 0
+
+
 def test_inference_only_rollout_matches_native_persisted_sinks(spec, resolved, artifact, package):
     """Native inference telemetry persists only its enabled log sink, not unused sinks."""
     from skyulf.integrations.databricks.serving import (
@@ -323,10 +494,12 @@ def test_create_uses_sdk_config_without_replacing_existing_endpoint(
     plan = build_pinned_endpoint(spec, resolved=resolved, artifact=artifact, package_info=package)
     client = SimpleNamespace(serving_endpoints=Mock(), api_client=Mock())
     client.serving_endpoints.get.side_effect = NotFound("absent")
+    client.api_client.do.side_effect = [{}, _ready_telemetry_response(plan)]
     create_pinned_endpoint(client, plan)
-    client.api_client.do.assert_called_once_with(
+    client.api_client.do.assert_any_call(
         method="POST", path="/api/2.0/serving-endpoints", body=plan.config
     )
+    assert client.api_client.do.call_count == 2
     client.serving_endpoints.create.assert_not_called()
 
 
@@ -339,7 +512,8 @@ def test_explicit_gateway_mode_keeps_legacy_contract(spec, resolved, artifact, p
     assert "telemetry_config" not in plan.config
     assert plan.config["ai_gateway"]["usage_tracking_config"] == {"enabled": True}
     client = SimpleNamespace(serving_endpoints=Mock())
-    client.serving_endpoints.get.side_effect = NotFound("absent")
+    ready = deepcopy(plan.config) | {"state": {"ready": "READY", "config_update": "NOT_UPDATING"}}
+    client.serving_endpoints.get.side_effect = [NotFound("absent"), ready]
     create_pinned_endpoint(client, plan)
     assert client.serving_endpoints.create.call_args.kwargs[
         "ai_gateway"
@@ -509,7 +683,8 @@ def test_disabled_logging_creates_an_endpoint_without_inference_tables(resolved,
     with pytest.raises(ValueError, match="logging is disabled"):
         _ = quiet.inference_table
     client = SimpleNamespace(serving_endpoints=Mock())
-    client.serving_endpoints.get.side_effect = NotFound("absent")
+    ready = deepcopy(plan.config) | {"state": {"ready": "READY", "config_update": "NOT_UPDATING"}}
+    client.serving_endpoints.get.side_effect = [NotFound("absent"), ready]
     create_pinned_endpoint(client, plan)
     kwargs = client.serving_endpoints.create.call_args.kwargs
     assert "ai_gateway" not in kwargs and "telemetry_config" not in kwargs

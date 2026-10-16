@@ -11,7 +11,8 @@ resources:
       tasks:
         - task_key: online_serving_setup
           description: Inspect a concrete online feature model and create one new endpoint
-          timeout_seconds: ${var.monitoring_task_timeout_seconds}
+          # Allow model inspection plus the default one-hour endpoint readiness wait.
+          timeout_seconds: ${var.monitoring_timeout_seconds}
           max_retries: 0
           disable_auto_optimization: true
           environment_key: serving

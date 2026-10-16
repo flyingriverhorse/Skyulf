@@ -82,6 +82,38 @@
       }
     }
   },
+  "serving_workload_type": {
+    "order": 910,
+    "type": "string",
+    "default": "CPU",
+    "enum": ["CPU", "CPU_MEDIUM", "CPU_LARGE"],
+    "description": "Online serving | CPU workload type for newly created endpoints; GPU packages are not supported by this setup.",
+    "skip_prompt_if": {}
+  },
+  "serving_workload_size": {
+    "order": 911,
+    "type": "string",
+    "default": "Small",
+    "enum": ["Small", "Medium", "Large"],
+    "description": "Online serving | Workload size for newly created endpoints.",
+    "skip_prompt_if": {}
+  },
+  "serving_scale_to_zero_enabled": {
+    "order": 912,
+    "type": "string",
+    "default": "true",
+    "enum": ["true", "false"],
+    "description": "Online serving | Allow newly created endpoints to scale to zero when idle.",
+    "skip_prompt_if": {}
+  },
+  "serving_ready_timeout_s": {
+    "order": 913,
+    "type": "string",
+    "default": "3600",
+    "pattern": "^[1-9][0-9]*$",
+    "description": "Online serving | Positive setup wait in seconds for READY and NOT_UPDATING; timeout leaves the endpoint intact for inspection.",
+    "skip_prompt_if": {}
+  },
   "serving_logging_table_prefix": {
     "order": 909,
     "type": "string",

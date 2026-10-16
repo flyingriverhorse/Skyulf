@@ -43,6 +43,58 @@ def test_serving_opt_ins_default_off_in_topic_and_generated_schema():
         assert generated["properties"][name]["default"] == "false"
 
 
+def test_endpoint_compute_answers_are_hidden_with_compatible_defaults():
+    """Answer files expose endpoint tuning without adding mandatory setup questions."""
+    topic = json.loads((ROOT / "schema/serving.json").read_text(encoding="utf-8"))
+    for name, default in {
+        "workload_type": "CPU",
+        "workload_size": "Small",
+        "scale_to_zero_enabled": "true",
+        "ready_timeout_s": "3600",
+    }.items():
+        field = topic["serving_" + name]
+        assert field["default"] == default
+        assert field["skip_prompt_if"] == {}
+
+
+def test_online_setup_budget_allows_preparation_and_default_ready_wait():
+    """The task must not expire before its own one-hour readiness timeout can finish."""
+    source = (TEMPLATE / "resources/online_serving_setup.job.yml.tmpl").read_text()
+    resource = yaml.safe_load(source)["resources"]["jobs"]["online_serving_setup"]
+    assert resource["tasks"][0]["timeout_seconds"] == "${var.monitoring_timeout_seconds}"
+
+
+@CLI
+@pytest.mark.parametrize(
+    "kind,size,zero,timeout",
+    [
+        ("CPU", "Small", "true", "3600"),
+        ("CPU_MEDIUM", "Medium", "false", "120"),
+        ("CPU_LARGE", "Large", "true", "7200"),
+    ],
+)
+def test_endpoint_settings_render_as_typed_yaml(tmp_path, kind, size, zero, timeout):
+    """Operators' explicit answers must reach serving.yml with boolean and integer types."""
+    from test_databricks_bundle_generation import _generate_project
+
+    project = _generate_project(
+        tmp_path,
+        include_online_serving="true",
+        serving_workload_type=kind,
+        serving_workload_size=size,
+        serving_scale_to_zero_enabled=zero,
+        serving_ready_timeout_s=timeout,
+    )
+    endpoint = yaml.safe_load((project / "config/serving.yml").read_text())["online_serving"][
+        "endpoint"
+    ]
+    assert endpoint["workload_type"] == kind
+    assert endpoint["workload_size"] == size
+    assert endpoint["scale_to_zero_enabled"] is (zero == "true")
+    assert type(endpoint["ready_timeout_s"]) is int
+    assert endpoint["ready_timeout_s"] == int(timeout)
+
+
 def test_publication_mode_prompt_is_conditional_and_defaults_to_triggered():
     """Existing initialization answers keep their paused hourly publisher behavior."""
     topic = json.loads((ROOT / "schema/serving.json").read_text(encoding="utf-8"))

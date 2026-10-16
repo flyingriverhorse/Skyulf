@@ -8,6 +8,7 @@ from .endpoints import (
     prepare_pinned_endpoint,
     query_named_records,
     require_pinned_endpoint_ready,
+    wait_for_pinned_endpoint_ready,
 )
 from .online_endpoints import prepare_online_endpoint
 from .rollout import (
@@ -64,4 +65,5 @@ __all__ = [
     "reconcile_rollout",
     "require_pinned_endpoint_ready",
     "rollout_endpoint_ready",
+    "wait_for_pinned_endpoint_ready",
 ]

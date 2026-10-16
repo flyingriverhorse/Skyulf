@@ -20,10 +20,15 @@ class PinnedEndpointSpec:
     logging_schema: str
     logging_table_prefix: str
     logging_mode: Literal["telemetry", "ai_gateway", "disabled"] = "telemetry"
+    workload_type: str = "CPU"
+    workload_size: str = "Small"
+    scale_to_zero_enabled: bool = True
+    ready_timeout_s: int = 3600
 
     def __post_init__(self) -> None:
         """Reject mutable selectors and unsafe service or UC identifiers."""
         _validate_selector(self)
+        _validate_compute(self)
         if not isinstance(self.logging_mode, str) or self.logging_mode not in {
             "telemetry",
             "ai_gateway",
@@ -73,6 +78,21 @@ class PinnedEndpointSpec:
         return (
             f"{self.logging_catalog}.{self.logging_schema}.{self.logging_table_prefix}_otel_metrics"
         )
+
+
+def _validate_compute(spec: PinnedEndpointSpec) -> None:
+    """Validate supported CPU compute and the client-side readiness deadline."""
+    for name, choices in (
+        ("workload_type", ("CPU", "CPU_MEDIUM", "CPU_LARGE")),
+        ("workload_size", ("Small", "Medium", "Large")),
+    ):
+        value = getattr(spec, name)
+        if not isinstance(value, str) or value not in choices:
+            raise ValueError(f"{name} must be one of {', '.join(choices)}.")
+    if type(spec.scale_to_zero_enabled) is not bool:
+        raise ValueError("scale_to_zero_enabled must be a boolean.")
+    if type(spec.ready_timeout_s) is not int or spec.ready_timeout_s <= 0:
+        raise ValueError("ready_timeout_s must be a positive integer.")
 
 
 def _validate_selector(spec: PinnedEndpointSpec) -> None:

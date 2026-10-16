@@ -218,8 +218,8 @@ def run_online_serving_setup(
 ) -> dict[str, Any]:
     """Inspect the saved policy and external publication, then create one new endpoint.
 
-    No publisher or batch scoring task is required. SUBMITTED is not readiness;
-    inspect the endpoint and query its returned schema after native startup.
+    No publisher or batch scoring task is required. Wait for the exact saved
+    configuration to become READY and NOT_UPDATING before returning READY.
     An existing endpoint is never overwritten and creation is never retried.
     """
     if not _enabled(settings):
@@ -244,7 +244,7 @@ def run_online_serving_setup(
     }
     create_pinned_endpoint(client, plan)
     return {
-        "status": "SUBMITTED",
+        "status": "READY",
         "endpoint_name": spec.endpoint_name,
         "model_uri": spec.model_uri,
         "input_schema": [list(column) for column in plan.input_schema],
