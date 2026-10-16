@@ -61,6 +61,8 @@ def prepare_competition(
             champion_version=champion,
             quality_threshold=config.get("quality_threshold"),
             quality_gates=config.get("quality_gates"),
+            min_scored_fraction=config.get("min_scored_fraction", 0.90),
+            max_coverage_drop=config.get("max_coverage_drop", 0.05),
             risk_category=config.get("risk_category"),
         )
         bound = _pipeline_trial_bound(effective, cv)

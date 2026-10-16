@@ -36,7 +36,7 @@ def _values(frame):
 @pytest.mark.parametrize("method", ["box-cox", "yeo-johnson"])
 @pytest.mark.parametrize("standardize", [False, True])
 def test_power_invalid_values_are_local_and_counted(engine, method, standardize, caplog):
-    """A bad value must become NaN while every valid neighbour retains its learned transform."""
+    """A bad selected value excludes its row while valid neighbours keep their learned transform."""
     training = pd.DataFrame({"x": [1.0, 2.0, 4.0, 8.0], "z": [2.0, 5.0, 7.0, 11.0]})
     state = PowerTransformerCalculator().fit(
         _native(training, engine),
@@ -45,29 +45,36 @@ def test_power_invalid_values_are_local_and_counted(engine, method, standardize,
     state = pickle.loads(pickle.dumps(state))
     saved = artifact_digest(state)
     bad = -1.0 if method == "box-cox" else np.inf
-    sample = pd.DataFrame({"x": [2.0, bad, np.nan], "z": [bad, 5.0, np.nan]}, index=[4, 4, 1])
+    sample = pd.DataFrame(
+        {"x": [2.0, bad, np.nan, 2.0], "z": [bad, 5.0, np.nan, 5.0]}, index=[4, 4, 1, 4]
+    )
     native = _native(sample, engine)
     before = deepcopy(native)
     applier = PowerTransformerApplier()
     with caplog.at_level(logging.WARNING):
         whole = applier.apply(native, state)
-    assert "2 invalid" in caplog.text
+    assert "excluded 2 invalid row" in caplog.text
     valid = applier.apply(_native(pd.DataFrame({"x": [2.0], "z": [5.0]}), engine), state)
-    assert whole["x"].to_numpy()[0] == valid["x"].to_numpy()[0]
-    assert whole["z"].to_numpy()[1] == valid["z"].to_numpy()[0]
-    assert np.isnan(_values(whole)[[1, 0], [0, 1]]).all()
-    for positions in ([0], [1], [2], [2, 0, 1], []):
+    np.testing.assert_array_equal(_values(whole), np.vstack([[np.nan, np.nan], _values(valid)]))
+    for positions in ([0], [1], [2], [3], [3, 2, 0, 1], []):
         batch = native.iloc[positions] if engine == "pandas" else native[positions]
         output = applier.apply(batch, state)
-        np.testing.assert_allclose(_values(output), _values(whole)[positions], rtol=0, atol=0)
+        kept = [index for index in positions if index in (2, 3)]
+        expected = np.array(
+            [[np.nan, np.nan] if index == 2 else _values(valid)[0] for index in kept]
+        ).reshape(-1, 2)
+        np.testing.assert_array_equal(_values(output), expected)
     if engine == "pandas":
         pd.testing.assert_frame_equal(native, before)
-        assert whole.index.equals(native.index)
+        assert whole.index.tolist() == [1, 4]
         assert whole.dtypes.tolist() == [np.dtype("float64")] * 2
     else:
         assert native.equals(before) and whole.dtypes == [pl.Float64, pl.Float64]
     capability = get_inference_capability("PowerTransformer", {}, state, engine=engine)
-    assert capability is not None and capability.context == "row"
+    assert capability is not None and (capability.context, capability.row_effect) == (
+        "row",
+        "filter",
+    )
     assert artifact_digest(state) == saved
 
 
@@ -131,11 +138,16 @@ def test_power_extreme_and_missing_values_keep_valid_negative_or_positive_rows(
     applier = PowerTransformerApplier()
     with caplog.at_level(logging.WARNING):
         output = applier.apply(_native(sample, engine), state)["x"].to_numpy()
-    assert "4 invalid" in caplog.text if method == "box-cox" else "3 invalid" in caplog.text
-    assert np.isnan(output[1:5]).all()
+    assert (
+        "excluded 4 invalid row" in caplog.text
+        if method == "box-cox"
+        else "excluded 3 invalid row" in caplog.text
+    )
+    assert len(output) == (2 if method == "box-cox" else 3)
     singleton = applier.apply(_native(sample.iloc[:1], engine), state)["x"].to_numpy()
     np.testing.assert_array_equal(output[:1], singleton)
-    assert np.isnan(output[-1]) if method == "box-cox" else np.isfinite(output[-1])
+    assert np.isnan(output[1])
+    assert np.isfinite(output[[0, -1]]).all() if method == "yeo-johnson" else np.isfinite(output[0])
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

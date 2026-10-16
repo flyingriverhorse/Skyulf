@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ....inference.fitted_pipeline import has_outlier_steps
+from ....inference.fitted_pipeline import has_exclusion_steps
 
 SPARK_OUTPUT_PARAM = "spark_output"
 # Marks a null in a mixed string column; the driver turns it back into SQL null.
@@ -94,7 +94,7 @@ def nullable_outputs(artifact: Any) -> bool:
     """
     pipeline = getattr(artifact, "pipeline", None)
     if pipeline is not None:
-        return pipeline.config.get("project_scoring") is not None or has_outlier_steps(artifact)
+        return pipeline.config.get("project_scoring") is not None or has_exclusion_steps(artifact)
     return any(
         column.name == "scoring_status"
         for component in artifact.manifest.components

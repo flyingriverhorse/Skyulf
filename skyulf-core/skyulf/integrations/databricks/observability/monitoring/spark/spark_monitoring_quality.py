@@ -5,6 +5,7 @@ from typing import Any
 from scipy.stats import fisher_exact
 
 from ..monitoring_metrics import (
+    exclusion_metrics,
     monitoring_metric,
     monitoring_report_status,
     validate_monitoring_inputs,
@@ -178,6 +179,13 @@ def monitoring_report(
         monitoring_metric("performance", target_column, name, value)
         for name, value in performance["values"].items()
     )
+    metrics.extend(
+        exclusion_metrics(
+            performance["scored_rows"] + excluded,
+            excluded,
+            _invalid_exclusions(predictions, excluded),
+        )
+    )
     notes = (
         ([f"{excluded} excluded predictions were not scored."] if excluded else [])
         + notes
@@ -204,3 +212,19 @@ def monitoring_report(
         "metrics": metrics,
         "notes": notes,
     }
+
+
+def _invalid_exclusions(predictions: Any, excluded: int) -> int | None:
+    """Count invalid outcomes without collecting requests or discarding unknown reasons."""
+    if not excluded:
+        return 0
+    if "exclusion_reason" not in predictions.columns:
+        return None
+    f = spark_functions()
+    reasons = predictions.where(spark_column("scoring_status") == "excluded")
+    reason = spark_column("exclusion_reason")
+    counts = reasons.agg(
+        f.sum(f.when(reason.isNull(), 1).otherwise(0)).alias("unknown"),
+        f.sum(f.when(reason.startswith("invalid:"), 1).otherwise(0)).alias("invalid"),
+    ).first()
+    return None if counts.unknown else int(counts.invalid)

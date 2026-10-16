@@ -16,6 +16,7 @@ from ..modeling._evaluation.metrics import (
 from ..preprocessing._helpers import select_rows_by_position
 from ..preprocessing._target_labels import encoded_labels
 from .fitted_pipeline import FittedPipelineArtifact, predict_pipeline
+from .pipeline_scoring import score_pipeline
 
 
 def evaluate_holdout(
@@ -39,20 +40,74 @@ def evaluate_holdout(
     normal training/batch prediction parallelism remain unchanged. This does not
     guarantee determinism for arbitrary models or other numerical runtimes.
     """
-    _validate_holdout(artifact, heldout, target_column)
-    columns = list(artifact.manifest.input_columns)
-    features = (
-        heldout.select(columns) if isinstance(heldout, pl.DataFrame) else heldout.loc[:, columns]
-    )
-    actual = heldout[target_column].to_numpy()
-    with parallel_config(backend="sequential"):
-        predictions = predict_pipeline(features, artifact)
+    features, actual, predictions = _holdout_predictions(artifact, heldout, target_column)
     raw_metrics = _evaluated_metrics(
         artifact, features, heldout, target_column, actual, predictions
     )
     if on_predictions is not None:
         on_predictions(actual, predictions)
     return {f"heldout_{name}": value for name, value in sanitize_metrics(raw_metrics).items()}
+
+
+def _holdout_predictions(
+    artifact: FittedPipelineArtifact, heldout: pd.DataFrame | pl.DataFrame, target_column: str
+) -> tuple[Any, np.ndarray, pd.DataFrame]:
+    """Predict the entire supplied holdout once before choosing any metric population."""
+    _validate_holdout(artifact, heldout, target_column)
+    columns = list(artifact.manifest.input_columns)
+    features = (
+        heldout.select(columns) if isinstance(heldout, pl.DataFrame) else heldout.loc[:, columns]
+    )
+    predict = (
+        score_pipeline if artifact.pipeline.config.get("project_scoring") else predict_pipeline
+    )
+    with parallel_config(backend="sequential"):
+        predictions = predict(features, artifact)
+    return features, heldout[target_column].to_numpy(), predictions
+
+
+def _scored_mask(predictions: pd.DataFrame) -> np.ndarray:
+    """Keep positional coverage independent of duplicate input labels."""
+    if "scoring_status" in predictions:
+        return predictions["scoring_status"].eq("predicted").to_numpy(dtype=bool)
+    return np.ones(len(predictions), dtype=bool)
+
+
+def evaluate_holdout_comparison(
+    candidate: FittedPipelineArtifact,
+    champion: FittedPipelineArtifact | None,
+    heldout: pd.DataFrame | pl.DataFrame,
+    *,
+    target_column: str,
+    include_coverage: bool = False,
+) -> tuple[dict[str, float], dict[str, float] | None]:
+    """Compare common predicted rows while reporting each model's own raw coverage.
+
+    Each model predicts once on the original holdout. Metric selection never
+    repeats preprocessing on a reduced frame or substitutes common coverage for
+    the candidate's own scored fraction.
+    """
+    artifacts = [candidate] if champion is None else [candidate, champion]
+    outputs = [_holdout_predictions(item, heldout, target_column) for item in artifacts]
+    common = np.logical_and.reduce([_scored_mask(output[2]) for output in outputs])
+    positions = np.flatnonzero(common)
+    if len(positions) < 2:
+        raise ValueError("Comparison requires at least two common predicted holdout rows.")
+    coverage = include_coverage or any("scoring_status" in output[2] for output in outputs)
+    metrics = []
+    for artifact, (features, actual, predicted) in zip(artifacts, outputs, strict=True):
+        raw = _evaluated_metrics(
+            artifact,
+            features,
+            heldout,
+            target_column,
+            actual,
+            predicted,
+            positions=positions,
+            include_coverage=coverage,
+        )
+        metrics.append({f"heldout_{name}": value for name, value in sanitize_metrics(raw).items()})
+    return metrics[0], metrics[1] if champion is not None else None
 
 
 def _evaluated_metrics(
@@ -62,11 +117,18 @@ def _evaluated_metrics(
     target_column: str,
     actual: Any,
     predictions: pd.DataFrame,
+    *,
+    positions: np.ndarray | None = None,
+    include_coverage: bool = False,
 ) -> dict[str, Any]:
     """Evaluate only predicted outcomes and make outlier coverage explicit."""
-    if "scoring_status" not in predictions:
+    coverage = include_coverage or "scoring_status" in predictions
+    if not coverage:
         return _holdout_metrics(artifact, features, heldout, target_column, actual, predictions)
-    positions = np.flatnonzero(predictions["scoring_status"].eq("predicted").to_numpy())
+    own_rows = int(_scored_mask(predictions).sum())
+    comparing = positions is not None
+    if positions is None:
+        positions = np.flatnonzero(_scored_mask(predictions))
     if len(positions) < 2:
         raise ValueError("Outlier-filtered holdout must contain at least two scored rows.")
     metrics = _holdout_metrics(
@@ -80,8 +142,10 @@ def _evaluated_metrics(
     return {
         **metrics,
         "total_rows": len(predictions),
-        "scored_rows": len(positions),
-        "excluded_rows": len(predictions) - len(positions),
+        "scored_rows": own_rows,
+        "excluded_rows": len(predictions) - own_rows,
+        "scored_fraction": own_rows / len(predictions),
+        **({"comparison_rows": len(positions)} if comparing else {}),
     }
 
 

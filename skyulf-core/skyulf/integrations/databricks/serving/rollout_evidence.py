@@ -10,6 +10,7 @@ from ...mlflow.lifecycle.validation import (
     comparison_digest,
     evaluate_quality_gates,
     quality_gate_results,
+    validate_coverage_policy,
     validate_quality_policy,
 )
 from ..observability.monitoring.monitoring_config import MonitorConfig
@@ -142,6 +143,7 @@ def _comparison_verdict(report: Any, state: RolloutState, digest: str) -> tuple[
     if comparison_digest(report) != digest:
         return "HOLD", "Saved comparison digest differs from the requested evidence."
     validate_quality_policy(report.metric, report.quality_threshold, report.quality_gates)
+    validate_coverage_policy(report.min_scored_fraction, report.max_coverage_drop)
     verdict = _gates_verdict(quality_gate_results(report))
     if verdict[0] == "PASS" and report.eligible is not True:
         return "FAIL", "Saved comparison does not admit the candidate improvement."

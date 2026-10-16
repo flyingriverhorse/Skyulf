@@ -70,7 +70,10 @@ def spark_dtype(dtype: str) -> str:
 
 def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tuple, str]:
     """Project component inputs and standard outputs without mixing sibling targets."""
-    from skyulf.inference.pipeline_scoring import prediction_output_schema  # noqa: PLC0415
+    from skyulf.inference.pipeline_scoring import (  # noqa: PLC0415
+        prediction_output_schema,
+        scoring_output_schema,
+    )
 
     manifest = artifact.manifest
     inputs = tuple(
@@ -81,8 +84,10 @@ def _payload_contract(artifact: Any, config: MonitorConfig) -> tuple[tuple, tupl
     outputs = tuple(
         (prefix + c.name, spark_dtype(c.dtype)) for c in prediction_output_schema(artifact)
     )
-    if config.model_set_branch or artifact.pipeline.config.get("project_scoring") is not None:
-        outputs += ((prefix + "scoring_status", "string"),)
+    if config.model_set_branch or any(
+        column.name == "scoring_status" for column in scoring_output_schema(artifact)
+    ):
+        outputs += ((prefix + "scoring_status", "string"), (prefix + "exclusion_reason", "string"))
     return inputs, outputs, prefix
 
 

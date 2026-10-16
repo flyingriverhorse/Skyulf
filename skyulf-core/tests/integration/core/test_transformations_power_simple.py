@@ -19,8 +19,6 @@ from tests.utils.test_case_loader import TestCaseLoader
 from skyulf.preprocessing.transformations.power import (
     PowerTransformerApplier,
     PowerTransformerCalculator,
-    _extract_scaler_params,
-    _filter_power_columns,
 )
 from skyulf.preprocessing.transformations.simple import (
     SimpleTransformationApplier,
@@ -50,13 +48,14 @@ def test_power_transformer_yeo_johnson_matches_sklearn_reference() -> None:
     np.testing.assert_allclose(out["a"].to_numpy(), expected[:, 0], rtol=1e-6, atol=1e-6)
 
 
-def test_power_transformer_box_cox_excludes_non_positive_columns() -> None:
-    """Box-Cox drops columns containing zero/negative values from ``columns``."""
-    df = pd.DataFrame({"pos": [1.0, 2.0, 3.0], "has_zero": [0.0, 1.0, 2.0]})
+def test_power_transformer_box_cox_excludes_non_positive_rows() -> None:
+    """Box-Cox retains selected columns and excludes rows containing invalid values."""
+    df = pd.DataFrame({"pos": np.arange(1.0, 11.0), "has_zero": np.arange(10.0)})
     art = PowerTransformerCalculator().fit(
         df, {"method": "box-cox", "columns": ["pos", "has_zero"]}
     )
-    assert art["columns"] == ["pos"]
+    assert art["columns"] == ["pos", "has_zero"]
+    assert len(PowerTransformerApplier().apply(df, art)) == 9
 
 
 @pytest.mark.parametrize(*_empty_artifact_cases)
@@ -69,8 +68,12 @@ def test_power_transformer_returns_empty_artifact(
     (group ``empty_artifact``).
     """
     df = pd.DataFrame(df_data)
-    art = PowerTransformerCalculator().fit(df, fit_config)
-    assert art == {}
+    if fit_config.get("method") == "box-cox":
+        with pytest.raises(ValueError, match="invalid training rows.*10%"):
+            PowerTransformerCalculator().fit(df, fit_config)
+    else:
+        art = PowerTransformerCalculator().fit(df, fit_config)
+        assert art == {}
 
 
 def test_power_transformer_apply_missing_lambdas_is_noop() -> None:
@@ -142,17 +145,11 @@ def test_power_transformer_infer_output_schema_is_identity() -> None:
     assert out is schema
 
 
-def test_filter_power_columns_empty_input_returns_empty() -> None:
-    """_filter_power_columns must short-circuit on an empty `cols` list directly."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    assert _filter_power_columns(df, [], "yeo-johnson") == []
-
-
-def test_extract_scaler_params_returns_empty_when_no_scaler_present() -> None:
-    """_extract_scaler_params must return {} when the transformer lacks a `_scaler` (line 84)."""
-    transformer = SkPowerTransformer(method="yeo-johnson", standardize=True)
-    # Freshly constructed (unfitted) transformer has no `_scaler` attribute yet.
-    assert _extract_scaler_params(transformer, standardize=True) == {}
+def test_power_explicit_empty_columns_is_noop() -> None:
+    """An intentional empty selection does not reject rows with missing values."""
+    df = pd.DataFrame({"a": [np.nan, -1.0]})
+    state = PowerTransformerCalculator().fit(df, {"columns": []})
+    pd.testing.assert_frame_equal(PowerTransformerApplier().apply(df, state), df)
 
 
 def test_power_transformer_apply_polars_missing_lambdas_is_noop() -> None:

@@ -8,8 +8,8 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer, HashingVectorizer, TfidfVectorizer
 from sklearn.preprocessing import OrdinalEncoder
 
+from ..preprocessing._exclusion import is_exclusion_step
 from ..preprocessing.inference_context import get_inference_capability
-from ..preprocessing.outliers._exclusion import is_outlier_step
 from ..registry import NodeRegistry
 from ._fitted_contract import resolve_fitted_step
 
@@ -123,7 +123,7 @@ def builtin_applier(node: str) -> type | None:
 
 
 def builtin_contract(record: dict, config: dict) -> tuple[Any, dict]:
-    """Require fitted row-local behavior, explicitly preserving outlier exclusion outcomes."""
+    """Require fitted row-local behavior, explicitly preserving row exclusion outcomes."""
     node = record["type"]
     applier = record["applier"]
     expected = builtin_applier(node)
@@ -134,7 +134,7 @@ def builtin_contract(record: dict, config: dict) -> tuple[Any, dict]:
     _check_nested_state(record["artifact"], set())
     state, params, _ = resolve_fitted_step(record, config, require_portable=False)
     capability = get_inference_capability(node, params, state, engine="pandas", applier=applier)
-    row_effects = {"filter", "preserve"} if is_outlier_step(record) else {"preserve"}
+    row_effects = {"filter", "preserve"} if is_exclusion_step(record) else {"preserve"}
     if (
         capability is None
         or capability.context != "row"

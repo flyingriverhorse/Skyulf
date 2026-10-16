@@ -131,8 +131,9 @@ def window_receipts(spark: Any, config: MonitorConfig, start: datetime, end: dat
 def prediction_columns(frame: Any, keys: tuple[str, ...], probabilities: int) -> tuple[str, ...]:
     """Select only raw saved model outputs, excluding unrelated business projections."""
     columns = (*keys, "run_id", "prediction", *(f"probability_{i}" for i in range(probabilities)))
-    if "scoring_status" in frame.columns:
-        columns += ("scoring_status",)
+    columns += tuple(
+        name for name in ("scoring_status", "exclusion_reason") if name in frame.columns
+    )
     return columns
 
 
@@ -253,9 +254,11 @@ def model_predictions(
         & (functions.col("model_set_version") == config.model_set_version)
     )
     outputs = ["prediction", *(f"probability_{i}" for i in range(probabilities))]
-    status = f"{config.model_set_branch}__scoring_status"
-    if status in frame.columns:
-        outputs.append("scoring_status")
+    outputs.extend(
+        name
+        for name in ("scoring_status", "exclusion_reason")
+        if f"{config.model_set_branch}__{name}" in frame.columns
+    )
     return frame.select(
         *keys,
         "run_id",

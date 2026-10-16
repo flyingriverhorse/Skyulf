@@ -495,6 +495,40 @@ def _validate_saved_predictions(scored: dict[tuple, dict], task: str, classes: t
             raise ValueError("Saved prediction does not match the model output contract.")
 
 
+def exclusion_metrics(total: int, excluded: int, invalid: int | None) -> list[dict]:
+    """Report ratios (0..1) over all saved outcomes, independent of available labels.
+
+    Invalid exclusions are a data-quality issue; ordinary eligibility exclusions
+    remain measured without implying bad input. Legacy missing reasons and empty
+    populations cannot establish an invalid-exclusion rate.
+    """
+    return [
+        monitoring_metric(
+            "quality", "prediction", "exclusion_rate", excluded / total if total else None
+        ),
+        monitoring_metric(
+            "quality",
+            "prediction",
+            "invalid_exclusion_rate",
+            invalid / total if total and invalid is not None else None,
+            threshold=0.0,
+            issue=bool(invalid),
+        ),
+    ]
+
+
+def _invalid_exclusions(prediction_rows: dict[tuple, dict]) -> int | None:
+    """Avoid reporting zero invalid inputs when historical excluded rows lack reasons."""
+    reasons = [
+        row.get("exclusion_reason")
+        for row in prediction_rows.values()
+        if row.get("scoring_status") == "excluded"
+    ]
+    if any(not isinstance(reason, str) for reason in reasons):
+        return None
+    return sum(isinstance(reason, str) and reason.startswith("invalid:") for reason in reasons)
+
+
 def _feature_report(
     reference: pl.DataFrame,
     current: pl.DataFrame,
@@ -589,6 +623,9 @@ def build_monitoring_report(
         task, classes, target_column, scored, eligible, probabilities
     )
     metrics.extend(performance)
+    metrics.extend(
+        exclusion_metrics(len(prediction_rows), excluded, _invalid_exclusions(prediction_rows))
+    )
     notes.extend(performance_notes)
     if labels is None:
         notes.append("No labels were provided; performance is unavailable.")

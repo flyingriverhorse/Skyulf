@@ -76,6 +76,23 @@ def _widgets(page: dict) -> list[dict]:
     return [item["widget"] for item in page["layout"]]
 
 
+def test_quality_table_displays_total_and_invalid_exclusions_as_percentages():
+    """Generic quality evidence must not disappear behind the dashboard's fixed pivot."""
+    dashboard = _dashboard()
+    dataset = next(d for d in dashboard["datasets"] if d["name"] == "quality_history")
+    sql = "".join(dataset["queryLines"])
+    table = next(
+        w for p in dashboard["pages"] for w in _widgets(p) if w["name"] == "quality_metrics"
+    )
+    fields = {f["name"] for f in table["queries"][0]["query"]["fields"]}
+    columns = {c["fieldName"]: c for c in table["spec"]["encodings"]["columns"]}
+    for name in ("exclusion_rate", "invalid_exclusion_rate"):
+        assert f"MAX(CASE WHEN metric_name = '{name}' THEN value END) AS {name}" in sql
+        assert name in fields
+        assert columns[name]["format"]["type"] == "number-percent"
+        assert columns[name]["displayName"].endswith("(%)")
+
+
 def test_shared_defaults_never_filter_visual_rows_by_an_all_sentinel() -> None:
     """Inherited scalar defaults must not become equality filters on portfolio rows."""
     dashboard = _dashboard()

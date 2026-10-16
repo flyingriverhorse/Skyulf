@@ -43,6 +43,8 @@ rollout:
     model_name: ""
     metric: {{if eq .task "classification"}}heldout_accuracy{{else}}heldout_rmse{{end}}
     min_improvement: 0.0
+    min_scored_fraction: {{.min_scored_fraction}}
+    max_coverage_drop: {{.max_coverage_drop}}
     quality_threshold: null
     quality_gates: null
     max_rows: 10000

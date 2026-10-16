@@ -174,6 +174,8 @@
         "MAX(CASE WHEN metric_name = 'schema_missing' THEN value END) AS schema_missing,\n",
         "MAX(CASE WHEN metric_name = 'missing_fraction' THEN value END) AS missing_fraction,\n",
         "MAX(CASE WHEN metric_name = 'nonfinite_fraction' THEN value END) AS nonfinite_fraction,\n",
+        "MAX(CASE WHEN metric_name = 'exclusion_rate' THEN value END) AS exclusion_rate,\n",
+        "MAX(CASE WHEN metric_name = 'invalid_exclusion_rate' THEN value END) AS invalid_exclusion_rate,\n",
         "concat_ws(', ', sort_array(collect_set(CASE WHEN status = 'unavailable' THEN metric_name END))) AS unavailable_metrics,\n",
         "concat_ws(', ', sort_array(collect_set(CASE WHEN has_issue THEN metric_name END))) AS flagged_metrics\n",
         "FROM metric_history WHERE category = 'quality'\n",
@@ -7554,6 +7556,14 @@
                       "expression": "`nonfinite_fraction`"
                     },
                     {
+                      "name": "exclusion_rate",
+                      "expression": "`exclusion_rate`"
+                    },
+                    {
+                      "name": "invalid_exclusion_rate",
+                      "expression": "`invalid_exclusion_rate`"
+                    },
+                    {
                       "name": "quality_status",
                       "expression": "`quality_status`"
                     },
@@ -7605,6 +7615,28 @@
                   {
                     "fieldName": "nonfinite_fraction",
                     "displayName": "Nonfinite values (%)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "exclusion_rate",
+                    "displayName": "Excluded predictions (%)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "invalid_exclusion_rate",
+                    "displayName": "Invalid input exclusions (%)",
                     "format": {
                       "type": "number-percent",
                       "decimalPlaces": {

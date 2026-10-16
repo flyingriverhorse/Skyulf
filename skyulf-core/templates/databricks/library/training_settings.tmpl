@@ -61,6 +61,9 @@
 {{$i}}max_input_mb: {{index $v (print $p "max_input_mb")}}
 {{$i}}metric: {{index $v (print $p $task "_metric")}}
 {{$i}}min_improvement: {{index $v (print $p "min_improvement")}}
+{{$i}}# Candidate coverage and allowed loss versus champion; null disables either gate.
+{{$i}}min_scored_fraction: {{index $v (print $p "min_scored_fraction")}}
+{{$i}}max_coverage_drop: {{index $v (print $p "max_coverage_drop")}} # 0.05 = five percentage points.
 {{if ne (index $v (print $p "quality_threshold")) "null"}}{{$i}}quality_threshold: {{index $v (print $p "quality_threshold")}}
 {{end -}}
 {{if and $p (ne (index $v (print $p "quality_gates")) "null")}}{{$i}}quality_gates: {{index $v (print $p "quality_gates")}}

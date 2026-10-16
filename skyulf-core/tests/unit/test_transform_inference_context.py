@@ -71,7 +71,11 @@ def test_power_contract_inspection_does_not_execute(node, engine, monkeypatch):
     monkeypatch.setattr(SkPowerTransformer, "fit", forbidden)
     assert applier.validate_inference_state(state) is state
     assert get_inference_capability(node, {}, state, engine=engine) == ExecutionCapability(
-        engine, "apply", "local", "preserve", "row" if node == "PowerTransformer" else "global"
+        engine,
+        "apply",
+        "local",
+        "filter" if node == "PowerTransformer" else "preserve",
+        "row" if node == "PowerTransformer" else "global",
     )
     assert get_inference_capability(node, {}, state, engine="spark") is None
     assert artifact_digest(state) == before

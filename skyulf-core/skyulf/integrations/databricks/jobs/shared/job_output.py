@@ -4,7 +4,7 @@ import json
 from html import escape
 from typing import Any
 
-from ....mlflow.lifecycle.validation import evaluate_quality_gates
+from ....mlflow.lifecycle.validation import coverage_drop_result, evaluate_quality_gates
 
 
 def _text(value: Any) -> str:
@@ -59,7 +59,13 @@ def _comparison_summary(candidate: dict[str, Any]) -> list[str]:
         comparison["metric"],
         comparison.get("quality_threshold"),
         comparison.get("quality_gates"),
+        min_scored_fraction=comparison.get("min_scored_fraction", 0.90),
     )
+    drop = coverage_drop_result(
+        challenger, champion or None, comparison.get("max_coverage_drop", 0.05)
+    )
+    if drop is not None:
+        gates.append(drop)
     if gates:
         labels = {
             "passed": "Passed",

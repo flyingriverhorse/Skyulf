@@ -84,6 +84,9 @@ def test_builtin_saved_state_partition_checks(node, builtin_recipes):
     )
     checks = {item["name"]: item["status"] for item in detail["checks"]}
     assert checks == dict.fromkeys(REQUIRED_CHECKS, "passed"), detail
+    if node == "PowerTransformer":
+        assert detail["action"] == "exclude_invalid"
+        assert detail["row_effect"] == "filter"
 
 
 @pytest.mark.parametrize("node", sorted(_INELIGIBLE_NODES))

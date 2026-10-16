@@ -47,6 +47,9 @@ models:
     max_input_mb: 64
     metric: heldout_rmse
     min_improvement: 0
+    # Candidate coverage and allowed loss versus champion; null disables either gate.
+    min_scored_fraction: 0.90
+    max_coverage_drop: 0.05 # 0.05 = five percentage points.
     quality_threshold: 100.0
 
     model:
@@ -86,6 +89,9 @@ models:
     max_input_mb: 64
     metric: heldout_rmse
     min_improvement: 0
+    # Candidate coverage and allowed loss versus champion; null disables either gate.
+    min_scored_fraction: 0.90
+    max_coverage_drop: 0.05 # 0.05 = five percentage points.
     quality_threshold: 180.0
 
     model:

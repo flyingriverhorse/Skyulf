@@ -254,8 +254,8 @@ def test_holdout_rejects_insufficient_survivors_before_observer(tmp_path):
     assert observed == []
 
 
-def test_comparison_rejects_different_masks_even_with_equal_counts(tmp_path):
-    """Equal coverage counts must not conceal candidate and champion scoring different rows."""
+def test_comparison_uses_common_rows_with_equal_but_different_masks(tmp_path):
+    """Equal own counts must not conceal the smaller shared evaluation population."""
     pytest.importorskip("mlflow")
     from skyulf.integrations.mlflow.lifecycle.validation import _comparison_metrics
 
@@ -266,8 +266,10 @@ def test_comparison_rejects_different_masks_even_with_equal_counts(tmp_path):
         tmp_path / "champion", "pandas", ("ManualBounds", {"bounds": {"x": {"upper": 2.0}}})
     )
     heldout = pd.DataFrame({"x": [-100.0, -1.0, 1.0, 100.0], "target": [0, 0, 1, 1]})
-    with pytest.raises(ValueError, match="same.*rows|different.*rows"):
-        _comparison_metrics(candidate, champion, heldout, "target")
+    left, right = _comparison_metrics(candidate, champion, heldout, "target")
+    assert right is not None
+    assert left["heldout_comparison_rows"] == right["heldout_comparison_rows"] == 2
+    assert left["heldout_scored_rows"] == right["heldout_scored_rows"] == 3
     equal, repeated = _comparison_metrics(candidate, candidate, heldout, "target")
     assert equal == repeated
     assert equal["heldout_scored_rows"] == 3

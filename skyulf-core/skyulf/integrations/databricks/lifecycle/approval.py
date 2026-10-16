@@ -30,7 +30,11 @@ from ...mlflow.lifecycle.promotion import (
     verify_staged_challenger,
 )
 from ...mlflow.lifecycle.rejection import reject_candidate
-from ...mlflow.lifecycle.validation import ModelComparisonReport, validate_quality_policy
+from ...mlflow.lifecycle.validation import (
+    ModelComparisonReport,
+    validate_coverage_policy,
+    validate_quality_policy,
+)
 from ...mlflow.registration.registry import resolve_model
 from ..shared._contracts import input_budget_bytes
 from ..training.fitting import candidate
@@ -359,12 +363,17 @@ def _validate_approval_policy(
     validate_quality_policy(
         config.get("metric", ""), config.get("quality_threshold"), config.get("quality_gates")
     )
+    validate_coverage_policy(
+        config.get("min_scored_fraction", 0.90), config.get("max_coverage_drop", 0.05)
+    )
     if (
         any(
             config.get(field) != getattr(report, field)
             for field in ("metric", "min_improvement", "quality_threshold")
         )
         or (config.get("quality_gates") or None) != report.quality_gates
+        or config.get("min_scored_fraction", 0.90) != report.min_scored_fraction
+        or config.get("max_coverage_drop", 0.05) != report.max_coverage_drop
         or report.quality_threshold is None
     ):
         raise ValueError("Approval policy must match the saved, absolute-quality-gated comparison.")

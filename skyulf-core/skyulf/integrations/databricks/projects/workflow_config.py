@@ -10,7 +10,7 @@ from typing import Any
 from ....config_validation import validate_pipeline_config
 from ....modeling.base import BaseModelCalculator
 from ....registry import NodeRegistry
-from ...mlflow.lifecycle.validation import validate_quality_policy
+from ...mlflow.lifecycle.validation import validate_coverage_policy, validate_quality_policy
 from ..data.training.training_dates import training_date_spec
 from ..lifecycle.workflow import (
     probed_admission,
@@ -92,6 +92,8 @@ WORKFLOW_FIELDS = {
     "min_improvement",
     "quality_threshold",
     "quality_gates",
+    "min_scored_fraction",
+    "max_coverage_drop",
     "pipeline",
     "tracking_uri",
     "registry_uri",
@@ -265,6 +267,9 @@ def _validate_workflow_quality(config: dict[str, Any], task: str, policy: str) -
         config.get("quality_threshold"),
         config.get("quality_gates"),
         task=task,
+    )
+    validate_coverage_policy(
+        config.get("min_scored_fraction", 0.90), config.get("max_coverage_drop", 0.05)
     )
     if _finite(config.get("min_improvement"), "min_improvement") < 0:
         raise ValueError("min_improvement must be nonnegative.")
@@ -496,6 +501,8 @@ def _preview_model_and_scoring(checked: dict[str, Any], cv: CVSpec) -> list[str]
         f"Promotion: {checked['promotion_policy']} | Metric: {checked['metric']} | "
         f"Threshold: {checked.get('quality_threshold')} | "
         f"Minimum improvement (absolute): {checked['min_improvement']}",
+        f"Minimum scored fraction: {checked.get('min_scored_fraction', 0.90)}",
+        f"Maximum coverage drop (fraction): {checked.get('max_coverage_drop', 0.05)}",
         f"Additional quality gates: {json.dumps(checked.get('quality_gates') or {}, sort_keys=True)}",
         f"Scoring source: {checked['score_source_table']}",
         f"Score model: {checked['model_name']} | {checked['score_model_selection']} | "

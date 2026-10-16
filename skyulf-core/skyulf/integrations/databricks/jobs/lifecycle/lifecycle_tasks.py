@@ -100,6 +100,8 @@ def _prepare_training_request(
         champion_version=champion,
         quality_threshold=config.get("quality_threshold"),
         quality_gates=config.get("quality_gates"),
+        min_scored_fraction=config.get("min_scored_fraction", 0.90),
+        max_coverage_drop=config.get("max_coverage_drop", 0.05),
         risk_category=config.get("risk_category"),
     )
     request.update(
@@ -551,6 +553,8 @@ def _compare(spark: Any, store: PhaseStore) -> dict[str, Any]:
         min_improvement=config["min_improvement"],
         quality_threshold=config.get("quality_threshold"),
         quality_gates=config.get("quality_gates"),
+        min_scored_fraction=config.get("min_scored_fraction", 0.90),
+        max_coverage_drop=config.get("max_coverage_drop", 0.05),
         tracking_uri=config["tracking_uri"],
         registry_uri=config.get("registry_uri", "databricks-uc"),
         engine=config["engine"],

@@ -48,6 +48,8 @@ class TrainingBranch:
     champion_version: str | None = None
     quality_threshold: float | None = None
     quality_gates: dict[str, float] | None = None
+    min_scored_fraction: float | None = 0.90
+    max_coverage_drop: float | None = 0.05
     risk_category: str | None = None
     cv: CVSpec = CVSpec()
     tracking_uri: str | None = None
@@ -141,6 +143,8 @@ def _validate_branch(branch: TrainingBranch) -> None:
         champion_version=branch.champion_version,
         quality_threshold=branch.quality_threshold,
         quality_gates=branch.quality_gates,
+        min_scored_fraction=branch.min_scored_fraction,
+        max_coverage_drop=branch.max_coverage_drop,
         risk_category=branch.risk_category,
     )
     validate_cv_holdout_policy(branch.spec, branch.cv)
@@ -178,6 +182,8 @@ def _from_config(name: str, config: dict[str, Any], now: datetime) -> TrainingBr
         champion_version=config.get("champion_version"),
         quality_threshold=config.get("quality_threshold"),
         quality_gates=config.get("quality_gates"),
+        min_scored_fraction=config.get("min_scored_fraction", 0.90),
+        max_coverage_drop=config.get("max_coverage_drop", 0.05),
         risk_category=config.get("risk_category"),
         cv=CVSpec.from_workflow(config),
         tracking_uri=config["tracking_uri"],
@@ -432,6 +438,8 @@ def train_branch(
         champion_version=branch.champion_version,
         quality_threshold=branch.quality_threshold,
         quality_gates=branch.quality_gates,
+        min_scored_fraction=branch.min_scored_fraction,
+        max_coverage_drop=branch.max_coverage_drop,
         risk_category=branch.risk_category,
         cv=branch.cv,
         evaluation_charts=evaluation_charts,

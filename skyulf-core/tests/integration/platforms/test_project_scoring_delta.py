@@ -8,6 +8,7 @@ an isolated catalog.schema.table_prefix before importing this module.
 import json
 import os
 import re
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 from types import SimpleNamespace
@@ -221,6 +222,56 @@ def _increment(case):
     return run_incremental_batch(
         case.spark, case.prepared, record_key_columns=(case.key,), admission=case.admission
     )
+
+
+@pytest.mark.parametrize("period", [False, True], ids=["incremental", "period"])
+def test_retrained_exclusion_schema_requires_new_or_migrated_target(
+    make_scoring_delta_case, tmp_path, period
+):
+    """Gaining outcome columns must fail before changing Delta data or its commit receipt."""
+    case = make_scoring_delta_case("pandas", period=period, policy=False)
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "bounds",
+                    "transformer": "ManualBounds",
+                    "params": {"bounds": {"x": {"lower": 0}}},
+                }
+            ],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    train = pd.DataFrame(
+        {"x": np.arange(20, dtype=float), "target": 2 * np.arange(20, dtype=float)}
+    )
+    pipeline.fit(SplitDataset(train=train, test=train.iloc[:0]), target_column="target")
+    destination = tmp_path / "retrained"
+    save_pipeline(pipeline, destination)
+    artifact = load_pipeline(destination)
+    assert [column.name for column in scoring_output_schema(artifact)] == [
+        "prediction",
+        "scoring_status",
+        "exclusion_reason",
+    ]
+    case.prepared = replace(
+        case.prepared,
+        artifact=artifact,
+        preflight=replace(
+            case.prepared.preflight,
+            model_digest=artifact.manifest.pipeline_sha256,
+            output_schema=scoring_output_schema(artifact),
+        ),
+    )
+    before = _latest(case.spark, case.target)
+    with pytest.raises(ValueError, match="schema|columns"):
+        if period:
+            source, request = _period_request(case)
+            run_frame_batch(case.spark, source, case.prepared, request, admission=case.admission)
+        else:
+            _increment(case)
+    assert _latest(case.spark, case.target) == before
+    assert case.spark.table(case.target).count() == 0
 
 
 def _assert_initial_rows(case):

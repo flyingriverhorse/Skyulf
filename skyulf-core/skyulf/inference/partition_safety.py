@@ -21,6 +21,7 @@ from ..modeling.classification import LogisticRegressionApplier
 from ..modeling.regression import LinearRegressionApplier
 from ..pipeline import SkyulfPipeline
 from ..pipeline.seal import artifact_digest
+from ..preprocessing._exclusion import exclusion_action, is_exclusion_step
 from ..preprocessing.drop_and_missing.deduplicate import DeduplicateApplier
 from ..preprocessing.drop_and_missing.drop_rows import DropMissingRowsApplier
 from ..preprocessing.function_steps import (
@@ -31,7 +32,6 @@ from ..preprocessing.function_steps import (
     RowFilterFunctionApplier,
 )
 from ..preprocessing.imputation.simple import SimpleImputerApplier, SimpleImputerCalculator
-from ..preprocessing.outliers._exclusion import is_outlier_step
 from ..preprocessing.pipeline import FeatureEngineer
 from ..preprocessing.scaling.standard import StandardScalerApplier, StandardScalerCalculator
 from ..registry import NodeRegistry
@@ -298,7 +298,7 @@ def _inspect_builtin_step(
     return PartitionStepEvidence(
         record["name"],
         record["type"],
-        "exclude_outliers" if is_outlier_step(record) else "apply_probed_builtin",
+        exclusion_action(record) if is_exclusion_step(record) else "apply_probed_builtin",
         json.dumps(_pack(params), sort_keys=True),
         artifact_digest(state).hex(),
     )

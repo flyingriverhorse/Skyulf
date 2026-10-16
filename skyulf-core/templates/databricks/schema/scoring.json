@@ -159,6 +159,22 @@
     "description": "4. Lifecycle | Minimum metric improvement required for manual or automatic promotion; ties never pass",
     "skip_prompt_if": {}
   },
+  "min_scored_fraction": {
+    "order": 755,
+    "type": "string",
+    "default": "0.90",
+    "description": "4. Lifecycle | Minimum fraction of holdout rows the candidate must score (0 to 1); null disables this coverage gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
+  "max_coverage_drop": {
+    "order": 756,
+    "type": "string",
+    "default": "0.05",
+    "description": "4. Lifecycle | Maximum scored-fraction loss versus champion (0 to 1); 0.05 means five percentage points; null disables this gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
   "quality_threshold": {
     "order": 731,
     "type": "string",

@@ -666,6 +666,8 @@ def _run_training_action(
             champion_version=champion_version,
             quality_threshold=config.get("quality_threshold"),
             quality_gates=config.get("quality_gates"),
+            min_scored_fraction=config.get("min_scored_fraction", 0.90),
+            max_coverage_drop=config.get("max_coverage_drop", 0.05),
             on_registered=lifecycle.registered,
             risk_category=config.get("risk_category"),
             cv=cv,

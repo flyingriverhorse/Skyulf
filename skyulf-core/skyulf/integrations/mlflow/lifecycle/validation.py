@@ -11,7 +11,7 @@ import pandas as pd
 import polars as pl
 
 from ....inference.fitted_pipeline import ArtifactRuntimeMismatchError, FittedPipelineArtifact
-from ....inference.pipeline_evaluation import evaluate_holdout
+from ....inference.pipeline_evaluation import evaluate_holdout_comparison
 from ..registration.registry import (
     ResolvedModel,
     load_registered_pipeline,
@@ -81,6 +81,8 @@ class ModelComparisonReport:
     holdout_reference: dict[str, Any] | None = None
     # Set only when the current Core release cannot load the champion's pinned runtime.
     champion_unavailable: str | None = None
+    min_scored_fraction: float | None = 0.90
+    max_coverage_drop: float | None = 0.05
 
 
 def _validate_threshold(metric: str, value: float, field: str) -> None:
@@ -89,7 +91,7 @@ def _validate_threshold(metric: str, value: float, field: str) -> None:
         raise ValueError(f"{field} must be a finite number.")
     if metric in _MINIMIZE and value < 0:
         raise ValueError(f"{field} must be nonnegative for error/loss metrics.")
-    if metric in _CLASSIFICATION - {"heldout_log_loss"}:
+    if metric in (_CLASSIFICATION - {"heldout_log_loss"}) | {"heldout_scored_fraction"}:
         lower = -1 if metric == "heldout_matthews_corrcoef" else 0
         if not lower <= value <= 1:
             raise ValueError(f"{field} for {metric} must be between {lower} and 1.")
@@ -114,7 +116,21 @@ def validate_quality_policy(
         raise ValueError("metric must be a supported heldout metric compatible with the task.")
     if quality_threshold is not None:
         _validate_threshold(metric, quality_threshold, "quality_threshold")
-    _validate_additional_gates(quality_gates, metric, supported)
+    _validate_additional_gates(quality_gates, metric, supported | {"heldout_scored_fraction"})
+
+
+def validate_coverage_policy(
+    min_scored_fraction: float | None = 0.90, max_coverage_drop: float | None = 0.05
+) -> None:
+    """Accept disabled coverage rules or finite fractions without boolean coercion."""
+    for name, value in (
+        ("min_scored_fraction", min_scored_fraction),
+        ("max_coverage_drop", max_coverage_drop),
+    ):
+        if value is not None and (
+            type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1
+        ):
+            raise ValueError(f"{name} must be null or a finite number between 0 and 1.")
 
 
 def evaluate_quality_gates(
@@ -122,10 +138,17 @@ def evaluate_quality_gates(
     metric: str,
     quality_threshold: float | None,
     quality_gates: dict[str, float] | None = None,
+    *,
+    min_scored_fraction: float | None = 0.90,
 ) -> list[dict[str, Any]]:
     """Explain every absolute gate, including unavailable probability/class metrics."""
     thresholds = {} if quality_threshold is None else {metric: quality_threshold}
     thresholds.update(sorted((quality_gates or {}).items()))
+    validate_coverage_policy(min_scored_fraction)
+    if min_scored_fraction is not None and "heldout_scored_fraction" in metrics:
+        thresholds["heldout_scored_fraction"] = max(
+            min_scored_fraction, thresholds.get("heldout_scored_fraction", 0.0)
+        )
     results = []
     for name, threshold in thresholds.items():
         value, direction, available, passed = _quality_gate_outcome(metrics, name, threshold)
@@ -148,9 +171,37 @@ def evaluate_quality_gates(
 
 def quality_gate_results(report: ModelComparisonReport) -> list[dict[str, Any]]:
     """Derive gate evidence from the saved policy and observed candidate metrics."""
-    return evaluate_quality_gates(
-        report.candidate_metrics, report.metric, report.quality_threshold, report.quality_gates
+    results = evaluate_quality_gates(
+        report.candidate_metrics,
+        report.metric,
+        report.quality_threshold,
+        report.quality_gates,
+        min_scored_fraction=report.min_scored_fraction,
     )
+    drop = coverage_drop_result(
+        report.candidate_metrics, report.champion_metrics, report.max_coverage_drop
+    )
+    return results if drop is None else [*results, drop]
+
+
+def coverage_drop_result(
+    candidate: dict[str, float], champion: dict[str, float] | None, maximum: float | None
+) -> dict[str, Any] | None:
+    """Compare own scored counts on the same denominator, avoiding fraction subtraction."""
+    validate_coverage_policy(max_coverage_drop=maximum)
+    if maximum is None or champion is None or "heldout_scored_fraction" not in candidate:
+        return None
+    drop = (champion["heldout_scored_rows"] - candidate["heldout_scored_rows"]) / candidate[
+        "heldout_total_rows"
+    ]
+    return {
+        "metric": "heldout_coverage_drop",
+        "direction": "minimize",
+        "threshold": maximum,
+        "value": drop,
+        "passed": drop <= maximum,
+        "reason": "passed" if drop <= maximum else "threshold_not_met",
+    }
 
 
 def quality_gates_pass(report: ModelComparisonReport) -> bool:
@@ -167,6 +218,11 @@ def comparison_payload(report: ModelComparisonReport) -> dict[str, Any]:
         payload.pop("holdout_reference")
     if report.champion_unavailable is None:
         payload.pop("champion_unavailable")
+    if "heldout_scored_fraction" not in report.candidate_metrics:
+        if report.max_coverage_drop == 0.05:
+            payload.pop("max_coverage_drop")
+        if report.min_scored_fraction == 0.90:
+            payload.pop("min_scored_fraction")
     return payload
 
 
@@ -296,29 +352,13 @@ def _comparison_metrics(
     champion: FittedPipelineArtifact | None,
     heldout: pd.DataFrame | pl.DataFrame,
     target_column: str,
+    *,
+    include_coverage: bool = False,
 ) -> tuple[dict[str, float], dict[str, float] | None]:
     """Evaluate the same labeled rows with both saved pipelines, without fitting."""
-    masks: list[tuple[bool, ...]] = []
-
-    def capture_rows(actual: Any, predictions: pd.DataFrame) -> None:
-        """Record positional coverage without altering the evaluated labels or outputs."""
-        masks.append(
-            tuple(predictions["scoring_status"].eq("predicted"))
-            if "scoring_status" in predictions
-            else (True,) * len(actual)
-        )
-
-    candidate_metrics = evaluate_holdout(
-        candidate, heldout, target_column=target_column, on_predictions=capture_rows
+    return evaluate_holdout_comparison(
+        candidate, champion, heldout, target_column=target_column, include_coverage=include_coverage
     )
-    if champion is None:
-        return candidate_metrics, None
-    champion_metrics = evaluate_holdout(
-        champion, heldout, target_column=target_column, on_predictions=capture_rows
-    )
-    if masks[0] != masks[1]:
-        raise ValueError("Candidate and champion must score the same heldout rows.")
-    return candidate_metrics, champion_metrics
 
 
 def _selected_metric(metrics: dict[str, float], metric: str) -> float:
@@ -347,14 +387,17 @@ def _comparison_decision(
     quality_passed: bool,
     min_improvement: float,
     champion_unavailable: str | None = None,
+    coverage: dict[str, Any] | None = None,
 ) -> tuple[bool, str]:
     """Explain promotion eligibility while preserving explicit first-champion approval."""
     if champion_unavailable is not None:
         return False, "champion_runtime_unavailable"
-    if improvement is None:
-        return False, "no_champion"
+    if coverage is not None and not coverage["passed"]:
+        return False, "coverage_drop_exceeded"
     if not quality_passed:
         return False, "quality_gate_failed"
+    if improvement is None:
+        return False, "no_champion"
     if improvement > 0 and improvement >= min_improvement:
         return True, "candidate_improved"
     return False, "insufficient_improvement"
@@ -373,6 +416,8 @@ def compare_registered_pipeline_models(
     max_bytes: int,
     quality_threshold: float | None = None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
 ) -> ModelComparisonReport:
@@ -383,6 +428,7 @@ def compare_registered_pipeline_models(
     A tie cannot pass even when min_improvement is zero. Without a champion,
     the first candidate is measured but never promoted implicitly.
     """
+    validate_coverage_policy(min_scored_fraction, max_coverage_drop)
     _validate_request(
         candidate,
         champion,
@@ -406,17 +452,26 @@ def compare_registered_pipeline_models(
     validate_quality_policy(metric, quality_threshold, quality_gates, task=task)
     _validate_artifact_pair(candidate_artifact, champion_artifact)
     candidate_metrics, champion_metrics = _comparison_metrics(
-        candidate_artifact, champion_artifact, heldout, target_column
+        candidate_artifact,
+        champion_artifact,
+        heldout,
+        target_column,
+        include_coverage="heldout_scored_fraction" in (quality_gates or {}),
     )
     improvement = _metric_improvement(candidate_metrics, champion_metrics, metric)
     quality_passed = all(
         gate["passed"]
         for gate in evaluate_quality_gates(
-            candidate_metrics, metric, quality_threshold, quality_gates
+            candidate_metrics,
+            metric,
+            quality_threshold,
+            quality_gates,
+            min_scored_fraction=min_scored_fraction,
         )
     )
+    coverage = coverage_drop_result(candidate_metrics, champion_metrics, max_coverage_drop)
     eligible, reason = _comparison_decision(
-        improvement, quality_passed, min_improvement, champion_unavailable
+        improvement, quality_passed, min_improvement, champion_unavailable, coverage
     )
     return ModelComparisonReport(
         dataset_id=dataset_id,
@@ -438,6 +493,8 @@ def compare_registered_pipeline_models(
         reason=reason,
         quality_gates=dict(quality_gates) if quality_gates else None,
         champion_unavailable=champion_unavailable,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
     )
 
 

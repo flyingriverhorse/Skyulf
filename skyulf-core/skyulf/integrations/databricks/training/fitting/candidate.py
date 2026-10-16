@@ -37,6 +37,7 @@ from ....mlflow.lifecycle.validation import (
     comparison_digest,
     comparison_payload,
     quality_gate_results,
+    validate_coverage_policy,
     validate_quality_policy,
 )
 from ....mlflow.registration.registry import ResolvedModel, register_model, resolve_model
@@ -892,6 +893,8 @@ def candidate_config(
     champion_version: str | None,
     quality_threshold: float | None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     risk_category: str | None,
 ) -> dict[str, Any]:
     """Validate one training request and derive its effective preprocessing recipe."""
@@ -947,6 +950,7 @@ def candidate_config(
     ):
         raise ValueError("stratify requires a classification model.")
     _validate_candidate_metadata(risk_category, min_improvement)
+    validate_coverage_policy(min_scored_fraction, max_coverage_drop)
     validate_quality_policy(
         metric,
         quality_threshold,
@@ -1284,6 +1288,8 @@ def compare_candidate(
     min_improvement: float,
     quality_threshold: float | None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     tracking_uri: str,
     registry_uri: str,
     engine: str,
@@ -1304,6 +1310,8 @@ def compare_candidate(
         max_bytes=spec.max_bytes,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
@@ -1368,6 +1376,8 @@ def train_candidate(
     champion_version: str | None = None,
     quality_threshold: float | None = None,
     quality_gates: dict[str, float] | None = None,
+    min_scored_fraction: float | None = 0.90,
+    max_coverage_drop: float | None = 0.05,
     on_registered: Callable[[ResolvedModel], None] | None = None,
     risk_category: str | None = None,
     cv: CVSpec | None = None,
@@ -1392,6 +1402,8 @@ def train_candidate(
         champion_version=champion_version,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         risk_category=risk_category,
     )
     champion = (
@@ -1473,6 +1485,8 @@ def train_candidate(
         min_improvement=min_improvement,
         quality_threshold=quality_threshold,
         quality_gates=quality_gates,
+        min_scored_fraction=min_scored_fraction,
+        max_coverage_drop=max_coverage_drop,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
         engine=engine,

@@ -475,3 +475,12 @@ def test_operator_actions_accept_the_unloaded_yaml_model_declaration(
     assert validate_workflow_config(workflow_config, action=action) == workflow_config
     with pytest.raises(ValueError):
         validate_workflow_config(workflow_config, action="train")
+
+
+@pytest.mark.parametrize("value", [-0.1, 1.1, True, float("nan"), "0.05"])
+def test_workflow_rejects_invalid_coverage_drop_before_external_work(workflow_config, value):
+    """A malformed per-model coverage margin must fail in offline configuration checks."""
+    from skyulf.integrations.databricks.projects.workflow_config import validate_workflow_config
+
+    with pytest.raises(ValueError, match="max_coverage_drop"):
+        validate_workflow_config({**workflow_config, "max_coverage_drop": value}, action="train")

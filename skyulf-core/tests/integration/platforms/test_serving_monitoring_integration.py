@@ -40,7 +40,7 @@ def artifact():
             classification_probabilities=False,
             pipeline_sha256="a" * 64,
         ),
-        pipeline=SimpleNamespace(config={}),
+        pipeline=SimpleNamespace(config={}, feature_engineer=SimpleNamespace(fitted_steps=[])),
     )
 
 
@@ -81,10 +81,25 @@ def test_serving_reads_late_arrivals_at_cutoff_and_attributes_parent_version(mon
     assert kwargs["output_columns"] == (
         ("risk__prediction", "double"),
         ("risk__scoring_status", "string"),
+        ("risk__exclusion_reason", "string"),
     )
     assert result[:2] == (current, predictions)
     assert result[2]["prediction_version"] == 7
     assert result[2]["window_basis"] == "serving_request_timestamp"
+
+
+def test_serving_preprocessing_exclusions_keep_nullable_outcome_contract(tmp_path):
+    """An outlier-only model needs status and reason even without project scoring rules."""
+    from tests.integration.platforms.test_outlier_scoring import RECIPES, _artifact
+
+    from skyulf.integrations.databricks.observability.monitoring.serving.serving_observation import (
+        _payload_contract,
+    )
+
+    saved = _artifact(tmp_path, "pandas", RECIPES[-1])
+    _, outputs, prefix = _payload_contract(saved, config())
+    assert prefix == ""
+    assert outputs[-2:] == (("scoring_status", "string"), ("exclusion_reason", "string"))
 
 
 def test_serving_performance_contract_separates_endpoints_and_parent_versions():

@@ -16,7 +16,7 @@ from ..preprocessing.time_series.history import (
 from ._manifest import ColumnSpec, label_dtype
 from .fitted_pipeline import (
     FittedPipelineArtifact,
-    has_outlier_steps,
+    has_exclusion_steps,
     predict_pipeline,
     validate_pipeline_input,
 )
@@ -81,7 +81,7 @@ def scoring_output_schema(artifact: FittedPipelineArtifact) -> tuple[ColumnSpec,
     """Include declared rules and explicit row outcomes only for opted-in models."""
     columns = prediction_output_schema(artifact)
     config = artifact.pipeline.config.get("project_scoring")
-    if config is None and not has_outlier_steps(artifact):
+    if config is None and not has_exclusion_steps(artifact):
         return columns
     additions = (
         *(scoring_output_columns(config) if config is not None else ()),

@@ -15,7 +15,7 @@ from ._manifest import ColumnSpec
 from ._partition_models import CONTRACTS, class_name, model_contract
 from ._probe_frames import Frame, ProbeFailure, assert_same, copy_frame, validate_frame
 from ._probe_strategies import run_check
-from .fitted_pipeline import FittedPipelineArtifact, has_outlier_steps, predict_pipeline
+from .fitted_pipeline import FittedPipelineArtifact, has_exclusion_steps, predict_pipeline
 from .pipeline_scoring import prediction_output_schema, score_pipeline
 from .probed_steps import (
     CHUNK_SIZES,
@@ -126,7 +126,7 @@ def probe_model(artifact: FittedPipelineArtifact, holdout: pd.DataFrame | pl.Dat
     engineer = artifact.pipeline.feature_engineer
     transformed = (
         engineer.transform_with_exclusions(raw)[0]
-        if has_outlier_steps(artifact)
+        if has_exclusion_steps(artifact)
         else engineer.transform(raw, preserve_rows=True)
     )
     if not MIN_ROWS <= len(transformed) <= 256:
@@ -219,7 +219,7 @@ def probe_pipeline(artifact: FittedPipelineArtifact, holdout: pd.DataFrame | pl.
 def _empty_check(artifact: FittedPipelineArtifact, raw: pd.DataFrame) -> tuple[dict, Frame | None]:
     """Exercise real empty serving against declared dtypes, independent of estimator quirks."""
     index = raw.head(0).index
-    outliers = has_outlier_steps(artifact)
+    outliers = has_exclusion_steps(artifact)
     schema = prediction_output_schema(artifact)
     if outliers:
         schema += (
@@ -265,8 +265,8 @@ def require_probed_model(artifact: FittedPipelineArtifact) -> dict:
     _require_checks(model)
     if evidence.get("rows") != model["input_rows"]:
         raise ValueError("Model sample count disagrees with the enclosing probe evidence.")
-    if not has_outlier_steps(artifact) and model["input_rows"] != model["rows"]:
-        raise ValueError("Model sample count changed without fitted outlier exclusions.")
+    if not has_exclusion_steps(artifact) and model["input_rows"] != model["rows"]:
+        raise ValueError("Model sample count changed without fitted row exclusions.")
     return model
 
 

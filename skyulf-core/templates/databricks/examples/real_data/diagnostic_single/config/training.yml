@@ -37,6 +37,9 @@ defaults:
   max_input_mb: 64
   metric: heldout_f1
   min_improvement: 0
+  # Candidate coverage and allowed loss versus champion; null disables either gate.
+  min_scored_fraction: 0.90
+  max_coverage_drop: 0.05 # 0.05 = five percentage points.
   quality_threshold: 0.85
   preprocessing_recipe: measured_shape
   pre_split_recipe: valid_measurements

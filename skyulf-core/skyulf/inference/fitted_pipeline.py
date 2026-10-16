@@ -20,8 +20,8 @@ from sklearn.base import is_classifier
 from ..core.portable_state import _bad_constant, _unique_object
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
+from ..preprocessing._exclusion import is_exclusion_step
 from ..preprocessing._target_labels import original_labels
-from ..preprocessing.outliers._exclusion import is_outlier_step
 from ._manifest import checksum, label_dtype, runtime_requirements
 from ._model_requirements import native_model_requirements
 from .project_code import MAX_PROJECT_SOURCE_BYTES, load_project_module, project_source_digest
@@ -292,13 +292,13 @@ def require_pipeline_scope(
 def predict_pipeline(
     frame: pd.DataFrame | pl.DataFrame, artifact: FittedPipelineArtifact
 ) -> pd.DataFrame:
-    """Apply saved preprocessing and publish null outcomes for fitted outlier exclusions."""
+    """Apply saved preprocessing and publish null outcomes for fitted row exclusions."""
     if not isinstance(artifact, FittedPipelineArtifact):
         raise TypeError("Expected a FittedPipelineArtifact.")
     if not isinstance(frame, pd.DataFrame | pl.DataFrame):
         raise TypeError("Local prediction requires a pandas or Polars DataFrame.")
     native = validate_pipeline_input(frame, artifact)
-    if has_outlier_steps(artifact):
+    if has_exclusion_steps(artifact):
         return _predict_with_exclusions(frame, native, artifact)
     if not len(native):
         return _empty_prediction(frame, artifact.manifest)
@@ -333,9 +333,9 @@ def _add_probabilities(
             result[f"probability_{position}"] = probabilities[:, position]
 
 
-def has_outlier_steps(artifact: FittedPipelineArtifact) -> bool:
+def has_exclusion_steps(artifact: FittedPipelineArtifact) -> bool:
     """Identify saved filters whose prediction outputs require explicit coverage columns."""
-    return any(is_outlier_step(step) for step in artifact.pipeline.feature_engineer.fitted_steps)
+    return any(is_exclusion_step(step) for step in artifact.pipeline.feature_engineer.fitted_steps)
 
 
 def _predict_with_exclusions(

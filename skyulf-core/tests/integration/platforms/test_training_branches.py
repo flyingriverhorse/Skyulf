@@ -77,6 +77,9 @@ def test_latest_resolved_once_and_plan_roundtrips(workflow_config, monkeypatch):
     configs = _configs(workflow_config)
     for config in configs.values():
         config["training_version"] = None
+    configs["amount"]["max_coverage_drop"] = 0.02
+    configs["amount"]["min_scored_fraction"] = None
+    configs["category"]["quality_gates"] = {"heldout_scored_fraction": 0.95}
     original = deepcopy(configs)
     spark = MagicMock()
     spark.sql.return_value.select.return_value.orderBy.return_value.first.return_value = {
@@ -92,6 +95,9 @@ def test_latest_resolved_once_and_plan_roundtrips(workflow_config, monkeypatch):
     assert [item.name for item in prepared] == ["amount", "category", "ensemble"]
     assert all(item.spec.version == 11 and item.spec.drop_missing_labels for item in prepared)
     assert restored == prepared
+    assert restored[0].max_coverage_drop == 0.02
+    assert restored[0].min_scored_fraction is None
+    assert restored[1].quality_gates == {"heldout_scored_fraction": 0.95}
     assert configs == original
     spark.sql.assert_called_once()
 

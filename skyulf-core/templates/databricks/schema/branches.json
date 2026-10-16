@@ -3435,6 +3435,22 @@
       ]
     }
   },
+  "branch_SLOT_min_scored_fraction": {
+    "order": 75,
+    "type": "string",
+    "default": "0.90",
+    "description": "Branch SLOT | Minimum fraction of holdout rows this candidate must score (0 to 1); null disables this coverage gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
+  "branch_SLOT_max_coverage_drop": {
+    "order": 76,
+    "type": "string",
+    "default": "0.05",
+    "description": "Branch SLOT | Maximum scored-fraction loss versus champion (0 to 1); 0.05 means five percentage points; null disables this gate.",
+    "pattern": "^(?:null|0(?:\\.[0-9]+)?|1(?:\\.0+)?)$",
+    "skip_prompt_if": {}
+  },
   "branch_SLOT_quality_threshold": {
     "order": 73,
     "type": "string",

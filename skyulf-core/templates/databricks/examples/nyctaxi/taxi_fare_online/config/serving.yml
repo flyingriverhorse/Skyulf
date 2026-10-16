@@ -36,6 +36,8 @@ rollout:
     model_name: ""
     metric: heldout_rmse
     min_improvement: 0.0
+    min_scored_fraction: 0.90
+    max_coverage_drop: 0.05
     quality_threshold: null
     quality_gates: null
     max_rows: 10000

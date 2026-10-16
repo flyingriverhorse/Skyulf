@@ -387,6 +387,8 @@ def test_comparison_payload_preserves_historical_single_gate_digest(tmp_path, mo
     historical.pop("quality_gates", None)
     historical.pop("holdout_reference", None)
     historical.pop("champion_unavailable", None)
+    historical.pop("max_coverage_drop", None)
+    historical.pop("min_scored_fraction", None)
     assert validation.comparison_payload(report) == historical
     assert (
         validation.comparison_digest(report)

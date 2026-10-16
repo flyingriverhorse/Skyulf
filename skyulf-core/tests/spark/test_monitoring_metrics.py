@@ -62,6 +62,80 @@ ARGS: dict[str, Any] = {
 }
 
 
+def test_invalid_exclusion_rates_and_performance_share_saved_population(spark):
+    """Null excluded outputs stay outside accuracy while both exclusion rates remain visible."""
+    from skyulf.integrations.databricks.observability.monitoring.spark.spark_monitoring_quality import (
+        monitoring_report,
+    )
+
+    current = spark.createDataFrame([(i, float(i)) for i in range(4)], "id long, x double")
+    predictions = spark.createDataFrame(
+        [
+            (0, "a", "predicted", None),
+            (1, "b", "predicted", None),
+            (2, None, "excluded", "invalid:power"),
+            (3, None, "excluded", "outlier:bounds"),
+        ],
+        "id long, prediction string, scoring_status string, exclusion_reason string",
+    )
+    labels = spark.createDataFrame(
+        [(i, "a" if i == 0 else "b", NOW.isoformat()) for i in range(4)],
+        "id long, y string, available string",
+    )
+    result = monitoring_report(
+        current,
+        current,
+        predictions,
+        labels,
+        feature_columns=("x",),
+        task="classification",
+        classes=("a", "b"),
+        thresholds=None,
+        **ARGS,
+    )
+    metrics = {item["metric_name"]: item for item in result["metrics"]}
+    assert result["scored_rows"] == result["excluded_rows"] == result["labeled_rows"] == 2
+    assert metrics["accuracy"]["value"] == 1.0
+    assert metrics["exclusion_rate"]["value"] == 0.5
+    assert metrics["invalid_exclusion_rate"]["value"] == 0.25
+    assert metrics["invalid_exclusion_rate"]["has_issue"]
+
+
+def test_model_set_monitoring_retains_component_exclusion_reason(spark):
+    """Branch projection must preserve the invalid-input cause without sibling outputs."""
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_config import (
+        MonitorConfig,
+    )
+    from skyulf.integrations.databricks.observability.monitoring.monitoring_sources import (
+        model_predictions,
+        prediction_columns,
+    )
+
+    predictions = spark.createDataFrame(
+        [(1, "run", "a.b.model", "2", None, "excluded", "invalid:power")],
+        "id long, run_id string, model_set_name string, model_set_version string, "
+        "risk__prediction double, risk__scoring_status string, risk__exclusion_reason string",
+    )
+    config = MonitorConfig(
+        environment="test",
+        project="exclusions",
+        model_name="a.b.risk",
+        model_version="1",
+        source_table="a.b.source",
+        prediction_table="a.b.predictions",
+        reference_namespace="a.monitoring",
+        model_set_name="a.b.model",
+        model_set_version="2",
+        model_set_branch="risk",
+    )
+    selected = model_predictions(predictions, config, "1", ("id",), 0)
+    selected = selected.select(*prediction_columns(selected, ("id",), 0))
+    row = selected.first()
+    assert row.prediction is None
+    assert row.scoring_status == "excluded"
+    assert row.exclusion_reason == "invalid:power"
+
+
 def test_metric_kernel_available():
     """Distributed monitoring must expose its public entry point without a JVM."""
     import importlib

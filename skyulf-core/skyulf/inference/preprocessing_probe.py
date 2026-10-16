@@ -17,9 +17,9 @@ import polars as pl
 from ..core.schema import SkyulfSchema
 from ..pipeline import SkyulfPipeline
 from ..pipeline.seal import artifact_digest
+from ..preprocessing._exclusion import apply_exclusion_filter, exclusion_action, is_exclusion_step
 from ..preprocessing._spark import use_spark
 from ..preprocessing.inference_context import get_inference_capability
-from ..preprocessing.outliers._exclusion import apply_outlier_filter, is_outlier_step
 from ..preprocessing.pipeline import FeatureEngineer, _apply_prediction_step
 from ..registry import NodeRegistry
 from ._fitted_contract import check_fitted_schemas, resolve_fitted_step
@@ -103,8 +103,8 @@ def _apply_checked(record: dict, frame: Frame, max_rows: int, max_bytes: int) ->
     before_state = _state_digest(record)
     try:
         result = (
-            _outlier_mask(argument, record)
-            if is_outlier_step(record)
+            _exclusion_mask(argument, record)
+            if is_exclusion_step(record)
             else _apply_prediction_step(argument, record)
         )
     finally:
@@ -126,9 +126,9 @@ def _apply_checked(record: dict, frame: Frame, max_rows: int, max_bytes: int) ->
     return result
 
 
-def _outlier_mask(frame: Frame, record: dict) -> Frame:
+def _exclusion_mask(frame: Frame, record: dict) -> Frame:
     """Probe the actual full-length exclusion decision rather than a shortened frame."""
-    _, positions = apply_outlier_filter(frame, record)
+    _, positions = apply_exclusion_filter(frame, record)
     keep = np.isin(np.arange(len(frame)), positions)
     if isinstance(frame, pd.DataFrame):
         return pd.DataFrame({"keep": keep}, index=frame.index)
@@ -182,8 +182,8 @@ def _probe_step(
     if not active:
         detail["status"] = "skipped"
         return detail, frame
-    if is_outlier_step(detached):
-        detail["action"] = "exclude_outliers"
+    if is_exclusion_step(detached):
+        detail["action"] = exclusion_action(detached)
     if detail["context"] in {"group", "window", "global"} or detail["history_mode"] == "carry":
         detail["status"] = "requires_context"
         return detail, frame
@@ -230,8 +230,8 @@ def _probe_checks(
     detail["status"] = (
         "failed" if any(c["status"] == "failed" for c in detail["checks"]) else "passed"
     )
-    if is_outlier_step(record):
-        transformed, _ = apply_outlier_filter(copy_frame(frame), deepcopy(record))
+    if is_exclusion_step(record):
+        transformed, _ = apply_exclusion_filter(copy_frame(frame), deepcopy(record))
     return detail, transformed
 
 
