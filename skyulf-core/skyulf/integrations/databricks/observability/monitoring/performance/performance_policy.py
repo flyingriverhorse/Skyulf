@@ -9,7 +9,7 @@ from typing import Any
 
 from ....shared.json_contracts import finite_json_digest
 
-_LOWER_METRICS = {"mae", "mse", "rmse", "mape"}
+_LOWER_METRICS = {"mae", "mse", "rmse", "mape", "wape"}
 _HIGHER_METRICS = {
     "r2",
     "explained_variance",

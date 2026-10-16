@@ -112,10 +112,85 @@ small floating-point comparison tolerance). Active tolerances and window lengths
 finite numbers; label delay is nonnegative, minimum rows is an integer at least 2, coverage is from
 0 to 1, and consecutive windows is an integer from 1 to 100.
 
-Policy metrics with `lower` direction are `mae`, `mse`, `rmse`, `mape`. Metrics with `higher`
+Policy metrics with `lower` direction are `mae`, `mse`, `rmse`, `mape`, `wape`. Metrics with `higher`
 direction are `r2`, `explained_variance`, `accuracy`, `balanced_accuracy`, `precision_weighted`,
 `recall_weighted`, `f1_weighted`, `matthews_corrcoef`, `g_score`. Observed reports can contain
 additional probability metrics; their presence does not make them supported policy metrics.
+
+### WAPE when actual values can be zero
+
+`wape` is `sum(abs(actual - prediction)) / sum(abs(actual))`. It is a ratio:
+`0.10` means 10%, and lower is better. Like the other reported regression metrics,
+it uses unweighted evaluation rows; training sample weights are not reused for
+holdout or monitoring observations. It is calculated from saved predictions and
+available labels, excluding rows the model did not score.
+
+For actual values `[0, 10, 20]` and predictions `[5, 12, 18]`, total absolute error
+is 9 and total absolute actual value is 30: **WAPE = 0.30**. MAPE instead divides
+each row's error by that row's actual magnitude. Its near-zero denominator makes
+the zero-actual row dominate. The taxi example's February labels include three
+zero fares, so MAPE can be extremely large even while most errors are small.
+Both metrics remain available; inspect WAPE alongside MAE, RMSE and label coverage.
+
+When every actual value is zero, WAPE is undefined, including for perfect zero
+predictions. Core evaluation omits `wape` from its finite metric dictionary;
+monitoring records `value: null`, `status: unavailable`. A WAPE policy cannot
+act on that window. No epsilon or invented zero score disguises the missing
+denominator. A nonfinite result is also unavailable.
+
+Use `metric: wape` with `direction: lower` in a performance policy, retaining
+all the other required policy fields shown above. For registered-model holdout
+comparison or an additional quality gate, use `heldout_wape`; its direction is
+`minimize`. A missing holdout WAPE fails the gate. This does not add a WAPE scorer
+to tuning or cross-validation model competitions.
+
+For example, this regression policy reports a WAPE increase of at least 20%
+relative to version 3's training holdout, after two completed daily windows:
+
+```yaml
+monitoring_performance_policies: >-
+  {"models.sales.revenue":{
+    "mode":"report",
+    "metric":"wape",
+    "direction":"lower",
+    "baseline":{"kind":"training_holdout","model_version":"3"},
+    "tolerance":0.2,
+    "tolerance_mode":"relative",
+    "window_hours":24,
+    "label_delay_hours":6,
+    "minimum_labeled_rows":20,
+    "minimum_label_coverage":0.8,
+    "consecutive_windows":2}}
+```
+
+Replace the model name and version with your enrolled identity and keep the label
+table/availability settings from the complete example above. With baseline WAPE
+0.05, the limit is 0.06: this is a 20% relative increase, not 20 percentage points.
+WAPE suits this example when actual values can be zero because it uses the whole
+population's absolute actual total; MAPE divides by each individual actual.
+`report` never requests training. Spark monitoring reads cached holdout metrics
+from its prepared reference; an older cache without WAPE produces unavailable
+policy evidence until a compatible reference exists. The in-memory path measures
+the verified holdout with the fitted model. Neither path rewrites historical
+training-run metrics.
+
+```python
+import numpy as np
+import pandas as pd
+from skyulf.modeling._evaluation.metrics import calculate_regression_metrics
+
+truth = np.array([0.0, 10.0, 20.0])
+values = calculate_regression_metrics(
+    None, pd.DataFrame(), truth,
+    X_np=np.empty((3, 0)), y_np=truth,
+    predictions=np.array([5.0, 12.0, 18.0]),
+)
+assert values["wape"] == 0.3
+```
+
+WAPE gives larger-magnitude actuals more influence and is undefined for all-zero
+populations. It does not replace per-segment inspection or establish business
+acceptability. A lower aggregate value can still conceal a poorly served segment.
 
 ## The command
 
@@ -157,7 +232,7 @@ an absolute quality goal.
 Local performance reuses skyulf.modeling._evaluation.metrics. Classification includes
 G-score, accuracy, balanced accuracy, MCC and precision/recall/F1; probabilities
 also enable log-loss, ROC-AUC and PR-AUC variants. Regression includes MAE, MSE,
-RMSE, R2, MAPE and explained variance. The job installs Core's optional G-score
+RMSE, R2, MAPE, WAPE and explained variance. The job installs Core's optional G-score
 dependency and compatibility pin. Local feature drift uses Core DriftCalculator;
 Spark enrollments use distributed metric and drift aggregations.
 

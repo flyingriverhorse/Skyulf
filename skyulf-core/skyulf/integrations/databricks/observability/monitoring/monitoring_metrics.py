@@ -16,10 +16,10 @@ from skyulf.modeling._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+from skyulf.profiling._drift_settings import merge_drift_settings
 from skyulf.profiling.drift import DriftCalculator
 
-_DRIFT_THRESHOLDS = {"psi", "ks_statistic", "wasserstein", "kl_divergence"}
-REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance")
+REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance", "wape")
 CLASSIFICATION_METRICS = (
     "accuracy",
     "balanced_accuracy",
@@ -79,13 +79,7 @@ def validate_monitoring_inputs(
 
 def _validate_thresholds(thresholds: dict | None) -> None:
     """Accept only finite positive overrides supported by Core drift."""
-    if thresholds is None:
-        return
-    if type(thresholds) is not dict or set(thresholds) - _DRIFT_THRESHOLDS:
-        raise ValueError("Unknown monitoring drift thresholds.")
-    for value in thresholds.values():
-        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
-            raise ValueError("Drift thresholds must be finite and positive.")
+    merge_drift_settings(thresholds)
 
 
 def _keyed_rows(frame: pl.DataFrame, columns: tuple[str, ...], name: str) -> dict[tuple, dict]:
@@ -333,14 +327,15 @@ def column_drift_evidence(column: str, result: Any) -> list[dict[str, Any]]:
     """Retain Core's per-statistic verdict or an explicit unavailable row."""
     if result is None:
         return [monitoring_metric("drift", column, "unavailable")]
+    diagnostics = {"ks_test_p_value", "new_category_rate"}
     metrics = [
         monitoring_metric(
             "drift",
             column,
             item.metric,
             item.value,
-            None if item.metric == "ks_test_p_value" else item.threshold,
-            result.drift_detected and item.has_drift and item.metric != "ks_test_p_value",
+            None if item.metric in diagnostics else item.threshold,
+            result.drift_detected and item.has_drift and item.metric not in diagnostics,
         )
         for item in result.metrics
     ]
@@ -434,9 +429,14 @@ def _performance_evidence(
         monitoring_metric("performance", target, name, float(value))
         for name, value in values.items()
     ]
+    if task == "regression" and "wape" not in values:
+        evidence.append(monitoring_metric("performance", target, "wape"))
+        notes.append(
+            "WAPE unavailable: absolute actual-value denominator is zero or the ratio is nonfinite."
+        )
     unavailable = any(item["status"] == "unavailable" for item in evidence)
     if unavailable:
-        notes.append("A calculated performance metric was nonfinite.")
+        notes.append("A calculated performance metric was undefined or nonfinite.")
     return evidence, len(pairs), notes, unavailable
 
 

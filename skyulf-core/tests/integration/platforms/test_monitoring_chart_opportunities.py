@@ -170,6 +170,49 @@ def test_categorical_and_numeric_psi_use_the_same_saved_value_and_limit(database
     assert [tuple(row) for row in table] == [("age", 0.31, 0.2), ("segment", 0.31, 0.2)]
 
 
+@pytest.mark.parametrize(
+    "dataset", ["performance_chart", "performance_latest", "performance_measurements"]
+)
+@pytest.mark.parametrize("value", [0.3, None])
+def test_wape_dashboard_preserves_values_and_lower_direction(database, dataset, value):
+    """WAPE must remain visible with the correct direction, including unavailable observations."""
+    identity = _report(database)
+    _insert(
+        database,
+        "metric_history",
+        **identity,
+        column_name="target",
+        category="performance",
+        metric_name="wape",
+        value=value,
+        status="measured" if value is not None else "unavailable",
+    )
+    if dataset == "performance_measurements":
+        sql = "".join(_dataset(dataset)["queryLines"])
+        expression = re.search(r"MAX\(CASE WHEN metric_name = 'wape' THEN value END\) AS wape", sql)
+        assert expression is not None
+        actual = database.execute(f"SELECT {expression[0]} FROM metric_history").fetchone()["wape"]
+        assert actual == value
+    else:
+        rows = _execute(database, dataset, performance_metric="wape")
+        assert len(rows) == 1
+        assert rows[0]["value"] == value
+        assert rows[0]["metric_label"] == "WAPE - lower is better / target"
+
+
+@pytest.mark.parametrize("dataset", ["performance_chart", "performance_latest"])
+def test_dashboard_metric_directions_match_performance_policy(dataset):
+    """A new error metric must not silently acquire a higher-is-better chart label."""
+    from skyulf.integrations.databricks.observability.monitoring.performance.performance_policy import (
+        _LOWER_METRICS,
+    )
+
+    sql = "".join(_dataset(dataset)["queryLines"])
+    match = re.search(r"source\.metric_name IN \(([^)]+)\)\s+THEN ' - lower is better'", sql)
+    assert match is not None
+    assert set(re.findall(r"'([^']+)'", match[1])) == _LOWER_METRICS | {"log_loss"}
+
+
 def test_serving_ratios_preserve_zero_missing_failure_and_version_identity(database):
     """A missing denominator or failed observation is not a zero error rate."""
     _insert(

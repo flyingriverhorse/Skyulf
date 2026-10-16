@@ -160,12 +160,112 @@ Statistical evidence is bounded separately: KS uses the exact lattice calculatio
 when the two population sizes multiply to at most 1,000,000, the Core asymptotic
 method when either size exceeds 10,000, and explicitly named
 `ks_dkw_union_bound` evidence in the remaining range. An inconclusive bound is
-unavailable rather than evidence of no drift. Categorical summaries allow at
-most 1,024 current categories and use Core's 50-category reference limit;
-classification allows at most 256 saved classes. Temporal/nested feature drift
+unavailable rather than evidence of no drift. Small categorical domains (at most
+50 distinct non-null reference values) keep their exact-category comparison;
+Spark accepts at most 1,024 current categories on that path. Larger domains use
+the grouped comparison below. Classification allows at most 256 saved classes. Temporal/nested feature drift
 and unsupported cardinalities are explicit failures or unavailable checks.
 These limits bound summaries and supported algorithms, not observation rows.
 
 Temporal or nested feature checks and unsupported cardinalities stay explicit; missing values never
 become a zero drift score. Numeric infinities or invalid numeric conversions can make the
 distribution comparison unavailable while quality evidence remains visible.
+
+### Categorical features with many values
+
+ZIP codes, cities and product categories can have more than 50 values without
+being identifiers. With default settings, pandas/Polars and Spark use the same rules:
+
+1. Count distinct **observed non-null** reference values. More than 10,000
+   categories on either side makes the comparison unavailable. The reference
+   must also have at least two non-null observations per distinct value on
+   average: `distinct_count / non_null_count <= 0.5`. This heuristic excludes
+   mostly unique identifiers; it does not prove that a column is an identifier.
+2. Keep the 50 most frequent reference categories, breaking equal counts by
+   ascending label. Pool all remaining reference and current values into one
+   additional bucket. Current frequencies never select the retained categories.
+   Spark collects bounded category counts, not raw observations.
+3. Calculate `psi_categorical` and statistical evidence from the 51 buckets.
+   Existing PSI limits, sparse-count tests and feature-family Bonferroni
+   correction still apply. Evidence test names end in `_top50_other` to expose
+   the grouping. A drift decision still needs both effect and statistical support.
+
+The additional `new_category_rate` is the fraction of **non-null current rows**
+whose label never appeared anywhere in the reference, including its pooled tail.
+For example, 25 rows with unseen ZIP codes among 100 non-null current rows give `0.25`, even
+if another 100 current rows are null. It is diagnostic: monitoring records
+`threshold: null` and `has_issue: false`. It does not independently trigger
+retraining. The direct Core `DriftMetric` retains its numeric threshold field
+with the harmless upper bound `1.0`; `has_drift` is always false for this metric.
+
+```python
+from skyulf.profiling.drift import DriftCalculator
+import polars as pl
+
+reference = pl.DataFrame({"zip": [f"zip{i:03}" for i in range(90)] * 20})
+current = pl.DataFrame({"zip": ["zip089"] * 75 + ["new_zip"] * 25})
+report = DriftCalculator(reference, current).calculate_drift()
+column = report.column_drifts["zip"]
+print({metric.metric: metric.value for metric in column.metrics})
+# Includes new_category_rate: 0.25 and the measured psi_categorical value.
+print(column.evidence.model_dump())
+```
+
+Pooling can conceal redistribution **within** the tail, even when all tail
+labels change. Inspect novelty alongside PSI; a small PSI does not establish
+stable rare-category frequencies. Missingness is measured separately by the
+monitoring quality checks. Columns with 50 or fewer reference categories retain
+their existing metrics and evidence; they do not gain `new_category_rate`.
+
+### Configure thresholds and measurement limits
+
+Use the existing `monitoring_drift_thresholds` JSON variable in your producer's
+`deployment/variables.yml` or target overrides. Register the changed enrollment
+through normal activation or scoring before the next monitoring job. These are
+per-monitor settings; changing the dashboard does not change a measurement.
+
+| Key | Default when absent | Meaning and valid range |
+| --- | --- | --- |
+| `psi` | `0.2` | PSI effect threshold; finite and positive. |
+| `ks_statistic` | `0.1` | Maximum-CDF-distance effect threshold; finite and positive. |
+| `wasserstein` | `0.1` | Distance normalized by reference standard deviation; finite and positive. |
+| `kl_divergence` | `0.1` | KL effect threshold; finite and positive. |
+| `categorical_top_k` | `50` | Retained reference levels before pooling; integer 1–1,000,000, no larger than `max_category_summaries`. |
+| `id_like_uniqueness` | `0.5` | Maximum distinct/non-null reference ratio for the grouped path; `(0, 1]`. Increase only for known categorical domains. |
+| `max_category_summaries` | `10000` | Maximum distinct categories per population on the grouped path; integer 1–1,000,000. An explicit override also caps exact-category comparisons. |
+| `psi_moderate` | `0.1` | Moderate severity wording, separate from the PSI alarm threshold. Positive and below `psi_critical`. |
+| `psi_critical` | `0.25` | Critical severity wording. Positive and above `psi_moderate`. |
+| `monitor_max_rows` | Existing observation budget, capped at 1,000,000 | Explicit non-Spark observation row budget; integer 1–1,000,000. |
+| `monitor_max_bytes` | Existing observation budget, capped at 1 GiB | Explicit non-Spark observation byte budget; integer 1–1 GiB. |
+
+The last two keys override driver materialization budgets, not feature thresholds.
+Without them, the producer's budgets remain in effect; direct `MonitorConfig`
+defaults remain 10,000 rows and 64 MiB. Overrides stay within the existing
+1,000,000-row / 1 GiB safety ceilings. For larger observations use Spark monitoring.
+Spark validates these keys but does not impose local row/byte budgets on distributed
+observations. It still bounds category summaries. Very large category limits increase
+driver memory for count summaries; a large top K also enlarges the statistical test's
+contingency table and its diagnostic details. Increase them only as needed.
+
+```yaml
+# Target variable override; JSON numbers must be numbers, not quoted strings.
+variables:
+  monitoring_drift_thresholds: >-
+    {"psi": 0.2, "categorical_top_k": 30,
+     "id_like_uniqueness": 0.75, "max_category_summaries": 20000,
+     "psi_moderate": 0.15, "psi_critical": 0.3,
+     "monitor_max_rows": 200000, "monitor_max_bytes": 268435456}
+```
+
+The same dictionary can be passed to `DriftCalculator(...).calculate_drift(...)`;
+row/byte keys are consumed by monitoring enrollment only. Category evidence names
+reflect the chosen K, for example `chi_square_top30_other`. Increasing K preserves
+more rare labels but increases summary work and can make sparse evidence harder
+to establish. Changing severity bands changes suggestions, not the independent
+effect/statistical gates. Omitted keys retain historical output and enrollment
+fields. With no categorical overrides, the small-domain Spark path retains its
+1,024-current-category limit.
+
+These settings do **not** expose preprocessing probe minimum/sample caps or float
+tolerances, the PowerTransformer 10% fit guard, SHAP's two-row minimum, Spark's
+maximum class count or its exact-KS cell limit. Those remain fixed contracts.

@@ -14,7 +14,8 @@ from skyulf.profiling._drift_evidence import (
     correct_evidence,
     numeric_evidence,
 )
-from skyulf.profiling.drift import ColumnDrift, DriftMetric
+from skyulf.profiling._drift_settings import merge_drift_settings
+from skyulf.profiling.drift import ColumnDrift, DriftCalculator, DriftMetric
 
 from ..monitoring_metrics import column_drift_evidence, monitoring_metric
 from .spark_monitoring_metrics import (
@@ -209,17 +210,19 @@ def _numeric_result(
     )
 
 
-def _category_counts(frame: Any, column: str) -> dict[str, int] | None:
+def _category_counts(
+    frame: Any, column: str, limit: int = MAX_CATEGORY_SUMMARIES
+) -> dict[str, int] | None:
     """Bound category summaries explicitly without ever collecting input observations."""
     rows = (
         frame.where(spark_column(column).isNotNull())
         .select(spark_column(column).cast("string").alias("value"))
         .groupBy("value")
         .count()
-        .limit(MAX_CATEGORY_SUMMARIES + 1)
+        .limit(limit + 1)
         .collect()
     )
-    if len(rows) > MAX_CATEGORY_SUMMARIES:
+    if len(rows) > limit:
         return None
     return {row["value"]: row["count"] for row in rows}
 
@@ -228,9 +231,20 @@ def _categorical_result(
     reference: Any, current: Any, column: str, thresholds: dict
 ) -> ColumnDrift | None:
     """Reuse Core exact categorical tests on bounded unsmoothed count tables."""
-    ref, cur = _category_counts(reference, column), _category_counts(current, column)
-    if not ref or not cur or len(ref) > 50:
+    cap = int(thresholds.get("max_category_summaries", DriftCalculator._MAX_CATEGORY_SUMMARIES))
+    ref = _category_counts(reference, column, cap)
+    if not ref:
         return None
+    grouped = len(ref) > thresholds.get(
+        "categorical_top_k", DriftCalculator._MAX_CATEGORICAL_CARDINALITY
+    )
+    configured = "max_category_summaries" in thresholds or "categorical_top_k" in thresholds
+    limit = cap if grouped or configured else MAX_CATEGORY_SUMMARIES
+    cur = _category_counts(current, column, limit)
+    if not cur:
+        return None
+    if grouped:
+        return DriftCalculator._grouped_categorical_drift(column, ref, cur, thresholds)
     categories = sorted(ref.keys() | cur.keys())
     table = np.array(
         [[ref.get(label, 0) for label in categories], [cur.get(label, 0) for label in categories]],
@@ -423,9 +437,7 @@ def drift_evidence(
     reference: Any, current: Any, columns: tuple[str, ...], thresholds: dict | None
 ) -> tuple[list[dict], int, list[str], bool]:
     """Return feature-only evidence with honest unavailable outcomes for unsupported types."""
-    limits = {"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1} | (
-        thresholds or {}
-    )
+    limits = merge_drift_settings(thresholds)
     missing = [
         column
         for column in columns

@@ -106,6 +106,51 @@ def test_examples_add_no_setup_question():
         assert set(json.loads(path.read_text())) <= set(properties), path.name
 
 
+@pytest.mark.parametrize("target", ["test", "syst", "prod"])
+def test_robust_example_wape_policy_only_reports(target):
+    """Every prepared target must use a valid, explicitly versioned policy that cannot retrain."""
+    from datetime import UTC, datetime
+
+    from skyulf.integrations.databricks.observability.monitoring.performance.performance_policy import (
+        evaluate_performance,
+        validate_performance_policy,
+    )
+
+    project = EXAMPLES / "taxi_fare_robust"
+    targets = yaml.safe_load((project / "deployment/targets.yml").read_text())
+    variables = targets["targets"][target]["variables"]
+    policies = json.loads(variables["monitoring_performance_policies"])
+    model = "${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}"
+    assert set(policies) == {model}
+    policy = validate_performance_policy(policies[model])
+    assert policy["mode"] == "report"
+    assert policy["metric"] == "wape" and policy["direction"] == "lower"
+    assert policy["baseline"] == {"kind": "training_holdout", "model_version": "1"}
+    assert policy["tolerance_mode"] == "relative" and policy["tolerance"] == 0.2
+    assert variables["monitoring_result_available_at_column"] == "result_available_at"
+    assert "trips_labels" in variables["monitoring_label_table"]
+    common = {
+        "model_version": "1",
+        "metric": "wape",
+        "contract_digest": "c" * 64,
+        "labeled_rows": 50,
+        "label_coverage": 1.0,
+    }
+    baseline = common | {"value": 0.05}
+    history = []
+    for day in (2, 3):
+        now = datetime(2026, 10, day, 12, tzinfo=UTC)
+        observed = common | {
+            "value": 0.07,
+            "window_start": datetime(2026, 10, day - 1, tzinfo=UTC).isoformat(),
+            "window_end": datetime(2026, 10, day, tzinfo=UTC).isoformat(),
+            "as_of": now.isoformat(),
+        }
+        history.append(evaluate_performance(policy, observed, baseline, history, now=now))
+    assert history[-1]["status"] == "degraded" and history[-1]["action"] == "report"
+    assert history[-1]["consecutive_failures"] == 2
+
+
 def test_loader_creates_every_column_the_examples_read():
     """The SQL loader must be create-only, keep change data feed, and supply every answered column."""
     sql = (EXAMPLES / "load_nyctaxi.sql").read_text(encoding="utf-8")

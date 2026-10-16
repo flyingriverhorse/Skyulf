@@ -23,6 +23,7 @@ _REGRESSION = {
     "heldout_rmse",
     "heldout_r2",
     "heldout_mape",
+    "heldout_wape",
     "heldout_explained_variance",
 }
 _CLASSIFICATION = {
@@ -51,6 +52,7 @@ _MINIMIZE = {
     "heldout_mse",
     "heldout_rmse",
     "heldout_mape",
+    "heldout_wape",
     "heldout_log_loss",
 }
 _MAXIMIZE = (_REGRESSION | _CLASSIFICATION) - _MINIMIZE

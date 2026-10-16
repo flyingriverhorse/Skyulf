@@ -23,6 +23,16 @@ targets:
       # load_nyctaxi.sql supplies outcomes; training.yml supplies trip_id and fare_amount.
       monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
       monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
       resource_suffix: ""
 
 
@@ -45,6 +55,16 @@ targets:
       metadata_schema: ${var.syst_metadata_schema}
       monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
       monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
       resource_suffix: ""
 
 
@@ -67,6 +87,16 @@ targets:
       metadata_schema: ${var.prod_metadata_schema}
       monitoring_label_table: ${var.catalog}.${var.input_schema}.trips_labels
       monitoring_result_available_at_column: result_available_at
+      # Initial version for a fresh model; set the concrete observed version before enrollment.
+      # An older Spark reference cache without WAPE is unavailable. This never requests training.
+      monitoring_performance_policies: >-
+        {"${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}":{
+          "mode":"report","metric":"wape","direction":"lower",
+          "baseline":{"kind":"training_holdout","model_version":"1"},
+          "tolerance":0.2,"tolerance_mode":"relative",
+          "window_hours":24,"label_delay_hours":6,
+          "minimum_labeled_rows":20,"minimum_label_coverage":0.8,
+          "consecutive_windows":2}}
       resource_suffix: ""
 
 

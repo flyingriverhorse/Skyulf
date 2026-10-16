@@ -15,7 +15,19 @@ import numpy as np
 import polars as pl
 from pydantic import BaseModel
 
-from ._drift_evidence import DriftEvidence, categorical_evidence, correct_evidence, numeric_evidence
+from ._drift_evidence import (
+    DriftEvidence,
+    categorical_drift_test,
+    categorical_evidence,
+    correct_evidence,
+    numeric_evidence,
+)
+from ._drift_settings import (
+    DEFAULT_CATEGORY_SUMMARIES,
+    DEFAULT_TOP_K,
+    DEFAULT_UNIQUENESS,
+    merge_drift_settings,
+)
 
 try:
     from scipy.stats import entropy, ks_2samp, wasserstein_distance
@@ -41,6 +53,8 @@ class DriftMetric(BaseModel):
     The exception is ``ks_test_p_value``: this raw diagnostic carries the KS
     statistic's effect flag and threshold for compatibility. The separate
     evidence record applies feature-family correction to its probability.
+    ``new_category_rate`` is diagnostic only: its compatibility threshold is
+    1.0 (the maximum possible proportion), and it never raises an effect flag.
 
     ``raw_value`` is set only where ``value`` is a transform of a more familiar
     quantity — the Wasserstein distance is reported normalized by the reference
@@ -99,10 +113,11 @@ class DriftCalculator:
     Uses Polars for efficient data processing.
     """
 
-    # Categorical columns with more distinct reference values than this are
-    # treated as free-text/ID-like (not a meaningful categorical distribution)
-    # and skipped, to avoid PSI blowing up on effectively-unique values.
-    _MAX_CATEGORICAL_CARDINALITY = 50
+    # Preserve the exact small-category path; larger domains use these many
+    # reference levels plus one pooled tail, subject to bounded ID-like guards.
+    _MAX_CATEGORICAL_CARDINALITY = DEFAULT_TOP_K
+    _MAX_CATEGORY_SUMMARIES = DEFAULT_CATEGORY_SUMMARIES
+    _MAX_REFERENCE_UNIQUENESS = DEFAULT_UNIQUENESS
 
     def __init__(self, reference_df: pl.DataFrame, current_df: pl.DataFrame):
         """Hold the two frames to compare and pin the columns present in both.
@@ -240,7 +255,7 @@ class DriftCalculator:
             column=col,
             metrics=metrics,
             drift_detected=drifted,
-            suggestions=self._numeric_drift_suggestions(drifted, flags),
+            suggestions=self._numeric_drift_suggestions(drifted, flags, thresholds),
             evidence=self._numeric_evidence(metrics, len(ref_data), len(curr_data)),
         )
 
@@ -278,13 +293,7 @@ class DriftCalculator:
 
     def _merge_thresholds(self, thresholds: dict[str, float] | None) -> dict[str, float]:
         """Merge user-supplied drift thresholds over the defaults."""
-        default_thresholds = {
-            "psi": 0.2,
-            "ks_statistic": 0.1,  # practical maximum CDF-distance threshold
-            "wasserstein": 0.1,  # applied to the std-normalized distance, so it is scale-free
-            "kl_divergence": 0.1,
-        }
-        return {**default_thresholds, **(thresholds or {})}
+        return merge_drift_settings(thresholds, allow_zero_thresholds=True)
 
     def _detect_schema_drift(self) -> tuple[list[str], list[str]]:
         """Return columns present only in the reference set and only in the current set."""
@@ -326,7 +335,7 @@ class DriftCalculator:
         metrics, is_drifted, drift_flags = self._compute_numeric_metrics(
             ref_data, curr_data, thresholds
         )
-        suggestions = self._numeric_drift_suggestions(is_drifted, drift_flags)
+        suggestions = self._numeric_drift_suggestions(is_drifted, drift_flags, thresholds)
         distribution = self._calculate_distribution(ref_data, curr_data)
 
         return ColumnDrift(
@@ -503,7 +512,10 @@ class DriftCalculator:
         return metrics, is_drifted, drift_flags
 
     def _numeric_drift_suggestions(
-        self, is_drifted: bool, drift_flags: dict[str, float | bool]
+        self,
+        is_drifted: bool,
+        drift_flags: dict[str, float | bool],
+        thresholds: dict[str, float] | None = None,
     ) -> list[str]:
         """Generate human-readable remediation suggestions from computed drift flags."""
         suggestions = []
@@ -515,11 +527,13 @@ class DriftCalculator:
         psi_drift = drift_flags["psi_drift"]
         wd_drift = drift_flags["wd_drift"]
 
-        if psi_val > PSI_CRITICAL:
+        settings = thresholds or {}
+        critical = settings.get("psi_critical", PSI_CRITICAL)
+        if psi_val > critical:
             suggestions.append(
-                "Critical population shift detected (PSI > 0.25). Immediate model retraining is recommended."
+                f"Critical population shift detected (PSI > {critical:g}). Immediate model retraining is recommended."
             )
-        elif psi_val > PSI_MODERATE:
+        elif psi_val > settings.get("psi_moderate", PSI_MODERATE):
             suggestions.append(
                 "Moderate population shift detected. Monitor model performance closely."
             )
@@ -610,16 +624,20 @@ class DriftCalculator:
         return categories, expected_percents, actual_percents
 
     @staticmethod
-    def _categorical_drift_suggestions(psi_drift: bool, psi_val: float) -> list[str]:
+    def _categorical_drift_suggestions(
+        psi_drift: bool, psi_val: float, thresholds: dict[str, float] | None = None
+    ) -> list[str]:
         """Build the user-facing suggestion messages for a categorical PSI drift result."""
         suggestions: list[str] = []
+        settings = thresholds or {}
+        critical = settings.get("psi_critical", PSI_CRITICAL)
         if psi_drift:
-            if psi_val > PSI_CRITICAL:
+            if psi_val > critical:
                 suggestions.append(
-                    "Critical category-distribution shift detected (PSI > 0.25). "
+                    f"Critical category-distribution shift detected (PSI > {critical:g}). "
                     "Immediate model retraining is recommended."
                 )
-            else:
+            elif "psi_moderate" not in settings or psi_val > settings["psi_moderate"]:
                 suggestions.append(
                     "Moderate category-distribution shift detected. Monitor model performance closely."
                 )
@@ -640,10 +658,9 @@ class DriftCalculator:
     ) -> "ColumnDrift | None":
         """Calculate categorical PSI with separate unsmoothed count-test evidence.
 
-        Uses the category frequency distribution — the union of categories seen
-        in either dataset. Returns ``None`` if the column looks like free-text
-        or a high-cardinality identifier (not a meaningful categorical
-        distribution), or if either side has no non-null values.
+        Uses the union of categories for small domains, or the top reference
+        categories plus a pooled tail for larger domains. Returns ``None`` for
+        empty populations, ID-like reference values or excessive cardinality.
         """
         reference, current = self.reference_df[col], self.current_df[col]
         boolean_labels = pl.Boolean in (reference.dtype, current.dtype)
@@ -656,8 +673,15 @@ class DriftCalculator:
             return None
 
         ref_n_unique = ref_data.n_unique()
-        if ref_n_unique > self._MAX_CATEGORICAL_CARDINALITY:
+        if (
+            "max_category_summaries" in thresholds
+            and max(ref_n_unique, curr_data.n_unique()) > thresholds["max_category_summaries"]
+        ):
             return None
+        if ref_n_unique > thresholds.get("categorical_top_k", self._MAX_CATEGORICAL_CARDINALITY):
+            return self._grouped_categorical_drift(
+                col, Counter(ref_data), Counter(curr_data), thresholds
+            )
 
         percents = self._categorical_percent_arrays(ref_data, curr_data, col)
         psi_val = 0.0
@@ -680,7 +704,7 @@ class DriftCalculator:
             )
         ]
 
-        suggestions = self._categorical_drift_suggestions(psi_drift, psi_val)
+        suggestions = self._categorical_drift_suggestions(psi_drift, psi_val, thresholds)
 
         return ColumnDrift(
             column=col,
@@ -689,6 +713,74 @@ class DriftCalculator:
             suggestions=suggestions,
             evidence=categorical_evidence(ref_data.to_list(), curr_data.to_list()),
             distribution=None,
+        )
+
+    @classmethod
+    def _grouped_category_table(
+        cls, reference: dict[str, int], current: dict[str, int], top_k: int
+    ) -> np.ndarray:
+        """Keep deterministic reference levels and an unnamed tail bucket without label collisions."""
+        head = sorted(reference, key=lambda label: (-reference[label], label))[:top_k]
+        rows = []
+        for counts in (reference, current):
+            row = [counts.get(label, 0) for label in head]
+            row.append(sum(counts.values()) - sum(row))
+            rows.append(row)
+        return np.asarray(rows, dtype=np.int64)
+
+    @classmethod
+    def _grouped_categorical_drift(
+        cls,
+        column: str,
+        reference: dict[str, int],
+        current: dict[str, int],
+        thresholds: dict[str, float],
+    ) -> ColumnDrift | None:
+        """Compare repeated large domains from bounded counts, shared by Core and Spark.
+
+        The pooled tail can hide redistribution among rare categories. Novelty
+        reports unseen labels separately but does not invent a new alert policy.
+        Reference uniqueness is a heuristic, not an identifier classifier.
+        """
+        if (
+            not reference
+            or not current
+            or max(len(reference), len(current))
+            > thresholds.get("max_category_summaries", cls._MAX_CATEGORY_SUMMARIES)
+        ):
+            return None
+        n, m = sum(reference.values()), sum(current.values())
+        if len(reference) / n > thresholds.get("id_like_uniqueness", cls._MAX_REFERENCE_UNIQUENESS):
+            return None
+        top_k = int(thresholds.get("categorical_top_k", cls._MAX_CATEGORICAL_CARDINALITY))
+        table = cls._grouped_category_table(reference, current, top_k)
+        threshold = thresholds["psi"]
+        expected, actual = table[0] / n, table[1] / m
+        expected = np.where(expected == 0, 0.5 / n, expected)
+        actual = np.where(actual == 0, 0.5 / m, actual)
+        psi = float(np.sum((actual - expected) * np.log(actual / expected)))
+        test, probability, minimum = categorical_drift_test(table)
+        evidence = DriftEvidence(
+            test=f"{test}_top{top_k}_other", p_value=probability, reference_count=n, current_count=m
+        )
+        evidence._minimum_p_value = minimum
+        novelty = sum(count for label, count in current.items() if label not in reference) / m
+        return ColumnDrift(
+            column=column,
+            metrics=[
+                DriftMetric(
+                    metric="psi_categorical",
+                    value=psi,
+                    threshold=threshold,
+                    has_drift=psi > threshold,
+                ),
+                DriftMetric(
+                    metric="new_category_rate", value=novelty, threshold=1.0, has_drift=False
+                ),
+            ],
+            drift_detected=psi > threshold,
+            suggestions=cls._categorical_drift_suggestions(psi > threshold, psi, thresholds),
+            evidence=evidence,
         )
 
     def _numeric_frequencies(

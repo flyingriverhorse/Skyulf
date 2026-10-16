@@ -24,14 +24,18 @@ The layout shapes the generated train job, so choose it at `bundle init`; see
 | --- | --- | --- | --- |
 | A scheduled job writing a Delta table within `max_rows`/`max_input_mb` | `score` job, `inference_mode: local` (default) | `taxi_high_fare` | [Scoring](databricks_scoring.md) |
 | A scheduled job on a table too large for one Python process | `score` job, `inference_mode: spark` | `taxi_fare` | [Spark scoring](databricks_spark_scoring.md) |
-| An application sending one request at a time | REST serving endpoint | `taxi_fare_online` | [Serving](databricks_serving.md) |
-| SQL users, SQL jobs and dashboards | SQL function calling the endpoint with `ai_query` | none | [SQL function](databricks_serving.md#3-create-the-sql-function) |
+| An application sending raw feature values | REST serving endpoint | `taxi_fare_robust` | [Serving](databricks_serving.md) |
+| SQL users, SQL jobs and dashboards | SQL function calling the endpoint with `ai_query` | `taxi_fare_robust` | [SQL function](databricks_serving.md#3-create-the-sql-function) |
 | Requests that send only an entity key | Endpoint with online feature lookup | `taxi_fare_online` | [Online features](databricks_online_features.md) |
 
 The batch job never calls an endpoint, and an endpoint never writes the
 prediction table. Models packaged with feature lookup score in batch only with
 `inference_mode: spark`. Runtime and cost per path are compared in
 [how predictions are produced](databricks_serving.md#choose-how-predictions-are-produced).
+
+For rows excluded by preprocessing at scoring, start with `taxi_fare_robust`.
+Its Spark and raw-input endpoint examples retain row identity and explain
+`excluded` status, null predictions and the resulting monitoring coverage.
 
 ## Which steps run on Spark workers and endpoints?
 

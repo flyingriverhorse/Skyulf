@@ -91,6 +91,20 @@ def test_disabled_policy_has_no_required_windows():
     assert result["required_windows"] is None
 
 
+def test_wape_policy_minimizes_and_refuses_missing_evidence():
+    """WAPE must use a lower-is-better policy without acting on an undefined denominator."""
+    settings = policy(metric="wape", direction="lower", consecutive_windows=1)
+    assert validate_performance_policy(settings) == settings
+    result = evaluate_performance(
+        settings,
+        current(metric="wape", value=None),
+        baseline(metric="wape", value=0.2),
+        [],
+        now=NOW,
+    )
+    assert result["status"] == "unavailable" and result["action"] == "none"
+
+
 def test_historical_window_revisit_updates_evidence_without_authorizing_training():
     """Late labels can repair an older streak window without starting stale training."""
     end = datetime(2026, 10, 5, 10, tzinfo=UTC)

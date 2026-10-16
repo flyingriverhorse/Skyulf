@@ -75,6 +75,16 @@ PROJECTS = {
         "training_edits": (LOOKUP_FILL, PROBE),
     },
     "taxi_fare_robust": {
+        "readme_note": (
+            "\n## Report WAPE performance changes\n\n"
+            "`deployment/targets.yml` enables a report-only WAPE policy for this model.\n"
+            "It compares completed daily windows with version 1's saved training holdout,\n"
+            "using a 20% relative tolerance and two consecutive windows. It never requests\n"
+            "training. Before deployment, replace the baseline version with the concrete\n"
+            "version you will monitor; older Spark reference caches without WAPE remain unavailable.\n"
+            "See [SERVE_EXAMPLE.md](SERVE_EXAMPLE.md#report-performance-loss-without-retraining)\n"
+            "for label coverage, timing, baseline changes and disabling the policy.\n"
+        ),
         "sources": (
             "config/pre_split.yml",
             "config/preprocessing.yml",
@@ -183,6 +193,9 @@ def generate_example(directory, name):
             raise RuntimeError(f"{name}: generated training.yml no longer contains: {old!r}")
         text = text.replace(old, new)
     training_path.write_text(text, encoding="utf-8", newline="\n")
+    if note := spec.get("readme_note"):
+        readme = project / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8") + note, encoding="utf-8", newline="\n")
     return project
 
 

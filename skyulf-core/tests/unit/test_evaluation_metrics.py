@@ -468,7 +468,7 @@ def test_regression_metrics_returns_all_expected_keys():
     y = pd.Series(X["f1"] + 1)
     model = LinearRegression().fit(X, y)
     metrics = calculate_regression_metrics(model, X, y)
-    assert set(metrics.keys()) == {"mae", "mse", "rmse", "r2", "mape", "explained_variance"}
+    assert set(metrics.keys()) == {"mae", "mse", "rmse", "r2", "mape", "explained_variance", "wape"}
 
 
 # ---------------------------------------------------------------------------

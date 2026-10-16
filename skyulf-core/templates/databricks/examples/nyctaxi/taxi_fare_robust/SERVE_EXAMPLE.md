@@ -42,11 +42,18 @@ This example's `deployment/targets.yml` binds `monitoring_label_table` to
 configuration supplies the join key `trip_id` and target `fare_amount`. Run the
 loader first: it creates outcomes with the trip's end time as availability time.
 Only predictions with status `predicted` and an available, finite outcome enter
-performance metrics; excluded rows are counted separately. Measuring performance
-does not enable a performance-loss policy or automatic retraining.
+performance metrics; excluded rows are counted separately. This prepared project
+also enables the report-only WAPE policy described below; it never requests training.
 Some taxi outcomes have a zero fare, which can make MAPE extremely large.
 Inspect MAE and RMSE alongside coverage; do not treat MAPE alone as a useful
 relative-error summary for this data.
+WAPE is also reported: total absolute error divided by total absolute actual
+fare. It remains useful with individual zero fares but is unavailable when the
+entire scored-and-labeled population has zero actual fares. A value of 0.1 means
+10%. Outside this prepared project, performance policies remain opt-in.
+Scoring labels keep their observed fare amounts; the training target-range filter
+does not remove unusual outcomes from monitoring. A much larger RMSE than MAE
+indicates that a small number of large errors dominate the squared error.
 
 The loader initially scores the same January population used for training, so
 that first observation is a wiring check. To observe later data without retraining,
@@ -55,13 +62,45 @@ then run the score job again. Leave `trips_train` unchanged. The incremental bat
 receipt identifies the new prediction window; inspect its row counts and source
 versions instead of treating the entire prediction table as one observation.
 
-`pickup_zip` is a string, not a numeric measurement. Categorical drift currently
-supports at most 50 distinct non-null reference categories; this taxi reference
-exceeds that limit. Its categorical evidence is therefore unavailable, and the
-observation is degraded even when the four numeric features and performance are
-measured. Do not interpret that status as proof of stable pickup-zone frequencies
-or cast ZIP codes to numbers to bypass the limit. See `src/monitoring/README.md`
-for monitoring setup and dashboard publication.
+`pickup_zip` is a string, not a numeric measurement. By default, repeated categorical domains
+with more than 50 reference values now compare the 50 most frequent reference
+labels plus one pooled tail. The reference uniqueness ratio must be at most 0.5,
+and neither side may exceed 10,000 categories. Inspect its `psi_categorical`,
+statistical evidence and diagnostic `new_category_rate`; pooling can hide shifts
+within rare ZIP codes. A supported ZIP comparison no longer degrades the report
+solely because it exceeds 50 categories. Other unavailable checks can still do
+so. Do not cast ZIP codes to numbers. See `src/monitoring/README.md` for monitoring
+setup and dashboard publication.
+
+## Report performance loss without retraining
+
+Each target in `deployment/targets.yml` includes `monitoring_performance_policies`
+for `${var.catalog}.${var.metadata_schema}.taxi_fare_robust_model${var.resource_suffix}`.
+The example uses `mode: report`, `metric: wape`, `direction: lower` and a
+`training_holdout` baseline pinned to model version `"1"`. This initial version
+assumes a fresh registered model. Before activation/scoring enrollment, replace
+it with the concrete version you will observe, including when using an existing
+model name or moving to a newly promoted version. Aliases such as `champion` are
+not valid baseline versions.
+
+The tolerance is 0.2 relative: a holdout WAPE of 0.05 permits values below 0.06.
+A value at or above 0.06 indicates loss for that window. Each window spans 24
+hours, waits six hours for outcomes, and needs at least 20 labeled predictions
+and 80% label coverage. Two adjacent eligible loss windows meet the streak rule.
+Even then, `mode: report` never requests training or changes serving traffic.
+
+Deploy the producer, run activation/scoring to update enrollment, then run the
+monitoring job. Its performance section reports the current value, saved baseline,
+limit, reason and streak. These daily windows differ from a whole-month batch
+metric; do not use February's aggregate WAPE as if it were a daily policy result.
+An older prepared Spark reference without cached WAPE, a version mismatch, zero-total actuals
+or insufficient labels gives unavailable/insufficient evidence. Historical
+training-run metrics are not rewritten. Use a compatible prepared reference or select an
+explicit supported production-window baseline before expecting a verdict.
+
+To disable the policy, set that model's entry to `{"mode":"off"}`. Use the
+[performance policy guide](https://www.skyulf.com/manual/user_guide/databricks_performance.html)
+for the full configuration and other baseline choices.
 
 ## Create the endpoint explicitly
 

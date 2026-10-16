@@ -9,11 +9,12 @@ not inspect your tables.
 ### Start from the closest example
 
 Copying a finished project is usually faster than answering the setup wizard.
-Four NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
+Five NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 
 | Your project | Copy | Notes |
 | --- | --- | --- |
 | One model, scored on Spark workers | `taxi_fare` | Promotes automatically and scores after promotion |
+| Preprocessing exclusions with Spark and raw-input serving | `taxi_fare_robust` | Reuses pre-split preparation; IQR, PowerTransformer and imputer handling; REST/`ai_query` examples and labels for monitoring |
 | One model behind an online endpoint | `taxi_fare_online` | Needs a billable Lakebase online store; no batch scoring |
 | One target, several candidate algorithms | `taxi_high_fare` | Competition with custom steps and manual approval |
 | Several targets approved together | `taxi_trips` | Model set with a combined scoring rule |

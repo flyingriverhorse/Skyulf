@@ -9,6 +9,12 @@ next.
 The end-to-end flow from scoring to dashboard is on the
 [monitoring overview](databricks_monitoring.md#how-monitoring-runs).
 
+Set per-model measurement controls through the existing
+`monitoring_drift_thresholds` JSON variable. The [complete settings table](databricks_drift.md#configure-thresholds-and-measurement-limits)
+covers category grouping, uniqueness, summary caps, PSI severity wording and
+non-Spark row/byte budgets. Empty `{}` preserves existing enrollment defaults.
+These settings do not resize Spark compute or change model admission probes.
+
 The canonical dashboard definition is `src/monitoring/monitoring.lvdash.json`
 inside the existing Databricks project template. This is not a separate Bundle
 or another project template. Single, competition and model-set projects write to

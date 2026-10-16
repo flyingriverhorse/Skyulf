@@ -89,6 +89,30 @@ def test_comparison_uses_same_holdout_and_minimizes_error(tmp_path, monkeypatch)
     assert json.loads(json.dumps(asdict(report)))["candidate_version"] == "2"
 
 
+def test_wape_selects_the_better_fitted_candidate(tmp_path, monkeypatch) -> None:
+    """Heldout WAPE must be computed from real saved models and select the lower error."""
+    candidate, champion = _fitted(tmp_path, 0.0), _fitted(tmp_path, 10.0)
+    artifacts = {"2": candidate, "1": champion}
+    monkeypatch.setattr(
+        validation, "load_registered_pipeline", lambda ref, **kwargs: artifacts[ref.version]
+    )
+    report = validation.compare_registered_pipeline_models(
+        _reference(candidate, "2"),
+        _reference(champion, "1"),
+        _holdout(),
+        target_column="target",
+        dataset_id="holdout@1",
+        metric="heldout_wape",
+        min_improvement=0.01,
+        max_rows=20,
+        max_bytes=10_000,
+    )
+    assert report.metric_direction == "minimize" and report.eligible
+    assert report.candidate_metrics["heldout_wape"] == pytest.approx(0.0, abs=1e-12)
+    assert report.champion_metrics is not None
+    assert report.champion_metrics["heldout_wape"] == pytest.approx(10 / 44)
+
+
 def test_first_candidate_is_reported_without_automatic_champion(tmp_path, monkeypatch) -> None:
     """The first registered version must still require a separate bootstrap choice."""
     candidate = _fitted(tmp_path, 0.0)

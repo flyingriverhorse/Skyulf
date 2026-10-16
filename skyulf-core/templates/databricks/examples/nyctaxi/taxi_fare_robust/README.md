@@ -40,3 +40,13 @@ upgrade notes before changing deployed jobs. Fitting saves preprocessing and
 model state, so editing a recipe afterwards needs a new trained version.
 Promotion, score selection and online traffic are separate decisions. All public
 guides are listed in the [topic index](https://www.skyulf.com/manual/user_guide/databricks_bundle.html).
+
+## Report WAPE performance changes
+
+`deployment/targets.yml` enables a report-only WAPE policy for this model.
+It compares completed daily windows with version 1's saved training holdout,
+using a 20% relative tolerance and two consecutive windows. It never requests
+training. Before deployment, replace the baseline version with the concrete
+version you will monitor; older Spark reference caches without WAPE remain unavailable.
+See [SERVE_EXAMPLE.md](SERVE_EXAMPLE.md#report-performance-loss-without-retraining)
+for label coverage, timing, baseline changes and disabling the policy.

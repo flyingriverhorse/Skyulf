@@ -191,6 +191,31 @@ def test_invalid_thresholds_block_scoring_before_inference(monkeypatch, raw):
     run.assert_not_called()
 
 
+@pytest.mark.parametrize("engine", ["local", "spark"])
+def test_json_limits_reach_enrollment_without_changing_spark_budgets(engine):
+    """The existing Bundle JSON variable must carry overrides into the registered configuration."""
+    from skyulf.integrations.databricks.observability.monitoring import (
+        monitoring_registration as registration,
+    )
+
+    overrides = {
+        "categorical_top_k": 20,
+        "id_like_uniqueness": 0.75,
+        "monitor_max_rows": 200_000,
+        "monitor_max_bytes": 256 * 1024**2,
+    }
+    config = registration.build_monitor_enrollment_config(
+        workflow(),
+        settings(
+            monitoring_execution_engine=engine, monitoring_drift_thresholds=json.dumps(overrides)
+        ),
+        "1",
+    )
+    assert config.thresholds == overrides
+    assert config.max_rows == (200_000 if engine == "local" else 10000)
+    assert config.max_bytes == (256 * 1024**2 if engine == "local" else 64 * 1024**2)
+
+
 def settings(**changes):
     """Keep monitoring storage separate from all model project namespaces."""
     return {

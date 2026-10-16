@@ -32,7 +32,7 @@ variables:
     description: Minimum new or changed labeled training rows for either automatic trigger
     default: "1"
   monitoring_drift_thresholds:
-    description: 'JSON overrides for psi, ks_statistic, wasserstein, kl_divergence; {} uses Core defaults'
+    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring.'
     default: '{}'
   monitoring_performance_policies:
     description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
