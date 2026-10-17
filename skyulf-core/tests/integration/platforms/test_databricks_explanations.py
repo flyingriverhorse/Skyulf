@@ -191,6 +191,7 @@ def test_too_few_survivors_keeps_exclusion_evidence(tmp_path, monkeypatch, survi
         {"method": "shap", "max_samples": True},
         {"method": "shap", "max_samples": 201},
         {"method": "shap", "max_features": 0},
+        {"method": "shap", "max_features": 101},
         {"method": "shap", "max_display_samples": 51},
         {"method": "shap", "max_samples": 2, "max_display_samples": 3},
         {"method": "shap", "unknown": 1},
@@ -302,3 +303,8 @@ def test_explanation_failures_preserve_evidence(tmp_path, monkeypatch, failure) 
     assert result["reason"] == reasons[failure]
     if failure == "transform":
         assert result["detail"] == "inference blocked"
+
+
+def test_wide_feature_budget_up_to_100_is_accepted() -> None:
+    """Models with 51-100 transformed features (e.g. fixed one-hot sets) can be explained."""
+    validate_explanation_config({"explainability": {"method": "shap", "max_features": 100}})

@@ -25,8 +25,8 @@
     "order": 902,
     "type": "string",
     "default": "30",
-    "pattern": "^(?:[1-9]|[1-4][0-9]|50)$",
-    "description": "Model explanations | Maximum transformed features (1-50). This is a guard, NOT top-K selection: exceeding it reports unavailable without computing SHAP",
+    "pattern": "^(?:[1-9]|[1-9][0-9]|100)$",
+    "description": "Model explanations | Maximum transformed features (1-100). This is a guard, NOT top-K selection: exceeding it reports unavailable without computing SHAP",
     "skip_prompt_if": {"properties": {"shap_enabled": {"const": "false"}}}
   },
   "shap_max_display_samples": {

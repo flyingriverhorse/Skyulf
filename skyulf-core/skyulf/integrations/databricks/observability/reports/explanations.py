@@ -13,7 +13,7 @@ from .....modeling._explainability.shap_explanation import compute_shap_explanat
 from .explanation_report import render_explanation_report
 
 _DEFAULTS = {"max_samples": 100, "max_features": 30, "max_display_samples": 10}
-_LIMITS = {"max_samples": (1, 200), "max_features": (1, 50), "max_display_samples": (0, 50)}
+_LIMITS = {"max_samples": (1, 200), "max_features": (1, 100), "max_display_samples": (0, 50)}
 _MIN_EXPLAINED_ROWS_AFTER_EXCLUSIONS = 2
 
 

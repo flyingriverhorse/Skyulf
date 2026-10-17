@@ -93,7 +93,7 @@ change; it does not invent a leaf if the graph has none.
 | Budget | Allowed value | Effect |
 | --- | --- | --- |
 | `max_samples` | 1–200; generated default 100 | Maximum training rows used for SHAP computation. Larger values can be expensive, especially for generic explainers. |
-| `max_features` | 1–50; default 30 | Guard on transformed input width. It does **not** select the top features or drop columns; exceeding it produces `unavailable`. |
+| `max_features` | 1–100; default 30 | Guard on transformed input width. It does **not** select the top features or drop columns; exceeding it produces `unavailable`. |
 | `max_display_samples` | 0–50, no greater than `max_samples`; generated default 3 | Number of saved sample waterfalls. Zero keeps global importance without sample waterfalls. |
 
 Budgets apply per fitted model: eight candidates can each compute an
