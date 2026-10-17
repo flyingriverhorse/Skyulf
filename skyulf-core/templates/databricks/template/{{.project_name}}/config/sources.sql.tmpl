@@ -9,9 +9,13 @@
 {{- range $slot := (regexp "[1-8]").FindAllString "12345678" -1 -}}{{- if le $slot $.branch_count -}}
 {{- $features = printf "%s,%s" $features (index $ (printf "branch_%s_input_columns" $slot)) -}}
 {{- $targets = printf "%s,%s" $targets (index $ (printf "branch_%s_target_column" $slot)) -}}
-{{- $events = printf "%s,%s,%s,%s" $events (index $ (printf "branch_%s_event_column" $slot)) (index $ (printf "branch_%s_result_available_at_column" $slot)) (index $ (printf "branch_%s_cv_group_column" $slot)) -}}
+{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_event_column" $slot)) -}}
+{{- if ne $.source_layout "separate_outcomes" -}}{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_result_available_at_column" $slot)) -}}{{- end -}}
+{{- $events = printf "%s,%s" $events (index $ (printf "branch_%s_cv_group_column" $slot)) -}}
 {{- end -}}{{- end -}}
-{{- else -}}{{- $features = printf "%s,%s" $features .input_columns -}}{{- $targets = .target_column -}}{{- $events = printf "%s,%s,%s" .event_column .result_available_at_column .cv_group_column -}}{{- end -}}
+{{- else -}}{{- $features = printf "%s,%s" $features .input_columns -}}{{- $targets = .target_column -}}{{- $events = .event_column -}}
+{{- if ne .source_layout "separate_outcomes" -}}{{- $events = printf "%s,%s" $events .result_available_at_column -}}{{- end -}}
+{{- $events = printf "%s,%s" $events .cv_group_column -}}{{- end -}}
 {{- $training := printf "%s,%s" $features $events -}}{{- if ne .source_layout "separate_outcomes" -}}{{- $training = printf "%s,%s" $training $targets -}}{{- end -}}
 {{- $score := .score_source_table_name -}}{{- if not $score -}}{{- $score = $source -}}{{- end -}}
 {{- $sourceLabels := (regexp (printf "(?i)^(%s|%s\\.%s\\.%s)$" $source .catalog .schema $source)).MatchString .label_table_name -}}

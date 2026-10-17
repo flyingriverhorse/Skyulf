@@ -1,6 +1,7 @@
 """Source and policy answers must become target-bound, executable configuration."""
 
 import json
+import re
 
 import pytest
 import yaml
@@ -169,6 +170,54 @@ def test_source_sql_creates_a_shared_label_source_only_once(tmp_path, label):
     assert sql.count("CREATE TABLE {catalog}.{input_schema}.observations") == 1
     assert "`known_at` TIMESTAMP" in sql
     assert "`customer` TYPE_FOR_customer" in sql
+
+
+@pytest.mark.parametrize("layout", ["single_model", "model_competition", "multi_target"])
+@pytest.mark.parametrize("sources", ["single_table", "separate_outcomes", "separate_all"])
+def test_source_sql_places_availability_on_the_table_that_owns_outcomes(tmp_path, layout, sources):
+    """Separate outcomes must not require label metadata on measurements or drop other inputs."""
+    project = _generate_project(
+        tmp_path,
+        training_layout=layout,
+        source_layout=sources,
+        source_table_name="measurements",
+        score_source_table_name="new_measurements" if sources == "separate_all" else "",
+        label_table_name="outcomes",
+        label_available_at_column="known_at",
+        record_key_columns="id",
+        input_columns="measurement",
+        target_column="value",
+        event_column="event_time",
+        cv_group_column="group_id",
+        result_available_at_column="training_known_at",
+        branch_1_input_columns="measurement",
+        branch_2_input_columns="measurement",
+        branch_1_target_column="first_value",
+        branch_2_target_column="second_value",
+        branch_1_event_column="event_time",
+        branch_2_event_column="event_time",
+        branch_1_cv_group_column="group_id",
+        branch_2_cv_group_column="group_id",
+        branch_1_result_available_at_column="first_known_at",
+        branch_2_result_available_at_column="second_known_at",
+        include_source_sql="true",
+    )
+    sql = (project / "config/sources.sql").read_text()
+    tables = dict(re.findall(r"CREATE TABLE (\S+) \((.*?)\) USING DELTA", sql, re.S))
+    columns = {table: set(re.findall(r"`([^`]+)`", body)) for table, body in tables.items()}
+    targets = {"first_value", "second_value"} if layout == "multi_target" else {"value"}
+    availability = (
+        {"first_known_at", "second_known_at"} if layout == "multi_target" else {"training_known_at"}
+    )
+    training = {"id", "measurement", "event_time", "group_id"}
+    if sources != "separate_outcomes":
+        training |= targets | availability
+    assert columns["{catalog}.{input_schema}.measurements"] == training
+    assert columns["{catalog}.{input_schema}.outcomes"] == {"id", "known_at"} | targets
+    assert "`known_at` TIMESTAMP" in tables["{catalog}.{input_schema}.outcomes"]
+    if sources == "separate_all":
+        assert columns["{catalog}.{input_schema}.new_measurements"] == {"id", "measurement"}
+    assert len(tables) == (3 if sources == "separate_all" else 2)
 
 
 @pytest.mark.parametrize(
