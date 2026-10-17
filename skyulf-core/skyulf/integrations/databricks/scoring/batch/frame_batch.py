@@ -193,10 +193,17 @@ def _validate_training_frames(data: SplitDataset, max_rows: int, max_bytes: int)
     ):
         raise TypeError("Training splits must be pandas or Polars DataFrames.")
     present = [frame for frame in frames if isinstance(frame, pd.DataFrame | pl.DataFrame)]
-    if sum(len(frame) for frame in present) > max_rows:
-        raise ValueError("Training input exceeds max_rows.")
-    if sum(frame_bytes(frame) for frame in present) > max_bytes:
-        raise ValueError("Training input exceeds max_bytes.")
+    if (rows := sum(len(frame) for frame in present)) > max_rows:
+        raise ValueError(
+            f"Training input has {rows} rows, exceeding max_rows={max_rows}. "
+            "Reduce the combined split size or increase fit_workflow(max_rows=...)."
+        )
+    if (size := sum(frame_bytes(frame) for frame in present)) > max_bytes:
+        raise ValueError(
+            f"Training input size {size} bytes exceeds max_bytes={max_bytes}. "
+            "Reduce the combined split size or increase fit_workflow(max_bytes=...) "
+            "only if sufficient memory is available."
+        )
 
 
 def _validate_scoring_source(spec: SourceSpec, prepared: PreparedWorkflow) -> None:

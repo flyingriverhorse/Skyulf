@@ -160,6 +160,28 @@ def test_reader_rejects_row_and_byte_overruns() -> None:
         read_source(_Spark(rows[:1], []), _spec(max_bytes=1))
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("budget", ["max_rows", "max_bytes"])
+def test_training_limit_error_names_budget_and_remedy(tmp_path, engine, budget):
+    """An exceeded aggregate split budget must explain how to fix the API call before fit."""
+    frame = pd.DataFrame({"x": [1.0, 2.0, 3.0], "target": [2.0, 4.0, 6.0]})
+    if engine == "polars":
+        frame = pl.from_pandas(frame)
+    limits = {"max_rows": 3, "max_bytes": 4096} | {budget: 1}
+    with pytest.raises(ValueError) as error:
+        fit_workflow(
+            {},
+            SplitDataset(train=frame[:2], test=frame[2:]),
+            target_column="target",
+            artifact_path=tmp_path / "should_not_exist",
+            **limits,
+        )
+    message = str(error.value)
+    assert f"{budget}=1" in message
+    assert "Reduce" in message and "fit_workflow" in message
+    assert not (tmp_path / "should_not_exist").exists()
+
+
 def test_fit_and_score_local_workflow_keeps_keys_outside_model(tmp_path) -> None:
     """A loaded fitted pipeline must score the new table without labels or refitting."""
     train = pd.DataFrame({"x": np.arange(8, dtype="float64"), "target": np.arange(8) * 2.0})
@@ -212,6 +234,7 @@ def test_heldout_regression_metrics_use_saved_pipeline_and_200_test_rows(tmp_pat
         "heldout_rmse",
         "heldout_r2",
         "heldout_mape",
+        "heldout_wape",
         "heldout_explained_variance",
     }
     assert metrics["heldout_mae"] == pytest.approx(0.0, abs=1e-8)
@@ -219,6 +242,7 @@ def test_heldout_regression_metrics_use_saved_pipeline_and_200_test_rows(tmp_pat
     assert metrics["heldout_r2"] == pytest.approx(1.0)
     assert metrics["heldout_mse"] == pytest.approx(0.0, abs=1e-8)
     assert metrics["heldout_mape"] == pytest.approx(0.0, abs=1e-8)
+    assert metrics["heldout_wape"] == pytest.approx(0.0, abs=1e-8)
     assert metrics["heldout_explained_variance"] == pytest.approx(1.0)
 
 
