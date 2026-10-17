@@ -38,7 +38,7 @@ from ..scoring.shared.prediction_output import (
     IDENTIFIER_PATTERN,
     TABLE_NAME_PATTERN,
     activate_prediction_view,
-    managed_prediction_view_exists,
+    active_prediction_generation,
     provision_prediction_table,
     scoring_target,
 )
@@ -231,6 +231,7 @@ def _scoring_config(config: dict[str, Any]) -> WorkflowConfig:
         runtime="databricks",
         engine=config["engine"],
         inference_mode=config.get("inference_mode", "local"),
+        initial_scoring=config.get("initial_scoring", "full_snapshot"),
         spark_udf_env_manager=config.get("spark_udf_env_manager", "virtualenv"),
         spark_udf_prediction_batch_rows=config.get("spark_udf_prediction_batch_rows", 10_000),
         source=InputSource(
@@ -718,8 +719,9 @@ def _run_scoring_action(
             raise ValueError("Champion scoring requires a committed champion.")
         config = {**config, "model_version": champion_version}
     target = scoring_target(config)
+    previous_target = None
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":
-        managed_prediction_view_exists(spark, config["prediction_table"])
+        previous_target = active_prediction_generation(spark, config["prediction_table"])
     score_config = {**config, "prediction_table": target}
     prepared = prepare_workflow(_scoring_config(score_config))
     from ..scoring.batch.spark_scoring import validate_prepared_spark  # noqa: PLC0415
@@ -733,6 +735,11 @@ def _run_scoring_action(
         prepared,
         record_key_columns=tuple(config["record_key_columns"]),
         admission=SingleWriterAdmission(),
+        **(
+            {"previous_prediction_table": previous_target}
+            if previous_target != target and previous_target
+            else {}
+        ),
         **({"recovery_request": recovery_request} if recovery_request is not None else {}),
     )
     if config.get("model_change_mode", "incremental_append") == "full_rebuild":

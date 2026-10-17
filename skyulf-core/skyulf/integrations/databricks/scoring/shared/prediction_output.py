@@ -62,7 +62,7 @@ def activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
         _validate_generation_schema(spark, logical, physical)
         if _view_reads_generation(spark, logical, generation):
             return
-    if not physical.limit(1).count():
+    if not physical.limit(1).count() and not _empty_start_generation(spark, generation):
         raise ValueError("A full-rebuild generation must contain predictions before activation.")
     if not exists:
         spark.sql(
@@ -71,6 +71,48 @@ def activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
         ).collect()
         return
     spark.sql(f"ALTER VIEW {logical} AS SELECT * FROM {generation}").collect()
+
+
+def active_prediction_generation(spark: Any, logical: str) -> str | None:
+    """Resolve only a managed same-target generation for boundary inheritance."""
+    if not TABLE_NAME_PATTERN.fullmatch(logical):
+        raise ValueError("Prediction view must be a three-part UC name.")
+    if not managed_prediction_view_exists(spark, logical):
+        return None
+    row = spark.sql(f"SHOW CREATE TABLE {logical}").first()
+    sql = row["createtab_stmt"].replace("`", "") if row is not None else ""
+    match = re.search(
+        r"\bAS\s+SELECT\s+\*\s+FROM\s+(" + re.escape(logical) + r"_v[1-9][0-9]*)\s*;?\s*$",
+        sql,
+        re.IGNORECASE,
+    )
+    if match is None:
+        raise ValueError("Managed prediction view does not select one complete model generation.")
+    return match[1]
+
+
+def _empty_start_generation(spark: Any, generation: str) -> bool:
+    """Allow an empty from_now result only after its atomic receipt was committed."""
+    import json  # noqa: PLC0415
+
+    from ...data.delta_io.delta import prediction_commit, table_identity  # noqa: PLC0415
+    from ..incremental.incremental_batch import latest_source_version  # noqa: PLC0415
+    from ..incremental.initial_scoring import start_fields  # noqa: PLC0415
+
+    latest = prediction_commit(spark, generation, latest_source_version(spark, generation))
+    try:
+        receipt = json.loads(latest["userMetadata"] or "{}")
+    except (TypeError, ValueError):
+        return False
+    if (
+        receipt.get("skyulf_mode") != "incremental_append"
+        or receipt.get("initial_scoring") != "from_now"
+        or receipt.get("target_table_id") != table_identity(spark, generation)
+        or receipt.get("output_count") != 0
+    ):
+        return False
+    start_fields(receipt, "from_now", receipt.get("source_end_version"))
+    return True
 
 
 def _view_reads_generation(spark: Any, logical: str, generation: str) -> bool:
@@ -222,6 +264,7 @@ def _create_prediction_table(
     """Check local bootstrap size and create a target with pinned generation properties."""
     if (
         config.get("inference_mode", "local") != "spark"
+        and config.get("initial_scoring", "full_snapshot") != "from_now"
         and source.select(*config["record_key_columns"], *config["input_columns"])
         .limit(config["max_rows"] + 1)
         .count()

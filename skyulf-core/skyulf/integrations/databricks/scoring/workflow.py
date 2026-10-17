@@ -122,12 +122,15 @@ class WorkflowConfig(BaseModel):
     model: ModelSelection
     sink: OutputSink
     inference_mode: Literal["local", "spark"] = "local"
+    initial_scoring: Literal["full_snapshot", "from_now"] = "full_snapshot"
     spark_udf_env_manager: Literal["local", "virtualenv"] = "virtualenv"
     spark_udf_prediction_batch_rows: int = Field(default=10_000, gt=0, le=100_000)
 
     @model_validator(mode="after")
     def validate_inference_runtime(self) -> WorkflowConfig:
         """Keep distributed inference separate from the saved local training engine."""
+        if self.initial_scoring == "from_now":
+            self._validate_initial_scoring_source()
         if self.inference_mode == "spark" and (
             self.runtime != "databricks" or self.engine != "pandas"
         ):
@@ -135,6 +138,19 @@ class WorkflowConfig(BaseModel):
         if self.inference_mode == "spark":
             self._validate_spark_source()
         return self
+
+    def _validate_initial_scoring_source(self) -> None:
+        """A starting watermark requires the admitted incremental Delta publication path."""
+        if (
+            self.runtime != "databricks"
+            or self.source.kind != "uc_table"
+            or self.source.read_mode != "incremental"
+            or self.source.version is not None
+            or self.sink.kind != "uc_delta"
+        ):
+            raise ValueError(
+                "initial_scoring=from_now requires incremental Databricks Delta scoring."
+            )
 
     def _validate_spark_source(self) -> None:
         """Limit Spark mode to the distributed source and publication route it implements."""

@@ -710,6 +710,7 @@ def score_model_set_payload(
         prediction_table=settings["prediction_table"],
         admission=SingleWriterAdmission(),
         model_change_mode=config["model_change_mode"],
+        initial_scoring=config.get("initial_scoring", "full_snapshot"),
         max_rows=config["max_rows"],
         max_bytes=input_budget_bytes(config.get("max_input_mb")),
         publication=settings.get("publication"),

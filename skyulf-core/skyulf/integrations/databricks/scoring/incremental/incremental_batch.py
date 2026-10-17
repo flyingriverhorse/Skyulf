@@ -4,7 +4,6 @@ import hashlib
 import importlib
 import json
 import pickle
-from contextlib import nullcontext
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any
@@ -44,6 +43,12 @@ from ..batch.spark_scoring import (
 from ..publish import check_target
 from ..workflow import PreparedWorkflow, WorkflowConfig
 from .history import history_receipt, incremental_history
+from .initial_scoring import (
+    PredictionCheckpoint,
+    scoring_snapshot,
+    snapshot_read_errors,
+    start_fields,
+)
 
 
 class SourceChangeRequiresRebuild(ValueError):
@@ -169,16 +174,19 @@ def run_incremental_batch(
     admission: PublishAdmission | None,
     period_column: str | None = None,
     recovery_request: dict[str, Any] | None = None,
+    previous_prediction_table: str | None = None,
 ) -> IncrementalBatchResult:
-    """Score the initial snapshot, then only inserts since the last target receipt.
+    """Apply the initial scoring policy, then score inserts after the target receipt.
 
     Source and target tables already exist. The source must have Delta CDF
     enabled before subsequent changes. Multiple target writers must share
     admission. A sole writer may instead use explicit SingleWriterAdmission
     when its job is serialized and no other writer can modify the target.
     A target commit outside this protocol halts automatic scoring.
-    A recovery request explicitly replaces the same target from its pinned
-    full snapshot after CDF history loss; ordinary calls never opt in implicitly.
+    ``from_now`` first commits an empty checkpoint and preserves its starting
+    boundary across rebuilds. A recovery request explicitly replaces the same
+    target from its pinned eligible snapshot after CDF history loss; ordinary
+    calls never opt in implicitly.
     """
     inputs = _validate_prepared(prepared, record_key_columns, period_column)
     validate_prepared_spark(prepared)
@@ -214,6 +222,9 @@ def run_incremental_batch(
         check_incremental_bootstrap(spark, target_table, previous, functions)
         prior_version = int(previous["source_end_version"]) if previous else None
         upper_version = int(latest_source_version(spark, source_table)["version"])
+        initial, checkpoint = _initial_fields(
+            spark, prepared, previous, previous_prediction_table, source_id, upper_version
+        )
         if prior_version is not None and upper_version < prior_version:
             raise BatchConflictError("Source version moved behind the committed watermark.")
         if prior_version == upper_version:
@@ -240,6 +251,8 @@ def run_incremental_batch(
             prior_version,
             upper_version,
             functions,
+            boundary=initial.get("scoring_start_version"),
+            checkpoint=checkpoint,
         )
         target = spark.table(target_table)
         output_names = check_target(
@@ -265,7 +278,7 @@ def run_incremental_batch(
             prior_version,
             upper_version,
             frame,
-            history_receipt(temporal_session) | coverage,
+            history_receipt(temporal_session) | coverage | initial,
         )
         output = _complete_incremental_output(output, target, config, digest, functions, frame)
         committed, recorded = _commit_increment(
@@ -305,15 +318,26 @@ def _read_incremental_input(
     prior: int | None,
     upper: int,
     functions: Any,
+    *,
+    boundary: int | None = None,
+    checkpoint: PredictionCheckpoint | None = None,
 ) -> tuple[Any, pd.DataFrame | DistributedRows]:
     """Attach pinned recovery evidence to history loss during CDF materialization only."""
     config = prepared.config
     assert config.source.table is not None
     try:
-        with normalize_cdf_error() if prior is not None else nullcontext():
-            selected = select_incremental_rows(
-                spark, config.source.table, prior, upper, period, functions
+        with normalize_cdf_error() if prior is not None else snapshot_read_errors(boundary):
+            selected = (
+                scoring_snapshot(
+                    spark, config.source.table, upper, keys, boundary, checkpoint=checkpoint
+                )
+                if prior is None and boundary is not None
+                else select_incremental_rows(
+                    spark, config.source.table, prior, upper, period, functions
+                )
             )
+            if prior is None and boundary is not None:
+                _validate_event_time(selected, period, functions)
             frame = _read_scoring_rows(selected, prepared, (*keys, *inputs), keys)
         return selected, frame
     except CdfHistoryExpired as exc:
@@ -328,6 +352,40 @@ def _read_incremental_input(
             source_end_version=upper,
         )
         raise CdfRecoveryRequired(request) from exc
+
+
+def _initial_fields(
+    spark: Any,
+    prepared: PreparedWorkflow,
+    previous: dict | None,
+    previous_table: str | None,
+    source_id: str,
+    upper: int,
+) -> tuple[dict[str, Any], PredictionCheckpoint | None]:
+    """Inherit a generation's original start without adopting its model or watermark."""
+    mode = prepared.config.initial_scoring
+    if previous_table is None:
+        return start_fields(previous, mode, upper), None
+    table_name(previous_table)
+    old_id = table_identity(spark, previous_table)
+    latest = latest_source_version(spark, previous_table)
+    receipt = prediction_commit(spark, previous_table, latest)
+    inherited = last_receipt(receipt, source_id, old_id)
+    if inherited is None or inherited.get("model_name") != prepared.config.model.name:
+        raise BatchConflictError("Previous prediction generation has no matching model receipt.")
+    initial = start_fields(inherited, mode, upper)
+    if previous is not None and start_fields(previous, mode, upper) != initial:
+        raise BatchConflictError(
+            "Prediction generations have different scoring_start_version values."
+        )
+    checkpoint = (
+        PredictionCheckpoint(
+            previous_table, old_id, int(latest["version"]), inherited["source_end_version"]
+        )
+        if initial
+        else None
+    )
+    return initial, checkpoint
 
 
 def _bind_single_recovery(
@@ -386,6 +444,7 @@ def _recover_incremental_batch(
     latest = latest_source_version(spark, target_name)
     receipt = prediction_commit(spark, target_name, latest)
     previous = last_receipt(receipt, source_id, target_id)
+    initial = start_fields(previous, prepared.config.initial_scoring, request["source_end_version"])
     if check_recovery_state(request, previous, int(latest["version"])):
         return IncrementalBatchResult(
             request["source_start_version"],
@@ -398,10 +457,20 @@ def _recover_incremental_batch(
             request["model_name"],
             request["model_version"],
         )
-    selected = select_incremental_rows(
-        spark, source, None, request["source_end_version"], period, functions
+    selected, frame = _read_incremental_input(
+        spark,
+        prepared,
+        keys,
+        period,
+        inputs,
+        source_id,
+        target_id,
+        latest,
+        None,
+        request["source_end_version"],
+        functions,
+        boundary=initial.get("scoring_start_version"),
     )
-    frame = _read_scoring_rows(selected, prepared, (*keys, *inputs), keys)
     target = spark.table(target_name)
     output_names = check_target(spark, selected, target, keys, period, prepared)
     with incremental_history(prepared, None) as temporal_session:
@@ -413,7 +482,9 @@ def _recover_incremental_batch(
         if period is not None
         else bridge
     )
-    fields = history_receipt(temporal_session) | coverage | recovery_receipt_fields(request)
+    fields = (
+        history_receipt(temporal_session) | coverage | recovery_receipt_fields(request) | initial
+    )
     fields |= {"expected_target_version": request["target_version"], "write_mode": "overwrite"}
     _, digest, manifest = _incremental_manifest(
         prepared, source_id, target_id, None, request["source_end_version"], frame, fields
@@ -553,12 +624,17 @@ def select_incremental_rows(
                     "Source updates and deletes require an explicit rescore policy."
                 )
             selected = selected.where(functions.col("_change_type") == "insert")
+    _validate_event_time(selected, period_column, functions)
+    return selected
+
+
+def _validate_event_time(selected: Any, period_column: str | None, functions: Any) -> None:
+    """Apply the same timestamp contract after either snapshot or CDF membership selection."""
     if period_column is not None:
         if selected.schema[period_column].dataType.typeName() != "timestamp":
             raise ValueError("Source event time must be a Spark timestamp.")
         if selected.where(functions.col(period_column).isNull()).limit(1).count():
             raise ValueError("Source event time must not be null.")
-    return selected
 
 
 def _incremental_prediction_bridge(

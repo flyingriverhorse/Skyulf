@@ -20,6 +20,7 @@ from ..lifecycle.workflow import (
 )
 from ..observability.charts.evaluation_chart_data import chart_settings
 from ..observability.reports.explanations import validate_explanation_config
+from ..scoring.incremental.initial_scoring import validate_initial_scoring
 from ..scoring.shared.prediction_output import IDENTIFIER_PATTERN, TABLE_NAME_PATTERN
 from ..scoring.workflow import ModelSelection
 from ..shared._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
@@ -30,6 +31,7 @@ from ..training.weights.weight_config import WEIGHT_FIELDS, validate_weight_role
 
 _ACTIONS = {"train", "score", "approve", "reject", "rollback"}
 WORKFLOW_FIELDS = {
+    "initial_scoring",
     "preprocessing_probe",
     "admit_probed_custom_steps",
     "feature_lookup",
@@ -332,6 +334,7 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
     policy = _choice(config, "promotion_policy", {"automatic", "manual_approval"})
     _choice(config, "score_handoff", {"disabled", "after_alias_change"})
     _choice(config, "model_change_mode", {"incremental_append", "full_rebuild"})
+    validate_initial_scoring(config.get("initial_scoring", "full_snapshot"))
     _validate_workflow_sources(config)
     _validate_workflow_model_selection(config, selection)
     _validate_workflow_quality(config, task, policy)
@@ -626,7 +629,13 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )
     lines.extend(_preview_model_and_scoring(checked, cv))
-    if checked["score_source_table"].casefold() == checked["training_table"].casefold():
+    if checked.get("initial_scoring", "full_snapshot") == "from_now":
+        lines.append(
+            "Initial scoring: from_now. First run commits a zero-row checkpoint; "
+            "later runs score only new inserts. Rebuilds retain the original boundary "
+            "using saved keys and recent CDF. CDF-expiry recovery needs the original snapshot."
+        )
+    elif checked["score_source_table"].casefold() == checked["training_table"].casefold():
         lines.append(
             "Warning: training and scoring use the same source; initial scoring includes training history. "
             "Its performance is not an independent production measurement."

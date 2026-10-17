@@ -11,6 +11,7 @@ from ._project_files import modeling_hook, read_source
 from .workflow_config import WORKFLOW_FIELDS
 
 INFERENCE_FIELDS = {
+    "initial_scoring",
     "inference_mode",
     "spark_udf_env_manager",
     "spark_udf_prediction_batch_rows",
