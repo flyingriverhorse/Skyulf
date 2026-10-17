@@ -3,6 +3,8 @@
 # model Python files, update their optional packages here before redeploying.
 skyulf-core[mlflow]==0.9.3
 mlflow==3.16.1
+# mlflow needs sqlalchemy<3; 2.1.5 has no serverless aarch64 wheel and fails to build there.
+sqlalchemy==2.0.43
 PyYAML==6.0.3
 imbalanced-learn==0.14.1
 sklearn-compat==0.1.5

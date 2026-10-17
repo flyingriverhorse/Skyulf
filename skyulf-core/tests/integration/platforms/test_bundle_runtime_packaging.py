@@ -204,3 +204,12 @@ def test_selected_runtime_dependencies_reach_both_job_types(
                     assert not any("whl" in item for item in task["libraries"])
     bundle = yaml.safe_load((project / "databricks.yml").read_text())
     assert "artifacts" not in bundle
+
+
+def test_shared_requirements_pin_sqlalchemy_to_a_wheel_release():
+    """mlflow pulls sqlalchemy<3; 2.1.5 has no serverless aarch64 wheel and fails to build there."""
+    template = (
+        Path(__file__).resolve().parents[3] / "templates/databricks/template/{{.project_name}}"
+    )
+    lines = (template / "deployment/requirements.txt.tmpl").read_text().splitlines()
+    assert "sqlalchemy==2.0.43" in lines
