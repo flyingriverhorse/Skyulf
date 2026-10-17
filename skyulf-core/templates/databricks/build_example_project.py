@@ -132,6 +132,20 @@ PROJECTS = {
         "removed": SAMPLES,
         "training_edits": (PROBE,),
     },
+    "air_quality_no2": {
+        "group": "real_data",
+        "sources": (
+            "config/pre_split.yml",
+            "config/preprocessing.yml",
+            "deployment/targets.yml",
+            "src/features/pre_split.py",
+            "src/features/preprocessing.py",
+            "src/features/scoring.py",
+            "src/features/sensors.py",
+        ),
+        "removed": SAMPLES,
+        "training_edits": (PROBE,),
+    },
 }
 
 

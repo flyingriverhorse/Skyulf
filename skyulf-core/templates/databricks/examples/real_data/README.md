@@ -1,7 +1,7 @@
 # Real data: custom preprocessing on Spark and serving endpoints
 
-These two prepared projects exercise the same saved Python code in training,
-Spark pandas UDF batches and a Databricks Model Serving endpoint. They demonstrate
+These prepared projects exercise the same saved Python code in training and
+Spark pandas UDF batches; the first two also use a Databricks Model Serving endpoint. They demonstrate
 the custom-step admission added on the development branch: static checks plus
 training-time checks across chunks, order changes, empty inputs, changed rows and
 freshly loaded project modules. They are not new setup questions in the wizard.
@@ -17,6 +17,7 @@ add a source-directory placeholder to the project.
 | --- | --- | --- |
 | `diagnostic_single` | UCI Wisconsin Diagnostic: classify `malignant` (1 = malignant, 0 = benign) from six measured cell-shape features. | A custom circularity column, a fitted percentile clipping step, nested CV with threshold tuning, reusable positive-measurement filter, missing-shape eligibility and a probability-band output. |
 | `bike_demand_set` | UCI Bike Sharing: separate hourly `casual` and `registered` demand regressors, then a custom sum. | Custom cyclic hour features, fitted weather medians, chronological CV/holdout, reusable hour filter, component output rules and a combined model-set rule. |
+| `air_quality_no2` | UCI Air Quality: estimate the hourly NO2 reference value of an Italian city station from five low-cost sensors, weather and the CO analyzer. | Custom and built-in pre-split filters, custom marker/category/fitted steps with built-in IQR exclusion, Yeo-Johnson, imputation, one-hot and scaling; combined scoring (pre-split reuse, a custom eligibility rule and an NO2 band); SHAP, charts, monitoring with real seasonal drift and a report-only WAPE policy. No endpoint. See [its section](#air-quality-real-seasonal-drift-and-every-exclusion-kind). |
 
 The diagnostic dataset is an educational classification example. The probability
 bands describe this fitted model's output; they are not clinical decision rules.
@@ -24,8 +25,8 @@ bands describe this fitted model's output; they are not clinical decision rules.
 ## Data, ownership and leakage boundaries
 
 Run [load_data.py](load_data.py) as a Databricks notebook. It verifies SHA256
-hashes of the original UCI archives and creates six Delta tables across exactly
-two schemas. It never replaces an existing table. An optional
+hashes of the original UCI archives and creates three Delta tables per project
+schema. Its `datasets` widget selects the projects; rerun it with only a new one. It never replaces an existing table. An optional
 `archive_directory` widget accepts the same verified ZIP files staged in a UC
 volume when compute cannot download from UCI.
 
@@ -33,6 +34,7 @@ volume when compute cannot download from UCI.
 | --- | --- | --- | --- |
 | `workspace.diagnostic_single` | 426 actual records; the pipeline makes its own final holdout. | 143 separate, stratified records with no target column. | `record_id`, `malignant`, `result_available_at`. |
 | `workspace.bike_demand_set` | 15,211 hourly records before October 2012. Training precedes July 2012; July–September is the final holdout. | 2,168 October–December 2012 records with no demand targets. | `record_id`, `casual`, `registered`, `cnt`, `result_available_at`. |
+| `workspace.air_quality_no2` | 5,646 hourly records, March–October 2004, with the raw `-200` marker. Training precedes September; September–October is the final holdout. | 3,711 November 2004–April 2005 records with no `no2_gt`. | 3,452 measured hours: `record_id`, `no2_gt`, `result_available_at`. |
 
 The bike models never read `casual`, `registered` or their observed sum `cnt`
 as features. The custom total reads model predictions only. Source clock labels
@@ -46,7 +48,8 @@ This does not distribute estimator fitting across Spark workers. Each project's
 monitoring store uses its own schema, keeping the two examples independent.
 
 Sources: [Wisconsin Diagnostic](https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic)
-and [Bike Sharing](https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset).
+[Bike Sharing](https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset)
+and [Air Quality](https://archive.ics.uci.edu/dataset/360/air+quality).
 Follow their CC BY 4.0 attribution requirements when redistributing the data.
 The repository includes loaders and source hashes, not copies of the records.
 
@@ -228,3 +231,66 @@ The answer JSON files are ordinary Bundle initialization answers. The builder
 uses the real CLI, copies only the listed authored feature/recipe files and
 preserves generated comments. Changes to the template should regenerate the
 examples through this builder rather than editing generated files independently.
+
+## Air quality: real seasonal drift and every exclusion kind
+
+`air_quality_no2` trains on spring and summer 2004 and scores the following
+winter, so its drift and performance changes come from the data, not from a
+synthetic shift. The station writes `-200` for an hour without a reading; the
+loader keeps that marker so the project's own code handles it.
+
+```mermaid
+flowchart LR
+    R["Raw hour (-200 = no reading)"] --> P1["pre_split: sensors_online (custom)"]
+    P1 --> P2["pre_split: measured_no2 (built-in ManualBounds, training only)"]
+    P2 --> S["Chronological split: holdout from 2004-09-01"]
+    S --> C1["missing_marker: -200 to NaN (custom)"]
+    C1 --> C2["day_part (custom) + temperature_anomaly (custom fitted)"]
+    C2 --> B1["IQR on pt08_s3_nox: exclude outliers"]
+    B1 --> B2["Yeo-Johnson + median imputer on co_gt"]
+    B2 --> B3["one-hot day_part + scaling"]
+    B3 --> M["random_forest_regressor"]
+    M --> O["Scoring: pre-split reuse, plausible_humidity, no2_band"]
+```
+
+| Stage | Built-in | Custom |
+| --- | --- | --- |
+| Pre-split | `ManualBounds` keeps hours with a measured NO2 value. It reads the target, so scoring skips it (`SKIP_TARGET_PRE_SPLIT_STEPS = True`). | `sensors_online` removes hours with an offline sensor; scoring reuses it as `pre_split:sensors_online`. |
+| Preprocessing | `IQR` (excluded rows get `outlier:nox_sensor_outliers`), `PowerTransformer` (Yeo-Johnson), `SimpleImputer` (median), `OneHotEncoder`, `StandardScaler`. | `missing_marker` turns `-200` into a real gap; `day_part` adds a category; `temperature_anomaly` learns each hour's mean temperature in training and subtracts it per row. |
+| Scoring (`combined`) | Pre-split reuse. | `plausible_humidity` excludes relative humidity outside 10-100 (`humidity_out_of_range`); `no2_band` publishes `low` (< 40), `moderate` and `high` (>= the EU 200 ug/m3 hourly limit). |
+
+Only `co_gt` comes from a reference analyzer. `NOx(GT)` contains the NO2 target and
+`C6H6(GT)` is derived from a sensor, so the loader leaves them out; `NMHC(GT)` is
+90% missing. Window or history steps are not used: Spark workers and endpoints do
+not admit them.
+
+A local run of the shipped recipe on these rows gave: 148 offline-sensor and 1,347
+unmeasured-NO2 training hours removed by pre-split; a September-October holdout
+RMSE of 20.8 ug/m3 (R2 0.74, WAPE 0.16) with 99.5% coverage; and, on the winter,
+3,381 predicted and 330 excluded hours (218 `pre_split:sensors_online`, 111
+`outlier:nox_sensor_outliers`, 1 `humidity_out_of_range`) with a winter WAPE of
+0.31. Treat these as orientation, not as a promise: retraining changes them.
+
+Unlike the other two projects, this one promotes automatically
+(`quality_threshold: 60.0`) and scores the champion after the alias changes, so
+one `train` run followed by `score` shows the whole path. `deployment/targets.yml`
+binds the `labels` table and a report-only WAPE policy (20% relative tolerance,
+daily windows, two consecutive windows); replace its baseline version with the
+version you monitor. Run monitoring once with
+`--params monitoring_action=observe` instead of unpausing its schedule. Expect
+drift on `temperature` and the sensor columns, because winter differs from the
+training months.
+
+A Databricks run of this project (2026-10-17) reproduced the local numbers: the
+score job wrote 3,381 predicted and 330 excluded rows with the three reasons
+above, and the monitoring report flagged drift on 9 of 11 inputs (PSI 3.54 for
+`temperature`, 2.15 for `pt08_s4_no2`, 1.52 for `abs_humidity`; `hour` and
+`weekday` stayed stable). Measured winter performance was MAE 42.7, RMSE 52.5,
+R2 -0.15 and WAPE 0.31, against a holdout WAPE of 0.16, with an exclusion rate of
+8.9%. The WAPE policy reports `unavailable` until a daily window has ended and
+its six-hour label delay has passed; run monitoring again after that.
+
+Monitoring reads the raw scoring inputs, before the model's preprocessing. The
+`-200` marker is therefore a value there, not a missing one: `co_gt` shows a
+missing fraction of 0, and its drift statistics include the marker. Convert such
+markers upstream when you need input-quality monitoring to see the gaps.
