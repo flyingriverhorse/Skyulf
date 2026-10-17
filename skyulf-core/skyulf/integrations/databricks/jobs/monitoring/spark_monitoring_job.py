@@ -118,15 +118,25 @@ def run_project_monitoring_notebook(spark: Any, dbutils: Any) -> dict:
     values = dbutils.widgets.getAll()
     dbutils.jobs.taskValues.set(key="monitoring_reference", value={"status": "disabled"})
     namespace = monitoring_destination(values)
+    action = values.get("monitoring_action", "observe")
+    if namespace is not None and action == "cleanup_references":
+        # A project that stopped monitoring is the one most likely to need cleanup.
+        from ...observability.monitoring.reference_cleanup import (  # noqa: PLC0415
+            cleanup_references,
+        )
+
+        return cleanup_references(spark, values)
     if namespace is None or values.get("monitoring_enabled", "true") != "true":
         return {"status": "disabled"}
-    action = values.get("monitoring_action", "observe")
     if action == "enroll_serving":
         return enroll_serving_configs(spark, namespace, values)
     if action == "prepare_references":
         return prepare_project_references(spark, values)
     if action != "observe":
-        raise ValueError("monitoring_action must be observe, prepare_references or enroll_serving.")
+        raise ValueError(
+            "monitoring_action must be observe, prepare_references, enroll_serving "
+            "or cleanup_references."
+        )
     return _observe_project(spark, dbutils, values, namespace)
 
 
