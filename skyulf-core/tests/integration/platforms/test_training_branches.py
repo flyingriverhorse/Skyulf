@@ -139,6 +139,34 @@ def test_explicit_version_pins_unspecified_siblings(workflow_config, monkeypatch
     assert {branch.spec.version for branch in prepared} == {7}
 
 
+def test_outcome_snapshot_is_shared_and_frozen_in_saved_branches(workflow_config, monkeypatch):
+    """Sibling targets must replay the same outcomes even when latest changes mid-run."""
+    from skyulf.integrations.databricks.data.training import training_labels
+
+    configs = _configs(workflow_config)
+    for config in configs.values():
+        config.update(
+            training_label_table="workspace.test.labels",
+            filter_unavailable_results=True,
+            result_available_at_column="known_at",
+        )
+    versions = iter((3, 4, 5))
+    history = MagicMock()
+    history.return_value.select.return_value.first.side_effect = lambda: {"version": next(versions)}
+    monkeypatch.setattr(training_labels, "history", history)
+    monkeypatch.setattr(training_labels, "table_identity", lambda *_: "outcome-table-id")
+    monkeypatch.setattr(branches, "controlled_champion_version", lambda *args, **kwargs: None)
+    prepared = branches.prepare_training_branches(None, configs)
+    assert {branch.spec.training_label_version for branch in prepared} == {3}
+    assert {branch.spec.training_label_table_id for branch in prepared} == {"outcome-table-id"}
+    history.assert_called_once()
+    payload = branches.branch_training_payload(prepared)
+    assert branches.restore_training_branches(payload) == prepared
+    del payload["branches"][0]["spec"]["training_label_version"]
+    with pytest.raises(ValueError, match="pinned outcome"):
+        branches.restore_training_branches(payload)
+
+
 @pytest.fixture
 def tracked(tmp_path):
     """Use actual SQLite tracking and a local artifact store for end-to-end candidates."""

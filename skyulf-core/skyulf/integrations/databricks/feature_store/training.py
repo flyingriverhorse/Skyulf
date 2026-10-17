@@ -179,6 +179,9 @@ def logging_training_set(spark: Any, spec: Any) -> Any:
         raise ValueError("Native logging requires a feature lookup.")
     binding = parse_feature_binding(spec.feature_binding_json)
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
+    from ..data.training.training_labels import join_training_labels  # noqa: PLC0415
+
+    source = join_training_labels(spark, source, spec)
     source = _training_source(source, spec, lookup)
     return create_checked_training_set(source, lookup, binding, spark=spark)
 

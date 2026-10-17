@@ -53,6 +53,8 @@ WORKFLOW_FIELDS = {
     "spark_udf_env_manager",
     "spark_udf_prediction_batch_rows",
     "training_table",
+    "training_label_table",
+    "training_label_version",
     "score_source_table",
     "prediction_table",
     "model_name",
@@ -624,6 +626,11 @@ def preview_workflow_config(config: dict[str, Any], *, action: str = "score") ->
         _preview_steps(checked["pipeline"].get("preprocessing", []), "  No preprocessing steps.")
     )
     lines.extend(_preview_model_and_scoring(checked, cv))
+    if checked["score_source_table"].casefold() == checked["training_table"].casefold():
+        lines.append(
+            "Warning: training and scoring use the same source; initial scoring includes training history. "
+            "Its performance is not an independent production measurement."
+        )
     if action == "train" and probed_admission(checked) is True:
         lines.extend(_preview_admission(checked["pipeline"]))
     return "\n".join(lines)

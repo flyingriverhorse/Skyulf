@@ -196,6 +196,10 @@ def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> d
     resolved = config.copy()
     for name in _TABLE_FIELDS:
         resolved[name] = bind_target_name(name, config[name], bindings, suffix)
+    if config.get("training_label_table") is not None:
+        resolved["training_label_table"] = bind_target_name(
+            "training_label_table", config["training_label_table"], bindings, suffix
+        )
     if config.get("feature_lookup") is not None:
         from ..feature_store.lifecycle_config import bind_lookup_tables  # noqa: PLC0415
 
@@ -282,6 +286,8 @@ def training_spec(config: dict[str, Any]) -> TrainingSpec:
         feature_lookup_json=workflow_lookup_json(config),
         table=config["training_table"],
         version=version,
+        training_label_table=config.get("training_label_table"),
+        training_label_version=config.get("training_label_version"),
         split_strategy=config.get("split_strategy", "random"),
         test_size=config.get("test_size", 0.2),
         random_state=config.get("random_state", 42),
@@ -480,22 +486,22 @@ def training_settings(config: dict[str, Any], now: datetime) -> dict[str, Any]:
 
 def resolve_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> TrainingSpec:
     """Pin an explicit or latest snapshot once, using the configured data window."""
+    from ..data.training.training_labels import pin_training_labels  # noqa: PLC0415
     from ..feature_store.training import pin_training_lookup  # noqa: PLC0415
 
     spec = training_spec(training_settings(config, now))
     validate_cv_holdout_policy(spec, CVSpec.from_workflow(config))
-    if config.get("training_version") is not None:
-        return pin_training_lookup(spark, spec)
-    table = spec.table
-    latest = (
-        spark.sql(f"DESCRIBE HISTORY {table}")
-        .select("version")
-        .orderBy("version", ascending=False)
-        .first()
-    )
-    if latest is None or type(latest["version"]) is not int or latest["version"] < 0:
-        raise ValueError("Training source has no concrete Delta version.")
-    return pin_training_lookup(spark, replace(spec, version=latest["version"]))
+    if config.get("training_version") is None:
+        latest = (
+            spark.sql(f"DESCRIBE HISTORY {spec.table}")
+            .select("version")
+            .orderBy("version", ascending=False)
+            .first()
+        )
+        if latest is None or type(latest["version"]) is not int or latest["version"] < 0:
+            raise ValueError("Training source has no concrete Delta version.")
+        spec = replace(spec, version=latest["version"])
+    return pin_training_labels(spark, pin_training_lookup(spark, spec))
 
 
 def _current_champion_version(config: dict[str, Any]) -> str | None:

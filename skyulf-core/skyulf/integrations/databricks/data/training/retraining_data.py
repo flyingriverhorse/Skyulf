@@ -68,6 +68,8 @@ def validate_compatible_specs(saved: TrainingSpec, current: TrainingSpec) -> Non
     """Prevent automatic comparisons across unrelated training source contracts."""
     fields = (
         "table",
+        "training_label_table",
+        "training_label_table_id",
         "record_key_columns",
         "input_columns",
         "target_column",

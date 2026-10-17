@@ -211,7 +211,11 @@ def prepare_spark_monitoring_reference(
         else pd.concat([train[columns], holdout[columns]], ignore_index=True)
     )
     frames = {"train": train[columns], "source": source, "seen": old_population}
-    source_schema = read_snapshot(spark, spec.table, spec.version).schema
+    from ....data.training.training_labels import join_training_labels  # noqa: PLC0415
+
+    source_schema = join_training_labels(
+        spark, read_snapshot(spark, spec.table, spec.version), spec
+    ).schema
     tables = {}
     for key, frame in frames.items():
         with notebook_task(f"reference.write_{key} {identity}", None):
