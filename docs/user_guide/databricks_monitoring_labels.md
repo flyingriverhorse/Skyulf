@@ -11,7 +11,10 @@ values. No configured label source means no measured performance, not zero
 accuracy. A target in an arbitrary source is not discovered automatically: use
 monitoring_label_table with the saved record keys and target column, and declare
 the result-availability timestamp. That table can be the scoring source when it
-already satisfies this contract. Fewer than two eligible pairs cannot be scored.
+already satisfies this contract and its rows are never updated; when outcomes
+arrive later, use a separate outcomes table (see
+[Choose a table layout](databricks_training_data.md#choose-a-table-layout)).
+Fewer than two eligible pairs cannot be scored.
 
 ```mermaid
 flowchart LR

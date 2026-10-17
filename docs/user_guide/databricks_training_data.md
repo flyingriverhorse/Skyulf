@@ -33,6 +33,44 @@ SET TBLPROPERTIES (delta.enableChangeDataFeed = true);
 For a worked example table, see the
 [end-to-end guide](databricks_bundle_walkthrough.md).
 
+### Choose a table layout
+
+Training, scoring and monitoring each read a table you name: `training_table`
+in `config/training.yml`, the scoring source in `config/inference.yml`, and
+`monitoring_label_table` in `deployment/targets.yml`. They may be the same table
+or different ones. Choose by how your actual outcomes arrive:
+
+| Layout | Use it when | Configure |
+| --- | --- | --- |
+| **One append-only table** | Each row is complete when it is inserted (inputs, target and the time the outcome became known) and is never updated afterwards. | Point all three settings at the same table. Training selects its window with `start`/`cutoff` and keeps rows whose outcome is available; scoring reads newly inserted rows. |
+| **Measurements plus a separate outcomes table** | The outcome is known only later. New measurements are inserted without a target; outcomes are inserted into a second table keyed by the same record key. | Training and scoring read the measurements table (or two tables, as in the examples); `monitoring_label_table` points at the outcomes table. Neither table is ever updated. |
+| **A raw table plus derived tables or views** | Your raw source receives updates or deletes, such as late corrections or outcomes written into existing rows. | Keep the raw table for your own processes, and give Skyulf insert-only derived tables: one for training, one for scoring inputs, one for outcomes. |
+
+Three behaviours decide which layout works:
+
+- **Incremental scoring accepts inserts only.** For a single model or a
+  competition, an UPDATE or DELETE in the scoring source fails the score job
+  with *Source updates and deletes require an explicit rescore policy*. Model
+  sets alone can opt into `source_change_policy: rebuild_on_change`; see
+  [source changes](databricks_scoring.md#source-changes-are-separate-from-model-changes).
+  Writing an outcome into an existing scoring row is an update, so use a
+  separate outcomes table instead.
+- **The first score covers every existing row.** When training and scoring
+  share one table, the first score run predicts the historical rows too,
+  including the rows the model was trained on. Later runs score only new inserts.
+  Start scoring from a separate table, or accept and filter that first population.
+- **Monitoring needs to know when an outcome became available.** The outcomes
+  table must contain the saved record keys, the target and a UTC timestamp for
+  when the actual value was known (`monitoring_result_available_at_column`); see
+  [delayed labels](databricks_monitoring_labels.md).
+
+[Tables in your workspace](databricks_workspace_tables.md) shows these tables next
+to the ones the jobs create. The prepared examples use the second layout: `observations_train`,
+`observations_score` and `labels`, with no column ever updated. When new data
+arrives, insert it: new measurements into the scoring source, measured outcomes
+into the outcomes table, and newly labelled rows into the training table before
+retraining.
+
 ### Local input limits
 
 `max_rows` bounds the rows read into the local process before train/test splitting.

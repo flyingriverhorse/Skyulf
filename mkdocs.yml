@@ -108,6 +108,7 @@ nav:
         - Topic Index: user_guide/databricks_bundle.md
         - Choose a Project Shape: user_guide/databricks_choose.md
         - Project Setup and Preview: user_guide/databricks_project_setup.md
+        - Tables in Your Workspace: user_guide/databricks_workspace_tables.md
         - Deployment and Access: user_guide/databricks_deployment.md
         - Project Upgrades: user_guide/databricks_project_upgrade.md
         - Remove a Project: user_guide/databricks_teardown.md

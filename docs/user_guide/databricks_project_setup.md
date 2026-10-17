@@ -30,6 +30,16 @@ Five NYC taxi projects on `samples.nyctaxi.trips` cover the main shapes:
 4. Run `databricks bundle deploy -t test --profile <profile>`, then
    `databricks bundle run train -t test --profile <profile>`.
 
+Three more projects in
+[`examples/real_data`](https://github.com/flyingriverhorse/Skyulf/tree/master/skyulf-core/templates/databricks/examples/real_data)
+use public UCI data, loaded by its `load_data.py` notebook with pinned archive
+hashes. `air_quality_no2` is the most complete one: built-in and custom
+pre-split filters, custom and built-in preprocessing (missing-value markers, IQR
+exclusion, Yeo-Johnson, imputation, encoding), combined scoring rules, SHAP,
+evaluation charts and monitoring on a later season with real drift and a
+report-only WAPE policy. `diagnostic_single` and `bike_demand_set` add serving
+endpoints and a model set.
+
 Then swap the taxi tables, columns and recipes for your own. The examples README
 owns the complete steps, approval and serving. Not sure which shape fits? See
 [choose a project shape](databricks_choose.md).
@@ -215,6 +225,8 @@ example `skyulf_monitoring`), not the project's own schema: all models then
 appear in one store and one dashboard. Only one project creates the dashboard;
 the others connect to it with `--dashboard-url`, see
 [the shared dashboard](databricks_monitoring_dashboard.md).
+[Tables in your workspace](databricks_workspace_tables.md) lists every table the
+jobs create and where each one belongs.
 
 A catalog answer sets `monitoring_enabled` to `"true"`: train and score enroll
 models and run monitoring. A blank catalog sets `monitoring_enabled` to

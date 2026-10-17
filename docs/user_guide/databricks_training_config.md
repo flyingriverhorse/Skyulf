@@ -137,6 +137,8 @@ answers use the same question name with a `branch_N_` prefix.
 | --- | --- | --- | --- | --- | --- |
 | `metric` | String | heldout_rmse / heldout_accuracy | Task-compatible supported heldout_ metric; competition has a stricter shared metric subset | Primary final comparison objective; error/loss minimizes, other scores maximize. | `regression_metric` / `classification_metric` |
 | `min_improvement` | Number | `0.0` | Finite, nonnegative, absolute metric units | Required improvement over champion; a tie never passes. | `min_improvement` |
+| `min_scored_fraction` | Number or null | `0.90` | 0 to 1; `null` disables | Minimum share of holdout rows a model that can exclude rows must score; see [models that exclude rows](databricks_lifecycle.md#models-that-exclude-rows). | `min_scored_fraction` |
+| `max_coverage_drop` | Number or null | `0.05` | 0 to 1; `null` disables | Largest allowed drop in scored share against the champion (0.05 = five percentage points). | `max_coverage_drop` |
 | `quality_threshold` | Number or null | Omitted/null | Finite task-valid bound; required for automatic promotion and first-champion approval | Maximum acceptable error/loss or minimum acceptable score. Set before training; later edits cannot relax a saved candidate. | `quality_threshold` |
 | `quality_gates` | Mapping or null | Omitted/null | Additional task-compatible metric: bound pairs | Every configured absolute gate must pass, including first activation. | YAML; branch quality-gates answer where offered |
 | `promotion_policy` | String | `manual_approval` | manual_approval, automatic | Individual candidate activation. Multi-target branches stay manual; the complete set's policy belongs in inference.yml. | `promotion_policy` |

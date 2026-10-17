@@ -82,6 +82,9 @@ These stay, because the Bundle never created them as resources:
 | Online stores, online tables and publication pipelines | Created through Feature Engineering, not by the Bundle |
 | A dashboard reused by URL | Owned by another project or created outside the Bundle |
 
+[Tables in your workspace](databricks_workspace_tables.md) explains what each of
+these objects holds and which ones grow over time.
+
 ## Common errors and fixes
 
 Check ownership before deleting anything by hand. The monitoring store, the

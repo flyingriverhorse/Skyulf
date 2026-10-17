@@ -106,7 +106,8 @@ Training and scoring reference the same existing input table by default; neither
 reference creates it. Separate them when labeled training data and new scoring
 data have different lifecycles. With the same table, the first score includes all
 existing rows, including historical labeled observations; confirm that population
-before running.
+before running. [Choose a table layout](databricks_training_data.md#choose-a-table-layout)
+compares one shared table with separate measurement and outcome tables.
 
 ## 2. Decide eligibility before training the version
 

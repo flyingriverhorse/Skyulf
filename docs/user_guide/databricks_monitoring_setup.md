@@ -100,6 +100,8 @@ creates the missing views. There is no fallback to partially initialized storage
 | `monitoring_issues` (view) | Create if absent | Reuse; read current health and recorded quality, drift and active-policy issues. |
 | `model_version_details` (view) | Create if absent | Reuse; read concrete version lineage and bounded metadata snapshots from existing reports. |
 
+[Tables in your workspace](databricks_workspace_tables.md#the-shared-monitoring-store)
+explains each of these objects and the reference tables in plain terms.
 One store serves all enrolled models; inventory, observations and action history
 are shared rather than recreated per model or score run. Spark reference
 preparation additionally creates four immutable Delta tables under the configured
