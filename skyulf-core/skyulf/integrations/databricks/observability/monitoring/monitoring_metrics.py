@@ -19,6 +19,13 @@ from skyulf.modeling._evaluation.metrics import (
 from skyulf.profiling._drift_settings import merge_drift_settings
 from skyulf.profiling.drift import DriftCalculator
 
+from .missing_markers import (
+    Marker,
+    require_marked_features,
+    split_missing_markers,
+    typed_markers,
+)
+
 REGRESSION_METRICS = ("mae", "mse", "rmse", "r2", "mape", "explained_variance", "wape")
 CLASSIFICATION_METRICS = (
     "accuracy",
@@ -38,6 +45,32 @@ def _frame(value: pd.DataFrame | pl.DataFrame, name: str) -> pl.DataFrame:
     if isinstance(value, pd.DataFrame):
         return pl.from_pandas(value, nan_to_null=False)
     raise TypeError(f"{name} must be a pandas or Polars DataFrame.")
+
+
+def _without_markers(frame: pl.DataFrame, markers: dict[str, tuple[Marker, ...]]) -> pl.DataFrame:
+    """Replace marked values with nulls of the same dtype in an in-memory population.
+
+    Args:
+        frame: A reference or current population.
+        markers: Validated markers per feature column.
+
+    Returns:
+        The frame with marked values as nulls; absent columns are left to schema checks.
+
+    Raises:
+        ValueError: If a marked column is not integer or floating point, or a marker has no
+            exact value in its dtype.
+    """
+    replacements = []
+    for column, values in markers.items():
+        if column not in frame.columns:
+            continue
+        dtype = frame.schema[column]
+        kind = str(dtype) if dtype.is_float() or dtype.is_integer() else None
+        exact = pl.Series(typed_markers(column, values, kind), dtype=dtype)
+        marked = pl.col(column).is_in(exact.implode())
+        replacements.append(pl.when(marked).then(None).otherwise(pl.col(column)).alias(column))
+    return frame.with_columns(replacements) if replacements else frame
 
 
 def monitoring_metric(
@@ -78,8 +111,8 @@ def validate_monitoring_inputs(
 
 
 def _validate_thresholds(thresholds: dict | None) -> None:
-    """Accept only finite positive overrides supported by Core drift."""
-    merge_drift_settings(thresholds)
+    """Accept only finite positive overrides supported by Core drift, plus valid markers."""
+    merge_drift_settings(split_missing_markers(thresholds)[0])
 
 
 def _keyed_rows(frame: pl.DataFrame, columns: tuple[str, ...], name: str) -> dict[tuple, dict]:
@@ -595,8 +628,10 @@ def build_monitoring_report(
     still counts NaN, whose quality verdict comes from the missingness check.
     """
     validate_monitoring_inputs(as_of, task, classes, thresholds)
-    reference = _frame(reference, "reference")
-    current = _frame(current, "current")
+    thresholds, markers = split_missing_markers(thresholds)
+    require_marked_features(markers, feature_columns)
+    reference = _without_markers(_frame(reference, "reference"), markers)
+    current = _without_markers(_frame(current, "current"), markers)
     predictions = _frame(predictions, "predictions")
     labels = None if labels is None else _frame(labels, "labels")
     current_rows = _keyed_rows(current, record_key_columns, "current")

@@ -14,6 +14,7 @@ from skyulf.profiling._drift_settings import (
 
 from ...shared._contracts import column_name, table_name
 from ...shared.json_contracts import finite_json_digest
+from .missing_markers import split_missing_markers
 from .performance.performance_policy import validate_performance_policy
 
 
@@ -61,7 +62,7 @@ class MonitorConfig:
     max_bytes: int = 67108864
     max_batches: int = 100
     enabled: bool = True
-    thresholds: dict[str, float] | None = None
+    thresholds: dict[str, Any] | None = None
     model_set_name: str | None = None
     model_set_version: str | None = None
     model_set_branch: str | None = None
@@ -187,9 +188,9 @@ def _validate_budgets(config: MonitorConfig) -> None:
         raise ValueError("expected_interval_hours must be finite and positive.")
 
 
-def _validate_thresholds(value: dict[str, float] | None) -> None:
-    """Accept only Core drift thresholds with finite positive values."""
-    merge_drift_settings(value)
+def _validate_thresholds(value: dict[str, Any] | None) -> None:
+    """Accept only Core drift thresholds with finite positive values, plus valid markers."""
+    merge_drift_settings(split_missing_markers(value)[0])
 
 
 def _apply_budget_overrides(config: MonitorConfig) -> None:
@@ -216,7 +217,7 @@ def _validate_performance_enrollment(config: MonitorConfig) -> None:
     object.__setattr__(config, "performance_policy", policy)
 
 
-def parse_drift_thresholds(value: str) -> dict[str, float]:
+def parse_drift_thresholds(value: str) -> dict[str, Any]:
     """Parse the Bundle policy; an empty object selects Core's default thresholds."""
     try:
         thresholds = json.loads(value)
