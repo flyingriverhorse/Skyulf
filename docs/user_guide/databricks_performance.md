@@ -145,7 +145,9 @@ comparison or an additional quality gate, use `heldout_wape`; its direction is
 to tuning or cross-validation model competitions.
 
 For example, this regression policy reports a WAPE increase of at least 20%
-relative to version 3's training holdout, after two completed daily windows:
+relative to version 3's training holdout in each eligible completed daily window.
+It counts adjacent failing windows; `consecutive_windows: 2` would gate trigger
+eligibility in `retrain` mode, but does not delay reports in `report` mode:
 
 ```yaml
 monitoring_performance_policies: >-

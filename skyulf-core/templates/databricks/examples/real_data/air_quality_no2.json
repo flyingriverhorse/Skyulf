@@ -35,7 +35,7 @@
   "score_model_selection": "champion",
   "score_handoff": "after_alias_change",
   "monitoring_catalog": "workspace",
-  "monitoring_schema": "air_quality_no2",
+  "monitoring_schema": "skyulf_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "shap_max_samples": "64",

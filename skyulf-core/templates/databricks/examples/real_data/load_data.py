@@ -1,10 +1,15 @@
 # Databricks notebook source
-"""Create the two example datasets from checksum-pinned public UCI archives.
+"""Create example datasets from checksum-pinned public UCI archives.
 
-Run once before either Bundle. Tables are create-only: this notebook never
-overwrites observations or predictions. Source timestamps in the bike archive
+Run before the selected Bundles. The default layout creates tables once; this
+notebook never overwrites observations or predictions. Source timestamps in the bike archive
 are local clock labels without an offset; UTC is used as an ordering convention,
 not a claim that the original observations were recorded in UTC.
+
+For the single-table air-quality walkthrough, select only air_quality_no2,
+set air_quality_layout=single_table and leave air_quality_day empty to seed
+summer data. Then supply one winter YYYY-MM-DD per invocation to append it.
+Run these invocations serially; the example is a single-writer loader.
 """
 
 import hashlib
@@ -22,15 +27,25 @@ from sklearn.model_selection import train_test_split
 spark = SparkSession.builder.getOrCreate()
 dbutils.widgets.text("catalog", "workspace")  # noqa: F821
 dbutils.widgets.text("archive_directory", "")  # noqa: F821
-# Comma-separated projects to create; tables are create-only, so rerun with only the new ones.
+# The default layout creates tables once; select only new projects when rerunning it.
 dbutils.widgets.text("datasets", "diagnostic_single,bike_demand_set,air_quality_no2")  # noqa: F821
+dbutils.widgets.dropdown("air_quality_layout", "separate", ["separate", "single_table"])  # noqa: F821
+dbutils.widgets.text("air_quality_day", "")  # noqa: F821
 catalog = dbutils.widgets.get("catalog")  # noqa: F821
 archive_directory = dbutils.widgets.get("archive_directory")  # noqa: F821
 datasets = {name.strip() for name in dbutils.widgets.get("datasets").split(",")}  # noqa: F821
+air_quality_layout = dbutils.widgets.get("air_quality_layout")  # noqa: F821
+air_quality_day = dbutils.widgets.get("air_quality_day")  # noqa: F821
 if not catalog.replace("_", "").isalnum():
     raise ValueError("Use a simple catalog identifier.")
 if not datasets <= {"diagnostic_single", "bike_demand_set", "air_quality_no2"}:
     raise ValueError(f"Unknown datasets: {sorted(datasets)}")
+if air_quality_layout not in {"separate", "single_table"}:
+    raise ValueError("Unknown air_quality_layout.")
+if air_quality_layout == "single_table" and datasets != {"air_quality_no2"}:
+    raise ValueError("The single-table walkthrough requires datasets=air_quality_no2 only.")
+if air_quality_day and air_quality_layout != "single_table":
+    raise ValueError("air_quality_day requires air_quality_layout=single_table.")
 
 SOURCES = {
     "diagnostic": (
@@ -171,6 +186,8 @@ def load_air_quality():
     """Train on March-October 2004 and score the winter that follows, so drift is real."""
     with source_archive("air_quality") as archive:
         frame = air_quality_frame(archive)
+    if air_quality_layout == "single_table":
+        return save_air_quality_single_table(air_quality_batch(frame, air_quality_day))
     boundary = pd.Timestamp("2004-11-01", tz="UTC")
     training = frame.loc[frame["observed_at"] < boundary]
     scoring = frame.loc[frame["observed_at"] >= boundary]
@@ -178,6 +195,72 @@ def load_air_quality():
     return save_dataset(
         "air_quality_no2", training, scoring, ["no2_gt"], labelled=scoring["no2_gt"].ne(-200)
     )
+
+
+def air_quality_batch(frame, day):
+    """Select summer initialization or exactly one existing winter day without mutating truth."""
+    boundary = pd.Timestamp("2004-11-01", tz="UTC")
+    if not day:
+        return frame.loc[frame["observed_at"] < boundary].copy()
+    try:
+        start = pd.Timestamp(day, tz="UTC")
+        if start.strftime("%Y-%m-%d") != day or start < boundary:
+            raise ValueError("Invalid day.")
+    except (ValueError, TypeError) as error:
+        raise ValueError("air_quality_day must be a winter YYYY-MM-DD from the archive.") from error
+    selected = frame.loc[
+        (frame["observed_at"] >= start) & (frame["observed_at"] < start + pd.Timedelta(days=1))
+    ]
+    if selected.empty:
+        raise ValueError("air_quality_day has no observations in the archive.")
+    return selected.copy()
+
+
+def append_missing_rows(table, frame):
+    """Recover a serial loader retry with inserts only, including partially written batches."""
+    missing = frame.join(spark.table(table).select("record_id"), "record_id", "left_anti")
+    count = missing.count()
+    if count:
+        missing.writeTo(table).append()
+    return count
+
+
+def save_air_quality_single_table(batch):
+    """Seed a separate example schema, then append inputs and known outcomes independently."""
+    schema = f"{catalog}.air_quality_no2_append"
+    observations = spark.createDataFrame(batch)
+    labels = spark.createDataFrame(batch[["record_id", "no2_gt"]]).where(F.col("no2_gt") != -200)
+    labels = labels.withColumn("result_available_at", F.current_timestamp())
+    if air_quality_day:
+        # New requests have unknown targets; outcomes never UPDATE the input table.
+        observations = observations.withColumn("no2_gt", F.lit(None).cast("double"))
+    tables = {"observations": observations, "labels": labels}
+    if not air_quality_day:
+        spark.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+        if any(spark.catalog.tableExists(f"{schema}.{name}") for name in tables):
+            raise ValueError("Single-table example already exists; use air_quality_day to append.")
+        for name, frame in tables.items():
+            frame.writeTo(f"{schema}.{name}").using("delta").tableProperty(
+                "delta.enableChangeDataFeed", "true"
+            ).tableProperty("skyulf.example", "air_quality_no2_single_table").create()
+        return {"schema": schema, "action": "seed", "rows": len(batch)}
+    for name in tables:
+        properties = {
+            row["key"]: row["value"]
+            for row in spark.sql(f"SHOW TBLPROPERTIES {schema}.{name}").collect()
+        }
+        if properties.get("skyulf.example") != "air_quality_no2_single_table":
+            raise ValueError(f"{schema}.{name} is not owned by this example loader.")
+        if properties.get("delta.enableChangeDataFeed") != "true":
+            raise ValueError(f"{schema}.{name} requires change data feed.")
+    return {
+        "schema": schema,
+        "action": "append",
+        "day": air_quality_day,
+        "inserted": {
+            name: append_missing_rows(f"{schema}.{name}", frame) for name, frame in tables.items()
+        },
+    }
 
 
 LOADERS = {

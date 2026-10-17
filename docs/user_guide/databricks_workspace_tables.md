@@ -148,11 +148,24 @@ tables, and all monitoring objects sit in one place:
 | Project schema(s) | Training table, scoring source, outcomes table, prediction table, registered model |
 | `skyulf_monitoring` | The 4 Delta tables, the 8 views and 4 reference tables per monitored version, for all projects |
 
-If you set `monitoring_schema` to the project schema, as the `real_data` examples
-do to stay independent, all of these appear together. The `air_quality_no2`
-example therefore shows 20 objects in one schema after one train, score and
-monitoring cycle: 3 data tables, the prediction table, 4 store tables, 8 views and
-4 reference tables.
+The `air_quality_no2` example uses this shared layout. A fresh installation has
+four project tables: `observations_train`, `observations_score`, `labels` and
+`predictions`. The store's four tables, eight views and per-version references
+are in `workspace.skyulf_monitoring`. The other two `real_data` examples keep
+their independent stores in their project schemas.
+
+The [single-table air-quality walkthrough](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/real_data/air_quality_single_table.md)
+uses three project tables: `observations` for both training and scoring,
+`labels` for outcomes, and `predictions`. Daily input inserts do not update old
+rows. It uses the same shared monitoring schema.
+
+Changing `monitoring_schema` redirects future enrollment and observations; it
+does not move or delete an existing store. Redeploy, enroll the existing concrete
+model in the destination, and prepare its Spark references before observing.
+Verify the destination report before retiring old objects. For example, an
+older air-quality installation may still contain its original 20 objects until
+its 16 monitoring objects are separately reviewed and removed. Historical reports
+stay in that old store; they are not automatically copied to the new one.
 
 ## What grows, and how to clean up
 

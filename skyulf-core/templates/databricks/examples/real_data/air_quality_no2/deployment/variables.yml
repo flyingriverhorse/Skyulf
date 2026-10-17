@@ -69,7 +69,7 @@ variables:
     default: "workspace"
   monitoring_schema:
     description: Central monitoring schema shared by model repositories; created on first use if allowed
-    default: "air_quality_no2"
+    default: "skyulf_monitoring"
   monitoring_label_table:
     description: Optional fully qualified table of actual outcomes for monitoring
     default: ""

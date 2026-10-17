@@ -42,10 +42,11 @@ have no timezone offset; the loader uses UTC as an ordering convention, not as
 a reconstruction of the original observation instants. `result_available_at`
 records when the example loads known outcomes for monitoring.
 
-Both projects train with pandas in one bounded Python process. Scoring uses
+All three projects train with pandas in one bounded Python process. Scoring uses
 `inference_mode: spark`, which applies the saved model through a Spark UDF.
 This does not distribute estimator fitting across Spark workers. Each project's
-monitoring store uses its own schema, keeping the two examples independent.
+monitoring store is configured independently: diagnostic and bike keep their
+own schemas; air quality uses the shared `workspace.skyulf_monitoring` schema.
 
 Sources: [Wisconsin Diagnostic](https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic)
 [Bike Sharing](https://archive.ics.uci.edu/dataset/275/bike+sharing+dataset)
@@ -74,7 +75,7 @@ a callback that subtracts a mean saved by `learn` can pass.
 
 ## Train and score
 
-From either project directory:
+From the selected project directory:
 
 ```powershell
 uv run python src/tools/smoke.py
@@ -112,10 +113,11 @@ databricks bundle run train -t test --profile YOUR_PROFILE
 Inspect **training_report**, the branch training outputs, SHAP tasks and
 **generate_charts**. Open the registered model's concrete version and MLflow run:
 look for the saved partition probe, cross-validation results, dataset Inputs,
-evaluation charts and explanation artifacts. Every model requests 32 SHAP
-training samples and two waterfall plots, with a 30-feature guard.
+evaluation charts and explanation artifacts. Diagnostic and bike models request
+32 SHAP samples and two waterfall plots; air quality requests 64 samples and
+three waterfall plots. Each uses a 30-feature guard.
 
-The projects use manual promotion. After inspecting the test candidate and its
+The diagnostic and bike projects use manual promotion. After inspecting the test candidate and its
 quality checks, initialize the first champion through a fresh lifecycle run:
 
 ```powershell
@@ -239,6 +241,17 @@ winter, so its drift and performance changes come from the data, not from a
 synthetic shift. The station writes `-200` for an hour without a reading; the
 loader keeps that marker so the project's own code handles it.
 
+For ongoing input arrivals, use the [single-table walkthrough](air_quality_single_table.md).
+It seeds the summer rows in `observations`, then appends individual winter days
+and their separate labels. It reuses this project's features and Spark scoring;
+there is no duplicate generated example to maintain.
+
+This project stores its four data/prediction tables in `workspace.air_quality_no2`
+and its monitoring objects in `workspace.skyulf_monitoring`. Redeploying with the
+new monitoring schema does not remove an older store or copy its historical
+reports. Enroll the model and prepare its references in the destination before
+observing; review old objects separately before cleanup.
+
 ```mermaid
 flowchart LR
     R["Raw hour (-200 = no reading)"] --> P1["pre_split: sensors_online (custom)"]
@@ -289,6 +302,15 @@ above, and the monitoring report flagged drift on 9 of 11 inputs (PSI 3.54 for
 R2 -0.15 and WAPE 0.31, against a holdout WAPE of 0.16, with an exclusion rate of
 8.9%. The WAPE policy reports `unavailable` until a daily window has ended and
 its six-hour label delay has passed; run monitoring again after that.
+
+Those predictions were committed on October 16, 2026 UTC. Their first daily
+policy window becomes eligible after October 17 at 06:00 UTC, subject to label
+coverage. That follow-up measurement returned `degraded` with action `report`:
+WAPE 0.31408 versus holdout 0.15978 and allowed limit 0.19174, from 3,142 labelled
+predictions (92.93% coverage). The consecutive count was one, against the configured
+two. Report mode records the first eligible loss; the two-window setting gates
+retraining eligibility if `mode` is later changed to `retrain`. No training was
+requested. Rerunning the same window cannot count it twice.
 
 Monitoring reads the raw scoring inputs, before the model's preprocessing. The
 `-200` marker is therefore a value there, not a missing one: `co_gt` shows a

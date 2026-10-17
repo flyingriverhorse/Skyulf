@@ -64,6 +64,12 @@ Three behaviours decide which layout works:
   when the actual value was known (`monitoring_result_available_at_column`); see
   [delayed labels](databricks_monitoring_labels.md).
 
+The [single-table air-quality walkthrough](https://github.com/flyingriverhorse/Skyulf/blob/master/skyulf-core/templates/databricks/examples/real_data/air_quality_single_table.md)
+trains on summer rows, then appends individual winter days to the same input
+table and scores them with Spark. Outcomes stay in a separate table, so retrying
+a partial load never updates the scoring source. It also explains why loading
+two historical days today does not create two daily performance-policy windows.
+
 [Tables in your workspace](databricks_workspace_tables.md) shows these tables next
 to the ones the jobs create. The prepared examples use the second layout: `observations_train`,
 `observations_score` and `labels`, with no column ever updated. When new data
