@@ -4,7 +4,8 @@
     "type": "string",
     "default": "",
     "description": "1. Data | Prediction INPUT table: rows the model will read to make predictions. This is NOT the output table. Blank = same input as training",
-    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+    "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+    "skip_prompt_if": {"properties": {"source_layout": {"enum": ["single_table", "separate_outcomes"]}}}
   },
   "prediction_table_name": {
     "order": 8,
@@ -20,11 +21,18 @@
       }
     }
   },
+  "initial_scoring": {
+    "order": 722.5,
+    "type": "string",
+    "default": "full_snapshot",
+    "enum": ["full_snapshot", "from_now"],
+    "description": "4. Scoring | First run: full_snapshot predicts existing rows; from_now records the current Delta version without predictions, then scores new inserts. Rebuilds keep the boundary using saved keys and recent CDF; CDF-expiry recovery needs the original snapshot"
+  },
   "model_change_mode": {
     "order": 723,
     "type": "string",
     "default": "incremental_append",
-    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes the complete source with the new selection. Independent of source UPDATE/DELETE handling",
+    "description": "4. Lifecycle | When the selected model/model set changes: incremental_append keeps old predictions and scores new rows; full_rebuild recomputes eligible source rows with the new selection, preserving any from_now boundary. Independent of source UPDATE/DELETE handling",
     "enum": [
       "incremental_append",
       "full_rebuild"

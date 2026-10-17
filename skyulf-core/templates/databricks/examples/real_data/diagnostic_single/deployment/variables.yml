@@ -32,11 +32,12 @@ variables:
     description: Minimum new or changed labeled training rows for either automatic trigger
     default: "1"
   monitoring_drift_thresholds:
-    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring.'
+    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes, missing_markers; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring. missing_markers maps numeric features to values counted as missing, e.g. {"co_gt": [-200]}.'
     default: '{}'
   monitoring_performance_policies:
     description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
     default: '{}'
+
   monitoring_task_timeout_seconds:
     description: Independent Spark monitoring task timeout
     default: 3600
@@ -107,6 +108,21 @@ variables:
     description: Optional RUN_DURATION_SECONDS warning rules for score
     type: complex
     default: []
+  monitoring_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for monitoring
+    type: complex
+    default: []
+  monitoring_email_notifications:
+    description: Optional monitoring job email events; measured drift needs a separate SQL alert
+    type: complex
+    default: {}
+  monitoring_reference_retention_days:
+    description: Minimum reference age in days for explicit cleanup_references; 1 to 3650, dry-run by default
+    default: "90"
+  monitoring_webhook_notifications:
+    description: Optional monitoring job events with existing notification destination IDs
+    type: complex
+    default: {}
   train_email_notifications:
     description: Optional train email events and recipient lists
     type: complex

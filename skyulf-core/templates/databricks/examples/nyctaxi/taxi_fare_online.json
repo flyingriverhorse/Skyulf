@@ -30,5 +30,6 @@
   "monitoring_schema": "",
   "include_online_serving": "true",
   "include_daily_rollout": "false",
-  "include_online_publication": "true"
+  "include_online_publication": "true",
+  "preprocessing_probe": "true"
 }

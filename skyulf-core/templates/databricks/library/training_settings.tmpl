@@ -46,13 +46,15 @@
 {{if ne (index $v (print $p "training_sample_rows")) "null"}}{{$i}}training_sample_rows: {{index $v (print $p "training_sample_rows")}}
 {{$i}}training_sample_seed: {{index $v (print $p "training_sample_seed")}}
 {{end -}}
-{{$i}}filter_unavailable_results: {{index $v (print $p "filter_unavailable_results")}}
-{{if and (eq (index $v (print $p "filter_unavailable_results")) "true") (ne (index $v (print $p "result_availability_lag_hours")) "null")}}{{$i}}result_availability_lag_hours: {{index $v (print $p "result_availability_lag_hours")}}
+{{- $availability := or (eq $v.source_layout "separate_outcomes") (eq (index $v (print $p "filter_unavailable_results")) "true") -}}
+{{$i}}filter_unavailable_results: {{$availability}}
+{{if and $availability (ne (index $v (print $p "result_availability_lag_hours")) "null")}}{{$i}}result_availability_lag_hours: {{index $v (print $p "result_availability_lag_hours")}}
 {{end -}}
 {{if index $v (print $p "event_column")}}{{$i}}event_column: {{printf "%q" (index $v (print $p "event_column"))}}
 {{$i}}event_time_parsing: {format: {{if index $v (print $p "event_time_format")}}{{printf "%q" (index $v (print $p "event_time_format"))}}{{else}}null{{end}}, timezone: {{if index $v (print $p "event_time_timezone")}}{{printf "%q" (index $v (print $p "event_time_timezone"))}}{{else}}null{{end}}, date_only: {{index $v (print $p "event_date_only")}}}
 {{end -}}
-{{if index $v (print $p "result_available_at_column")}}{{$i}}result_available_at_column: {{printf "%q" (index $v (print $p "result_available_at_column"))}}
+{{if eq $v.source_layout "separate_outcomes"}}{{$i}}result_available_at_column: {{printf "%q" $v.label_available_at_column}}
+{{else if index $v (print $p "result_available_at_column")}}{{$i}}result_available_at_column: {{printf "%q" (index $v (print $p "result_available_at_column"))}}
 {{$i}}result_time_parsing: {format: {{if index $v (print $p "result_time_format")}}{{printf "%q" (index $v (print $p "result_time_format"))}}{{else}}null{{end}}, timezone: {{if index $v (print $p "result_time_timezone")}}{{printf "%q" (index $v (print $p "result_time_timezone"))}}{{else}}null{{end}}, date_only: {{index $v (print $p "result_date_only")}}}
 {{end -}}
 {{range $key := (regexp "[a-z_]+").FindAllString "start holdout_start cutoff result_cutoff" -1}}{{if index $v (print $p $key)}}{{$i}}{{$key}}: {{printf "%q" (index $v (print $p $key))}}

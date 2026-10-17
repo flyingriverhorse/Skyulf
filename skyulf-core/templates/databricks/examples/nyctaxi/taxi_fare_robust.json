@@ -26,5 +26,6 @@
   "monitoring_catalog": "workspace",
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
-  "shap_enabled": "true"
+  "shap_enabled": "true",
+  "preprocessing_probe": "true"
 }

@@ -39,5 +39,6 @@
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
   "shap_max_samples": "64",
-  "shap_max_display_samples": "3"
+  "shap_max_display_samples": "3",
+  "preprocessing_probe": "true"
 }

@@ -48,6 +48,7 @@ In that copy, change these settings. Keep the supplied feature code and recipes.
 | `databricks.yml` | `bundle.name` | `air_quality_no2_append` |
 | `config/training.yml` | `defaults.training_table` | `"{catalog}.{input_schema}.observations"` |
 | `config/inference.yml` | `score_source_table` | `"{catalog}.{input_schema}.observations"` |
+| `config/inference.yml` | `initial_scoring` | `from_now` for a fresh prediction target; first scoring records a checkpoint without predicting summer rows. |
 | `deployment/targets.yml` | `targets.test.workspace.host` | Your workspace URL. |
 | `deployment/targets.yml` | `targets.test.workspace.root_path` | `/Workspace/Projects/air_quality_no2_append/test` |
 | `deployment/targets.yml` | `targets.test.variables.input_schema`, `output_schema`, `metadata_schema` | Set each to `air_quality_no2_append`. |
@@ -77,7 +78,14 @@ Automatic promotion uses the existing quality and coverage gates, and a
 successful first activation starts scoring through the configured handoff.
 Wait for that scoring job before appending more data.
 
-**The initial score includes every existing summer row**, including training
+With `initial_scoring: from_now`, the initial score records the current source
+version and produces zero predictions. Append winter rows only after that
+successful checkpoint; they become the first production predictions. Rebuilds
+keep the boundary using saved prediction keys and recent CDF. CDF-expiry recovery
+also needs the original starting snapshot to remain readable.
+The first empty checkpoint provides no measured production performance.
+
+If you keep the default `full_snapshot`, **the initial score includes every existing summer row**, including training
 rows. It establishes the incremental checkpoint. Its performance is not an
 independent production evaluation. The policy cannot filter out that initial
 batch: ignore its daily performance result. Winter rows scored on that same UTC

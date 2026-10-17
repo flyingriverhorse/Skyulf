@@ -1,0 +1,8 @@
+{{- define "source_columns" -}}
+{{- $seen := "," -}}
+{{- range $name := (regexp "[A-Za-z_][A-Za-z0-9_]*").FindAllString .columns -1 -}}
+{{- if not ((regexp (printf ",%s," $name)).MatchString $seen) -}}
+{{if ne $seen ","}},
+{{end}}  `{{$name}}` {{if eq $name $.timestamp}}TIMESTAMP{{else}}TYPE_FOR_{{$name}}{{end}}{{- $seen = printf "%s%s," $seen $name -}}
+{{- end -}}{{- end -}}
+{{- end -}}

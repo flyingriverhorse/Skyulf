@@ -570,7 +570,7 @@
     "description": "1. Data | Optional sample: enter 10000 to select up to 10000 eligible rows BEFORE train/test splitting. null = no sampling. Prediction rows are never sampled",
     "pattern": "^(?:null|[1-9][0-9]*)$",
     "order": 52,
-    "skip_prompt_if": {}
+    "skip_prompt_if": {"properties": {"training_layout": {"const": "multi_target"}}}
   },
   "training_sample_seed": {
     "type": "string",
@@ -579,6 +579,13 @@
     "pattern": "^(?:0|[1-9][0-9]*)$",
     "skip_prompt_if": {},
     "order": 53
+  },
+  "preprocessing_probe": {
+    "type": "string",
+    "default": "false",
+    "enum": ["false", "true"],
+    "description": "1. Data | Save preprocessing diagnostics using at most 256 holdout rows and 8 MiB. This does not replace Spark/endpoint admission checks",
+    "order": 53.1
   },
   "lookback_days": {
     "type": "string",

@@ -4,6 +4,12 @@ New here? Read [START_HERE.md](START_HERE.md) first: it lists what to edit, the
 first train and score, and which guide answers which question. This page maps
 each setting to the file that owns it.
 
+If your source tables already exist, start with the read-only source check in
+[SOURCES.md](SOURCES.md). It explains this project's input/outcome arrangement
+and column contract. If tables do not exist yet, choose `include_source_sql: "true"`
+during setup to include an editable `config/sources.sql` starter. The default is
+`"false"`; initialization and deployment never create your source tables.
+
 Skyulf 0.9.3 Bundle: **{{if eq .training_layout "multi_target"}}independent target models{{else}}{{.task}}{{end}}** with **{{.engine}}** training and **{{.inference_mode}}** inference, using **{{.compute_mode}}**
 compute. Training and preprocessing fit in one bounded Python process on this compute. {{if eq .inference_mode "spark"}}Scoring runs a partition-safe MLflow pyfunc on Spark workers and keeps keyed predictions distributed.{{else}}Scoring uses a bounded frame in the saved pandas/Polars engine.{{end}}
 
@@ -33,6 +39,35 @@ branch, competition and deployment choices. Both ask for the monitoring store;
 blank answers start without monitoring. Neither mode inspects source rows.
 Empty `config/features.yml` groups create no feature job or merged table;
 training and scoring read their configured sources directly.
+
+Training defaults to at most **10,000 rows and 64 MiB per Python input read**.
+For a larger source, set `training_sample_rows` in `config/training.yml` to
+sample eligible rows before splitting, or raise `max_rows` and `max_input_mb`
+within your compute's memory budget. Sampling never samples scoring rows.
+Detailed setup asks for the sample limit and optional `preprocessing_probe`.
+The probe records diagnostics on at most 256 holdout rows and 8 MiB; Spark and
+endpoint admission checks are a separate requirement.
+
+With `initial_scoring: full_snapshot` (default) in `config/inference.yml`, the
+first scoring run includes existing rows. If training uses the same table,
+this includes training history; its measured performance is not independent.
+Choose `initial_scoring: from_now` before the first score to commit a zero-row
+checkpoint and score only later inserts. Rebuilds preserve that boundary using
+saved prediction keys and recent CDF. CDF-expiry recovery additionally needs the
+original starting snapshot to remain readable.
+The choice cannot be changed on an existing prediction target.
+`python src/tools/preview.py` explains the choice. Scheduled training with a
+`fixed_window` repeatedly reads the same date interval; use `rolling_days` or
+`rolling_calendar` when the interval should advance. Preview also warns about
+this combination; intentional repeated experiments are still allowed.
+
+Monitoring job failures can notify through `monitoring_email_notifications`,
+`monitoring_webhook_notifications` and `monitoring_health_rules`. Measured drift
+does not fail the job; use a separate SQL alert over `monitoring_issues` for it.
+See [notifications](https://www.skyulf.com/manual/user_guide/databricks_drift.html#notifications).
+Optional old-reference cleanup uses the monitoring job's `cleanup_references`
+action and defaults to a dry run. Review its plan and pause producers before
+explicit confirmation; see [reference retention](https://www.skyulf.com/manual/user_guide/databricks_monitoring_setup.html#retain-or-clean-old-spark-references).
 
 These short guides ship with this project revision and link to detailed topic
 pages. Public documentation can describe a newer release; use the release

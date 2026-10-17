@@ -48,5 +48,6 @@
   "monitoring_schema": "taxi_monitoring",
   "evaluation_charts_enabled": "true",
   "shap_enabled": "true",
-  "competition_preprocessing_recipe": "zones_and_trips"
+  "competition_preprocessing_recipe": "zones_and_trips",
+  "preprocessing_probe": "true"
 }

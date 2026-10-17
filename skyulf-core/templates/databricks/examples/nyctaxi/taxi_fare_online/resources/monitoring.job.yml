@@ -8,6 +8,10 @@ resources:
       queue:
         enabled: true
       timeout_seconds: ${var.monitoring_timeout_seconds}
+      email_notifications: ${var.monitoring_email_notifications}
+      webhook_notifications: ${var.monitoring_webhook_notifications}
+      health:
+        rules: ${var.monitoring_health_rules}
       schedule:
         quartz_cron_expression: ${var.monitoring_cron}
         timezone_id: UTC
@@ -17,6 +21,10 @@ resources:
           default: ""
         - name: monitoring_action
           default: observe
+        - name: cleanup_confirm
+          default: "false"
+        - name: reference_retention_days
+          default: ${var.monitoring_reference_retention_days}
         - name: monitoring_serving_enrollments
           default: '[]'
         - name: score_model_version
@@ -61,6 +69,8 @@ resources:
               monitoring_request: '{{job.parameters.monitoring_request}}'
               monitoring_revisit_windows: ${var.monitoring_revisit_windows}
               monitoring_action: '{{job.parameters.monitoring_action}}'
+              cleanup_confirm: '{{job.parameters.cleanup_confirm}}'
+              reference_retention_days: '{{job.parameters.reference_retention_days}}'
               monitoring_serving_enrollments: '{{job.parameters.monitoring_serving_enrollments}}'
               as_of_unix_ms: '{{job.start_time.timestamp_ms}}'
         - task_key: monitoring_report

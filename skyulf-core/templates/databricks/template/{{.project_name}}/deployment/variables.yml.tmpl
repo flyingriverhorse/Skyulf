@@ -1,5 +1,11 @@
 # Authentication belongs to your CLI profile or external CI/CD, never to this file.
 # Override scalar values with BUNDLE_VAR_<name> or --var; see deployment/README.md.
+{{- if or (and .label_table_name (not .label_available_at_column)) (and .label_available_at_column (not .label_table_name))}}
+{{- template "ERROR_label_table_name_and_label_available_at_column_must_be_set_together" . -}}
+{{- end}}
+{{- if and (ne .performance_policy_mode "off") (or (not .label_table_name) (not .monitoring_catalog) (not .monitoring_schema))}}
+{{- template "ERROR_performance_policy_requires_outcomes_and_monitoring_store" . -}}
+{{- end}}
 variables:
   pipeline_owner:
     description: User with CAN_MANAGE on every target besides the deployer; CI may pass --var pipeline_owner
@@ -45,11 +51,18 @@ variables:
     description: Minimum new or changed labeled training rows for either automatic trigger
     default: "1"
   monitoring_drift_thresholds:
-    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring.'
+    description: 'JSON overrides: psi, ks_statistic, wasserstein, kl_divergence, categorical_top_k, id_like_uniqueness, max_category_summaries, psi_moderate, psi_critical, monitor_max_rows, monitor_max_bytes, missing_markers; {} preserves defaults. Row/byte overrides apply only to non-Spark monitoring. missing_markers maps numeric features to values counted as missing, e.g. {"co_gt": [-200]}.'
     default: '{}'
   monitoring_performance_policies:
     description: 'JSON object keyed by fully qualified component model name; {} disables performance policy'
-    default: '{}'
+{{if eq .performance_policy_mode "off"}}    default: '{}'
+{{else}}    # Verify concrete baseline versions before activation; edit each component independently.
+    default: >-
+      {
+{{if eq .training_layout "multi_target"}}{{range $slot := (regexp "[1-8]").FindAllString "12345678" -1}}{{if le $slot $.branch_count}}        {{if ne $slot "1"}},{{end}}"${var.catalog}.${var.metadata_schema}.{{$.project_name}}_{{index $ (printf "branch_%s_name" $slot)}}${var.resource_suffix}": {{template "performance_policy" (map (pair "values" $) (pair "task" (index $ (printf "branch_%s_task" $slot))))}}
+{{end}}{{end}}{{else}}        "${var.catalog}.${var.metadata_schema}.{{.project_name}}_model${var.resource_suffix}": {{template "performance_policy" (map (pair "values" .) (pair "task" .task))}}
+{{end}}      }
+{{end}}
   monitoring_task_timeout_seconds:
     description: Independent Spark monitoring task timeout
     default: 3600
@@ -88,10 +101,10 @@ variables:
     default: "{{.monitoring_schema}}"
   monitoring_label_table:
     description: Optional fully qualified table of actual outcomes for monitoring
-    default: ""
+    default: "{{if .label_table_name}}{{if not ((regexp "\\.").MatchString .label_table_name)}}${var.catalog}.${var.input_schema}.{{end}}{{.label_table_name}}{{end}}"
   monitoring_result_available_at_column:
     description: UTC outcome availability column in the monitoring label table
-    default: ""
+    default: "{{.label_available_at_column}}"
   monitoring_expected_interval_hours:
     description: Maximum scoring age before the dashboard reports stale
     default: "24"
@@ -123,6 +136,21 @@ variables:
     description: Optional RUN_DURATION_SECONDS warning rules for score
     type: complex
     default: []
+  monitoring_health_rules:
+    description: Optional RUN_DURATION_SECONDS warning rules for monitoring
+    type: complex
+    default: []
+  monitoring_email_notifications:
+    description: Optional monitoring job email events; measured drift needs a separate SQL alert
+    type: complex
+    default: {}
+  monitoring_reference_retention_days:
+    description: Minimum reference age in days for explicit cleanup_references; 1 to 3650, dry-run by default
+    default: "90"
+  monitoring_webhook_notifications:
+    description: Optional monitoring job events with existing notification destination IDs
+    type: complex
+    default: {}
   train_email_notifications:
     description: Optional train email events and recipient lists
     type: complex

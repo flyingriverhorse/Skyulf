@@ -1,6 +1,8 @@
 # Scoring controls and output destinations. No model is trained by this file.
 version: 1
 inference_mode: {{.inference_mode}}
+# from_now checkpoints without predictions on the first run; rebuilds keep that boundary.
+initial_scoring: {{.initial_scoring}}
 {{if eq .inference_mode "spark"}}spark_udf_env_manager: {{if eq .compute_mode "serverless"}}local{{else}}virtualenv{{end}}
 spark_udf_prediction_batch_rows: 10000
 {{end}}score_source_table: "{catalog}.{input_schema}.{{if .score_source_table_name}}{{.score_source_table_name}}{{else}}{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}{{end}}"

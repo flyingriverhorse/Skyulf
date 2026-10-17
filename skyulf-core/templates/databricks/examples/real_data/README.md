@@ -314,5 +314,11 @@ requested. Rerunning the same window cannot count it twice.
 
 Monitoring reads the raw scoring inputs, before the model's preprocessing. The
 `-200` marker is therefore a value there, not a missing one: `co_gt` shows a
-missing fraction of 0, and its drift statistics include the marker. Convert such
-markers upstream when you need input-quality monitoring to see the gaps.
+missing fraction of 0, and its drift statistics include the marker. Monitoring can
+count it as missing with `missing_markers` in `monitoring_drift_thresholds`, for
+example `{"missing_markers": {"co_gt": [-200]}}`; see
+[drift settings](https://www.skyulf.com/manual/user_guide/databricks_drift.html#configure-thresholds-and-measurement-limits).
+This example leaves it off. A missing value on an excluded row is a quality issue,
+so markers on the six sensor columns would report the 218 `sensors_online`
+exclusions as quality issues, and a `co_gt` marker would flag excluded rows whose
+`co_gt` was not measured.

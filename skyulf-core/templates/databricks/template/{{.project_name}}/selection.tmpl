@@ -1,5 +1,8 @@
 {{- /* Generation-only selection: skip paths are relative to this directory. */ -}}
 {{- skip "selection" -}}
+{{- if ne .include_source_sql "true" -}}
+{{- skip "config/sources.sql" -}}
+{{- end -}}
 {{- if eq .training_layout "multi_target" -}}
 {{- range $name := (regexp "[a-z_]+").FindAllString "initialize_run load_data prepare_dataset train_and_tune select_best_model validate_model register_model evaluate_model model_decision training_report" -1 -}}
 {{- skip (printf "src/jobs/%s.py" $name) -}}

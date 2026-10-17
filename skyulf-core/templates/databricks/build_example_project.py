@@ -16,10 +16,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 EXAMPLES = ROOT / "examples/nyctaxi"
-PROBE = (
-    "  preprocessing_probe: false",
-    "  preprocessing_probe: true",
-)
 # Online serving renders empty lookup declarations; the online example fills them
 # with the zone features that load_nyctaxi.sql creates.
 LOOKUP_FILL = (
@@ -56,7 +52,6 @@ PROJECTS = {
         # Built-in transformers only: no custom filter or step modules.
         "removed": (*SAMPLES, "src/features/pre_split.py", "src/features/preprocessing.py"),
         "training_edits": (
-            PROBE,
             (
                 "  quality_threshold: 6.0\n",
                 "  quality_threshold: 6.0\n  preprocessing_recipe: spark_safe\n",
@@ -72,7 +67,7 @@ PROJECTS = {
         ),
         # Built-in preprocessing only; pre_split.py keeps the value_range filter.
         "removed": (*SAMPLES, "src/features/preprocessing.py"),
-        "training_edits": (LOOKUP_FILL, PROBE),
+        "training_edits": (LOOKUP_FILL,),
     },
     "taxi_fare_robust": {
         "readme_note": (
@@ -96,10 +91,10 @@ PROJECTS = {
             "SERVE_EXAMPLE.md",
         ),
         "removed": (*SAMPLES, "src/features/preprocessing.py"),
-        "training_edits": (PROBE,),
+        "training_edits": (),
     },
-    "taxi_high_fare": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
-    "taxi_trips": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": (PROBE,)},
+    "taxi_high_fare": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": ()},
+    "taxi_trips": {"sources": OWN_CODE, "removed": SAMPLES, "training_edits": ()},
     "diagnostic_single": {
         "group": "real_data",
         "sources": (
@@ -112,7 +107,6 @@ PROJECTS = {
         ),
         "removed": SAMPLES,
         "training_edits": (
-            PROBE,
             (
                 "  quality_threshold: 0.85\n",
                 "  quality_threshold: 0.85\n  preprocessing_recipe: measured_shape\n  pre_split_recipe: valid_measurements\n",
@@ -130,7 +124,7 @@ PROJECTS = {
             "src/features/numeric.py",
         ),
         "removed": SAMPLES,
-        "training_edits": (PROBE,),
+        "training_edits": (),
     },
     "air_quality_no2": {
         "group": "real_data",
@@ -144,7 +138,7 @@ PROJECTS = {
             "src/features/sensors.py",
         ),
         "removed": SAMPLES,
-        "training_edits": (PROBE,),
+        "training_edits": (),
     },
 }
 

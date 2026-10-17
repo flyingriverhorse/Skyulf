@@ -18,10 +18,15 @@ SHARED = {
     "project_name",
     "setup_mode",
     "source_table_name",
+    "source_layout",
+    "include_source_sql",
+    "initial_scoring",
     "record_key_columns",
     # No default can name a monitoring store; blank answers start without monitoring.
     "monitoring_catalog",
     "monitoring_schema",
+    "label_table_name",
+    "label_available_at_column",
 }
 ONE_TARGET = SHARED | {"task", "input_columns", "target_column"}
 LAYOUTS = ["single_model", "model_competition", "multi_target"]
