@@ -190,6 +190,67 @@ producer repositories; they do not provide per-row tenant isolation.
 Configure [the shared dashboard](databricks_monitoring_dashboard.md) after the store exists. Its
 training tables also require `training_summary_json` in the owned `model_version_details` view.
 
+## Retain or clean old Spark references
+
+Prepared Spark monitoring references are stored snapshots of training and source
+populations. They are separate from source tables and historical monitoring
+reports. The optional cleanup action considers only references whose saved
+receipt proves they belong to this project and environment in the configured
+monitoring store. Nothing is cleaned during ordinary observation.
+
+```mermaid
+flowchart TD
+    A["Reference receipt in the store"] --> B{"Identity recomputed from this project's inventory matches?"}
+    B -- "no" --> K1["Another project's: ignored"]
+    B -- "yes" --> C{"Owned, unchanged since creation, same table ids?"}
+    C -- "no" --> K2["Skipped with a reason"]
+    C -- "yes" --> D{"Still needed? Enrolled anywhere, alias, policy baseline or unfinished retraining"}
+    D -- "yes" --> K3["Preserved with a reason"]
+    D -- "no" --> E{"Older than reference_retention_days?"}
+    E -- "no" --> K3
+    E -- "yes" --> F["Deletable"]
+    F --> G{"cleanup_confirm=true?"}
+    G -- "no" --> L["Dry run: listed with its size"]
+    G -- "yes" --> H["Recheck everything; drop only what is still deletable"]
+    H --> I["Audit intent, drop train/seen/source, drop the receipt, audit result"]
+```
+
+If the inventory, registry aliases or retraining state cannot be read, the run
+stops before any change.
+
+Start with a dry run from the deployed project:
+
+```powershell
+databricks bundle run monitoring -t test --profile YOUR_PROFILE --params monitoring_action=cleanup_references,reference_retention_days=90,cleanup_confirm=false
+```
+
+Inspect the `monitor_model` output for candidate tables, size and preservation
+reasons. The default age is 90 days, measured from receipt creation; accepted
+values are 1–3650. Change the default with
+`monitoring_reference_retention_days` in the target variables. Active enrollment
+in any project sharing the store, a registered alias, a policy baseline or
+pending retraining can preserve an old reference. Unknown ownership or missing
+dependency evidence is never permission to delete it.
+
+Before deleting, pause training, scoring, monitoring and rollout producers that
+can change enrollment or aliases in this store, and wait for active runs to end.
+Then rerun the same command with `cleanup_confirm=true`. The action rechecks
+dependencies, records intent and outcome in the owned
+`reference_cleanup_audit` Delta table, drops reference populations and drops
+their receipt last. Cross-service checks and table drops are not one atomic
+transaction; pausing producers remains necessary. If dropping a population table
+fails, the receipt remains for investigation and recovery. A failure writing the
+final audit result can occur after every table, including the receipt, is gone;
+completed deletions are not rolled back. Inspect the table state and recorded
+intent before retrying or treating an absent final audit row as proof of no deletion.
+
+The action does not delete source/prediction tables, model versions, monitoring
+reports, jobs or dashboards. Disabled monitoring can still run cleanup when the
+store destination is configured; personal development targets remain disabled.
+The caller needs read access to the store, registry aliases and retraining job
+state, permission to create/write the audit table, and ownership or equivalent
+permission to drop the selected references. No new dashboard chart is created.
+
 ## Common errors and fixes
 
 | Symptom | Fix |

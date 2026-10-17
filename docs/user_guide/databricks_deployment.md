@@ -309,7 +309,9 @@ uv pip install -r deployment/train-requirements.txt
 ```
 
 Source tables must already exist. Enable Delta Change Data Feed on the scoring
-source before new rows arrive; the first score processes its existing rows.
+source before new rows arrive; the default `initial_scoring: full_snapshot`
+processes existing rows. Choose `from_now` before the first score to establish
+a zero-row checkpoint; see [scoring start](databricks_scoring.md#start-with-new-records-only).
 Record keys must be unique, nonnull STRING/BIGINT columns. See
 [scoring](databricks_scoring.md) for publication, receipts and recovery.
 

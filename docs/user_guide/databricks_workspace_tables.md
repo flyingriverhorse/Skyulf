@@ -52,7 +52,8 @@ schema, but separating them keeps each schema readable (see
 
 These may be one table or several; see
 [Choose a table layout](databricks_training_data.md#choose-a-table-layout).
-The prepared examples create them with their own loaders (`load_nyctaxi.sql`,
+[Check or create your source tables](databricks_source_tables.md) explains
+how to verify them before the first run. The prepared examples create them with their own loaders (`load_nyctaxi.sql`,
 `real_data/load_data.py`); a normal project uses tables you already have.
 
 ## Predictions: `output_schema`

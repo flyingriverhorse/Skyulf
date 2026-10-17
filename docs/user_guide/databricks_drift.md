@@ -237,8 +237,10 @@ per-monitor settings; changing the dashboard does not change a measurement.
 | `psi_critical` | `0.25` | Critical severity wording. Positive and above `psi_moderate`. |
 | `monitor_max_rows` | Existing observation budget, capped at 1,000,000 | Explicit non-Spark observation row budget; integer 1–1,000,000. |
 | `monitor_max_bytes` | Existing observation budget, capped at 1 GiB | Explicit non-Spark observation byte budget; integer 1–1 GiB. |
+| `missing_markers` | None | Object mapping monitored integer or floating-point feature columns to 1–100 marker values, for example `{"co_gt": [-200]}`. Matching values count as missing in both the reference and the current population. See [missing-value markers](#missing-value-markers). Monitoring only. |
 
-The last two keys override driver materialization budgets, not feature thresholds.
+`monitor_max_rows` and `monitor_max_bytes` override driver materialization budgets,
+not feature thresholds.
 Without them, the producer's budgets remain in effect; direct `MonitorConfig`
 defaults remain 10,000 rows and 64 MiB. Overrides stay within the existing
 1,000,000-row / 1 GiB safety ceilings. For larger observations use Spark monitoring.
@@ -257,7 +259,8 @@ variables:
      "monitor_max_rows": 200000, "monitor_max_bytes": 268435456}
 ```
 
-The same dictionary can be passed to `DriftCalculator(...).calculate_drift(...)`;
+The same dictionary, without `missing_markers`, can be passed to
+`DriftCalculator(...).calculate_drift(...)`, which rejects that key;
 row/byte keys are consumed by monitoring enrollment only. Category evidence names
 reflect the chosen K, for example `chi_square_top30_other`. Increasing K preserves
 more rare labels but increases summary work and can make sparse evidence harder
@@ -269,3 +272,77 @@ fields. With no categorical overrides, the small-domain Spark path retains its
 These settings do **not** expose preprocessing probe minimum/sample caps or float
 tolerances, the PowerTransformer 10% fit guard, SHAP's two-row minimum, Spark's
 maximum class count or its exact-KS cell limit. Those remain fixed contracts.
+
+### Missing-value markers
+
+Monitoring measures the raw scoring inputs, before the model's preprocessing. A
+source that writes a code such as `-200` for "no reading" therefore looks like a
+real measurement: its missing fraction stays 0 and drift includes the code. List
+such codes per column to count them as missing instead:
+
+```yaml
+variables:
+  monitoring_drift_thresholds: '{"missing_markers": {"co_gt": [-200], "hour": [-1]}}'
+```
+
+For a sensor that writes `-200` during outages:
+
+| | Without markers | With `{"co_gt": [-200]}` |
+| --- | --- | --- |
+| `co_gt` missing fraction | 0, because `-200` counts as a reading | The share of rows without a reading |
+| `co_gt` drift | Includes the `-200` values, so more outages look like a shift in the readings | Compares real readings only |
+| More outages than in training | Not visible | A quality issue when the increase is significant |
+| Model, predictions and training | Unchanged | Unchanged |
+
+- Markers apply to the reference and the current population before quality and
+  drift, in Spark and in-memory monitoring alike. Stored reference tables keep
+  raw rows, so changing markers takes effect at the next observation.
+- A marker matches exactly in the column's own type. Integer columns need whole
+  numbers within their range. Floating-point columns need a value that type holds
+  exactly: a 32-bit float column accepts `-200` or `-999.5`, but not `0.1`.
+  Decimal, text and other columns cannot carry markers.
+- A marker for a column that is not a monitored feature, or that has no exact
+  value in the column's type, fails the observation instead of being skipped.
+- A marked value is then an ordinary missing value. Missingness above the
+  training rate, and a missing value on a row without a saved prediction (an
+  excluded row), are quality issues.
+- Without `missing_markers`, reports are unchanged.
+
+## Notifications
+
+Job failures and measured drift are separate events. A successful monitoring run
+can report drift, missing evidence or performance loss. Configure native job
+notifications for failed runs and long durations in your target variables:
+
+```yaml
+variables:
+  monitoring_email_notifications:
+    on_failure: [ml-operations@example.com]
+    on_duration_warning_threshold_exceeded: [ml-operations@example.com]
+  monitoring_health_rules:
+    - metric: RUN_DURATION_SECONDS
+      op: GREATER_THAN
+      value: 1800
+  monitoring_webhook_notifications:
+    on_failure:
+      - id: YOUR_EXISTING_NOTIFICATION_DESTINATION_ID
+```
+
+Replace the example email/destination before deploying. Webhooks use an existing
+workspace notification destination ID, not a URL. Empty defaults send nothing.
+To notify on monitoring findings, create a separate SQL alert over the shared
+store's existing `monitoring_issues` view. For example:
+
+```sql
+SELECT count(DISTINCT monitor_id) AS models_requiring_attention
+FROM my_catalog.skyulf_monitoring.monitoring_issues
+WHERE environment = 'prod';
+```
+
+Alert when `models_requiring_attention > 0`; choose an existing warehouse,
+notification destination and a schedule aligned with the monitoring job.
+This view includes drift, quality, policy loss and missing/stale evidence, with
+current enrollment and configuration filtering. Multiple feature issues for one
+monitor count once. Open the view or dashboard for the individual reasons.
+Narrow `project` or `model_name` to alert on a particular workload. The Bundle
+does not create this SQL alert or any recipient automatically.

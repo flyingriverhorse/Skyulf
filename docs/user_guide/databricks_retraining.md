@@ -51,9 +51,13 @@ performance retraining requests. Set a model's performance policy to
 `on_drift` remains an independent setting. Either trigger uses the same guarded
 train job request. Neither trigger bypasses model evaluation or approval.
 
-Set `training_version: null`. Maintain the configured training table upstream:
-new feature rows must contain actual target values when they become available.
-Monitoring's optional label table does not automatically update training data.
+Set `training_version: null`. Maintain the configured training features upstream.
+Targets may be embedded in that table or read through an explicit
+[`training_label_table` join](databricks_training_data.md#train-from-separate-outcomes).
+With the join, use `training_label_version: null` for fresh runs: new eligible
+outcomes can count as changed training data even when feature rows are unchanged.
+Monitoring's optional label binding alone does not enable the training join or
+write outcomes back to a source table.
 Freshness means eligible training values changed relative to the active model;
 it does not require their arrival time to be after the drift report. The request
 records the assessed Delta version and content digest. The train run independently
@@ -64,6 +68,33 @@ some new eligible rows in training; merely reshuffling old rows does not qualify
 Temporal rows qualify once they enter the training side of the time boundary.
 Changing the table, column roles, split strategy or engine needs an explicit
 training run before automatic retraining can assess the new contract.
+
+A scheduled training job with `training_window_mode: fixed_window` repeats the
+same date interval. The project preview warns but permits this intentional
+combination. Use `rolling_days` or `rolling_calendar` to advance the interval.
+This warning does not alter automatic retraining's freshness and cooldown checks.
+
+New data has to reach the training read before any trigger can pass the
+fresh-rows guard:
+
+```mermaid
+flowchart TD
+    N["New measurements inserted"] --> TT[("Training source")]
+    O["Actual outcomes inserted"] --> OT[("Outcomes table")]
+    TT --> J["Training read: pinned versions"]
+    OT -. "only with training_label_table" .-> J
+    J --> F{"New eligible labelled rows since the active model?"}
+    F -- "no" --> X["No request"]
+    F -- "yes" --> G{"Cooldown passed and no active train run?"}
+    G -- "no" --> X
+    G -- "yes" --> R["Request recorded as intent, then submitted with its run"]
+    R --> E["Train run: normal evaluation, promotion and approval"]
+```
+
+If new outcomes exist only in the monitoring label table, they do not reach
+training without `training_label_table`, so they cannot satisfy the fresh-rows
+guard. Training rows that already contain actual targets still work without a
+join. Predictions are never used as targets on either path.
 
 For a daily rolling window, configure `defaults` or a model entry in `config/training.yml`:
 

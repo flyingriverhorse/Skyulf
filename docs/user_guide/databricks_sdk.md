@@ -553,7 +553,11 @@ receipts are different contracts.
 
 
 `run_incremental_batch` selects records by **Delta source commits**, not
-by calendar date. On the first run it scores the existing bounded snapshot. On
+by calendar date. By default the first run scores the existing bounded snapshot.
+Set `WorkflowConfig(initial_scoring="from_now", ...)` to record an empty first
+checkpoint and skip existing rows. The choice is fixed in the target receipt;
+see [starting boundaries and retention](databricks_scoring.md#start-with-new-records-only).
+On
 later runs it reads only inserts after the source version recorded in the last
 prediction-table commit. It appends predictions without replacing an older
 period. A source `event_time` column is optional; if you want to carry it into
@@ -654,8 +658,10 @@ an earlier preprocessing step before using them as temporal ordering keys.
 - Limits apply across all entities per step: by default 10,000 rows and 1 MiB.
   Exceeding a limit fails explicitly; inactive entities are not silently evicted.
 
-**Incremental Databricks scoring:** the initial complete source snapshot
+**Incremental Databricks scoring:** the default initial complete source snapshot
 reconstructs history from that snapshot, without prepending the training seed.
+With `initial_scoring="from_now"`, context starts empty at the checkpoint and
+is built only from later admitted rows; excluded historical rows do not seed it.
 Later increments read `temporal_history` from the last prediction receipt.
 The new context, source watermark and predictions share one Delta commit.
 A failed write leaves the prior committed context; a retry reads the actual

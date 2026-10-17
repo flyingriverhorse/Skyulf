@@ -23,6 +23,40 @@ flowchart LR
 
 ## What to edit
 
+Detailed setup offers a simple initial policy through these answers:
+
+```json
+{
+  "monitoring_catalog": "workspace",
+  "monitoring_schema": "skyulf_monitoring",
+  "label_table_name": "outcomes",
+  "label_available_at_column": "available_at",
+  "performance_policy_mode": "report",
+  "performance_regression_metric": "wape",
+  "performance_classification_metric": "accuracy",
+  "performance_tolerance_mode": "relative",
+  "performance_tolerance": "0.2",
+  "performance_baseline_version": "1"
+}
+```
+
+The default is `off`. Enabling `report` or `retrain` requires both an outcome
+binding and a monitoring store. Setup writes `monitoring_performance_policies`
+in `deployment/variables.yml`: one entry for a single model or competition
+winner, and one entry per component in a model set. Regression and classification
+components use their respective metric answer and the correct loss direction.
+The initial policy uses 24-hour windows, a six-hour label delay, at least 20
+labeled rows, 80% coverage and two consecutive failing windows for retraining.
+These are editable policy fields, not additional hidden runtime rules.
+
+Verify the concrete baseline version before activation. Different model-set
+components may need different versions: edit their JSON entries independently.
+Changing the baseline is an explicit policy change; promoting a new champion
+does not automatically advance the baseline. `report` can show a degraded
+first window but never requests training.
+
+For a more specific classification policy, set a target override:
+
 ```yaml
 monitoring_label_table: labels.production.outcomes
 monitoring_result_available_at_column: available_at

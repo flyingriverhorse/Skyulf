@@ -67,7 +67,7 @@ Smoke and preview run locally. Validate and deploy use the workspace; see
 | `single_model` | One target and one chosen model | One fitted pipeline and registered candidate |
 | `model_competition` | One target, several candidate algorithms | Comparable candidate runs and one selected winner |
 | `multi_target` | Several independently defined targets | One fitted component per target and a versioned model set |
-| `setup_mode=quick` (default) | You want a working starting configuration | Ask for source, keys, targets and input columns; accept editable defaults |
+| `setup_mode=quick` (default) | You want a working starting configuration | Choose source arrangement, tables, keys, targets, input columns and monitoring destination; accept editable defaults |
 | `setup_mode=detailed` | You want to choose model, search, schedules and compute before generation | Ask applicable settings, including competition candidates and each active branch |
 
 Quick mode still supports all three layouts. Its defaults include bounded pandas training,
@@ -119,8 +119,8 @@ Targets are `test`, `syst` and `prod`, with optional paired
 standalone `dev` target. Personal schedules start paused. Input catalogs/schemas
 and tables must exist; template generation and deployment do not provision them.
 
-Quick setup asks only for the layout, project name, task, source table, record
-keys (including composite keys), target and input columns, and the
+Quick setup asks for the training layout, project name, task, source arrangement,
+tables, record keys (including composite keys), target and input columns, and the
 [monitoring destination](#monitoring-destination). Detailed setup also
 asks for split strategy, applicable date parsing, model, CV, scoring/promotion
 policies, compute and deployment choices. Serverless is the default. Answer-file
@@ -197,12 +197,22 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 
 Setup follows your answers; it does not inspect source tables or sample rows.
 Random full-snapshot training hides observation-date questions. Result-availability
-questions appear only when you enable that separate filter. Schedule and
+questions appear when you enable that filter; `separate_outcomes` enables it
+using the selected outcome availability timestamp. Schedule and
 policy-cluster details likewise appear only when selected.
 
 `setup_mode` chooses how much to answer now. The default, `quick`, asks for the
-layout, project name, task, source table, record keys and target/input columns,
-and for the monitoring destination. A model set asks for the task and columns of
+training layout, project name, task, source arrangement, record keys and target/input columns,
+and for the monitoring destination. It also asks for optional outcome-table and
+availability-column names. `separate_all` asks for a distinct scoring source.
+Both modes ask `include_source_sql`, default `false`: keep it off when your tables
+already exist and use `preview.py --action sources` to check them. Choose `true`
+only if you need an editable CREATE TABLE starter for tables that do not exist
+yet. In a JSON answer file this is `"include_source_sql": "true"` (a string).
+The starter is `config/sources.sql`; replace its namespace and type placeholders
+before running it yourself. Setup and deployment never execute it. `SOURCES.md`
+and the read-only source check remain available with either choice.
+A model set asks for the task and columns of
 each active branch. It accepts documented defaults for the remaining settings.
 Choose `detailed` to inspect model choices, competition candidates, branch
 recipes, search and deployment settings as they become relevant. Every list
@@ -251,7 +261,7 @@ running preview:
 | Never asked | Default |
 | --- | --- |
 | `test_size`, `random_state`, `stratify` | `0.2`, `42`, `false` |
-| `training_sample_rows`, `training_sample_seed` | `null` (all eligible rows within limits), `42` |
+| `training_sample_seed` | `42` |
 | `min_improvement` | `0.0` |
 | `risk_category` | Empty: the key is omitted from `config/training.yml` |
 | `catalog`, `schema` | `REPLACE_TEST_CATALOG`, `REPLACE_TEST_SCHEMA`; prefill the `test` bindings in `deployment/variables.yml` and the preview/smoke defaults |
@@ -265,6 +275,9 @@ apply to the chosen layout and earlier answers:
 | `training_window_mode` | `auto`: full snapshot for random, rolling calendar for temporal |
 | `cv_enabled`, then `cv_folds`, `cv_type`, `cv_shuffle`, `cv_random_state` | CV off; `5`, `k_fold`, `true`, `42` |
 | `max_rows`, `max_input_mb` | `10000`, `64` |
+| `training_sample_rows` (per branch for model sets) | `null`: read all rows within the limits; this never samples predictions |
+| `preprocessing_probe` | `false`: enable to check fitted preprocessing on a bounded holdout sample |
+| `performance_policy_mode`, task-specific metric, tolerance and baseline version | `off`; when enabled, require outcomes and a monitoring store. See [performance policy](databricks_performance.md). |
 
 Most answer-file values are strings, including `"true"`, `"42"` and `"null"`;
 `min_improvement` is a JSON number. The generated `config/training.yml` uses
@@ -301,15 +314,22 @@ control these questions only; the generated `config/training.yml` stores only th
 declared rules.
 
 The project has two **input** table references. `source_table_name` contains the
-training examples and known answers. `score_source_table_name` contains records
+training observations. Targets may be embedded or joined from explicitly selected
+outcomes. `score_source_table_name` contains records
 to predict; blank reuses the training input. Neither is the output. Choose the
 result name through `prediction_table_name`, for example `customer_predictions`.
 It becomes `prediction_table` in the configured output schema, with any target
 resource suffix. Blank uses `<project_name>_predictions`.
 
-Quick setup asks for neither `score_source_table_name` nor
-`prediction_table_name` and keeps the blank defaults. Detailed setup asks both
-for `single_model` and `model_competition`. A `multi_target` project sets its
+Both modes ask `source_layout`: `single_table` uses embedded training targets;
+`separate_outcomes` joins actual targets into training and shares one feature
+source with scoring; `separate_all` uses distinct training and scoring sources.
+The separate layouts require `label_table_name` and `label_available_at_column`.
+Only `separate_all` prompts for `score_source_table_name`; explicit answer-file
+overrides in older projects are preserved. Quick setup keeps the default
+`prediction_table_name`; detailed setup asks for it for a single model or competition.
+See [source contracts and validation](databricks_training_data.md#choose-a-table-layout).
+A `multi_target` project sets its
 scoring outputs in `config/inference.yml`.
 
 | Setting | Meaning and example |

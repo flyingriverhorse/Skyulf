@@ -27,6 +27,22 @@ flowchart LR
 
 ## What to edit
 
+During Bundle initialization, both setup modes accept `label_table_name` and
+`label_available_at_column`. For example:
+
+```json
+{
+  "label_table_name": "outcomes",
+  "label_available_at_column": "available_at"
+}
+```
+
+A short table name resolves through the active target's catalog and input schema.
+A three-part name such as `labels.production.outcomes` stays explicit across
+targets. Leave both fields empty to start without label-based measurements.
+Setting only one fails initialization. These answers generate the two variables
+below; override them per target if your environments use different sources.
+
 Set these target variables in `deployment/targets.yml`; the names below are examples.
 
 ```yaml
@@ -50,7 +66,10 @@ finite numeric regression targets.
 
 For a model set, include the target columns required by each monitored component. Skyulf does not
 discover an arbitrary target source, generate outcomes, or write labels back into the training
-table. Maintain that training source upstream for [retraining](databricks_retraining.md).
+table. `source_layout: separate_outcomes` also configures a read-only training
+join; in other layouts, monitoring's label binding alone does not enable that
+join. See [training from separate outcomes](databricks_training_data.md#train-from-separate-outcomes)
+before enabling [retraining](databricks_retraining.md).
 
 `monitoring_revisit_windows` controls how many completed performance windows are
 checked for late labels. It defaults to `3`, includes the latest window, and
@@ -58,6 +77,36 @@ accepts 1 to 100. Historical windows can update saved evidence, but do not
 independently submit training. Spark joins saved predictions, pinned feature
 snapshots and eligible actual outcomes, then writes durable Delta observations.
 Ongoing Spark measurements do not use the local one-million-row monitoring cap.
+
+### Which time counts
+
+For batch predictions, three timestamps are involved, and only the prediction
+commit time places a row in a performance window:
+
+```mermaid
+sequenceDiagram
+    participant S as Scoring source
+    participant J as Score job
+    participant P as Predictions
+    participant L as Outcomes table
+    participant M as Monitoring job
+    S->>J: Row inserted, observed_at is when it was measured
+    J->>P: Prediction committed, this time picks the window
+    L->>L: Outcome inserted with available_at
+    Note over P,M: A daily window holds the predictions committed in one UTC day
+    M->>P: Read the window after its end plus label_delay_hours
+    M->>L: Join on the record key, keep available_at at or before the cutoff
+    M->>M: Compare the metric with the baseline
+    Note over M: report mode records the first degraded window
+```
+
+- `observed_at` is a source column for training windows; it does not decide the
+  performance window. Loading two historical days today puts both into today's
+  window.
+- `available_at` decides whether an outcome may be used yet. An outcome that
+  arrives later is picked up when monitoring revisits that window.
+- `consecutive_windows` counts adjacent degraded windows. It decides whether
+  `mode: retrain` may request training; it does not delay a report.
 
 ## The command
 

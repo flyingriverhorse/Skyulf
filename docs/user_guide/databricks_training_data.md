@@ -16,7 +16,7 @@ training run, make sure the training and scoring sources meet these rules:
 | Requirement | Why |
 | --- | --- |
 | Unity Catalog Delta table | Training pins a Delta snapshot version; scoring reads Delta changes. |
-| Change Data Feed on the scoring source, before new rows arrive | Incremental scoring reads new rows from the change feed. The first score processes the rows that already exist. [Scoring](databricks_scoring.md) explains how updates and deletes are handled. |
+| Change Data Feed on the scoring source, before new rows arrive | Incremental scoring reads new rows from the change feed. The default first score processes existing rows; `initial_scoring: from_now` checkpoints without predictions. [Scoring](databricks_scoring.md) explains the starting choice, updates and deletes. |
 | Record key columns of type `STRING` or `BIGINT`, nonnull and unique | Keys identify each prediction. Date or timestamp keys are not supported. |
 | Keys kept out of `input_columns` | Keys are copied to the output, not learned from. |
 | A nonnull target for every eligible training row | Skyulf does not create labels. Use [result availability](#record-identity-and-result-availability) for delayed outcomes. |
@@ -35,6 +35,57 @@ For a worked example table, see the
 
 ### Choose a table layout
 
+A project reads data in three roles. A layout only decides how many physical
+tables hold them:
+
+| Role | What it holds | Who reads it |
+| --- | --- | --- |
+| Training data | Inputs and the known answer (target) for past rows | The train job, to fit the model |
+| Scoring input | Rows to predict, without a target | The score job, which writes the `predictions` table |
+| Actual outcomes (labels) | The real answer for a predicted row, learned later: record key, target and the time it became known (`available_at`) | Monitoring, to compare predictions with reality; training too, when `training_label_table` is set |
+
+A label is the actual answer. A prediction is made before the answer is known,
+so the scoring input has no target; the answer is inserted into the outcomes
+table when it arrives.
+
+The score job never writes to its input table. It reads only the record keys and
+input columns, so a target column in the scoring input is ignored, and it writes
+each prediction as a row of the separate prediction table
+(see [Tables in your workspace](databricks_workspace_tables.md#predictions-output_schema)).
+Even with one input table, a project therefore has at least two tables: the
+input and its predictions.
+
+Quick and detailed setup both ask for `source_layout`. `single_table` is the
+default and uses embedded training targets. `separate_outcomes` connects one
+feature source to a separate actual-outcome table for both training and
+monitoring. `separate_all` asks for a distinct scoring source and keeps targets
+in the training table. The separate layouts require an outcome table and its
+availability column. Existing answer files with an explicit scoring-table
+override retain that override even when no layout answer was supplied.
+
+[Check or create your source tables](databricks_source_tables.md) walks through
+the check, the table contract and its error messages.
+
+Each generated project includes `SOURCES.md` and a read-only validation command.
+The optional `config/sources.sql` starter is generated only when setup selects
+`include_source_sql: "true"` (default `"false"`). Existing tables need no SQL starter:
+
+```powershell
+python src/tools/preview.py --action sources --profile YOUR_PROFILE --warehouse-id YOUR_WAREHOUSE_ID --catalog my_catalog --input-schema my_schema --output-schema my_schema --metadata-schema my_schema
+```
+
+The check reads Delta metadata, CDF settings, required columns, compatible input
+types, unique/non-null keys and the declared outcomes. Key probes may scan the
+full table; no data or settings are changed. It validates the calling identity's
+access to current tables. It cannot prove future inserts or another run-as
+identity will satisfy the same contract. Supply `--label-table` and
+`--label-available-at-column` when target overrides differ from setup answers.
+Fetched Feature Store outputs are not required in raw tables. The report warns
+that lookup-table permissions, point-in-time joins and fetched feature types
+still require the training checks.
+The SQL starter deliberately leaves unknown types as `TYPE_FOR_column`:
+replace these and namespace placeholders with your real schema before running.
+
 Training, scoring and monitoring each read a table you name: `training_table`
 in `config/training.yml`, the scoring source in `config/inference.yml`, and
 `monitoring_label_table` in `deployment/targets.yml`. They may be the same table
@@ -43,8 +94,55 @@ or different ones. Choose by how your actual outcomes arrive:
 | Layout | Use it when | Configure |
 | --- | --- | --- |
 | **One append-only table** | Each row is complete when it is inserted (inputs, target and the time the outcome became known) and is never updated afterwards. | Point all three settings at the same table. Training selects its window with `start`/`cutoff` and keeps rows whose outcome is available; scoring reads newly inserted rows. |
-| **Measurements plus a separate outcomes table** | The outcome is known only later. New measurements are inserted without a target; outcomes are inserted into a second table keyed by the same record key. | Training and scoring read the measurements table (or two tables, as in the examples); `monitoring_label_table` points at the outcomes table. Neither table is ever updated. |
+| **Measurements plus a separate outcomes table** | The outcome is known only later. New measurements are inserted without a target; outcomes are inserted into a second table keyed by the same record key. | `separate_outcomes` sets both `training_label_table` and `monitoring_label_table`; training joins a pinned outcome snapshot. Training and scoring share the measurement source. |
 | **A raw table plus derived tables or views** | Your raw source receives updates or deletes, such as late corrections or outcomes written into existing rows. | Keep the raw table for your own processes, and give Skyulf insert-only derived tables: one for training, one for scoring inputs, one for outcomes. |
+
+| `source_layout` | Tables | Use it when |
+| --- | --- | --- |
+| `single_table` | One: inputs, target and `available_at` | Each row arrives complete with its answer and is never updated afterwards |
+| `separate_outcomes` | Two: measurements without a target, and actual outcomes | The answer arrives later; the most common case |
+| `separate_all` | Three: training with targets, scoring input, actual outcomes | Training and scoring data come from different places, as in the `real_data` examples |
+
+In every layout the score job works in batches: each run predicts the rows
+inserted since the previous run, found through Delta change data feed. It does
+not predict a row the moment it arrives; use a [serving endpoint](databricks_serving.md)
+for that.
+
+The generated `source_layout` choices map to these tables and jobs:
+
+```mermaid
+flowchart LR
+    subgraph ONE["single_table"]
+        O1[("observations: inputs, target, available_at")]
+        O1 --> T1["train"]
+        O1 -- "new inserts" --> S1["score"]
+        O1 -- "outcomes" --> M1["monitoring"]
+        S1 -- "predictions" --> M1
+    end
+    subgraph TWO["separate_outcomes"]
+        F2[("measurements: inputs only")]
+        L2[("outcomes: key, target, available_at")]
+        F2 --> T2["train"]
+        L2 -- "pinned join on the record key" --> T2
+        F2 -- "new inserts" --> S2["score"]
+        L2 -- "outcomes" --> M2["monitoring"]
+        S2 -- "predictions" --> M2
+    end
+    subgraph THREE["separate_all"]
+        A3[("training table: inputs, target")]
+        B3[("scoring source: inputs only")]
+        L3[("outcomes: key, target, available_at")]
+        A3 --> T3["train"]
+        B3 -- "new inserts" --> S3["score"]
+        L3 -- "outcomes" --> M3["monitoring"]
+        S3 -- "predictions" --> M3
+    end
+```
+
+In `separate_all`, training keeps the targets embedded in its own table: new
+labelled rows must reach that table upstream, unless you also configure
+`training_label_table`. Only `separate_outcomes` joins the outcomes into training
+by default.
 
 Three behaviours decide which layout works:
 
@@ -55,10 +153,17 @@ Three behaviours decide which layout works:
   [source changes](databricks_scoring.md#source-changes-are-separate-from-model-changes).
   Writing an outcome into an existing scoring row is an update, so use a
   separate outcomes table instead.
-- **The first score covers every existing row.** When training and scoring
-  share one table, the first score run predicts the historical rows too,
-  including the rows the model was trained on. Later runs score only new inserts.
-  Start scoring from a separate table, or accept and filter that first population.
+- **Choose whether to score existing rows.** The default
+  `initial_scoring: full_snapshot` includes historical training rows when the
+  source is shared; that first population is an in-sample observation.
+  Set `initial_scoring: from_now` in `config/inference.yml` before the first
+  score to record a zero-row checkpoint and score only later inserts. The choice
+  is fixed for that prediction target. Rebuilds preserve the starting boundary
+  using saved prediction keys and recent CDF. Only CDF-expiry recovery needs
+  the original starting snapshot to remain readable. See
+  [start with new records only](databricks_scoring.md#start-with-new-records-only).
+  If you keep `full_snapshot`, run the first score on its own UTC day and ignore
+  that day's performance window; the policy cannot filter out training rows.
 - **Monitoring needs to know when an outcome became available.** The outcomes
   table must contain the saved record keys, the target and a UTC timestamp for
   when the actual value was known (`monitoring_result_available_at_column`); see
@@ -74,8 +179,54 @@ two historical days today does not create two daily performance-policy windows.
 to the ones the jobs create. The prepared examples use the second layout: `observations_train`,
 `observations_score` and `labels`, with no column ever updated. When new data
 arrives, insert it: new measurements into the scoring source, measured outcomes
-into the outcomes table, and newly labelled rows into the training table before
-retraining.
+into the outcomes table. These prepared examples keep embedded training targets,
+so they also need newly labelled rows in the training source before retraining.
+With `training_label_table`, insert new feature rows into the training source and
+actual targets into the outcome table instead; the join supplies the labels.
+
+### Train from separate outcomes
+
+Use a read-only join when new feature rows arrive before their actual target.
+The `separate_outcomes` layout generates this configuration; you can also add
+it explicitly to `defaults` or a model entry in `config/training.yml`:
+
+```yaml
+training_table: "{catalog}.{input_schema}.measurements"
+training_version: null
+training_label_table: "{catalog}.{input_schema}.outcomes"
+training_label_version: null
+record_key_columns: [record_id]
+input_columns: [temperature, humidity]
+target_column: demand
+filter_unavailable_results: true
+result_available_at_column: available_at
+result_availability_lag_hours: 0
+# result_cutoff is resolved at invocation when omitted.
+```
+
+The outcomes table supplies `record_id`, `demand` and the UTC `available_at`.
+Its target and availability values are authoritative; same-named columns in
+the feature table are ignored. Both sources need unique, non-null keys with
+exactly matching types. A duplicate outcome fails instead of choosing an
+arbitrary latest row. Missing joins and outcomes after the availability cutoff
+are excluded by the existing availability policy. An available row with a null
+target still needs an explicit target-missing policy; joining does not invent
+labels or silently relax target validation.
+
+At invocation, both Delta versions and the outcome table's immutable identity
+are pinned. Saved training specifications, dataset identity and MLflow input
+provenance include that binding. Replaying the saved model uses those versions,
+even if outcomes have since arrived. A replaced same-name outcome table fails
+the identity check. `training_label_version: 12` explicitly selects version 12;
+leave it null for new training runs to see later outcomes. No source rows are
+written or merged back into Delta.
+
+The same join is used for pandas/Polars training and Spark retraining freshness
+checks. It can recognize new eligible labels when the feature table has not
+changed. In `separate_all`, rows arriving only in the scoring source still need
+to reach the configured training feature source upstream. Model-set branches
+may share one outcome table with multiple targets; each branch keeps its own
+target and availability policy.
 
 ### Local input limits
 
@@ -83,6 +234,11 @@ retraining.
 Without sampling it applies after any observation-window selection, but before
 result-availability filtering. An overflow fails; the reader never silently
 truncates data. Explicit sampling is available as described below.
+
+Quick setup uses `max_rows: 10000` and `max_input_mb: 64`. Detailed setup also
+asks for `training_sample_rows`; null means no sampling. Overflow errors show
+the configured limit and the setting to edit. A bounded read reports **at least**
+the observed number of rows, not a fabricated count of the entire table.
 
 `max_input_mb` is required; setup writes `64`. One unit is 1 MiB (1,048,576
 bytes). It bounds

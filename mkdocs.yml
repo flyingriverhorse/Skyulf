@@ -109,6 +109,7 @@ nav:
         - Choose a Project Shape: user_guide/databricks_choose.md
         - Project Setup and Preview: user_guide/databricks_project_setup.md
         - Tables in Your Workspace: user_guide/databricks_workspace_tables.md
+        - Check or Create Source Tables: user_guide/databricks_source_tables.md
         - Deployment and Access: user_guide/databricks_deployment.md
         - Project Upgrades: user_guide/databricks_project_upgrade.md
         - Remove a Project: user_guide/databricks_teardown.md

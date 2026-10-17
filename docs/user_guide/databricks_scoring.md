@@ -77,6 +77,7 @@ version you inspected in training evidence:
 ```yaml
 version: 1
 inference_mode: local
+initial_scoring: full_snapshot
 score_source_table: workspace.demo.customer_score
 prediction_table: "{catalog}.{output_schema}.customer_scores{resource_suffix}"
 score_model_selection: pinned_version
@@ -104,10 +105,60 @@ replace one component through the score job's version parameter.
 
 Training and scoring reference the same existing input table by default; neither
 reference creates it. Separate them when labeled training data and new scoring
-data have different lifecycles. With the same table, the first score includes all
+data have different lifecycles. With the default `full_snapshot`, the first score includes all
 existing rows, including historical labeled observations; confirm that population
 before running. [Choose a table layout](databricks_training_data.md#choose-a-table-layout)
 compares one shared table with separate measurement and outcome tables.
+
+### Start with new records only
+
+Set this in `config/inference.yml` **before the first score run** when existing
+rows are training history and should not receive production predictions:
+
+```yaml
+initial_scoring: from_now
+```
+
+Quick and detailed setup both ask for this choice. The default is
+`full_snapshot` for every layout. It applies to single models, competition
+winners and model sets, using local pandas/Polars or supported Spark UDF
+scoring. It does not change training selection or serving endpoint requests.
+
+For example, suppose the source has 50,000 rows at Delta version 12:
+
+| Run | Source | Result with `from_now` |
+| --- | --- | --- |
+| First score | Version 12, 50,000 old rows | Records version 12 in the prediction receipt; writes zero predictions. |
+| Repeat without changes | Still version 12 | No-op; the checkpoint stays unchanged. |
+| Next score | Version 13 inserts 100 new keys | Scores those 100 rows. The 50,000 old rows remain excluded. |
+| Model changes with `full_rebuild` | Current source snapshot | Recomputes eligible rows added after version 12; keeps the original exclusion boundary. |
+
+The first score succeeds and can complete a training-to-scoring handoff even
+with zero predictions. Monitoring has no production predictions to evaluate
+yet; this is not a zero error rate or a measured performance score. An append
+after the pinned version, including one arriving during the first run, belongs
+to a later scoring run.
+
+The receipt fixes `initial_scoring` and `scoring_start_version`. Changing the
+choice on an existing prediction target fails; use a new target for a separate
+scoring history. Existing projects and historical receipts continue to use
+`full_snapshot` unless a new target explicitly selects `from_now`.
+
+**Retention and keys:** record keys must be immutable and never reused.
+Normal increments need only the CDF interval since the last successful score.
+A normal model-change or model-set source-correction rebuild uses keys in the
+last committed prediction snapshot (including excluded rows), plus new inserts
+after its source watermark, joined to the current source snapshot. Keep that
+prediction checkpoint and the recent CDF interval readable. It does not need
+the original starting snapshot, even when months have passed.
+
+Approved **CDF-expiry recovery** cannot reconstruct missing insert history this
+way. It needs the source snapshot at the original starting version to exclude
+its keys. Retain that snapshot and its data files if you require this recovery
+option. If it has expired or been removed by VACUUM, recovery fails; it never
+silently expands to all historical rows. Restore the snapshot or choose a new
+prediction target and explicitly establish a new starting policy. Source
+updates/deletes still follow the separate source-change policy.
 
 ## 2. Decide eligibility before training the version
 
@@ -359,7 +410,7 @@ receipt. The workflow rejects those changes rather than guessing a watermark.
 | Event | Default behavior | Explicit alternative |
 | --- | --- | --- |
 | New source INSERT | Score and append that observation. | No special setting required. |
-| Selected model version changes | `incremental_append` leaves old predictions intact and uses the selected version for new inserts. | `model_change_mode: full_rebuild` starts a versioned generation from the full source. |
+| Selected model version changes | `incremental_append` leaves old predictions intact and uses the selected version for new inserts. | `model_change_mode: full_rebuild` starts a versioned generation, preserving the initial scoring boundary. |
 | Readable source UPDATE/DELETE | Ordinary single-model/competition insert scorer rejects it; model sets also default to reject. | Model sets alone support `model_set.source_change_policy: rebuild_on_change`. |
 | Required CDF history expired | Fail with history-loss evidence. | Deploy the optional recognized-expiry recovery graph described below. |
 
@@ -368,9 +419,12 @@ versions. Use stored provenance when comparing rows. Merely choosing a different
 version with no new source rows does not rescore the old population.
 
 In full_rebuild, the logical prediction name is a managed view over a physical
-`<prediction_table>_v<version>` generation. A new version scores the complete
+`<prediction_table>_v<version>` generation. A new version scores the eligible
 snapshot and switches the view after successful publication; older generation
 tables remain. Repeated runs for that generation can continue incrementally.
+With `full_snapshot`, every current source row is eligible. With `from_now`,
+the rebuild uses keys already in the previous prediction generation plus new
+CDF inserts after its source watermark; pre-start history remains excluded.
 A version-specific physical table records the model name, version and artifact
 digest. Scoring rejects a table at that name when its saved model provenance
 differs. A different registered model sharing the same numeric version needs a
@@ -388,11 +442,11 @@ model_set:
   source_change_policy: rebuild_on_change
 ```
 
-When CDF contains UPDATE/DELETE, that policy rebuilds the complete current source
-with the selected set. Deleted observations disappear and corrected values,
+When CDF contains UPDATE/DELETE, that policy rebuilds the eligible current source
+with the selected set, preserving any `from_now` boundary. Deleted observations disappear and corrected values,
 business outputs and temporal history are recomputed. Even if append mode had
 mixed earlier versions, the source-triggered rebuild uses the selected set for
-all rows. It does not retrain. The complete local snapshot must fit row/byte
+all eligible rows. It does not retrain. The selected local snapshot must fit row/byte
 limits. Do not add source_change_policy at the top level or to a single-model
 project expecting the same behavior.
 
@@ -414,7 +468,11 @@ deployed. Keep `workflow_contract: "3"` fixed; it is not the YAML version.
 
 The score task recognizes a supported missing-history condition and emits a
 recovery request. recovery_needed selects recover_predictions, which scores the
-pinned full source snapshot with the same concrete model/set selection. A
+pinned eligible source snapshot with the same concrete model/set selection. For
+`from_now`, recovery excludes keys in the original starting snapshot. That
+snapshot must still be readable; if its history or files have expired, recovery
+stops rather than scoring pre-start history. Normal model-change rebuilds use
+the saved prediction keys and recent CDF instead. A
 successful replacement verifies source/output identities and the expected output
 version, then atomically retains the output table identity, grants and
 named views, then ordinary incremental scoring resumes at the new watermark. Older model-version
