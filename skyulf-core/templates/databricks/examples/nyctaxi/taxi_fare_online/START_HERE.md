@@ -98,7 +98,7 @@ model version. A monitoring failure does not undo committed predictions.
 
 ## Upgrading this project
 
-This template pins `skyulf-core[mlflow]==0.9.3` in `deployment/requirements.txt`;
+This template pins `skyulf-core[mlflow]==0.9.4` in `deployment/requirements.txt`;
 public guides describe the current revision. Before changing the pin, follow
 [Upgrade an existing project](https://www.skyulf.com/manual/user_guide/databricks_project_upgrade.html)
 and **Upgrade steps for generated Databricks projects** in the

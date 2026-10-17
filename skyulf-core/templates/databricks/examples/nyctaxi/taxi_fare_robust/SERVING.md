@@ -54,7 +54,7 @@ then inspect readiness before querying. The endpoint setup job reports its real
 - [Daily traffic increases, holds and rollback](https://www.skyulf.com/manual/user_guide/databricks_serving_rollout.html)
 - [Serving observations and labels](https://www.skyulf.com/manual/user_guide/databricks_serving_monitoring.html)
 
-Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.3`.
+Version: `deployment/requirements.txt` pins `skyulf-core[mlflow]==0.9.4`.
 Public links show the latest documentation; compare them with that pin before
 using newer settings. Rollout latency checks p99 model execution time when it is
 recorded and falls back to the maximum latency otherwise.
