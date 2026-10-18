@@ -50,7 +50,7 @@ def _json_copy(value: Any) -> Any:
     return result
 
 
-def _identifier(value: Any) -> bool:
+def is_scoring_identifier(value: Any) -> bool:
     """Recognize simple public names outside Skyulf's internal namespace."""
     return (
         isinstance(value, str)
@@ -61,7 +61,9 @@ def _identifier(value: Any) -> bool:
 
 def _resolve(module: ModuleType, path: str) -> Callable[..., Any]:
     """Resolve a relative dotted function solely within saved project code."""
-    if not isinstance(path, str) or not all(_identifier(part) for part in path.split(".")):
+    if not isinstance(path, str) or not all(
+        is_scoring_identifier(part) for part in path.split(".")
+    ):
         raise ValueError("Scoring function must be a relative dotted project name.")
     parent, separator, name = path.rpartition(".")
     try:
@@ -86,7 +88,7 @@ def _validate_rule(rule: Any, *, output: bool, module: ModuleType) -> None:
         raise ValueError(
             "Scoring rule fields must match name, version, function, params and output columns."
         )
-    if not _identifier(rule["name"]):
+    if not is_scoring_identifier(rule["name"]):
         raise ValueError("Scoring rule name must be a simple identifier.")
     if not isinstance(rule["version"], str) or not rule["version"].strip():
         raise ValueError("Scoring rule requires a nonempty immutable version string.")
@@ -94,7 +96,7 @@ def _validate_rule(rule: Any, *, output: bool, module: ModuleType) -> None:
         raise ValueError("Scoring rule params must be a JSON object.")
     _resolve(module, rule["function"])
     if output:
-        _validate_columns(rule["columns"])
+        validate_scoring_columns(rule["columns"])
 
 
 def _reserved(name: str) -> bool:
@@ -105,14 +107,14 @@ def _reserved(name: str) -> bool:
     )
 
 
-def _validate_columns(columns: Any) -> None:
+def validate_scoring_columns(columns: Any) -> None:
     """Require explicit supported scalar output types and unreserved names."""
     if type(columns) is not list or not columns:
         raise ValueError("Output rules need a nonempty columns list.")
     for column in columns:
         if type(column) is not dict or set(column) != {"name", "dtype"}:
             raise ValueError("Output column requires exactly name and dtype.")
-        if not _identifier(column["name"]) or _reserved(column["name"]):
+        if not is_scoring_identifier(column["name"]) or _reserved(column["name"]):
             raise ValueError("Output column name is invalid or reserved.")
         if column["dtype"] not in _DTYPES:
             raise ValueError("Output column dtype must be float64, int64, string or bool.")

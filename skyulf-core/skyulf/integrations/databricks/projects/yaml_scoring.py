@@ -6,19 +6,14 @@ import math
 from pathlib import Path
 from typing import Any, cast
 
-from ....inference import scoring_rules
-from ....inference._model_set_operations import _inputs, _weights
-from ....inference.project_scoring import _identifier, _validate_columns
+from ....inference._model_set_operations import operation_inputs, operation_weights
+from ....inference.project_scoring import is_scoring_identifier, validate_scoring_columns
+from ....inference.scoring_rules import YAML_SCORING_CALLBACKS
 from ._project_files import contained_project_file, read_source
 from .yaml_config import read_yaml_mapping
-from .yaml_recipes import _binds_name, _custom_source, _known_fields
+from .yaml_recipes import binds_name, known_fields, validate_custom_source
 
 _BUILDERS = ("build_model_rules", "build_scoring", "build_combined_rules")
-_BUILTINS = {
-    "required_values": scoring_rules._skyulf_yaml_required_values,
-    "value_range": scoring_rules._skyulf_yaml_value_range,
-    "prediction_band": scoring_rules._skyulf_yaml_prediction_band,
-}
 
 
 def _text(value: Any, label: str) -> str:
@@ -30,7 +25,7 @@ def _text(value: Any, label: str) -> str:
 
 def _required_values(params: dict[str, Any]) -> None:
     """Validate required observed columns without executing the captured callback."""
-    _known_fields(params, {"columns"}, "required_values params")
+    known_fields(params, {"columns"}, "required_values params")
     columns = params.get("columns")
     if type(columns) is not list or not columns:
         raise ValueError("required_values columns must be a nonempty list.")
@@ -50,7 +45,7 @@ def _finite(value: Any) -> bool:
 
 def _value_range(params: dict[str, Any]) -> None:
     """Require at least one finite, inclusive and ordered numeric bound."""
-    _known_fields(params, {"column", "minimum", "maximum"}, "value_range params")
+    known_fields(params, {"column", "minimum", "maximum"}, "value_range params")
     _text(params.get("column"), "value_range column")
     lower, upper = params.get("minimum"), params.get("maximum")
     bounds = [value for value in (lower, upper) if value is not None]
@@ -62,7 +57,7 @@ def _value_range(params: dict[str, Any]) -> None:
 
 def _prediction_band(params: dict[str, Any], columns: list[dict[str, str]]) -> None:
     """Reject ambiguous band cut points, labels or declared output schemas early."""
-    _known_fields(params, {"column", "thresholds", "labels", "output"}, "prediction_band params")
+    known_fields(params, {"column", "thresholds", "labels", "output"}, "prediction_band params")
     _text(params.get("column", "prediction"), "prediction_band column")
     thresholds = params.get("thresholds")
     if type(thresholds) is not list or not all(_finite(value) for value in thresholds):
@@ -94,12 +89,16 @@ def _builtin(rule: dict[str, Any], kind: str) -> str:
         _value_range(rule["params"])
     else:
         _prediction_band(rule["params"], rule["columns"])
-    return _BUILTINS[name].__name__
+    return YAML_SCORING_CALLBACKS[name].__name__
 
 
 def _dependencies(value: Any) -> None:
     """Require direct component names before binding them to the fitted model set."""
-    if type(value) is not list or not value or not all(_identifier(name) for name in value):
+    if (
+        type(value) is not list
+        or not value
+        or not all(is_scoring_identifier(name) for name in value)
+    ):
         raise ValueError("Combined required_components must be a nonempty list of names.")
     if len(value) != len(set(value)):
         raise ValueError("Combined required_components must be unique.")
@@ -111,8 +110,8 @@ def _operation(rule: dict[str, Any]) -> None:
         raise ValueError("Combined operation must be weighted_sum or weighted_mean, version '1'.")
     if len(rule["columns"]) != 1 or rule["columns"][0]["dtype"] != "float64":
         raise ValueError("Combined operation requires one float64 output column.")
-    _inputs(rule)
-    _weights(rule)
+    operation_inputs(rule)
+    operation_weights(rule)
 
 
 def _rule_fields(value: Any, kind: str) -> dict[str, Any]:
@@ -123,11 +122,11 @@ def _rule_fields(value: Any, kind: str) -> dict[str, Any]:
         fields.add("columns")
     if kind == "combined":
         fields.add("required_components")
-    raw = _known_fields(value, fields, f"scoring {kind} rule")
+    raw = known_fields(value, fields, f"scoring {kind} rule")
     if ("custom" in raw) == (selector in raw):
         raise ValueError(f"Scoring {kind} rule needs exactly one of custom or {selector}.")
     rule = {"version": "1", "params": {}, **raw}
-    if not _identifier(rule.get("name")):
+    if not is_scoring_identifier(rule.get("name")):
         raise ValueError("Scoring rule name must be a simple identifier.")
     _text(rule["version"], "Scoring rule version")
     if type(rule["params"]) is not dict:
@@ -143,7 +142,7 @@ def _columns(columns: Any) -> None:
         for column in columns:
             if isinstance(column, dict) and not isinstance(column.get("dtype"), str):
                 raise ValueError("Scoring output column dtype must be a string.")
-    _validate_columns(columns)
+    validate_scoring_columns(columns)
 
 
 def _rule(value: Any, root: Path, kind: str) -> dict[str, Any]:
@@ -152,7 +151,7 @@ def _rule(value: Any, root: Path, kind: str) -> dict[str, Any]:
     if kind == "combined":
         _dependencies(rule.get("required_components"))
     if "custom" in rule:
-        _custom_source(root, rule["custom"])
+        validate_custom_source(root, rule["custom"])
         rule["function"] = rule.pop("custom")
     elif kind == "combined":
         _operation(rule)
@@ -172,7 +171,7 @@ def _unique_rules(rules: list[dict[str, Any]]) -> None:
 
 def _envelope(document: dict[str, Any]) -> tuple[str, bool]:
     """Reject invalid modes and flags without executing user source."""
-    _known_fields(
+    known_fields(
         document,
         {"version", "mode", "skip_target_pre_split_steps", "eligibility", "outputs", "combined"},
         "scoring.yml",
@@ -219,11 +218,11 @@ def _python_owners(root: Path) -> None:
 
 def _competing_binding(tree: ast.AST) -> bool:
     """Include destructured assignments, conditional exports and reserved callback symbols."""
-    names = {*_BUILDERS, *(function.__name__ for function in _BUILTINS.values())}
+    names = {*_BUILDERS, *(function.__name__ for function in YAML_SCORING_CALLBACKS.values())}
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in names:
             return True
-        if isinstance(node, ast.stmt) and any(_binds_name(node, name) for name in names):
+        if isinstance(node, ast.stmt) and any(binds_name(node, name) for name in names):
             return True
     return False
 
@@ -231,7 +230,9 @@ def _competing_binding(tree: ast.AST) -> bool:
 def _callback_source(custom: dict[str, Any]) -> str:
     """Snapshot selected builtins and reject exported symbol collisions."""
     callbacks = {rule.get("function") for rules in custom.values() for rule in rules}
-    selected = [function for function in _BUILTINS.values() if function.__name__ in callbacks]
+    selected = [
+        function for function in YAML_SCORING_CALLBACKS.values() if function.__name__ in callbacks
+    ]
     names = (*_BUILDERS, *(function.__name__ for function in selected))
     result = "\n"
     for name in names:

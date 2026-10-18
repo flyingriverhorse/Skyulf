@@ -14,7 +14,7 @@ from .yaml_config import read_yaml_mapping
 _FACTORIES = {"preprocessing": "build_preprocessing", "pre_split": "build_pre_split_steps"}
 
 
-def _known_fields(value: Any, allowed: set[str], label: str) -> dict[str, Any]:
+def known_fields(value: Any, allowed: set[str], label: str) -> dict[str, Any]:
     """Reject misspelled declarations before any editable Python gets executed."""
     if type(value) is not dict:
         raise ValueError(f"{label} must be a mapping.")
@@ -24,7 +24,7 @@ def _known_fields(value: Any, allowed: set[str], label: str) -> dict[str, Any]:
     return value
 
 
-def _custom_source(root: Path, reference: Any) -> None:
+def validate_custom_source(root: Path, reference: Any) -> None:
     """Require the referenced module to be a captured project file, not an external import."""
     module, _ = custom_reference(reference)
     relative = module.replace(".", "/")
@@ -45,13 +45,13 @@ def _step(value: Any, root: Path, label: str) -> dict[str, Any]:
     fields = (
         {"name", "custom", "params"} if custom else {"name", "transformer", "params", "pre_split"}
     )
-    step = _known_fields(value, fields, f"{label} {'custom' if custom else 'step'}")
+    step = known_fields(value, fields, f"{label} {'custom' if custom else 'step'}")
     if type(step.get("params", {})) is not dict:
         raise ValueError(f"{label} params must be a mapping.")
     if "name" in step and (type(step["name"]) is not str or not step["name"].strip()):
         raise ValueError(f"{label} name must be a nonempty string.")
     if custom:
-        _custom_source(root, step["custom"])
+        validate_custom_source(root, step["custom"])
     else:
         validate_preprocessing_steps([step])
     return step
@@ -59,7 +59,7 @@ def _step(value: Any, root: Path, label: str) -> dict[str, Any]:
 
 def _recipes(document: dict[str, Any], root: Path, phase: str) -> dict[str, list[dict[str, Any]]]:
     """Require a default recipe and bounded safe YAML lists with one declaration owner."""
-    _known_fields(document, {"version", "recipes"}, f"{phase}.yml")
+    known_fields(document, {"version", "recipes"}, f"{phase}.yml")
     if type(document.get("version")) is not int or document["version"] != 1:
         raise ValueError(f"{phase}.yml version must be 1.")
     entries = document.get("recipes")
@@ -82,7 +82,7 @@ def _recipe(name: str, steps: Any, root: Path, phase: str) -> list[dict[str, Any
     return [_step(step, root, f"{phase}.yml recipes.{name}[{i}]") for i, step in enumerate(steps)]
 
 
-def _binds_name(statement: ast.stmt, name: str) -> bool:
+def binds_name(statement: ast.stmt, name: str) -> bool:
     """Recognize direct builder definitions, assignments and imports without execution."""
     if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return statement.name == name
@@ -100,7 +100,7 @@ def _python_owner(root: Path, phase: str) -> None:
         if not (root / filename).exists():
             continue
         tree = ast.parse(read_source(contained_project_file(root, filename)), filename=filename)
-        if any(_binds_name(statement, _FACTORIES[phase]) for statement in tree.body):
+        if any(binds_name(statement, _FACTORIES[phase]) for statement in tree.body):
             raise ValueError(f"Recipes defined in both {phase}.yml and {filename}.")
 
 

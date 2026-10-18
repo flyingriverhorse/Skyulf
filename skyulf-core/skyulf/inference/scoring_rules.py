@@ -49,3 +49,11 @@ def _skyulf_yaml_prediction_band(frame, predictions, params):
         [params["labels"][position] for position in positions], index=frame.index, dtype="string"
     )
     return pd.DataFrame({params.get("output", "band"): bands.mask(values.isna())})
+
+
+# Preserve these callback names in captured project source and saved model policies.
+YAML_SCORING_CALLBACKS = {
+    "required_values": _skyulf_yaml_required_values,
+    "value_range": _skyulf_yaml_value_range,
+    "prediction_band": _skyulf_yaml_prediction_band,
+}
