@@ -1,4 +1,6 @@
-"""Engineered weekend flags must preserve missing dates and existing valid-date dtypes."""
+"""Weekend flags must preserve missing dates and their saved artifact's dtype contract."""
+
+import pickle
 
 import pandas as pd
 import polars as pl
@@ -13,8 +15,11 @@ from skyulf.preprocessing.feature_generation import (
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("parsed", [False, True])
 @pytest.mark.parametrize("case", ["valid", "mixed", "all-missing", "empty"])
-def test_weekend_preserves_missing_dates_and_observed_values(engine, parsed, case, monkeypatch):
-    """Missing and invalid dates stay unknown while valid weekend flags retain integer values."""
+@pytest.mark.parametrize("legacy", [False, True])
+def test_weekend_preserves_missing_dates_and_observed_values(
+    engine, parsed, case, legacy, monkeypatch
+):
+    """Missing dates stay unknown; new fits use nullable integers and old states keep their dtype."""
     monkeypatch.setenv("SKYULF_ENGINE", engine)
     cases = {
         "valid": (["2026-10-03", "2026-10-04", "2026-10-05"], [1, 1, 0]),
@@ -38,7 +43,19 @@ def test_weekend_preserves_missing_dates_and_observed_values(engine, parsed, cas
             }
         ]
     }
-    params = FeatureGenerationCalculator().fit(frame, config)
+    if legacy:
+        params = {
+            "type": "feature_generation",
+            "operations": config["operations"],
+            "epsilon": 1e-9,
+            "allow_overwrite": False,
+        }
+        assert "operation_contract_version" not in params
+    else:
+        params = dict(FeatureGenerationCalculator().fit(frame, config))
+        assert params["operation_contract_version"] == 1
+    saved = pickle.dumps(params)
+    params = pickle.loads(saved)
 
     output = FeatureGenerationApplier().apply(frame, params)
 
@@ -49,6 +66,11 @@ def test_weekend_preserves_missing_dates_and_observed_values(engine, parsed, cas
     pd.testing.assert_frame_equal(source, original)
     if engine == "pandas":
         pd.testing.assert_index_equal(output.index, source.index)
-        expected_dtype = "Int64" if None in expected else str(pd.Series(dtype=int).dtype)
+        expected_dtype = (
+            str(pd.Series(dtype=int).dtype) if legacy and None not in expected else "Int64"
+        )
         assert str(output["date_is_weekend"].dtype) == expected_dtype
+    else:
+        assert output["date_is_weekend"].dtype == pl.Int64
+    assert pickle.dumps(params) == saved
     assert list(output.columns) == ["date", "date_is_weekend"]
