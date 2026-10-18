@@ -2,6 +2,20 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { CountVectorizerNode, TfidfVectorizerNode, HashingVectorizerNode } from './VectorizerNodes';
 
+it.each([CountVectorizerNode, TfidfVectorizerNode])('edits independent vocabularies for $type and rejects an imported unknown mode', (definition) => {
+  // Column identity and IDF populations must be an explicit saved choice in the existing panel.
+  const Settings = definition.settings!;
+  const config = { ...definition.getDefaultConfig(), columns: ['text', 'category'], sublinear_tf: false };
+  const onChange = vi.fn();
+  render(<Settings config={config} onChange={onChange} />);
+  const control = screen.getByRole('combobox', { name: 'Vocabulary columns' });
+  expect(control).toHaveValue('joined');
+  fireEvent.change(control, { target: { value: 'per_column' } });
+  expect(onChange).toHaveBeenLastCalledWith({ ...config, column_mode: 'per_column' });
+  Reflect.set(config, 'column_mode', 'unsupported');
+  expect(definition.validate(config)).toEqual(expect.objectContaining({ isValid: false, field: 'column_mode' }));
+});
+
 vi.mock('../../../core/hooks/useUpstreamData', () => ({ useUpstreamData: () => [{ datasetId: 'data' }] }));
 vi.mock('../../../core/hooks/useDatasetSchema', () => ({ useDatasetSchema: () => ({ data: { columns: {
   text: { name: 'text', dtype: 'STRING' }, category: { name: 'category', dtype: 'category' },
@@ -39,6 +53,7 @@ it('renders hashing fields and keeps info expansion independent of later panel w
   const { rerender } = render(<Settings config={config} onChange={onChange} isExpanded />);
   expect(screen.getByText(/Stateless hashing vectorizer/)).toBeVisible();
   expect(screen.queryByLabelText('Max features')).not.toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: 'Vocabulary columns' })).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Number of features (hash buckets)'), { target: { value: '0' } });
   expect(onChange).toHaveBeenLastCalledWith({ ...config, n_features: 0 });
   fireEvent.change(screen.getByLabelText('Number of features (hash buckets)'), { target: { value: '' } });

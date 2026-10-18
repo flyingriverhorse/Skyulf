@@ -1,5 +1,5 @@
 export interface EncodingConfig {
-  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
+  method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe' | 'frequency' | 'rare';
   columns: string[];
   // OneHot/Dummy specific
   drop_first?: boolean | undefined;
@@ -16,6 +16,14 @@ export interface EncodingConfig {
   target_column?: string | undefined;
   smooth?: number | 'auto' | undefined;
   target_type?: 'auto' | 'continuous' | 'multiclass' | 'binary' | undefined;
+  cv?: number | undefined;
+  shuffle?: boolean | undefined;
+  random_state?: number | null | undefined;
+  // Frequency / rare grouping
+  mode?: 'frequency' | 'count' | undefined;
+  min_count?: number | undefined;
+  min_share?: number | undefined;
+  replacement?: string | undefined;
   // WOE specific
   regularization?: number | undefined;
   // Label/Ordinal specific

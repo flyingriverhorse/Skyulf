@@ -47,6 +47,43 @@ beforeEach(() => {
 });
 
 describe('EncodingNode settings behavior', () => {
+  it.each([
+    ['rare', { min_count: 0 }, 'min_count'],
+    ['rare', { min_count: 2.5 }, 'min_count'],
+    ['rare', { min_share: 2 }, 'min_share'],
+    ['rare', { replacement: '' }, 'replacement'],
+    ['target', { cv: 1 }, 'cv'],
+    ['target', { cv: 2.5 }, 'cv'],
+    ['target', { random_state: -1 }, 'random_state'],
+    ['target', { random_state: 4294967296 }, 'random_state'],
+  ] as const)('reports invalid %s options on field %s', (method, options, field) => {
+    // Invalid new controls must offer actionable Canvas feedback before execution.
+    expect(EncodingNode.validate!({ ...EncodingNode.getDefaultConfig(), columns: ['city'], method, ...options })).toEqual(expect.objectContaining({ isValid: false, field }));
+  });
+
+  it('edits frequency mode and rare grouping thresholds without losing selected columns', () => {
+    // Learned statistics and membership require separate, explicit method controls.
+    const { onChange } = renderSettings({ columns: ['city'] });
+    selectMethod('frequency');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Statistic' }), { target: { value: 'count' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'frequency', mode: 'count', columns: ['city'] }));
+    selectMethod('rare');
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum count' }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Minimum share' }), { target: { value: '0.2' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Replacement label' }), { target: { value: 'Grouped' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'rare', min_count: 3, min_share: 0.2, replacement: 'Grouped', columns: ['city'] }));
+  });
+
+  it('edits target cross-fitting and disables the seed when shuffle is disabled', () => {
+    // Unshuffled folds must reach sklearn without an active random seed.
+    const { onChange } = renderSettings({ method: 'target', columns: ['city'] });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Maximum CV folds' }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Random seed' }), { target: { value: '17' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Shuffle folds' }));
+    expect(screen.getByRole('spinbutton', { name: 'Random seed' })).toBeDisabled();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cv: 3, random_state: 17, shuffle: false }));
+  });
+
   it('edits ordered fixed categories and disables conflicting one-hot options', () => {
     // Unobserved levels must survive form editing without capping or missing-token substitution.
     const { onChange } = renderSettings({ columns: ['city'] });
@@ -91,14 +128,14 @@ describe('EncodingNode settings behavior', () => {
     },
   );
 
-  it('preserves saved options, column search and method control identity across all seven methods', () => {
+  it('preserves saved options, column search and method control identity across all nine methods', () => {
     // Switching methods must not erase hidden settings or remount the shared picker.
     const initial = { columns: ['city'], max_categories: 37, n_features: 16, missing_code: 0 };
     const { onChange } = renderSettings(initial);
     const methodControl = screen.getByRole('combobox', { name: 'Encoding Method' });
     const picker = screen.getByRole('group', { name: 'Columns to Encode' });
     fireEvent.change(within(picker).getByRole('textbox'), { target: { value: 'city' } });
-    const methods: Config['method'][] = ['dummy', 'label', 'ordinal', 'target', 'woe', 'hash', 'onehot'];
+    const methods: Config['method'][] = ['dummy', 'label', 'ordinal', 'target', 'woe', 'hash', 'frequency', 'rare', 'onehot'];
     for (const method of methods) {
       selectMethod(method);
       expect(onChange).toHaveBeenLastCalledWith({ ...EncodingNode.getDefaultConfig(), ...initial, method });
@@ -125,7 +162,7 @@ describe('EncodingNode settings behavior', () => {
 
   it.each([
     ['onehot', 'Max Categories', 'max_categories'],
-    ['hash', 'Number of Features', 'n_features'],
+    ['hash', 'Number of Buckets', 'n_features'],
     ['ordinal', 'Unknown Value', 'unknown_value'],
     ['label', 'Missing/Unknown Code', 'missing_code'],
   ] as const)('preserves zero and the last value when clearing %s numeric options', (method, name, field) => {

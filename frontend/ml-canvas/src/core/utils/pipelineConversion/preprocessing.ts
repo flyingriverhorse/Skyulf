@@ -40,6 +40,7 @@ const convertImputationNode: NodeConverter = (node) => {
       columns: node.data.columns,
       group_by: node.data.group_by,
       strategy: node.data.strategy,
+      ...(node.data.fallback === undefined ? {} : { fallback: node.data.fallback }),
     };
   } else if (method === 'iterative') {
     stepType = 'IterativeImputer';
@@ -127,6 +128,7 @@ const convertMissingIndicator: NodeConverter = (node) => {
 
 const scalerTypes = new Map([
   ['minmax', 'MinMaxScaler'], ['maxabs', 'MaxAbsScaler'], ['robust', 'RobustScaler'],
+  ['quantile', 'QuantileTransformer'], ['normalize', 'Normalizer'],
 ]);
 
 /** Translate scalar UI bounds into the backend's tuple parameters. */
@@ -149,22 +151,29 @@ const convertScaleNumericFeatures: NodeConverter = (node) => {
   };
 };
 
-const convertEncoding: NodeConverter = (node) => {
-  let stepType = 'unknown';
-  let params: Record<string, unknown> = {};
-  const method = node.data.method;
-  if (method === 'onehot') stepType = 'OneHotEncoder';
-  else if (method === 'dummy') stepType = 'DummyEncoder';
-  else if (method === 'label') stepType = 'LabelEncoder';
-  else if (method === 'ordinal') stepType = 'OrdinalEncoder';
-  else if (method === 'target') stepType = 'TargetEncoder';
-  else if (method === 'hash') stepType = 'HashEncoder';
-  else if (method === 'woe') stepType = 'WOEEncoder';
-  else stepType = 'OneHotEncoder'; // Default
+const encoderTypes = new Map([
+  ['onehot', 'OneHotEncoder'], ['dummy', 'DummyEncoder'], ['label', 'LabelEncoder'],
+  ['ordinal', 'OrdinalEncoder'], ['target', 'TargetEncoder'], ['hash', 'HashEncoder'],
+  ['woe', 'WOEEncoder'], ['frequency', 'FrequencyEncoder'], ['rare', 'RareCategoryGrouping'],
+]);
 
-  params = stepType === 'OneHotEncoder' ? onehotParams(node.data) : node.data;
+const convertEncoding: NodeConverter = (node) => {
+  const stepType = encoderTypes.get(node.data.method as string) ?? 'OneHotEncoder';
+  const params = encodingParams(stepType, node.data);
   return { stepType, params };
 };
+
+/** Keep method-specific encoder settings independent when a saved graph changes method. */
+function encodingParams(stepType: string, data: Record<string, unknown>): Record<string, unknown> {
+  if (stepType === 'OneHotEncoder') return onehotParams(data);
+  const fields: Record<string, string[]> = {
+    FrequencyEncoder: ['columns', 'mode'],
+    RareCategoryGrouping: ['columns', 'min_count', 'min_share', 'replacement'],
+    TargetEncoder: ['columns', 'target_column', 'smooth', 'target_type', 'cv', 'shuffle', 'random_state'],
+  };
+  const allowed = fields[stepType];
+  return allowed ? Object.fromEntries(Object.entries(data).filter(([key]) => allowed.includes(key))) : data;
+}
 
 /** Keep hidden settings from other encoding methods out of the strict fitted contract. */
 function onehotParams(data: Record<string, unknown>): Record<string, unknown> {
@@ -202,9 +211,22 @@ const convertFeatureSelection: NodeConverter = (node) => {
   };
 };
 
+const outlierTypes = new Map([
+  ['iqr', 'IQR'], ['zscore', 'ZScore'], ['winsorize', 'Winsorize'],
+  ['elliptic_envelope', 'EllipticEnvelope'], ['isolation_forest', 'IsolationForest'],
+  ['local_outlier_factor', 'LocalOutlierFactor'],
+]);
+
+/** Drop stale overrides for columns removed from an explicit Winsorize selection. */
+function outlierParams(method: unknown, data: Record<string, unknown>): Record<string, unknown> {
+  if (method !== 'winsorize' || data.percentiles_by_column === undefined || !Array.isArray(data.columns)) return data;
+  const overrides = data.percentiles_by_column;
+  if (overrides === null || typeof overrides !== 'object' || Array.isArray(overrides)) return data;
+  const columns = new Set(data.columns);
+  return { ...data, percentiles_by_column: Object.fromEntries(Object.entries(overrides).filter(([name]) => columns.has(name))) };
+}
+
 const convertOutlier: NodeConverter = (node) => {
-  let stepType = 'unknown';
-  let params: Record<string, unknown> = {};
   const method = node.data.method || 'iqr';
   if (method === 'manual_bounds') {
     return { stepType: 'ManualBounds', params: { bounds: selectedManualBounds(node.data) } };
@@ -212,13 +234,7 @@ const convertOutlier: NodeConverter = (node) => {
   if (method === 'clip') {
     return { stepType: 'ClipValues', params: { bounds: selectedManualBounds(node.data) } };
   }
-  if (method === 'iqr') stepType = 'IQR';
-  else if (method === 'zscore') stepType = 'ZScore';
-  else if (method === 'winsorize') stepType = 'Winsorize';
-  else if (method === 'elliptic_envelope') stepType = 'EllipticEnvelope';
-  else stepType = 'IQR';
-  params = node.data;
-  return { stepType, params };
+  return { stepType: outlierTypes.get(method as string) ?? 'IQR', params: outlierParams(method, node.data) };
 };
 
 const convertGeoDistance: NodeConverter = (node) => {

@@ -117,16 +117,16 @@ it.each(['mean', 'median', 'most_frequent', 'constant'] as const)('preserves %s 
   const { onChange } = renderSettings();
   fireEvent.change(screen.getByRole('combobox', { name: 'Strategy' }), { target: { value: strategy } });
   expect(onChange).toHaveBeenLastCalledWith({ ...ImputationNode.getDefaultConfig(), strategy });
-  if (strategy === 'constant') expect(screen.getByRole('textbox', { name: 'Fill Value' })).toHaveValue('');
+  if (strategy === 'constant') expect(screen.getByRole('textbox', { name: 'Fill Value' })).toHaveValue('0');
   else expect(screen.queryByRole('textbox', { name: 'Fill Value' })).not.toBeInTheDocument();
 });
 
-it('keeps constant fill input strings and existing numeric-zero display fallback', () => {
-  /** The text input forwards raw strings; extraction must not add numeric coercion. */
+it('keeps constant fill input strings and displays numeric zero without precision loss', () => {
+  /** Core performs per-column casts; Canvas must retain exact text and visibly preserve zero. */
   const { onChange } = renderSettings({ strategy: 'constant', fill_value: 0 });
   const fill = screen.getByRole('textbox', { name: 'Fill Value' });
-  expect(fill).toHaveValue('');
-  for (const value of ['0', 'unknown', '']) {
+  expect(fill).toHaveValue('0');
+  for (const value of ['9007199254740993', '0', 'false', 'unknown', '']) {
     fireEvent.change(fill, { target: { value } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ fill_value: value }));
   }
@@ -220,4 +220,25 @@ it('offers upstream columns as groups and keeps the chosen group and strategy', 
   fireEvent.change(groupBy, { target: { value: 'city' } });
   fireEvent.change(screen.getByRole('combobox', { name: 'Group Strategy' }), { target: { value: 'median' } });
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ method: 'group', group_by: 'city', strategy: 'median' }));
+});
+
+it('opts legacy groups into ordered keys and preserves hierarchy order', () => {
+  /** Opening old graphs stays scalar until the user explicitly enables ordered group keys. */
+  sources.schema!.columns.fourth = { name: 'industry', dtype: 'object' };
+  const { onChange } = renderSettings({ method: 'group', columns: ['amount'], group_by: 'city' });
+  expect(onChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Use multiple group columns' }));
+  const groups = screen.getByRole('group', { name: 'Ordered Group Columns' });
+  fireEvent.click(within(groups).getByRole('checkbox', { name: 'industry' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Group Fallback' }), { target: { value: 'hierarchical' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ group_by: ['city', 'industry'], fallback: 'hierarchical' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Move industry earlier' }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ group_by: ['industry', 'city'], fallback: 'hierarchical' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Use multiple group columns' }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ group_by: 'industry', fallback: undefined }));
+});
+
+it.each([{ group_by: [] }, { group_by: ['city', 'city'] }, { group_by: ['city', 'amount'] }])('rejects invalid ordered group keys $group_by', ({ group_by }) => {
+  /** Group keys must be distinct, nonempty, and disjoint from filled columns. */
+  expect(ImputationNode.validate({ ...ImputationNode.getDefaultConfig(), method: 'group', columns: ['amount'], group_by })).toMatchObject({ isValid: false, field: 'group_by' });
 });

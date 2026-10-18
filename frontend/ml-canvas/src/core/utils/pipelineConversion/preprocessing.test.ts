@@ -9,13 +9,19 @@ function convert(definitionType: string, config: Record<string, unknown>) {
 }
 
 describe('preprocessing semantic parameters', () => {
+  it.each([null, 7, 'invalid', []])('preserves malformed Winsorize overrides for validation: %s', (overrides) => {
+    // Imported configurations must reach validation without crashing conversion or hiding errors.
+    expect(convert('outlier', {
+      method: 'winsorize', columns: ['x'], percentiles_by_column: overrides,
+    }).params.percentiles_by_column).toEqual(overrides);
+  });
   it('retains the compatibility payload for unknown saved node types', () => {
     /** Known-node cleanup must not discard an extension's opaque configuration. */
     const data = { definitionType: 'custom_node', isExpanded: 'custom', value: 0 };
     expect(convertUnknownNode({ id: 'custom', position: { x: 0, y: 0 }, data }).params).toEqual(data);
   });
   it.each([
-    'simple_imputer', 'scale_numeric_features', 'encoding', 'label_encoding',
+    'simple_imputer', 'scale_numeric_features', 'label_encoding',
     'feature_target_split', 'feature_selection', 'outlier', 'ResamplingNode',
     'TimeSeriesNode', 'TextCleaning', 'count_vectorizer', 'tfidf_vectorizer',
     'hashing_vectorizer', 'tokenizer', 'sentence_embedder', 'ValueReplacement',
@@ -24,6 +30,17 @@ describe('preprocessing semantic parameters', () => {
     // Node dispatch metadata must not become a backend method parameter.
     const params = { columns: ['x'], method: 'standard', custom_setting: 0, options: { isExpanded: 'semantic' } };
     expect(convert(definitionType, params).params).toEqual(params);
+  });
+
+  it('forwards only settings that belong to the selected encoding method', () => {
+    // Switching methods must not carry hidden controls into strict fitted contracts.
+    expect(convert('encoding', {
+      method: 'target', columns: ['category'], cv: 3, shuffle: false,
+      random_state: 42, max_categories: 20, options: { isExpanded: 'editor' },
+    }).params).toEqual({ columns: ['category'], cv: 3, shuffle: false, random_state: 42 });
+    expect(convert('encoding', {
+      method: 'onehot', columns: ['category'], cv: 3, max_categories: null,
+    }).params).toEqual({ columns: ['category'], max_categories: null });
   });
 
   it('omits operation expansion state without mutating or defaulting saved operations', () => {

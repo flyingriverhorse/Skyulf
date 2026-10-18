@@ -63,3 +63,25 @@ it.each([
 ])('rejects omitted $field values', ({ method, field }) => {
   expect(TimeSeriesNode.validate({ method, columns: ['value'] })).toMatchObject({ isValid: false, field });
 });
+
+/** Date options expose local business calendars and explicit cycles without changing saved selections. */
+it('edits the IANA timezone and calendar cycle features', () => {
+  const config = { ...TimeSeriesNode.getDefaultConfig(), method: 'date' as const, columns: ['value'] };
+  const onChange = vi.fn();
+  const Settings = TimeSeriesNode.settings!;
+  render(<Settings config={config} onChange={onChange} />);
+  expect(screen.getByLabelText('Timezone')).toHaveValue('UTC');
+  fireEvent.change(screen.getByLabelText('Timezone'), { target: { value: 'Europe/Istanbul' } });
+  expect(onChange).toHaveBeenLastCalledWith({ ...config, timezone: 'Europe/Istanbul' });
+  for (const feature of ['second', 'hour_sin', 'hour_cos', 'dayofweek_sin', 'dayofweek_cos', 'month_sin', 'month_cos', 'dayofyear_sin', 'dayofyear_cos']) {
+    fireEvent.click(screen.getByRole('button', { name: feature }));
+    expect(onChange).toHaveBeenLastCalledWith({ ...config, features: [...config.features!, feature] });
+  }
+});
+
+/** Bad timezone names must be actionable before a training request is queued. */
+it.each(['', 'No/Such_Zone', '+03:00'])('rejects date timezone %s', (timezone) => {
+  const config = { ...TimeSeriesNode.getDefaultConfig(), method: 'date' as const, columns: ['value'], timezone };
+  expect(TimeSeriesNode.validate(config)).toMatchObject({ isValid: false, field: 'timezone' });
+  expect(TimeSeriesNode.validate({ ...config, timezone: 'Europe/Istanbul' })).toEqual({ isValid: true });
+});

@@ -1,6 +1,7 @@
 import { ValidationField } from '../../../../components/shared/ValidationField';
 import { parseIntSafe } from '../../../../core/utils/numberInput';
 import type { ImputationConfig, ImputationSettingsProps } from './types';
+import { ColumnMultiSelect } from '../../shared/ColumnMultiSelect';
 
 /** Keep the shared method selector mounted while conditional options change. */
 export function ImputationMethodOptions({ config, onChange, availableColumns = [] }: ImputationSettingsProps & { availableColumns?: string[] }) {
@@ -60,11 +61,12 @@ function SimpleOptions({ config, onChange }: ImputationSettingsProps) {
               aria-label="Fill Value"
               type="text"
               className="w-full p-2 border rounded bg-background text-sm"
-              value={config.fill_value || ''}
+              value={config.fill_value ?? ''}
               onChange={(e) => onChange({ ...config, fill_value: e.target.value })}
               placeholder="Enter value..."
             />
           </ValidationField>
+          <p className="text-xs text-muted-foreground mt-1">Numeric columns convert this text to their number type. Boolean columns accept true or false; text columns keep the literal value.</p>
         </div>
       )}
     </>
@@ -77,7 +79,11 @@ function GroupOptions({ config, onChange, availableColumns }: ImputationSettings
   const strategy = config.strategy === 'constant' ? 'mean' : config.strategy;
   return (
     <>
-      <div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={Array.isArray(config.group_by)} onChange={event => onChange({ ...config, group_by: event.target.checked ? (config.group_by ? [config.group_by as string] : []) : config.group_by?.[0] ?? '', fallback: undefined })} />
+        Use multiple group columns
+      </label>
+      {Array.isArray(config.group_by) ? <OrderedGroups config={config} onChange={onChange} availableColumns={availableColumns} keys={config.group_by} /> : <div>
         <span className="block text-sm font-medium mb-1">Group By</span>
         <ValidationField field="group_by">
           <select
@@ -93,7 +99,7 @@ function GroupOptions({ config, onChange, availableColumns }: ImputationSettings
         <p className="text-[10px] text-muted-foreground mt-1">
           Example: fill missing employee counts with the median of the same industry.
         </p>
-      </div>
+      </div>}
       <div>
         <span className="block text-sm font-medium mb-1">Strategy</span>
         <ValidationField field="strategy">
@@ -114,6 +120,32 @@ function GroupOptions({ config, onChange, availableColumns }: ImputationSettings
       </div>
     </>
   );
+}
+
+/** The displayed order is the prefix fallback order and survives serialization unchanged. */
+function OrderedGroups({ config, onChange, availableColumns, keys }: ImputationSettingsProps & { availableColumns: string[]; keys: string[] }) {
+  function moveEarlier(index: number) {
+    const reordered = [...keys];
+    [reordered[index - 1], reordered[index]] = [reordered[index]!, reordered[index - 1]!];
+    onChange({ ...config, group_by: reordered });
+  }
+  return <>
+    <ValidationField field="group_by">
+      <ColumnMultiSelect variant="compact" label="Ordered Group Columns" columns={availableColumns} selected={keys} onChange={group_by => onChange({ ...config, group_by })} />
+      <ol aria-label="Group fallback order" className="space-y-1 text-xs mt-2">
+        {keys.map((key, index) => <li key={key} className="flex items-center gap-2"><span>{index + 1}. {key}</span><button type="button" disabled={index === 0} aria-label={`Move ${key} earlier`} className="ml-auto px-2 py-1 border rounded disabled:opacity-40" onClick={() => moveEarlier(index)}>Move up</button></li>)}
+      </ol>
+    </ValidationField>
+    <ValidationField field="fallback">
+      <label className="block text-sm">Group Fallback
+        <select aria-label="Group Fallback" className="w-full p-2 border rounded bg-background text-sm" value={config.fallback ?? 'global'} onChange={event => onChange({ ...config, fallback: event.target.value as ImputationConfig['fallback'] })}>
+          <option value="global">Global training value</option>
+          <option value="hierarchical">Ordered prefixes, then global</option>
+        </select>
+      </label>
+      <p className="text-xs text-muted-foreground mt-1">Hierarchical fallback tries all keys, then removes the last key until only the first remains. Missing key components skip that level.</p>
+    </ValidationField>
+  </>;
 }
 
 /** Nearest-neighbor imputation retains its weight and numeric fallback behavior. */

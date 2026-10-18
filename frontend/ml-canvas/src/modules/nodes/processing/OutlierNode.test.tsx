@@ -51,6 +51,34 @@ beforeEach(() => {
 });
 
 describe('OutlierNode public settings', () => {
+  it.each([null, [], { age: null }, { age: { lower: 1, upper: 99, extra: true } }])('rejects malformed imported percentile maps %j', (value) => {
+    // Imported malformed maps must surface a configuration issue before wire conversion or fitting.
+    expect(OutlierNode.validate({ ...OutlierNode.getDefaultConfig(), method: 'winsorize', columns: ['age'], percentiles_by_column: value as unknown as Config['percentiles_by_column'] }).isValid).toBe(false);
+  });
+  it('configures actual joint detectors without losing selected columns', () => {
+    // The new methods must reach editable model controls rather than the per-column envelope.
+    const { onChange } = setup({ columns: ['age', 'score'] });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Method' }), { target: { value: 'isolation_forest' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Trees' }), { target: { value: '50' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Method' }), { target: { value: 'local_outlier_factor' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Neighbors' }), { target: { value: '8' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ columns: ['age', 'score'], n_estimators: 50, n_neighbors: 8 }));
+  });
+  it('allows distinct Winsorize tails for selected measurements', () => {
+    // Per-column overrides must remain separate from the global defaults.
+    const { onChange } = setup({ method: 'winsorize', columns: ['age', 'score'] });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Override percentiles for age' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'age lower percentile' }), { target: { value: '10' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ percentiles_by_column: { age: { lower: 10, upper: 95 } } }));
+  });
+  it.each([
+    { method: 'isolation_forest', contamination: 0 },
+    { method: 'local_outlier_factor', n_neighbors: 0 },
+    { method: 'winsorize', percentiles_by_column: { age: { lower: 90, upper: 10 } } },
+  ] as const)('rejects malformed new options %j', (options) => {
+    // A visible invalid setting must block preview before backend fitting.
+    expect(OutlierNode.validate({ ...OutlierNode.getDefaultConfig(), columns: ['age'], ...options }).isValid).toBe(false);
+  });
   it.each([false, true])('filters columns and preserves picker state at wide=%s', (wide) => {
     // Numeric eligibility, dropped columns and local search survive method updates.
     source.wide = wide;

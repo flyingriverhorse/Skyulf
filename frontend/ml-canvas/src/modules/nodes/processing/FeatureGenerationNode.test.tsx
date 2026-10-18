@@ -83,6 +83,17 @@ function renderFeatureGeneration(config: FeatureGenerationConfig, onChange = vi.
   return { onChange, ...view };
 }
 
+it('offers learned group deviation with training-only fallback guidance', () => {
+  /** Deviations must be exposed as an existing group operation with its unseen-group behavior. */
+  const operation = { operation_type: 'group_agg' as const, method: 'mean', input_columns: ['city'], secondary_columns: ['income'], output_column: 'deviation', isExpanded: true };
+  const { onChange, rerender } = renderFeatureGeneration({ operations: [operation] });
+  const Settings = FeatureGenerationNode.settings!;
+  fireEvent.change(screen.getByRole('combobox', { name: 'Method for operation 1' }), { target: { value: 'deviation' } });
+  expect(onChange).toHaveBeenLastCalledWith({ operations: [{ ...operation, method: 'deviation' }] });
+  rerender(<QueryClientProvider client={new QueryClient()}><Settings config={{ operations: [{ ...operation, method: 'deviation' }] }} onChange={onChange} /></QueryClientProvider>);
+  expect(screen.getByText(/subtracts the group's training mean/i)).toBeInTheDocument();
+});
+
 describe('FeatureGenerationNode recommendations', () => {
   beforeAll(() => initializeRegistry());
 
@@ -176,7 +187,7 @@ describe('FeatureGenerationNode public contracts', () => {
   it.each([
     ['arithmetic', 'subtract', ['add', 'subtract', 'multiply', 'divide']],
     ['similarity', 'token_set_ratio', ['ratio', 'token_sort_ratio', 'token_set_ratio']],
-    ['group_agg', 'median', ['mean', 'sum', 'count', 'min', 'max', 'std', 'median']],
+    ['group_agg', 'median', ['mean', 'sum', 'count', 'min', 'max', 'std', 'median', 'deviation']],
   ])('updates the %s method and keeps expansion and operands', (type, method, methods) => {
     // Header method updates must merge with the current operation rather than resetting it.
     const original = operation(type as string, { input_columns: ['age'], constants: [0], isExpanded: false });

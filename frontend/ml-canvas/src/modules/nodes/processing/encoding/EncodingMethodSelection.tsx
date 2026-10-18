@@ -8,7 +8,9 @@ const methodDescriptions: Record<EncodingConfig['method'], string> = {
   ordinal: 'Encodes categories as ordered integers.',
   target: 'Encodes categories based on target mean.',
   woe: 'Replaces each category with its Weight of Evidence (log-odds of a binary target).',
-  hash: 'Maps categories to a fixed number of features.',
+  hash: 'Replaces each source column with one integer bucket index. Collisions are possible.',
+  frequency: 'Replaces categories with their training frequency or count. Unseen values become zero.',
+  rare: 'Groups infrequent or unseen text categories under a replacement label.',
 };
 
 const featureHint = (
@@ -40,12 +42,14 @@ const methodHints = {
   woe: (
     <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
       <Info size={10} className="shrink-0" />
-      <span>Needs a <strong>binary target</strong> (exactly 2 classes). The target is auto-excluded — use Label Encoder for the target itself. Non-binary targets are <strong>skipped</strong> (columns pass through unchanged), not an error. Records Information Value (IV) per column.</span>
+      <span>Needs a <strong>binary target</strong> (exactly 2 classes). The target is auto-excluded — use Label Encoder for the target itself. Non-binary targets raise an error. Records Information Value (IV) per column.</span>
     </div>
   ),
   onehot: featureHint,
   dummy: featureHint,
   hash: featureHint,
+  frequency: featureHint,
+  rare: featureHint,
 };
 
 export function EncodingMethodSelection({ config, onChange, id }: EncodingSettingsProps & { id: string }) {
@@ -65,6 +69,8 @@ export function EncodingMethodSelection({ config, onChange, id }: EncodingSettin
         <option value="target">Target Encoding</option>
         <option value="woe">Weight of Evidence (WOE)</option>
         <option value="hash">Hash Encoding</option>
+        <option value="frequency">Frequency / Count Encoding</option>
+        <option value="rare">Rare Category Grouping</option>
       </select>
       <p className="text-xs text-muted-foreground">
         {Object.prototype.hasOwnProperty.call(methodDescriptions, config.method) && methodDescriptions[config.method]}

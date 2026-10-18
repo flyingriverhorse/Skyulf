@@ -12,6 +12,41 @@ import { EncodingMethodOptions } from './encoding/EncodingMethodOptions';
 import { EncodingFeedback } from './encoding/EncodingFeedback';
 import { fixedCategoriesValid } from './encoding/OnehotCategories';
 
+function rareThresholdIssue(config: EncodingConfig) {
+  const count = config.min_count === undefined ? 2 : config.min_count;
+  const share = config.min_share === undefined ? 0 : config.min_share;
+  if (!Number.isInteger(count) || count < 1)
+    return { isValid: false, field: 'min_count', message: 'Minimum count must be a positive integer' };
+  if (!Number.isFinite(share) || share < 0 || share > 1)
+    return { isValid: false, field: 'min_share', message: 'Minimum share must be between 0 and 1' };
+  return null;
+}
+
+function rareOptionsIssue(config: EncodingConfig) {
+  const thresholdIssue = rareThresholdIssue(config);
+  if (thresholdIssue) return thresholdIssue;
+  const replacement = config.replacement === undefined ? 'Other' : config.replacement;
+  if (typeof replacement !== 'string' || replacement.length === 0)
+    return { isValid: false, field: 'replacement', message: 'Enter a nonempty replacement label' };
+  return null;
+}
+
+function targetOptionsIssue(config: EncodingConfig) {
+  const cv = config.cv === undefined ? 5 : config.cv;
+  const seed = config.random_state === undefined ? 42 : config.random_state;
+  if (!Number.isInteger(cv) || cv < 2)
+    return { isValid: false, field: 'cv', message: 'Maximum CV folds must be an integer of at least 2' };
+  if (seed !== null && (!Number.isInteger(seed) || seed < 0 || seed > 4294967295))
+    return { isValid: false, field: 'random_state', message: 'Random seed must be an integer from 0 to 4294967295, or blank' };
+  return null;
+}
+
+function methodOptionsIssue(config: EncodingConfig) {
+  if (config.method === 'rare') return rareOptionsIssue(config);
+  if (config.method === 'target') return targetOptionsIssue(config);
+  return null;
+}
+
 const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: EncodingConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -90,6 +125,8 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
       return { isValid: false, field: 'target_column', message: 'WOE encoding requires a binary target column' };
     if (!fixedCategoriesValid(config))
       return { isValid: false, field: 'categories', message: 'Enter unique categories for every selected column' };
+    const issue = methodOptionsIssue(config);
+    if (issue) return issue;
     return { isValid: true };
   },
   getDefaultConfig: () => ({
@@ -103,6 +140,13 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
     n_features: 8,
     smooth: 'auto',
     target_type: 'auto',
+    cv: 5,
+    shuffle: true,
+    random_state: 42,
+    mode: 'frequency',
+    min_count: 2,
+    min_share: 0,
+    replacement: 'Other',
     regularization: 0.5,
     unknown_value: -1,
     missing_code: -1,

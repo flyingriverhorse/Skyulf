@@ -130,7 +130,7 @@ export function GroupAggregationEditor({ op, idx, updateOperation, stringColumns
   return (
     <div className="space-y-3">
       <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
-        Calculates aggregate statistics (e.g., Mean Salary) grouped by a categorical column (e.g., Department) and assigns it back to each row.
+        {op.method === 'deviation' ? "Subtracts the group's training mean from each value. Unseen groups use the overall training mean; missing values stay missing." : 'Calculates aggregate statistics (e.g., Mean Salary) grouped by a categorical column (e.g., Department) and assigns it back to each row.'}
       </div>
       <ValidationField field={`operations.${idx}.input_columns`}>
         <ColumnMultiSelect

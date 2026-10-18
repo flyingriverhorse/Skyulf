@@ -63,7 +63,7 @@ export function SelectionControls(props: SelectionControlsProps) {
     'select_k_best', 'select_percentile', 'select_fpr', 'select_fdr', 'select_fwe', 'generic_univariate_select'
   ].includes(config.method);
 
-  const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
+  const isModelBased = ['select_from_model', 'rfe', 'rfecv', 'sequential_feature_selection'].includes(config.method);
 
 
   return <>
@@ -90,6 +90,8 @@ export function SelectionControls(props: SelectionControlsProps) {
         <optgroup label="Model Based">
           <option value="select_from_model">Select From Model</option>
           <option value="rfe">Recursive Feature Elimination (RFE)</option>
+          <option value="rfecv">Recursive Elimination with CV (RFECV)</option>
+          <option value="sequential_feature_selection">Sequential Feature Selection</option>
         </optgroup>
       </select>
     </div>
