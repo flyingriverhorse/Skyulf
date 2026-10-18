@@ -182,7 +182,7 @@ describe('preprocessing node feedback metrics', () => {
     expect(screen.getByText('Used percentile bounds')).toBeInTheDocument();
   });
 
-  it('does not claim zero dropped columns for ambiguous wrapped FeatureSelection metrics', () => {
+  it('does not claim zero dropped columns for ambiguous wrapped FeatureSelection metrics', async () => {
     renderFeatureSelection(
       {
         steps: {
@@ -201,11 +201,11 @@ describe('preprocessing node feedback metrics', () => {
       },
     );
 
-    expect(screen.getByText(/could not be resolved to a single step/i)).toBeInTheDocument();
+    expect(await screen.findByText(/could not be resolved to a single step/i)).toBeInTheDocument();
     expect(screen.queryByText('No columns were dropped.')).not.toBeInTheDocument();
   });
 
-  it('keeps FeatureSelection empty wrapped single-step feedback as zero drops', () => {
+  it('keeps FeatureSelection empty wrapped single-step feedback as zero drops', async () => {
     renderFeatureSelection(
       {
         steps: {
@@ -221,10 +221,10 @@ describe('preprocessing node feedback metrics', () => {
       },
     );
 
-    expect(screen.getByText('No columns were dropped.')).toBeInTheDocument();
+    expect(await screen.findByText('No columns were dropped.')).toBeInTheDocument();
   });
 
-  it('keeps FeatureSelection legacy flat dropped-columns feedback', () => {
+  it('keeps FeatureSelection legacy flat dropped-columns feedback', async () => {
     renderFeatureSelection(
       {
         dropped_columns: ['fare'],
@@ -236,7 +236,7 @@ describe('preprocessing node feedback metrics', () => {
       },
     );
 
-    expect(screen.getByText('Dropped Columns (1)')).toBeInTheDocument();
+    expect(await screen.findByText('Dropped Columns (1)')).toBeInTheDocument();
     expect(screen.getByText('fare')).toBeInTheDocument();
   });
 });
